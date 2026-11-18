@@ -322,6 +322,29 @@ static void box_texture_scroll_ctor(
     }
 }
 
+/** Construct WindSway values that do not bend, with a height of 1 at a base of 0 and a 2 Hz
+ * flutter of no amplitude that reaches full over 0.3 world units.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_wind_sway_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    WindSway *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (WindSway){
+            .height = BOX_MATERIAL_SWAY_HEIGHT,
+            .flutter_frequency = BOX_MATERIAL_SWAY_FLUTTER_FREQUENCY,
+            .flutter_reach = BOX_MATERIAL_SWAY_FLUTTER_REACH };
+    }
+}
+
 /** Construct TextureMapping values that keep the UVs of the mesh, with a size of 1 and no
  * blend.
  *
@@ -365,6 +388,7 @@ void BoxMaterialImport(
     ECS_META_COMPONENT(world, Transmission);
     ECS_META_COMPONENT(world, Distortion);
     ECS_META_COMPONENT(world, Water);
+    ECS_META_COMPONENT(world, WindSway);
     ECS_META_COMPONENT(world, BlendMode);
     ECS_META_COMPONENT(world, BackFaceMode);
     ECS_META_COMPONENT(world, PbrTextures);
@@ -398,19 +422,20 @@ void BoxMaterialImport(
     ecs_set_hooks(world, Fresnel, { .ctor = box_fresnel_ctor });
     ecs_set_hooks(world, Distortion, { .ctor = box_distortion_ctor });
     ecs_set_hooks(world, Water, { .ctor = box_water_ctor });
+    ecs_set_hooks(world, WindSway, { .ctor = box_wind_sway_ctor });
     ecs_set_hooks(world, MaterialId, { .ctor = box_material_id_ctor });
     ecs_add_pair(world, ecs_id(MaterialId), EcsOnInstantiate, EcsInherit);
     ecs_add_pair(world, ecs_id(PbrTextures), EcsOnInstantiate, EcsInherit);
     ecs_add_pair(world, ecs_id(TextureBlend), EcsOnInstantiate, EcsInherit);
 
-    ecs_entity_t materials[15] = {
+    ecs_entity_t materials[16] = {
         ecs_id(Rgb), ecs_id(PbrMaterial), ecs_id(Emissive), ecs_id(TextureTransform),
         ecs_id(AlphaCutoff), ecs_id(Transmission), ecs_id(ClearCoat), ecs_id(SpecularAnisotropy),
         ecs_id(Sheen), ecs_id(DiffuseTransmission), ecs_id(TextureMapping), ecs_id(TextureScroll),
-        ecs_id(Fresnel), ecs_id(Water), ecs_id(Distortion)
+        ecs_id(Fresnel), ecs_id(Water), ecs_id(Distortion), ecs_id(WindSway)
     };
     int32_t i;
-    for (i = 0; i < 15; i ++) {
+    for (i = 0; i < 16; i ++) {
         ecs_add_pair(world, materials[i], EcsOnInstantiate, EcsInherit);
         ecs_add_pair(world, materials[i], EcsWith, ecs_id(MaterialId));
     }

@@ -137,6 +137,8 @@ static void box_gpu_feature_constants(
  * the scene it draws (box_render_mesh_overrides); ignored by the 2D shape shader
  * @param mirrored Whether the view is mirrored (a planar reflection), which turns the winding of
  * the front faces to clockwise
+ * @param wind Whether the vertex stage moves the vertices by the WindSway of their material
+ * (the material_wind constant of the mesh shaders); ignored by the 2D shape shader
  * @return The pipeline
  */
 static WGPURenderPipeline box_gpu_forward_create(
@@ -157,7 +159,8 @@ static WGPURenderPipeline box_gpu_forward_create(
     bool polygon,
     bool surface,
     uint32_t features,
-    bool mirrored)
+    bool mirrored,
+    bool wind)
 {
     bool shape2d = handle == BOX_RENDER_SHADER_SHAPE2D;
     bool extended = handle == BOX_RENDER_SHADER_MESH_EXTENDED;
@@ -249,6 +252,16 @@ static WGPURenderPipeline box_gpu_forward_create(
         }
     };
     bool mesh = box_render_is_mesh(handle);
+    int32_t vertex_count = extended ? 6 : 2;
+    WGPUConstantEntry vertex_constants[7];
+    ecs_os_memcpy_n(vertex_constants, mesh_vertex_constants, WGPUConstantEntry, vertex_count);
+    if (mesh && wind) {
+        vertex_constants[vertex_count ++] = (WGPUConstantEntry){
+            .key = { .data = "material_wind", .length = WGPU_STRLEN },
+            .value = 1.0
+        };
+    }
+
     WGPUConstantEntry constants[BOX_RENDER_MESH_OVERRIDES];
     box_gpu_feature_constants((features & BOX_RENDER_OVERRIDE_SCENE) |
         (transmissive && extended ? BOX_RENDER_OVERRIDE_TRANSMISSIVE : 0u) |
@@ -276,8 +289,8 @@ static WGPURenderPipeline box_gpu_forward_create(
         .vertex = {
             .module = shader,
             .entryPoint = { .data = surface ? "vs_surface" : "vs", .length = WGPU_STRLEN },
-            .constantCount = shape2d ? 1 : extended ? 6 : mesh ? 2 : 0,
-            .constants = shape2d ? &vertex_constant : mesh ? mesh_vertex_constants : NULL,
+            .constantCount = shape2d ? 1 : mesh ? (size_t)vertex_count : 0,
+            .constants = shape2d ? &vertex_constant : mesh ? vertex_constants : NULL,
             .bufferCount = 2,
             .buffers = buffers
         },
@@ -313,6 +326,8 @@ static WGPURenderPipeline box_gpu_forward_create(
  * @param surface Whether the instances are parametric surfaces, placed by the surface variants
  * of the vertex stages
  * @param count Format of the overdraw count target, Undefined for a depth only prepass
+ * @param wind Whether the vertex stage moves the vertices by the WindSway of their material, as
+ * the forward pipeline of the batch does (material_wind)
  * @return The pipeline
  */
 static WGPURenderPipeline box_gpu_prepass_create(
@@ -322,8 +337,13 @@ static WGPURenderPipeline box_gpu_prepass_create(
     bool cutout,
     bool texture_blend,
     bool surface,
-    WGPUTextureFormat count)
+    WGPUTextureFormat count,
+    bool wind)
 {
+    WGPUConstantEntry wind_constant = {
+        .key = { .data = "material_wind", .length = WGPU_STRLEN },
+        .value = 1.0
+    };
     bool counts = count != WGPUTextureFormat_Undefined;
     const char *entry = !cutout ? (counts ? "fs_count" : "fs_depth")
         : texture_blend ? (counts ? "fs_count_cutout_blend" : "fs_depth_cutout_blend")
@@ -387,6 +407,8 @@ static WGPURenderPipeline box_gpu_prepass_create(
         .vertex = {
             .module = shader,
             .entryPoint = { .data = vertex, .length = WGPU_STRLEN },
+            .constantCount = wind ? 1 : 0,
+            .constants = wind ? &wind_constant : NULL,
             .bufferCount = 2,
             .buffers = buffers
         },
@@ -414,7 +436,7 @@ typedef enum box_gpu_depth_mode_t {
 /** Pack the state a forward or depth prepass pipeline is created for into its cache key.
  *
  * @param shader Shader handle, below 2^12
- * @param format Format of the color target, below 2^23, Undefined for a depth prepass, the count
+ * @param format Format of the color target, below 2^22, Undefined for a depth prepass, the count
  * format for an overdraw count
  * @param blend BlendMode, below 16
  * @param back_face BackFaceMode, of which the pipeline only tells BackFaceCull from the rest
@@ -432,6 +454,8 @@ typedef enum box_gpu_depth_mode_t {
  * @param water Whether the pipeline draws Water shapes (the water override)
  * @param distortion Whether the pipeline offsets the snapshot by a Distortion (the
  * material_distortion override)
+ * @param wind Whether the vertex stage moves the vertices by their WindSway (the material_wind
+ * override)
  * @return The key, distinct for every distinct pipeline
  */
 static uint64_t box_gpu_forward_key(
@@ -447,16 +471,17 @@ static uint64_t box_gpu_forward_key(
     uint32_t features,
     bool mirrored,
     bool water,
-    bool distortion)
+    bool distortion,
+    bool wind)
 {
-    ecs_assert((uint32_t)format < (1u << 23), ECS_INTERNAL_ERROR, NULL);
+    ecs_assert((uint32_t)format < (1u << 22), ECS_INTERNAL_ERROR, NULL);
     ecs_assert(shader < (1u << 12), ECS_INTERNAL_ERROR, NULL);
     ecs_assert(features <= BOX_RENDER_OVERRIDE_SCENE, ECS_INTERNAL_ERROR, NULL);
 
     return ((uint64_t)shader << 52) | ((uint64_t)distortion << 51) | ((uint64_t)water << 50) |
         ((uint64_t)surface << 49) | ((uint64_t)mirrored << 48) | ((uint64_t)features << 33) |
         ((uint64_t)texture_blend << 32) |
-        ((uint64_t)transmissive << 31) |
+        ((uint64_t)transmissive << 31) | ((uint64_t)wind << 30) |
         ((uint64_t)format << 8) | ((uint64_t)blend << 4) | ((uint64_t)depth << 2) |
         (cutout ? 2u : 0u) | (back_face == BackFaceCull ? 0u : 1u);
 }
@@ -540,7 +565,7 @@ WGPURenderPipeline box_gpu_forward_pipeline_mirrored(
     WGPUShaderModule shader;
     ecs_map_val_t *cached;
     uint64_t key;
-    bool texture_blend, cutout, surface, water, distortion;
+    bool texture_blend, cutout, surface, water, distortion, wind;
     if (b->blend > Max) {
         goto done;
     }
@@ -558,13 +583,14 @@ WGPURenderPipeline box_gpu_forward_pipeline_mirrored(
     texture_blend = texture_blend && !water;
     distortion = b->transmissive && b->pipeline == BOX_RENDER_SHADER_MESH_EXTENDED &&
         (b->features & BOX_RENDER_FEATURE_DISTORTION);
+    wind = mesh && b->wind;
 
     key = box_gpu_forward_key(b->pipeline, format, b->blend, b->back_face,
         shape2d ? b->box_shadow : cutout,
         shape2d ? b->slice : b->transmissive,
         shape2d ? b->polygon : texture_blend, surface,
         equal ? BOX_GPU_DEPTH_EQUAL : BOX_GPU_DEPTH_GREATER, features, mirrored, water,
-        distortion);
+        distortion, wind);
     cached = ecs_map_get(&gpu->forward, key);
     if (cached && *cached) {
         result = (WGPURenderPipeline)(uintptr_t)*cached;
@@ -574,7 +600,7 @@ WGPURenderPipeline box_gpu_forward_pipeline_mirrored(
     result = box_gpu_forward_cache(gpu, key, box_gpu_forward_create(gpu, b->pipeline, shader,
         format, b->blend, b->back_face, cutout, b->transmissive, water, distortion, equal,
         b->box_shadow,
-        b->slice, texture_blend, b->polygon, surface, features, mirrored));
+        b->slice, texture_blend, b->polygon, surface, features, mirrored, wind));
 done:
     return result;
 }
@@ -606,7 +632,7 @@ WGPURenderPipeline box_gpu_prepass_pipeline(
     key = box_gpu_forward_key(b->pipeline, count, Opaque, b->back_face, b->cutout,
         false, texture_blend, b->surface,
         count != WGPUTextureFormat_Undefined ? BOX_GPU_DEPTH_COUNT : BOX_GPU_DEPTH_PREPASS, 0,
-        false, false, false);
+        false, false, false, b->wind);
     cached = ecs_map_get(&gpu->forward, key);
     if (cached && *cached) {
         result = (WGPURenderPipeline)(uintptr_t)*cached;
@@ -615,7 +641,7 @@ WGPURenderPipeline box_gpu_prepass_pipeline(
 
     result = box_gpu_forward_cache(gpu, key,
         box_gpu_prepass_create(gpu, shader, b->back_face, b->cutout, texture_blend, b->surface,
-            count));
+            count, b->wind));
 done:
     return result;
 }
@@ -628,8 +654,9 @@ done:
  * opaque, alpha tested, alpha blended and transmissive ones of the extended mesh shader, of both
  * back face modes with the depth states of the view, each when its scene enables it.
  *
- * A scene with Scene.water also gets the culled water pipeline of the extended mesh shader, and
- * one with Scene.distortion the transmissive ones without Scene.transmission.
+ * A scene with Scene.water also gets the culled water pipeline of the extended mesh shader, one
+ * with Scene.distortion the transmissive ones without Scene.transmission, and one with
+ * Scene.wind the opaque and alpha tested wind pipelines of the mesh shader.
  *
  * @param gpu The backend
  * @param format The format of the color target of the view
@@ -674,6 +701,30 @@ void box_gpu_draw_prewarm(
 
             box_gpu_forward_pipeline(gpu, format, &b, false);
             if (prepass && b.blend == Opaque) {
+                box_gpu_forward_pipeline(gpu, format, &b, true);
+                box_gpu_prepass_pipeline(gpu, &b, WGPUTextureFormat_Undefined);
+            }
+        }
+    }
+
+    for (face = 0; (f & BOX_RENDER_FEATURE_WIND) && face < 2; face ++) {
+        for (kind = 0; kind < 2; kind ++) {
+            box_render_batch_t b = {
+                .view = -1,
+                .scene = v->scene,
+                .pipeline = BOX_RENDER_SHADER_MESH,
+                .features = f,
+                .blend = Opaque,
+                .back_face = face ? BackFacePlain : BackFaceCull,
+                .cutout = kind == 1,
+                .wind = true
+            };
+            if (b.cutout && !(f & BOX_RENDER_FEATURE_ALPHA_CUTOUT)) {
+                continue;
+            }
+
+            box_gpu_forward_pipeline(gpu, format, &b, false);
+            if (prepass) {
                 box_gpu_forward_pipeline(gpu, format, &b, true);
                 box_gpu_prepass_pipeline(gpu, &b, WGPUTextureFormat_Undefined);
             }

@@ -88,6 +88,25 @@ struct Material {
     // DISTORTION_PRESENT with a Distortion, DISTORTION_SHARP too without Transmission; 0 without
     // one
     distortion_flags: u32,
+    // The Wind of a WindSway material (Scene.wind), all 0 without one: its normalized world X and
+    // Z direction, the wrapped world offset of its gust field, its speed, gust (0..1), 1 over its
+    // gust scale and the phase of its sway (0..1)
+    wind_direction: vec2f,
+    wind_offset: vec2f,
+    wind_speed: f32,
+    wind_gust: f32,
+    wind_frequency: f32,
+    wind_sway: f32,
+    // WindSway bend, height, base, flutter and flutter reach, and the phase of its flutter (0..1)
+    wind_bend: f32,
+    wind_height: f32,
+    wind_base: f32,
+    wind_flutter: f32,
+    wind_reach: f32,
+    wind_flutter_phase: f32,
+    // WIND_PRESENT with a WindSway, 0 without one
+    wind_flags: u32,
+    wind_pad: f32,
 };
 
 // Smallest depth and visibility of a Water record (BOX_RENDER_WATER_MIN).

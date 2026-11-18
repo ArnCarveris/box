@@ -274,16 +274,18 @@ static bool box_shadows_key_equal(
  *
  * Each cascade renders when the extracts since every cascade last rendered, plus its index,
  * are a multiple of its interval; every cascade renders when the view is new to the extract or
- * what its cascades are fitted to changed.
+ * what its cascades are fitted to changed, and while casters with a WindSway sway in its scene.
  *
  * @param state The state of the extract
  * @param v The view, with its shadows resolved
  * @param s The resolved settings of the view
+ * @param swaying Whether the scene of the view has casters that sway in the wind
  */
 static void box_shadows_schedule(
     box_shadows_t *state,
     box_render_view_t *v,
-    const ShadowSettings *s)
+    const ShadowSettings *s,
+    bool swaying)
 {
     box_render_view_shadows_t *out = &v->shadows;
     box_shadows_history_t *h = ecs_map_get_deref(
@@ -314,6 +316,9 @@ static void box_shadows_schedule(
     if (h->count < 0 || !box_shadows_key_equal(&h->key, &key)) {
         h->key = key;
         h->count = 0;
+        out->render = all;
+    } else if (swaying) {
+        h->count ++;
         out->render = all;
     } else {
         h->count ++;
@@ -386,7 +391,7 @@ static void box_shadows_view(
     out->near_ = near_;
     box_render_shadow_splits(near_, distance, s.split_lambda, s.cascades, out->splits);
     glm_vec3_normalize_to(v->lights.sun, out->direction);
-    box_shadows_schedule(state, v, &s);
+    box_shadows_schedule(state, v, &s, box_render_draws_swaying(world, v->scene));
 done:
     return;
 }

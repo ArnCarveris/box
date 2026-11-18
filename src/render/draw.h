@@ -229,6 +229,9 @@ typedef struct box_draw_key_t {
                              *   of the 2D shape shader */
     bool polygon;           /**< Polygons (Polygon2D), drawn with the polygon variant of the 2D
                              *   shape shader */
+    bool wind;              /**< 3D shapes that have or inherit a WindSway in a scene with
+                             *   Scene.wind: their pipelines move the vertices
+                             *   (material_wind), other batches keep those without it */
     bool texture_blend;     /**< 3D shapes with a TextureBlend (texture_blend pipeline):
                              *   textures[0] is the owner of the TextureBlend, textures[2] and
                              *   textures[3] are 0, so the key does not grow */
@@ -299,6 +302,8 @@ typedef struct box_draw_material_t {
     const Distortion *distortion; /**< Shimmer of the scene behind a 3D shape, ignored by 2D
                                  *   shapes and by Water */
     const Water *water;         /**< Water surface of a 3D shape, ignored by 2D shapes */
+    const WindSway *sway;       /**< Wind sway of a 3D shape, ignored by 2D shapes */
+    box_render_wind_t wind;     /**< Wind of the frame the sway is packed with, read with sway */
     const Tint *tint;           /**< Tint of the shape itself, applied after the inherited */
     const box_draw_tint_t *inherited; /**< Composed tints of the ancestors, NULL for none */
     const Shape2D *shape2d;     /**< Resolved 2D shape, NULL for a 3D shape */
@@ -357,6 +362,9 @@ typedef struct box_draw_transition_material_t {
     Distortion distortion;  /**< Distortion */
     Water water;            /**< Water, which has no transition: the record keeps it */
     bool watered;           /**< The material has a Water */
+    WindSway sway;          /**< WindSway, which has no transition: the record keeps it */
+    bool swayed;            /**< The material has a WindSway */
+    box_render_wind_t wind; /**< Wind of the frame the sway was packed with */
     Opacity opacity;        /**< Opacity of the shape itself */
     Tint tint;              /**< Tint of the shape itself */
     box_draw_tint_t inherited; /**< Tints of the ancestors, when tinted */
@@ -514,6 +522,9 @@ typedef struct box_draw_batch_t {
     float world_min[3];     /**< Minimum corner of the world bounds of its slots, padded */
     float world_max[3];     /**< Maximum corner of the world bounds of its slots, padded */
     float world_radius;     /**< Largest radius of the world box of a slot, padded */
+    float world_wind;       /**< wind_reach the world bounds were grown by */
+    float wind_reach;       /**< Largest world distance the WindSway of a slot of a wind batch
+                             *   moves a vertex in the wind of this extract (box_draws_wind) */
     uint32_t lods[BOX_LOD_LEVELS_MAX]; /**< Mesh of each level of detail the views of the packet
                              *   use, see box_render_batch_t.lods */
     int64_t record_frame;   /**< Frame of the packet its batch record was last sent in */
@@ -746,6 +757,12 @@ typedef struct box_render_draws_t {
                                  *   transform, which alpha tested casters read, changed in this
                                  *   extract while recording */
     bool shadow_record;         /**< Record shadow_regions, while a scene keeps shadow tiles */
+    box_render_wind_t wind;     /**< Wind of this extract */
+    bool wind_blew;             /**< The wind blew in the last extract, so the swaying casters
+                                 *   render their shadows once more where they came to rest */
+    ecs_vec_t swaying;          /**< ecs_entity_t, the scenes (0 for the default one) with a
+                                 *   ready caster batch with a WindSway while the wind blows in
+                                 *   this extract, whose shadow cascades render every frame */
     int32_t box_shadows;        /**< BoxShadowSlot values with a batch, so the paths every 2D
                                  *   shape takes (the runs, the transitions) skip the lookup of
                                  *   the slot while no shadow is drawn */
@@ -987,6 +1004,20 @@ void box_draws_groups(
 void box_draws_shadow_movers(
     const ecs_world_t *world,
     box_render_draws_t *d);
+
+/** Follow the Wind of this extract in the batches with a WindSway (box_draw_key_t.wind):
+ * resolve the wind, compute the reach of every ready wind batch, record the regions of its
+ * casters while the wind blows so the shadow tiles they reach render again, and list the scenes
+ * with swaying casters (swaying). Batches without one are left as they are.
+ *
+ * @param world The world
+ * @param d The state
+ * @param cache The mesh cache
+ */
+void box_draws_wind(
+    const ecs_world_t *world,
+    box_render_draws_t *d,
+    box_mesh_cache_t *cache);
 
 /** Get the transform of a slot.
  *

@@ -87,6 +87,7 @@ static void box_draws_free(
     ecs_vec_fini_t(NULL, &d->blended, int32_t);
     ecs_vec_fini_t(NULL, &d->sorted, box_draw_sorted_t);
     ecs_vec_fini_t(NULL, &d->shadow_regions, box_render_shadow_region_t);
+    ecs_vec_fini_t(NULL, &d->swaying, ecs_entity_t);
     ecs_vec_fini_t(NULL, &d->shadow_materials, uint32_t);
     ecs_vec_fini_t(NULL, &d->dirty, ecs_entity_t);
     ecs_vec_fini_t(NULL, &d->moved, box_draw_moved_t);
@@ -895,6 +896,8 @@ static void box_draws_key(
         !ecs_get_target_for_id(world, e, EcsChildOf, NoShadow);
     key->fixture = key->shadow && (ecs_has_id(world, e, LightFixture) ||
         ecs_get_target_for_id(world, e, EcsChildOf, LightFixture) != 0);
+    key->wind = !shape2d && (key->features & BOX_RENDER_FEATURE_WIND) &&
+        ecs_get(world, e, WindSway) != NULL;
     key->transmissive = !shape2d && (key->features & BOX_RENDER_FEATURE_TRANSMISSION) &&
         ecs_get(world, e, Transmission) != NULL;
     key->transmissive = key->transmissive ||
@@ -1773,6 +1776,7 @@ void box_render_draws_init(
     ecs_vec_init_t(NULL, &d->blended, int32_t, 0);
     ecs_vec_init_t(NULL, &d->sorted, box_draw_sorted_t, 0);
     ecs_vec_init_t(NULL, &d->shadow_regions, box_render_shadow_region_t, 0);
+    ecs_vec_init_t(NULL, &d->swaying, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &d->shadow_materials, uint32_t, 0);
     ecs_vec_init_t(NULL, &d->planets, ecs_entity_t, 0);
     ecs_map_init(&d->lookup, NULL);
@@ -1861,6 +1865,20 @@ ecs_vec_t* box_render_draws_shadow_regions(
     box_render_draws_t *d = box_draws_state(world);
 
     return d ? &d->shadow_regions : NULL;
+}
+
+bool box_render_draws_swaying(
+    const ecs_world_t *world,
+    ecs_entity_t scene)
+{
+    box_render_draws_t *d = box_draws_state(world);
+    int32_t i, count = d ? ecs_vec_count(&d->swaying) : 0;
+    bool result = false;
+    for (i = 0; i < count && !result; i ++) {
+        result = *ecs_vec_get_t(&d->swaying, ecs_entity_t, i) == scene;
+    }
+
+    return result;
 }
 
 void box_render_draws_shadow_record(

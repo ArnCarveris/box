@@ -69,7 +69,9 @@ typedef enum box_gpu_debug_kind_t {
     BOX_GPU_DEBUG_OVERDRAW_ALL = 3, /**< Heat map of the plain and alpha tested overdraw */
     BOX_GPU_DEBUG_OVERDRAW_PLAIN = 4, /**< Heat map of the plain overdraw */
     BOX_GPU_DEBUG_OVERDRAW_CUTOUT = 5, /**< Heat map of the alpha tested overdraw */
-    BOX_GPU_DEBUG_BVH = 6           /**< Boxes of the spatial index trees */
+    BOX_GPU_DEBUG_BVH = 6,          /**< Boxes of the spatial index trees */
+    BOX_GPU_DEBUG_WIRE_OVERLAY_WIND = 7, /**< WireframeOverlay of the batches with a WindSway */
+    BOX_GPU_DEBUG_WIRE_ONLY_WIND = 8 /**< WireframeOnly of the batches with a WindSway */
 } box_gpu_debug_kind_t;
 
 /** Format of the texture the overdraw pass counts the fragments of a pixel in: the plain meshes
@@ -90,6 +92,9 @@ struct box_gpu_debug_t {
     WGPUBindGroupLayout wire_layout; /**< Uniform of the wire draws of a view, group 3 */
     WGPUPipelineLayout wire_pipeline_layout; /**< View, mesh, depth only instance and wire
                                      *   uniform groups */
+    WGPUBindGroupLayout wire_view_layout; /**< View uniform alone, group 0 of wire_wind_layout */
+    WGPUPipelineLayout wire_wind_layout; /**< View uniform, mesh, material_instance_layout and
+                                     *   wire groups, of the wire draws of WindSway batches */
     ecs_map_t pipelines;            /**< Kind << 32 | color format to the WGPURenderPipeline */
     int32_t grid_revision;          /**< Revision of the grid shader of the pipelines */
     int32_t wire_revision;          /**< Revision of the wire shader of the pipelines */
@@ -206,6 +211,18 @@ void box_gpu_debug_init(
         gpu->view_layout, d->wire_mesh_layout, gpu->transform_layout, d->wire_layout
     };
     d->wire_pipeline_layout = wgpuDeviceCreatePipelineLayout(gpu->device,
+        &(WGPUPipelineLayoutDescriptor){
+            .bindGroupLayoutCount = 4,
+            .bindGroupLayouts = wire_groups
+        });
+    WGPUBindGroupLayoutEntry wire_view = { .binding = 0, .visibility = WGPUShaderStage_Vertex,
+        .buffer = { .type = WGPUBufferBindingType_Uniform, .hasDynamicOffset = true,
+            .minBindingSize = sizeof(box_gpu_view_uniforms_t) } };
+    d->wire_view_layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
+        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 1, .entries = &wire_view });
+    wire_groups[0] = d->wire_view_layout;
+    wire_groups[2] = gpu->material_instance_layout;
+    d->wire_wind_layout = wgpuDeviceCreatePipelineLayout(gpu->device,
         &(WGPUPipelineLayoutDescriptor){
             .bindGroupLayoutCount = 4,
             .bindGroupLayouts = wire_groups
@@ -342,6 +359,8 @@ void box_gpu_debug_fini(
     }
 
     wgpuPipelineLayoutRelease(d->wire_pipeline_layout);
+    wgpuPipelineLayoutRelease(d->wire_wind_layout);
+    wgpuBindGroupLayoutRelease(d->wire_view_layout);
     wgpuBindGroupLayoutRelease(d->wire_layout);
     wgpuBindGroupLayoutRelease(d->wire_mesh_layout);
 
@@ -544,15 +563,20 @@ done:
  * is in front hides the lines; WireframeOnly compares Always and shows every line. Neither
  * writes the depth or culls faces; the premultiplied color and alpha blend over the target.
  *
+ * The pipeline of the batches with a WindSway places the vertices with vs_wind, which moves
+ * them as the mesh shaders do, with the instance group with the shading stream.
+ *
  * @param gpu The backend
  * @param mode The mode, WireframeOverlay or WireframeOnly
  * @param format The format of the color target
+ * @param wind Whether to get the pipeline of the batches with a WindSway
  * @return The pipeline, NULL until the shader exists
  */
 static WGPURenderPipeline box_gpu_debug_wire_pipeline(
     box_gpu_t *gpu,
     WireframeMode mode,
-    WGPUTextureFormat format)
+    WGPUTextureFormat format,
+    bool wind)
 {
     box_gpu_debug_t *d = gpu->debug;
     box_gpu_shader_t *shader = ecs_map_get_deref(
@@ -567,12 +591,14 @@ static WGPURenderPipeline box_gpu_debug_wire_pipeline(
 
     if (d->wire_revision != shader->revision) {
         box_gpu_debug_pipelines_free(d,
-            (1u << BOX_GPU_DEBUG_WIRE_OVERLAY) | (1u << BOX_GPU_DEBUG_WIRE_ONLY));
+            (1u << BOX_GPU_DEBUG_WIRE_OVERLAY) | (1u << BOX_GPU_DEBUG_WIRE_ONLY) |
+            (1u << BOX_GPU_DEBUG_WIRE_OVERLAY_WIND) | (1u << BOX_GPU_DEBUG_WIRE_ONLY_WIND));
         d->wire_revision = shader->revision;
     }
 
-    key = box_gpu_debug_key(
-        overlay ? BOX_GPU_DEBUG_WIRE_OVERLAY : BOX_GPU_DEBUG_WIRE_ONLY, format);
+    key = box_gpu_debug_key(wind
+        ? (overlay ? BOX_GPU_DEBUG_WIRE_OVERLAY_WIND : BOX_GPU_DEBUG_WIRE_ONLY_WIND)
+        : (overlay ? BOX_GPU_DEBUG_WIRE_OVERLAY : BOX_GPU_DEBUG_WIRE_ONLY), format);
     cached = ecs_map_get(&d->pipelines, key);
     if (cached && *cached) {
         result = (WGPURenderPipeline)(uintptr_t)*cached;
@@ -622,10 +648,10 @@ static WGPURenderPipeline box_gpu_debug_wire_pipeline(
         .depthBiasSlopeScale = overlay ? BOX_GPU_DEBUG_WIRE_SLOPE_BIAS : 0.0f
     };
     result = box_gpu_render_pipeline(gpu, &(WGPURenderPipelineDescriptor){
-        .layout = d->wire_pipeline_layout,
+        .layout = wind ? d->wire_wind_layout : d->wire_pipeline_layout,
         .vertex = {
             .module = shader->module,
-            .entryPoint = { .data = "vs", .length = WGPU_STRLEN },
+            .entryPoint = { .data = wind ? "vs_wind" : "vs", .length = WGPU_STRLEN },
             .bufferCount = 1,
             .buffers = &slots
         },
@@ -1626,12 +1652,17 @@ static bool box_gpu_debug_view_sequence(
  * the early arguments the cull pass wrote, which hold what the late phase kept too, as
  * box_gpu_draw_batches draws them.
  *
+ * The batches with a WindSway draw with the wind pipeline of the mode, once it exists, with
+ * the view uniform alone at group 0.
+ *
  * @param gpu The backend
  * @param pass The debug pass, with the view group bound
  * @param pipeline The wire pipeline
  * @param packet The packet
  * @param v The view
+ * @param group The view group bound in the pass
  * @param slot Slot of the view in the view buffer
+ * @param format The format of the color target
  */
 static void box_gpu_debug_wire_draws(
     box_gpu_t *gpu,
@@ -1639,10 +1670,14 @@ static void box_gpu_debug_wire_draws(
     WGPURenderPipeline pipeline,
     const box_render_packet_t *packet,
     const box_render_view_t *v,
-    int32_t slot)
+    WGPUBindGroup group,
+    int32_t slot,
+    WGPUTextureFormat format)
 {
     const box_gpu_cull_view_t *cv = box_gpu_cull_view(gpu, slot, -1);
-    WGPUBindGroup instances = NULL, mesh = NULL, wire = NULL;
+    WGPUBindGroup instances = NULL, mesh = NULL, wire = NULL, view = NULL;
+    WGPURenderPipeline bound = pipeline;
+    uint32_t offset = (uint32_t)(slot * BOX_GPU_VIEW_STRIDE);
     int32_t i;
     if (!box_gpu_debug_view_sequence(gpu, packet, cv)) {
         goto done;
@@ -1661,21 +1696,44 @@ static void box_gpu_debug_wire_draws(
         }
 
         box_gpu_mesh_t *m = ecs_map_get_deref(&gpu->meshes, box_gpu_mesh_t, b->mesh);
-        WGPUBindGroup group = m ? box_gpu_debug_mesh_group(gpu, m) : NULL;
-        if (!group || d->skip) {
+        WGPUBindGroup mesh_group = m ? box_gpu_debug_mesh_group(gpu, m) : NULL;
+        WGPURenderPipeline drawn = b->wind
+            ? box_gpu_debug_wire_pipeline(gpu, v->debug.wireframe, format, true) : pipeline;
+        if (b->wind && drawn && !view) {
+            view = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
+                .layout = gpu->debug->wire_view_layout, .entryCount = 1,
+                .entries = &(WGPUBindGroupEntry){ .binding = 0, .buffer = gpu->view_buffer,
+                    .size = sizeof(box_gpu_view_uniforms_t) } });
+        }
+
+        if (!mesh_group || d->skip || !drawn) {
             continue;
         }
 
-        if (group != mesh) {
-            wgpuRenderPassEncoderSetBindGroup(pass, 1, group, 0, NULL);
-            mesh = group;
+        if (drawn != bound) {
+            wgpuRenderPassEncoderSetPipeline(pass, drawn);
+            wgpuRenderPassEncoderSetBindGroup(pass, 0, b->wind ? view : group, 1, &offset);
+            bound = drawn;
+        }
+
+        if (mesh_group != mesh) {
+            wgpuRenderPassEncoderSetBindGroup(pass, 1, mesh_group, 0, NULL);
+            mesh = mesh_group;
         }
 
         if (box_gpu_cull_draw_wire(gpu, pass, packet, d, 2, false, gpu->debug->sequence,
-            &instances))
+            b->wind, &instances))
         {
             box_gpu_count(gpu, BOX_GPU_STAT_DRAW);
         }
+    }
+
+    if (bound != pipeline) {
+        wgpuRenderPassEncoderSetBindGroup(pass, 0, group, 1, &offset);
+    }
+
+    if (view) {
+        wgpuBindGroupRelease(view);
     }
 
     wgpuBindGroupRelease(wire);
@@ -1815,7 +1873,7 @@ void box_gpu_debug_record(
     }
 
     if (v->debug.wireframe == WireframeOverlay || v->debug.wireframe == WireframeOnly) {
-        wire = box_gpu_debug_wire_pipeline(gpu, v->debug.wireframe, t->format);
+        wire = box_gpu_debug_wire_pipeline(gpu, v->debug.wireframe, t->format, false);
     }
 
     if (v->debug.light_probes || v->debug.reflection_probes) {
@@ -1892,7 +1950,7 @@ void box_gpu_debug_record(
     }
 
     if (wire) {
-        box_gpu_debug_wire_draws(gpu, pass, wire, packet, v, slot);
+        box_gpu_debug_wire_draws(gpu, pass, wire, packet, v, group, slot, t->format);
     }
 
     if (lights || reflections) {

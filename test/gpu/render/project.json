@@ -354,6 +354,16 @@
                 ]
             },
             {
+                "id": "WindSway",
+                "testcases": [
+                    "calm_matches_without",
+                    "bends_downwind",
+                    "shadow_follows",
+                    "plain_mesh_unchanged",
+                    "scene_off_draws_without"
+                ]
+            },
+            {
                 "id": "TextureScroll",
                 "testcases": [
                     "shifts_checker",

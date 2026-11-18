@@ -7,6 +7,11 @@ enable clip_distances;
 #include "include/instance.wgsl"
 #include "include/material.wgsl"
 #include "include/blend.wgsl"
+#include "include/wind.wgsl"
+
+// The casters of a WindSway material move by the Wind (Scene.wind) as the mesh shaders move
+// them, set per pipeline for the batches whose shapes have one (caster_wind).
+override material_wind: bool = false;
 
 // Uniforms of a cascade, a spot light tile or an octant of a point light tile.
 struct Cascade {
@@ -93,8 +98,22 @@ struct PointShadowOut {
 #endif
 };
 
+// A world position of a vertex of a caster moved by the WindSway of its material with
+// material_wind, as place_wind of place.wgsl moves it; the position otherwise.
+fn caster_wind(slot: u32, world: vec3f, model: mat4x4f) -> vec3f {
+    var result = world;
+    if (material_wind) {
+        let m = material_fetch(shadings[slot].material & 0xFFFFFFu);
+        if (wind_sways(m)) {
+            result = world + wind_move(world, model[3].xyz, m).offset;
+        }
+    }
+    return result;
+}
+
 fn caster_world_mesh(slot: u32, vertex: vec3f) -> vec3f {
-    return (instance_model(transforms[slot]) * vec4f(vertex, 1.0)).xyz;
+    let model = instance_model(transforms[slot]);
+    return caster_wind(slot, (model * vec4f(vertex, 1.0)).xyz, model);
 }
 
 // World position of a vertex of a caster; sets surface_data. A plain mesh page binds one zero
@@ -112,7 +131,7 @@ fn caster_world(slot: u32, vertex: vec3f) -> vec3f {
     } else if (surface_data.p[0].x != 0.0) {
         position = surface_position(i32(position.z), position.x, position.y);
     }
-    return (model * vec4f(position, 1.0)).xyz;
+    return caster_wind(slot, (model * vec4f(position, 1.0)).xyz, model);
 }
 
 // Object position and normal of a vertex of a parametric surface caster, as place of place.wgsl

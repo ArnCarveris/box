@@ -1,8 +1,11 @@
 // Placement of the vertices of a mesh instance, shared by the vertex stages of mesh.wgsl and
 // debug_wire.wgsl. The includer declares view (group 0) and the transforms, surface_assets and
-// surfaces streams of the instance group (group 2, bindings 0, 1 and 3).
+// surfaces streams of the instance group (group 2, bindings 0, 1 and 3); the entry points that
+// move vertices by the wind (place_wind) also the material table (binding 4).
 #pragma once
 #include "instance.wgsl"
+#include "material.wgsl"
+#include "wind.wgsl"
 
 struct VertexIn {
     @builtin(vertex_index) vertex: u32,
@@ -23,12 +26,26 @@ struct Placed {
     pos: vec4f,
     // The object position, the evaluated position of a parametric surface
     local: vec3f,
+    // Derivative along world Y of the world offset a WindSway moved the vertex by, which bends
+    // the normal; 0 for a vertex the wind does not move
+    slope: vec3f,
 };
 
 fn place_at(v: VertexIn, position: vec3f, normal: vec3f) -> Placed {
     let model = instance_model(transforms[v.slot]);
     let world = model * vec4f(position, 1.0);
-    return Placed(model, normal, world, view.view_proj * world, position);
+    return Placed(model, normal, world, view.view_proj * world, position, vec3f(0.0));
+}
+
+// A placed vertex moved by the wind (wind.wgsl): its world and clip position move, the origin of
+// its shape is the translation of its model matrix.
+fn place_wind(p: Placed, m: Material) -> Placed {
+    var result = p;
+    let w = wind_move(p.world.xyz, p.model[3].xyz, m);
+    result.world = vec4f(p.world.xyz + w.offset, p.world.w);
+    result.pos = view.view_proj * result.world;
+    result.slope = w.slope;
+    return result;
 }
 
 fn place_mesh(v: VertexIn) -> Placed {

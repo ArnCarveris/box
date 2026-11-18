@@ -64,7 +64,11 @@
 /** Depth format of the shadow maps, cleared to 0 and compared with greater for reversed Z */
 #define BOX_GPU_SHADOW_FORMAT (WGPUTextureFormat_Depth32Float)
 
-#define BOX_GPU_SHADOW_VARIANTS (4)
+/** Shadow pipelines made on first use per kind of tile (box_gpu_shadow_variant): the alpha
+ * tested one with a TextureBlend and the three of the parametric surfaces, then the same six of
+ * the casters with a WindSway (plain, alpha tested, with a TextureBlend, of meshes then of
+ * surfaces) */
+#define BOX_GPU_SHADOW_VARIANTS (10)
 
 /** Color format of the HDR target a view with effects renders into */
 #define BOX_GPU_HDR_FORMAT (WGPUTextureFormat_RGBA16Float)
@@ -254,11 +258,17 @@ typedef struct box_gpu_blend_group_t {
     struct box_gpu_blend_group_t *next; /**< Next group */
 } box_gpu_blend_group_t;
 
+/** Streams an instance bind group binds, by its layout */
+typedef enum box_gpu_instance_binds_t {
+    BOX_GPU_INSTANCE_TRANSFORMS = 0, /**< transform_layout: transforms, surface assets, surfaces */
+    BOX_GPU_INSTANCE_ALL = 1,       /**< instance_layout: every stream and the material table */
+    BOX_GPU_INSTANCE_MATERIALS = 2  /**< material_instance_layout: all but the frame stream */
+} box_gpu_instance_binds_t;
+
 /** Bind group of an instance page with the surface assets of a mesh that has them */
 typedef struct box_gpu_instance_group_t {
     uint32_t mesh;                  /**< Handle of the mesh */
-    bool shading;                   /**< It binds the shading stream, instance_layout, else
-                                     *   transform_layout */
+    int32_t binds;                  /**< box_gpu_instance_binds_t, the layout it is made for */
     WGPUBuffer assets;              /**< Surface assets of the mesh it binds, held */
     WGPUBindGroup group;            /**< The bind group */
 } box_gpu_instance_group_t;
@@ -273,6 +283,8 @@ typedef struct box_gpu_buffer_t {
                                      *   assets (instance_layout), made on use */
     WGPUBindGroup transforms;       /**< The same without the shading stream, for the passes
                                      *   that read no material (transform_layout) */
+    WGPUBindGroup materials;        /**< The same without the frame stream, for the wire draws
+                                     *   of the batches with a WindSway (material_instance_layout) */
     ecs_vec_t mesh_groups;          /**< box_gpu_instance_group_t, binds the page with the
                                      *   surface assets of a mesh that has them, made on use */
     int64_t counted;                /**< History ranges pass that last counted its words */
@@ -506,7 +518,9 @@ typedef struct box_gpu_cull_job_t {
     uint32_t exclude;               /**< Page slot plus one of the instance no frustum of the
                                      *   group draws, the shape of a planar reflection, 0 for
                                      *   none */
-    uint32_t pad;                   /**< Pads the job to the size of Job in cull.wgsl */
+    uint32_t reach;                 /**< Bits of the float world distance the vertices of a
+                                     *   batch with a WindSway move at most, which the world box
+                                     *   of each instance grows by; 0 for other batches */
 } box_gpu_cull_job_t;
 
 /** Workgroups along x of a cull_lod dispatch at most; each one strides over the instances */
@@ -522,7 +536,7 @@ typedef struct box_gpu_cull_job_t {
  * arguments, center and extent the bounds of its mesh, mask its levels; base is the first
  * visible entry of its level runs, history the entries of a run and list the first draw
  * arguments of its levels. fixture is the first merged arguments plus one, 0 for none, and for
- * a late job exclude is the first entry of the early runs plus one and pad their entries, which
+ * a late job exclude is the first entry of the early runs plus one and reach their entries, which
  * it appends to at the merged count. */
 typedef struct box_gpu_cull_lod_job_t {
     box_gpu_cull_job_t job;         /**< The job as the shader reads it */
@@ -1066,6 +1080,9 @@ typedef struct box_gpu_t {
                                      *   tested casters */
     WGPUBindGroupLayout transform_layout; /**< instance_layout without the shading stream: the
                                      *   cull, the shadow casters and the capture cull */
+    WGPUBindGroupLayout material_instance_layout; /**< instance_layout without the frame
+                                     *   stream: the wire draws of the batches with a WindSway,
+                                     *   whose wire mesh group leaves no room for more */
     WGPUBuffer no_assets;           /**< One zero vec4, the surface assets of the draws of
                                      *   meshes without any */
     WGPUBuffer no_surfaces;         /**< One zero box_render_surface_t, the surface stream of

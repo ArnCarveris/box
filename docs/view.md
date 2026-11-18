@@ -96,7 +96,8 @@ renders only its camera's scene, lit by that scene's lights.
 All fields are false by default (smallest shaders); a shape needing a disabled feature draws as if it
 did not have it: `baked, reflections, punctual_shadows, cookies, environment, aerial_perspective,
 alpha_cutout, blend_modes, transmission, texture_blend, triplanar, sheen, clear_coat, anisotropy,
-diffuse_transmission, fresnel, water, distortion, planar_reflections, texture_scroll, planet_light`.
+diffuse_transmission, fresnel, water, distortion, planar_reflections, texture_scroll, planet_light,
+wind`.
 
 ```flecs
 $ { Scene: {baked: true, reflections: true, environment: true} }

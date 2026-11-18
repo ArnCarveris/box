@@ -356,6 +356,8 @@ void box_gpu_instance_layouts_init(
         &(WGPUBindGroupLayoutDescriptor){ .entryCount = 6, .entries = entries });
     gpu->transform_layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
         &(WGPUBindGroupLayoutDescriptor){ .entryCount = 3, .entries = entries });
+    gpu->material_instance_layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
+        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 5, .entries = entries });
     gpu->no_materials = box_gpu_buffer_new(gpu, sizeof(box_render_material_t),
         WGPUBufferUsage_Storage);
     wgpuQueueWriteBuffer(gpu->queue, gpu->no_materials, 0, &fallback, sizeof(fallback));
@@ -372,6 +374,11 @@ void box_gpu_instance_layouts_fini(
     if (gpu->transform_layout) {
         wgpuBindGroupLayoutRelease(gpu->transform_layout);
         gpu->transform_layout = NULL;
+    }
+
+    if (gpu->material_instance_layout) {
+        wgpuBindGroupLayoutRelease(gpu->material_instance_layout);
+        gpu->material_instance_layout = NULL;
     }
 
     if (gpu->no_materials) {
@@ -395,7 +402,7 @@ void box_gpu_instance_layouts_fini(
  * frame stream of a page without one
  * @param assets The surface assets
  * @param size Bytes of the surface assets
- * @param shading Bind the shading stream too, instance_layout, else transform_layout
+ * @param binds The streams to bind, box_gpu_instance_binds_t
  * @return The bind group
  */
 static WGPUBindGroup box_gpu_instance_group_new(
@@ -403,7 +410,7 @@ static WGPUBindGroup box_gpu_instance_group_new(
     box_gpu_buffer_t *const *streams,
     WGPUBuffer assets,
     uint64_t size,
-    bool shading)
+    int32_t binds)
 {
     const box_gpu_buffer_t *transforms = streams[BOX_RENDER_STREAM_TRANSFORM];
     const box_gpu_buffer_t *shadings = streams[BOX_RENDER_STREAM_SHADING];
@@ -433,19 +440,33 @@ static WGPUBindGroup box_gpu_instance_group_new(
         }
     };
 
+    WGPUBindGroupLayout layouts[3] = {
+        gpu->transform_layout, gpu->instance_layout, gpu->material_instance_layout
+    };
+    size_t counts[3] = { 3, 6, 5 };
+
     return wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
-        .layout = shading ? gpu->instance_layout : gpu->transform_layout,
-        .entryCount = shading ? 6 : 3,
+        .layout = layouts[binds],
+        .entryCount = counts[binds],
         .entries = entry
     });
 }
 
-WGPUBindGroup box_gpu_instance_group(
+/** Get the bind group of an instance page with the surface assets of a mesh, made on use.
+ *
+ * @param gpu The backend
+ * @param page Handle of the transform stream of the page
+ * @param handle Handle of the mesh
+ * @param m The mesh, NULL for a pass that reads no surface assets
+ * @param binds The streams to bind, box_gpu_instance_binds_t
+ * @return The bind group, NULL when a stream of the page is missing or not a storage buffer
+ */
+static WGPUBindGroup box_gpu_instance_group_binds(
     box_gpu_t *gpu,
     uint32_t page,
     uint32_t handle,
     const box_gpu_mesh_t *m,
-    bool shading)
+    int32_t binds)
 {
     WGPUBindGroup result = NULL;
     box_gpu_buffer_t *streams[BOX_RENDER_INSTANCE_STREAMS] = {0};
@@ -470,10 +491,11 @@ WGPUBindGroup box_gpu_instance_group(
 
     box_gpu_buffer_t *b = streams[BOX_RENDER_STREAM_TRANSFORM];
     if (!m || !m->assets) {
-        WGPUBindGroup *group = shading ? &b->instances : &b->transforms;
+        WGPUBindGroup *groups[3] = { &b->transforms, &b->instances, &b->materials };
+        WGPUBindGroup *group = groups[binds];
         if (!*group) {
             *group = box_gpu_instance_group_new(gpu, streams, gpu->no_assets, sizeof(vec4),
-                shading);
+                binds);
         }
 
         result = *group;
@@ -483,7 +505,7 @@ WGPUBindGroup box_gpu_instance_group(
     box_gpu_instance_group_t *g = NULL;
     for (i = 0; i < ecs_vec_count(&b->mesh_groups); i ++) {
         g = ecs_vec_get_t(&b->mesh_groups, box_gpu_instance_group_t, i);
-        if (g->mesh == handle && g->shading == shading) {
+        if (g->mesh == handle && g->binds == binds) {
             break;
         }
 
@@ -499,16 +521,36 @@ WGPUBindGroup box_gpu_instance_group(
     } else {
         g = ecs_vec_append_t(NULL, &b->mesh_groups, box_gpu_instance_group_t);
         g->mesh = handle;
-        g->shading = shading;
+        g->binds = binds;
     }
 
     g->assets = m->surface_assets;
     wgpuBufferAddRef(g->assets);
     g->group = box_gpu_instance_group_new(gpu, streams, m->surface_assets,
-        m->surface_asset_size, shading);
+        m->surface_asset_size, binds);
     result = g->group;
 done:
     return result;
+}
+
+WGPUBindGroup box_gpu_instance_group(
+    box_gpu_t *gpu,
+    uint32_t page,
+    uint32_t handle,
+    const box_gpu_mesh_t *m,
+    bool shading)
+{
+    return box_gpu_instance_group_binds(gpu, page, handle, m,
+        shading ? BOX_GPU_INSTANCE_ALL : BOX_GPU_INSTANCE_TRANSFORMS);
+}
+
+WGPUBindGroup box_gpu_instance_group_material(
+    box_gpu_t *gpu,
+    uint32_t page,
+    uint32_t handle,
+    const box_gpu_mesh_t *m)
+{
+    return box_gpu_instance_group_binds(gpu, page, handle, m, BOX_GPU_INSTANCE_MATERIALS);
 }
 
 void box_gpu_instance_groups_release(
@@ -523,6 +565,11 @@ void box_gpu_instance_groups_release(
     if (b->transforms) {
         wgpuBindGroupRelease(b->transforms);
         b->transforms = NULL;
+    }
+
+    if (b->materials) {
+        wgpuBindGroupRelease(b->materials);
+        b->materials = NULL;
     }
 
     for (i = 0; i < ecs_vec_count(&b->mesh_groups); i ++) {

@@ -640,6 +640,8 @@ done:
  * @param texture_blend Whether the alpha tested pipeline blends the layers of a TextureBlend;
  * ignored without cutout
  * @param surface Whether the casters are parametric surfaces
+ * @param wind Whether the vertex stage moves the vertices by the WindSway of their material
+ * (the material_wind constant), as the mesh shaders do
  * @return The pipeline
  */
 static WGPURenderPipeline box_gpu_shadow_create(
@@ -649,8 +651,13 @@ static WGPURenderPipeline box_gpu_shadow_create(
     bool point,
     bool discard,
     bool texture_blend,
-    bool surface)
+    bool surface,
+    bool wind)
 {
+    WGPUConstantEntry wind_constant = {
+        .key = { .data = "material_wind", .length = WGPU_STRLEN },
+        .value = 1.0
+    };
     static const char *vertex[2][2][2] = {
         { { "vs", "vs_surface" }, { "vs_cutout", "vs_cutout_surface" } },
         { { "vs_point", "vs_point_surface" }, { "vs_point_cutout", "vs_point_cutout_surface" } }
@@ -715,6 +722,8 @@ static WGPURenderPipeline box_gpu_shadow_create(
         .vertex = {
             .module = module,
             .entryPoint = { .data = vs, .length = WGPU_STRLEN },
+            .constantCount = wind ? 1 : 0,
+            .constants = wind ? &wind_constant : NULL,
             .bufferCount = 2,
             .buffers = buffers
         },
@@ -789,8 +798,8 @@ static WGPURenderPipeline box_gpu_shadow_pipeline(
 
     WGPURenderPipeline *current[3] = { &gpu->shadow, &gpu->shadow_cutout, &gpu->shadow_clear };
     WGPURenderPipeline next[3] = {
-        box_gpu_shadow_create(gpu, s->module, false, false, false, false, false),
-        box_gpu_shadow_create(gpu, s->module, true, false, false, false, false),
+        box_gpu_shadow_create(gpu, s->module, false, false, false, false, false, false),
+        box_gpu_shadow_create(gpu, s->module, true, false, false, false, false, false),
         box_gpu_shadow_clear_create(gpu, s->module)
     };
     if (!box_gpu_render_pipelines_swap(current, next, 3)) {
@@ -841,8 +850,8 @@ static WGPURenderPipeline box_gpu_shadow_point_pipeline(
     bool discard = handle == BOX_RENDER_SHADER_SHADOW;
     WGPURenderPipeline *current[2] = { &gpu->shadow_point, &gpu->shadow_point_cutout };
     WGPURenderPipeline next[2] = {
-        box_gpu_shadow_create(gpu, s->module, false, true, discard, false, false),
-        box_gpu_shadow_create(gpu, s->module, true, true, discard, false, false)
+        box_gpu_shadow_create(gpu, s->module, false, true, discard, false, false, false),
+        box_gpu_shadow_create(gpu, s->module, true, true, discard, false, false, false)
     };
     if (!box_gpu_render_pipelines_swap(current, next, 2)) {
         goto done;
@@ -879,15 +888,16 @@ done:
     return;
 }
 
-/** Get a shadow pipeline of the alpha tested casters with a TextureBlend or of the parametric
- * surfaces, created on first use from the shader the other pipelines of the cascades, or of the
- * point light tiles, were made with, and released with them.
+/** Get a shadow pipeline of the alpha tested casters with a TextureBlend, of the parametric
+ * surfaces or of the casters with a WindSway, created on first use from the shader the other
+ * pipelines of the cascades, or of the point light tiles, were made with, released with them.
  *
  * @param gpu The backend
  * @param point Whether to get the pipeline of the octants of the point light tiles
  * @param cutout Whether the casters are alpha tested
  * @param texture_blend Whether the alpha tested casters blend the layers of a TextureBlend
  * @param surface Whether the casters are parametric surfaces
+ * @param wind Whether the casters sway (the material_wind constant)
  * @return The pipeline, NULL without a shader module or while it is being created
  */
 static WGPURenderPipeline box_gpu_shadow_variant(
@@ -895,10 +905,15 @@ static WGPURenderPipeline box_gpu_shadow_variant(
     bool point,
     bool cutout,
     bool texture_blend,
-    bool surface)
+    bool surface,
+    bool wind)
 {
     texture_blend = texture_blend && cutout;
     int32_t index = surface ? 1 + (int32_t)cutout + (int32_t)texture_blend : 0;
+    if (wind) {
+        index = 4 + (surface ? 3 : 0) + (int32_t)cutout + (int32_t)texture_blend;
+    }
+
     WGPURenderPipeline *slot = &gpu->shadow_variants[point][index];
     uint32_t handle = point && gpu->shadow_point_shader
         ? gpu->shadow_point_shader : BOX_RENDER_SHADER_SHADOW;
@@ -908,7 +923,7 @@ static WGPURenderPipeline box_gpu_shadow_variant(
     }
 
     *slot = box_gpu_shadow_create(gpu, s->module, cutout, point,
-        handle == BOX_RENDER_SHADER_SHADOW, texture_blend, surface);
+        handle == BOX_RENDER_SHADER_SHADOW, texture_blend, surface, wind);
 done:
     return *slot;
 }
@@ -926,9 +941,9 @@ void box_gpu_shadow_request(
         const box_render_batch_t *b = ecs_vec_get_t(&packet->batches, box_render_batch_t, i);
         bool blend = b->cutout && box_gpu_texture_blends(b);
         if (b->shadow && b->view == -1 && b->blend == Opaque &&
-            box_render_is_mesh(b->pipeline) && (b->surface || blend))
+            box_render_is_mesh(b->pipeline) && (b->surface || blend || b->wind))
         {
-            box_gpu_shadow_variant(gpu, false, b->cutout, blend, b->surface);
+            box_gpu_shadow_variant(gpu, false, b->cutout, blend, b->surface, b->wind);
         }
     }
 
@@ -943,8 +958,8 @@ done:
  * pipeline and the material group of their batch, whose albedo texture they sample.
  *
  * Alpha tested casters with a TextureBlend draw with a pipeline of box_gpu_shadow_variant and
- * the blend group of their batch, whose layers they blend. Parametric surfaces draw with the
- * surface pipelines of box_gpu_shadow_variant, and wait for them.
+ * the blend group of their batch, whose layers they blend. Parametric surfaces and casters with
+ * a WindSway draw with the pipelines of box_gpu_shadow_variant, and wait for them.
  *
  * @param gpu The backend
  * @param pass The shadow pass of the cascade or the atlas
@@ -981,12 +996,12 @@ static bool box_gpu_shadow_draw(
         bool cutout = b->cutout && alpha;
         bool blend = cutout && box_gpu_texture_blends(b);
         WGPURenderPipeline pipeline = cutout ? alpha : plain;
-        if (blend || b->surface) {
-            pipeline = box_gpu_shadow_variant(gpu, point, cutout, blend, b->surface);
+        if (blend || b->surface || b->wind) {
+            pipeline = box_gpu_shadow_variant(gpu, point, cutout, blend, b->surface, b->wind);
             result = result && pipeline != NULL;
         }
 
-        if (!pipeline && !b->surface) {
+        if (!pipeline && !b->surface && !b->wind) {
             cutout = false;
             pipeline = plain;
         }

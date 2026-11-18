@@ -68,6 +68,22 @@ WGPUBindGroup box_gpu_instance_group(
     const box_gpu_mesh_t *m,
     bool shading);
 
+/** Get the bind group of an instance page without its frame stream
+ * (material_instance_layout), for the wire draws of the batches with a WindSway, as
+ * box_gpu_instance_group does.
+ *
+ * @param gpu The backend
+ * @param page Handle of the transform stream of the page, box_render_batch_t.instances
+ * @param handle Handle of the mesh
+ * @param m The mesh
+ * @return The bind group, NULL when a stream of the page is missing or not a storage buffer
+ */
+WGPUBindGroup box_gpu_instance_group_material(
+    box_gpu_t *gpu,
+    uint32_t page,
+    uint32_t handle,
+    const box_gpu_mesh_t *m);
+
 /** Forget the cull views of the previous target, before the views of a target are written.
  *
  * Also maps the counter copies of earlier targets, which have been submitted by now, publishes
@@ -460,6 +476,8 @@ bool box_gpu_cull_draw(
  * @param group Bind group index the instance page is bound at
  * @param late Draw what the late phase kept instead of the early or only phase
  * @param sequence Index buffer of the sequence, at least index_count of the mesh long
+ * @param shading Bind the shading stream and material table of the page too, for the wire
+ * pipeline of the batches with a WindSway (material_instance_layout)
  * @param bound Instance bind group bound last in the pass, NULL for none, updated
  * @return Whether the draw was recorded
  */
@@ -471,6 +489,7 @@ bool box_gpu_cull_draw_wire(
     uint32_t group,
     bool late,
     WGPUBuffer sequence,
+    bool shading,
     WGPUBindGroup *bound);
 
 #endif

@@ -308,7 +308,7 @@ static void box_gpu_cull_lod_add(
         job->fixture = d->lod + 2 * levels + 1;
         if (late) {
             job->exclude = d->lod_base + 1;
-            job->pad = d->lod_stride;
+            job->reach = d->lod_stride;
         }
     }
 
@@ -422,6 +422,10 @@ static uint32_t box_gpu_cull_job(
     job->history = history;
     job->mask = mask;
     job->fixture = b->fixture ? 1u : 0u;
+    if (b->wind && b->wind_reach > 0.0f) {
+        ecs_os_memcpy(&job->reach, &b->wind_reach, ECS_SIZEOF(float));
+    }
+
     if (c->exclude_page && b->instances == c->exclude_page) {
         job->exclude = c->exclude_slot + 1u;
     }

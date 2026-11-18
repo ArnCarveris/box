@@ -26,7 +26,7 @@
 _Static_assert(sizeof(box_render_transform_t) == 48, "InstanceTransform of instance.wgsl");
 _Static_assert(sizeof(box_render_shading_t) == 64, "Shape2DShading of shape2d.wgsl");
 _Static_assert(sizeof(box_render_mesh_shading_t) == 16, "MeshShading of instance.wgsl");
-_Static_assert(sizeof(box_render_material_t) == 192, "Material of material.wgsl");
+_Static_assert(sizeof(box_render_material_t) == 256, "Material of material.wgsl");
 _Static_assert(BOX_RENDER_MATERIALS_MAX <= BOX_RENDER_MESH_MATERIAL_MASK,
     "the material slots fit below the planet light slot of a mesh shading");
 
@@ -49,7 +49,7 @@ static uint64_t box_draws_hash(
     h ^= (((((uint64_t)key->blend * 2 + key->back_face) * 4 + key->wrap) * 2 + key->cutout) * 2 +
         key->transmissive + 1) * 0x27D4EB2F165667C5ull;
     h ^= ((uint64_t)key->surface + (uint64_t)key->water * 2 + (uint64_t)key->frame * 4 +
-        (uint64_t)key->mover * 8) * 0x85EBCA77C2B2AE63ull;
+        (uint64_t)key->mover * 8 + (uint64_t)key->wind * 16) * 0x85EBCA77C2B2AE63ull;
     h ^= ((uint64_t)key->foam + 1) * 0x9FB21C651E98DF25ull;
     for (i = 0; i < BOX_RENDER_TEXTURE_SLOTS; i ++) {
         h = (h ^ (h >> 31)) * 0x9E3779B97F4A7C15ull + key->textures[i];
@@ -85,7 +85,7 @@ static bool box_draws_key_eq(
         a->atlas == b->atlas && a->features == b->features && a->planet == b->planet &&
         a->atmosphere == b->atmosphere && a->surface == b->surface && a->frame == b->frame &&
         a->box_shadow == b->box_shadow && a->slice == b->slice &&
-        a->texture_blend == b->texture_blend && a->polygon == b->polygon;
+        a->texture_blend == b->texture_blend && a->polygon == b->polygon && a->wind == b->wind;
 }
 
 box_draw_batch_t* box_draws_batch(
@@ -1315,6 +1315,8 @@ static void box_draws_send_batch(
     out->fixture = b->key.fixture;
     out->bake = b->key.bake;
     out->surface = b->key.surface;
+    out->wind = b->key.wind;
+    out->wind_reach = b->key.wind ? b->wind_reach : 0.0f;
     out->mesh = b->key.mesh;
     ecs_os_memcpy_n(out->lods, b->lods, uint32_t, BOX_LOD_LEVELS_MAX);
     box_draws_batch_textures(d, b, out);
@@ -1458,6 +1460,8 @@ static void box_draws_send_blended(
             out->shadow = b->key.shadow;
             out->fixture = b->key.fixture;
             out->surface = b->key.surface;
+            out->wind = b->key.wind;
+            out->wind_reach = b->key.wind ? b->wind_reach : 0.0f;
             out->mesh = b->key.mesh;
             box_draws_batch_textures(d, b, out);
             box_draws_batch_blend(p, d, b, out);
@@ -1881,6 +1885,7 @@ void box_draws_send(
 
     box_draws_pages(p, d);
     box_draws_shadow_movers(world, d);
+    box_draws_wind(world, d, cache);
     for (i = 0; i < count; i ++) {
         box_draw_batch_t *b = box_draws_batch(d, i);
         if (b->ready && b->bounds_dirty) {

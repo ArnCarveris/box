@@ -353,6 +353,110 @@ void box_render_debug_bvh(
     const ecs_world_t *world,
     box_render_packet_t *p);
 
+/** The Wind of a frame as the WindSway records pack it (box_render_wind_frame) */
+typedef struct box_render_wind_t {
+    float direction[2];     /**< Normalized world X and Z the wind blows toward */
+    float offset[2];        /**< Wrapped world X and Z offset of the gust field */
+    float speed;            /**< World units per second, 0 when calm or without a Wind */
+    float gust;             /**< Gust, clamped to 0..1 */
+    float frequency;        /**< 1 over the gust scale, gust patches per world unit */
+    float sway;             /**< Phase of the sway, 0..1 */
+    double time;            /**< Seconds the wind was advanced, the clock of the flutter */
+} box_render_wind_t;
+
+/** Smallest Wind.gust_scale the engine uses */
+#define BOX_RENDER_WIND_GUST_SCALE_MIN (0.01f)
+
+/** Smallest WindSway.height and flutter_reach a record keeps */
+#define BOX_RENDER_WIND_MIN (1e-3f)
+
+/** Relative amplitude of the sway of a plant around its lean, along the wind */
+#define BOX_RENDER_WIND_SWAY (0.25f)
+
+/** Relative amplitude of the sway of a plant across the wind */
+#define BOX_RENDER_WIND_CROSS (0.12f)
+
+/** Frequency of the sway in Hz in a calm, and the Hz it gains per world unit per second of wind
+ * speed, up to BOX_RENDER_WIND_SWAY_MAX */
+#define BOX_RENDER_WIND_SWAY_BASE (0.25)
+#define BOX_RENDER_WIND_SWAY_RATE (0.05)
+#define BOX_RENDER_WIND_SWAY_MAX (1.5)
+
+/** Resolve the values of a Wind: the direction normalized ({1, 0} when zero or not finite), the
+ * speed 0 when negative or not finite, the gust clamped to 0..1, the gust scale at least
+ * BOX_RENDER_WIND_GUST_SCALE_MIN.
+ *
+ * @param wind The Wind
+ * @param out Receives the resolved values
+ */
+void box_render_wind_resolve(
+    const Wind *wind,
+    Wind *out);
+
+/** Frequency of the sway of a resolved Wind in Hz, which grows with its speed.
+ *
+ * @param wind The resolved Wind
+ * @return The frequency
+ */
+double box_render_wind_sway_frequency(
+    const Wind *wind);
+
+/** Advance the status of a Wind by a delta: the gust offset moves along the direction by the
+ * speed times the delta and wraps to BOX_WIND_GUST_PERIOD times the gust scale, the sway phase
+ * advances by its frequency times the delta and wraps to 0..1, time by the delta, all in
+ * double precision. A negative or not finite delta advances nothing.
+ *
+ * @param wind The Wind
+ * @param delta Seconds to advance by
+ * @param status The status, advanced in place
+ */
+void box_render_wind_advance(
+    const Wind *wind,
+    double delta,
+    WindStatus *status);
+
+/** Get the Wind of a world as the WindSway records pack it: the singleton Wind, resolved, with
+ * the state of its WindStatus; a calm wind without one.
+ *
+ * @param world The world
+ * @param out Receives the wind
+ */
+void box_render_wind_frame(
+    const ecs_world_t *world,
+    box_render_wind_t *out);
+
+/** Pack the WindSway fields of a material record: the wind of the frame and the sway, the flutter
+ * phase computed from the time of the wind in double precision; all 0 without a sway.
+ *
+ * @param out The record
+ * @param sway The WindSway, NULL for none
+ * @param wind The wind of the frame
+ */
+void box_render_wind_pack(
+    box_render_material_t *out,
+    const WindSway *sway,
+    const box_render_wind_t *wind);
+
+/** Largest world distance a WindSway moves a vertex in a wind, which the bounds of its shapes
+ * grow by: the bend along and across the wind at the strongest gust and sway (the drop that keeps
+ * the length is below it) plus 1.15 times the flutter, the longest flutter vector; 0 when calm.
+ *
+ * @param sway The WindSway
+ * @param wind The wind of the frame
+ * @return The distance
+ */
+float box_render_wind_reach(
+    const WindSway *sway,
+    const box_render_wind_t *wind);
+
+/** Register the system that advances the WindStatus of the Wind and the observer that adds it,
+ * called by the import of box.atmosphere.
+ *
+ * @param world The world
+ */
+void box_render_wind_import(
+    ecs_world_t *world);
+
 /** Get the offset the wind of a FogVolume moves its noise by at a time: its wind times the time
  * on each axis, computed in double precision and wrapped to [0, BOX_RENDER_FOG_NOISE_PERIOD
  * times its noise_scale), the distance over which both noise samples of the shader repeat.
@@ -1234,6 +1338,17 @@ ecs_vec_t* box_render_draws_shadow_regions(
 void box_render_draws_shadow_record(
     const ecs_world_t *world,
     bool record);
+
+/** Check whether the draw extract of this frame found shadow casters with a WindSway in a
+ * scene while the wind blows, whose shadow cascades then render every frame.
+ *
+ * @param world The world
+ * @param scene The scene, 0 for the default scene
+ * @return Whether the scene has swaying casters
+ */
+bool box_render_draws_swaying(
+    const ecs_world_t *world,
+    ecs_entity_t scene);
 
 /** Make the light extract of a world render every shadow atlas tile every frame instead of only
  * the tiles that changed, for tests that compare both. Applies from the next extract.

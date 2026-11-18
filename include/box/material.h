@@ -1,7 +1,7 @@
 /**
  * @file box/material.h
  * @brief Material components: color, opacity, tint, PBR parameters, clear coat, anisotropy, sheen,
- * diffuse transmission, emission, Fresnel rim, transmission, distortion and water.
+ * diffuse transmission, emission, Fresnel rim, transmission, distortion, water and wind sway.
  *
  * The box.material module resolves tints through the hierarchy and registers
  * the material layers a scene applies on top of the sampled surface.
@@ -465,6 +465,54 @@ ECS_STRUCT(TextureScroll, {
     vec2 velocity;        /**< Texture widths per second added to the UV offset of every layer */
     vec2 normal_velocity; /**< Texture widths per second added to the UV offset of the normal map
                            *   only, on top of velocity */
+});
+
+/** Height of a constructed WindSway: world units above base at which the bend is full */
+#define BOX_MATERIAL_SWAY_HEIGHT (1.0f)
+
+/** Flutter frequency of a constructed WindSway, in Hz */
+#define BOX_MATERIAL_SWAY_FLUTTER_FREQUENCY (2.0f)
+
+/** Flutter reach of a constructed WindSway: world distance from the origin of the shape over
+ * which the flutter rises from 0 to full */
+#define BOX_MATERIAL_SWAY_FLUTTER_REACH (0.3f)
+
+/** Bending and fluttering of the vertices of a 3D mesh in the Wind (trees, bushes, grass), a
+ * material component inherited by instances like Rgb, default bend 0, height 1, base 0, flutter
+ * 0, flutter_frequency 2 and flutter_reach 0.3.
+ *
+ * The main bend is a smooth function of the world position of a vertex only: its height above
+ * base over height, clamped to 0..1 and squared, times bend times the strength of the wind at
+ * its world X and Z (the speed, varied by the gusts and the sway of the Wind). Every shape of a
+ * plant (trunk, branches, leaf cards as separate child shapes) with the same bend, height and
+ * base so moves together without cracks. A vertex that moves sideways is lowered so branches do
+ * not visibly stretch, and the normals bend with the displacement.
+ *
+ * The flutter adds a fast motion of flutter world units at full wind (BOX_WIND_FULL_SPEED) at
+ * flutter_frequency, different for every vertex, weighted by the world distance of the vertex
+ * from the origin of its shape over flutter_reach, clamped to 0..1: a leaf card built with its
+ * origin at its stem stays attached there.
+ *
+ * The displacement is the same in every pass that places the vertices: the depth prepass, the
+ * forward pass, the shadows of every light, planar reflections and captures. The culling bounds
+ * grow by the largest displacement so swaying shapes do not pop, and the shadow tiles and
+ * cascades with swaying casters render again every frame while the wind blows.
+ *
+ * Its record is packed every frame, like that of a TextureScroll. Needs Scene.wind: a scene
+ * without it draws the shape as if it had no WindSway, with the shaders it has without it. Only
+ * 3D meshes sway, 2D shapes and text ignore it.
+ */
+ECS_STRUCT(WindSway, {
+    float bend;             /**< World units a vertex at height moves per unit of wind speed,
+                             *   0 for a rigid shape */
+    float height;           /**< World height above base at which the bend reaches its full
+                             *   amount; at least 0.001 */
+    float base;             /**< World Y at which the displacement is 0, the ground */
+    float flutter;          /**< World units of the fast local flutter at full wind, 0 for
+                             *   none */
+    float flutter_frequency; /**< Hz of the flutter */
+    float flutter_reach;    /**< World distance from the origin of the shape over which the
+                             *   flutter rises from 0 to full; at least 0.001 */
 });
 
 /** Where the texture coordinates of a material come from */

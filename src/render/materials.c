@@ -7,9 +7,9 @@
  * by its hash; slot 0, the default material, is never freed. A material change hashes its owners
  * in the next extract, and a frame without one hashes nothing (box_draws_materials_resolve).
  *
- * Prefabs, shapes of DynamicMaterial batches, with a TextureScroll (packed every frame, see
- * box_materials_scroll) or a running material transition own a private slot, packed from its
- * owner in the send that uploads it, so transitions.c can patch the record by slot.
+ * Prefabs, shapes of DynamicMaterial batches, with a TextureScroll or a WindSway (packed every
+ * frame, see box_materials_scroll) or a running material transition own a private slot, packed
+ * from its owner in the send that uploads it, so transitions.c can patch the record by slot.
  */
 
 #include "draw.h"
@@ -276,7 +276,7 @@ static bool box_materials_distortion_moves(
  * @param owner The owner, 0 for the default material
  * @param out The record
  * @return Whether the record changes with the time: the owner has or inherits a TextureScroll,
- * a Water whose ripples move (box_materials_water_moves) or a Distortion that moves
+ * a WindSway, a Water whose ripples move (box_materials_water_moves) or a Distortion that moves
  * (box_materials_distortion_moves) without Water
  */
 static bool box_materials_pack(
@@ -289,13 +289,14 @@ static bool box_materials_pack(
     box_draws_material_of(world, owner, m->time, &material);
     box_draws_material_pack(out, &material);
 
-    return material.scroll != NULL || box_materials_water_moves(material.water) ||
+    return material.scroll != NULL || material.sway != NULL ||
+        box_materials_water_moves(material.water) ||
         (!material.water && box_materials_distortion_moves(material.distortion));
 }
 
-/** Check whether an entity has or inherits a TextureScroll, a Water whose ripples move or a
- * Distortion that moves, whose record changes every frame, in a scene that enables it
- * (Scene.texture_scroll, Scene.water, Scene.distortion).
+/** Check whether an entity has or inherits a TextureScroll, a WindSway, a Water whose ripples
+ * move or a Distortion that moves, whose record changes every frame, in a scene that enables it
+ * (Scene.texture_scroll, Scene.wind, Scene.water, Scene.distortion).
  *
  * @param world The world
  * @param e The entity
@@ -306,16 +307,18 @@ static bool box_materials_scrolls(
     ecs_entity_t e)
 {
     const TextureScroll *scroll = ecs_get(world, e, TextureScroll);
+    const WindSway *sway = ecs_get(world, e, WindSway);
     const Water *water = ecs_get(world, e, Water);
     bool moves = box_materials_water_moves(water);
     bool distorts = box_materials_distortion_moves(ecs_get(world, e, Distortion));
     bool result = false;
-    if (!scroll && !moves && !distorts) {
+    if (!scroll && !sway && !moves && !distorts) {
         goto done;
     }
 
     uint32_t features = box_materials_features(world, e);
     result = (scroll && (features & BOX_RENDER_FEATURE_TEXTURE_SCROLL)) ||
+        (sway && (features & BOX_RENDER_FEATURE_WIND)) ||
         (moves && (features & BOX_RENDER_FEATURE_WATER)) ||
         (distorts && (features & BOX_RENDER_FEATURE_DISTORTION) &&
             !(water && (features & BOX_RENDER_FEATURE_WATER)));
@@ -864,7 +867,7 @@ static bool box_materials_slotted(
     ecs_entity_t component)
 {
     return component == ecs_id(TextureScroll) || component == ecs_id(Water) ||
-        component == ecs_id(Distortion);
+        component == ecs_id(Distortion) || component == ecs_id(WindSway);
 }
 
 /** Check whether adding or removing a material component changes the batch key of the shapes
@@ -881,7 +884,8 @@ static bool box_materials_keyed(
         component == ecs_id(Sheen) || component == ecs_id(ClearCoat) ||
         component == ecs_id(SpecularAnisotropy) || component == ecs_id(DiffuseTransmission) ||
         component == ecs_id(Fresnel) || component == ecs_id(Water) ||
-        component == ecs_id(Distortion) || component == ecs_id(PlanarReflection);
+        component == ecs_id(Distortion) || component == ecs_id(PlanarReflection) ||
+        component == ecs_id(WindSway);
 }
 
 /** Follow a set or removal of a material component on its owner, or on a base that propagates
@@ -935,18 +939,19 @@ void box_draws_materials_observers(
     ecs_world_t *world,
     box_render_draws_t *d)
 {
-    ecs_entity_t components[16] = {
+    ecs_entity_t components[17] = {
         ecs_id(Rgb), ecs_id(PbrMaterial), ecs_id(Emissive), ecs_id(TextureTransform),
         ecs_id(AlphaCutoff), ecs_id(Transmission), ecs_id(ClearCoat), ecs_id(SpecularAnisotropy),
         ecs_id(Sheen), ecs_id(DiffuseTransmission), ecs_id(TextureMapping), ecs_id(TextureScroll),
-        ecs_id(Fresnel), ecs_id(Water), ecs_id(PlanarReflection), ecs_id(Distortion)
+        ecs_id(Fresnel), ecs_id(Water), ecs_id(PlanarReflection), ecs_id(Distortion),
+        ecs_id(WindSway)
     };
-    const char *names[16] = {
+    const char *names[17] = {
         "DrawsOnColor", "DrawsOnPbrMaterial", "DrawsOnEmissive", "DrawsOnTextureTransform",
         "DrawsOnAlphaCutoff", "DrawsOnTransmission", "DrawsOnClearCoat",
         "DrawsOnSpecularAnisotropy", "DrawsOnSheen", "DrawsOnDiffuseTransmission",
         "DrawsOnTextureMapping", "DrawsOnTextureScroll", "DrawsOnFresnel", "DrawsOnWater",
-        "DrawsOnPlanarReflection", "DrawsOnDistortion"
+        "DrawsOnPlanarReflection", "DrawsOnDistortion", "DrawsOnWindSway"
     };
     int32_t i;
     box_draws_observer(world, d, "MaterialsOnPrefab", (ecs_observer_desc_t){
@@ -971,7 +976,7 @@ void box_draws_materials_observers(
         .query.flags = EcsQueryMatchPrefab,
         .events = { EcsOnAdd, EcsOnRemove } }, BoxMaterialsOnIsA);
 
-    for (i = 0; i < 16; i ++) {
+    for (i = 0; i < 17; i ++) {
         bool keyed = box_materials_keyed(components[i]) || box_materials_slotted(components[i]);
         bool owned = components[i] == ecs_id(PlanarReflection);
         box_draws_observer(world, d, names[i], (ecs_observer_desc_t){
@@ -1009,11 +1014,17 @@ void box_draws_material_of(
         out->fresnel = ecs_get(world, owner, Fresnel);
         out->water = ecs_get(world, owner, Water);
         out->distortion = ecs_get(world, owner, Distortion);
+        out->sway = ecs_get(world, owner, WindSway);
     }
 
-    if (out->scroll || out->water || out->distortion) {
+    if (out->scroll || out->water || out->distortion || out->sway) {
         uint32_t features = box_materials_features(world, owner);
         out->scroll = features & BOX_RENDER_FEATURE_TEXTURE_SCROLL ? out->scroll : NULL;
+        out->sway = features & BOX_RENDER_FEATURE_WIND ? out->sway : NULL;
+        if (out->sway) {
+            box_render_wind_frame(world, &out->wind);
+        }
+
         out->water = features & BOX_RENDER_FEATURE_WATER ? out->water : NULL;
         out->distortion = features & BOX_RENDER_FEATURE_DISTORTION && !out->water
             ? out->distortion : NULL;

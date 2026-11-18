@@ -65,6 +65,11 @@ override water: bool = false;
 // ignore it.
 override material_distortion: bool = false;
 
+// The vertices of a WindSway material move by the Wind (Scene.wind), set per pipeline for the
+// batches whose shapes have one: every vertex stage reads the material of its instance and
+// places the vertex with place_wind. The other batches leave it false.
+override material_wind: bool = false;
+
 const PI: f32 = 3.141592653589793;
 const MIN_ROUGHNESS: f32 = 0.045;
 
@@ -171,6 +176,19 @@ fn shading_material(s: MeshShading) -> u32 {
 // Planet light slot of an instance (box_render_mesh_shading_t), 0 for none.
 fn shading_planet(s: MeshShading) -> u32 {
     return s.material >> 24u;
+}
+
+// A placed vertex of an instance moved by the WindSway of its material with material_wind; the
+// vertex as it was placed otherwise, or when its material does not sway.
+fn placed_wind(v: VertexIn, p: Placed) -> Placed {
+    var result = p;
+    if (material_wind) {
+        let m = material_fetch(shading_material(shadings[v.slot]));
+        if (wind_sways(m)) {
+            result = place_wind(p, m);
+        }
+    }
+    return result;
 }
 
 // Make the sun of the planet of a fragment light it, with scene_planet_light.
@@ -405,7 +423,12 @@ fn model_frame(p: Placed) -> ModelFrame {
     let cofactor = mat3x3f(cross(c1, c2), cross(c2, c0), cross(c0, c1));
     let flip = select(1.0, -1.0, dot(c0, cross(c1, c2)) < 0.0);
     let scale = vec3f(length(c0), length(c1), length(c2));
-    return ModelFrame(cofactor * p.normal * flip, scale);
+    var normal = cofactor * p.normal * flip;
+    if (material_wind) {
+        // The normal of a surface moved sideways by an offset that grows along world Y
+        normal.y -= dot(p.slope, normal);
+    }
+    return ModelFrame(normal, scale);
 }
 
 fn vertex_scalars(material: Material, mapped: f32) -> vec2u {
@@ -525,7 +548,7 @@ fn planar_owner(slot: u32) -> u32 {
 @vertex fn vs(v: VertexIn) -> VertexOut {
     let shading = shadings[v.slot];
     let material = material_fetch(shading_material(shading));
-    let p = place_mesh(v);
+    let p = placed_wind(v, place_mesh(v));
     let frame = model_frame(p);
     var o = vertex_out(p, material, frame,
         vertex_shading(v, shading, material, p, frame.scale, frame.normal));
@@ -541,7 +564,7 @@ fn planar_owner(slot: u32) -> u32 {
 @vertex fn vs_surface(v: VertexIn) -> VertexOut {
     let shading = shadings[v.slot];
     let material = material_fetch(shading_material(shading));
-    let p = place(v);
+    let p = placed_wind(v, place(v));
     let frame = model_frame(p);
     var o = vertex_out(p, material, frame,
         vertex_shading_surface(v, shading, material, p, frame.scale, frame.normal));
@@ -555,17 +578,17 @@ fn planar_owner(slot: u32) -> u32 {
 }
 
 @vertex fn vs_depth(v: VertexIn) -> DepthOut {
-    return DepthOut(place_mesh(v).pos);
+    return DepthOut(placed_wind(v, place_mesh(v)).pos);
 }
 
 @vertex fn vs_depth_surface(v: VertexIn) -> DepthOut {
-    return DepthOut(place(v).pos);
+    return DepthOut(placed_wind(v, place(v)).pos);
 }
 
 @vertex fn vs_cutout(v: VertexIn) -> CutoutOut {
     let shading = shadings[v.slot];
     let material = material_fetch(shading_material(shading));
-    let p = place_mesh(v);
+    let p = placed_wind(v, place_mesh(v));
     let frame = model_frame(p);
     return cutout_out(p, material,
         vertex_shading(v, shading, material, p, frame.scale, frame.normal));
@@ -574,7 +597,7 @@ fn planar_owner(slot: u32) -> u32 {
 @vertex fn vs_cutout_surface(v: VertexIn) -> CutoutOut {
     let shading = shadings[v.slot];
     let material = material_fetch(shading_material(shading));
-    let p = place(v);
+    let p = placed_wind(v, place(v));
     let frame = model_frame(p);
     return cutout_out(p, material,
         vertex_shading_surface(v, shading, material, p, frame.scale, frame.normal));

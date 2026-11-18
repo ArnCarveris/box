@@ -32,6 +32,7 @@ coat, sheen, anisotropy, transmission, water, ...), texture layers and UV mappin
 | `Transmission` | `transmission_factor` 0, `ior` 1.5, `thickness_factor` 0, `attenuation_distance` 1e10, `attenuation_color` white | `transmission` |
 | `Distortion` | `strength` 0.004 (fraction of image height), `scale` 1, `speed` 0.5 | `distortion` |
 | `Water` | `shallow_color` {60,170,160}, `deep_color` {8,40,64}, `depth` 3, `visibility` 2, `refraction` 0.02, `foam_color` {240,245,245}, `foam_width` 0.3, `foam_texture` 0, `foam_scale` 1, `ripple_scale` 0, `ripple_velocity` | `water` |
+| `WindSway` | `bend` 0 (world units per unit of wind speed at full height), `height` 1, `base` 0 (world Y of no motion), `flutter` 0 (world units at full wind), `flutter_frequency` 2 Hz, `flutter_reach` 0.3 | `wind` |
 
 Defaults above are what a component added in script gets (constructors). A C literal zeroes
 unset fields.
@@ -63,6 +64,7 @@ unset fields.
 using box.geometry
 using box.material
 using box.texture
+using box.atmosphere
 
 assets {
   hull_a { Path: {path: "etc/scenes/space_station/assets/hull.jpg"} }
@@ -79,21 +81,24 @@ assets {
 }
 
 $ { Scene: {transmission: true, clear_coat: true, triplanar: true, texture_blend: true,
-  water: true, texture_scroll: true} }
+  water: true, texture_scroll: true, alpha_cutout: true, wind: true}
+  Wind: {direction: {1, 0}, speed: 5} }
 
 ground { Box: {30, 0.2, 30}; Rgb: {255, 255, 255}; PbrMaterial: {roughness: 1}
   texture.Blend: {mask: patches, layers: [dirt_a, dirt_b]}
   texture.Mapping: {mode: MappingWorld, size: 8} }
 river { Box: {10, 0.05, 40}; Water: {}; PbrTextures: {normal: water_n}
   texture.Scroll: {velocity: {0.05, 0.02}} }
+prefab Grass { Quad: {0.3, 0.8}; PbrTextures: {albedo: blade}; AlphaCutoff: {}
+  BackFaceMode: {BackFacePlain}; WindSway: {bend: 0.03, height: 0.8, flutter: 0.03} }
 ```
 
 ## Behavior rules
 
 - `Rgb`, `PbrMaterial`, `Emissive`, `AlphaCutoff`, `Transmission`, `ClearCoat`,
   `SpecularAnisotropy`, `Sheen`, `DiffuseTransmission`, `Fresnel`, `Water`, `Distortion`,
-  `texture.Transform`, `texture.Mapping`, `texture.Scroll`, `PbrTextures` and `texture.Blend`
-  are inherited by prefab instances (OnInstantiate Inherit). Changing the prefab updates all
+  `WindSway`, `texture.Transform`, `texture.Mapping`, `texture.Scroll`, `PbrTextures` and
+  `texture.Blend` are inherited by prefab instances (OnInstantiate Inherit). Changing the prefab updates all
   instances that do not override.
 - `Scene` features are all false by default. A shape needing a feature that is off draws as if
   it lacked the component (no error). Set them on the Scene root, or `$ { Scene: {...} }` for
@@ -111,6 +116,18 @@ river { Box: {10, 0.05, 40}; Water: {}; PbrTextures: {normal: water_n}
   texture as (r, 0, 0, 1).
 - Parametric surfaces keep their own UVs under MappingObject/World, except a Sweep with
   MappingObject (lengths in path units / size) and MappingFrame.
+- `WindSway` moves the vertices in the `Wind` (docs/atmosphere.md) in every pass: depth
+  prepass, forward, shadows of every light, planar reflections, captures and the wireframe. The
+  main bend depends on the world position only: `clamp((y - base) / height, 0, 1)^2 * bend *`
+  the wind strength there, so the trunk, branches and leaf cards of a plant built as separate
+  shapes with the same `bend`, `height` and `base` move together without cracks. Vertices that
+  move sideways drop so branches do not stretch, and normals bend with the displacement.
+- The flutter is a fast per vertex motion of `flutter` world units at full wind (speed 10),
+  weighted by the distance of the vertex from the origin of its shape over `flutter_reach`: a leaf
+  card with its origin at its stem stays attached there.
+- Shapes with a `WindSway` draw in batches of their own with the wind variants of the pipelines;
+  every other shape keeps the pipelines, bounds, culling and shadow caching it has without the
+  wind. Their culling bounds grow by the largest displacement, so they do not pop.
 - ClearCoat, SpecularAnisotropy, Sheen, DiffuseTransmission, Transmission and Distortion are
   transitionable (`Transition`); adding/removing animates from/to strength 0 with on_add /
   on_remove.
@@ -118,8 +135,10 @@ river { Box: {10, 0.05, 40}; Water: {}; PbrTextures: {normal: water_n}
 ## Cost
 
 - Material records are shared by content hash: shapes with identical values share one slot.
-  Prefabs, `DynamicMaterial` batches, `texture.Scroll`, moving `Distortion`/rippling `Water` and
-  running transitions own a private slot packed every frame or on change.
+  Prefabs, `DynamicMaterial` batches, `texture.Scroll`, `WindSway`, moving `Distortion`/rippling
+  `Water` and running transitions own a private slot packed every frame or on change.
+- `WindSway` costs a material read and the sway math per vertex in every pass of its batches,
+  and re-renders the shadow tiles and cascades of its casters every frame while the wind blows.
 - Put materials on prefabs so instances share them; avoid `DynamicMaterial` unless values truly
   change every frame.
 - `PbrTextures` and `texture.Blend` are part of the batch, not the material table: every distinct

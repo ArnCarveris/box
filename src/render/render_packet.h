@@ -825,6 +825,12 @@ typedef struct box_render_view_gtao_t {
  * of the extended mesh shader offset the snapshot by its noise (material_distortion override) */
 #define BOX_RENDER_FEATURE_DISTORTION (1u << 21)
 
+/** Wind (Scene.wind): the materials pack their WindSway with the Wind of the frame, and the
+ * batches of the shapes with one (box_render_batch_t.wind) draw with the material_wind
+ * override of every vertex stage, which moves their vertices; the other batches keep the
+ * pipelines of a scene without it */
+#define BOX_RENDER_FEATURE_WIND (1u << 22)
+
 /** The scene features of the mesh shader */
 #define BOX_RENDER_FEATURE_LIGHTING (0x3Fu)
 
@@ -1554,7 +1560,27 @@ typedef struct box_render_material_t {
     float distortion_phase; /**< Distortion.speed times the total render time wrapped to 0..1
                              *   (box_draws_distortion_phase), 0 without one */
     uint32_t distortion_flags; /**< BOX_RENDER_DISTORTION_* flags, 0 without one */
+    float wind_direction[2]; /**< Normalized world X and Z the Wind blows toward, of a record
+                             *   with a WindSway (Scene.wind), 0 without one */
+    float wind_offset[2];   /**< Wrapped world X and Z offset of the gust field, 0 without one */
+    float wind_speed;       /**< Wind.speed, 0 without a WindSway or when calm */
+    float wind_gust;        /**< Wind.gust clamped to 0..1, 0 without a WindSway */
+    float wind_frequency;   /**< 1 over Wind.gust_scale, 0 without a WindSway */
+    float wind_sway;        /**< Phase of the sway of the Wind, 0..1, 0 without a WindSway */
+    float wind_bend;        /**< WindSway.bend, 0 without one or when not finite */
+    float wind_height;      /**< WindSway.height, at least BOX_RENDER_WIND_MIN, 0 without one */
+    float wind_base;        /**< WindSway.base, 0 without one or when not finite */
+    float wind_flutter;     /**< WindSway.flutter, 0 without one, when negative or not finite */
+    float wind_reach;       /**< WindSway.flutter_reach, at least BOX_RENDER_WIND_MIN, 0
+                             *   without one */
+    float wind_flutter_phase; /**< WindSway.flutter_frequency times the time of the wind wrapped
+                             *   to 0..1, 0 without one */
+    uint32_t wind_flags;    /**< BOX_RENDER_WIND_PRESENT with a WindSway, 0 without one */
+    float wind_pad;         /**< Pads the record to the 16 byte alignment of Material */
 } box_render_material_t;
+
+/** Flag of a record with a WindSway (Scene.wind) */
+#define BOX_RENDER_WIND_PRESENT (1u)
 
 /** Smallest Distortion.scale of a record */
 #define BOX_RENDER_DISTORTION_MIN (1e-3f)
@@ -1755,6 +1781,13 @@ typedef struct box_render_batch_t {
     bool surface;               /**< The instances are parametric surfaces, drawn with the
                                  *   surface variants of the vertex stages of the mesh and shadow
                                  *   shaders */
+    bool wind;                  /**< The instances have a WindSway in a scene with Scene.wind:
+                                 *   every pass draws them with the material_wind override of its
+                                 *   vertex stage, which moves the vertices by the WindSway of
+                                 *   their material */
+    float wind_reach;           /**< Largest world distance the WindSway of an instance moves a
+                                 *   vertex in the wind of the frame, which the cull pass grows
+                                 *   the world box of each instance by; 0 without wind */
     uint32_t mesh;              /**< Mesh handle */
     uint32_t lods[BOX_LOD_LEVELS_MAX]; /**< Mesh handle of each level of detail of an opaque 3D
                                  *   batch, lods[0] being mesh and a level that does not reduce

@@ -83,7 +83,8 @@ default**. A shape that needs a feature its scene lacks draws as if it did not h
 Members: `baked`, `reflections`, `punctual_shadows`, `cookies`, `environment`,
 `aerial_perspective`, `alpha_cutout`, `blend_modes`, `transmission`, `texture_blend`, `triplanar`,
 `sheen`, `clear_coat`, `anisotropy`, `diffuse_transmission`, `fresnel`, `water`, `distortion`,
-`planar_reflections`, `texture_scroll`, `planet_light`.
+`planar_reflections`, `texture_scroll`, `planet_light`, `wind` (only the batches of `WindSway`
+shapes get the wind pipelines; every other batch keeps those of a scene without it).
 
 - Default scene: `$ { Scene: {...} }`. Nested scene: `Scene` on a root entity; an entity belongs
   to its nearest ancestor with `Scene`.

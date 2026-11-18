@@ -621,6 +621,7 @@ void box_draws_material_pack(
 
     box_draws_fresnel_pack(out, material->fresnel);
     box_draws_water_pack(out, material->water, material->time);
+    box_render_wind_pack(out, material->sway, &material->wind);
     out->transmission_factor = transmission ? transmission->transmission_factor : 0.0f;
     out->ior = transmission ? transmission->ior : BOX_MATERIAL_IOR;
     out->thickness_factor = transmission ? glm_max(transmission->thickness_factor, 0.0f) : 0.0f;

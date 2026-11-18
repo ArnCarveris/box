@@ -1522,14 +1522,16 @@ bool box_gpu_cull_draw_wire(
     uint32_t group,
     bool late,
     WGPUBuffer sequence,
+    bool shading,
     WGPUBindGroup *bound)
 {
     box_gpu_cull_t *c = &gpu->cull;
     const box_render_batch_t *b = ecs_vec_get_t(
         &packet->batches, box_render_batch_t, draw->batch);
     box_gpu_mesh_t *m = ecs_map_get_deref(&gpu->meshes, box_gpu_mesh_t, b->mesh);
-    WGPUBindGroup instances = m
-        ? box_gpu_instance_group(gpu, b->instances, b->mesh, m, false) : NULL;
+    WGPUBindGroup instances = !m ? NULL : shading
+        ? box_gpu_instance_group_material(gpu, b->instances, b->mesh, m)
+        : box_gpu_instance_group(gpu, b->instances, b->mesh, m, false);
     uint32_t args = late ? draw->late : draw->args;
     uint32_t base = late ? draw->base + draw->count : draw->base;
     bool result = m && instances && sequence && args != UINT32_MAX;

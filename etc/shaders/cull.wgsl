@@ -41,7 +41,10 @@ struct Job {
     // Page slot plus one of the instance no frustum of the group draws, the shape of a planar
     // reflection, 0 for none.
     exclude: u32,
-    pad: u32,
+    // A batch with a WindSway (Scene.wind): the bits of the world distance its vertices move at
+    // most, which the world box of each instance grows by; 0 for the other batches. The level
+    // jobs of cull_lod use it otherwise.
+    reach: u32,
 };
 
 // World space box around an instance.
@@ -120,7 +123,10 @@ fn bounds(job: Job, m: mat4x4f) -> Bounds {
     let c1 = m[1].xyz;
     let c2 = m[2].xyz;
     let center = c0 * local_center.x + c1 * local_center.y + c2 * local_center.z + m[3].xyz;
-    let extent = abs(c0) * local_extent.x + abs(c1) * local_extent.y + abs(c2) * local_extent.z;
+    var extent = abs(c0) * local_extent.x + abs(c1) * local_extent.y + abs(c2) * local_extent.z;
+    if (job.reach != 0u) {
+        extent += vec3f(bitcast<f32>(job.reach));
+    }
 
     return Bounds(center, extent);
 }
@@ -157,12 +163,23 @@ fn visible(b: Bounds, f: u32) -> bool {
 fn occluded(job: Job, m: mat4x4f) -> bool {
     let local_center = job.center;
     let local_extent = job.extent;
-    let center = m[0].xyz * local_center.x + m[1].xyz * local_center.y + m[2].xyz * local_center.z +
+    var center = m[0].xyz * local_center.x + m[1].xyz * local_center.y + m[2].xyz * local_center.z +
         m[3].xyz;
+    var ax = m[0].xyz * local_extent.x;
+    var ay = m[1].xyz * local_extent.y;
+    var az = m[2].xyz * local_extent.z;
+    // A swaying instance tests the world box around its moved vertices.
+    if (job.reach != 0u) {
+        let b = bounds(job, m);
+        center = b.center;
+        ax = vec3f(b.extent.x, 0.0, 0.0);
+        ay = vec3f(0.0, b.extent.y, 0.0);
+        az = vec3f(0.0, 0.0, b.extent.z);
+    }
     let origin = cull.view_proj * vec4f(center, 1.0);
-    let dx = cull.view_proj * vec4f(m[0].xyz * local_extent.x, 0.0);
-    let dy = cull.view_proj * vec4f(m[1].xyz * local_extent.y, 0.0);
-    let dz = cull.view_proj * vec4f(m[2].xyz * local_extent.z, 0.0);
+    let dx = cull.view_proj * vec4f(ax, 0.0);
+    let dy = cull.view_proj * vec4f(ay, 0.0);
+    let dz = cull.view_proj * vec4f(az, 0.0);
     var lo = vec2f(1.0);
     var hi = vec2f(0.0);
     var depth = 0.0;
@@ -570,7 +587,7 @@ fn cull_lod(
         if (job.fixture != 0u) {
             let merged = atomicAdd(&args[(job.fixture - 1u + level) * ARGS + 1u], 1u);
             if (job.exclude != 0u) {
-                visible_slots[job.exclude - 1u + level * job.pad + merged] = slot;
+                visible_slots[job.exclude - 1u + level * job.reach + merged] = slot;
             }
         }
     }

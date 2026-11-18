@@ -1110,6 +1110,26 @@
                     "light_fixture_ancestor_keeps_key",
                     "fade_with_other_change_rekeys"
                 ]
+            },
+            {
+                "id": "Wind",
+                "testcases": [
+                    "defaults",
+                    "sway_defaults",
+                    "resolve",
+                    "advance_wraps",
+                    "speed_change_continuous",
+                    "system_fixed_delta",
+                    "pack",
+                    "flutter_phase_wraps",
+                    "reach",
+                    "scene_feature",
+                    "batches",
+                    "calm_and_removed",
+                    "spot_tile_kept_without_sway",
+                    "spot_tile_renders_with_sway",
+                    "cascades_render_with_sway"
+                ]
             }
         ]
     }

@@ -72,6 +72,12 @@ void box_draws_transition_target(
         out->water = *material->water;
     }
 
+    if (material->sway) {
+        out->swayed = true;
+        out->sway = *material->sway;
+        out->wind = material->wind;
+    }
+
     out->time = material->time;
 
     if (material->transmission) {
@@ -239,6 +245,8 @@ static void box_draws_transition_parts(
         .distortion = box_draws_transition_part(material, BOX_RENDER_TRANSITION_DISTORTION,
             &material->distortion),
         .water = material->watered ? &material->water : NULL,
+        .sway = material->swayed ? &material->sway : NULL,
+        .wind = material->wind,
         .tint = box_draws_transition_part(material, BOX_RENDER_TRANSITION_TINT,
             &material->tint),
         .inherited = material->tinted ? &material->inherited : NULL,
