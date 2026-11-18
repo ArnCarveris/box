@@ -1171,7 +1171,8 @@
                     "add_remove",
                     "amount_animates",
                     "record_maps",
-                    "ignored"
+                    "ignored",
+                    "water"
                 ]
             }
         ]

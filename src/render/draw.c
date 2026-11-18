@@ -931,7 +931,7 @@ static void box_draws_key(
         key->pipeline = BOX_RENDER_SHADER_MESH_EXTENDED;
     }
 
-    const TextureLayers *layers = shape2d || key->transmissive ||
+    const TextureLayers *layers = shape2d || (key->transmissive && !key->water) ||
         !box_render_is_mesh(key->pipeline) || !(key->features & BOX_RENDER_FEATURE_TEXTURE_LAYERS)
         ? NULL : ecs_get(world, e, TextureLayers);
     if (layers) {

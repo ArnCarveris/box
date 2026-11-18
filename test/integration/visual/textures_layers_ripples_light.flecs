@@ -1,0 +1,73 @@
+// texture.Layers with raindrop ripples at density 0.3: the light layer of
+// test/assets/textures/ripples/rain, whose normal is an animated graph of nodes.Ripples, on a
+// gray ground on the left and on a Water quad over a sunken bed on the right, seen from above at
+// an angle against a sun in front, whose glint the rings break up. In the dark glossy puddles of
+// the ground and where the layer covers the water, expanding rings of raindrops of different ages
+// and sizes overlap and fade, without seams at the repeats of the 4 unit world mapping; between
+// the puddles the ground is matte.
+// Three in ten drops fall, so the rings are sparse.
+//
+// frames: 8
+
+include test/assets/textures/ripples/rain
+
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+using box.camera
+using box.view
+using box.light
+
+$ {
+  Scene: {texture_layers: true, water: true}
+  AmbientLight: {sky: {150, 165, 190}, ground: {60, 56, 50}, intensity: 0.6}
+}
+
+camera {
+  Position: {0.5, 2.2, 3.4}
+  Rotation: {-0.5, 0, 0}
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {130, 150, 180, 255}}}
+}
+
+sun {
+  Rotation: {0.5, 0, 0}
+  DirectionalLight: {intensity: 1.5 * flecs.script.math.PI}
+  Rgb: {255, 235, 210}
+}
+
+ground {
+  Position: {-2.5, -0.1, 0}
+  Box: {7, 0.2, 9}
+  Rgb: {120, 112, 100}
+  PbrMaterial: {roughness: 0.9}
+  texture.Layers: {layers: [rain.light]}
+}
+
+bed {
+  Position: {3.5, -0.6, 0}
+  Box: {5, 0.2, 9}
+  Rgb: {90, 80, 60}
+  PbrMaterial: {roughness: 0.95}
+}
+
+brook {
+  Position: {3.5, -0.15, 0}
+  Rotation: {-1.5708, 0, 0}
+  Quad: {5, 9}
+  Rgb: {255, 255, 255}
+  PbrMaterial: {metallic: 0, roughness: 0.06}
+  texture.Layers: {layers: [rain.light]}
+  Water: {
+    shallow_color: {60, 140, 130}
+    deep_color: {10, 40, 50}
+    depth: 1
+    visibility: 1
+    refraction: 0.02
+    foam_width: 0
+  }
+}

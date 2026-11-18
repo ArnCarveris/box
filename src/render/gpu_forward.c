@@ -141,7 +141,8 @@ static void box_gpu_feature_constants(
  * (the material_wind constant of the mesh shaders); ignored by the 2D shape shader
  * @param layers Whether the fragments apply TextureLayers: the _layers entry points of the
  * layers module of the mesh shader (shader, box_render_mesh_layers) with the layers layouts
- * (box_gpu_layer_pipeline_layout); ignored by the 2D shape shader and for water
+ * (box_gpu_layer_pipeline_layout), fs_water_layers for water; ignored by the 2D shape shader
+ * and for the other transmissive pipelines
  * @return The pipeline
  */
 static WGPURenderPipeline box_gpu_forward_create(
@@ -185,10 +186,11 @@ static WGPURenderPipeline box_gpu_forward_create(
         entry = cutout ? "fs_blend_cutout" : "fs_blend";
     }
 
-    layers = layers && !shape2d && !water && !transmissive;
+    layers = layers && !shape2d && (water || !transmissive);
     if (layers) {
         entry = texture_blend ? (cutout ? "fs_blend_cutout_layers" : "fs_blend_layers")
             : (cutout ? "fs_cutout_layers" : "fs_layers");
+        entry = water ? "fs_water_layers" : entry;
     }
 
     WGPUCompareFunction compare = WGPUCompareFunction_Greater;
@@ -589,7 +591,7 @@ WGPURenderPipeline box_gpu_forward_pipeline_mirrored(
     }
 
     water = b->water && b->transmissive && b->pipeline == BOX_RENDER_SHADER_MESH_EXTENDED;
-    layers = box_gpu_layered(b) && !water;
+    layers = box_gpu_layered(b);
     shader = box_gpu_shader_get(gpu, layers ? box_render_mesh_layers(b->pipeline) : b->pipeline);
     if (!shader) {
         goto done;
@@ -674,9 +676,9 @@ done:
  * opaque, alpha tested, alpha blended and transmissive ones of the extended mesh shader, of both
  * back face modes with the depth states of the view, each when its scene enables it.
  *
- * Scene.water adds the culled water pipeline of the extended mesh shader, Scene.distortion the
- * transmissive ones without Scene.transmission, Scene.wind and Scene.texture_layers the opaque
- * and alpha tested wind and layers pipelines of the mesh shader.
+ * Scene.water adds the culled water pipeline of the extended mesh shader (and its layers variant
+ * with Scene.texture_layers), Scene.distortion the transmissive ones without Scene.transmission,
+ * Scene.wind and Scene.texture_layers the opaque and alpha tested wind and layers mesh pipelines.
  *
  * @param gpu The backend
  * @param format The format of the color target of the view
@@ -787,6 +789,10 @@ void box_gpu_draw_prewarm(
             .water = true
         };
         box_gpu_forward_pipeline(gpu, format, &b, false);
+        if (f & BOX_RENDER_FEATURE_TEXTURE_LAYERS) {
+            b.texture_layers = true;
+            box_gpu_forward_pipeline(gpu, format, &b, false);
+        }
     }
 }
 

@@ -1,0 +1,57 @@
+// Rain on puddles as TextureLayers whose normal is an animated texture graph of raindrop
+// ripples (nodes.Ripples into nodes.Normal, 30 updates per second, interpolated). heavy lets
+// every drop fall (density 1), light three in ten (density 0.3). Each layer covers the low
+// places of a noise mask facing up, darkens the albedo, makes the surface glossy and replaces
+// its normal by the ripples, in world space with a repeat of 4 units, so ground and water with
+// the same layer show the same rings.
+
+using box.material
+using box.texture
+
+rain {
+  puddle_mask {
+    n { nodes.Noise: {frequency: 3, octaves: 3, seed: 11} }
+    wide { nodes.Remap: {input: n, from_min: 0.3, from_max: 0.7, to_min: 0, to_max: 1, clamp: true} }
+    Graph: {output: wide, width: 256, format: GraphSingle}
+  }
+
+  heavy_ripples {
+    time { nodes.Time: {} }
+    ripples {
+      nodes.Ripples: {count: 256, speed: 0.8, lifetime: 1, width: 0.15, seed: 5, time: time,
+        density_value: 1}
+    }
+    normal { nodes.Normal: {height: ripples, strength: 2} }
+    Graph: {output: normal, width: 512, format: GraphLinear, rate: 30, interpolate: true}
+  }
+
+  light_ripples {
+    time { nodes.Time: {} }
+    ripples {
+      nodes.Ripples: {count: 256, speed: 0.8, lifetime: 1, width: 0.15, seed: 5, time: time,
+        density_value: 0.3}
+    }
+    normal { nodes.Normal: {height: ripples, strength: 2} }
+    Graph: {output: normal, width: 512, format: GraphLinear, rate: 30, interpolate: true}
+  }
+
+  heavy {
+    texture.Layer: {amount: 0.6, direction: {0, 1, 0}, facing: 0.95, mask: puddle_mask,
+      contrast: 16, albedo: LayerMultiply, roughness: LayerMix, metallic: LayerKeep,
+      occlusion: LayerKeep, normal: 1}
+    Rgb: {110, 110, 110}
+    PbrMaterial: {roughness: 0.04}
+    PbrTextures: {normal: heavy_ripples}
+    texture.Mapping: {mode: MappingWorld, size: 4}
+  }
+
+  light {
+    texture.Layer: {amount: 0.6, direction: {0, 1, 0}, facing: 0.95, mask: puddle_mask,
+      contrast: 16, albedo: LayerMultiply, roughness: LayerMix, metallic: LayerKeep,
+      occlusion: LayerKeep, normal: 1}
+    Rgb: {110, 110, 110}
+    PbrMaterial: {roughness: 0.04}
+    PbrTextures: {normal: light_ripples}
+    texture.Mapping: {mode: MappingWorld, size: 4}
+  }
+}

@@ -513,7 +513,9 @@
                     "porosity",
                     "texture_blend",
                     "amount_animates",
-                    "flag_off"
+                    "flag_off",
+                    "water",
+                    "water_ripples"
                 ]
             },
             {
@@ -1714,6 +1716,15 @@
                     "evolve_sphere",
                     "coords_input",
                     "script_defaults"
+                ]
+            },
+            {
+                "id": "TextureRipples",
+                "testcases": [
+                    "plane_tiles",
+                    "density_zero",
+                    "density_follows",
+                    "time_moves"
                 ]
             },
             {

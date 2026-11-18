@@ -1076,6 +1076,31 @@ static void box_texture_cells_ctor(
     }
 }
 
+/** Construct TexRipples components with 64 cells, a speed of 1, a lifetime of 1, a width of
+ * 0.15, a density of 1 and the other members zero.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_texture_ripples_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    TexRipples *ripples = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        ecs_os_memset_t(&ripples[i], 0, TexRipples);
+        ripples[i].count = 64;
+        ripples[i].speed = 1;
+        ripples[i].lifetime = 1;
+        ripples[i].width = 0.15f;
+        ripples[i].density_value = 1;
+    }
+}
+
 /** Free the image of TexturePixels components.
  *
  * @param ptr The components
@@ -1451,6 +1476,7 @@ static void box_texture_register(
     ECS_META_COMPONENT(world, TexNoise);
     BOX_TEXTURE_COMPONENT(world, TextureCellsDistance, "CellsDistance");
     ECS_META_COMPONENT(world, TexCells);
+    ECS_META_COMPONENT(world, TexRipples);
     ECS_META_COMPONENT(world, TexBlocks);
     BOX_TEXTURE_COMPONENT(world, TextureChannel, "Channel");
     ECS_META_COMPONENT(world, TexSplit);
@@ -1518,6 +1544,7 @@ void BoxTextureImport(
     ecs_set_hooks(world, TexNoise, { .ctor = box_texture_noise_ctor });
     ecs_set_hooks(world, TexBlocks, { .ctor = box_texture_blocks_ctor });
     ecs_set_hooks(world, TexCells, { .ctor = box_texture_cells_ctor });
+    ecs_set_hooks(world, TexRipples, { .ctor = box_texture_ripples_ctor });
     box_owned_hooks(world, TextureNodePort, BOX_OWNED_STR(TextureNodePort, name),
         BOX_OWNED_STR(TextureNodePort, value));
     box_owned_hooks(world, TextureNodeParam, BOX_OWNED_STR(TextureNodeParam, name));

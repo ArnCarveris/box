@@ -80,8 +80,12 @@ TileTerrain. Weather (snow, wet, puddles) is a set of layer entities a scene ani
   `(1 - metallic) * roughness`: rough soil, bark and stone change fully, glossy leaves little,
   metals not at all. The albedo darkens by a plain multiply weighted that way (a simplification of
   Lagarde's wet surfaces model).
-- Alpha never changes; alpha tested shapes keep their holes. Water, Transmission and Distortion
-  shapes, 2D shapes and text ignore layers. Probe and reflection captures see them.
+- Alpha never changes; alpha tested shapes keep their holes. Transmission and Distortion shapes,
+  2D shapes and text ignore layers. Probe and reflection captures see them.
+- `Water` (in a scene with `Scene.water`) uses only the normals of its layers: they blend into
+  its ripple normal by their coverage (`normal` times the coverage, the cavity ignored), before
+  the waves. Their albedo, roughness, metallic and occlusion do nothing on Water. Rain on a
+  brook is the puddle layer with a `Ripples` graph as its normal (texture.md).
 
 ```flecs
 $ { Scene: {texture_layers: true, texture_blend: true, alpha_cutout: true} }
@@ -107,6 +111,7 @@ puddles {
 }
 
 rock { Box: {1, 1, 1}; texture.Layers: {layers: [wet, snow]} }
+brook { Quad: {4, 20}; Water: {}; texture.Layers: {layers: [puddles]} }
 ```
 
 ## Tags
@@ -207,7 +212,8 @@ prefab Grass { Quad: {0.3, 0.8}; PbrTextures: {albedo: blade}; AlphaCutoff: {}
   the layers entry points of separate modules of the mesh shaders (compiled with
   `BOX_TEXTURE_LAYERS`, only in scenes with `Scene.texture_layers`) and their own bind group
   layouts. Shapes without it keep their shader modules, pipelines, bind groups, material records
-  and batches unchanged, with `Scene.texture_layers` on or off. The values of a layer live in one small uniform buffer per
+  and batches unchanged, with `Scene.texture_layers` on or off; a Water batch with layers
+  draws with the `fs_water_layers` entry point, Water without layers keeps its pipeline. The values of a layer live in one small uniform buffer per
   layer entity, written only when they change, so animating `amount` touches no shape and no
   batch. The maps of the layers (and their masks) are blitted into one texture array per layer
   set, built again when an image changes (every update of an animated graph).

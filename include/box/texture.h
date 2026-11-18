@@ -793,6 +793,47 @@ ECS_STRUCT(TexCells, {
                          *   in 1 to 2 units */
 });
 
+/** Node of a TextureGraph whose Scalar value is the height of raindrop ripples: rings of drops
+ * that expand from random places and fade out over their lifetime, overlapping where they meet.
+ * 0 is flat, a fresh ring reaches about 1; a TexNormal turns it into the normal map of rain.
+ *
+ * The domain is a periodic lattice of about count cells, so the image tiles. Each cell has one
+ * drop per lifetime at its own phase, at a new place every cycle, which falls when a random
+ * value of the cycle is below density: density 0.3 lets three in ten drops fall.
+ *
+ * The rings of the cells within 3 cells of the texel add up, so speed * lifetime + width should
+ * stay below 3. time is the clock in seconds, usually a TexTime, which makes the graph animated
+ * (TextureGraph.rate, smoothed by TextureGraph.interpolate). Only DomainPlane.
+ *
+ * @code
+ * rain {
+ *   time    { nodes.Time: {} }
+ *   ripples { nodes.Ripples: {count: 48, time: time, density_value: 0.6} }
+ *   normal  { nodes.Normal: {height: ripples, strength: 2} }
+ *   Graph: {output: normal, width: 512, format: GraphLinear, rate: 30, interpolate: true}
+ * }
+ * @endcode
+ */
+ECS_STRUCT(TexRipples, {
+    int32_t count;      /**< Approximate number of cells, drops per lifetime at density 1,
+                         *   over the domain, 64 when the component is added, at least 1 */
+    float speed;        /**< Growth of the radius of a ring in cell sizes per second, 1 when
+                         *   the component is added */
+    float lifetime;     /**< Seconds from the impact of a drop until its ring has faded out, 1
+                         *   when the component is added; at least 0.01 */
+    float width;        /**< Width of the band of a ring in cell sizes, 0.15 when the component
+                         *   is added: a crest between two troughs */
+    int32_t seed;       /**< Seed of the places, phases and cycles of the drops */
+    ecs_entity_t coords; /**< Vector input node of the coordinates, 0 for the coordinates of
+                          *   the texel in the domain */
+    ecs_entity_t time;  /**< Scalar input node of the clock in seconds, 0 for time_value */
+    float time_value;   /**< Value of time without a node, a still image */
+    ecs_entity_t density; /**< Scalar input node of the share of drops that fall, 0 for
+                           *   density_value */
+    float density_value; /**< Value of density without a node: 0 no drops to 1 every drop, 1
+                          *   when the component is added */
+});
+
 /** Node of a TextureGraph that blurs its input with a separable gaussian, in two passes.
  *
  * The input is a Scalar or a Vector node and the value has its type, input_value without one.

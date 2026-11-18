@@ -648,3 +648,81 @@ void TextureLayers_ignored(void) {
     ecs_fini(world);
     box_render_null_free(null);
 }
+
+/** Find the draw of a water batch in the last packet: water batches draw per view.
+ *
+ * @param null The backend
+ * @param layered Whether the draw has TextureLayers
+ * @return The draw, NULL for none
+ */
+static const box_render_batch_t* layers_water_draw(
+    const box_render_null_t *null,
+    bool layered)
+{
+    const box_render_batch_t *result = NULL;
+    int32_t i;
+    for (i = 0; i < ecs_vec_count(&null->last.batches); i ++) {
+        const box_render_batch_t *draw = ecs_vec_get_t(
+            &null->last.batches, box_render_batch_t, i);
+        if (draw->water && draw->texture_layers == layered) {
+            result = draw;
+        }
+    }
+
+    return result;
+}
+
+/** A Water shape with TextureLayers in a scene with Scene.water and Scene.texture_layers keys
+ * its layers and draws them with the layers record; a Water shape without them keeps the batch
+ * and draw it has without the feature, and without Scene.water a Water shape with layers is an
+ * opaque layered mesh */
+void TextureLayers_water(void) {
+    // materials/texture_layers
+    box_render_null_t *null;
+    ecs_world_t *world = layers_world(&null);
+    ecs_singleton_set(world, Scene, {.texture_layers = true, .water = true});
+    ecs_entity_t rain = ecs_new(world);
+    ecs_set(world, rain, TextureLayer, {.amount = 1, .normal = 1});
+    ecs_entity_t brook = layers_box(world, 0);
+    ecs_add(world, brook, Water);
+    ecs_set(world, brook, TextureLayers, {.layers = {rain}});
+    ecs_entity_t pond = layers_box(world, 2);
+    ecs_add(world, pond, Water);
+    layers_frame(world);
+    layers_frame(world);
+
+    box_draw_batch_t *bb = layers_batch(world, brook);
+    test_bool(bb->key.water, true);
+    test_bool(bb->key.transmissive, true);
+    test_int(bb->key.pipeline, BOX_RENDER_SHADER_MESH_EXTENDED);
+    test_bool(box_draws_key_layered(&bb->key), true);
+    test_uint(bb->key.layers[0], rain);
+
+    box_draw_batch_t *pb = layers_batch(world, pond);
+    test_bool(pb->key.water, true);
+    test_bool(box_draws_key_layered(&pb->key), false);
+    test_assert(layers_batch_index(world, pond) != layers_batch_index(world, brook));
+
+    const box_render_batch_t *draw = layers_water_draw(null, true);
+    test_assert(draw != NULL);
+    test_bool(draw->transmissive, true);
+    const box_render_texture_layers_t *r = box_render_packet_data(&null->last, draw->layers);
+    test_uint(r->count, 1);
+    test_uint(r->entities[0], rain);
+    test_flt(r->values[0].color[3], 1);
+
+    draw = layers_water_draw(null, false);
+    test_assert(draw != NULL);
+    test_uint(draw->layers, 0);
+
+    ecs_singleton_set(world, Scene, {.texture_layers = true});
+    layers_frame(world);
+    layers_frame(world);
+    bb = layers_batch(world, brook);
+    test_bool(bb->key.water, false);
+    test_bool(bb->key.transmissive, false);
+    test_bool(box_draws_key_layered(&bb->key), true);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}

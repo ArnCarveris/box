@@ -867,7 +867,9 @@ ECS_ENUM(TextureLayerBlend, {
  * The values are read every frame into a small buffer of the layer entity shared by every
  * batch that uses it, so writing amount (or any field) animates every shape with the layer
  * without moving them between batches. Only 3D meshes of a scene with Scene.texture_layers have
- * layers; Water, Transmission and Distortion shapes, 2D shapes and texts ignore them.
+ * layers; Transmission and Distortion shapes, 2D shapes and texts ignore them. A Water shape
+ * uses only their normals: they blend into its ripple normal by their coverage, before its
+ * waves, the cavity ignored; their other channels do not change Water.
  */
 ECS_STRUCT(TextureLayer, {
     float amount;           /**< Coverage, 0 none to 1 everything the rules allow */
@@ -898,8 +900,9 @@ ECS_STRUCT(TextureLayer, {
  *
  * Shapes with the same layers share a batch; they draw with their own variants of the mesh
  * shaders. A shape without TextureLayers, or of a scene without Scene.texture_layers, draws with
- * the pipelines, bind groups and records it has without the feature. A layer entity of 0, a
- * deleted one or one without TextureLayer does nothing.
+ * the pipelines, bind groups and records it has without the feature; so does a Water shape
+ * without TextureLayers, while one with them draws with the water layers variant. A layer
+ * entity of 0, a deleted one or one without TextureLayer does nothing.
  */
 ECS_STRUCT(TextureLayers, {
     ecs_entity_t layers[4]; /**< Entities with TextureLayer, 0 for an unused slot */

@@ -64,7 +64,7 @@ Each input is an entity member (`a`, `input`, ...) or, when 0, its constant (`a_
 | Math | `Add`, `Subtract`, `Multiply`, `Divide` (0 where b = 0), `Min`, `Max`, `Power`, `Dot`, `Cross`, `Mix {a, b, factor}`, `Clamp {input, min, max}`, `Step {input, edge}`, `Smoothstep {input, edge0, edge1}`, `Abs`, `Negate`, `Floor`, `Fract`, `Sin`, `Cos`, `Length`, `Normalize`, `Remap {input, from_min, from_max, to_min, to_max, clamp}` |
 | Channels | `Split {input, channel}` (Scalar), `Combine {r, g, b, a}` |
 | Coordinates | `Warp {coords, offset, amount}` (offset centered at 0.5), `Transform {coords, angle (deg), axis, translate, scale}` |
-| Patterns | `Noise {coords, evolve, frequency 4, octaves 1, lacunarity 2, gain 0.5, seed, fractal NoiseFbm/NoiseRidged/NoiseBillow, offset 1, channels 1/3/4}`, `Cells {distance CellsNearest/CellsSecond/CellsEdge, count 64, jitter 1, seed, edge 0.25, coords, evolve}` -> (dist, id, rand, rand), `Blocks {courses 8, per_course 4, gap, jitter, stagger, softness, tones, tone_order, seed, layer_seed}` -> (mask, id, tone, rand), plane only |
+| Patterns | `Noise {coords, evolve, frequency 4, octaves 1, lacunarity 2, gain 0.5, seed, fractal NoiseFbm/NoiseRidged/NoiseBillow, offset 1, channels 1/3/4}`, `Cells {distance CellsNearest/CellsSecond/CellsEdge, count 64, jitter 1, seed, edge 0.25, coords, evolve}` -> (dist, id, rand, rand), `Blocks {courses 8, per_course 4, gap, jitter, stagger, softness, tones, tone_order, seed, layer_seed}` -> (mask, id, tone, rand), plane only, `Ripples {count 64, speed 1, lifetime 1, width 0.15, seed, coords, time, density 1}` -> raindrop ring height (Scalar, 0 flat), plane only |
 | Lookup | `Ramp {input, keys}` (max 32 keys, linear color out), `Curve {input, curve}` (box/curve.h, max 32 keys), `Image {texture, coords, address, linear}`, `Lut {texture, u, v, linear}` |
 | Neighbourhood | `Blur {input, radius}`, `Distance {input, range}` (signed distance to 0.5 contour), `Normal {height, strength}` (for GraphLinear), `Slope {height, strength}`, `Gradient {height, strength}` (uphill vector in the space of `Coords`), `Flow {input, field, length, reach}`, `Transmittance {density, light, absorption, range, steps}` |
 
@@ -89,6 +89,24 @@ clouds {
 }
 ```
 
+Raindrop ripples: `Ripples` puts one drop per cell (`count` cells over the domain, so scale it with
+the area a layer mapping repeats over to keep the ring size; about one drop per cell per
+`lifetime` at `density` 1) at a random place and phase each cycle; its ring grows by `speed` cell
+sizes per second and fades out over `lifetime` seconds. `density` (0..1, a node or
+`density_value`) is the share of drops that fall, to follow the rain intensity; `time` is usually
+a `Time`, which animates the graph. Keep `speed * lifetime + width` below 3 cells. Feed the height
+to `Normal` and use the graph as the normal of a `texture.Layer` (puddles, water, see material.md).
+`Cells`, `Time` and math nodes give only one clipped ring per Voronoi cell, so use `Ripples`.
+
+```flecs
+rain {
+  t       { nodes.Time: {} }
+  ripples { nodes.Ripples: {count: 64, speed: 0.8, time: t, density_value: 0.6} }
+  normal  { nodes.Normal: {height: ripples, strength: 2} }
+  Graph: {output: normal, width: 512, format: GraphLinear, rate: 30, interpolate: true}
+}
+```
+
 Wait for a graph or load in script: `const ready: bool = tex[box.texture.Status].revision > 0`.
 
 ## Behavior rules
@@ -103,7 +121,7 @@ Wait for a graph or load in script: `const ready: bool = tex[box.texture.Status]
 - Gen: a `source` that has no `Gen` by the next frame fails it; `width`/`height` are ignored
   with a source. `palette_layer` must exist and not be GenNoise.
 - Graph fails (`Status.error`) on a cycle, a deleted node, a child without a node component by
-  the next frame, an input of the wrong type, `Blocks` on DomainSphere, more than 32 Ramp/Curve
+  the next frame, an input of the wrong type, `Blocks` or `Ripples` on DomainSphere, more than 32 Ramp/Curve
   keys or an invalid curve.
 - Graph tiling: DomainPlane tiles when noise frequencies and Transform scales are whole numbers
   and rotations are multiples of 90 degrees. DomainSphere outputs an equirectangular image

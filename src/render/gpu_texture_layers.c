@@ -175,8 +175,8 @@ WGPUPipelineLayout box_gpu_layer_pipeline_layout(
 bool box_gpu_layered(
     const box_render_batch_t *b)
 {
-    return b->texture_layers && box_render_is_mesh(b->pipeline) && !b->transmissive &&
-        !b->water;
+    return b->texture_layers && box_render_is_mesh(b->pipeline) && (!b->transmissive ||
+        (b->water && b->pipeline == BOX_RENDER_SHADER_MESH_EXTENDED));
 }
 
 /** Get the uniform buffer of a layer entity, created on first use, and write its values when
@@ -393,6 +393,9 @@ static WGPUBindGroup box_gpu_layer_group(
                 b->textures[i] == (BOX_RENDER_TEXTURE_TARGET | gpu->rendering);
             key.textures[i] = self ? 0 : b->textures[i];
         }
+
+        key.textures[BOX_RENDER_TEXTURE_SLOTS] = b->water && !(gpu->rendering &&
+            b->foam == (BOX_RENDER_TEXTURE_TARGET | gpu->rendering)) ? b->foam : 0;
     }
 
     ecs_os_memcpy_n(key.entities, l->entities, ecs_entity_t, BOX_RENDER_LAYERS);
@@ -469,6 +472,10 @@ WGPUBindGroup box_gpu_forward_group(
 
     for (i = 0; i < BOX_RENDER_TEXTURE_SLOTS; i ++) {
         box_gpu_texture_graph_sampled(gpu, b->textures[i]);
+    }
+
+    if (b->water) {
+        box_gpu_texture_graph_sampled(gpu, b->foam);
     }
 
     result = box_gpu_layer_group(gpu, packet, b);

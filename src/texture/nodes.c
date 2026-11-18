@@ -601,6 +601,78 @@ static const char *box_texture_transform_wgsl =
     "    return vec4f(r + vec2f(0.5) + translate.xy, c.z * scale.z + translate.z, c.w);\n"
     "}\n";
 
+/** WGSL of the TexRipples node: the rings of raindrops in a periodic lattice of cells.
+ *
+ * Each cell has one drop per lifetime at its own phase, at a new place every cycle, falling when
+ * a random value of the cycle is below the density. The rings of the cells in reach add up.
+ *
+ * A ring is a crest between two troughs that widens and fades as it ages. */
+static const char *box_texture_ripples_wgsl =
+    "fn box_tex_ripples_hash(cell: vec2i, seed: u32) -> u32 {\n"
+    "    return box_texgraph_hash(box_texgraph_hash2(bitcast<vec2u>(cell)) ^\n"
+    "        box_texgraph_hash(seed + 0x7f4a7c15u));\n"
+    "}\n"
+    "\n"
+    "fn box_tex_ripples_random(h: u32, k: u32) -> f32 {\n"
+    "    return box_texgraph_random(box_texgraph_hash(h ^ (k * 0x9e3779b9u)));\n"
+    "}\n"
+    "\n"
+    "fn box_tex_ripples_ring(d: f32, radius: f32, width: f32, age: f32) -> f32 {\n"
+    "    let x = (d - radius) / width;\n"
+    "    if (abs(x) >= 1.0) {\n"
+    "        return 0.0;\n"
+    "    }\n"
+    "    let w = 1.0 - x * x;\n"
+    "    let fade = (1.0 - age) * (1.0 - age) * smoothstep(0.0, 0.05, age);\n"
+    "    return w * w * cos(x * 1.5 * BOX_TEXGRAPH_PI) * fade;\n"
+    "}\n"
+    "\n"
+    "fn box_tex_ripples(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f) -> vec4f {\n"
+    "    let count = f32(max(bitcast<i32>(p[0].x), 1));\n"
+    "    let speed = max(bitcast<f32>(p[0].y), 0.0);\n"
+    "    let lifetime = max(bitcast<f32>(p[0].z), 0.01);\n"
+    "    let width = max(bitcast<f32>(p[0].w), 1e-3);\n"
+    "    let seed = p[1].x;\n"
+    "    let time = i[1].x;\n"
+    "    let density = clamp(i[2].x, 0.0, 1.0);\n"
+    "    if (density <= 0.0) {\n"
+    "        return vec4f(0.0);\n"
+    "    }\n"
+    "\n"
+    "    let size = vec2f(box_texgraph_stage.size);\n"
+    "    let gx = clamp(floor(sqrt(count * size.x / size.y) + 0.5), 1.0, 4096.0);\n"
+    "    let gy = clamp(floor(count / gx + 0.5), 1.0, 4096.0);\n"
+    "    let ratio = sqrt((size.x / gx) / (size.y / gy));\n"
+    "    let weight = vec2f(ratio, 1.0 / ratio);\n"
+    "    let period = vec2i(i32(gx), i32(gy));\n"
+    "    let q = i[0].xy * vec2f(gx, gy);\n"
+    "    let base = vec2i(floor(q));\n"
+    "    let extent = (speed * lifetime + 2.0 * width) * max(ratio, 1.0 / ratio);\n"
+    "    let reach = i32(clamp(ceil(extent), 1.0, 3.0));\n"
+    "    var h = 0.0;\n"
+    "    for (var y = -reach; y <= reach; y ++) {\n"
+    "        for (var x = -reach; x <= reach; x ++) {\n"
+    "            let c = base + vec2i(x, y);\n"
+    "            let cell = ((c % period) + period) % period;\n"
+    "            let hc = box_tex_ripples_hash(cell, seed);\n"
+    "            let cycle = time / lifetime + box_tex_ripples_random(hc, 0u);\n"
+    "            let n = floor(cycle);\n"
+    "            let age = cycle - n;\n"
+    "            let hd = box_texgraph_hash(hc ^ box_texgraph_hash(bitcast<u32>(i32(n))));\n"
+    "            if (box_tex_ripples_random(hd, 1u) >= density) {\n"
+    "                continue;\n"
+    "            }\n"
+    "\n"
+    "            let at = vec2f(c) + vec2f(box_tex_ripples_random(hd, 2u),\n"
+    "                box_tex_ripples_random(hd, 3u));\n"
+    "            let d = length((q - at) * weight);\n"
+    "            h += box_tex_ripples_ring(d, speed * lifetime * age, width * (1.0 + age), age);\n"
+    "        }\n"
+    "    }\n"
+    "\n"
+    "    return vec4f(h, 0.0, 0.0, 0.0);\n"
+    "}\n";
+
 /** WGSL of the TexTime node: the seconds of the world clock times its scale plus its offset */
 static const char *box_texture_time_wgsl =
     "fn box_tex_time(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f) -> vec4f {\n"
@@ -835,7 +907,7 @@ static void box_texture_nodes_register_math(
 }
 
 /** Register the built in node kinds of lookups, patterns and textures: TexRamp, TexCurve,
- * TexBlocks, TexCells, TexImage and TexLut.
+ * TexBlocks, TexCells, TexRipples, TexImage and TexLut.
  *
  * @param world The world
  */
@@ -906,6 +978,28 @@ static void box_texture_nodes_register_lookups(
         },
         .function = "box_tex_cells",
         .source = box_texture_cells_wgsl
+    });
+
+    box_texture_node_register(world, &(box_texture_node_desc_t){
+        .component = ecs_id(TexRipples),
+        .output = TexScalar,
+        .inputs = {
+            { "coords", offsetof(TexRipples, coords), TexVector, NULL, 0, true },
+            { "time", offsetof(TexRipples, time), TexScalar, "time_value",
+                offsetof(TexRipples, time_value) },
+            { "density", offsetof(TexRipples, density), TexScalar, "density_value",
+                offsetof(TexRipples, density_value) }
+        },
+        .params = {
+            { "count", offsetof(TexRipples, count), 4, BOX_TEXTURE_PARAM_I32 },
+            { "speed", offsetof(TexRipples, speed), 4, BOX_TEXTURE_PARAM_F32 },
+            { "lifetime", offsetof(TexRipples, lifetime), 4, BOX_TEXTURE_PARAM_F32 },
+            { "width", offsetof(TexRipples, width), 4, BOX_TEXTURE_PARAM_F32 },
+            { "seed", offsetof(TexRipples, seed), 4, BOX_TEXTURE_PARAM_I32 }
+        },
+        .function = "box_tex_ripples",
+        .source = box_texture_ripples_wgsl,
+        .flags = BOX_TEXTURE_NODE_PLANE
     });
 
     box_texture_node_register(world, &(box_texture_node_desc_t){

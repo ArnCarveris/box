@@ -1194,6 +1194,29 @@ fn layered(f: VertexOut, front: bool, s: Surface, maps: texture_2d_array<f32>, f
     return o;
 }
 
+// fs of a Water batch with TextureLayers: the normals of the layers blend into the ripple normal
+// by their coverage before the waves bend it; the other channels of the layers do not change
+// Water. The coverage sees an unoccluded surface, so the cavity of a layer does nothing here.
+@fragment fn fs_water_layers(f: VertexOut, @builtin(front_facing) front: bool)
+    -> @location(0) vec4f
+{
+    let geometric = normalize(f.normal);
+    let dx = dpdx(f.world.xz);
+    let dy = dpdy(f.world.xz);
+    var layers = water_layers(f, geometric, vo_water(f));
+    let l = apply_layers(layer_maps, 0u, f, LayerSurface(layers.albedo.rgb, 0.0, layers.orm.g,
+        1.0, layers.normal, geometric, 0.0));
+    if (front) {
+        layers.normal = l.normal;
+    }
+    let waves = vo_water_waves(f);
+    if (waves != 0u) {
+        layers.normal = water_waves_normal(waves, f.world.xz, dx, dy, layers.normal);
+    }
+    layers.normal = water_ripples_normal(f.world, layers.normal);
+    return water_lit(f, surface_of(f, front, geometric, layers));
+}
+
 @fragment fn fs_layers(f: VertexOut, @builtin(front_facing) front: bool) -> @location(0) vec4f {
     return lit(f, layered(f, front, surface(f, front), layer_maps, 0u, 0.0));
 }

@@ -575,7 +575,8 @@ uint32_t box_gpu_draw_kind(
     bool equal);
 
 /** Check whether a batch draws with the layers variants of the mesh pipelines: an opaque,
- * alpha tested or blended batch of a mesh shader with TextureLayers, not transmissive.
+ * alpha tested or blended batch of a mesh shader with TextureLayers, not transmissive, or a
+ * water batch with TextureLayers (fs_water_layers).
  *
  * Its forward and depth prepass pipelines have the layers layouts and bind the group of
  * box_gpu_forward_group; its shadows bind the group without layers.
