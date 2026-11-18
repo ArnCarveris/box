@@ -21,6 +21,7 @@ camera {
   CameraController: {speed: 4}
 }
 
+// Round shapes and sweeps (the trunks and limbs of the trees) lose segments with distance (lod).
 // A filmic chain: ambient occlusion, the height fog of the sky, bloom, auto exposure into the
 // Tony McMapface tone map, a gentle grade, a subtle vignette and SMAA
 view {
@@ -37,6 +38,7 @@ view {
 
   View: {
     camera: camera,
+    lod: {levels: 3, distances: [0, 30, 70, 0]},
     clear: {enabled: true, color: {120, 140, 160, 255}},
     lighting: {
       enabled: true,

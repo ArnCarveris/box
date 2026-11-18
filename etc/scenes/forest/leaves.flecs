@@ -1,0 +1,644 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+using state
+using assets
+
+// Leaf cards. A card is a cluster of a few hundred leaves (or a frond of needles) drawn
+// procedurally in levels, each a texture graph that stamps the level below it with the Image
+// node: one leaf, a twig of leaves along a stem, a spray of twigs along a stem and the card, a
+// fan of sprays from its stem. Conifers stamp a twig of needles into side shoots and those into
+// a frond. Every level is data, not color: (coverage, veins, tone, height), the tone 0 on the
+// wood and varying leaf by leaf. From the data of a card an albedo graph makes a light, nearly
+// neutral detail with the coverage as alpha and a normal graph the normals. The color comes from
+// the Rgb of the leaf prefab, so the season task recolors every leaf of a species by changing
+// its prefab (the B prefabs inherit it). The card mesh has its origin at the stem of the card,
+// in the middle of its bottom edge.
+state {
+  // Resolutions of a leaf, a twig, a spray and a card
+  export const BLADE_RES: i32 = 128
+  export const TWIG_RES: i32 = 256
+  export const SPRAY_RES: i32 = 512
+  export const LEAF_RES: i32 = 1024
+
+  // Where a stamp of a pinnate map sits along its stem (0 at the foot): side stamp i of 9 from
+  // start to end, and the tip stamp, i = 9
+  fn forest_pinnate_t(i: f64, start: f64, end: f64) -> f64 {
+    i > 8.5 ? 0.97 : start + (end - start) * i / 8
+  }
+
+  // 1 for a stamp to the right of the stem, -1 to the left; they alternate
+  fn forest_pinnate_side(i: f64) -> f64 {
+    i - 2 * floor(i / 2) < 0.5 ? 1 : -1
+  }
+
+  // Angle of stamp i in degrees (0 up the map, positive to the left), from spread at the foot
+  // to spread_tip at the end, with a seeded jitter; the tip stamp points up the stem
+  fn forest_pinnate_angle(i: f64, seed: f64, start: f64, end: f64, spread: f64, spread_tip: f64) -> f64 {
+    const t = (forest_pinnate_t(i, start, end) - start) / (end - start)
+    const jitter = (forest_hash(i, seed) - 0.5) * 16
+    i > 8.5 ? jitter * 0.5 : 0 - forest_pinnate_side(i) * (spread + (spread_tip - spread) * t) + jitter
+  }
+
+  // Length of stamp i, from len at the foot to len_tip at the end, with a seeded jitter
+  fn forest_pinnate_len(i: f64, seed: f64, start: f64, end: f64, len: f64, len_tip: f64) -> f64 {
+    const t = i > 8.5 ? 1 : (forest_pinnate_t(i, start, end) - start) / (end - start)
+    (len + (len_tip - len) * t) * (0.88 + 0.24 * forest_hash(i + 20, seed))
+  }
+
+  // Tone of stamp i, from tone_min to 1
+  fn forest_pinnate_tone(i: f64, seed: f64, tone_min: f64) -> f64 {
+    tone_min + (1 - tone_min) * forest_hash(i + 40, seed)
+  }
+
+  // Spray i of the 5 of a fan: the outer two first (under the others) at -fan and fan degrees,
+  // then two between, then the middle one; the middle ones longer, their stems a little apart
+  // along the bottom of the card
+  fn forest_fan_angle(i: f64, seed: f64, fan: f64) -> f64 {
+    const slot = i < 0.5 ? 0 - 1 : (i < 1.5 ? 1 : (i < 2.5 ? 0 - 0.45 : (i < 3.5 ? 0.45 : 0)))
+    slot * fan + (forest_hash(i + 2, seed) - 0.5) * 12
+  }
+
+  fn forest_fan_len(i: f64, seed: f64, len: f64) -> f64 {
+    const outer = i < 1.5 ? 0.72 : (i < 3.5 ? 0.9 : 1)
+    len * outer * (0.9 + 0.2 * forest_hash(i + 10, seed))
+  }
+
+  fn forest_fan_x(i: f64, seed: f64) -> f64 {
+    0.5 + (forest_hash(i + 30, seed) - 0.5) * 0.06
+  }
+
+  // The translation of a Transform node that turns the coordinates of a map into those of a
+  // stamp whose stem (0.5, 1) sits at (x, y) of the map, pointing at angle degrees (0 up the
+  // map, positive to the left), len long: the Transform scales by 1 / len and turns by angle
+  // about the centre, and this moves the stem into place
+  fn forest_stamp_tx(x: f64, y: f64, angle: f64, len: f64) -> f64 {
+    const r = angle * PI / 180
+    (cos(r) * (0.5 - x) - sin(r) * (0.5 - y)) / len
+  }
+
+  fn forest_stamp_ty(x: f64, y: f64, angle: f64, len: f64) -> f64 {
+    const r = angle * PI / 180
+    (sin(r) * (0.5 - x) + cos(r) * (0.5 - y)) / len + 0.5
+  }
+}
+
+assets {
+  // One stamp of a map, as a node of its graph: the data of tex placed with its stem (0.5, 1)
+  // at (x, y), pointing at angle degrees, len long, its tone times tone, over prev (the stamps
+  // before it) by its coverage. Outside tex the stamp covers nothing (its border is empty)
+  template ForestStamp {
+    prop prev: entity = 0
+    prop tex: entity = 0
+    prop x: f32 = 0.5
+    prop y: f32 = 1
+    prop angle: f32 = 0
+    prop len: f32 = 1
+    prop tone: f32 = 1
+
+    at {
+      nodes.Transform: {
+        angle_value: angle,
+        scale: {1 / len, 1 / len, 1},
+        translate: {forest_stamp_tx(x, y, angle, len), forest_stamp_ty(x, y, angle, len), 0}
+      }
+    }
+
+    img { nodes.Image: {texture: tex, coords: at, address: AddressClamp, linear: true} }
+    toned { nodes.Multiply: {a: img, b_value: {1, 1, tone, 1}} }
+    cover { nodes.Split: {input: img, channel: ChannelR} }
+    nodes.Mix: {a: prev, b: toned, factor: cover}
+  }
+
+  // A mask that is 1 inside a map and 0 on its border, in every channel
+  forest_frame_mask {
+    uv { nodes.Coords: {} }
+    centred { nodes.Subtract: {a: uv, b_value: {0.5, 0.5, 0, 0}} }
+    off { nodes.Abs: {input: centred} }
+    off_u { nodes.Split: {input: off, channel: ChannelR} }
+    off_v { nodes.Split: {input: off, channel: ChannelG} }
+    off_max { nodes.Max: {a: off_u, b: off_v} }
+    inside { nodes.Step: {input_value: {0.494, 0, 0, 0}, edge: off_max} }
+    mask { nodes.Combine: {r: inside, g: inside, b: inside, a: inside} }
+    Graph: {output: mask, width: 256, format: GraphLinear}
+  }
+
+  // The output of a map, emptied at its border by forest_frame_mask, so a stamp of it covers
+  // nothing outside it (the Image node of a stamp clamps to the border)
+  template ForestFrame {
+    prop input: entity = 0
+
+    mask { nodes.Image: {texture: forest_frame_mask, linear: true} }
+    nodes.Multiply: {a: input, b: mask}
+  }
+
+  // One leaf, its stalk from the middle of the bottom edge up and the blade over the rest: the
+  // outline is width x sin(pi t^shape) to either side of the midrib at t along the blade, cut by
+  // lobes (oak) or teeth (birch; a wavy edge on beech), with a midrib and veins slanting from
+  // it. Stem is the stalk in lengths of the blade
+  template ForestBladeMap {
+    prop width: f32 = 0.3
+    prop shape: f32 = 1
+    prop lobes: f32 = 0
+    prop lobe_count: f32 = 4
+    prop teeth: f32 = 0
+    prop tooth_count: f32 = 12
+    prop veins: f32 = 7
+    prop stem: f32 = 0.1
+
+    const len = 0.96 / (1 + stem)
+
+    // Across the leaf from the midrib, and along it from the base of the blade to its tip, in
+    // lengths of the blade
+    leaf_uv { nodes.Transform: {scale: {1 / len, 0 - 1 / len, 1}, translate: {-0.5, 0.48 / len - 0.5 - stem, 0}} }
+    across { nodes.Split: {input: leaf_uv, channel: ChannelR} }
+    along { nodes.Split: {input: leaf_uv, channel: ChannelG} }
+    t { nodes.Clamp: {input: along, min_value: {0, 0, 0, 0}, max_value: {1, 0, 0, 0}} }
+    side { nodes.Abs: {input: across} }
+
+    // The outline
+    shaped { nodes.Power: {a: t, b_value: {shape, 0, 0, 0}} }
+    arc { nodes.Multiply: {a: shaped, b_value: {PI, 0, 0, 0}} }
+    envelope { nodes.Sin: {input: arc} }
+    lobe_arc { nodes.Multiply: {a: t, b_value: {2 * PI * lobe_count, 0, 0, 0}} }
+    lobe_wave { nodes.Cos: {input: lobe_arc} }
+    lobe { nodes.Remap: {input: lobe_wave, from_min: -1, from_max: 1, to_min: 1 - lobes, to_max: 1} }
+    tooth_run { nodes.Multiply: {a: t, b_value: {tooth_count, 0, 0, 0}} }
+    tooth_saw { nodes.Fract: {input: tooth_run} }
+    tooth { nodes.Remap: {input: tooth_saw, from_min: 0, from_max: 1, to_min: 1, to_max: 1 - teeth} }
+    outline { nodes.Multiply: {a: lobe, b: tooth} }
+    half_env { nodes.Multiply: {a: envelope, b: outline} }
+    half { nodes.Multiply: {a: half_env, b_value: {width, 0, 0, 0}} }
+    inside { nodes.Subtract: {a: half, b: side} }
+    blade { nodes.Smoothstep: {input: inside, edge0_value: {0, 0, 0, 0}, edge1_value: {0.025, 0, 0, 0}} }
+
+    // The midrib and the veins slanting from it toward the tip
+    rows { nodes.Multiply: {a: along, b_value: {veins, 0, 0, 0}} }
+    slant { nodes.Multiply: {a: side, b_value: {veins * 1.3, 0, 0, 0}} }
+    lines { nodes.Subtract: {a: rows, b: slant} }
+    lines_f { nodes.Fract: {input: lines} }
+    lines_c { nodes.Subtract: {a: lines_f, b_value: {0.5, 0, 0, 0}} }
+    lines_d { nodes.Abs: {input: lines_c} }
+    mid { nodes.Smoothstep: {input: side, edge0_value: {0.03, 0, 0, 0}, edge1_value: {0.01, 0, 0, 0}} }
+    lateral { nodes.Smoothstep: {input: lines_d, edge0_value: {0.38, 0, 0, 0}, edge1_value: {0.48, 0, 0, 0}} }
+    lateral_w { nodes.Multiply: {a: lateral, b_value: {0.55, 0, 0, 0}} }
+    vein_all { nodes.Max: {a: mid, b: lateral_w} }
+    vein { nodes.Multiply: {a: vein_all, b: blade} }
+
+    // The stalk, from stem below the blade into it
+    stalk_from { nodes.Step: {input: along, edge_value: {0 - stem, 0, 0, 0}} }
+    stalk_to { nodes.Step: {input_value: {0.1, 0, 0, 0}, edge: along} }
+    stalk_w { nodes.Smoothstep: {input: side, edge0_value: {0.035, 0, 0, 0}, edge1_value: {0.015, 0, 0, 0}} }
+    stalk_span { nodes.Multiply: {a: stalk_from, b: stalk_to} }
+    stalk { nodes.Multiply: {a: stalk_span, b: stalk_w} }
+    cover { nodes.Max: {a: blade, b: stalk} }
+
+    // Domed between the veins; the tone 1 on the blade and 0 on the stalk
+    dome { nodes.Smoothstep: {input: inside, edge0_value: {0, 0, 0, 0}, edge1_value: {width * 0.6, 0, 0, 0}} }
+    dome_h { nodes.Multiply: {a: dome, b_value: {0.3, 0, 0, 0}} }
+    groove { nodes.Multiply: {a: vein, b_value: {0.1, 0, 0, 0}} }
+    raised { nodes.Subtract: {a: dome_h, b: groove} }
+    height { nodes.Add: {a: raised, b_value: {0.45, 0, 0, 0}} }
+    data { nodes.Combine: {r: cover, g: vein, b: blade, a: height} }
+    ForestFrame framed(input: data)
+    Graph: {output: framed, width: BLADE_RES, format: GraphLinear}
+  }
+
+  // A stem from the middle of the bottom edge to the top, thinning toward it: wood, tone 0
+  template ForestStemMap {
+    prop width: f32 = 0.02
+
+    uv { nodes.Coords: {} }
+    u { nodes.Split: {input: uv, channel: ChannelR} }
+    v { nodes.Split: {input: uv, channel: ChannelG} }
+    off { nodes.Subtract: {a: u, b_value: {0.5, 0, 0, 0}} }
+    side { nodes.Abs: {input: off} }
+    // Half width: width at the foot (v 1), half that at the top
+    half { nodes.Remap: {input: v, from_min: 0, from_max: 1, to_min: width * 0.5, to_max: width} }
+    inside { nodes.Subtract: {a: half, b: side} }
+    edge { nodes.Smoothstep: {input: inside, edge0_value: {0, 0, 0, 0}, edge1_value: {0.006, 0, 0, 0}} }
+    ends { nodes.Smoothstep: {input: v, edge0_value: {0.005, 0, 0, 0}, edge1_value: {0.02, 0, 0, 0}} }
+    cover { nodes.Multiply: {a: edge, b: ends} }
+    round { nodes.Divide: {a: inside, b: half} }
+    height { nodes.Remap: {input: round, from_min: 0, from_max: 1, to_min: 0.4, to_max: 0.55, clamp: true} }
+    data { nodes.Combine: {r: cover, g_value: 0, b_value: 0, a: height} }
+    ForestFrame framed(input: data)
+    Graph: {output: framed, width: SPRAY_RES, format: GraphLinear}
+  }
+
+  // A twig of needles: a stem up the middle and needles needle long to either side, density per
+  // map width, slanting toward the tip by slant, shorter toward the tip
+  template ForestNeedleTwigMap {
+    prop needle: f32 = 0.12
+    prop density: f32 = 60
+    prop slant: f32 = 1.2
+    prop seed: i32 = 1
+
+    uv { nodes.Coords: {} }
+    jitter_n { nodes.Noise: {channels: 3, frequency: 8, octaves: 2, seed: seed} }
+    warped { nodes.Warp: {coords: uv, offset: jitter_n, amount_value: 0.03} }
+    u { nodes.Split: {input: warped, channel: ChannelR} }
+    v { nodes.Split: {input: warped, channel: ChannelG} }
+    off { nodes.Subtract: {a: u, b_value: {0.5, 0, 0, 0}} }
+    side { nodes.Abs: {input: off} }
+    along { nodes.Subtract: {a_value: {0.99, 0, 0, 0}, b: v} }
+
+    // The band of needles, narrowing to the tip
+    reach { nodes.Remap: {input: along, from_min: 0, from_max: 0.97, to_min: needle, to_max: needle * 0.45, clamp: true} }
+    inside { nodes.Subtract: {a: reach, b: side} }
+    band_in { nodes.Smoothstep: {input: inside, edge0_value: {0, 0, 0, 0}, edge1_value: {0.02, 0, 0, 0}} }
+    tip_in { nodes.Smoothstep: {input: along, edge0_value: {0.995, 0, 0, 0}, edge1_value: {0.95, 0, 0, 0}} }
+    foot_in { nodes.Smoothstep: {input: along, edge0_value: {0.02, 0, 0, 0}, edge1_value: {0.06, 0, 0, 0}} }
+    band_t { nodes.Multiply: {a: band_in, b: tip_in} }
+    band { nodes.Multiply: {a: band_t, b: foot_in} }
+
+    // Needles: lines from the stem slanting out toward the tip
+    rows { nodes.Multiply: {a: along, b_value: {density, 0, 0, 0}} }
+    slanted { nodes.Multiply: {a: side, b_value: {density * slant, 0, 0, 0}} }
+    lines { nodes.Subtract: {a: rows, b: slanted} }
+    lines_f { nodes.Fract: {input: lines} }
+    lines_c { nodes.Subtract: {a: lines_f, b_value: {0.5, 0, 0, 0}} }
+    lines_d { nodes.Abs: {input: lines_c} }
+    needles_m { nodes.Smoothstep: {input: lines_d, edge0_value: {0.05, 0, 0, 0}, edge1_value: {0.2, 0, 0, 0}} }
+    needles { nodes.Multiply: {a: needles_m, b: band} }
+
+    // The stem: wood, tone 0
+    stem { nodes.Smoothstep: {input: side, edge0_value: {0.03, 0, 0, 0}, edge1_value: {0.015, 0, 0, 0}} }
+    stem_on { nodes.Multiply: {a: stem, b: foot_in} }
+    cover { nodes.Max: {a: needles, b: stem_on} }
+    bare { nodes.Subtract: {a_value: {1, 0, 0, 0}, b: stem_on} }
+    tone { nodes.Multiply: {a: needles, b: bare} }
+    ridge { nodes.Multiply: {a: needles_m, b_value: {0.2, 0, 0, 0}} }
+    height { nodes.Add: {a: ridge, b_value: {0.42, 0, 0, 0}} }
+    data { nodes.Combine: {r: cover, g_value: 0, b: tone, a: height} }
+    ForestFrame framed(input: data)
+    Graph: {output: framed, width: TWIG_RES, format: GraphLinear}
+  }
+
+  // A pinnate map: a stem up the middle with 9 stamps of tex alternating along it from start to
+  // end (fractions of the stem from its foot) and one at its tip. They point spread degrees off
+  // the stem at the foot and spread_tip at the end, len long at the foot and len_tip at the
+  // end, each with a seeded tone from tone_min to 1. Twigs of leaves, sprays of twigs, and the
+  // side shoots and fronds of the conifers
+  template ForestPinnateMap {
+    prop tex: entity = 0
+    prop stem_tex: entity = 0
+    prop seed: f32 = 1
+    prop start: f32 = 0.1
+    prop end: f32 = 0.85
+    prop spread: f32 = 50
+    prop spread_tip: f32 = 35
+    prop len: f32 = 0.35
+    prop len_tip: f32 = 0.25
+    prop tone_min: f32 = 0.4
+    prop res: i32 = 256
+
+    ForestStamp stem(tex: stem_tex, x: 0.5, y: 0.995, angle: 0, len: 0.96, tone: 0)
+    ForestStamp s0(prev: stem, tex: tex, x: 0.5, y: 0.995 - 0.97 * forest_pinnate_t(0, start, end), angle: forest_pinnate_angle(0, seed, start, end, spread, spread_tip), len: forest_pinnate_len(0, seed, start, end, len, len_tip), tone: forest_pinnate_tone(0, seed, tone_min))
+    ForestStamp s1(prev: s0, tex: tex, x: 0.5, y: 0.995 - 0.97 * forest_pinnate_t(1, start, end), angle: forest_pinnate_angle(1, seed, start, end, spread, spread_tip), len: forest_pinnate_len(1, seed, start, end, len, len_tip), tone: forest_pinnate_tone(1, seed, tone_min))
+    ForestStamp s2(prev: s1, tex: tex, x: 0.5, y: 0.995 - 0.97 * forest_pinnate_t(2, start, end), angle: forest_pinnate_angle(2, seed, start, end, spread, spread_tip), len: forest_pinnate_len(2, seed, start, end, len, len_tip), tone: forest_pinnate_tone(2, seed, tone_min))
+    ForestStamp s3(prev: s2, tex: tex, x: 0.5, y: 0.995 - 0.97 * forest_pinnate_t(3, start, end), angle: forest_pinnate_angle(3, seed, start, end, spread, spread_tip), len: forest_pinnate_len(3, seed, start, end, len, len_tip), tone: forest_pinnate_tone(3, seed, tone_min))
+    ForestStamp s4(prev: s3, tex: tex, x: 0.5, y: 0.995 - 0.97 * forest_pinnate_t(4, start, end), angle: forest_pinnate_angle(4, seed, start, end, spread, spread_tip), len: forest_pinnate_len(4, seed, start, end, len, len_tip), tone: forest_pinnate_tone(4, seed, tone_min))
+    ForestStamp s5(prev: s4, tex: tex, x: 0.5, y: 0.995 - 0.97 * forest_pinnate_t(5, start, end), angle: forest_pinnate_angle(5, seed, start, end, spread, spread_tip), len: forest_pinnate_len(5, seed, start, end, len, len_tip), tone: forest_pinnate_tone(5, seed, tone_min))
+    ForestStamp s6(prev: s5, tex: tex, x: 0.5, y: 0.995 - 0.97 * forest_pinnate_t(6, start, end), angle: forest_pinnate_angle(6, seed, start, end, spread, spread_tip), len: forest_pinnate_len(6, seed, start, end, len, len_tip), tone: forest_pinnate_tone(6, seed, tone_min))
+    ForestStamp s7(prev: s6, tex: tex, x: 0.5, y: 0.995 - 0.97 * forest_pinnate_t(7, start, end), angle: forest_pinnate_angle(7, seed, start, end, spread, spread_tip), len: forest_pinnate_len(7, seed, start, end, len, len_tip), tone: forest_pinnate_tone(7, seed, tone_min))
+    ForestStamp s8(prev: s7, tex: tex, x: 0.5, y: 0.995 - 0.97 * forest_pinnate_t(8, start, end), angle: forest_pinnate_angle(8, seed, start, end, spread, spread_tip), len: forest_pinnate_len(8, seed, start, end, len, len_tip), tone: forest_pinnate_tone(8, seed, tone_min))
+    ForestStamp s9(prev: s8, tex: tex, x: 0.5, y: 0.995 - 0.97 * forest_pinnate_t(9, start, end), angle: forest_pinnate_angle(9, seed, start, end, spread, spread_tip), len: forest_pinnate_len(9, seed, start, end, len, len_tip), tone: forest_pinnate_tone(9, seed, tone_min))
+    ForestFrame framed(input: s9)
+    Graph: {output: framed, width: res, format: GraphLinear}
+  }
+
+  // The data of a card: five sprays of tex fanned over -fan..fan degrees from its stem in the
+  // middle of the bottom edge, the middle ones len long, each with a seeded tone
+  template ForestFanMap {
+    prop tex: entity = 0
+    prop seed: f32 = 1
+    prop fan: f32 = 40
+    prop len: f32 = 0.7
+    prop tone_min: f32 = 0.75
+
+    ForestStamp f0(tex: tex, x: forest_fan_x(0, seed), y: 0.995, angle: forest_fan_angle(0, seed, fan), len: forest_fan_len(0, seed, len), tone: forest_pinnate_tone(0, seed, tone_min))
+    ForestStamp f1(prev: f0, tex: tex, x: forest_fan_x(1, seed), y: 0.995, angle: forest_fan_angle(1, seed, fan), len: forest_fan_len(1, seed, len), tone: forest_pinnate_tone(1, seed, tone_min))
+    ForestStamp f2(prev: f1, tex: tex, x: forest_fan_x(2, seed), y: 0.995, angle: forest_fan_angle(2, seed, fan), len: forest_fan_len(2, seed, len), tone: forest_pinnate_tone(2, seed, tone_min))
+    ForestStamp f3(prev: f2, tex: tex, x: forest_fan_x(3, seed), y: 0.995, angle: forest_fan_angle(3, seed, fan), len: forest_fan_len(3, seed, len), tone: forest_pinnate_tone(3, seed, tone_min))
+    ForestStamp f4(prev: f3, tex: tex, x: forest_fan_x(4, seed), y: 0.995, angle: forest_fan_angle(4, seed, fan), len: forest_fan_len(4, seed, len), tone: forest_pinnate_tone(4, seed, tone_min))
+    Graph: {output: f4, width: LEAF_RES, format: GraphLinear}
+  }
+
+  // The albedo of a card from its data: light tones that vary leaf by leaf (lighter, darker
+  // and yellower), lighter veins, darker toward the stem of the card where the leaves shade each
+  // other, and brown wood, with the coverage as alpha
+  template ForestLeafAlbedo {
+    prop data: entity = 0
+    prop needles: bool = false
+
+    img { nodes.Image: {texture: data, linear: true} }
+    cover { nodes.Split: {input: img, channel: ChannelR} }
+    vein { nodes.Split: {input: img, channel: ChannelG} }
+    tone { nodes.Split: {input: img, channel: ChannelB} }
+    uv { nodes.Coords: {} }
+    v { nodes.Split: {input: uv, channel: ChannelG} }
+    inner { nodes.Remap: {input: v, from_min: 0.3, from_max: 1, to_min: 1, to_max: 0.6, clamp: true} }
+
+    if needles {
+      shade {
+        nodes.Ramp: {
+          input: tone,
+          keys: [
+            {0, {120, 92, 70}}, {0.08, {120, 92, 70}}, {0.15, {150, 170, 150}},
+            {0.45, {200, 214, 196}}, {0.75, {226, 236, 214}}, {1, {244, 246, 222}}
+          ]
+        }
+      }
+
+      shaded { nodes.Multiply: {a: shade, b: inner} }
+      r { nodes.Split: {input: shaded, channel: ChannelR} }
+      g { nodes.Split: {input: shaded, channel: ChannelG} }
+      b { nodes.Split: {input: shaded, channel: ChannelB} }
+      color { nodes.Combine: {r: r, g: g, b: b, a: cover} }
+      Graph: {output: color, width: LEAF_RES}
+    } else {
+      shade {
+        nodes.Ramp: {
+          input: tone,
+          keys: [
+            {0, {120, 92, 70}}, {0.08, {120, 92, 70}}, {0.15, {160, 176, 140}},
+            {0.35, {200, 214, 178}}, {0.55, {226, 234, 200}}, {0.75, {244, 240, 196}},
+            {0.9, {222, 236, 206}}, {1, {250, 246, 214}}
+          ]
+        }
+      }
+
+      veined { nodes.Mix: {a: shade, b_value: {1, 1, 0.82, 1}, factor: vein} }
+      shaded { nodes.Multiply: {a: veined, b: inner} }
+      r { nodes.Split: {input: shaded, channel: ChannelR} }
+      g { nodes.Split: {input: shaded, channel: ChannelG} }
+      b { nodes.Split: {input: shaded, channel: ChannelB} }
+      color { nodes.Combine: {r: r, g: g, b: b, a: cover} }
+      Graph: {output: color, width: LEAF_RES}
+    }
+  }
+
+  // The normals of a card from the height in its data
+  template ForestLeafNormal {
+    prop data: entity = 0
+
+    img { nodes.Image: {texture: data, linear: true} }
+    height { nodes.Split: {input: img, channel: ChannelA} }
+    bumps { nodes.Normal: {height: height, strength: 1.2} }
+    Graph: {output: bumps, width: LEAF_RES, format: GraphLinear}
+  }
+
+  ForestStemMap forest_stem(width: 0.022)
+
+  // Beech: oval, glossy leaves with straight parallel veins and a wavy edge, alternate on zigzag
+  // twigs in flat sprays
+  ForestBladeMap leaf_beech_blade(width: 0.3, shape: 0.85, teeth: 0.05, tooth_count: 8, veins: 8, stem: 0.08)
+  ForestPinnateMap leaf_beech_twig(tex: leaf_beech_blade, stem_tex: forest_stem, seed: 3, start: 0.08, end: 0.8, spread: 58, spread_tip: 42, len: 0.3, len_tip: 0.24, tone_min: 0.35, res: TWIG_RES)
+  ForestPinnateMap leaf_beech_spray(tex: leaf_beech_twig, stem_tex: forest_stem, seed: 4, start: 0.06, end: 0.78, spread: 55, spread_tip: 40, len: 0.5, len_tip: 0.36, tone_min: 0.7, res: SPRAY_RES)
+  ForestFanMap leaf_beech_data(tex: leaf_beech_spray, seed: 5, fan: 42, len: 0.72)
+  ForestFanMap leaf_beech_b_data(tex: leaf_beech_spray, seed: 6, fan: 34, len: 0.78)
+
+  // Oak: lobed leaves, widest toward the tip, crowded on short stalks
+  ForestBladeMap leaf_oak_blade(width: 0.34, shape: 1.4, lobes: 0.5, lobe_count: 4.5, veins: 5, stem: 0.05)
+  ForestPinnateMap leaf_oak_twig(tex: leaf_oak_blade, stem_tex: forest_stem, seed: 7, start: 0.3, end: 0.85, spread: 62, spread_tip: 30, len: 0.36, len_tip: 0.34, tone_min: 0.35, res: TWIG_RES)
+  ForestPinnateMap leaf_oak_spray(tex: leaf_oak_twig, stem_tex: forest_stem, seed: 8, start: 0.05, end: 0.75, spread: 60, spread_tip: 45, len: 0.48, len_tip: 0.38, tone_min: 0.7, res: SPRAY_RES)
+  ForestFanMap leaf_oak_data(tex: leaf_oak_spray, seed: 9, fan: 46, len: 0.7)
+  ForestFanMap leaf_oak_b_data(tex: leaf_oak_spray, seed: 10, fan: 38, len: 0.76)
+
+  // Birch: small, triangular, toothed leaves on long stalks along thin twigs that hang in long
+  // tresses
+  ForestBladeMap leaf_birch_blade(width: 0.36, shape: 0.6, teeth: 0.16, tooth_count: 11, veins: 6, stem: 0.3)
+  ForestPinnateMap leaf_birch_twig(tex: leaf_birch_blade, stem_tex: forest_stem, seed: 11, start: 0.06, end: 0.86, spread: 48, spread_tip: 36, len: 0.24, len_tip: 0.2, tone_min: 0.35, res: TWIG_RES)
+  ForestPinnateMap leaf_birch_spray(tex: leaf_birch_twig, stem_tex: forest_stem, seed: 12, start: 0.04, end: 0.7, spread: 24, spread_tip: 16, len: 0.55, len_tip: 0.42, tone_min: 0.7, res: SPRAY_RES)
+  ForestFanMap leaf_birch_data(tex: leaf_birch_spray, seed: 13, fan: 22, len: 0.86)
+  ForestFanMap leaf_birch_b_data(tex: leaf_birch_spray, seed: 14, fan: 30, len: 0.8)
+
+  // Spruce: short, stiff needles all around the shoots, which stand off the branch at a steep
+  // angle; fir: longer, flat needles in two rows on shoots in a flat, level spray
+  ForestNeedleTwigMap needle_spruce_twig(needle: 0.2, density: 40, slant: 1.1, seed: 15)
+  ForestPinnateMap needle_spruce_shoot(tex: needle_spruce_twig, stem_tex: forest_stem, seed: 16, start: 0.05, end: 0.82, spread: 46, spread_tip: 32, len: 0.5, len_tip: 0.34, tone_min: 0.6, res: SPRAY_RES)
+  ForestPinnateMap leaf_spruce_data(tex: needle_spruce_shoot, stem_tex: forest_stem, seed: 17, start: 0.04, end: 0.8, spread: 50, spread_tip: 36, len: 0.55, len_tip: 0.34, tone_min: 0.7, res: LEAF_RES)
+  ForestNeedleTwigMap needle_fir_twig(needle: 0.24, density: 30, slant: 0.5, seed: 18)
+  ForestPinnateMap needle_fir_shoot(tex: needle_fir_twig, stem_tex: forest_stem, seed: 19, start: 0.05, end: 0.82, spread: 68, spread_tip: 50, len: 0.48, len_tip: 0.32, tone_min: 0.6, res: SPRAY_RES)
+  ForestPinnateMap leaf_fir_data(tex: needle_fir_shoot, stem_tex: forest_stem, seed: 20, start: 0.04, end: 0.8, spread: 64, spread_tip: 46, len: 0.52, len_tip: 0.32, tone_min: 0.7, res: LEAF_RES)
+
+  ForestLeafAlbedo leaf_beech_albedo(data: leaf_beech_data)
+  ForestLeafAlbedo leaf_beech_b_albedo(data: leaf_beech_b_data)
+  ForestLeafAlbedo leaf_oak_albedo(data: leaf_oak_data)
+  ForestLeafAlbedo leaf_oak_b_albedo(data: leaf_oak_b_data)
+  ForestLeafAlbedo leaf_birch_albedo(data: leaf_birch_data)
+  ForestLeafAlbedo leaf_birch_b_albedo(data: leaf_birch_b_data)
+  ForestLeafAlbedo leaf_spruce_albedo(data: leaf_spruce_data, needles: true)
+  ForestLeafAlbedo leaf_fir_albedo(data: leaf_fir_data, needles: true)
+  ForestLeafNormal leaf_beech_normal(data: leaf_beech_data)
+  ForestLeafNormal leaf_beech_b_normal(data: leaf_beech_b_data)
+  ForestLeafNormal leaf_oak_normal(data: leaf_oak_data)
+  ForestLeafNormal leaf_oak_b_normal(data: leaf_oak_b_data)
+  ForestLeafNormal leaf_birch_normal(data: leaf_birch_data)
+  ForestLeafNormal leaf_birch_b_normal(data: leaf_birch_b_data)
+  ForestLeafNormal leaf_spruce_normal(data: leaf_spruce_data)
+  ForestLeafNormal leaf_fir_normal(data: leaf_fir_data)
+
+  // A card one unit wide and long, its origin at the stem in the middle of its bottom edge, up
+  // +Y, facing +Z: cupped across, its tip bending back. Its back is a second, reversed copy, so
+  // both sides show the textures
+  prefab ForestCardMesh {
+    Mesh3: {
+      vertices: [
+        {-0.5, 0, 0.1}, {0, 0, 0}, {0.5, 0, 0.1},
+        {-0.5, 0.5, 0.08}, {0, 0.5, -0.02}, {0.5, 0.5, 0.08},
+        {-0.5, 0.98, -0.06}, {0, 0.98, -0.16}, {0.5, 0.98, -0.06},
+        {-0.5, 0, 0.1}, {0, 0, 0}, {0.5, 0, 0.1},
+        {-0.5, 0.5, 0.08}, {0, 0.5, -0.02}, {0.5, 0.5, 0.08},
+        {-0.5, 0.98, -0.06}, {0, 0.98, -0.16}, {0.5, 0.98, -0.06}
+      ],
+      normals: [
+        {0.196, -0.04, 0.98}, {0, -0.04, 1}, {-0.196, -0.04, 0.98},
+        {0.196, 0.2, 0.96}, {0, 0.2, 0.98}, {-0.196, 0.2, 0.96},
+        {0.196, 0.32, 0.93}, {0, 0.32, 0.95}, {-0.196, 0.32, 0.93},
+        {-0.196, 0.04, -0.98}, {0, 0.04, -1}, {0.196, 0.04, -0.98},
+        {-0.196, -0.2, -0.96}, {0, -0.2, -0.98}, {0.196, -0.2, -0.96},
+        {-0.196, -0.32, -0.93}, {0, -0.32, -0.95}, {0.196, -0.32, -0.93}
+      ],
+      uvs: [
+        {0, 1}, {0.5, 1}, {1, 1}, {0, 0.5}, {0.5, 0.5}, {1, 0.5}, {0, 0}, {0.5, 0}, {1, 0},
+        {0, 1}, {0.5, 1}, {1, 1}, {0, 0.5}, {0.5, 0.5}, {1, 0.5}, {0, 0}, {0.5, 0}, {1, 0}
+      ],
+      indices: [
+        0, 1, 4, 0, 4, 3, 1, 2, 5, 1, 5, 4, 3, 4, 7, 3, 7, 6, 4, 5, 8, 4, 8, 7,
+        9, 13, 10, 9, 12, 13, 10, 14, 11, 10, 13, 14, 12, 16, 13, 12, 15, 16, 13, 17, 14, 13, 16, 17
+      ]
+    }
+  }
+
+  // Three cards from one stem, for the broadleaf clusters: the card above and two more, a
+  // little smaller, turned 60 degrees to either side about the stem and tilted and spun off it,
+  // so a cluster has depth from every side. Its origin is the stem of all three
+  prefab ForestCardTripleMesh {
+    Mesh3: {
+      vertices: [
+        {-0.5, 0, 0.1}, {0, 0, 0}, {0.5, 0, 0.1},
+        {-0.5, 0.5, 0.08}, {0, 0.5, -0.02}, {0.5, 0.5, 0.08},
+        {-0.5, 0.98, -0.06}, {0, 0.98, -0.16}, {0.5, 0.98, -0.06},
+        {-0.5, 0, 0.1}, {0, 0, 0}, {0.5, 0, 0.1},
+        {-0.5, 0.5, 0.08}, {0, 0.5, -0.02}, {0.5, 0.5, 0.08},
+        {-0.5, 0.98, -0.06}, {0, 0.98, -0.16}, {0.5, 0.98, -0.06},
+        {-0.171, -0.17, 0.378}, {0, 0, 0}, {0.317, 0.118, -0.295},
+        {-0.155, 0.23, 0.561}, {0.016, 0.4, 0.183}, {0.334, 0.518, -0.111},
+        {-0.228, 0.645, 0.687}, {-0.056, 0.816, 0.309}, {0.261, 0.934, 0.014},
+        {-0.171, -0.17, 0.378}, {0, 0, 0}, {0.317, 0.118, -0.295},
+        {-0.155, 0.23, 0.561}, {0.016, 0.4, 0.183}, {0.334, 0.518, -0.111},
+        {-0.228, 0.645, 0.687}, {-0.056, 0.816, 0.309}, {0.261, 0.934, 0.014},
+        {-0.28, 0.098, -0.28}, {0, 0, 0}, {0.145, -0.133, 0.357},
+        {-0.28, 0.474, -0.144}, {0, 0.376, 0.136}, {0.145, 0.244, 0.494},
+        {-0.198, 0.857, -0.06}, {0.082, 0.759, 0.22}, {0.227, 0.626, 0.578},
+        {-0.28, 0.098, -0.28}, {0, 0, 0}, {0.145, -0.133, 0.357},
+        {-0.28, 0.474, -0.144}, {0, 0.376, 0.136}, {0.145, 0.244, 0.494},
+        {-0.198, 0.857, -0.06}, {0.082, 0.759, 0.22}, {0.227, 0.626, 0.578}
+      ],
+      normals: [
+        {0.196, -0.04, 0.98}, {0, -0.04, 0.999}, {-0.196, -0.04, 0.98},
+        {0.196, 0.2, 0.96}, {0, 0.2, 0.98}, {-0.196, 0.2, 0.96},
+        {0.195, 0.319, 0.927}, {0, 0.319, 0.948}, {-0.195, 0.319, 0.927},
+        {-0.196, 0.04, -0.98}, {0, 0.04, -0.999}, {0.196, 0.04, -0.98},
+        {-0.196, -0.2, -0.96}, {0, -0.2, -0.98}, {0.196, -0.2, -0.96},
+        {-0.195, -0.319, -0.927}, {0, -0.319, -0.948}, {0.195, -0.319, -0.927},
+        {0.918, -0.261, 0.299}, {0.825, -0.331, 0.458}, {0.7, -0.39, 0.598},
+        {0.918, -0.04, 0.394}, {0.826, -0.11, 0.553}, {0.701, -0.168, 0.693},
+        {0.899, 0.076, 0.43}, {0.808, 0.006, 0.59}, {0.682, -0.052, 0.729},
+        {-0.918, 0.261, -0.299}, {-0.825, 0.331, -0.458}, {-0.7, 0.39, -0.598},
+        {-0.918, 0.04, -0.394}, {-0.826, 0.11, -0.553}, {-0.701, 0.168, -0.693},
+        {-0.899, -0.076, -0.43}, {-0.808, -0.006, -0.59}, {-0.682, 0.052, -0.729},
+        {-0.724, -0.308, 0.617}, {-0.844, -0.255, 0.471}, {-0.932, -0.195, 0.305},
+        {-0.715, -0.08, 0.694}, {-0.836, -0.027, 0.548}, {-0.924, 0.033, 0.382},
+        {-0.692, 0.039, 0.721}, {-0.813, 0.091, 0.575}, {-0.9, 0.151, 0.41},
+        {0.724, 0.308, -0.617}, {0.844, 0.255, -0.471}, {0.932, 0.195, -0.305},
+        {0.715, 0.08, -0.694}, {0.836, 0.027, -0.548}, {0.924, -0.033, -0.382},
+        {0.692, -0.039, -0.721}, {0.813, -0.091, -0.575}, {0.9, -0.151, -0.41}
+      ],
+      uvs: [
+        {0, 1}, {0.5, 1}, {1, 1}, {0, 0.5}, {0.5, 0.5}, {1, 0.5}, {0, 0}, {0.5, 0}, {1, 0},
+        {0, 1}, {0.5, 1}, {1, 1}, {0, 0.5}, {0.5, 0.5}, {1, 0.5}, {0, 0}, {0.5, 0}, {1, 0},
+        {0, 1}, {0.5, 1}, {1, 1}, {0, 0.5}, {0.5, 0.5}, {1, 0.5}, {0, 0}, {0.5, 0}, {1, 0},
+        {0, 1}, {0.5, 1}, {1, 1}, {0, 0.5}, {0.5, 0.5}, {1, 0.5}, {0, 0}, {0.5, 0}, {1, 0},
+        {0, 1}, {0.5, 1}, {1, 1}, {0, 0.5}, {0.5, 0.5}, {1, 0.5}, {0, 0}, {0.5, 0}, {1, 0},
+        {0, 1}, {0.5, 1}, {1, 1}, {0, 0.5}, {0.5, 0.5}, {1, 0.5}, {0, 0}, {0.5, 0}, {1, 0}
+      ],
+      indices: [
+        0, 1, 4, 0, 4, 3, 1, 2, 5, 1, 5, 4, 3, 4, 7, 3, 7, 6, 4, 5, 8, 4, 8, 7,
+        9, 13, 10, 9, 12, 13, 10, 14, 11, 10, 13, 14, 12, 16, 13, 12, 15, 16, 13, 17, 14, 13, 16, 17,
+        18, 19, 22, 18, 22, 21, 19, 20, 23, 19, 23, 22, 21, 22, 25, 21, 25, 24, 22, 23, 26, 22, 26, 25,
+        27, 31, 28, 27, 30, 31, 28, 32, 29, 28, 31, 32, 30, 34, 31, 30, 33, 34, 31, 35, 32, 31, 34, 35,
+        36, 37, 40, 36, 40, 39, 37, 38, 41, 37, 41, 40, 39, 40, 43, 39, 43, 42, 40, 41, 44, 40, 44, 43,
+        45, 49, 46, 45, 48, 49, 46, 50, 47, 46, 49, 50, 48, 52, 49, 48, 51, 52, 49, 53, 50, 49, 52, 53
+      ]
+    }
+  }
+
+  // A frond of a conifer branch: the card above along the whole branch and a second, narrower
+  // one over its outer half, banked off the first about the length of the branch, so the
+  // branch has depth. Its origin is the stem of the first, at the foot of the branch
+  prefab ForestFrondPairMesh {
+    Mesh3: {
+      vertices: [
+        {-0.5, 0, 0.1}, {0, 0, 0}, {0.5, 0, 0.1},
+        {-0.5, 0.5, 0.08}, {0, 0.5, -0.02}, {0.5, 0.5, 0.08},
+        {-0.5, 0.98, -0.06}, {0, 0.98, -0.16}, {0.5, 0.98, -0.06},
+        {-0.5, 0, 0.1}, {0, 0, 0}, {0.5, 0, 0.1},
+        {-0.5, 0.5, 0.08}, {0, 0.5, -0.02}, {0.5, 0.5, 0.08},
+        {-0.5, 0.98, -0.06}, {0, 0.98, -0.16}, {0.5, 0.98, -0.06},
+        {-0.235, 0.44, 0.216}, {0, 0.42, 0.02}, {0.292, 0.411, -0.071},
+        {-0.24, 0.727, 0.176}, {-0.006, 0.707, -0.019}, {0.286, 0.698, -0.11},
+        {-0.281, 0.997, 0.075}, {-0.046, 0.977, -0.121}, {0.246, 0.968, -0.211},
+        {-0.235, 0.44, 0.216}, {0, 0.42, 0.02}, {0.292, 0.411, -0.071},
+        {-0.24, 0.727, 0.176}, {-0.006, 0.707, -0.019}, {0.286, 0.698, -0.11},
+        {-0.281, 0.997, 0.075}, {-0.046, 0.977, -0.121}, {0.246, 0.968, -0.211}
+      ],
+      normals: [
+        {0.196, -0.04, 0.98}, {0, -0.04, 0.999}, {-0.196, -0.04, 0.98},
+        {0.196, 0.2, 0.96}, {0, 0.2, 0.98}, {-0.196, 0.2, 0.96},
+        {0.195, 0.319, 0.927}, {0, 0.319, 0.948}, {-0.195, 0.319, 0.927},
+        {-0.196, 0.04, -0.98}, {0, 0.04, -0.999}, {0.196, 0.04, -0.98},
+        {-0.196, -0.2, -0.96}, {0, -0.2, -0.98}, {0.196, -0.2, -0.96},
+        {-0.195, -0.319, -0.927}, {0, -0.319, -0.948}, {0.195, -0.319, -0.927},
+        {0.642, 0.035, 0.766}, {0.479, 0.046, 0.877}, {0.298, 0.054, 0.953},
+        {0.631, 0.28, 0.723}, {0.469, 0.291, 0.834}, {0.288, 0.299, 0.91},
+        {0.614, 0.399, 0.681}, {0.453, 0.41, 0.792}, {0.272, 0.418, 0.867},
+        {-0.642, -0.035, -0.766}, {-0.479, -0.046, -0.877}, {-0.298, -0.054, -0.953},
+        {-0.631, -0.28, -0.723}, {-0.469, -0.291, -0.834}, {-0.288, -0.299, -0.91},
+        {-0.614, -0.399, -0.681}, {-0.453, -0.41, -0.792}, {-0.272, -0.418, -0.867}
+      ],
+      uvs: [
+        {0, 1}, {0.5, 1}, {1, 1}, {0, 0.5}, {0.5, 0.5}, {1, 0.5}, {0, 0}, {0.5, 0}, {1, 0},
+        {0, 1}, {0.5, 1}, {1, 1}, {0, 0.5}, {0.5, 0.5}, {1, 0.5}, {0, 0}, {0.5, 0}, {1, 0},
+        {0, 1}, {0.5, 1}, {1, 1}, {0, 0.5}, {0.5, 0.5}, {1, 0.5}, {0, 0}, {0.5, 0}, {1, 0},
+        {0, 1}, {0.5, 1}, {1, 1}, {0, 0.5}, {0.5, 0.5}, {1, 0.5}, {0, 0}, {0.5, 0}, {1, 0}
+      ],
+      indices: [
+        0, 1, 4, 0, 4, 3, 1, 2, 5, 1, 5, 4, 3, 4, 7, 3, 7, 6, 4, 5, 8, 4, 8, 7,
+        9, 13, 10, 9, 12, 13, 10, 14, 11, 10, 13, 14, 12, 16, 13, 12, 15, 16, 13, 17, 14, 13, 16, 17,
+        18, 19, 22, 18, 22, 21, 19, 20, 23, 19, 23, 22, 21, 22, 25, 21, 25, 24, 22, 23, 26, 22, 26, 25,
+        27, 31, 28, 27, 30, 31, 28, 32, 29, 28, 31, 32, 30, 34, 31, 30, 33, 34, 31, 35, 32, 31, 34, 35
+      ]
+    }
+  }
+
+  // The leaves of each species. The season task recolors a species through the Rgb (or a Tint)
+  // of its first prefab; the B prefabs inherit it and only change the cluster
+  prefab ForestLeafBeech : ForestCardTripleMesh {
+    Rgb: {98, 138, 50}
+    PbrMaterial: {roughness: 0.75}
+    AlphaCutoff: {0.4}
+    DiffuseTransmission: {factor: 0.65, color: {226, 255, 150}}
+    PbrTextures: {albedo: leaf_beech_albedo, normal: leaf_beech_normal}
+  }
+
+  prefab ForestLeafBeechB : ForestLeafBeech {
+    PbrTextures: {albedo: leaf_beech_b_albedo, normal: leaf_beech_b_normal}
+  }
+
+  prefab ForestLeafOak : ForestCardTripleMesh {
+    Rgb: {76, 112, 42}
+    PbrMaterial: {roughness: 0.8}
+    AlphaCutoff: {0.4}
+    DiffuseTransmission: {factor: 0.5, color: {214, 255, 140}}
+    PbrTextures: {albedo: leaf_oak_albedo, normal: leaf_oak_normal}
+  }
+
+  prefab ForestLeafOakB : ForestLeafOak {
+    PbrTextures: {albedo: leaf_oak_b_albedo, normal: leaf_oak_b_normal}
+  }
+
+  prefab ForestLeafBirch : ForestCardTripleMesh {
+    Rgb: {118, 156, 58}
+    PbrMaterial: {roughness: 0.72}
+    AlphaCutoff: {0.4}
+    DiffuseTransmission: {factor: 0.7, color: {232, 255, 160}}
+    PbrTextures: {albedo: leaf_birch_albedo, normal: leaf_birch_normal}
+  }
+
+  prefab ForestLeafBirchB : ForestLeafBirch {
+    PbrTextures: {albedo: leaf_birch_b_albedo, normal: leaf_birch_b_normal}
+  }
+
+  // The needles stay green all year
+  prefab ForestNeedleSpruce : ForestFrondPairMesh {
+    Rgb: {52, 86, 50}
+    PbrMaterial: {roughness: 0.85}
+    AlphaCutoff: {0.4}
+    DiffuseTransmission: {factor: 0.15, color: {150, 200, 120}}
+    PbrTextures: {albedo: leaf_spruce_albedo, normal: leaf_spruce_normal}
+  }
+
+  prefab ForestNeedleFir : ForestFrondPairMesh {
+    Rgb: {44, 80, 54}
+    PbrMaterial: {roughness: 0.85}
+    AlphaCutoff: {0.4}
+    DiffuseTransmission: {factor: 0.12, color: {150, 200, 120}}
+    PbrTextures: {albedo: leaf_fir_albedo, normal: leaf_fir_normal}
+  }
+}

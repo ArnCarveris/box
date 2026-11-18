@@ -2,12 +2,17 @@
 // the time of day, set with the sliders of the panel (H hides it). Fly with the camera controller.
 //
 // One file per concern in forest/: the state the sliders write, the layout functions that place
-// things, the materials, the ground, the sky and light, the view and the HUD.
+// things, the materials, the ground, the bark, leaves and trees and the stands they grow in, the
+// sky and light, the view and the HUD.
 include ui/widgets
 include forest/state
 include forest/layout
 include forest/materials
 include forest/ground
+include forest/bark
+include forest/leaves
+include forest/trees
+include forest/stands
 include forest/sky
 include forest/view
 include forest/hud
