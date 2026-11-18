@@ -463,6 +463,34 @@
                     "mistakes",
                     "first_mistake_only"
                 ]
+            },
+            {
+                "id": "Card",
+                "testcases": [
+                    "enum_reflects",
+                    "script_value",
+                    "block",
+                    "other_shapes_unchanged",
+                    "pool_bytes",
+                    "max_clamped",
+                    "shape_change_empties_pool",
+                    "orientation_unit",
+                    "orientation_spread",
+                    "same_seed_same_draws",
+                    "other_seed_other_draws",
+                    "streams_own",
+                    "turn_keeps_axis",
+                    "turn_shows_edge",
+                    "turn_full_circle",
+                    "ease",
+                    "flat_lies_flat",
+                    "flat_keeps_heading",
+                    "flat_zero_unchanged",
+                    "rest_stops_turning",
+                    "in_air_turns",
+                    "rests",
+                    "word"
+                ]
             }
         ]
     }

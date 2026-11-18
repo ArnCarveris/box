@@ -789,7 +789,8 @@ static void box_gpu_particle_upload(
         d->block = (uint32_t)i;
         d->used = b->used;
         d->blend = b->blend;
-        d->texture = box_gpu_texture_color(gpu, b->look == ParticleSprite ? pool->texture : 0);
+        d->texture = box_gpu_texture_color(gpu,
+            b->look == ParticleSprite || b->look == ParticleCard ? pool->texture : 0);
         d->soft = b->softness > 0;
         d->origin[0] = b->model[3][0];
         d->origin[1] = b->model[3][1];

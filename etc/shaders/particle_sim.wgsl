@@ -8,7 +8,8 @@
 // speed from the seed and its spawn index, each from its own stream, and adds the velocity it
 // inherits from the emitter; the C twin is box_particle_* in src/particle/simulate.h. A local
 // emitter spawns, moves and keeps its particles in its space, under its world forces turned
-// into that space.
+// into that space. A ParticleCard pool keeps a card word per particle after its slots, which
+// integrate sets once the card comes to rest on the ground plane and spawn clears.
 #include "include/lights.wgsl"
 #include "include/particle.wgsl"
 
@@ -36,6 +37,45 @@ struct Batch {
 // The pool and the chunk of it of every workgroup of the dispatches of the packet
 @group(0) @binding(9) var<storage, read> work: array<vec2u>;
 @group(0) @binding(10) var<uniform> batch: Batch;
+
+// Write the card word of the particle in slot i of a ParticleCard pool, as particle_card_word
+// reads it. Every invocation writes a member of its own, so neighbours share the slot safely.
+fn particle_card_store(base: u32, cards: u32, i: u32, word: u32) {
+    let k = base + cards + i / CARD_WORDS;
+    switch (i % CARD_WORDS) {
+        case 0u: { particles[k].position.x = bitcast<f32>(word); }
+        case 1u: { particles[k].position.y = bitcast<f32>(word); }
+        case 2u: { particles[k].position.z = bitcast<f32>(word); }
+        case 3u: { particles[k].remaining = word; }
+        case 4u: { particles[k].velocity.x = bitcast<f32>(word); }
+        case 5u: { particles[k].velocity.y = bitcast<f32>(word); }
+        case 6u: { particles[k].velocity.z = bitcast<f32>(word); }
+        default: { particles[k].index = word; }
+    }
+}
+
+// Have a card in the air that came to rest on the ground plane after its step remember the age
+// it came to rest at, 1 plus its microseconds, so the draw stops turning it and lays it flat.
+fn card_rest(emitter: Emitter, i: u32, p: Particle) {
+    let base = emitter.gradient_max.z;
+    if (particle_card_word(base, emitter.life.w, i) != 0u) {
+        return;
+    }
+
+    var position = p.position;
+    var velocity = p.velocity;
+    if (emitter.gradient_max.w != 0u) {
+        position = (emitter.model * vec4f(p.position, 1.0)).xyz;
+        velocity = (emitter.model * vec4f(p.velocity, 0.0)).xyz;
+    }
+
+    if (particle_card_rests(emitter.collide, position.y, length(velocity), emitter.ground.x,
+        emitter.turbulence.z))
+    {
+        let life = particle_life(emitter.spawn.y, p.index, emitter.life.y, emitter.life.z);
+        particle_card_store(base, emitter.life.w, i, life - p.remaining + 1u);
+    }
+}
 
 @compute @workgroup_size(256)
 fn integrate(@builtin(workgroup_id) group: vec3u, @builtin(local_invocation_id) local: vec3u) {
@@ -86,6 +126,8 @@ fn integrate(@builtin(workgroup_id) group: vec3u, @builtin(local_invocation_id) 
 
         if (!alive) {
             p.remaining = 0u;
+        } else if (emitter.life.w != 0u) {
+            card_rest(emitter, i, p);
         }
     }
 
@@ -142,4 +184,7 @@ fn spawn(@builtin(workgroup_id) group: vec3u, @builtin(local_invocation_id) lane
     }
 
     particles[emitter.gradient_max.z + slot] = p;
+    if (emitter.life.w != 0u) {
+        particle_card_store(emitter.gradient_max.z, emitter.life.w, slot, 0u);
+    }
 }

@@ -1,5 +1,7 @@
 // Particle draw: one instanced draw per blend and sprite of the pools of the scene of a view,
-// every instance a slot of a chunk of CHUNK slots of a pool that the chunk buffer names.
+// every instance a slot of a chunk of CHUNK slots of a pool that the chunk buffer names. A
+// circle or sprite faces the camera; a card is a quad in world space that tumbles around its
+// axis and lies flat once it rests on the ground plane.
 #include "include/lights.wgsl"
 #include "include/shadow.wgsl"
 #include "include/cookie.wgsl"
@@ -46,6 +48,13 @@ struct VertexOut {
     // x: softness, y: fraction lit
     @location(9) @interpolate(flat) params: vec2f,
 };
+
+// Screen width in pixels a card seen edge on keeps, so it shows as a thin line without holes.
+const CARD_MIN_PIXELS: f32 = 1.5;
+
+// Share of its size a card at rest is lifted above the ground plane once it lies flat, so it
+// does not fight the depth of the ground it lies on.
+const CARD_REST_LIFT: f32 = 0.02;
 
 // Corners of the two triangles of the quad.
 const CORNERS = array<vec2f, 6>(
@@ -129,9 +138,59 @@ fn vs(@builtin(vertex_index) vertex: u32, @builtin(instance_index) instance: u32
     }
 
     let turned = axis_x * (corner.x * stretched) + axis_y * corner.y;
-    let world = center + (right * turned.x + up * turned.y) * (0.5 * size);
+    var world = center + (right * turned.x + up * turned.y) * (0.5 * size);
+    if (emitter.look.x == PARTICLE_CARD) {
+        // The rotation around its axis, held at the age it came to rest once it rests
+        let word = particle_card_word(emitter.gradient_max.z, emitter.life.w, slot);
+        var rested = -1.0;
+        var landed = 0.0;
+        if (word != 0u) {
+            let at = f32(word - 1u) * 1e-6;
+            rested = age - at;
+            landed = radians(particle_rotation(rotation, spin, emitter.curve_rows.z,
+                emitter.curve_max.z, emitter.curve_values.z,
+                particle_curve_blend(seed, p.index, CURVE_ROTATION, emitter.curve_max.z),
+                emitter.curve_rows.w, emitter.curve_max.w, emitter.curve_values.w,
+                particle_curve_blend(seed, p.index, CURVE_SPIN, emitter.curve_max.w), at,
+                life));
+        }
+
+        let q = particle_card(seed, p.index, angle, landed, rested);
+        let ex = particle_quat_rotate(q, vec3f(1.0, 0.0, 0.0));
+        let ey = particle_quat_rotate(q, vec3f(0.0, 1.0, 0.0));
+        let n = particle_quat_rotate(q, vec3f(0.0, 0.0, 1.0));
+        let offset = ex * corner.x + ey * corner.y;
+        let ortho = view.lights.w != 0u;
+        let to_eye = view.camera.xyz - center;
+        let eye = select(to_eye * inverseSqrt(max(dot(to_eye, to_eye), 1e-12)), toward,
+            ortho || dot(to_eye, to_eye) <= 1e-12);
+        let facing = dot(n, eye);
+        let side = select(-1.0, 1.0, facing >= 0.0);
+        out.normal = n * side;
+
+        // Widen a card seen near edge on to CARD_MIN_PIXELS across: move the corners along the
+        // screen direction the card is thin in, by the share of the size it lacks.
+        let distance = select(max(-(view.view * vec4f(center, 1.0)).z, 0.0), 1.0, ortho);
+        let pixel = 2.0 * view.cluster.y * distance / max(view.viewport.y, 1.0);
+        let lack = max(CARD_MIN_PIXELS * pixel / max(size, 1e-6) - abs(facing), 0.0);
+        let thin = n - eye * facing;
+        let thin_len = length(thin);
+        var widen = vec3f(0.0);
+        if (lack > 0.0 && thin_len > 1e-6) {
+            let across = (eye - n * facing) / thin_len;
+            widen = thin / thin_len * (-side * lack * dot(offset, across));
+        }
+
+        var lift = 0.0;
+        if (rested >= 0.0) {
+            lift = CARD_REST_LIFT * size * particle_card_ease(rested);
+        }
+
+        world = center + (offset + widen) * (0.5 * size) + vec3f(0.0, lift, 0.0);
+    }
+
     out.uv = corner;
-    if (emitter.look.x == PARTICLE_SPRITE) {
+    if (emitter.look.x == PARTICLE_SPRITE || emitter.look.x == PARTICLE_CARD) {
         let frame = particle_frame(emitter.look.z, emitter.look.w, emitter.params.x, age,
             life);
         let rect = particle_frame_rect(frame, emitter.look.z, emitter.look.w);
@@ -232,7 +291,7 @@ fn fs(in: VertexOut) -> @location(0) vec4f {
     if (in.look.x == PARTICLE_CIRCLE) {
         // smoothstep(1, 0, d2), written with ascending edges
         alpha *= 1.0 - smoothstep(0.0, 1.0, dot(in.uv, in.uv));
-    } else if (in.look.x == PARTICLE_SPRITE) {
+    } else if (in.look.x == PARTICLE_SPRITE || in.look.x == PARTICLE_CARD) {
         color *= texel.rgb;
         alpha *= texel.a;
     }

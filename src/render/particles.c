@@ -53,7 +53,9 @@ typedef struct box_particle_pool_t {
     int32_t max;            /**< Clamped ParticleEmitter.max the pool was made for */
     uint32_t page;          /**< Index of its page plus one, 0 for none */
     uint32_t base;          /**< First slot of the pool in the arena */
-    uint32_t capacity;      /**< Slots of the pool */
+    uint32_t capacity;      /**< Particle slots of the pool */
+    bool card;              /**< The pool keeps the card words of ParticleCard after its
+                             *   particle slots */
     bool fresh;             /**< The range was not cleared on the backend yet */
     bool seen;              /**< The emitter is enabled in this frame */
     bool kept;              /**< The emitter of an effect instance was disabled, so the pool
@@ -310,12 +312,24 @@ static void box_particles_arena_release(
     }
 }
 
+/** Get the slots of the range of a pool: its particle slots, and for a ParticleCard pool the
+ * slots of its card words after them.
+ *
+ * @param pool The pool, its capacity and card set
+ * @return The slots
+ */
+static uint32_t box_particles_range_slots(
+    const box_particle_pool_t *pool)
+{
+    return pool->capacity + (pool->card ? box_particle_card_slots(pool->capacity) : 0u);
+}
+
 /** Give a pool a range of slots in a page of its size: a page of that size with a free range,
  * else an empty page of as many slots, else a new page at the end of the arena.
  *
  * @param s The state
  * @param p The packet, receives the arena when it grows
- * @param pool The pool, its capacity set
+ * @param pool The pool, its capacity and card set
  */
 static void box_particles_range_alloc(
     box_render_particles_t *s,
@@ -323,14 +337,15 @@ static void box_particles_range_alloc(
     box_particle_pool_t *pool)
 {
     box_particle_page_t *page = NULL;
-    uint32_t pools = BOX_PARTICLE_PAGE_SLOTS / pool->capacity, bit;
+    uint32_t range = box_particles_range_slots(pool);
+    uint32_t pools = BOX_PARTICLE_PAGE_SLOTS / range, bit;
     int32_t i, index = -1;
     pools = pools < 1 ? 1 : pools > BOX_PARTICLE_PAGE_POOLS ? BOX_PARTICLE_PAGE_POOLS : pools;
     for (i = 0; i < ecs_vec_count(&s->pages); i ++) {
         box_particle_page_t *candidate = ecs_vec_get_t(&s->pages, box_particle_page_t, i);
         uint64_t full = candidate->pools >= 64 ? UINT64_MAX
             : (((uint64_t)1 << candidate->pools) - 1);
-        if (candidate->capacity == pool->capacity && candidate->occupied != full) {
+        if (candidate->capacity == range && candidate->occupied != full) {
             index = i;
             break;
         }
@@ -338,8 +353,8 @@ static void box_particles_range_alloc(
 
     for (i = 0; index < 0 && i < ecs_vec_count(&s->pages); i ++) {
         box_particle_page_t *candidate = ecs_vec_get_t(&s->pages, box_particle_page_t, i);
-        if (!candidate->occupied && candidate->slots == pools * pool->capacity) {
-            candidate->capacity = pool->capacity;
+        if (!candidate->occupied && candidate->slots == pools * range) {
+            candidate->capacity = range;
             candidate->pools = pools;
             index = i;
         }
@@ -349,8 +364,8 @@ static void box_particles_range_alloc(
         page = ecs_vec_append_t(NULL, &s->pages, box_particle_page_t);
         ecs_os_memset_t(page, 0, box_particle_page_t);
         page->base = s->arena_slots;
-        page->slots = pools * pool->capacity;
-        page->capacity = pool->capacity;
+        page->slots = pools * range;
+        page->capacity = range;
         page->pools = pools;
         s->arena_slots += page->slots;
         index = ecs_vec_count(&s->pages) - 1;
@@ -435,18 +450,21 @@ static void box_particles_table_free(
  * @param p The packet
  * @param e The emitter
  * @param max Clamped ParticleEmitter.max, at least 1
+ * @param card The emitter draws ParticleCard, which keeps card words
  * @return The pool
  */
 static box_particle_pool_t* box_particles_pool_new(
     box_render_particles_t *s,
     box_render_packet_t *p,
     ecs_entity_t e,
-    int32_t max)
+    int32_t max,
+    bool card)
 {
     box_particle_pool_t *result = ecs_os_calloc_t(box_particle_pool_t);
     result->entity = e;
     result->max = max;
     result->capacity = box_particles_class(max);
+    result->card = card;
     ecs_vec_init_t(NULL, &result->deaths, box_particle_death_t, 0);
     ecs_vec_init_t(NULL, &result->free_slots, uint32_t, 0);
     box_particles_range_alloc(s, p, result);
@@ -1098,7 +1116,7 @@ static void box_particles_block_look(
         out->softness = look->softness > 0 ? look->softness * scale : 0.0f;
         out->stretch = look->stretch > 0 && scale > 0 ? look->stretch / scale : 0.0f;
         out->lit = glm_clamp(look->lit, 0.0f, 1.0f);
-        if (look->shape != ParticleSprite) {
+        if (look->shape != ParticleSprite && look->shape != ParticleCard) {
             out->look = ParticleCircle;
         }
     }
@@ -1117,7 +1135,9 @@ static uint32_t box_particles_texture(
     const ParticleAppearance *look)
 {
     uint32_t result = 0;
-    if (look && look->shape == ParticleSprite && look->texture) {
+    if (look && (look->shape == ParticleSprite || look->shape == ParticleCard) &&
+        look->texture)
+    {
         result = box_textures_handle(box_textures_get(world), look->texture);
     }
 
@@ -1252,7 +1272,9 @@ static void box_particles_emitter(
     const box_particles_light_t *lights,
     ParticleStats *stats)
 {
-    int32_t max = emitter->max > BOX_PARTICLE_MAX ? BOX_PARTICLE_MAX : emitter->max;
+    bool card = look && look->shape == ParticleCard;
+    int32_t limit = card ? BOX_PARTICLE_MAX / 2 : BOX_PARTICLE_MAX;
+    int32_t max = emitter->max > limit ? limit : emitter->max;
     box_particle_pool_t *pool = ecs_map_get_deref(&s->by_entity, box_particle_pool_t, e);
     uint32_t life_min = box_particle_us(emitter->lifetime.min);
     uint32_t life_max = box_particle_us(emitter->lifetime.max);
@@ -1269,12 +1291,13 @@ static void box_particles_emitter(
     }
 
     if (!pool) {
-        pool = box_particles_pool_new(s, p, e, max);
-    } else if (pool->max != max) {
+        pool = box_particles_pool_new(s, p, e, max, card);
+    } else if (pool->max != max || pool->card != card) {
         box_particles_range_free(s, p, pool);
         box_particles_empty(pool);
         pool->max = max;
         pool->capacity = box_particles_class(max);
+        pool->card = card;
         box_particles_range_alloc(s, p, pool);
     }
 
@@ -1358,7 +1381,7 @@ static void box_particles_emitter(
     entry->scene = scene;
     entry->buffer = BOX_RENDER_BUFFER_PARTICLE_FIRST;
     entry->offset = pool->base * BOX_RENDER_PARTICLE_SIZE;
-    entry->capacity = pool->capacity;
+    entry->capacity = box_particles_range_slots(pool);
     entry->clear = pool->fresh;
     entry->table = pool->table ? BOX_RENDER_BUFFER_PARTICLE_TABLE_FIRST : 0;
     entry->slots = slots;
@@ -1407,6 +1430,7 @@ static void box_particles_emitter(
     entry->block.delta_us = age_us;
     entry->block.life_min = life_min;
     entry->block.life_span = life_max > life_min ? life_max - life_min : 0;
+    entry->block.cards = pool->card ? pool->capacity : 0u;
     pool->fresh = false;
     if (emitter->linger) {
         pool->entry = *entry;

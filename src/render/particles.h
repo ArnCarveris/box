@@ -64,7 +64,8 @@ typedef struct box_render_particle_block_t {
     uint32_t delta_us;      /**< Microseconds of the frame */
     uint32_t life_min;      /**< Shortest lifetime in microseconds */
     uint32_t life_span;     /**< Microseconds the longest lifetime is above life_min */
-    uint32_t pad0;          /**< Padding to the vec4 of Emitter */
+    uint32_t cards;         /**< Slot of the card words of a ParticleCard pool from the
+                             *   start of the pool, its particle slots, 0 for other shapes */
     float wind[4];          /**< World velocity the drag pulls toward, w the drag rate */
     float turbulence[4];    /**< Acceleration of the wander field, y its frequency scale, z the
                              *   uniform world scale of the emitter, which multiplies the
@@ -120,7 +121,8 @@ typedef struct box_render_particle_pool_t {
     ecs_entity_t scene;     /**< Scene root of the emitter, 0 for the default scene */
     uint32_t buffer;        /**< Handle of the particle arena */
     uint32_t offset;        /**< Byte offset of the pool in the arena */
-    uint32_t capacity;      /**< Slots of the pool */
+    uint32_t capacity;      /**< Slots of the pool, with the card words of a ParticleCard
+                             *   pool after its particle slots */
     bool clear;             /**< The range is zeroed before the passes, for a new pool */
     uint32_t table;         /**< Buffer handle of the mesh tables, 0 for none */
     uint32_t slots;         /**< Data offset of the block.count uint32_t spawn slots */

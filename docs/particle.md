@@ -21,7 +21,7 @@ a run is the same every time. Curve authoring (every curve field, recipes, error
 | `ParticleMotion` | `Motion` | `velocity_x/_y/_z`, `force_x/_y/_z`, `speed`, `drag`: over life, GPU |
 | `ParticleTimeline` | `Timeline` | `period`, `loop`, `rate`, `speed`: multiply emission over the playback clock, CPU |
 | `ParticleLight` | `box.particle.Light` | `intensity` (1), `curve`, `period`, `loop`, `fade`: drives the emitter's `PointLight`/`SpotLight` |
-| `ParticleAppearance` | `Appearance` | `shape` (`Circle`/`Sprite`), `blend` (`Alpha`/`Additive`), `texture`, `columns`, `rows`, `fps` (0 = sheet once over life), `softness`, `stretch`, `lit` (0..1) |
+| `ParticleAppearance` | `Appearance` | `shape` (`Circle`/`Sprite`/`Card`), `blend` (`Alpha`/`Additive`), `texture`, `columns`, `rows`, `fps` (0 = sheet once over life), `softness`, `stretch`, `lit` (0..1) |
 | `EffectFlash` | `EffectFlash` | `intensity` (0 = the light's), `seconds` (0 = 0.2 s): flash of a `PointLight` per effect play |
 | `ParticleSettings` | `box.particle.Settings` | singleton: `effect_max`, `effect_total` (0 = any), `effect_overflow` (`EffectRecycle`/`EffectSkip`/`EffectMerge`), `effect_distance`, `effect_merge` |
 | `ParticleEffect` | `Effect` | on an effect instance root: `effect`, `scale`, `time`, `emit`, `retire` |
@@ -145,6 +145,31 @@ get $ box.particle.Stats
   bloom (colors > 1 bloom) with atmosphere aerial perspective. Draw order: alpha before additive,
   then by sprite, then farthest emitter first; no per-particle sort.
 - Spin is invisible on the default circle: use a sprite.
+- `ParticleCard` draws the texture (sheet frames as a sprite) on a world space quad that tumbles:
+  each particle draws a random initial orientation and a random world axis from streams of its
+  own; `rotation` is the initial angle and `spin` (with the `rotation`/`spin` curves) the
+  angular speed around that axis. Both sides are lit (the normal faces the camera); edge on it
+  keeps 1.5 pixels of width. With a `Collision` ground (not `die`), a card within 0.01 units of
+  the plane and slower than 0.5 units/s (both times world scale) rests: it stops turning and
+  eases flat (normal to ±Y, keeping its heading, lifted 2% of its size off the plane against
+  depth fighting) until it dies, so give it an opacity fade.
+  Orientations stay in world directions also for `local` emitters; `stretch` does not apply.
+- A card pool keeps a 4-byte card word per particle after its slots (`max` 1000: 1152 slots
+  instead of 1024, 14 pools per page instead of 16) and clamps `max` to half
+  `BOX_PARTICLE_MAX`; other shapes keep their pools unchanged. Switching to or from `Card`
+  empties the pool.
+
+```flecs
+leaves {
+  Position: {0, 4, 0}
+  Emitter: {max: 300, rate: 30, shape: EmitterBox, extents: {3, 0.2, 3}, direction: {0, 0, 0},
+    lifetime: {8, 8}, size: {0.25, 0.35}, spin: {90, 240}, seed: 3}
+  Forces: {drag: 2.5, turbulence: 1.5}
+  Collision: {bounce: 0.1, friction: 0.6}
+  Appearance: {shape: Card, texture: leaf, lit: 1}
+  Curves: {opacity: {keys: [{0, 1}, {0.85, 1}, {1, 0}]}}
+}
+```
 - Each drawn property has its own random stream: changing one range keeps the other draws.
 - Scenes write `box.particle.Light` and `box.particle.Settings` qualified (`Settings` also exists
   in `box.audio`).

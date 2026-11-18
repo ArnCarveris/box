@@ -136,9 +136,10 @@ ECS_STRUCT(ParticleEmitter, {
     ParticleRange lifetime; /**< Seconds a particle lives, default {1, 2} */
     ParticleRange size;     /**< Diameter of the drawn circle in world units, default
                              *   {0.1, 0.1} */
-    ParticleRange rotation; /**< Initial rotation in degrees around the view axis, default
-                             *   {0, 0} */
-    ParticleRange spin;     /**< Rotation in degrees per second, default {0, 0} */
+    ParticleRange rotation; /**< Initial rotation in degrees around the view axis, or around
+                             *   the axis of a ParticleCard, default {0, 0} */
+    ParticleRange spin;     /**< Rotation in degrees per second, the angular speed around the
+                             *   axis of a ParticleCard, default {0, 0} */
     ParticleRange opacity;  /**< Opacity the color is drawn with, default {1, 1} */
     vec3 acceleration;      /**< Acceleration in world units per second squared, default
                              *   {0, 0, 0} */
@@ -352,7 +353,20 @@ ECS_STRUCT(ParticleMotion, {
 /** What a particle is drawn as */
 ECS_ENUM(ParticleShape, {
     ParticleCircle = 0,     /**< A soft round sprite, the look without an appearance */
-    ParticleSprite = 1      /**< The texture of the appearance over a sheet of frames */
+    ParticleSprite = 1,     /**< The texture of the appearance over a sheet of frames */
+    ParticleCard = 2        /**< The texture of the appearance, as a sprite, on a quad in world
+                             *   space that tumbles around an axis of its own: each particle
+                             *   draws its initial orientation and its axis from streams of its
+                             *   own, ParticleEmitter.rotation is its initial angle around the
+                             *   axis and spin with the rotation and spin curves turns it, so it
+                             *   shows its face and its edge. Both sides are shaded, with the
+                             *   normal toward the camera, and a card seen edge on keeps a width
+                             *   of 1.5 pixels. With a ground plane of ParticleCollision a card that
+                             *   comes to rest on it, slower than half a world unit a second
+                             *   times the world scale, stops turning and eases to lie flat on
+                             *   it until it dies, for leaves, petals and needles. Its pool keeps
+                             *   4 bytes more per particle and max is clamped to half
+                             *   BOX_PARTICLE_MAX; stretch does not apply */
 });
 
 /** How the particles of an emitter blend with the image */
@@ -371,7 +385,8 @@ ECS_ENUM(ParticleBlend, {
 ECS_STRUCT(ParticleAppearance, {
     ParticleShape shape;    /**< What a particle is drawn as, default ParticleCircle */
     ParticleBlend blend;    /**< How it blends, default ParticleAlpha */
-    ecs_entity_t texture;   /**< TexturePath or Texture entity a sprite reads, white without */
+    ecs_entity_t texture;   /**< TexturePath or Texture entity a sprite or card reads, white
+                             *   without */
     int32_t columns;        /**< Frames across the texture, 0 and 1 for one */
     int32_t rows;           /**< Frames down the texture, 0 and 1 for one, read row by row */
     float fps;              /**< Frames a second, 0 to play the sheet once over the life */
