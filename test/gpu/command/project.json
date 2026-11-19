@@ -56,6 +56,16 @@
                     "http_resource",
                     "resources_in_tmp_dir"
                 ]
+            },
+            {
+                "id": "Portal",
+                "testcases": [
+                    "status_follows_camera",
+                    "freeze_keeps_traversal",
+                    "lines_are_drawn",
+                    "lines_without_culling",
+                    "areas_and_occluders_are_drawn"
+                ]
             }
         ]
     }

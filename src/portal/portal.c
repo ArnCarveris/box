@@ -47,6 +47,8 @@ void BoxPortalImport(
     ECS_META_COMPONENT(world, VisOccluder);
     ECS_META_COMPONENT(world, PortalSensor);
     ECS_META_COMPONENT(world, PortalStatus);
+    ECS_META_COMPONENT(world, PortalTreeEntry);
+    ECS_META_COMPONENT(world, PortalTree);
 
     box_portal_index_import(world);
     box_portal_sensors_import(world);

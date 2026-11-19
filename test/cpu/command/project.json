@@ -226,6 +226,22 @@
                     "aspect_of_view_surface",
                     "aspect_of_claimed_view_surface"
                 ]
+            },
+            {
+                "id": "Portal",
+                "testcases": [
+                    "cull_toggles",
+                    "options_write_members",
+                    "named_view",
+                    "not_a_view",
+                    "no_view",
+                    "invalid_state",
+                    "status_without_traversal",
+                    "status_prints_traversal",
+                    "tree_prints_entries",
+                    "tree_limits_rows",
+                    "help_lists_portal"
+                ]
             }
         ]
     }

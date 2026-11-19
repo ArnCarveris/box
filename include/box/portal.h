@@ -152,6 +152,30 @@ ECS_STRUCT(PortalStatus, {
     bool outdoors;          /**< The outdoors is seen */
     bool culling;           /**< The view culls by what was seen: false when the traversal ran
                              *   out of entries, so the view draws every area */
+    bool frozen;            /**< The traversal is from where the camera was when
+                             *   CullSettings.freeze_portals was set */
+    bool truncated;         /**< The traversal ran out of entries */
+});
+
+/** Entries of PortalTree at most, the entries a traversal visits at most */
+#define BOX_PORTAL_TREE_MAX (127)
+
+/** An area as seen through a chain of portals, one entry of PortalTree */
+ECS_STRUCT(PortalTreeEntry, {
+    ecs_entity_t area;      /**< The area, 0 for the outdoors */
+    ecs_entity_t via;       /**< Portal it was reached through, 0 for the area of the camera */
+    int32_t depth;          /**< Portals between the camera and the area */
+    bool sky_only;          /**< Only the sky is seen in it */
+});
+
+/** The portals the camera of a view looked through, set with PortalStatus on the View entity of
+ * a view with CullSettings.portals when it changes. A parent comes before its children.
+ * Read only.
+ */
+ECS_STRUCT(PortalTree, {
+    int32_t count;          /**< Entries in use */
+    PortalTreeEntry entries[127]; /**< The BOX_PORTAL_TREE_MAX entries, the first is the area of
+                                   *   the camera */
 });
 
 /** Register the box.portal module.

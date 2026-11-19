@@ -51,6 +51,7 @@ static void box_portal_index_release(
         ecs_vec_fini_t(NULL, &index->links, int32_t);
         ecs_vec_fini_t(NULL, &index->occluders, box_portal_occluder_t);
         ecs_map_fini(&index->frames);
+        box_portal_freeze_fini(index);
         ecs_os_free(index);
         ecs_os_free(ref);
     }
@@ -755,6 +756,7 @@ void box_portal_index_import(
     ecs_vec_init_t(NULL, &index->links, int32_t, 0);
     ecs_vec_init_t(NULL, &index->occluders, box_portal_occluder_t, 0);
     ecs_map_init(&index->frames, NULL);
+    ecs_map_init(&index->frozen, NULL);
     index->dirty = true;
     ref->index = index;
     ref->refs = 4;

@@ -100,7 +100,7 @@ static bool box_portal_opening_holds(
  * @param min Receives the smallest corner of the box around them
  * @param max Receives the largest corner of the box around them
  */
-static void box_portal_occluder_corners(
+void box_portal_occluder_corners(
     const box_portal_occluder_t *o,
     const float *eye,
     float *normal,

@@ -126,6 +126,14 @@ typedef enum box_cmd_switch_t {
     BoxCmdSwitchToggle = 2 /**< Flip the current state, when no argument is given */
 } box_cmd_switch_t;
 
+/** Register the portal command that prints the portal options and the traversal of a view, and
+ * its subcommands portal.cull, freeze, lines, areas, occluders, tree and status.
+ *
+ * @param world The world
+ */
+void box_cmd_portal_init(
+    ecs_world_t *world);
+
 /** Register the audio command that prints the status of the audio and its subcommands, such
  * as audio.volume, audio.capture and audio.plot.
  *

@@ -119,6 +119,7 @@ void BoxViewImport(
     ECS_META_COMPONENT(world, WireframeMode);
     ECS_META_COMPONENT(world, OverdrawMode);
     ECS_META_COMPONENT(world, BvhDebug);
+    ECS_META_COMPONENT(world, PortalDebug);
     ecs_set_name_prefix(world, "View");
     ECS_META_COMPONENT(world, ViewDebug);
     ecs_set_name_prefix(world, NULL);

@@ -113,6 +113,9 @@ ECS_STRUCT(CullSettings, {
     bool portals;           /**< In a scene with areas (VisArea), draw only the instances in the
                              *   areas the camera sees from its area through open portals
                              *   (box.portal); needs enabled and a perspective camera */
+    bool freeze_portals;    /**< Keep looking from where the camera was when this was set: the
+                             *   areas drawn stay those it saw from there while it moves, and
+                             *   what lies outside them stays hidden. Needs portals */
 });
 
 /** Settings of the infinite grid a view draws in its debug pass: the plane y = height, with
@@ -190,6 +193,22 @@ ECS_STRUCT(BvhDebug, {
 /** Boxes of the BVH debug view (BvhDebug) a view draws at most */
 #define BOX_VIEW_DEBUG_BOXES_MAX (1048576)
 
+/** Lines of the portal world of the scene of a view (ViewDebug.portal), drawn with the boxes of
+ * BvhDebug but over everything, so the rooms behind a wall show. They need a perspective camera
+ * and a scene with areas, not CullSettings.portals.
+ *
+ * The outline of a portal is green when the camera looked through it, cyan when only the sky
+ * is seen through it, amber when it was left out and red when it is shut. The part of it that
+ * a frustum leaves is white. The outline of an area is cyan for the area of the camera and green
+ * for those it sees. An occluder is violet.
+ */
+ECS_STRUCT(PortalDebug, {
+    bool lines;             /**< Outlines of the portals of the areas the camera sees, and the
+                             *   part of each of them that a frustum leaves */
+    bool areas;             /**< Volumes of the areas the camera sees */
+    bool occluders;         /**< Occluders in the areas the camera sees */
+});
+
 /** Debug drawing of a view, in a pass after its effects into the color of its target, with the
  * depth of the view read only. All zero (a C literal View) draws nothing and records no pass.
  *
@@ -222,6 +241,7 @@ ECS_STRUCT(ViewDebug, {
                              *   spacing for a light probe and 0.25 for a reflection probe;
                              *   default 0 */
     BvhDebug bvh;           /**< Boxes of the trees of the spatial index, default none */
+    PortalDebug portal;     /**< Lines of the portals, areas and occluders, default none */
 });
 
 /** Distances at which a view draws the shapes with segment counts (round shapes, RoundedBox,

@@ -4,6 +4,7 @@
  */
 
 #include "render.h"
+#include "debug_portals.h"
 #include "../spatial/spatial.h"
 
 /** Walk of one tree for the boxes of a view */
@@ -50,7 +51,8 @@ static bool box_render_bvh_box(
     b->kind = w->tree | (leaf ? BOX_RENDER_DEBUG_BOX_LEAF : 0u);
     b->depth = (uint32_t)depth;
     b->pose = w->pose;
-    b->padding[0] = b->padding[1] = b->padding[2] = 0;
+    b->style = BOX_RENDER_DEBUG_STYLE_TREE;
+    b->padding[0] = b->padding[1] = 0;
     w->count ++;
 done:
     return result;
@@ -108,6 +110,8 @@ void box_render_debug_bvh(
             box_spatial_mover_walk(world, v->scene, box_render_bvh_mover, box_render_bvh_box,
                 &w);
         }
+
+        box_render_debug_portals_append(p, v, &w.count, &w.poses);
 
         v->debug_box_count = w.count;
         v->debug_pose_count = w.count ? w.poses : 0;

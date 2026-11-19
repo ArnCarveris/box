@@ -32,6 +32,8 @@ void box_render_packet_init(
     ecs_vec_init_t(NULL, &p->planar_reflections, box_render_planar_t, 0);
     ecs_vec_init_t(NULL, &p->debug_boxes, box_render_debug_box_t, 0);
     ecs_vec_init_t(NULL, &p->debug_poses, mat4, 0);
+    ecs_vec_init_t(NULL, &p->portal_debug_boxes, box_render_debug_box_t, 0);
+    ecs_vec_init_t(NULL, &p->portal_debug_poses, mat4, 0);
     ecs_vec_init_t(NULL, &p->portals, vec4, 0);
     ecs_vec_init_t(NULL, &p->areas, vec4, 0);
     ecs_vec_init_t(NULL, &p->portal_marks, box_render_portal_mark_t, 0);
@@ -65,6 +67,8 @@ void box_render_packet_fini(
     ecs_vec_fini_t(NULL, &p->planar_reflections, box_render_planar_t);
     ecs_vec_fini_t(NULL, &p->debug_boxes, box_render_debug_box_t);
     ecs_vec_fini_t(NULL, &p->debug_poses, mat4);
+    ecs_vec_fini_t(NULL, &p->portal_debug_boxes, box_render_debug_box_t);
+    ecs_vec_fini_t(NULL, &p->portal_debug_poses, mat4);
     ecs_vec_fini_t(NULL, &p->portals, vec4);
     ecs_vec_fini_t(NULL, &p->areas, vec4);
     ecs_vec_fini_t(NULL, &p->portal_marks, box_render_portal_mark_t);
@@ -109,6 +113,8 @@ void box_render_packet_reset(
     ecs_vec_clear(&p->planar_reflections);
     ecs_vec_clear(&p->debug_boxes);
     ecs_vec_clear(&p->debug_poses);
+    ecs_vec_clear(&p->portal_debug_boxes);
+    ecs_vec_clear(&p->portal_debug_poses);
     ecs_vec_clear(&p->portals);
     ecs_vec_clear(&p->areas);
     ecs_vec_clear(&p->portal_marks);

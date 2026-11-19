@@ -697,8 +697,21 @@ typedef struct box_render_debug_box_t {
     uint32_t depth;     /**< Depth of the box in its tree, 0 for the root */
     uint32_t pose;      /**< Index of the matrix that places the box in the debug poses of the
                          *   view, 0 for the identity of the boxes in world space */
-    uint32_t padding[3];
+    uint32_t style;     /**< BOX_RENDER_DEBUG_STYLE_* color of the lines of a portal world box,
+                         *   0 for the color of its tree */
+    uint32_t padding[2];
 } box_render_debug_box_t;
+
+/** Styles of box_render_debug_box_t.style, the colors of debug_bvh.wgsl */
+#define BOX_RENDER_DEBUG_STYLE_TREE (0u)           /**< The color of the tree of the box */
+#define BOX_RENDER_DEBUG_STYLE_AREA_HERE (1u)      /**< Area of the camera */
+#define BOX_RENDER_DEBUG_STYLE_AREA_SEEN (2u)      /**< Area the camera sees */
+#define BOX_RENDER_DEBUG_STYLE_PORTAL_PASSED (3u)  /**< Portal looked through */
+#define BOX_RENDER_DEBUG_STYLE_PORTAL_SKY (4u)     /**< Portal that only lets the sky through */
+#define BOX_RENDER_DEBUG_STYLE_PORTAL_LEFT_OUT (5u) /**< Portal not looked through */
+#define BOX_RENDER_DEBUG_STYLE_PORTAL_SHUT (6u)    /**< Portal that is shut */
+#define BOX_RENDER_DEBUG_STYLE_CLIPPED (7u)        /**< Part of a portal a frustum leaves */
+#define BOX_RENDER_DEBUG_STYLE_OCCLUDER (8u)       /**< Occluder */
 
 /** Tree of box_render_debug_box_t.kind of the tree of a mover in its frame */
 #define BOX_RENDER_DEBUG_BOX_MOVER (3u)
@@ -1015,6 +1028,12 @@ typedef struct box_render_view_t {
     int32_t debug_pose_count;   /**< Poses the boxes of the view index, the identity first and
                                  *   then one per mover tree (BvhDebug.mover_trees), 0 without
                                  *   boxes */
+    int32_t portal_debug_first; /**< Index of the first box of the view in the portal debug boxes
+                                 *   of the packet (PortalDebug) */
+    int32_t portal_debug_count; /**< Boxes of the lines of its portal world, 0 without */
+    int32_t portal_pose_first;  /**< Index of the first pose of those boxes in the portal debug
+                                 *   poses of the packet */
+    int32_t portal_pose_count;  /**< Poses of those boxes */
     LodSettings lod;            /**< View.lod resolved by box_render_lod_settings, all zero
                                  *   (every shape at full detail) without a view */
     uint32_t features;          /**< BOX_RENDER_FEATURE_* features: those of its scene, without
@@ -2017,6 +2036,10 @@ typedef struct box_render_packet_t {
     ecs_vec_t debug_boxes;  /**< box_render_debug_box_t, the boxes of the spatial index trees
                              *   of the views */
     ecs_vec_t debug_poses;  /**< mat4, the matrices that place the boxes of the views */
+    ecs_vec_t portal_debug_boxes; /**< box_render_debug_box_t, the lines of the portal worlds of
+                                   *   the views before box_render_debug_bvh copies them to
+                                   *   the debug boxes; not copied with the packet */
+    ecs_vec_t portal_debug_poses; /**< mat4, the matrices that place those boxes */
     ecs_vec_t portals;      /**< vec4, the portal visibility blocks of the views
                              *   (box_portal_block_pack) */
     ecs_vec_t areas;        /**< vec4, the shading blocks of the areas of the views

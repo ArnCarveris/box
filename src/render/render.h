@@ -354,7 +354,9 @@ void box_render_debug_bvh(
     box_render_packet_t *p);
 
 /** Give every view that culls by portals (CullSettings.portals, a perspective camera, a scene
- * with areas) the visibility block of what its camera sees, and write its PortalStatus.
+ * with areas) the visibility block of what its camera sees, write its PortalStatus and
+ * PortalTree, and the lines of its portal world (PortalDebug). A view that only draws lines or
+ * keeps a frozen traversal gets no block.
  *
  * @param world The world
  * @param stage The stage of the extract system, which the statuses are set through

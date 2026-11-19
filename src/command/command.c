@@ -300,6 +300,7 @@ void BoxCommandImport(
     box_cmd_render_init(world);
     box_cmd_fit_init(world);
     box_cmd_audio_init(world);
+    box_cmd_portal_init(world);
     box_cmd_frames_init(world);
     box_cmd_edit_init(world);
     box_cmd_geometry_init(world);

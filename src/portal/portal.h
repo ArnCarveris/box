@@ -128,6 +128,8 @@ typedef struct box_portal_index_t {
     ecs_query_t *area_query;     /**< Entities with VisArea */
     ecs_query_t *portal_query;   /**< Entities with VisPortal */
     ecs_query_t *occluder_query; /**< Entities with VisOccluder */
+    ecs_map_t frozen;       /**< box_portal_camera_t of the views that keep a frozen traversal,
+                             *   keyed by the view entity */
     bool dirty;             /**< A component or a transform changed since it was built */
     int32_t builds;         /**< Times it was built */
 } box_portal_index_t;
@@ -357,6 +359,46 @@ void box_portal_traverse(
     ecs_entity_t scene,
     const box_portal_camera_t *camera,
     box_portal_vis_t *vis);
+
+/** Keep the camera a view looked from when its traversal froze, and give it back while it
+ * stays frozen.
+ *
+ * @param index The index, which holds the cameras
+ * @param view The view
+ * @param freeze Whether the traversal of the view is frozen
+ * @param camera The camera of the view, replaced by the frozen one when there is one
+ * @return Whether the camera was replaced: false for the frame that froze, which draws from
+ * the camera as it is, and for a view that is not frozen
+ */
+bool box_portal_freeze(
+    const box_portal_index_t *index,
+    ecs_entity_t view,
+    bool freeze,
+    box_portal_camera_t *camera);
+
+/** Free the frozen cameras of an index.
+ *
+ * @param index The index
+ */
+void box_portal_freeze_fini(
+    box_portal_index_t *index);
+
+/** Write the corners of an occluder as an eye sees it and the box around them.
+ *
+ * @param o The occluder
+ * @param eye The eye, which an occluder with auto_orient_y turns to
+ * @param normal Receives the normal it has for the eye
+ * @param verts Receives the four corners
+ * @param min Receives the smallest corner of the box around them
+ * @param max Receives the largest corner of the box around them
+ */
+void box_portal_occluder_corners(
+    const box_portal_occluder_t *o,
+    const float *eye,
+    float *normal,
+    vec3 *verts,
+    float *min,
+    float *max);
 
 /** Pack what a traversal saw for the cull pass.
  *

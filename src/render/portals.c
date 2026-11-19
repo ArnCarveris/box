@@ -9,6 +9,7 @@
 
 #include "render.h"
 #include "portal_marks.h"
+#include "debug_portals.h"
 #include "../portal/portal.h"
 
 /** Aspect ratio of the traversal frustum when no surface knows its size */
@@ -79,6 +80,7 @@ static int32_t box_render_portals_areas(
  * @param index The index
  * @param vis What its camera saw
  * @param culling Whether the view culls by it
+ * @param frozen Whether the traversal is from the camera as it was when it froze
  */
 static void box_render_portals_status(
     const ecs_world_t *world,
@@ -86,7 +88,8 @@ static void box_render_portals_status(
     ecs_entity_t view,
     const box_portal_index_t *index,
     const box_portal_vis_t *vis,
-    bool culling)
+    bool culling,
+    bool frozen)
 {
     const PortalStatus *current = ecs_get(world, view, PortalStatus);
     PortalStatus status = {
@@ -97,7 +100,9 @@ static void box_render_portals_status(
         .portals_passed = vis->passed,
         .portals_closed = vis->closed,
         .outdoors = vis->sky,
-        .culling = culling
+        .culling = culling,
+        .frozen = frozen,
+        .truncated = vis->truncated
     };
 
     bool same = current && current->area == status.area && current->areas == status.areas &&
@@ -105,10 +110,63 @@ static void box_render_portals_status(
         current->portals_tested == status.portals_tested &&
         current->portals_passed == status.portals_passed &&
         current->portals_closed == status.portals_closed &&
-        current->outdoors == status.outdoors && current->culling == status.culling;
+        current->outdoors == status.outdoors && current->culling == status.culling &&
+        current->frozen == status.frozen && current->truncated == status.truncated;
 
     if (!same) {
         ecs_set_ptr(stage, view, PortalStatus, &status);
+    }
+}
+
+/** Check whether the traversal of a view is wanted: to cull by it, to draw its lines or to
+ * keep it.
+ *
+ * @param view The view
+ * @return Whether the view needs what its camera sees of the portal world
+ */
+static bool box_render_portals_wanted(
+    const View *view)
+{
+    const PortalDebug *debug = &view->debug.portal;
+
+    return (view->culling.enabled && view->culling.portals) || debug->lines || debug->areas ||
+        debug->occluders;
+}
+
+/** Write the PortalTree of a view when it changed.
+ *
+ * @param world The world
+ * @param stage The stage of the system, which the tree is set through
+ * @param view The view entity
+ * @param index The index
+ * @param vis What its camera saw
+ */
+static void box_render_portals_tree(
+    const ecs_world_t *world,
+    ecs_world_t *stage,
+    ecs_entity_t view,
+    const box_portal_index_t *index,
+    const box_portal_vis_t *vis)
+{
+    const box_portal_entry_t *entries = ecs_vec_first_t(&vis->entries, box_portal_entry_t);
+    const box_portal_area_t *areas = ecs_vec_first_t(&index->areas, box_portal_area_t);
+    const box_portal_portal_t *portals = ecs_vec_first_t(&index->portals, box_portal_portal_t);
+    const PortalTree *current = ecs_get(world, view, PortalTree);
+    PortalTree tree;
+    int32_t i, count = ecs_vec_count(&vis->entries);
+
+    ecs_os_memset_t(&tree, 0, PortalTree);
+    tree.count = count < BOX_PORTAL_TREE_MAX ? count : BOX_PORTAL_TREE_MAX;
+
+    for (i = 0; i < tree.count; i ++) {
+        tree.entries[i].area = areas[entries[i].area].entity;
+        tree.entries[i].via = entries[i].via >= 0 ? portals[entries[i].via].entity : 0;
+        tree.entries[i].depth = entries[i].depth;
+        tree.entries[i].sky_only = entries[i].sky_only;
+    }
+
+    if (!current || ecs_os_memcmp(current, &tree, ECS_SIZEOF(PortalTree))) {
+        ecs_set_ptr(stage, view, PortalTree, &tree);
     }
 }
 
@@ -132,12 +190,24 @@ void box_render_portals(
         const Camera *c = &v->camera_data;
         box_portal_camera_t camera;
         mat4 proj, view_proj;
+        bool frozen;
 
         v->portal_first = ecs_vec_count(&p->portals);
         v->portal_count = 0;
-        if (!view || !view->culling.enabled || !view->culling.portals || c->ortho ||
-            !box_portal_index_has(index, v->scene))
+        v->portal_debug_count = 0;
+        v->portal_pose_count = 0;
+        if (!view || c->ortho || !box_portal_index_has(index, v->scene) ||
+            !box_render_portals_wanted(view))
         {
+            if (v->view && ecs_is_alive(world, v->view)) {
+                box_portal_freeze(index, v->view, false, NULL);
+
+                if (ecs_has(world, v->view, PortalStatus)) {
+                    ecs_remove(stage, v->view, PortalStatus);
+                    ecs_remove(stage, v->view, PortalTree);
+                }
+            }
+
             continue;
         }
 
@@ -148,15 +218,21 @@ void box_render_portals(
         box_camera_projection(c, glm_max(aspect, c->aspect_ratio), 1.0f, proj);
         glm_mat4_mul(proj, v->view_matrix, view_proj);
         box_portal_camera_init(&camera, view_proj, v->camera_transform[3]);
+        frozen = box_portal_freeze(index, v->view, view->culling.freeze_portals, &camera);
         box_portal_traverse(index, v->scene, &camera, &vis);
 
-        if (box_portal_block_pack(index, &vis, &p->portals, BOX_PORTAL_BLOCK_MAX)) {
-            v->portal_count = ecs_vec_count(&p->portals) - v->portal_first;
+        if (view->culling.enabled && view->culling.portals) {
+            if (box_portal_block_pack(index, &vis, &p->portals, BOX_PORTAL_BLOCK_MAX)) {
+                v->portal_count = ecs_vec_count(&p->portals) - v->portal_first;
+            }
+
+            box_render_portal_marks(index, &vis, camera.eye, p, v);
         }
 
-        box_render_portal_marks(index, &vis, v->camera_transform[3], p, v);
-
-        box_render_portals_status(world, stage, v->view, index, &vis, v->portal_count > 0);
+        box_render_debug_portals(index, &vis, camera.eye, &view->debug.portal, p, v);
+        box_render_portals_status(world, stage, v->view, index, &vis, v->portal_count > 0,
+            frozen);
+        box_render_portals_tree(world, stage, v->view, index, &vis);
     }
 
     box_portal_vis_fini(&vis);

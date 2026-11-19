@@ -37,6 +37,13 @@ curl localhost:27760/shell/session/<id>/resource/<name> -o out.png   # empty unt
 | `logs [level] [count]` | Last `count` (20) captured log messages at `level` (`fatal`, `error`, `warning`, `info`, `debug` or a number) or worse; keeps 1024 |
 | `geometry` | Shape, triangle and cached mesh counts |
 | `geometry.check [root] [tolerance=u] [area=u^2] [max=n] [hidden]` | Lists pairs of 3D shapes whose faces z-fight (coplanar, same facing, overlapping); defaults 0.0001 / 0.0001 / 100 |
+| `portal [view]`, `portal.status [view]` | The portal options of a view (the first view that clears, in render order, by default) and what its camera saw in the last traversal: its area, the areas and entries it sees, the portals tested, passed and closed, whether it is frozen or truncated |
+| `portal.tree [view]` | The areas the camera sees through portals as an indented tree, like the original's "PORTAL TREE" overlay: the kind of portal it came through and the area, sky only ones marked, 32 rows |
+| `portal.cull [on\|off] [view]` | Toggle or set `View.culling.portals`: draw only the areas the camera sees through open portals |
+| `portal.freeze [on\|off] [view]` | Toggle or set `View.culling.freeze_portals`: keep the traversal from where the camera is now while it moves |
+| `portal.lines [on\|off] [view]` | Toggle or set `View.debug.portal.lines`: outlines of the portals of the areas the camera sees (green looked through, cyan sky only, amber left out, red shut) and, in white, the part of each a frustum leaves. Also drawn with culling off |
+| `portal.areas [on\|off] [view]` | Toggle or set `View.debug.portal.areas`: the volumes of the areas the camera sees, cyan for its own |
+| `portal.occluders [on\|off] [view]` | Toggle or set `View.debug.portal.occluders`: the occluders in the areas the camera sees, violet |
 | `audio`, `audio.*` | Audio state and the mixer/transport/analysis subcommands: `volume mute mute_bus solo bypass note play stop seek tempo song capture render analyze diff plot meter notes chords check`; see [audio.md](audio.md) |
 
 ## Input commands
