@@ -1438,6 +1438,7 @@ static void box_texture_register(
     ecs_set_name_prefix(world, NULL);
     BOX_TEXTURE_COMPONENT(world, TextureGraphDomain, "Domain");
     BOX_TEXTURE_COMPONENT(world, TextureGraphFormat, "Format");
+    BOX_TEXTURE_COMPONENT(world, TextureGraphWindow, "Window");
     BOX_TEXTURE_COMPONENT(world, TextureGraphCache, "Cache");
     BOX_TEXTURE_COMPONENT(world, TextureNodePort, "Port");
     BOX_TEXTURE_COMPONENT(world, TextureNodeParam, "Param");

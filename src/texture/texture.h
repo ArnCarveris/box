@@ -95,6 +95,10 @@ typedef struct box_texture_node_kind_t {
     ecs_size_t texture_offset;  /**< Offset of that member */
     char *linear;               /**< Member that reads the texture as stored, NULL for none */
     ecs_size_t linear_offset;   /**< Offset of that member */
+    box_texture_node_window_t window; /**< Writes the window elements of a node, NULL for none */
+    int32_t window_size;        /**< vec4 elements window writes */
+    box_texture_node_reach_t reach; /**< Reach of a node on DomainWorld, NULL for one texel per
+                                 *   pass */
     bool sent;                  /**< The current backend has the kind */
 } box_texture_node_kind_t;
 
@@ -109,6 +113,11 @@ typedef struct box_texture_graph_node_t {
     int32_t param_size;         /**< Its parameter bytes, the node_size of its kind */
     int32_t texture;            /**< Index of the texture it samples in the textures of the
                                  *   graph, -1 for none */
+    int32_t window;             /**< Offset of its window elements in the graph parameters, after
+                                 *   the parameters of every node, on DomainWorld for a kind with
+                                 *   a window function; 0 for none */
+    int32_t reach;              /**< Texels it reads its inputs away from a texel on DomainWorld,
+                                 *   0 for a pointwise node */
 } box_texture_graph_node_t;
 
 /** A texture a compiled graph samples, one per node of a sampling kind */
@@ -126,6 +135,11 @@ typedef struct box_texture_graph_t {
     float region[4];            /**< Longitude start and end, latitude start and end of the
                                  *   image on the sphere in radians, resolved: the whole sphere
                                  *   (0, 2 pi, -pi / 2, pi / 2) for equal ranges; 0 on the plane */
+    double origin[2];           /**< World x and z of the first texel on DomainWorld, 0 else */
+    float spacing[2];           /**< Meters between neighbouring texels along x and z on
+                                 *   DomainWorld, 0 else */
+    int32_t apron;              /**< Texels the window is grown by on each side on DomainWorld for
+                                 *   the reach of its neighbourhood nodes, 0 else */
     TextureGraphFormat format;  /**< What the image stores */
     float rate;                 /**< Updates per second of an animated graph, 0 every frame */
     bool interpolate;           /**< Crossfade keys k / rate (TextureGraph.interpolate) */

@@ -478,6 +478,9 @@ typedef struct box_render_texture_graph_node_t {
     uint32_t param_size;        /**< Bytes of the node in the parameter block */
     int32_t texture;            /**< Index of the texture a node of a sampling kind samples in
                                  *   the textures of the graph, -1 for none */
+    uint32_t window;            /**< Offset of the window elements of a node of a kind with a
+                                 *   window function on DomainWorld in the parameter block,
+                                 *   after the bytes of every node; 0 for none */
 } box_render_texture_graph_node_t;
 
 /** Flag of a texture of a compiled texture graph whose color channels read as stored, not
@@ -518,6 +521,12 @@ typedef struct box_render_texture_graph_t {
     float region[4];            /**< Longitude start and end, latitude start and end of the
                                  *   image on the sphere in radians, resolved (whole sphere
                                  *   (0, 2 pi, -pi / 2, pi / 2) by default), 0 on the plane */
+    double origin[2];           /**< World x and z of the first texel on DomainWorld, 0 else */
+    float spacing[2];           /**< Meters between neighbouring texels along x and z on
+                                 *   DomainWorld, 0 else */
+    uint32_t apron;             /**< Texels the stages before the output grow the image by on
+                                 *   each side on DomainWorld for the reach of the neighbourhood
+                                 *   nodes, 0 else */
 } box_render_texture_graph_t;
 
 /** Get the nodes of a compiled texture graph.

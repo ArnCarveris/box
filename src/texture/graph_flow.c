@@ -107,7 +107,7 @@ static const char *box_texture_flow_wgsl =
     "\n"
     "fn box_tex_flow(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f, texel: vec2i,\n"
     "    t0: texture_2d<f32>, t1: texture_2d<f32>, t2: texture_2d<f32>) -> vec4f {\n"
-    "    if (any(textureDimensions(t0) != box_texgraph_stage.size)) {\n"
+    "    if (!box_texgraph_has(t0)) {\n"
     "        return i[0];\n"
     "    }\n"
     "    let center = box_texgraph_load(t0, texel);\n"
@@ -116,7 +116,7 @@ static const char *box_texture_flow_wgsl =
     "    if (!(texels > 0.0)) {\n"
     "        return center;\n"
     "    }\n"
-    "    let has_field = all(textureDimensions(t1) == box_texgraph_stage.size);\n"
+    "    let has_field = box_texgraph_has(t1);\n"
     "    let taps = clamp(i32(ceil(texels - 1e-3)), 1, BOX_TEX_FLOW_TAPS);\n"
     "    let sigma = f32(taps) / 3.0;\n"
     "    var fwd: array<vec4f, 2>;\n"
@@ -189,7 +189,7 @@ static const char *box_texture_transmittance_wgsl =
     "    if (!(absorption > 0.0)) {\n"
     "        return vec4f(1.0, 0.0, 0.0, 0.0);\n"
     "    }\n"
-    "    let has = all(textureDimensions(t0) == box_texgraph_stage.size);\n"
+    "    let has = box_texgraph_has(t0);\n"
     "    if (!has && !(i[0].x != 0.0)) {\n"
     "        return vec4f(1.0, 0.0, 0.0, 0.0);\n"
     "    }\n"
@@ -274,6 +274,39 @@ static const char *box_texture_transmittance_wgsl =
     "    return vec4f(exp(-absorption * depth), 0.0, 0.0, 0.0);\n"
     "}\n";
 
+/** Get the reach of a TexFlow node on DomainWorld: its reach in meters, and a texel the
+ * streak reads between.
+ *
+ * @param node The TexFlow
+ * @param texel Meters between neighbouring texels
+ * @return Texels
+ */
+static float box_texture_flow_reach(
+    const void *node,
+    float texel)
+{
+    const TexFlow *flow = node;
+
+    return flow->reach > 0 ? flow->reach / texel + 1.0f : 0.0f;
+}
+
+/** Get the reach of a TexTransmittance node on DomainWorld: none, its path to the source has
+ * no bound, so it fails a graph there.
+ *
+ * @param node The TexTransmittance
+ * @param texel Meters between neighbouring texels
+ * @return -1
+ */
+static float box_texture_transmittance_reach(
+    const void *node,
+    float texel)
+{
+    (void)node;
+    (void)texel;
+
+    return -1.0f;
+}
+
 void box_texture_flow_register(
     ecs_world_t *world)
 {
@@ -292,7 +325,8 @@ void box_texture_flow_register(
         .params = {{ "reach", offsetof(TexFlow, reach), 4, BOX_TEXTURE_PARAM_F32 }},
         .function = "box_tex_flow",
         .source = box_texture_flow_wgsl,
-        .flags = BOX_TEXTURE_NODE_NEIGHBOURHOOD
+        .flags = BOX_TEXTURE_NODE_NEIGHBOURHOOD,
+        .reach = box_texture_flow_reach
     });
 
     box_texture_node_register(world, &(box_texture_node_desc_t){
@@ -311,6 +345,7 @@ void box_texture_flow_register(
         },
         .function = "box_tex_transmittance",
         .source = box_texture_transmittance_wgsl,
-        .flags = BOX_TEXTURE_NODE_NEIGHBOURHOOD
+        .flags = BOX_TEXTURE_NODE_NEIGHBOURHOOD,
+        .reach = box_texture_transmittance_reach
     });
 }

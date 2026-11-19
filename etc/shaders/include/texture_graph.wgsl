@@ -1,6 +1,9 @@
 // Shared code of the compute stages the GPU backend generates for the texture graphs
 // (src/render/gpu_texture_graph.c). A stage evaluates its nodes per texel in workgroups of 8x8
-// and stores the value of its last node in box_texgraph_out at binding 2. The node kinds call
+// and stores the value of its last node in box_texgraph_out at binding 2. On the world the
+// stages before the output evaluate the grid of the image grown by the apron on each side, so
+// the neighbourhood nodes read their inputs past the edges of the window; the texel of a node
+// is a texel of that grid, the output stage stores the texels of the image only. The node kinds call
 // the hashing, the reads of materialized inputs and the samples of bound textures below.
 
 const BOX_TEXGRAPH_PI: f32 = 3.141592653589793;
@@ -9,25 +12,39 @@ const BOX_TEXGRAPH_PI: f32 = 3.141592653589793;
 struct BoxTexGraphStage {
     // Size of the image in texels
     size: vec2u,
-    // TextureGraphDomain of the coordinates: 0 the plane, 1 the sphere
+    // TextureGraphDomain of the coordinates: 0 the plane, 1 the sphere, 2 the world
     domain: u32,
     // How the output stage stores its value: 0 as computed, 1 display encoded with alpha kept,
     // 2 the first channel as (x, 0, 0, 1)
     encode: u32,
     // Seconds of the world clock at the evaluation, which TexTime reads
     time: f32,
-    pad0: u32,
+    // Texels the grid of the stages grows the image by on each side on the world, else 0
+    apron: u32,
     pad1: u32,
     pad2: u32,
     // Longitudes of the first and last column edges and latitudes of the top and bottom row
     // edges of the image on the sphere in radians, (0, 2 pi, -pi / 2, pi / 2) for the whole
     // sphere (TextureGraph.longitude_start and the others, resolved)
     region: vec4f,
+    // Meters between neighbouring texels along x and z of the world in xy, 0 on the other
+    // domains
+    world: vec4f,
 };
 
 // Parameter bytes of every node of the graph, at the offsets of the compiled graph
 @group(0) @binding(0) var<storage, read> box_texgraph_params: array<vec4u>;
 @group(0) @binding(1) var<uniform> box_texgraph_stage: BoxTexGraphStage;
+
+// Size of the grid of texels the stages evaluate: the image grown by the apron on each side
+fn box_texgraph_grid() -> vec2i {
+    return vec2i(box_texgraph_stage.size) + 2 * i32(box_texgraph_stage.apron);
+}
+
+// Whether a materialized input has a node: the texture of an input without one is 1x1
+fn box_texgraph_has(t: texture_2d<f32>) -> bool {
+    return all(vec2i(textureDimensions(t)) == box_texgraph_grid());
+}
 
 // Parameters of the node whose bytes start at vec4 at: the p argument of a node function
 fn box_texgraph_node_params(at: u32) -> array<vec4u, 4> {
@@ -72,8 +89,13 @@ fn box_texgraph_texel_angle() -> vec2f {
 }
 
 // Texels of a unit of the radii, reaches and ranges of the nodes: a texel of a 512 wide image on
-// the plane, 2 pi / 512 rad on the sphere, in texels along a row at the equator
+// the plane, 2 pi / 512 rad on the sphere, in texels along a row at the equator, a meter along
+// x on the world
 fn box_texgraph_unit() -> f32 {
+    if (box_texgraph_stage.domain == 2u) {
+        return 1.0 / box_texgraph_stage.world.x;
+    }
+
     if (box_texgraph_stage.domain == 1u) {
         return 2.0 * BOX_TEXGRAPH_PI / 512.0 / box_texgraph_texel_angle().x;
     }
@@ -114,8 +136,14 @@ fn box_texgraph_opposite(x: i32) -> i32 {
 // Coordinates of the center of a texel in the domain of the graph: (u, v, 0, 1) on the plane
 // with v 0 at the top, the unit direction of its longitude and latitude on the sphere
 // (box_texgraph_lonlat), which for the whole sphere is the equirectangular texel, y up and
-// longitude along x as the environment images map it (-z at u 0.5)
+// longitude along x as the environment images map it (-z at u 0.5). On the world (x, z, 0, 1) in
+// meters from the origin of the window, the texel of the grid at the apron at (0, 0)
 fn box_texgraph_coords(texel: vec2i) -> vec4f {
+    if (box_texgraph_stage.domain == 2u) {
+        let at = vec2f(texel - vec2i(i32(box_texgraph_stage.apron)));
+        return vec4f(at * box_texgraph_stage.world.xy, 0.0, 1.0);
+    }
+
     if (box_texgraph_stage.domain == 1u) {
         return vec4f(box_texgraph_lonlat_dir(box_texgraph_lonlat(vec2f(texel) + 0.5)), 1.0);
     }
@@ -127,10 +155,14 @@ fn box_texgraph_coords(texel: vec2i) -> vec4f {
 // Texel of the image at integer coordinates outside it: the plane repeats. The sphere wraps
 // around in longitude when it covers the whole of it and continues past a pole it covers on the
 // opposite meridian (a row above the top is the row below it half a turn away), up to one height
-// beyond; past the other edges it clamps
+// beyond; past the other edges it clamps. The world clamps to its grid
 fn box_texgraph_wrap(texel: vec2i) -> vec2i {
     let size = vec2i(box_texgraph_stage.size);
     var t = texel;
+    if (box_texgraph_stage.domain == 2u) {
+        return clamp(t, vec2i(0), box_texgraph_grid() - 1);
+    }
+
     if (box_texgraph_stage.domain == 1u) {
         let poles = box_texgraph_poles();
         if (t.y < 0 && poles.x) {
@@ -229,8 +261,17 @@ fn box_texgraph_sphere_frame(texel: vec2i) -> mat3x3f {
 // a whole longitude wraps, poles in the range are crossed and the other edges clamp. east and
 // north point along the UV tangents of an EllipsoidShell of the range of the image (of a Sphere
 // mesh for the whole sphere), at unit length: a normal map scales them with
-// box_texgraph_normal_scale.
+// box_texgraph_normal_scale. On the world they are the central differences per meter along x
+// and z times strength, the slope of a height in meters with strength 1.
 fn box_texgraph_gradient(t: texture_2d<f32>, texel: vec2i, strength: f32) -> vec2f {
+    if (box_texgraph_stage.domain == 2u) {
+        let e = box_texgraph_load(t, texel + vec2i(1, 0)).x;
+        let w = box_texgraph_load(t, texel - vec2i(1, 0)).x;
+        let n = box_texgraph_load(t, texel - vec2i(0, 1)).x;
+        let so = box_texgraph_load(t, texel + vec2i(0, 1)).x;
+        return vec2f(e - w, so - n) * strength / (2.0 * box_texgraph_stage.world.xy);
+    }
+
     let scale = strength * box_texgraph_unit();
     if (box_texgraph_stage.domain == 1u) {
         let frame = box_texgraph_sphere_frame(texel);

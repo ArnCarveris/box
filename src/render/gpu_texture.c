@@ -520,7 +520,8 @@ box_gpu_texture_t* box_gpu_texture_output(
 
     entry = ecs_os_calloc_t(box_gpu_texture_entry_t);
     result = &entry->base;
-    result->mips = box_gpu_mip_count(width, height);
+    result->mips = format == WGPUTextureFormat_R32Float ||
+        format == WGPUTextureFormat_RGBA32Float ? 1 : box_gpu_mip_count(width, height);
     WGPUTextureDescriptor desc = {
         .usage = WGPUTextureUsage_TextureBinding | WGPUTextureUsage_CopyDst |
             WGPUTextureUsage_CopySrc | WGPUTextureUsage_RenderAttachment |
@@ -572,6 +573,20 @@ void box_gpu_texture_output_written(
     *ecs_vec_append_t(NULL, &gpu->mips, uint32_t) = handle;
 done:
     return;
+}
+
+/** Test whether a texture can be sampled with filtering, which a float32 texture of a texture
+ * graph (GraphFloat, GraphFloat4) can not on the web.
+ *
+ * @param tex The texture
+ * @return True when it is filterable
+ */
+static bool box_gpu_texture_filterable(
+    const box_gpu_texture_t *tex)
+{
+    WGPUTextureFormat format = ((const box_gpu_texture_entry_t*)tex)->format;
+
+    return format != WGPUTextureFormat_R32Float && format != WGPUTextureFormat_RGBA32Float;
 }
 
 uint32_t box_gpu_texture_serial(
@@ -889,7 +904,8 @@ void box_gpu_material_mips(
     }
 }
 
-/** Get the view a layer binds: the texture of its handle or the default of the layer.
+/** Get the view a layer binds: the texture of its handle or the default of the layer, also for
+ * a float32 texture, which a layer can not filter.
  *
  * @param gpu The backend
  * @param handle Texture handle, 0 for the default
@@ -915,7 +931,7 @@ WGPUTextureView box_gpu_material_view(
         goto done;
     }
 
-    if (!tex) {
+    if (!tex || !box_gpu_texture_filterable(tex)) {
         tex = slot == BOX_RENDER_TEXTURE_SLOTS - 1 ? gpu->flat : gpu->white;
     }
 
@@ -945,7 +961,7 @@ WGPUTextureView box_gpu_texture_cookie(
         : NULL;
     box_gpu_texture_graph_sampled(gpu, handle);
 
-    return tex ? tex->linear : NULL;
+    return tex && box_gpu_texture_filterable(tex) ? tex->linear : NULL;
 }
 
 WGPUBindGroup box_gpu_material_group(
@@ -1042,7 +1058,8 @@ bool box_gpu_texture_blends(
     return b->texture_blend && box_render_is_mesh(b->pipeline);
 }
 
-/** Get a texture a blend samples: an image of the backend, not the image of a target.
+/** Get a texture a blend samples: an image of the backend, not the image of a target nor a
+ * float32 texture.
  *
  * @param gpu The backend
  * @param handle Texture handle, 0 for none
@@ -1052,9 +1069,11 @@ box_gpu_texture_t* box_gpu_blend_source(
     box_gpu_t *gpu,
     uint32_t handle)
 {
-    return handle && !(handle & BOX_RENDER_TEXTURE_TARGET)
+    box_gpu_texture_t *result = handle && !(handle & BOX_RENDER_TEXTURE_TARGET)
         ? ecs_map_get_deref(&gpu->textures, box_gpu_texture_t, handle)
         : NULL;
+
+    return result && box_gpu_texture_filterable(result) ? result : NULL;
 }
 
 /** Get the serial of the image a blend samples through a handle.

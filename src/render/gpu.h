@@ -329,8 +329,9 @@ void box_gpu_texture_mips(
     const box_render_packet_t *packet);
 
 /** Get the texture of a handle that a texture graph writes, creating it with storage binding
- * (unless R8Unorm) and a full mip chain when the handle has none of the size and format; a
- * replaced image of the handle is released.
+ * (unless R8Unorm) and a full mip chain (one level for R32Float and RGBA32Float, which are not
+ * filterable) when the handle has none of the size and format; a replaced image of the handle
+ * is released.
  *
  * An RGBA8Unorm texture has an sRGB view, which the color layers sample. Its levels below the
  * first are generated once box_gpu_texture_output_written queued them.
@@ -339,7 +340,7 @@ void box_gpu_texture_mips(
  * @param handle Handle of the texture
  * @param width Width of the first level
  * @param height Height of the first level
- * @param format RGBA8Unorm, RGBA16Float or R8Unorm
+ * @param format RGBA8Unorm, RGBA16Float, R8Unorm, R32Float or RGBA32Float
  * @param color The texture holds display encoded color, whose levels average linear light
  * @return The texture
  */
@@ -499,7 +500,7 @@ void box_gpu_materials_clear(
  *
  * @param gpu The backend
  * @param handle Texture handle
- * @return The view, NULL when the backend has no image of the handle
+ * @return The view, NULL when the backend has no image of the handle or it is float32
  */
 WGPUTextureView box_gpu_texture_cookie(
     box_gpu_t *gpu,

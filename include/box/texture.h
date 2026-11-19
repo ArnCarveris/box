@@ -246,8 +246,15 @@ ECS_STRUCT(TextureGen, {
 ECS_ENUM(TextureGraphDomain, {
     DomainPlane = 0,  /**< The image plane: (u, v, 0, 1) with u and v in 0..1, v 0 at the top,
                        *   the default */
-    DomainSphere = 1  /**< The unit sphere of an equirectangular image: (x, y, z, 1), the
+    DomainSphere = 1, /**< The unit sphere of an equirectangular image: (x, y, z, 1), the
                        *   direction of the texel, y up */
+    DomainWorld = 2   /**< A rectangle of the ground of the world (TextureGraph.window): (x, z,
+                       *   0, 1) in meters from the origin of the window, the first texel at
+                       *   (0, 0) and the last of a row at window.width. The texels are samples
+                       *   at the corners of a grid, so adjacent windows share their edge texels.
+                       *   The patterns (TexNoise, TexCells) add the origin in double precision,
+                       *   so their value is of the absolute position and does not repeat, as
+                       *   precise at a million meters as at the origin */
 });
 
 /** What the image of a TextureGraph stores */
@@ -256,7 +263,27 @@ ECS_ENUM(TextureGraphFormat, {
                       *   format of colors such as a TexRamp outputs */
     GraphLinear = 1, /**< RGBA8 stored as the output is, for normal and ORM maps */
     GraphSingle = 2, /**< R8 of the first channel of the output, as a GenHeight TextureGen */
-    GraphHdr = 3     /**< RGBA16Float of the linear output, for emissive maps */
+    GraphHdr = 3,    /**< RGBA16Float of the linear output, for emissive maps */
+    GraphFloat = 4,  /**< R32Float of the first channel of the output, as computed, such as a
+                      *   height in meters. Not filterable on the web: read it with textureLoad;
+                      *   a material layer or light cookie that names it uses its default.
+                      *   One level, no interpolation (TextureGraph.interpolate) */
+    GraphFloat4 = 5  /**< RGBA32Float of the output as computed, as GraphFloat with four
+                      *   channels */
+});
+
+/** Rectangle of the ground of the world a TextureGraph on DomainWorld covers.
+ *
+ * The texel (i, j) of a w x h image is at (x + i * width / (w - 1), z + j * depth / (h - 1)),
+ * so a window whose x is the x of another plus its width continues it and both have the
+ * texels of their shared edge. Many TextureGraph entities can output the same node with
+ * different windows, as the tiles of a terrain: the values are cached per window.
+ */
+ECS_STRUCT(TextureGraphWindow, {
+    double x;    /**< World x of the first column in meters */
+    double z;    /**< World z of the first row in meters */
+    float width; /**< Meters from the first to the last column, 0 for one meter per texel */
+    float depth; /**< Meters from the first to the last row, 0 for the texel spacing of width */
 });
 
 /** Type of a value that flows between the nodes of a TextureGraph */
@@ -301,6 +328,8 @@ ECS_STRUCT(TextureGraph, {
                                 *   EllipsoidShell.latitude_start */
     float latitude_end;        /**< Latitude of the bottom edge, equal to the start for the
                                 *   whole latitude */
+    TextureGraphWindow window; /**< Rectangle of the world on DomainWorld, ignored on the
+                                *   other domains */
     TextureGraphFormat format; /**< What the image stores, default GraphColor */
     float rate;                /**< Updates per second of an animated graph, 0 for every frame.
                                 *   An animated graph whose image no draw sampled in the
@@ -310,7 +339,8 @@ ECS_STRUCT(TextureGraph, {
                                 *   ahead, by fract(time * rate), in linear light for GraphColor.
                                 *
                                 *   It keeps two key images (TextureGraphStats.key_bytes); a
-                                *   GraphSingle or static graph ignores it. A paused clock shows
+                                *   GraphSingle, GraphFloat, GraphFloat4 or static graph
+                                *   ignores it. A paused clock shows
                                 *   a fixed image, a jump or a change of the graph evaluates both.
                                 *
                                 *   TextureStatus.revision increments when a change of the graph
@@ -319,8 +349,8 @@ ECS_STRUCT(TextureGraph, {
 
 /** Settings of the cache of the values the texture graphs materialize, a singleton.
  *
- * Values are cached by the content hash of their node (its kind, parameters, inputs, the size and
- * domain of the graph) for every graph, so an edit evaluates only the stages after the edited
+ * Values are cached by the content hash of their node (its kind, parameters, inputs, the size,
+ * domain, range and window of the graph) for every graph, so an edit evaluates only the stages after the edited
  * node, graphs with an identical subgraph share it and an edit undone finds the earlier value.
  *
  * Values no graph uses stay while the cache fits the budget, the least recently used evicted
@@ -337,7 +367,8 @@ ECS_STRUCT(TexConstant, {
 });
 
 /** Node of a TextureGraph whose value is the coordinates of the texel in the domain of the
- * graph, see TextureGraphDomain */
+ * graph, see TextureGraphDomain. On DomainWorld the scale is about the origin of the world, so
+ * the patterns reading the result stay seamless across windows */
 ECS_STRUCT(TexCoords, {
     float scale; /**< Factor of the coordinates, 1 when the component is added */
 });
@@ -643,6 +674,11 @@ ECS_STRUCT(TexWarp, {
  * times smaller; a translate moves the points off the unit sphere through the 3D field of the
  * generators, which changes the pattern but keeps it seamless. Neither keeps unit length.
  *
+ * On DomainWorld the centre is the origin of the world (x 0, z 0) and the rotation turns (x,
+ * z) from +x towards +z, ignoring axis, so the result is seamless across windows; the part of
+ * the transform at the origin of the window is computed in double precision with angle_value.
+ * An angle node turns about the origin of the window instead, which is not seamless.
+ *
  * The angle may come from a Scalar node, so a field spins when an animated value drives it.
  *
  * @code
@@ -765,6 +801,8 @@ ECS_ENUM(TextureCellsDistance, {
  * tiles; distances are in cell sizes as TextureGen measures them, the square root of the area
  * of a cell in pixels. On DomainSphere they are 3D cells evaluated at the coordinates, scaled
  * so about count cells cover the unit sphere, seamless; distances are in 3D lattice cells.
+ * On DomainWorld they are square cells of size meters of the absolute position, which do not
+ * repeat; count is ignored and distances are in cell sizes.
  *
  * Each point moves within its cell, back and forth at its own speed, as evolve changes, so a
  * time on evolve animates the cells continuously; 0 keeps the points where the seed puts them.
@@ -791,6 +829,7 @@ ECS_STRUCT(TexCells, {
     ecs_entity_t evolve; /**< Scalar input node that moves the points, 0 for evolve_value */
     float evolve_value; /**< Value of evolve without a node: a point crosses its cell and back
                          *   in 1 to 2 units */
+    float size;         /**< DomainWorld: edge of a cell in meters, 0 for 1 */
 });
 
 /** Node of a TextureGraph whose Scalar value is the height of raindrop ripples: rings of drops
@@ -803,7 +842,8 @@ ECS_STRUCT(TexCells, {
  *
  * The rings of the cells within 3 cells of the texel add up, so speed * lifetime + width should
  * stay below 3. time is the clock in seconds, usually a TexTime, which makes the graph animated
- * (TextureGraph.rate, smoothed by TextureGraph.interpolate). Only DomainPlane.
+ * (TextureGraph.rate, smoothed by TextureGraph.interpolate). Only DomainPlane: it fails a graph
+ * on DomainSphere or DomainWorld.
  *
  * @code
  * rain {
@@ -838,7 +878,9 @@ ECS_STRUCT(TexRipples, {
  *
  * The input is a Scalar or a Vector node and the value has its type, input_value without one.
  * DomainPlane wraps, so a tiling input still tiles. DomainSphere wraps in longitude, scales the
- * horizontal radius by 1/cos(latitude) and continues vertical taps across a pole.
+ * horizontal radius by 1/cos(latitude) and continues vertical taps across a pole. On DomainWorld
+ * the radius is in meters and the input is evaluated over the window grown by the radius (an
+ * apron), so adjacent windows agree on their shared edge.
  *
  * @code
  * soft { nodes.Blur: {input: noise, radius: 8} }
@@ -848,8 +890,9 @@ ECS_STRUCT(TexBlur, {
     ecs_entity_t input; /**< Node to blur, a Scalar or a Vector, 0 for input_value */
     vec4 input_value;   /**< Value of input without a node */
     float radius;       /**< Reach of the gaussian in texels of a 512 pixel wide image, scaled
-                         *   with the width so the look does not change with the resolution:
-                         *   three standard deviations, 0 for no blur */
+                         *   with the width so the look does not change with the resolution
+                         *   (in meters on DomainWorld): three standard deviations, 0 for no
+                         *   blur */
 });
 
 /** Node of a TextureGraph whose Scalar value is the signed distance to the 0.5 contour of its
@@ -862,7 +905,8 @@ ECS_STRUCT(TexBlur, {
  * DomainPlane wraps. DomainSphere measures along great circles: a texel of the equator is
  * 2 pi / 512 radians, the longitude wraps and the flood crosses the poles. An input without a
  * node has no contour, and the value is range or -range. The flood reaches about 1000 texels of
- * the image; the image has at most 2^24 texels for exact seeds.
+ * the image; the image has at most 2^24 texels for exact seeds. On DomainWorld the range and
+ * the distance are in meters and the input is evaluated over the window grown by the range.
  *
  * @code
  * coast { nodes.Distance: {input: land, range: 8} }
@@ -891,7 +935,10 @@ ECS_ENUM(TextureNoiseFractal, {
  * The noise is three dimensional at coords. On DomainPlane its lattice repeats with a whole
  * number of cells across the image in each octave, frequency and the frequency of each octave
  * rounded as GenNoise does them, so the image tiles; on DomainSphere it is seamless without a
- * period. An evolve node moves the noise through a fourth dimension, so it animates in place
+ * period. On DomainWorld the frequency is in lattice cells per meter and the lattice is of the
+ * absolute position: the cell of each octave at the origin of the window is computed in double
+ * precision on the CPU, so the noise does not repeat and is as smooth at a million meters as at
+ * the origin. An evolve node moves the noise through a fourth dimension, so it animates in place
  * without sliding; without one the node evaluates three dimensional noise only.
  *
  * With channels 1 the node outputs a Scalar, with 3 or 4 a Vector of independent noise per
@@ -985,6 +1032,10 @@ ECS_STRUCT(TexLut, {
  * dx (along u) and dy (down the image) are the central differences of the height, which is
  * materialized, times strength and the width over 512, as TextureGen does for the same height.
  * On DomainSphere they follow the layout in the UV frame of a Sphere mesh (texture_graph.wgsl).
+ * On DomainWorld they are the change of the height per meter along x and z (the central
+ * difference over two texels) times strength, so a height in meters with strength 1 gives the
+ * true slope, whatever the resolution; the height is evaluated with an apron of a texel, so
+ * adjacent windows agree on their shared edge.
  *
  * @code
  * relief {
@@ -1008,7 +1059,8 @@ ECS_STRUCT(TexNormal, {
  * tilt of its normal, 0 where flat. For masks such as rock on steep ground.
  *
  * On DomainSphere it follows the layout as TexNormal does, with the same steepness in every
- * direction up to the poles. */
+ * direction up to the poles. On DomainWorld it is the tangent of the slope of a height in meters
+ * with strength 1, as TexNormal. */
 ECS_STRUCT(TexSlope, {
     ecs_entity_t height; /**< Scalar height node, 0 for height_value: 0 */
     float height_value;  /**< Value of height without a node */
@@ -1021,6 +1073,7 @@ ECS_STRUCT(TexSlope, {
  * its length is that TexSlope. On DomainPlane it is (du, dv, 0, 0), u right and v down the
  * image. On DomainSphere it is the 3D tangent of the sphere east * du + north * dn, w 0, so it
  * takes Dot with a direction and Cross with TexCoords (a field 90 degrees from uphill) as is.
+ * On DomainWorld it is (dx, dz, 0, 0) per meter as TexSlope.
  * For rims lit from a direction and curl flow fields. */
 ECS_STRUCT(TexGradient, {
     ecs_entity_t height; /**< Scalar height node, 0 for height_value: 0 */
@@ -1046,6 +1099,9 @@ ECS_STRUCT(TexGradient, {
  * On DomainSphere the field is a 3D vector in the direction space of TexCoords, projected on
  * the tangent plane at every step: the streak follows great circles across the longitude seam
  * and the poles. The reach is in units of 2 pi / 512 radians.
+ *
+ * On DomainWorld the (x, y) of the field is along (x, z) of the world, the reach is in meters
+ * and the input and the field are evaluated over the window grown by the reach.
  *
  * @code
  * filaments { nodes.Flow: {input: noise, field: curl, reach: 24} }
@@ -1083,6 +1139,7 @@ ECS_STRUCT(TexFlow, {
  * range is in units of 2 pi / 512 radians. The texel at the source has transmittance 1.
  *
  * light, absorption, range and steps change the parameters of the graph, not its structure.
+ * It fails a graph on DomainWorld, its path having no bound.
  *
  * @code
  * shadow { nodes.Transmittance: {density: gas, light: [0.3, 0.4, 0], absorption: 0.05} }
@@ -1124,7 +1181,8 @@ ECS_STRUCT(TexTransmittance, {
 /** Flag of a node kind whose value depends on time */
 #define BOX_TEXTURE_NODE_ANIMATED (1u << 1)
 
-/** Flag of a node kind that works on DomainPlane only, failing a graph on DomainSphere */
+/** Flag of a node kind that works on DomainPlane only, failing a graph on DomainSphere or
+ * DomainWorld */
 #define BOX_TEXTURE_NODE_PLANE (1u << 2)
 
 /** Flag of a node kind that samples a texture entity, set by box_texture_node_register for a
@@ -1134,6 +1192,13 @@ ECS_STRUCT(TexTransmittance, {
 /** Flag of an animated node kind whose first parameter is an f32 factor of the time: a node
  * whose factor is 0 does not depend on time and is not animated */
 #define BOX_TEXTURE_NODE_TIME_SCALE (1u << 4)
+
+/** Flag of a node kind with a window function (box_texture_node_desc_t.window), set by
+ * box_texture_node_register */
+#define BOX_TEXTURE_NODE_WINDOW (1u << 5)
+
+/** Most vec4 elements the window function of a node kind writes */
+#define BOX_TEXTURE_NODE_WINDOW_MAX (16)
 
 /** Most passes of a node kind */
 #define BOX_TEXTURE_NODE_PASSES (16)
@@ -1252,6 +1317,31 @@ typedef TextureValueType (*box_texture_node_type_t)(
     const void *node,
     const TextureValueType *inputs);
 
+/** Write the elements of a node that depend on the window of a graph on DomainWorld, such as
+ * the lattice cell of the origin of the window, computed in double precision.
+ *
+ * @param node The node component
+ * @param origin World x and z of the origin of the window in meters
+ * @param out Receives the window_size vec4 elements of 32 bit words, zeroed before the call
+ */
+typedef void (*box_texture_node_window_t)(
+    const void *node,
+    const double origin[2],
+    uint32_t *out);
+
+/** Get how far a node of a neighbourhood kind reads its inputs on DomainWorld: the graph is
+ * evaluated over its window grown by the sum of the reaches along its deepest path (an apron),
+ * so adjacent windows agree on their shared edge.
+ *
+ * @param node The node component
+ * @param texel Meters between neighbouring texels, the smaller of x and z
+ * @return Texels the node reads away from a texel, all its passes together; a negative value
+ * fails a graph on DomainWorld, for a node whose reach has no bound
+ */
+typedef float (*box_texture_node_reach_t)(
+    const void *node,
+    float texel);
+
 /** Description of a node kind for box_texture_node_register.
  *
  * The WGSL function fn name(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f) -> vec4f
@@ -1271,6 +1361,10 @@ typedef TextureValueType (*box_texture_node_type_t)(
  *
  * A sampling kind (texture) gets the texture_2d<f32> it samples last, read with
  * box_texgraph_sample.
+ *
+ * A kind with a window function gets window: u32 after coords, the vec4 index in
+ * box_texgraph_params of the elements the function wrote for the window of the graph, on
+ * DomainWorld only (0 on the other domains, where the elements are not written).
  */
 typedef struct box_texture_node_desc_t {
     ecs_entity_t component;     /**< Component of the nodes of the kind */
@@ -1296,6 +1390,12 @@ typedef struct box_texture_node_desc_t {
                                  *   the texture as stored instead of decoded from display
                                  *   encoding, NULL to always decode them */
     ecs_size_t linear_offset;   /**< Offset of that member */
+    box_texture_node_window_t window; /**< Writes the elements of a node for the window of a
+                                 *   graph on DomainWorld, NULL for none */
+    int32_t window_size;        /**< vec4 elements window writes, 1 to
+                                 *   BOX_TEXTURE_NODE_WINDOW_MAX */
+    box_texture_node_reach_t reach; /**< Reach of a node of a neighbourhood kind on
+                                 *   DomainWorld, NULL for one texel per pass */
 } box_texture_node_desc_t;
 
 /** Register a node kind, or replace the kind of a component registered before; the graphs

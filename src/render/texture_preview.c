@@ -488,7 +488,7 @@ static void box_render_preview_encode(
     height = height > 0 ? height : 1;
     index = box_render_preview_index(tex, preview->node);
     output = r->index < 0 || r->index == tex->graph->node_count - 1;
-    gray = tex->graph->format == GraphSingle ||
+    gray = tex->graph->format == GraphSingle || tex->graph->format == GraphFloat ||
         (!output && index >= 0 && tex->graph->nodes[index].output == TexScalar);
     encode = !output && (tex->graph->format == GraphColor || tex->graph->format == GraphHdr);
     mode = (gray ? 1 : 0) | (encode ? 2 : 0);

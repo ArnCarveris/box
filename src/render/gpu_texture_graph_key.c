@@ -177,7 +177,8 @@ bool box_gpu_tg_interpolated(
     const box_gpu_tg_graph_t *graph)
 {
     return graph->desc.interpolate && graph->desc.rate > 0 && graph->is_animated &&
-        graph->desc.format != GraphSingle;
+        graph->desc.format != GraphSingle && graph->desc.format != GraphFloat &&
+        graph->desc.format != GraphFloat4;
 }
 
 /** Plan the evaluations of an interpolated graph in a packet with key k of the clock: keys k
@@ -267,9 +268,7 @@ void box_gpu_tg_blend(
     int32_t lo = graph->key_index[0] <= graph->key_index[1] ? 0 : 1;
     double frac = tg->time * (double)graph->desc.rate - (double)graph->key_index[lo];
     float f = (float)(frac < 0 ? 0 : frac > 1 ? 1 : frac);
-    uint32_t uniforms[12] = {
-        w, h, graph->desc.domain, graph->desc.format == GraphColor ? 1u : 0u, 0, 0, 0, 0
-    };
+    uint32_t uniforms[16];
     box_gpu_texture_t *tex;
     WGPUTextureView out;
     WGPUBindGroup group;
@@ -279,8 +278,8 @@ void box_gpu_tg_blend(
         goto done;
     }
 
-    ecs_os_memcpy(&uniforms[4], &f, ECS_SIZEOF(float));
-    ecs_os_memcpy(&uniforms[8], graph->desc.region, ECS_SIZEOF(graph->desc.region));
+    box_gpu_tg_uniforms(&graph->desc, graph->desc.format == GraphColor ? 1u : 0u, f,
+        uniforms);
     if (!graph->blend_uniforms) {
         graph->blend_uniforms = wgpuDeviceCreateBuffer(gpu->device, &(WGPUBufferDescriptor){
             .usage = WGPUBufferUsage_Uniform | WGPUBufferUsage_CopyDst,

@@ -130,6 +130,8 @@ static float* box_gpu_tg_texels(
                 out[1] = 0;
                 out[2] = 0;
                 out[3] = 1;
+            } else if (r->format == WGPUTextureFormat_RGBA32Float) {
+                ecs_os_memcpy(out, row + x * 16, 16);
             } else if (r->format == WGPUTextureFormat_RGBA16Float) {
                 const uint16_t *t = (const uint16_t*)(row + x * 8);
                 out[0] = box_gpu_tg_half(t[0]);
@@ -160,8 +162,9 @@ static float* box_gpu_tg_texels(
  * @param r The readback
  * @param texture The texture, level 0 is copied
  * @param format Its format
- * @param width Its width
- * @param height Its height
+ * @param offset First column and row copied
+ * @param width Width copied
+ * @param height Height copied
  */
 static void box_gpu_tg_copy(
     box_gpu_t *gpu,
@@ -169,6 +172,7 @@ static void box_gpu_tg_copy(
     box_gpu_tg_read_t *r,
     WGPUTexture texture,
     WGPUTextureFormat format,
+    uint32_t offset,
     uint32_t width,
     uint32_t height)
 {
@@ -184,6 +188,7 @@ static void box_gpu_tg_copy(
     wgpuCommandEncoderCopyTextureToBuffer(encoder,
         &(WGPUTexelCopyTextureInfo){
             .texture = texture,
+            .origin = { offset, offset, 0 },
             .aspect = WGPUTextureAspect_All
         },
         &(WGPUTexelCopyBufferInfo){
@@ -459,7 +464,9 @@ void box_gpu_tg_copies(
             box_gpu_tg_pooled_t *p = ev && r->read.index < graph->current->node_count
                 ? ev->textures[r->read.index] : NULL;
             if (p) {
-                box_gpu_tg_copy(gpu, encoder, r, p->texture, p->format, p->width, p->height);
+                uint32_t apron = graph->desc.apron;
+                box_gpu_tg_copy(gpu, encoder, r, p->texture, p->format, apron,
+                    p->width - 2 * apron, p->height - 2 * apron);
             }
 
             continue;
@@ -469,7 +476,8 @@ void box_gpu_tg_copies(
             ? ecs_map_get_deref(&gpu->textures, box_gpu_texture_t, graph->handle) : NULL;
         if (tex) {
             box_gpu_tg_copy(gpu, encoder, r, tex->texture,
-                box_gpu_tg_image_format(graph->desc.format), wgpuTextureGetWidth(tex->texture),
+                box_gpu_tg_image_format(graph->desc.format), 0,
+                wgpuTextureGetWidth(tex->texture),
                 wgpuTextureGetHeight(tex->texture));
         }
     }

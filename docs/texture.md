@@ -18,7 +18,7 @@ settings in `box.texture.graph` (`graph.Cache`, `graph.Stats`, `graph.Preview`);
 |---|---|---|
 | `Path` | `path`, `width`/`height` 0 (source size), `linear` false, `single_channel` false | stb_image raster or resvg `.svg` (one dimension keeps aspect). `linear` for linear-light color images (encoded to sRGB on load); leave off for ORM/normal maps. `single_channel` = R8 with mips, a quarter of RGBA8 (masks, cookies) |
 | `Gen` | `width` 0 = 512, `height` 0 = width, `seed`, `layers`, `source`, `output` GenHeight/GenAlbedo/GenNormal, `colors` (ramp keys `{pos, {r,g,b}}`), `palette`, `palette_layer` 0, `strength` 1 | Seamless, deterministic CPU generator on the job system |
-| `Graph` | `output` (node), `width` 0 = 512, `height` 0 = width, `domain` DomainPlane/DomainSphere, `format` GraphColor/GraphLinear/GraphSingle/GraphHdr, `rate` 0, `interpolate` false | Per texel evaluation of a node graph on the render backend |
+| `Graph` | `output` (node), `width` 0 = 512, `height` 0 = width, `domain` DomainPlane/DomainSphere/DomainWorld, `window` {`x`, `z` (f64), `width`, `depth` meters} on DomainWorld, `format` GraphColor/GraphLinear/GraphSingle/GraphHdr/GraphFloat (R32Float)/GraphFloat4 (RGBA32Float), `rate` 0, `interpolate` false | Per texel evaluation of a node graph on the render backend |
 
 The texture entity of a `Surface` (`Surface.texture`, box/surface.h) is also a texture entity:
 materials sample its image of the same frame.
@@ -121,7 +121,7 @@ Wait for a graph or load in script: `const ready: bool = tex[box.texture.Status]
 - Gen: a `source` that has no `Gen` by the next frame fails it; `width`/`height` are ignored
   with a source. `palette_layer` must exist and not be GenNoise.
 - Graph fails (`Status.error`) on a cycle, a deleted node, a child without a node component by
-  the next frame, an input of the wrong type, `Blocks` or `Ripples` on DomainSphere, more than 32 Ramp/Curve
+  the next frame, an input of the wrong type, `Blocks` or `Ripples` on DomainSphere or DomainWorld, `Transmittance` on DomainWorld, more than 32 Ramp/Curve
   keys or an invalid curve.
 - Graph tiling: DomainPlane tiles when noise frequencies and Transform scales are whole numbers
   and rotations are multiples of 90 degrees. DomainSphere outputs an equirectangular image
@@ -129,13 +129,20 @@ Wait for a graph or load in script: `const ready: bool = tex[box.texture.Status]
 - DomainSphere `longitude_start/end`, `latitude_start/end` (radians, equal = whole) make the
   image a full resolution crop of the whole sphere graph that lines up on an `EllipsoidShell` of
   the same ranges; node radii keep their angular units, reads past the range clamp to its edge.
+- DomainWorld evaluates a window of the world in meters at any absolute position: `Coords` is
+  (x, z, 0, 1) in meters from the window origin, texel i at `x + i * width / (w - 1)` so
+  adjacent windows share edge texels. `Noise` (`frequency` in cells per meter) and `Cells`
+  (`size` meters) hash absolute cells (offsets in f64 on the CPU), so they do not repeat and stay
+  precise far from the origin. Neighbourhood nodes take radii/ranges/reaches in meters (slopes per
+  meter) and evaluate over the window grown by their reach, so adjacent windows match. Float
+  formats are unfilterable: read them with `textureLoad`; one mip level, no `interpolate`.
 - `Image` nodes wait (TextureLoading) for their texture, evaluate after the graph they sample
   and again when its image changes; rebinding to another texture compiles nothing.
 - Animated graphs (a `Time` with scale != 0) update `rate` times per second (0 = every frame)
   and skip updates while no draw sampled the image in the previous frame. A paused world clock
   shows a fixed image.
 - `interpolate` crossfades two key images (doubles memory for the graph); ignored for
-  GraphSingle and static graphs.
+  GraphSingle, the float formats and static graphs.
 
 ## Cost
 

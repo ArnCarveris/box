@@ -39,7 +39,7 @@
 #define BOX_GPU_TG_BLEND (2)
 
 /** Bytes of BoxTexGraphStage */
-#define BOX_GPU_TG_UNIFORM_SIZE (48)
+#define BOX_GPU_TG_UNIFORM_SIZE (64)
 
 /** Bytes of the cached values no graph uses kept by default (TextureGraphCache.budget) */
 #define BOX_GPU_TG_CACHE_BUDGET (256ll * 1024 * 1024)
@@ -290,20 +290,24 @@ typedef struct box_gpu_texgraphs_t {
 static inline uint32_t box_gpu_tg_texel_size(
     WGPUTextureFormat format)
 {
-    return format == WGPUTextureFormat_RGBA16Float ? 8
+    return format == WGPUTextureFormat_RGBA32Float ? 16
+        : format == WGPUTextureFormat_RGBA16Float ? 8
         : format == BOX_GPU_TEXTURE_SINGLE ? 1 : 4;
 }
 
 /** Get the format of the texture of the image of a graph.
  *
  * @param format The TextureGraphFormat
- * @return RGBA8Unorm for color and linear, R8Unorm for single, RGBA16Float for HDR
+ * @return RGBA8Unorm for color and linear, R8Unorm for single, RGBA16Float for HDR,
+ * R32Float and RGBA32Float for the float formats
  */
 static inline WGPUTextureFormat box_gpu_tg_image_format(
     uint32_t format)
 {
     return format == GraphSingle ? BOX_GPU_TEXTURE_SINGLE
-        : format == GraphHdr ? WGPUTextureFormat_RGBA16Float : BOX_GPU_TEXTURE_FORMAT;
+        : format == GraphHdr ? WGPUTextureFormat_RGBA16Float
+        : format == GraphFloat ? WGPUTextureFormat_R32Float
+        : format == GraphFloat4 ? WGPUTextureFormat_RGBA32Float : BOX_GPU_TEXTURE_FORMAT;
 }
 
 /** Get the format the output stage of a graph writes: the image, or for an R8Unorm image an
@@ -315,8 +319,50 @@ static inline WGPUTextureFormat box_gpu_tg_image_format(
 static inline WGPUTextureFormat box_gpu_tg_output_format(
     uint32_t format)
 {
-    return format == GraphColor || format == GraphLinear
-        ? BOX_GPU_TEXTURE_FORMAT : WGPUTextureFormat_RGBA16Float;
+    return format == GraphColor || format == GraphLinear ? BOX_GPU_TEXTURE_FORMAT
+        : format == GraphFloat ? WGPUTextureFormat_R32Float
+        : format == GraphFloat4 ? WGPUTextureFormat_RGBA32Float
+        : WGPUTextureFormat_RGBA16Float;
+}
+
+/** Get the size of the grid the stages of a graph before its output evaluate: its image grown
+ * by its apron on each side on DomainWorld, its image on the other domains.
+ *
+ * @param desc The description of the graph
+ * @param width Receives the width
+ * @param height Receives the height
+ */
+static inline void box_gpu_tg_grid(
+    const box_render_texture_graph_t *desc,
+    uint32_t *width,
+    uint32_t *height)
+{
+    *width = desc->width + 2 * desc->apron;
+    *height = desc->height + 2 * desc->apron;
+}
+
+/** Fill the BoxTexGraphStage of a graph.
+ *
+ * @param desc The description of the graph
+ * @param encode How the output stage stores its value
+ * @param time Time of the evaluation, or factor of a crossfade
+ * @param out Receives the 16 words
+ */
+static inline void box_gpu_tg_uniforms(
+    const box_render_texture_graph_t *desc,
+    uint32_t encode,
+    float time,
+    uint32_t out[16])
+{
+    ecs_os_memset(out, 0, 16 * ECS_SIZEOF(uint32_t));
+    out[0] = desc->width;
+    out[1] = desc->height;
+    out[2] = desc->domain;
+    out[3] = encode;
+    ecs_os_memcpy(&out[4], &time, ECS_SIZEOF(float));
+    out[5] = desc->apron;
+    ecs_os_memcpy(&out[8], desc->region, ECS_SIZEOF(desc->region));
+    ecs_os_memcpy(&out[12], desc->spacing, ECS_SIZEOF(desc->spacing));
 }
 
 /** Get a node kind by id.

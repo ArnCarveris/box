@@ -1760,6 +1760,21 @@
                 ]
             },
             {
+                "id": "TextureGraphWorld",
+                "testcases": [
+                    "adjacent_windows_match",
+                    "coords_meters",
+                    "far_window_smooth",
+                    "far_windows_match",
+                    "float_heights",
+                    "float4_values",
+                    "blur_meters",
+                    "cache_keeps_windows_apart",
+                    "many_windows",
+                    "float_material_defaults"
+                ]
+            },
+            {
                 "id": "TextureBlur",
                 "testcases": [
                     "constant_plane",

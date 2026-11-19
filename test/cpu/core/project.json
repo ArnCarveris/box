@@ -466,6 +466,22 @@
                 ]
             },
             {
+                "id": "TextureGraphWorld",
+                "testcases": [
+                    "kinds_window",
+                    "plane_keeps_layout",
+                    "noise_window_elements",
+                    "cells_window_elements",
+                    "windows_share_structure",
+                    "spacing",
+                    "apron",
+                    "plane_kinds_fail",
+                    "float_formats",
+                    "window_reflected",
+                    "null_backend_window"
+                ]
+            },
+            {
                 "id": "TextureLinear",
                 "testcases": [
                     "encode_table",

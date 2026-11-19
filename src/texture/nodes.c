@@ -4,6 +4,7 @@
  */
 
 #include "texture.h"
+#include <math.h>
 
 /** WGSL of the TexConstant node: its value */
 static const char *box_texture_constant_wgsl =
@@ -11,10 +12,17 @@ static const char *box_texture_constant_wgsl =
     "    return bitcast<vec4f>(p[0]);\n"
     "}\n";
 
-/** WGSL of the TexCoords node: the coordinates times its scale */
+/** WGSL of the TexCoords node: the coordinates times its scale, on the world plus the offset
+ * that makes the scale about the origin of the world, its window element */
 static const char *box_texture_coords_wgsl =
-    "fn box_tex_coords(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f) -> vec4f {\n"
-    "    return vec4f(coords.xyz * bitcast<f32>(p[0].x), coords.w);\n"
+    "fn box_tex_coords(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f, window: u32)\n"
+    "    -> vec4f {\n"
+    "    let v = vec4f(coords.xyz * bitcast<f32>(p[0].x), coords.w);\n"
+    "    if (box_texgraph_stage.domain == 2u) {\n"
+    "        let o = bitcast<vec2f>(box_texgraph_params[window].xy);\n"
+    "        return vec4f(v.xy + o, v.zw);\n"
+    "    }\n"
+    "    return v;\n"
     "}\n";
 
 /** WGSL of the TexBlur node: a gaussian along x in pass 0, along y in pass 1, normalized by
@@ -54,7 +62,7 @@ static const char *box_texture_blur_wgsl =
     "    let radius = max(bitcast<f32>(p[0].x), 0.0) * box_texgraph_unit();\n"
     "    let sphere = box_texgraph_stage.domain == 1u;\n"
     "    if (pass_index == 0u) {\n"
-    "        if (any(textureDimensions(t0) != box_texgraph_stage.size)) {\n"
+    "        if (!box_texgraph_has(t0)) {\n"
     "            return i[0];\n"
     "        }\n"
     "        var r = radius;\n"
@@ -63,6 +71,10 @@ static const char *box_texture_blur_wgsl =
     "            r = min(radius / max(s, 1e-6), box_texgraph_half_turn());\n"
     "        }\n"
     "        return box_tex_blur_axis(t0, texel, 0u, r);\n"
+    "    }\n"
+    "    if (box_texgraph_stage.domain == 2u) {\n"
+    "        let world = box_texgraph_stage.world;\n"
+    "        return box_tex_blur_axis(prev, texel, 1u, radius * world.x / world.y);\n"
     "    }\n"
     "    let angle = box_texgraph_texel_angle();\n"
     "    return box_tex_blur_axis(prev, texel, 1u,\n"
@@ -78,13 +90,13 @@ static const char *box_texture_blur_wgsl =
  *
  * The last takes a step of one texel and measures the distance to the contour points of the
  * seeds it finds: where the input, interpolated linearly along an edge between the seed and a
- * neighbour across the contour, is 0.5. */
+ * neighbour across the contour, is 0.5. On the world the distances are in meters. */
 static const char *box_texture_distance_wgsl =
     "const BOX_TEX_DISTANCE_LAST: u32 = 11u;\n"
     "const BOX_TEX_DISTANCE_STEP_MAX: u32 = 512u;\n"
     "\n"
     "fn box_tex_distance_seed(index: f32) -> vec2i {\n"
-    "    let w = i32(box_texgraph_stage.size.x);\n"
+    "    let w = box_texgraph_grid().x;\n"
     "    let k = i32(index);\n"
     "    return vec2i(k % w, k / w);\n"
     "}\n"
@@ -101,6 +113,9 @@ static const char *box_texture_distance_wgsl =
     "    if (box_texgraph_stage.domain == 1u) {\n"
     "        let chord = length(box_tex_distance_dir(pos) - box_tex_distance_dir(c));\n"
     "        return 2.0 * asin(min(chord * 0.5, 1.0)) * 256.0 / BOX_TEXGRAPH_PI;\n"
+    "    }\n"
+    "    if (box_texgraph_stage.domain == 2u) {\n"
+    "        return length((pos - c) * box_texgraph_stage.world.xy);\n"
     "    }\n"
     "    var d = pos - c;\n"
     "    d -= size * round(d / size);\n"
@@ -127,7 +142,7 @@ static const char *box_texture_distance_wgsl =
     "fn box_tex_distance(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f, texel: vec2i,\n"
     "    pass_index: u32, prev: texture_2d<f32>, t0: texture_2d<f32>) -> vec4f {\n"
     "    let range = max(bitcast<f32>(p[0].x), 0.0);\n"
-    "    let has_input = all(textureDimensions(t0) == box_texgraph_stage.size);\n"
+    "    let has_input = box_texgraph_has(t0);\n"
     "    if (pass_index == 0u) {\n"
     "        if (!has_input) {\n"
     "            return vec4f(-1.0, 0.0, 0.0, 0.0);\n"
@@ -138,7 +153,7 @@ static const char *box_texture_distance_wgsl =
     "        let s = box_texgraph_load_poles(t0, texel + vec2i(0, 1)).x >= 0.5;\n"
     "        let n = box_texgraph_load_poles(t0, texel - vec2i(0, 1)).x >= 0.5;\n"
     "        let edge = (e != inside) || (w != inside) || (s != inside) || (n != inside);\n"
-    "        let index = f32(texel.y * i32(box_texgraph_stage.size.x) + texel.x);\n"
+    "        let index = f32(texel.y * box_texgraph_grid().x + texel.x);\n"
     "        return vec4f(select(-1.0, index, edge), 0.0, 0.0, 0.0);\n"
     "    }\n"
     "\n"
@@ -240,9 +255,12 @@ static const char *box_texture_gradient_wgsl =
     "    return vec4f(frame[1] * d.x - frame[2] * d.y, 0.0);\n"
     "}\n";
 
-/** WGSL of the TexCells node: Voronoi cells of jittered lattice points, periodic on the plane
- * and 3D on the sphere, the distance in x and three random values of the nearest cell in y, z
- * and w.
+/** WGSL of the TexCells node: Voronoi cells of jittered lattice points, periodic on the plane,
+ * 3D on the sphere and of the absolute position on the world, the distance in x and three random
+ * values of the nearest cell in y, z and w.
+ *
+ * On the world the lattice starts at the fraction of the cell of the origin of the window and the
+ * cells are hashed shifted by that cell: its window elements, with the inverse cell size.
  *
  * The cells around the texel are searched inner ring first, skipping a cell whose box, which
  * holds its point wherever evolve moves it, is farther than the second nearest point found. */
@@ -268,7 +286,8 @@ static const char *box_texture_cells_wgsl =
     "    return 0.5 + jitter * (box_tex_cells_wave(r + evolve * speed) - 0.5);\n"
     "}\n"
     "\n"
-    "fn box_tex_cells(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f) -> vec4f {\n"
+    "fn box_tex_cells(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f, window: u32)\n"
+    "    -> vec4f {\n"
     "    let count = f32(max(bitcast<i32>(p[0].x), 1));\n"
     "    let jitter = clamp(bitcast<f32>(p[0].y), 0.0, 1.0);\n"
     "    let seed = p[0].z;\n"
@@ -277,10 +296,18 @@ static const char *box_texture_cells_wgsl =
     "    let evolve = i[1].x;\n"
     "    var q = vec3f(0.0);\n"
     "    var period = vec3i(0);\n"
+    "    var shift = vec3i(0);\n"
     "    var weight = vec3f(1.0);\n"
     "    var reach = 2;\n"
     "    if (box_texgraph_stage.domain == 1u) {\n"
     "        q = i[0].xyz * sqrt(count / (6.0 * BOX_TEXGRAPH_PI));\n"
+    "    } else if (box_texgraph_stage.domain == 2u) {\n"
+    "        let w = box_texgraph_params[window];\n"
+    "        let inverse = bitcast<f32>(box_texgraph_params[window + 1u].x);\n"
+    "        q = vec3f(i[0].xy * inverse + bitcast<vec2f>(w.zw), 0.0);\n"
+    "        shift = vec3i(bitcast<vec2i>(w.xy), 0);\n"
+    "        weight = vec3f(1.0, 1.0, 0.0);\n"
+    "        reach = 0;\n"
     "    } else {\n"
     "        let size = vec2f(box_texgraph_stage.size);\n"
     "        let gx = clamp(floor(sqrt(count * size.x / size.y) + 0.5), 1.0, 4096.0);\n"
@@ -309,7 +336,7 @@ static const char *box_texture_cells_wgsl =
     "                        continue;\n"
     "                    }\n"
     "\n"
-    "                    var cell = c;\n"
+    "                    var cell = c + shift;\n"
     "                    if (period.x > 0) {\n"
     "                        cell = ((c % period) + period) % period;\n"
     "                    }\n"
@@ -574,9 +601,13 @@ static const char *box_texture_warp_wgsl =
     "}\n";
 
 /** WGSL of the TexTransform node: its coordinates scaled and rotated about the centre of the
- * domain, then translated. A rotation by a multiple of 90 degrees is exact, so the plane tiles */
+ * domain, then translated. A rotation by a multiple of 90 degrees is exact, so the plane tiles.
+ *
+ * On the world the transform of the origin of the window minus that origin is added: its window
+ * element, so the transform is about the origin of the world */
 static const char *box_texture_transform_wgsl =
-    "fn box_tex_transform(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f) -> vec4f {\n"
+    "fn box_tex_transform(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f, window: u32)\n"
+    "    -> vec4f {\n"
     "    let c = i[0];\n"
     "    let axis = bitcast<vec3f>(p[0].xyz);\n"
     "    let translate = bitcast<vec3f>(p[1].xyz);\n"
@@ -589,6 +620,12 @@ static const char *box_texture_transform_wgsl =
     "    let angle = radians(deg);\n"
     "    let cs = select(vec2f(cos(angle), sin(angle)), exact,\n"
     "        abs(deg / 90.0 - quarter) < 1e-6);\n"
+    "    if (box_texgraph_stage.domain == 2u) {\n"
+    "        let d = c.xy * scale.xy;\n"
+    "        let r = vec2f(cs.x * d.x - cs.y * d.y, cs.y * d.x + cs.x * d.y);\n"
+    "        let o = bitcast<vec2f>(box_texgraph_params[window].xy);\n"
+    "        return vec4f(r + o + translate.xy, c.z * scale.z + translate.z, c.w);\n"
+    "    }\n"
     "    if (box_texgraph_stage.domain == 1u) {\n"
     "        let len = length(axis);\n"
     "        let n = select(vec3f(0.0, 1.0, 0.0), axis / max(len, 1e-6), len > 1e-6);\n"
@@ -772,6 +809,124 @@ done:
     return result;
 }
 
+/** Write the window element of a TexCoords node: the offset (scale - 1) * origin in x and z that
+ * makes its scale about the origin of the world rather than of the window.
+ *
+ * @param node The TexCoords
+ * @param origin World x and z of the origin of the window
+ * @param out Receives one vec4
+ */
+static void box_texture_coords_window(
+    const void *node,
+    const double origin[2],
+    uint32_t *out)
+{
+    const TexCoords *coords = node;
+    float o[2] = {
+        (float)(((double)coords->scale - 1.0) * origin[0]),
+        (float)(((double)coords->scale - 1.0) * origin[1])
+    };
+    ecs_os_memcpy(out, o, ECS_SIZEOF(o));
+}
+
+/** Write the window element of a TexTransform node: rotate(origin * scale) - origin in x and z,
+ * so its scale and rotation by angle_value are about the origin of the world.
+ *
+ * @param node The TexTransform
+ * @param origin World x and z of the origin of the window
+ * @param out Receives one vec4
+ */
+static void box_texture_transform_window(
+    const void *node,
+    const double origin[2],
+    uint32_t *out)
+{
+    const TexTransform *transform = node;
+    double deg = (double)transform->angle_value, quarter = round(deg / 90.0);
+    double c = cos(deg * GLM_PI / 180.0), sn = sin(deg * GLM_PI / 180.0);
+    double x = origin[0] * (double)transform->scale[0];
+    double z = origin[1] * (double)transform->scale[1];
+    float o[2];
+    if (fabs(deg / 90.0 - quarter) < 1e-6) {
+        int32_t k = (((int32_t)fmod(quarter, 4.0)) + 4) % 4;
+        c = k == 0 ? 1 : k == 2 ? -1 : 0;
+        sn = k == 1 ? 1 : k == 3 ? -1 : 0;
+    }
+
+    o[0] = (float)(c * x - sn * z - origin[0]);
+    o[1] = (float)(sn * x + c * z - origin[1]);
+    ecs_os_memcpy(out, o, ECS_SIZEOF(o));
+}
+
+/** Write the window elements of a TexCells node: the cell of the origin of the window as two
+ * i32 and its fraction as two f32, at the inverse of the size of a cell in single precision as
+ * the shader takes it, multiplied in double precision; then that inverse.
+ *
+ * @param node The TexCells
+ * @param origin World x and z of the origin of the window
+ * @param out Receives two vec4
+ */
+static void box_texture_cells_window(
+    const void *node,
+    const double origin[2],
+    uint32_t *out)
+{
+    const TexCells *cells = node;
+    float inverse = cells->size > 0 && isfinite(cells->size) ? 1.0f / cells->size : 1.0f;
+    int32_t k;
+    for (k = 0; k < 2; k ++) {
+        double at = origin[k] * (double)inverse;
+        double cell = floor(at);
+        float frac = (float)(at - cell);
+        if (!(frac < 1.0f)) {
+            frac = 0;
+            cell += 1;
+        }
+
+        if (!isfinite(cell)) {
+            cell = 0;
+            frac = 0;
+        }
+
+        out[k] = (uint32_t)(int64_t)fmod(cell, 4294967296.0);
+        ecs_os_memcpy(&out[2 + k], &frac, ECS_SIZEOF(float));
+    }
+
+    ecs_os_memcpy(&out[4], &inverse, ECS_SIZEOF(float));
+}
+
+/** Get the reach of a TexBlur node on DomainWorld: its radius in meters, and a texel the taps
+ * read between.
+ *
+ * @param node The TexBlur
+ * @param texel Meters between neighbouring texels
+ * @return Texels
+ */
+static float box_texture_blur_reach(
+    const void *node,
+    float texel)
+{
+    const TexBlur *blur = node;
+
+    return blur->radius > 0 ? blur->radius / texel + 1.0f : 0.0f;
+}
+
+/** Get the reach of a TexDistance node on DomainWorld: its range in meters, and the texels
+ * around a seed the contour is placed between.
+ *
+ * @param node The TexDistance
+ * @param texel Meters between neighbouring texels
+ * @return Texels
+ */
+static float box_texture_distance_reach(
+    const void *node,
+    float texel)
+{
+    const TexDistance *distance = node;
+
+    return distance->range > 0 ? distance->range / texel + 2.0f : 1.0f;
+}
+
 /** Register the built in node kinds of values and their math: TexConstant, TexCoords, the
  * math kinds such as TexAdd, TexNoise, TexBlur, TexDistance, TexSplit, TexCombine, TexWarp,
  * TexTransform, TexTime and TexSplat.
@@ -794,7 +949,9 @@ static void box_texture_nodes_register_math(
         .output = TexVector,
         .params = {{ "scale", offsetof(TexCoords, scale), 4, BOX_TEXTURE_PARAM_F32 }},
         .function = "box_tex_coords",
-        .source = box_texture_coords_wgsl
+        .source = box_texture_coords_wgsl,
+        .window = box_texture_coords_window,
+        .window_size = 1
     });
 
     box_texture_math_register(world);
@@ -811,7 +968,8 @@ static void box_texture_nodes_register_math(
         .function = "box_tex_blur",
         .source = box_texture_blur_wgsl,
         .flags = BOX_TEXTURE_NODE_NEIGHBOURHOOD,
-        .passes = 2
+        .passes = 2,
+        .reach = box_texture_blur_reach
     });
 
     box_texture_node_register(world, &(box_texture_node_desc_t){
@@ -825,7 +983,8 @@ static void box_texture_nodes_register_math(
         .function = "box_tex_distance",
         .source = box_texture_distance_wgsl,
         .flags = BOX_TEXTURE_NODE_NEIGHBOURHOOD,
-        .passes = BOX_TEX_DISTANCE_PASSES
+        .passes = BOX_TEX_DISTANCE_PASSES,
+        .reach = box_texture_distance_reach
     });
 
     box_texture_node_register(world, &(box_texture_node_desc_t){
@@ -880,7 +1039,9 @@ static void box_texture_nodes_register_math(
             { "scale", offsetof(TexTransform, scale), 12, BOX_TEXTURE_PARAM_F32 }
         },
         .function = "box_tex_transform",
-        .source = box_texture_transform_wgsl
+        .source = box_texture_transform_wgsl,
+        .window = box_texture_transform_window,
+        .window_size = 1
     });
 
     box_texture_node_register(world, &(box_texture_node_desc_t){
@@ -977,7 +1138,9 @@ static void box_texture_nodes_register_lookups(
             { "edge", offsetof(TexCells, edge), 4, BOX_TEXTURE_PARAM_F32 }
         },
         .function = "box_tex_cells",
-        .source = box_texture_cells_wgsl
+        .source = box_texture_cells_wgsl,
+        .window = box_texture_cells_window,
+        .window_size = 2
     });
 
     box_texture_node_register(world, &(box_texture_node_desc_t){
