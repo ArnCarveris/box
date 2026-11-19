@@ -13,11 +13,13 @@ using box.surface
 using box.ui
 using box.widgets
 using box.transition
+using box.audio
 using state
 using assets
 
 // The panel: Season, Precipitation, Wind and Time of day sliders that write the state, each
-// showing its value in words, and the temperature. H hides it for screenshots.
+// showing its value in words, the temperature, and the master volume of the sound. H hides it
+// for screenshots, M mutes the sound.
 state {
   export const PANEL_W: f32 = 296
   export const SLIDER_W: f32 = PANEL_W - 36
@@ -27,13 +29,17 @@ state {
   export const READOUT_PRECIPITATION: i32 = 1
   export const READOUT_WIND: i32 = 2
   export const READOUT_HOUR: i32 = 3
+  export const READOUT_VOLUME: i32 = 4
 
+  // The value of a slider in words; t is the temperature for the precipitation, and 1 while
+  // the sound is muted for the volume
   fn forest_readout(kind: i32, v: f64, t: f64) -> string {
     match kind {
       0: forest_season_name(v)
       1: forest_precip_text(v, t)
       2: forest_wind_text(v)
-      _: forest_clock(v)
+      3: forest_clock(v)
+      _: forest_volume_text(v, t > 0.5)
     }
   }
 }
@@ -249,8 +255,19 @@ hud {
 
       ForestRule rule_bottom()
 
+      ForestSlider volume(
+        label: "Volume",
+        kind: READOUT_VOLUME,
+        t: state.muted ? 1 : 0,
+        width: SLIDER_W,
+        min: 0,
+        max: 1,
+        step: 0.01,
+        value: state.volume
+      )
+
       hint {
-        Text: {value: "H hides this panel", size: 12}
+        Text: {value: "H hides this panel, M mutes the sound", size: 12}
         Rgb: {150, 158, 138}
       }
     }
@@ -280,6 +297,8 @@ async {
         state.wind = v
       } else if n == "hour" {
         state.hour = v
+      } else if n == "volume" {
+        state.volume = v
       }
     }
   }
@@ -289,5 +308,17 @@ async {
   while true {
     await on.pressed(state.actions.toggle_hud)
     state.hud_shown = !state.hud_shown
+  }
+}
+
+// The master volume and the mute of the sound
+$ {
+  Settings: {master_volume: state.volume, mute: state.muted}
+}
+
+async {
+  while true {
+    await on.pressed(state.actions.toggle_mute)
+    state.muted = !state.muted
   }
 }

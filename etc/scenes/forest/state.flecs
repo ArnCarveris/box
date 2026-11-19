@@ -11,6 +11,11 @@ state {
       Action: {description: "Hide or show the panel"}
       Binding: {key: H}
     }
+
+    toggle_mute {
+      Action: {description: "Mute or unmute the sound"}
+      Binding: {key: M}
+    }
   }
 
   // Season, 0..4, continuous and cyclic: 0 the start of spring, 1 of summer, 2 of autumn, 3 of
@@ -41,6 +46,7 @@ state {
   export const START_PRECIPITATION: f32 = 0
   export const START_WIND: f32 = 3
   export const START_HOUR: f32 = 17
+  export const START_VOLUME: f32 = 0.8
 
   fn forest_fract(v: f64) -> f64 {
     v - floor(v)
@@ -164,6 +170,11 @@ state {
     "{hs}:{ms}"
   }
 
+  fn forest_volume_text(v: f64, muted: bool) -> string {
+    const pct = v * 100
+    muted ? "Muted" : "{pct:.0}%"
+  }
+
   fn forest_temperature_text(t: f64) -> string {
     const r = round(t)
     const shown = r == 0 ? 0 : r
@@ -180,6 +191,10 @@ state {
   export mut precip_kind: i32 = forest_precip_kind(forest_temperature(START_SEASON, START_HOUR))
 
   export mut hud_shown: bool = true
+
+  // The master volume of the sound, 0..1, and whether M muted it
+  export mut volume: f32 = START_VOLUME
+  export mut muted: bool = false
 }
 
 async {
