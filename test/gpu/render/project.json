@@ -563,6 +563,12 @@
                 ]
             },
             {
+                "id": "MeshGraph",
+                "testcases": [
+                    "tube_with_spheres"
+                ]
+            },
+            {
                 "id": "TileTerrain",
                 "testcases": [
                     "corner_variant",

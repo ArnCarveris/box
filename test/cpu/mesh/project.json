@@ -1,0 +1,85 @@
+{
+    "id": "mesh",
+    "type": "application",
+    "value": {
+        "public": false,
+        "use": [
+            "box"
+        ]
+    },
+    "lang.c": {
+        "include": [
+            "../../../src/mesh_graph",
+            "../../../src/geometry"
+        ]
+    },
+    "test": {
+        "testsuites": [
+            {
+                "id": "MeshGraph",
+                "testcases": [
+                    "shape_after_job",
+                    "keeps_mesh_during_edit",
+                    "status_counts",
+                    "prefab_instances_share",
+                    "outputs_share_nodes",
+                    "cache_hit_on_undo",
+                    "graphs_share_subgraph",
+                    "cache_budget",
+                    "error_cycle",
+                    "error_wrong_type",
+                    "error_missing_node",
+                    "error_no_node_component",
+                    "error_output_not_mesh",
+                    "error_unconnected_input",
+                    "failed_keeps_mesh",
+                    "remove_graph",
+                    "output_changed_keeps_mesh",
+                    "script_graph",
+                    "node_kinds",
+                    "custom_kind",
+                    "shape_of_graph"
+                ]
+            },
+            {
+                "id": "MeshNodes",
+                "testcases": [
+                    "shape_box",
+                    "shape_sphere",
+                    "shape_lathe",
+                    "shape_missing",
+                    "mesh3",
+                    "mesh3_flat_normals",
+                    "path_line",
+                    "path_curve_frames",
+                    "path_closed",
+                    "path_taper",
+                    "transform_mesh",
+                    "transform_points",
+                    "merge_meshes",
+                    "merge_curves",
+                    "merge_mixed_types",
+                    "tube_counts",
+                    "tube_uvs",
+                    "tube_caps",
+                    "tube_profile",
+                    "points_on_curves_count",
+                    "points_on_curves_spacing",
+                    "points_on_curves_range",
+                    "points_on_curves_jitter",
+                    "points_on_mesh_count",
+                    "points_on_mesh_seeded",
+                    "points_on_mesh_spacing",
+                    "instance_on_points",
+                    "displace_seeded",
+                    "displace_along_normal",
+                    "normals_flat",
+                    "normals_smooth",
+                    "normals_angle",
+                    "deterministic_across_worlds",
+                    "sincos"
+                ]
+            }
+        ]
+    }
+}
