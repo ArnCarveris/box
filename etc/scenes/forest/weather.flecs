@@ -1,0 +1,328 @@
+using flecs.script
+using flecs.script.math
+using box.app
+using box.material
+using box.texture
+using state
+
+// The weather on the surfaces of the forest, from the Precipitation slider (state.precipitation)
+// and the temperature (state.flecs): rain, sleet or snow. The async block at the end integrates
+// the weather over time into three levels, 0..1: how wet things are, how full the puddles are and
+// how deep the snow lies. Things get wet within seconds and dry over minutes, faster in the warm;
+// the puddles fill in heavy rain and drain once it eases; snow builds up below freezing and melts
+// above it, faster in rain, its meltwater wetting the ground and filling the puddles.
+//
+// The levels drive four TextureLayers that the materials of the forest list over their own
+// surfaces (materials.flecs, bark.flecs, leaves.flecs, undergrowth.flecs and the scene's own):
+// wet darkens and smooths what lies beneath by its porosity, the puddles stand in the low, flat
+// places of the floor with the rings of the rain on them, snow settles on what faces up, and the
+// rain rings the brook. Only the layer entities follow the levels, never the plants that list
+// them, so the integration costs no more than writing four layers a frame.
+state {
+  // Seconds of the scene for the weather to change the surfaces: to soak fully in heavy rain, to
+  // dry at DRY_AT °C without rain, to fill the puddles in heavy rain and to drain them, to cover
+  // the ground in heavy snow and to melt it at MELT_AT °C
+  export const WET_TIME: f32 = 6
+  export const DRY_TIME: f32 = 120
+  export const DRY_AT: f32 = 20
+  export const PUDDLE_TIME: f32 = 20
+  export const DRAIN_TIME: f32 = 100
+  export const SNOW_TIME: f32 = 45
+  export const MELT_TIME: f32 = 60
+  export const MELT_AT: f32 = 10
+
+  // Below this rain (precipitation times the share that falls as water) the puddles drain
+  export const PUDDLE_RAIN: f32 = 0.25
+
+  // The share of the precipitation that falls as water at a temperature: all of it as rain, half
+  // of it as sleet, none of it as snow
+  fn forest_liquid(t: f64) -> f64 {
+    match forest_precip_kind(t) {
+      0: 1
+      1: 0.5
+      _: 0
+    }
+  }
+
+  // Rain and snowfall at a precipitation and temperature, 0..1
+  fn forest_rainfall(p: f64, t: f64) -> f64 {
+    p * forest_liquid(t)
+  }
+
+  fn forest_snowfall(p: f64, t: f64) -> f64 {
+    p * (1 - forest_liquid(t))
+  }
+
+  // Share of the snow that melts per second at a temperature and rain
+  fn forest_melt(t: f64, rain: f64) -> f64 {
+    max(0, t) / MELT_AT * (1 + 3 * rain) / MELT_TIME
+  }
+
+  // Share of the wetness that dries per second at a temperature and rain: barely in the frost,
+  // faster in the warm, not while it rains
+  fn forest_drying(t: f64, rain: f64) -> f64 {
+    clamp(0.25 + 0.75 * t / DRY_AT, 0.1, 1.6) * (1 - min(1, rain * 4)) / DRY_TIME
+  }
+
+  // The levels a scene starts with in a steady weather: soaked and puddled in rain, snowed over
+  // in snow
+  fn forest_wet_start(p: f64, t: f64) -> f64 {
+    forest_rainfall(p, t) > 0.02 ? 1 : 0
+  }
+
+  fn forest_puddles_start(p: f64, t: f64) -> f64 {
+    forest_rainfall(p, t) > PUDDLE_RAIN ? 1 : 0
+  }
+
+  fn forest_snow_start(p: f64, t: f64) -> f64 {
+    forest_snowfall(p, t) > 0.02 && forest_melt(t, forest_rainfall(p, t)) < 0.0001 ? 1 : 0
+  }
+
+  // The amounts of the layers at the levels
+  fn forest_wet_amount(wet: f64) -> f64 {
+    clamp(wet * 1.1, 0, 1)
+  }
+
+  fn forest_puddle_amount(puddles: f64) -> f64 {
+    0.45 * sqrt(clamp(puddles, 0, 1))
+  }
+
+  // The cover thins as soon as the snow starts to melt, so the ground shows through in patches
+  fn forest_snow_amount(snow: f64) -> f64 {
+    clamp(snow * 1.1, 0, 1)
+  }
+
+  // Leaves, needles and blades hold less of it, only where they lie flat
+  fn forest_snow_foliage_amount(snow: f64) -> f64 {
+    0.8 * forest_snow_amount(snow * sqrt(snow))
+  }
+
+  // The weather levels, 0..1, written every frame by the async block at the end, and the rain
+  // the rings of the puddles and the brook show, 0..1, which follows the slider
+  export mut wet: f32 = forest_wet_start(START_PRECIPITATION, forest_temperature(START_SEASON, START_HOUR))
+  export mut puddles: f32 =
+    forest_puddles_start(START_PRECIPITATION, forest_temperature(START_SEASON, START_HOUR))
+  export mut snow: f32 = forest_snow_start(START_PRECIPITATION, forest_temperature(START_SEASON, START_HOUR))
+  export mut rain: f32 = forest_rainfall(START_PRECIPITATION, forest_temperature(START_SEASON, START_HOUR))
+}
+
+assets {
+  // Where the ground dries last, in patches
+  forest_wet_patches {
+    n { nodes.Noise: {frequency: 5, octaves: 3, seed: 311} }
+    soft { nodes.Remap: {input: n, from_min: 0.2, from_max: 0.8, to_min: 0.35, to_max: 1, clamp: true} }
+    Graph: {output: soft, width: 256, format: GraphSingle}
+  }
+
+  // Where the puddles stand, over a world mapping of PUDDLE_SIZE meters: a few blobs that the
+  // cavity of the layer puts in the low places of the floor
+  forest_puddle_mask {
+    n { nodes.Noise: {frequency: 2, octaves: 3, seed: 312} }
+    wide { nodes.Remap: {input: n, from_min: 0.45, from_max: 0.7, to_min: 0, to_max: 1, clamp: true} }
+    Graph: {output: wide, width: 512, format: GraphSingle}
+  }
+
+  // Rings of raindrops on the puddles: one repeat every PUDDLE_SIZE meters, drops of about 13 cm
+  // cells, as many as the rain lets fall
+  forest_puddle_rings {
+    time { nodes.Time: {} }
+    ripples {
+      nodes.Ripples: {count: 2304, speed: 0.9, lifetime: 0.9, width: 0.16, seed: 313, time: time,
+        density_value: rain}
+    }
+    normal { nodes.Normal: {height: ripples, strength: 1.4} }
+    Graph: {output: normal, width: 512, format: GraphLinear, rate: 30, interpolate: true}
+  }
+
+  // Rings of raindrops on the brook, over a world mapping of BROOK_RING_SIZE meters
+  forest_brook_rings {
+    time { nodes.Time: {} }
+    ripples {
+      nodes.Ripples: {count: 1024, speed: 0.9, lifetime: 1, width: 0.16, seed: 314, time: time,
+        density_value: rain}
+    }
+    normal { nodes.Normal: {height: ripples, strength: 2} }
+    Graph: {output: normal, width: 512, format: GraphLinear, rate: 30, interpolate: true}
+  }
+
+  // Drifts of the snow and the soft lumps of its surface
+  forest_snow_drifts {
+    n { nodes.Noise: {frequency: 3, octaves: 4, seed: 315} }
+    soft { nodes.Remap: {input: n, from_min: 0.25, from_max: 0.75, to_min: 0.05, to_max: 1, clamp: true} }
+    Graph: {output: soft, width: 256, format: GraphSingle}
+  }
+
+  forest_snow_n {
+    lumps { nodes.Noise: {frequency: 24, octaves: 4, fractal: NoiseBillow, seed: 316} }
+    normal { nodes.Normal: {height: lumps, strength: 0.8} }
+    Graph: {output: normal, width: 512, format: GraphLinear}
+  }
+
+  // Wet: darker, warmer and a little glossier where it is porous (soil, bark, stone, dead
+  // leaves), little on the glossy leaves, without a broad sheen in the sun. It dries from the
+  // open ridges first, the crevices and the damp patches last
+  layer_wet {
+    texture.Layer: {
+      amount: forest_wet_amount(wet),
+      mask: forest_wet_patches,
+      cavity: 0.35,
+      contrast: 5,
+      albedo: LayerMultiply,
+      roughness: LayerMultiply,
+      metallic: LayerKeep,
+      occlusion: LayerKeep,
+      normal: 0.03,
+      porosity: 1
+    }
+    Rgb: {166, 152, 132}
+    PbrMaterial: {roughness: 0.86}
+    texture.Mapping: {mode: MappingWorld, size: 7}
+  }
+
+  // Wet foliage: leaves, needles, grass and ferns shed the water, so they darken and turn only a
+  // little glossier
+  layer_wet_foliage {
+    texture.Layer: {
+      amount: forest_wet_amount(wet),
+      mask: forest_wet_patches,
+      contrast: 5,
+      albedo: LayerMultiply,
+      roughness: LayerMultiply,
+      metallic: LayerKeep,
+      occlusion: LayerKeep,
+      normal: 0,
+      porosity: 1
+    }
+    Rgb: {184, 184, 178}
+    PbrMaterial: {roughness: 0.9}
+    texture.Mapping: {mode: MappingWorld, size: 7}
+  }
+
+  // Puddles in the low, flat places of the floor: darker, muddy, smooth water with soft edges,
+  // ringed by the rain
+  layer_puddles {
+    texture.Layer: {
+      amount: forest_puddle_amount(puddles),
+      direction: {0, 1, 0},
+      facing: 0.94,
+      mask: forest_puddle_mask,
+      cavity: 0.3,
+      contrast: 5,
+      albedo: LayerMultiply,
+      roughness: LayerMix,
+      metallic: LayerKeep,
+      occlusion: LayerKeep,
+      normal: 0.85
+    }
+    Rgb: {168, 156, 138}
+    PbrMaterial: {roughness: 0.14}
+    PbrTextures: {normal: forest_puddle_rings}
+    texture.Mapping: {mode: MappingWorld, size: 6}
+  }
+
+  // Snow on what faces up: the ground first, the tops of the stones, logs, limbs and needles,
+  // in drifts that fill the hollows first
+  layer_snow {
+    texture.Layer: {
+      amount: forest_snow_amount(snow),
+      direction: {0, 1, 0},
+      facing: 0.5,
+      mask: forest_snow_drifts,
+      cavity: 0.3,
+      contrast: 9,
+      albedo: LayerMix,
+      roughness: LayerMix,
+      metallic: LayerMix,
+      occlusion: LayerKeep,
+      normal: 0.7
+    }
+    Rgb: {238, 242, 250}
+    PbrMaterial: {roughness: 0.72, metallic: 0}
+    PbrTextures: {normal: forest_snow_n}
+    texture.Mapping: {mode: MappingWorld, size: 5}
+  }
+
+  // Snow on the leaves, needles and blades: only on the flattest of them, and only once it lies
+  // deep
+  layer_snow_foliage {
+    texture.Layer: {
+      amount: forest_snow_foliage_amount(snow),
+      direction: {0, 1, 0},
+      facing: 0.72,
+      mask: forest_snow_drifts,
+      contrast: 9,
+      albedo: LayerMix,
+      roughness: LayerMix,
+      metallic: LayerKeep,
+      occlusion: LayerKeep,
+      normal: 0.5
+    }
+    Rgb: {238, 242, 250}
+    PbrMaterial: {roughness: 0.72}
+    PbrTextures: {normal: forest_snow_n}
+    texture.Mapping: {mode: MappingWorld, size: 5}
+  }
+
+  // The rings of the rain on water: Water takes only the normal of a layer, by its coverage
+  layer_rain_rings {
+    texture.Layer: {
+      amount: 1,
+      facing: 0,
+      albedo: LayerKeep,
+      roughness: LayerKeep,
+      metallic: LayerKeep,
+      occlusion: LayerKeep,
+      normal: min(1, rain * 2.5) * 0.85
+    }
+    PbrTextures: {normal: forest_brook_rings}
+    texture.Mapping: {mode: MappingWorld, size: 4}
+  }
+}
+
+// The weather integrates over time: the levels follow the rain, the snow and the temperature
+async {
+  mut last: f64 = box.app.Status[box.app.Status].elapsed
+
+  while true {
+    await next_frame()
+    const now = box.app.Status[box.app.Status].elapsed
+    const fixed = App[App].delta_time
+    const d = fixed > 0 ? fixed : clamp(now - last, 0.001, 0.1)
+    last = now
+
+    const p = state.precipitation
+    const t = state.temperature
+    const r: f32 = state.forest_rainfall(p, t)
+    const s = state.forest_snowfall(p, t)
+
+    // Snow builds up from the snowfall and melts in the warm and the rain
+    const melt = min(state.snow, state.forest_melt(t, r) * d)
+    const sn: f32 = clamp(state.snow + s * d / SNOW_TIME - melt, 0, 1)
+
+    // The rain and the meltwater soak the surfaces, which dry once it stops
+    const soak = r > 0.02 ? (0.3 + 0.7 * r) * d / WET_TIME : 0
+    const w: f32 = clamp(state.wet + soak + melt * 4 - state.wet * state.forest_drying(t, r) * d, 0, 1)
+
+    // The puddles fill in heavy rain once the ground is soaked, and from the melt, and drain
+    // once the rain eases
+    const fill = r > PUDDLE_RAIN ? (r - PUDDLE_RAIN) / (1 - PUDDLE_RAIN) * state.wet * state.wet : 0
+    const drain = r > PUDDLE_RAIN ? 0 : (1 - r / PUDDLE_RAIN) * (0.4 + 0.6 * clamp(t / DRY_AT, 0, 1))
+    const pd: f32 = clamp(state.puddles + (fill / PUDDLE_TIME - drain / DRAIN_TIME) * d + melt * 1.5, 0, 1)
+
+    if abs(sn - state.snow) > 0.00001 {
+      state.snow = sn
+    }
+
+    if abs(w - state.wet) > 0.00001 {
+      state.wet = w
+    }
+
+    if abs(pd - state.puddles) > 0.00001 {
+      state.puddles = pd
+    }
+
+    if abs(r - state.rain) > 0.001 {
+      state.rain = r
+    }
+  }
+}

@@ -93,7 +93,7 @@ state {
 }
 
 sun {
-  DirectionalLight: {intensity: 2.8 * PI * (1 - 0.6 * precipitation)}
+  DirectionalLight: {intensity: 2.8 * PI * (1 - 0.94 * min(1, precipitation * 1.6))}
   Rgb: {255, forest_seasonal(season, 251, 249, 238, 248), forest_seasonal(season, 240, 236, 212, 252)}
   Cookie: {
     texture: forest_clouds,
@@ -101,7 +101,7 @@ sun {
     height: CLOUD_ALTITUDE,
     threshold: forest_cloud_threshold(season, precipitation),
     softness: 0.14,
-    strength: 0.4 + 0.3 * precipitation,
+    strength: 0.4 + 0.5 * precipitation,
     velocity: {cloud_velocity_x, cloud_velocity_z}
   }
 }

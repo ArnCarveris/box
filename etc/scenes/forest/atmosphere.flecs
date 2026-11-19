@@ -33,15 +33,16 @@ state {
   }
 
   // Extinction per meter of the shafts: dusty in summer, moist in autumn, crisp in winter;
-  // rain fills the air
+  // rain and snow fill the air, but the overcast takes the beams away
   fn forest_shaft_density(season: f64, hour: f64, p: f64) -> f64 {
-    0.0075 * forest_beam(season, hour) * forest_seasonal(season, 0.9, 1, 1.15, 0.75) * (1 + 1.5 * p)
+    0.0075 * forest_beam(season, hour) * forest_seasonal(season, 0.9, 1, 1.15, 0.75) * (1 + 1.5 * p) *
+      (1 - 0.9 * min(1, p * 1.6))
   }
 
   // Extinction per meter of the brook mist at its thickest: autumn mornings are the mistiest,
   // summer the least; rain keeps a mist over the water all day
   fn forest_mist_density(season: f64, hour: f64, p: f64) -> f64 {
-    const m = max(forest_mist(season, hour), 0.6 * p)
+    const m = max(forest_mist(season, hour), 0.4 * p)
     0.9 * m * forest_seasonal(season, 1, 0.7, 1.3, 0.9)
   }
 

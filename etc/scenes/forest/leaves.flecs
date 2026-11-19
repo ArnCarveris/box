@@ -645,6 +645,7 @@ assets {
     AlphaCutoff: {forest_leaf_cutoff(0, season)}
     DiffuseTransmission: {factor: 0.65, color: {forest_leaf_glow_r(season), forest_leaf_glow_g(season), forest_leaf_glow_b(season)}}
     PbrTextures: {albedo: leaf_beech_albedo, normal: leaf_beech_normal}
+    texture.Layers: {layers: [layer_wet_foliage, layer_snow_foliage]}
     NoBake
   }
 
@@ -662,6 +663,7 @@ assets {
     AlphaCutoff: {forest_leaf_cutoff(1, season)}
     DiffuseTransmission: {factor: 0.5, color: {forest_leaf_glow_r(season), forest_leaf_glow_g(season), forest_leaf_glow_b(season)}}
     PbrTextures: {albedo: leaf_oak_albedo, normal: leaf_oak_normal}
+    texture.Layers: {layers: [layer_wet_foliage, layer_snow_foliage]}
     NoBake
   }
 
@@ -679,6 +681,7 @@ assets {
     AlphaCutoff: {forest_leaf_cutoff(2, season)}
     DiffuseTransmission: {factor: 0.7, color: {forest_leaf_glow_r(season), forest_leaf_glow_g(season), forest_leaf_glow_b(season)}}
     PbrTextures: {albedo: leaf_birch_albedo, normal: leaf_birch_normal}
+    texture.Layers: {layers: [layer_wet_foliage, layer_snow_foliage]}
     NoBake
   }
 
@@ -697,6 +700,7 @@ assets {
     AlphaCutoff: {0.4}
     DiffuseTransmission: {factor: 0.15, color: {150, 200, 120}}
     PbrTextures: {albedo: leaf_spruce_albedo, normal: leaf_spruce_normal}
+    texture.Layers: {layers: [layer_wet_foliage, layer_snow_foliage]}
   }
 
   prefab ForestNeedleFir : ForestFrondPairMesh {
@@ -706,5 +710,6 @@ assets {
     AlphaCutoff: {0.4}
     DiffuseTransmission: {factor: 0.12, color: {150, 200, 120}}
     PbrTextures: {albedo: leaf_fir_albedo, normal: leaf_fir_normal}
+    texture.Layers: {layers: [layer_wet_foliage, layer_snow_foliage]}
   }
 }

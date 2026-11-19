@@ -145,7 +145,7 @@ assets {
       heights: [moss_height, litter_height, path_height, pebble_height],
       contrast: 12
     }
-    texture.Layers: {layers: [layer_fallen_leaves]}
+    texture.Layers: {layers: [layer_fallen_leaves, layer_wet, layer_puddles, layer_snow]}
     texture.Mapping: {mode: MappingWorld, size: WORLD_SIZE}
   }
 }

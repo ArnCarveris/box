@@ -568,6 +568,7 @@ assets {
     AlphaCutoff: {forest_seasonal(season, LEAF_FULL, LEAF_FULL, 0.5, 0.8)}
     DiffuseTransmission: {factor: 0.6, color: {forest_leaf_glow_r(season), forest_leaf_glow_g(season), forest_leaf_glow_b(season)}}
     PbrTextures: {albedo: grass_albedo, normal: grass_normal}
+    texture.Layers: {layers: [layer_wet_foliage, layer_snow_foliage]}
     NoShadow
     NoBake
   }
@@ -584,6 +585,7 @@ assets {
     AlphaCutoff: {forest_flower_cutoff(0, season)}
     DiffuseTransmission: {factor: 0.5, color: {240, 255, 200}}
     PbrTextures: {albedo: bloom_yellow_albedo, normal: bloom_normal}
+    texture.Layers: {layers: [layer_wet_foliage, layer_snow_foliage]}
     NoShadow
     NoBake
   }
@@ -607,6 +609,7 @@ assets {
     AlphaCutoff: {0.4}
     DiffuseTransmission: {factor: 0.45, color: {220, 255, 150}}
     PbrTextures: {albedo: reed_albedo, normal: reed_normal}
+    texture.Layers: {layers: [layer_wet_foliage, layer_snow_foliage]}
     NoShadow
     NoBake
   }
@@ -619,6 +622,7 @@ assets {
     AlphaCutoff: {forest_seasonal(season, 0.7, LEAF_FULL, 0.5, 0.93)}
     DiffuseTransmission: {factor: 0.6, color: {forest_leaf_glow_r(season), forest_leaf_glow_g(season), forest_leaf_glow_b(season)}}
     PbrTextures: {albedo: fern_albedo, normal: fern_normal}
+    texture.Layers: {layers: [layer_wet_foliage, layer_snow_foliage]}
     NoShadow
     NoBake
   }
@@ -630,6 +634,7 @@ assets {
     PbrMaterial: {roughness: 0.9}
     AlphaCutoff: {forest_seasonal(season, 0.88, 0.92, 0.3, 0.62)}
     PbrTextures: {albedo: litter_patch_albedo, normal: litter_patch_normal}
+    texture.Layers: {layers: [layer_wet, layer_snow]}
     NoShadow
     NoBake
   }
@@ -644,6 +649,7 @@ assets {
     AlphaCutoff: {forest_seasonal(season, 0.6, LEAF_FULL, 0.78, LEAF_BARE)}
     DiffuseTransmission: {factor: 0.6, color: {forest_leaf_glow_r(season), forest_leaf_glow_g(season), forest_leaf_glow_b(season)}}
     PbrTextures: {albedo: leaf_beech_albedo, normal: leaf_beech_normal}
+    texture.Layers: {layers: [layer_wet_foliage, layer_snow_foliage]}
     NoBake
   }
 
@@ -654,6 +660,7 @@ assets {
     AlphaCutoff: {forest_seasonal(season, 0.5, LEAF_FULL, 0.86, LEAF_BARE)}
     DiffuseTransmission: {factor: 0.55, color: {forest_leaf_glow_r(season), forest_leaf_glow_g(season), forest_leaf_glow_b(season)}}
     PbrTextures: {albedo: leaf_birch_albedo, normal: leaf_birch_normal}
+    texture.Layers: {layers: [layer_wet_foliage, layer_snow_foliage]}
     NoBake
   }
 
@@ -664,6 +671,7 @@ assets {
     AlphaCutoff: {forest_seasonal(season, 0.5, 0.01, 0.4, 0.88)}
     PbrTextures: {albedo: canopy_leaf_albedo, normal: canopy_normal}
     texture.Mapping: {mode: MappingWorld, size: 3, blend: 0.5}
+    texture.Layers: {layers: [layer_wet_foliage, layer_snow_foliage]}
     HemiSphere: {segments: 10, smooth: true, radius: 1}
     NoBake
   }
@@ -674,6 +682,7 @@ assets {
     PbrMaterial: {roughness: 1}
     PbrTextures: {albedo: moss_albedo, normal: moss_normal, orm: moss_orm}
     texture.Mapping: {mode: MappingObject, size: 1.5, blend: 0.4}
+    texture.Layers: {layers: [layer_wet, layer_snow]}
     IcoSphere: {radius: 1, segments: 2, smooth: true}
     NoShadow
     NoBake
@@ -683,6 +692,7 @@ assets {
   prefab ForestMushroomCap {
     Rgb: {150, 98, 56}
     PbrMaterial: {roughness: 0.55}
+    texture.Layers: {layers: [layer_wet, layer_snow]}
     HemiSphere: {segments: 10, smooth: true, radius: 1}
     NoShadow
   }
@@ -696,6 +706,7 @@ assets {
   prefab ForestMushroomGills {
     Rgb: {214, 196, 160}
     PbrMaterial: {roughness: 0.9}
+    texture.Layers: {layers: [layer_wet, layer_snow]}
     Cylinder: {segments: 10, smooth: true, length: 1, radius: 1}
     NoShadow
   }
@@ -703,6 +714,7 @@ assets {
   prefab ForestMushroomStem {
     Rgb: {226, 216, 192}
     PbrMaterial: {roughness: 0.8}
+    texture.Layers: {layers: [layer_wet, layer_snow]}
     Cylinder: {segments: 8, smooth: true, length: 1, radius: 1}
     NoShadow
   }
@@ -724,6 +736,7 @@ assets {
     PbrMaterial: {roughness: 0.95}
     PbrTextures: {albedo: bark_dead_albedo, normal: bark_dead_normal}
     texture.Mapping: {mode: MappingObject, size: 0.6}
+    texture.Layers: {layers: [layer_wet, layer_snow]}
     Cylinder: {segments: 14, smooth: true, length: 1, radius: 1}
   }
 

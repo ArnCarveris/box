@@ -178,6 +178,7 @@ assets {
     PbrTextures: {normal: forest_ripple_n}
     texture.Mapping: {mode: MappingWorld, size: 1}
     texture.Transform: {scale_x: 0.8, scale_y: 1 / RIPPLE_ALONG}
+    texture.Layers: {layers: [layer_rain_rings]}
     NoShadow
   }
 
@@ -211,6 +212,7 @@ assets {
     ClearCoat: {strength: 0.7, roughness: 0.12}
     PbrTextures: {albedo: rock_albedo, normal: rock_normal, orm: rock_orm}
     texture.Mapping: {mode: MappingObject, size: 1.5, blend: 0.35}
+    texture.Layers: {layers: [layer_wet, layer_snow]}
   }
 
   // Wet dark earth of the banks at the water line
@@ -220,6 +222,7 @@ assets {
     ClearCoat: {strength: 0.6, roughness: 0.18}
     PbrTextures: {albedo: litter_albedo, normal: litter_normal, orm: litter_orm}
     texture.Mapping: {mode: MappingWorld, size: 4, blend: 0.4}
+    texture.Layers: {layers: [layer_wet, layer_snow]}
   }
 
   // Mossy turf of the banks that overhangs the water
@@ -228,6 +231,7 @@ assets {
     PbrMaterial: {roughness: 1}
     PbrTextures: {albedo: moss_albedo, normal: moss_normal, orm: moss_orm}
     texture.Mapping: {mode: MappingWorld, size: 6, blend: 0.4}
+    texture.Layers: {layers: [layer_wet, layer_snow]}
   }
 
   // Roots out of the banks
@@ -236,6 +240,7 @@ assets {
     PbrMaterial: {roughness: 0.8}
     PbrTextures: {albedo: forest_wood, normal: forest_wood_n}
     texture.Transform: {scale_x: 1, scale_y: 3}
+    texture.Layers: {layers: [layer_wet, layer_snow]}
   }
 
   // Boards of the footbridge along local X, and beams along local Z, the grain along them
@@ -245,6 +250,7 @@ assets {
     PbrTextures: {albedo: forest_wood, normal: forest_wood_n}
     texture.Mapping: {mode: MappingObject, size: 1}
     texture.Transform: {scale_x: 2, scale_y: 0.2}
+    texture.Layers: {layers: [layer_wet, layer_snow]}
   }
 
   prefab ForestBeam {
@@ -253,6 +259,7 @@ assets {
     PbrTextures: {albedo: forest_wood, normal: forest_wood_n}
     texture.Mapping: {mode: MappingObject, size: 1}
     texture.Transform: {scale_x: 0.2, scale_y: 2}
+    texture.Layers: {layers: [layer_wet, layer_snow]}
   }
 
   // A mossy stone that breaks the surface, its local origin on the water: size meters across,

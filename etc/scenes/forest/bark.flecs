@@ -374,6 +374,7 @@ assets {
       contrast: 10
     }
     texture.Mapping: {mode: MappingObject, size: BARK_MASK_SIZE}
+    texture.Layers: {layers: [layer_wet, layer_snow]}
   }
 
   prefab ForestBarkOak {
@@ -387,6 +388,7 @@ assets {
       contrast: 10
     }
     texture.Mapping: {mode: MappingObject, size: BARK_MASK_SIZE}
+    texture.Layers: {layers: [layer_wet, layer_snow]}
   }
 
   prefab ForestBarkBirch {
@@ -400,6 +402,7 @@ assets {
       contrast: 10
     }
     texture.Mapping: {mode: MappingObject, size: BARK_MASK_SIZE}
+    texture.Layers: {layers: [layer_wet, layer_snow]}
   }
 
   prefab ForestBarkSpruce {
@@ -413,6 +416,7 @@ assets {
       contrast: 10
     }
     texture.Mapping: {mode: MappingObject, size: BARK_MASK_SIZE}
+    texture.Layers: {layers: [layer_wet, layer_snow]}
   }
 
   // Silver fir: the smooth bark of the beech, darker and cooler
@@ -427,6 +431,7 @@ assets {
       contrast: 10
     }
     texture.Mapping: {mode: MappingObject, size: BARK_MASK_SIZE}
+    texture.Layers: {layers: [layer_wet, layer_snow]}
   }
 
   prefab ForestBarkDead {
@@ -439,6 +444,7 @@ assets {
       contrast: 10
     }
     texture.Mapping: {mode: MappingObject, size: BARK_MASK_SIZE}
+    texture.Layers: {layers: [layer_wet, layer_snow]}
   }
 
   // Branches: the bark alone, a tile every BARK_LIMB_TILE path units
@@ -448,6 +454,7 @@ assets {
     WindSway: {bend: SWAY_BROADLEAF_BEND, height: SWAY_BROADLEAF_HEIGHT, base: 0}
     PbrTextures: {albedo: bark_beech_albedo, normal: bark_beech_normal, orm: bark_beech_orm}
     texture.Mapping: {mode: MappingObject, size: BARK_LIMB_TILE}
+    texture.Layers: {layers: [layer_wet, layer_snow]}
   }
 
   prefab ForestLimbOak {
@@ -456,6 +463,7 @@ assets {
     WindSway: {bend: SWAY_BROADLEAF_BEND, height: SWAY_BROADLEAF_HEIGHT, base: 0}
     PbrTextures: {albedo: bark_oak_albedo, normal: bark_oak_normal, orm: bark_oak_orm}
     texture.Mapping: {mode: MappingObject, size: BARK_LIMB_TILE}
+    texture.Layers: {layers: [layer_wet, layer_snow]}
   }
 
   prefab ForestLimbBirch {
@@ -464,6 +472,7 @@ assets {
     WindSway: {bend: SWAY_BIRCH_BEND, height: SWAY_BIRCH_HEIGHT, base: 0}
     PbrTextures: {albedo: bark_birch_albedo, normal: bark_birch_normal, orm: bark_birch_orm}
     texture.Mapping: {mode: MappingObject, size: BARK_LIMB_TILE}
+    texture.Layers: {layers: [layer_wet, layer_snow]}
   }
 
   prefab ForestLimbSpruce {
@@ -472,6 +481,7 @@ assets {
     WindSway: {bend: SWAY_CONIFER_BEND, height: SWAY_CONIFER_HEIGHT, base: 0}
     PbrTextures: {albedo: bark_spruce_albedo, normal: bark_spruce_normal, orm: bark_spruce_orm}
     texture.Mapping: {mode: MappingObject, size: BARK_LIMB_TILE}
+    texture.Layers: {layers: [layer_wet, layer_snow]}
   }
 
   prefab ForestLimbFir {
@@ -480,6 +490,7 @@ assets {
     WindSway: {bend: SWAY_CONIFER_BEND, height: SWAY_CONIFER_HEIGHT, base: 0}
     PbrTextures: {albedo: bark_beech_albedo, normal: bark_beech_normal, orm: bark_beech_orm}
     texture.Mapping: {mode: MappingObject, size: BARK_LIMB_TILE}
+    texture.Layers: {layers: [layer_wet, layer_snow]}
   }
 
   prefab ForestLimbDead {
@@ -487,6 +498,7 @@ assets {
     PbrMaterial: {roughness: 1}
     PbrTextures: {albedo: bark_dead_albedo, normal: bark_dead_normal, orm: bark_dead_orm}
     texture.Mapping: {mode: MappingObject, size: BARK_LIMB_TILE}
+    texture.Layers: {layers: [layer_wet, layer_snow]}
   }
 
   // Bracket fungus on the snags and logs
@@ -494,6 +506,7 @@ assets {
     Rgb: {255, 255, 255}
     PbrMaterial: {roughness: 0.75}
     PbrTextures: {albedo: forest_fungus_albedo}
+    texture.Layers: {layers: [layer_wet, layer_snow]}
   }
 
   // The dense, dark inside of a conifer crown, and of a cheap broadleaf crown, between the cards
@@ -503,6 +516,7 @@ assets {
     WindSway: {bend: SWAY_CONIFER_BEND, height: SWAY_CONIFER_HEIGHT, base: 0}
     PbrTextures: {albedo: canopy_albedo, normal: canopy_normal}
     texture.Mapping: {mode: MappingWorld, size: 6, blend: 0.5}
+    texture.Layers: {layers: [layer_wet_foliage, layer_snow_foliage]}
   }
 
   // The core of a broadleaf crown follows its leaves: it turns with them and thins away in
@@ -514,6 +528,7 @@ assets {
     AlphaCutoff: {forest_seasonal(season, 0.55, 0.01, 0.4, LEAF_BARE)}
     PbrTextures: {albedo: canopy_leaf_albedo, normal: canopy_normal}
     texture.Mapping: {mode: MappingWorld, size: 8, blend: 0.5}
+    texture.Layers: {layers: [layer_wet_foliage, layer_snow_foliage]}
     NoBake
   }
 }

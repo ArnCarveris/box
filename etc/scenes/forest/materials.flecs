@@ -5,6 +5,7 @@ using box.geometry
 using box.material
 using box.texture
 using state
+using assets
 
 // Procedural textures and materials of the forest. Every ground material is a set of texture
 // graphs made by one template with a map prop: its albedo, normal, height (for the height based
@@ -518,7 +519,7 @@ assets {
     Rgb: {200, 196, 190}
     PbrMaterial: {roughness: 1}
     PbrTextures: {albedo: litter_albedo, normal: litter_normal, orm: litter_orm}
-    texture.Layers: {layers: [layer_fallen_leaves]}
+    texture.Layers: {layers: [layer_fallen_leaves, layer_wet, layer_puddles, layer_snow]}
     texture.Transform: {scale_x: 24, scale_y: 24}
     texture.Mapping: {mode: MappingWorld, size: GROUND_MAP_SIZE}
   }
@@ -533,6 +534,7 @@ assets {
       contrast: 10
     }
     texture.Mapping: {mode: MappingObject, size: 3, blend: 0.35}
+    texture.Layers: {layers: [layer_wet, layer_snow]}
   }
 
   // The backdrop tree line and the hills beyond the world: broadleaf crowns, the darker
@@ -545,6 +547,7 @@ assets {
     WindSway: {bend: SWAY_FAR_BEND, height: SWAY_BROADLEAF_HEIGHT, base: 0}
     PbrTextures: {albedo: canopy_leaf_albedo, normal: canopy_normal}
     texture.Mapping: {mode: MappingWorld, size: 14, blend: 0.5}
+    texture.Layers: {layers: [layer_wet_foliage, layer_snow_foliage]}
     NoShadow
   }
 
@@ -554,6 +557,7 @@ assets {
     WindSway: {bend: SWAY_FAR_BEND * 0.5, height: 7, base: 0}
     PbrTextures: {albedo: canopy_leaf_albedo, normal: canopy_normal}
     texture.Mapping: {mode: MappingWorld, size: 8, blend: 0.5}
+    texture.Layers: {layers: [layer_wet_foliage, layer_snow_foliage]}
     NoShadow
   }
 
@@ -563,6 +567,7 @@ assets {
     WindSway: {bend: SWAY_FAR_BEND * 0.6, height: SWAY_CONIFER_HEIGHT, base: 0}
     PbrTextures: {albedo: canopy_albedo, normal: canopy_normal}
     texture.Mapping: {mode: MappingWorld, size: 10, blend: 0.5}
+    texture.Layers: {layers: [layer_wet_foliage, layer_snow_foliage]}
     NoShadow
   }
 
@@ -571,6 +576,7 @@ assets {
     PbrMaterial: {roughness: 0.95}
     PbrTextures: {albedo: canopy_leaf_albedo, normal: canopy_normal}
     texture.Mapping: {mode: MappingWorld, size: 60, blend: 0.4}
+    texture.Layers: {layers: [layer_wet, layer_snow]}
     NoShadow
   }
 
