@@ -2020,6 +2020,16 @@
                 ]
             },
             {
+                "id": "TerrainMaterial",
+                "testcases": [
+                    "mask_matches_graph",
+                    "layers_show_channels",
+                    "levels_seamless",
+                    "triplanar_slope_density",
+                    "sample_renders"
+                ]
+            },
+            {
                 "id": "WorldOrigin",
                 "testcases": [
                     "shift_same_image",

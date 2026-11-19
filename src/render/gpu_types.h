@@ -200,6 +200,19 @@ typedef struct box_gpu_mesh_t {
                                      *   into each slot of its surface assets, 0 for none */
     int32_t terrain_slots;          /**< Slots its surface assets hold */
     uint64_t terrain_slot_size;     /**< Bytes of a slot */
+    WGPUTexture terrain_masks;      /**< Grid mesh of terrain tiles with masks: the mask atlas,
+                                     *   a cell per slot (box_render_terrain_height_t), NULL
+                                     *   until a tile has masks */
+    WGPUTextureView terrain_mask_view; /**< View of the mask atlas */
+    uint32_t *terrain_mask_serials; /**< Serials of the masks and the coarse masks copied into
+                                     *   each cell, two per slot, 0 for none */
+    uint32_t terrain_mask_texels;   /**< Texels along an edge of the masks of a tile, the height
+                                     *   of a cell, half its width */
+    uint32_t terrain_mask_columns;  /**< Cells across the atlas */
+    uint32_t terrain_mask_rows;     /**< Cells down the atlas */
+    WGPUTextureFormat terrain_mask_format; /**< Format of the atlas, that of the masks */
+    uint32_t terrain_mask_version;  /**< Texture serial taken when the atlas is made again, so
+                                     *   the blend groups that bound it bind the new one */
 } box_gpu_mesh_t;
 
 /** Frames the CPU may submit before it waits for the GPU to finish the oldest */
@@ -290,6 +303,8 @@ typedef struct box_gpu_blend_group_t {
     WGPUBindGroup group;            /**< The bind group, NULL until made */
     int64_t used;                   /**< Frame of the last packet that drew with it */
     int64_t checked;                /**< Frame its arrays and images were last checked */
+    int64_t bound;                  /**< Frame its bind group was last made, which the layers
+                                     *   groups that extend it compare */
     struct box_gpu_blend_group_t *next; /**< Next group */
 } box_gpu_blend_group_t;
 
@@ -327,7 +342,8 @@ typedef struct box_gpu_layer_group_t {
     box_gpu_blend_array_t *array;   /**< Array of the layer maps (after the heights of a blend),
                                      *   referenced */
     uint32_t version;               /**< Version of the array it binds */
-    WGPUBindGroup base;             /**< Blend group whose entries it binds, NULL for the plain
+    int64_t base;                   /**< Frame the blend group whose entries it binds was
+                                     *   bound (box_gpu_blend_group_t.bound), 0 for the plain
                                      *   variant */
     uint32_t serials[BOX_GPU_MATERIAL_TEXTURES]; /**< Serials of the images of the textures of
                                      *   the plain variant it binds */

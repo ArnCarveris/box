@@ -7,6 +7,10 @@
  * The tiles are children of a container without a transform in the scene of the terrain, roots
  * that a shift of the WorldOrigin moves, placed in double precision from the terrain position.
  * A tile is disabled while it does not draw: its heights are pending, or another tile covers it.
+ *
+ * With Terrain.masks a tile also has the TextureGraph of the masks over the window of its heights
+ * and of the masks of the next coarser level at every second texel, which the fragment stage
+ * fades to as the grid morphs. The levels above 0 read the masks through a TexBlur per level.
  */
 
 #include "terrain.h"
@@ -34,11 +38,16 @@ ECS_COMPONENT_DECLARE(TerrainTile);
 #define BOX_TERRAIN_DROPS (4)
 
 /** Material components of a terrain that its tiles get */
-#define BOX_TERRAIN_MATERIALS (12)
+#define BOX_TERRAIN_MATERIALS (13)
+
+/** Reach of the TexBlur of the masks of a level above 0 in cells of the level: three standard
+ * deviations, so a standard deviation of half a cell */
+#define BOX_TERRAIN_MASK_BLUR (1.5)
 
 /** The values of a Terrain with its defaults and limits applied */
 typedef struct box_terrain_settings_t {
     ecs_entity_t height;    /**< Height node */
+    ecs_entity_t masks;     /**< Masks node, 0 for none */
     double tile_size;       /**< Edge of a tile of level 0 */
     double lod_distance;    /**< Range of level 0 */
     double extent;          /**< Half size, 0 unbounded */
@@ -63,6 +72,8 @@ typedef struct box_terrain_tiles_t {
     ecs_map_t map;          /**< Key of a node to its box_terrain_tile_t */
     ecs_vec_t list;         /**< box_terrain_tile_t*, every tile */
     ecs_entity_t container; /**< Parent of the tile entities */
+    ecs_entity_t filters[BOX_TERRAIN_LEVELS + 1]; /**< TexBlur node of the masks of each level
+                             *   above 0, children of the container, 0 until made */
     box_terrain_settings_t settings; /**< Settings the tiles were made with */
     bool made;              /**< settings holds the settings of the tiles */
     double foci[BOX_TERRAIN_FOCI][2]; /**< Foci the tiles morph around, x and z in the frame
@@ -107,6 +118,12 @@ static int32_t box_terrain_vertices(
     return result + ((result & 1) ? 0 : 1);
 }
 
+int32_t box_terrain_coarse_texels(
+    int32_t resolution)
+{
+    return (box_terrain_vertices(resolution) + 2 * BOX_TERRAIN_BORDER + 1) / 2;
+}
+
 uint32_t box_terrain_row_bytes(
     int32_t resolution)
 {
@@ -126,6 +143,7 @@ static void box_terrain_settings(
 {
     ecs_os_memset_t(out, 0, box_terrain_settings_t);
     out->height = t->height;
+    out->masks = t->masks;
     out->tile_size = isfinite(t->tile_size) && t->tile_size > 0.0f ? t->tile_size : 32.0;
     out->resolution = box_terrain_vertices(t->resolution);
     out->levels = t->levels > 0 ? t->levels : 6;
@@ -536,6 +554,66 @@ static void box_terrain_materials_copy(
             ecs_remove_id(world, tile, id);
         }
     }
+
+    const Terrain *terrain = ecs_get(world, e, Terrain);
+    if (terrain && terrain->masks && ecs_has(world, e, TextureBlend) &&
+        !ecs_has(world, e, TextureMapping))
+    {
+        ecs_set(world, tile, TextureMapping, { .mode = MappingWorld, .size = 1.0f });
+    }
+}
+
+/** Get the node the tiles of a level read their masks from: the masks node at level 0, else
+ * the TexBlur of the level, made under the container on first use and kept on the masks node
+ * and the reach of the level.
+ *
+ * @param world The world
+ * @param tiles The tiles of the terrain, with their settings
+ * @param level The level
+ * @return The node, 0 without masks
+ */
+static ecs_entity_t box_terrain_filter(
+    ecs_world_t *world,
+    box_terrain_tiles_t *tiles,
+    int32_t level)
+{
+    const box_terrain_settings_t *s = &tiles->settings;
+    ecs_entity_t result = s->masks;
+    if (!s->masks || level <= 0 || level > BOX_TERRAIN_LEVELS) {
+        goto done;
+    }
+
+    double cell = box_terrain_size(s, level) / (double)(s->resolution - 1);
+    float radius = (float)(BOX_TERRAIN_MASK_BLUR * cell);
+    result = tiles->filters[level];
+    if (!result || !ecs_is_alive(world, result)) {
+        result = tiles->container
+            ? ecs_new_w_pair(world, EcsChildOf, tiles->container) : ecs_new(world);
+        tiles->filters[level] = result;
+    }
+
+    const TexBlur *blur = ecs_get(world, result, TexBlur);
+    if (!blur || blur->input != s->masks || blur->radius != radius) {
+        ecs_set(world, result, TexBlur, { .input = s->masks, .radius = radius });
+    }
+
+done:
+    return result;
+}
+
+/** Check whether the image of a texture of a tile is computed.
+ *
+ * @param world The world
+ * @param texture The texture entity, 0 for none
+ * @return Whether it has an image, true for none
+ */
+static bool box_terrain_texture_ready(
+    const ecs_world_t *world,
+    ecs_entity_t texture)
+{
+    const TextureStatus *status = texture ? ecs_get(world, texture, TextureStatus) : NULL;
+
+    return !texture || (status && status->state == TextureReady && status->revision > 0);
 }
 
 /** Write the TerrainTile of a tile: its node, slot, focus and morph.
@@ -575,6 +653,8 @@ static void box_terrain_tile_write(
     TerrainTile v = {
         .terrain = e,
         .texture = t->texture,
+        .masks = t->masks,
+        .coarse = t->coarse,
         .level = t->level,
         .ix = t->ix,
         .iz = t->iz,
@@ -587,6 +667,7 @@ static void box_terrain_tile_write(
         .min_height = s->min_height,
         .max_height = s->max_height,
         .bounded = s->extent > 0.0,
+        .masked = t->masks && t->coarse && ecs_has(world, e, TextureBlend),
         .clip = { (float)(-s->extent - cx), (float)(-s->extent - cz),
             (float)(s->extent - cx), (float)(s->extent - cz) }
     };
@@ -655,6 +736,30 @@ static box_terrain_tile_t* box_terrain_tile_new(
         },
         .format = GraphFloat
     });
+    if (s->masks) {
+        const TextureGraph *heights = ecs_get(world, t->texture, TextureGraph);
+        TextureGraphWindow window = heights->window;
+        int32_t coarse = box_terrain_coarse_texels(s->resolution);
+        t->masks = ecs_new_w_pair(world, EcsChildOf, t->entity);
+        ecs_set(world, t->masks, TextureGraph, {
+            .output = box_terrain_filter(world, tiles, node->level),
+            .width = texels,
+            .height = texels,
+            .domain = DomainWorld,
+            .window = window,
+            .format = GraphLinear
+        });
+        t->coarse = ecs_new_w_pair(world, EcsChildOf, t->entity);
+        ecs_set(world, t->coarse, TextureGraph, {
+            .output = box_terrain_filter(world, tiles, node->level + 1),
+            .width = coarse,
+            .height = coarse,
+            .domain = DomainWorld,
+            .window = window,
+            .format = GraphLinear
+        });
+    }
+
     ecs_map_insert_ptr(&tiles->map, box_terrain_key(t->level, t->ix, t->iz), t);
     *ecs_vec_append_t(NULL, &tiles->list, box_terrain_tile_t*) = t;
     tiles->created ++;
@@ -890,8 +995,13 @@ static void box_terrain_status(
 {
     TerrainStatus status = {0};
     int32_t i, texels = tiles->settings.resolution + 2 * BOX_TERRAIN_BORDER;
+    int32_t coarse = box_terrain_coarse_texels(tiles->settings.resolution);
     int64_t bytes = (int64_t)texels * texels * 4 +
         (int64_t)box_terrain_row_bytes(tiles->settings.resolution) * texels;
+    if (tiles->settings.masks) {
+        bytes += 2 * ((int64_t)texels * texels * 4 + (int64_t)coarse * coarse * 4);
+    }
+
     for (i = 0; i < ecs_vec_count(&tiles->list); i ++) {
         const box_terrain_tile_t *t = *ecs_vec_get_t(&tiles->list, box_terrain_tile_t*, i);
         status.tiles[t->level] += t->drawn;
@@ -940,6 +1050,7 @@ static box_terrain_tiles_t* box_terrain_tiles_of(
         }
 
         result->container = scene ? ecs_new_w_pair(world, EcsChildOf, scene) : ecs_new(world);
+        ecs_os_memset_n(result->filters, 0, ecs_entity_t, BOX_TERRAIN_LEVELS + 1);
         result->positioned = false;
         result->materials = 0;
     }
@@ -1028,8 +1139,9 @@ static void box_terrain_update(
     for (i = 0; i < ecs_vec_count(&tiles->list); i ++) {
         box_terrain_tile_t *t = list[i];
         if (!t->ready && i < first) {
-            const TextureStatus *status = ecs_get(world, t->texture, TextureStatus);
-            t->ready = status && status->state == TextureReady && status->revision > 0;
+            t->ready = box_terrain_texture_ready(world, t->texture) &&
+                box_terrain_texture_ready(world, t->masks) &&
+                box_terrain_texture_ready(world, t->coarse);
         }
     }
 
@@ -1043,7 +1155,7 @@ static void box_terrain_update(
             continue;
         }
 
-        if (fresh || refocus) {
+        if (fresh || refocus || restyle) {
             box_terrain_tile_write(world, tiles, &s, e, t);
         }
 
@@ -1171,6 +1283,18 @@ static void box_terrain_ctx_free(
     ecs_os_free(ctx);
 }
 
+ecs_entity_t box_terrain_mask_node(
+    ecs_world_t *world,
+    ecs_entity_t terrain,
+    int32_t level)
+{
+    const TerrainModule *m = ecs_singleton_get(world, TerrainModule);
+    box_terrain_tiles_t *tiles = m && m->ctx
+        ? ecs_map_get_deref(&m->ctx->terrains, box_terrain_tiles_t, terrain) : NULL;
+
+    return tiles && tiles->made ? box_terrain_filter(world, tiles, level) : 0;
+}
+
 box_terrain_tile_t* const* box_terrain_tiles(
     const ecs_world_t *world,
     ecs_entity_t terrain,
@@ -1200,6 +1324,7 @@ void box_terrain_tile_surface(
     data->p[2][1] = tile->focus[1];
     data->p[2][2] = tile->morph[0];
     data->p[2][3] = tile->morph[1];
+    data->p[3][0] = tile->masked ? 1.0f : 0.0f;
     data->p[4][0] = tile->size;
     data->p[4][1] = tile->skirt;
     data->p[4][2] = (float)tile->level;
@@ -1348,7 +1473,8 @@ void box_terrain_tiles_import(
     ecs_id_t materials[BOX_TERRAIN_MATERIALS] = {
         ecs_id(Rgb), ecs_id(Tint), ecs_id(PbrMaterial), ecs_id(ClearCoat), ecs_id(Sheen),
         ecs_id(Emissive), ecs_id(PbrTextures), ecs_id(TextureMapping),
-        ecs_id(TextureTransform), ecs_id(TextureWrap), ecs_id(TextureLayers), NoShadow
+        ecs_id(TextureTransform), ecs_id(TextureWrap), ecs_id(TextureLayers), NoShadow,
+        ecs_id(TextureBlend)
     };
     ecs_os_memcpy_n(ctx->materials, materials, ecs_id_t, BOX_TERRAIN_MATERIALS);
 

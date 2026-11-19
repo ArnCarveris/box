@@ -344,7 +344,11 @@
                     "materials_copied",
                     "bounded_extent",
                     "remove_deletes_tiles",
-                    "script"
+                    "script",
+                    "masks_graph_windows",
+                    "masks_wait_ready",
+                    "masks_blend_surface",
+                    "masks_change_remakes_tiles"
                 ]
             },
             {

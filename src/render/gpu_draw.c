@@ -320,6 +320,15 @@ static void box_gpu_mesh_free(
     box_gpu_debug_mesh_free(m);
     wgpuBufferRelease(m->surface_assets);
     ecs_os_free(m->terrain_serials);
+    ecs_os_free(m->terrain_mask_serials);
+    if (m->terrain_mask_view) {
+        wgpuTextureViewRelease(m->terrain_mask_view);
+    }
+
+    if (m->terrain_masks) {
+        wgpuTextureRelease(m->terrain_masks);
+    }
+
     if (m->buffer) {
         box_gpu_mesh_pool_free(gpu, m->page, m->offset, m->alloc_size);
     }

@@ -2856,8 +2856,10 @@ void box_draws_batch_blend(
     box_render_batch_t *out);
 
 /** Get the entity whose TextureBlend a 3D shape draws with: the shape itself when it owns a
- * TileTerrain, else the owner of the TextureBlend it has or inherits, 0 when it has neither or
- * is no mesh shape. Alpha tested, blended, transmissive and triplanar shapes blend alike.
+ * TileTerrain, the terrain of a TerrainTile with a TextureBlend (a copy of that of its
+ * terrain), so the tiles of a terrain share a batch, else the owner of the TextureBlend it has
+ * or inherits, 0 when it has neither or is no mesh shape. Alpha tested, blended, transmissive
+ * and triplanar shapes blend alike.
  *
  * @param world The world
  * @param e The shape

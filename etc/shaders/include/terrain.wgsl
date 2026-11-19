@@ -3,9 +3,10 @@
 // of the grid mesh (box_gpu_terrain_heights). The surface of a tile (box_terrain_tile_surface):
 // p[1] its slot, the floats per row of its heights, the texels per row and the vertices per
 // edge; p[2] the focus relative to its center and the distances where its morph into the grid
-// of the next coarser level starts and ends; p[4] its size, the skirt depth, its level and 1
-// when bounded; p[5] the extent of a bounded terrain relative to its center. The includer
-// declares surface_assets.
+// of the next coarser level starts and ends; p[3].x 1 when its masks weigh the layers of a
+// TextureBlend (terrain_flat); p[4] its size, the skirt depth, its level and 1 when bounded;
+// p[5] the extent of a bounded terrain relative to its center. The includer declares
+// surface_assets.
 #pragma once
 
 // Surface kind of a terrain tile (BOX_TERRAIN_SURFACE)
@@ -75,4 +76,20 @@ fn terrain_vertex(position: vec3f) -> TerrainVertex {
     let unit = m / n - vec2f(0.5);
     return TerrainVertex(vec3f(unit.x, y, unit.y),
         normalize(vec3f(-dx * scale, 1.0, -dz * scale)));
+}
+
+// Whether the tile of surface_data reads its masks in the fragment stage: its uv is its grid uv
+// and terrain_flat holds the rest.
+fn terrain_masked() -> bool {
+    return surface_data.p[0].x == TERRAIN_SURFACE && surface_data.p[3].x != 0.0;
+}
+
+// What a vertex of a tile with masks passes on in VertexOut.flat4 for terrain_mask
+// (mesh_blend.wgsl): the slot of the tile, the focus relative to its center and the morph
+// distances in tile sizes (pack2x16float), and the mapping offset of its material, which uv.xy
+// no longer holds.
+fn terrain_flat(offset: vec2f) -> vec4u {
+    let size = max(surface_data.p[4].x, 1e-6);
+    return vec4u(u32(surface_data.p[1].x), pack2x16float(surface_data.p[2].xy / size),
+        pack2x16float(surface_data.p[2].zw / size), pack2x16float(offset));
 }

@@ -219,6 +219,13 @@ fn blend_triplanar(f: VertexOut, geometric: vec3f, front: bool) -> Layers {
     o.emissive = vec3f(0.0);
     o.orm = vec3f(0.0);
     var normal = vec3f(0.0);
+    let offset = blend_offset(f);
+    // The mask of a terrain tile is the same for every projection
+    let terrain = (blending.flags & BLEND_TERRAIN) != 0u;
+    var mask = vec4f(0.0);
+    if (terrain) {
+        mask = blend_mask_at(f, offset, gx[0], gy[0]);
+    }
     for (var k = 0u; k < 3u; k++) {
         if (w[k] == 0.0) {
             continue;
@@ -233,10 +240,12 @@ fn blend_triplanar(f: VertexOut, geometric: vec3f, front: bool) -> Layers {
         if (!sampled) {
             continue;
         }
-        let uv = planes[k] + f.uv.xy;
+        let uv = planes[k] + offset;
+        if (!terrain) {
+            mask = textureSampleGrad(blend_mask, material_sampler, uv, gx[k], gy[k]);
+        }
         let lw = blend_height_weights(blend_heights, material_sampler, blending,
-            blend_weights(textureSampleGrad(blend_mask, material_sampler, uv, gx[k], gy[k]),
-            blending), uv, gx[k], gy[k]);
+            blend_weights(mask, blending), uv, gx[k], gy[k]);
         let b = blend_sample(uv, gx[k], gy[k], lw, front);
         o.albedo += w[k] * b.albedo;
         if (!front) {

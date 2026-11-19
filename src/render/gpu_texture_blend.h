@@ -41,13 +41,18 @@
  * are the atlases of its kinds */
 #define BOX_GPU_BLEND_TILES (256u)
 
+/** BlendUniforms flag: a Terrain with masks, whose mask is the mask atlas of its grid mesh,
+ * read at the cell of the tile of a fragment (terrain_mask of mesh_blend.wgsl) */
+#define BOX_GPU_BLEND_TERRAIN (512u)
+
 /** BlendUniforms of mesh.wgsl */
 typedef struct box_gpu_blend_uniforms_t {
     float transforms[BOX_RENDER_BLEND_LAYERS][4]; /**< TextureTransform of each layer */
     uint32_t count;     /**< Slices of the arrays */
     uint32_t flags;     /**< BOX_GPU_BLEND_MASKED, BOX_GPU_BLEND_SINGLE, BOX_GPU_BLEND_HEIGHT */
     float contrast;     /**< TextureBlend.contrast, 0 samples no heights */
-    uint32_t pad;       /**< Unused, zero */
+    uint32_t terrain;   /**< BOX_GPU_BLEND_TERRAIN: texels along an edge of the masks of a tile
+                         *   | cells across the mask atlas << 16, else 0 */
 } box_gpu_blend_uniforms_t;
 
 /** Queue the textures a new bind group binds in a color layer whose levels average stored values.
@@ -80,6 +85,17 @@ WGPUTextureView box_gpu_material_view(
 box_gpu_texture_t* box_gpu_blend_source(
     box_gpu_t *gpu,
     uint32_t handle);
+
+/** Get the view of the mask a blend group binds: the mask atlas of the grid mesh of a terrain
+ * blend, the image of the mask, or white.
+ *
+ * @param gpu The backend
+ * @param blend The blend record
+ * @return The view
+ */
+WGPUTextureView box_gpu_blend_mask_view(
+    box_gpu_t *gpu,
+    const box_render_texture_blend_t *blend);
 
 /** Get the serial of the image a blend samples through a handle.
  *

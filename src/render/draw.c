@@ -12,6 +12,7 @@
  */
 
 #include "draw.h"
+#include "../terrain/terrain.h"
 
 ECS_COMPONENT_DECLARE(DrawSlot);
 
@@ -817,7 +818,9 @@ ecs_entity_t box_draws_blend_owner(
         goto done;
     }
 
-    result = ecs_get_target_for_id(world, e, EcsIsA, ecs_id(TextureBlend));
+    const TerrainTile *tile = ecs_id(TerrainTile) ? ecs_get(world, e, TerrainTile) : NULL;
+    result = tile && tile->terrain ? tile->terrain
+        : ecs_get_target_for_id(world, e, EcsIsA, ecs_id(TextureBlend));
 done:
     return result;
 }

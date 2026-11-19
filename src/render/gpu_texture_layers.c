@@ -258,7 +258,6 @@ static void box_gpu_layer_group_bind(
     }
 
     if (bg) {
-        box_gpu_texture_t *mask = box_gpu_blend_source(gpu, bg->blend.mask);
         entries[n ++] = (WGPUBindGroupEntry){
             .binding = BOX_GPU_BLEND_EMISSIVE,
             .textureView = box_gpu_material_view(gpu, bg->emissive, 1)
@@ -269,7 +268,7 @@ static void box_gpu_layer_group_bind(
         };
         entries[n ++] = (WGPUBindGroupEntry){
             .binding = BOX_GPU_BLEND_MASK,
-            .textureView = mask ? mask->linear : gpu->white->linear
+            .textureView = box_gpu_blend_mask_view(gpu, &bg->blend)
         };
         entries[n ++] = (WGPUBindGroupEntry){
             .binding = BOX_GPU_BLEND_UNIFORMS,
@@ -330,7 +329,7 @@ static void box_gpu_layer_group_bind(
     }
 
     g->version = g->array->version;
-    g->base = bg ? bg->group : NULL;
+    g->base = bg ? bg->bound : 0;
     g->group = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
         .layout = bg ? gpu->blend_layer_layout : gpu->layer_layout,
         .entryCount = (size_t)n,
@@ -437,7 +436,7 @@ static WGPUBindGroup box_gpu_layer_group(
     box_gpu_blend_array_t *a = box_gpu_array_get(gpu, BOX_GPU_LAYER_MAP, sources, count,
         key.quality, flat);
     stale = !g->group || a != g->array || a->version != g->version ||
-        (bg && bg->group != g->base) ||
+        (bg && bg->bound != g->base) ||
         ecs_os_memcmp(buffers, g->buffers, ECS_SIZEOF(buffers));
     for (i = 0; !bg && !stale && i < BOX_GPU_MATERIAL_TEXTURES; i ++) {
         stale = box_gpu_blend_serial(gpu, key.textures[i]) != g->serials[i];

@@ -1,7 +1,8 @@
 /**
  * @file render/terrain.c
  * @brief Extract of the terrain tiles: the heights each tile that draws needs in the surface
- * assets of its grid mesh, appended to the packet for the backend (box_gpu_terrain_heights).
+ * assets of its grid mesh and its masks in the mask atlas of the mesh, appended to the packet for
+ * the backend (box_gpu_terrain_heights).
  */
 
 #include "render.h"
@@ -33,7 +34,9 @@ static void BoxRenderExtractTerrain(
             (box_render_terrain_height_t){
                 .mesh = shapes[i].mesh,
                 .slot = (uint32_t)tiles[i].slot,
-                .texture = texture
+                .texture = texture,
+                .masks = tiles[i].masks ? box_textures_handle(t, tiles[i].masks) : 0,
+                .coarse = tiles[i].coarse ? box_textures_handle(t, tiles[i].coarse) : 0
             };
     }
 }

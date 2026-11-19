@@ -1,12 +1,182 @@
 /**
  * @file render/gpu_terrain.c
  * @brief The heights of the terrain tiles in the surface assets of their grid meshes: the WebGPU
- * backend copies the R32Float image of each tile into its slot, which the vertex stages read.
+ * backend copies the R32Float image of each tile into its slot, which the vertex stages read,
+ * and the masks of a tile with masks into its cell of the mask atlas of the mesh, which the
+ * fragment stages of a terrain TextureBlend read.
  */
 
 #include "gpu.h"
 
 #ifdef BOX_RENDER_WGPU
+
+/** Most cells across the mask atlas of a grid mesh */
+#define BOX_GPU_TERRAIN_MASK_COLUMNS (16u)
+
+/** Make the mask atlas of a terrain grid mesh hold the cell of a slot: an atlas of twice the
+ * rows, at least the row of the slot, whose cells are all copied again, of a new version that
+ * the blend groups bind again. An atlas of other masks is made again from the first row.
+ *
+ * @param gpu The backend
+ * @param m The mesh
+ * @param slot The slot
+ * @param texels Texels along an edge of the masks
+ * @param format Format of the masks
+ * @return Whether the atlas holds the cell
+ */
+static bool box_gpu_terrain_masks_grow(
+    box_gpu_t *gpu,
+    box_gpu_mesh_t *m,
+    uint32_t slot,
+    uint32_t texels,
+    WGPUTextureFormat format)
+{
+    bool result = true;
+    WGPULimits limits = WGPU_LIMITS_INIT;
+    uint32_t rows = 0, columns, limit;
+    if (m->terrain_masks && (m->terrain_mask_texels != texels ||
+        m->terrain_mask_format != format))
+    {
+        rows = 0;
+    } else if (m->terrain_masks) {
+        rows = m->terrain_mask_rows;
+    }
+
+    if (m->terrain_masks && rows && slot / m->terrain_mask_columns < rows) {
+        goto done;
+    }
+
+    if (wgpuDeviceGetLimits(gpu->device, &limits) != WGPUStatus_Success) {
+        result = false;
+        goto done;
+    }
+
+    limit = limits.maxTextureDimension2D;
+    columns = texels ? limit / (2u * texels) : 0;
+    columns = columns > BOX_GPU_TERRAIN_MASK_COLUMNS ? BOX_GPU_TERRAIN_MASK_COLUMNS : columns;
+    if (!columns) {
+        result = false;
+        goto done;
+    }
+
+    uint32_t need = slot / columns + 1u, most = limit / texels;
+    rows = rows * 2u > need ? rows * 2u : need;
+    rows = rows < 2u ? 2u : rows;
+    rows = rows > most ? most : rows;
+    if (rows < need) {
+        ecs_err("terrain masks exceed device texture capacity");
+        box_gpu_count(gpu, BOX_GPU_STAT_ERRORS);
+        result = false;
+        goto done;
+    }
+
+    if (m->terrain_mask_view) {
+        wgpuTextureViewRelease(m->terrain_mask_view);
+    }
+
+    if (m->terrain_masks) {
+        wgpuTextureRelease(m->terrain_masks);
+    }
+
+    m->terrain_masks = wgpuDeviceCreateTexture(gpu->device, &(WGPUTextureDescriptor){
+        .usage = WGPUTextureUsage_TextureBinding | WGPUTextureUsage_CopyDst,
+        .dimension = WGPUTextureDimension_2D,
+        .size = { columns * 2u * texels, rows * texels, 1 },
+        .format = format,
+        .mipLevelCount = 1,
+        .sampleCount = 1
+    });
+    m->terrain_mask_view = wgpuTextureCreateView(m->terrain_masks, NULL);
+    m->terrain_mask_texels = texels;
+    m->terrain_mask_format = format;
+    m->terrain_mask_columns = columns;
+    m->terrain_mask_rows = rows;
+    m->terrain_mask_version = ++ gpu->texture_serial;
+    ecs_os_free(m->terrain_mask_serials);
+    m->terrain_mask_serials = ecs_os_calloc_n(uint32_t, (int32_t)(columns * rows * 2u));
+done:
+    return result;
+}
+
+/** Copy the masks of a tile into its cell of the mask atlas of its grid mesh when an image
+ * changed since the last copy.
+ *
+ * @param gpu The backend
+ * @param m The mesh
+ * @param h The tile
+ * @param grow Make the atlas hold the cell instead of copying
+ * @param encoder The encoder, made on first use
+ */
+static void box_gpu_terrain_masks(
+    box_gpu_t *gpu,
+    box_gpu_mesh_t *m,
+    const box_render_terrain_height_t *h,
+    bool grow,
+    WGPUCommandEncoder *encoder)
+{
+    box_gpu_texture_t *fine = h->masks
+        ? ecs_map_get_deref(&gpu->textures, box_gpu_texture_t, h->masks) : NULL;
+    box_gpu_texture_t *coarse = h->coarse
+        ? ecs_map_get_deref(&gpu->textures, box_gpu_texture_t, h->coarse) : NULL;
+    uint32_t sources[2] = { h->masks, h->coarse }, k;
+    if (!fine || !coarse) {
+        goto done;
+    }
+
+    WGPUTextureFormat format = wgpuTextureGetFormat(fine->texture);
+    uint32_t texels = wgpuTextureGetWidth(fine->texture);
+    if (wgpuTextureGetFormat(coarse->texture) != format ||
+        wgpuTextureGetHeight(fine->texture) != texels ||
+        wgpuTextureGetWidth(coarse->texture) > texels ||
+        wgpuTextureGetHeight(coarse->texture) > texels)
+    {
+        goto done;
+    }
+
+    if (grow) {
+        box_gpu_terrain_masks_grow(gpu, m, h->slot, texels, format);
+        goto done;
+    }
+
+    if (!m->terrain_masks || m->terrain_mask_texels != texels ||
+        m->terrain_mask_format != format ||
+        h->slot / m->terrain_mask_columns >= m->terrain_mask_rows)
+    {
+        goto done;
+    }
+
+    uint32_t x = (h->slot % m->terrain_mask_columns) * 2u * texels;
+    uint32_t y = (h->slot / m->terrain_mask_columns) * texels;
+    for (k = 0; k < 2; k ++) {
+        box_gpu_texture_t *src = k ? coarse : fine;
+        uint32_t serial = box_gpu_texture_serial(gpu, sources[k]);
+        uint32_t *copied = &m->terrain_mask_serials[h->slot * 2u + k];
+        if (!serial || *copied == serial) {
+            continue;
+        }
+
+        if (!*encoder) {
+            *encoder = wgpuDeviceCreateCommandEncoder(gpu->device, NULL);
+        }
+
+        wgpuCommandEncoderCopyTextureToTexture(*encoder,
+            &(WGPUTexelCopyTextureInfo){
+                .texture = src->texture,
+                .aspect = WGPUTextureAspect_All
+            },
+            &(WGPUTexelCopyTextureInfo){
+                .texture = m->terrain_masks,
+                .origin = { x + k * texels, y, 0 },
+                .aspect = WGPUTextureAspect_All
+            },
+            &(WGPUExtent3D){ wgpuTextureGetWidth(src->texture),
+                wgpuTextureGetHeight(src->texture), 1 });
+        *copied = serial;
+    }
+
+done:
+    return;
+}
 
 /** Make the surface assets of a terrain grid mesh hold a slot: a buffer of twice the slots, at
  * least slot + 1, whose slots are all copied again; the instance groups that bound the old
@@ -95,8 +265,11 @@ void box_gpu_terrain_heights(
             uint64_t slot_size = (uint64_t)row * height;
             if (pass == 0) {
                 box_gpu_terrain_grow(gpu, m, h->slot, slot_size);
+                box_gpu_terrain_masks(gpu, m, h, true, &encoder);
                 continue;
             }
+
+            box_gpu_terrain_masks(gpu, m, h, false, &encoder);
 
             uint32_t serial = box_gpu_texture_serial(gpu, h->texture);
             if (m->terrain_slot_size != slot_size || (int64_t)h->slot >= m->terrain_slots ||

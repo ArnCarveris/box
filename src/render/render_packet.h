@@ -2071,17 +2071,25 @@ typedef struct box_render_copy_t {
 } box_render_copy_t;
 
 /** Copy of the heights of a tile of a Terrain into its slot of the surface assets of its grid
- * mesh, which the vertex stages of the tile read (terrain.wgsl).
+ * mesh, which the vertex stages of the tile read (terrain.wgsl), and of its masks into the mask
+ * atlas of the grid mesh, which the fragment stages of a terrain TextureBlend read.
  *
  * The backend copies the R32Float image of the texture into the slot when the image changed since
  * it last copied it there, after the texture graphs evaluated and before the views render. A
  * slot holds the rows of the image, each aligned to 256 bytes (box_terrain_row_bytes); the
  * assets grow to hold the highest slot, which copies every slot again.
+ *
+ * The RGBA8 masks of slot s go to the cell s of the atlas, s % columns across and s / columns
+ * down, a cell twice as wide as the masks image: the masks at its left, the coarse masks in the
+ * top left corner of its right half. The atlas grows by rows as the assets do.
  */
 typedef struct box_render_terrain_height_t {
     uint32_t mesh;          /**< Handle of the grid mesh of the tile */
     uint32_t slot;          /**< Slot of the tile */
     uint32_t texture;       /**< Handle of the texture with the heights of the tile */
+    uint32_t masks;         /**< Handle of the texture with the masks of the tile, 0 for none */
+    uint32_t coarse;        /**< Handle of the texture with the masks of the next coarser level
+                             *   at every second texel, 0 for none */
 } box_render_terrain_height_t;
 
 /** Description of a BOX_RENDER_SHADER create or update, followed by its code and its label.
@@ -2131,6 +2139,8 @@ typedef struct box_render_texture_blend_t {
     uint32_t quality;   /**< Largest dimension of a slice, the texture quality of the surfaces */
     float contrast;     /**< TextureBlend.contrast, 0 for the linear blend without heights */
     uint32_t tiles;     /**< 1 for a TileTerrain, whose mask is its grid of kind indices */
+    uint32_t terrain;   /**< Handle of the grid mesh of the tiles of a Terrain with masks, whose
+                         *   mask is the mask atlas of the mesh, else 0 */
 } box_render_texture_blend_t;
 
 /** The values of one TextureLayer as the mesh shaders read them (TextureLayer of

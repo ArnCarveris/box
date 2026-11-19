@@ -46,6 +46,11 @@ void box_terrain_dims(
 typedef struct TerrainTile {
     ecs_entity_t terrain;   /**< The terrain entity */
     ecs_entity_t texture;   /**< Child entity with the TextureGraph of the heights */
+    ecs_entity_t masks;     /**< Child entity with the TextureGraph of the masks over the window
+                             *   of the heights, 0 without Terrain.masks */
+    ecs_entity_t coarse;    /**< Child entity with the TextureGraph of the masks of the next
+                             *   coarser level at every second texel of the window, 0 without
+                             *   Terrain.masks */
     int32_t level;          /**< Level of detail, 0 the finest */
     int32_t ix;             /**< Column of the tile in the grid of its level */
     int32_t iz;             /**< Row of the tile in the grid of its level */
@@ -59,6 +64,8 @@ typedef struct TerrainTile {
     float min_height;       /**< Bottom of the culling bounds */
     float max_height;       /**< Top of the culling bounds */
     bool bounded;           /**< The terrain is bounded: clip is the extent */
+    bool masked;            /**< The masks weigh the layers of the TextureBlend of the terrain:
+                             *   it has both, and the tile draws with masks */
     float clip[4];          /**< Extent of a bounded terrain relative to the center of the tile:
                              *   min x, min z, max x, max z */
 } TerrainTile;
@@ -70,12 +77,15 @@ extern ECS_COMPONENT_DECLARE(TerrainTile);
 typedef struct box_terrain_tile_t {
     ecs_entity_t entity;    /**< Tile entity, with TerrainTile */
     ecs_entity_t texture;   /**< Child entity with the TextureGraph of the heights */
+    ecs_entity_t masks;     /**< Child entity with the TextureGraph of the masks, 0 for none */
+    ecs_entity_t coarse;    /**< Child entity with the TextureGraph of the masks of the next
+                             *   coarser level, 0 for none */
     int32_t level;          /**< Level of detail */
     int32_t ix;             /**< Column in the grid of its level */
     int32_t iz;             /**< Row in the grid of its level */
     int32_t slot;           /**< Slot of its heights */
     double distance;        /**< Distance to the nearest focus when it was last wanted */
-    bool ready;             /**< Its heights are computed */
+    bool ready;             /**< Its heights and masks are computed */
     bool wanted;            /**< The focus needs it this frame */
     bool drawn;             /**< It draws this frame */
     bool keep;              /**< It stands in for a wanted tile that is not ready */
@@ -102,11 +112,34 @@ box_terrain_tile_t* const* box_terrain_tiles(
 void box_terrain_tiles_import(
     ecs_world_t *world);
 
+/** Texels along an edge of the image of the masks of the next coarser level of a tile, every
+ * second texel of its heights.
+ *
+ * @param resolution Vertices along an edge of the tile
+ * @return Texels
+ */
+int32_t box_terrain_coarse_texels(
+    int32_t resolution);
+
+/** Get the texture graph node the tiles of a level of a terrain read their masks from: the
+ * masks node at level 0, a TexBlur of it of about a texel of the level above, made on first use.
+ *
+ * @param world The world
+ * @param terrain The terrain entity
+ * @param level The level, up to the number of levels for the coarse masks of the coarsest
+ * @return The node, 0 without masks
+ */
+ecs_entity_t box_terrain_mask_node(
+    ecs_world_t *world,
+    ecs_entity_t terrain,
+    int32_t level);
+
 /** Fill the surface of a tile of a Terrain.
  *
  * p[1] is the slot, the floats per row of the heights in the surface assets, the texels per row
  * and the resolution; p[2] the focus relative to the center of the tile and the morph distances;
- * p[4] the size, the skirt depth, the level and 1 when bounded; p[5] the clip rectangle.
+ * p[3].x 1 when the tile has masks; p[4] the size, the skirt depth, the level and 1 when bounded;
+ * p[5] the clip rectangle.
  *
  * @param tile The tile
  * @param data The surface to fill

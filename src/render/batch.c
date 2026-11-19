@@ -1077,7 +1077,14 @@ void box_draws_batch_blend(
     } else if (blend) {
         float contrast = isfinite(blend->contrast) && blend->contrast > 0.0f
             ? blend->contrast : 0.0f;
-        r->mask = box_draws_texture_handle(d, blend->mask);
+        const Terrain *heights = ecs_id(Terrain)
+            ? ecs_get(d->world, b->key.textures[0], Terrain) : NULL;
+        if (heights && heights->masks) {
+            r->terrain = b->key.mesh;
+        } else {
+            r->mask = box_draws_texture_handle(d, blend->mask);
+        }
+
         r->contrast = contrast;
         for (k = 0; k < BOX_RENDER_BLEND_LAYERS; k ++) {
             ecs_entity_t layer = blend->layers[k];

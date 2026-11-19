@@ -127,6 +127,64 @@ fn blend_tiles(o: ptr<function, BlendFragment>) {
     (*o).albedo = vec4f(color, 1.0);
 }
 
+// A texel of the masks of a terrain tile in the mask atlas: origin the corner of the image in
+// the atlas, size its texels along an edge, p clamped to the image.
+fn terrain_mask_texel(origin: vec2i, size: i32, p: vec2i) -> vec4f {
+    return textureLoad(blend_mask, origin + clamp(p, vec2i(0), vec2i(size - 1)), 0);
+}
+
+// The masks of a terrain tile bilinear between its texels at t, in texels from the corner.
+fn terrain_mask_bilinear(origin: vec2i, size: i32, t: vec2f) -> vec4f {
+    let f = floor(t);
+    let a = t - f;
+    let p = vec2i(f);
+    let top = mix(terrain_mask_texel(origin, size, p),
+        terrain_mask_texel(origin, size, p + vec2i(1, 0)), a.x);
+    let bottom = mix(terrain_mask_texel(origin, size, p + vec2i(0, 1)),
+        terrain_mask_texel(origin, size, p + vec2i(1, 1)), a.x);
+    return mix(top, bottom, a.y);
+}
+
+// The masks of a fragment of a terrain tile (BLEND_TERRAIN): those of its tile at its grid uv
+// (f.uv.xy), faded into the masks of the next coarser level, at every second texel of the
+// window, by the morph factor of its distance to the focus, as the vertex stage morphs the grid
+// (terrain_vertex), so at the edge of its range the tile has the masks of the coarser tiles it
+// meets. The cell of slot s in the atlas is s % columns across and s / columns down, twice as
+// wide as the masks: the masks of the tile at its left, the coarse ones at the right.
+fn terrain_mask(f: VertexOut) -> vec4f {
+    let texels = i32(blending.terrain & 0xFFFFu);
+    let columns = max(blending.terrain >> 16u, 1u);
+    let slot = f.flat4.x;
+    let origin = vec2i(i32(slot % columns) * 2 * texels, i32(slot / columns) * texels);
+    let steps = f32(texels) - 1.0 - 2.0 * TERRAIN_BORDER;
+    let uv = f.uv.xy;
+    let t = uv * steps + vec2f(TERRAIN_BORDER);
+    let fine = terrain_mask_bilinear(origin, texels, t);
+    let coarse = terrain_mask_bilinear(origin + vec2i(texels, 0), (texels + 1) / 2, t * 0.5);
+    let focus = unpack2x16float(f.flat4.y);
+    let morph = unpack2x16float(f.flat4.z);
+    let d = length(uv - vec2f(0.5) - focus);
+    let k = clamp((d - morph.x) / max(morph.y - morph.x, 1e-4), 0.0, 1.0);
+    return mix(fine, coarse, k);
+}
+
+// The mapping offset of a fragment: its uv.xy, or for a terrain tile with masks (BLEND_TERRAIN),
+// whose uv.xy is its grid uv, the offset its vertices pass in flat4.w (terrain_flat).
+fn blend_offset(f: VertexOut) -> vec2f {
+    return select(f.uv.xy, unpack2x16float(f.flat4.w), (blending.flags & BLEND_TERRAIN) != 0u);
+}
+
+// The mask of a fragment at uv: the mask of a terrain tile (terrain_mask), else the mask image.
+fn blend_mask_at(f: VertexOut, uv: vec2f, gx: vec2f, gy: vec2f) -> vec4f {
+    if ((blending.flags & BLEND_TERRAIN) != 0u) {
+        if ((blending.flags & BLEND_MASKED) == 0u) {
+            return vec4f(1.0, 0.0, 0.0, 0.0);
+        }
+        return terrain_mask(f);
+    }
+    return textureSampleGrad(blend_mask, material_sampler, uv, gx, gy);
+}
+
 fn blend_slice(b: BlendFragment, k: u32) -> u32 {
     return select(k, b.slice[k], b.tiled != 0u);
 }
@@ -149,7 +207,7 @@ fn blend_fragment(f: VertexOut) -> BlendFragment {
     var o: BlendFragment;
     o.uv = f.uv.xy;
     if (vo_scalars(f).w != 0.0) {
-        o.uv = mapping_uv(f.object, f.object_normal.xyz, f.uv.xy);
+        o.uv = mapping_uv(f.object, f.object_normal.xyz, blend_offset(f));
     }
     o.gx = dpdx(o.uv);
     o.gy = dpdy(o.uv);
@@ -160,8 +218,7 @@ fn blend_fragment(f: VertexOut) -> BlendFragment {
         blend_tiles(&o);
     } else {
         o.w = blend_height_weights(blend_heights, material_sampler, blending,
-            blend_weights(textureSampleGrad(blend_mask, material_sampler, o.uv, o.gx, o.gy),
-            blending), o.uv, o.gx, o.gy);
+            blend_weights(blend_mask_at(f, o.uv, o.gx, o.gy), blending), o.uv, o.gx, o.gy);
     }
     return o;
 }

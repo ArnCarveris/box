@@ -725,6 +725,12 @@ fn mesh_vertex_surface(v: VertexIn) -> VertexOut {
     let frame = model_frame(p);
     var o = vertex_out(p, material, frame,
         vertex_shading_surface(v, shading, material, p, frame.scale, frame.normal));
+    // A terrain tile with masks: the grid uv of the morphed vertex, where the fragment reads the
+    // masks, and the mapping offset in flat4, which Water and Distortion would hold
+    if (terrain_masked() && !water && !(material_distortion && material.distortion_flags != 0u)) {
+        o.flat4 = terrain_flat(o.uv.xy);
+        o.uv = vec4f(p.local.xz + vec2f(0.5), o.uv.zw);
+    }
     if (scene_planar) {
         o.planar = planar_owner(slot_of(v.slot));
     }

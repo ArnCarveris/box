@@ -1091,6 +1091,49 @@ uint32_t box_gpu_blend_serial(
     return tex ? ((box_gpu_texture_entry_t*)tex)->serial : 0;
 }
 
+/** Get the grid mesh whose mask atlas a terrain blend binds.
+ *
+ * @param gpu The backend
+ * @param blend The blend record
+ * @return The mesh, NULL for another blend or while it has no atlas
+ */
+static box_gpu_mesh_t* box_gpu_blend_terrain(
+    box_gpu_t *gpu,
+    const box_render_texture_blend_t *blend)
+{
+    box_gpu_mesh_t *result = blend->terrain
+        ? ecs_map_get_deref(&gpu->meshes, box_gpu_mesh_t, blend->terrain) : NULL;
+
+    return result && result->terrain_mask_view ? result : NULL;
+}
+
+/** Get the serial of the mask a blend group binds: the version of the mask atlas of a terrain
+ * blend, else the serial of the image of the mask.
+ *
+ * @param gpu The backend
+ * @param blend The blend record
+ * @return The serial, 0 for none
+ */
+static uint32_t box_gpu_blend_mask_serial(
+    box_gpu_t *gpu,
+    const box_render_texture_blend_t *blend)
+{
+    box_gpu_mesh_t *m = box_gpu_blend_terrain(gpu, blend);
+
+    return blend->terrain ? (m ? m->terrain_mask_version : 0)
+        : box_gpu_blend_serial(gpu, blend->mask);
+}
+
+WGPUTextureView box_gpu_blend_mask_view(
+    box_gpu_t *gpu,
+    const box_render_texture_blend_t *blend)
+{
+    box_gpu_mesh_t *m = box_gpu_blend_terrain(gpu, blend);
+    box_gpu_texture_t *mask = blend->terrain ? NULL : box_gpu_blend_source(gpu, blend->mask);
+
+    return m ? m->terrain_mask_view : mask ? mask->linear : gpu->white->linear;
+}
+
 /** Create a view of one level of one slice of a texture array.
  *
  * @param texture The array
@@ -1401,7 +1444,9 @@ static void box_gpu_blend_group_bind(
     box_gpu_t *gpu,
     box_gpu_blend_group_t *g)
 {
-    box_gpu_texture_t *mask = box_gpu_blend_source(gpu, g->blend.mask);
+    box_gpu_texture_t *mask = g->blend.terrain
+        ? NULL : box_gpu_blend_source(gpu, g->blend.mask);
+    box_gpu_mesh_t *terrain = box_gpu_blend_terrain(gpu, &g->blend);
     box_gpu_blend_uniforms_t u = {0};
     uint32_t textures[BOX_RENDER_TEXTURE_SLOTS] = { 0, g->emissive, 0, 0 };
     int32_t m;
@@ -1413,8 +1458,12 @@ static void box_gpu_blend_group_bind(
     u.count = g->arrays[0]->count;
     u.flags = (mask ? BOX_GPU_BLEND_MASKED : 0) |
         (mask && ((box_gpu_texture_entry_t*)mask)->single ? BOX_GPU_BLEND_SINGLE : 0) |
-        (g->blend.tiles ? BOX_GPU_BLEND_TILES : 0);
+        (g->blend.tiles ? BOX_GPU_BLEND_TILES : 0) |
+        (g->blend.terrain ? BOX_GPU_BLEND_TERRAIN : 0) |
+        (terrain ? BOX_GPU_BLEND_MASKED : 0);
     u.contrast = g->blend.contrast;
+    u.terrain = terrain
+        ? terrain->terrain_mask_texels | (terrain->terrain_mask_columns << 16) : 0;
     for (m = 0; g->arrays[BOX_RENDER_BLEND_HEIGHT] && m < (int32_t)u.count; m ++) {
         uint32_t serial = g->arrays[BOX_RENDER_BLEND_HEIGHT]->serials[m];
         if (serial && serial != UINT32_MAX) {
@@ -1442,7 +1491,7 @@ static void box_gpu_blend_group_bind(
         },
         {
             .binding = BOX_GPU_BLEND_MASK,
-            .textureView = mask ? mask->linear : gpu->white->linear
+            .textureView = box_gpu_blend_mask_view(gpu, &g->blend)
         },
         {
             .binding = BOX_GPU_BLEND_UNIFORMS,
@@ -1472,8 +1521,9 @@ static void box_gpu_blend_group_bind(
     g->versions[BOX_RENDER_BLEND_HEIGHT] = g->arrays[BOX_RENDER_BLEND_HEIGHT]
         ? g->arrays[BOX_RENDER_BLEND_HEIGHT]->version : 0;
 
-    g->mask_serial = box_gpu_blend_serial(gpu, g->blend.mask);
+    g->mask_serial = box_gpu_blend_mask_serial(gpu, &g->blend);
     g->emissive_serial = box_gpu_blend_serial(gpu, g->emissive);
+    g->bound = gpu->blend_frame;
     g->group = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
         .layout = gpu->blend_layout,
         .entryCount = BOX_GPU_BLEND_ENTRIES,
@@ -1536,7 +1586,7 @@ box_gpu_blend_group_t* box_gpu_blend_group_get(
         heights |= r->layers[m][BOX_RENDER_BLEND_HEIGHT] != 0;
     }
 
-    stale = !g->group || g->mask_serial != box_gpu_blend_serial(gpu, r->mask) ||
+    stale = !g->group || g->mask_serial != box_gpu_blend_mask_serial(gpu, r) ||
         g->emissive_serial != box_gpu_blend_serial(gpu, emissive);
     for (m = 0; m < BOX_RENDER_BLEND_SOURCES; m ++) {
         box_gpu_blend_array_t *a = m < BOX_RENDER_BLEND_MAPS || heights

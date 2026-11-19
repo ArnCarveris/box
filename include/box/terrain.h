@@ -102,6 +102,20 @@ ECS_STRUCT(TileTerrain, {
  * components of the terrain entity (Rgb, PbrMaterial, PbrTextures, TextureMapping, TextureLayers,
  * ...) apply to its tiles; TextureMapping MappingWorld with a triplanar blend suits steep slopes.
  *
+ * @par Masks
+ * masks is a second node of the graph, a Vector whose four channels weigh the layers of a
+ * TextureBlend of the terrain entity in place of TextureBlend.mask, so slope, height and noise
+ * of the same graph (TexSlope, TexCurve, TexRemap on the height node, TexCells, TexNoise) paint
+ * rock, grass, paths and forest floor. Each tile evaluates it as a TextureGraph (GraphLinear,
+ * 0..1) over the window of its heights, and at the texels of the next coarser level, which the
+ * tile fades to as its grid morphs, so tiles of adjacent levels meet without a seam in the
+ * material. The tiles of a coarser level read the node through a TexBlur of about a texel of
+ * their level, so distant slopes do not shimmer. The layers are mapped by the TextureMapping of
+ * the terrain, MappingWorld of a size of 1 without one, continuous across tiles and shifts of
+ * the WorldOrigin, with the height based contrast of the TextureBlend; a triplanar blend keeps
+ * steep rock from stretching and TextureLayers apply on top. The tiles still draw in one batch.
+ * A terrain without masks, or without a TextureBlend, draws as before.
+ *
  * @code
  * hills {
  *   noise { nodes.Noise: {frequency: 0.004, octaves: 5, fractal: NoiseRidged} }
@@ -113,6 +127,8 @@ ECS_STRUCT(TileTerrain, {
  */
 ECS_STRUCT(Terrain, {
     ecs_entity_t height;    /**< Texture graph node whose first channel is the height in meters */
+    ecs_entity_t masks;     /**< Texture graph node whose four channels weigh the layers of the
+                             *   TextureBlend of the terrain, 0 for TextureBlend.mask */
     float tile_size;        /**< Meters along the edge of a tile of the finest level, 0 for 32 */
     int32_t resolution;     /**< Vertices along the edge of a tile, 0 for 65: rounded up to an
                              *   odd count, 5 to 257 */
@@ -139,8 +155,8 @@ ECS_STRUCT(TerrainStatus, {
     int32_t count;          /**< Tiles that exist, drawn, pending or kept until replaced */
     int32_t created;        /**< Tiles made since the terrain was set */
     int32_t dropped;        /**< Tiles deleted since the terrain was set */
-    int64_t gpu_bytes;      /**< Bytes of the height images of the tiles and of their copies the
-                             *   vertex stage reads */
+    int64_t gpu_bytes;      /**< Bytes of the height and mask images of the tiles and of their
+                             *   copies the shaders read */
 });
 
 /** Register the box.terrain module.

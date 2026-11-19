@@ -8,13 +8,15 @@
 #pragma once
 
 // The TextureTransform of each layer (scale in xy, offset in zw), the slices of the arrays, the
-// BLEND_MASKED, BLEND_SINGLE and BLEND_HEIGHT flags and the contrast of the height based
-// transitions, 0 for the linear blend.
+// BLEND_MASKED, BLEND_SINGLE, BLEND_HEIGHT, BLEND_TILES and BLEND_TERRAIN flags, the contrast of
+// the height based transitions, 0 for the linear blend, and of a BLEND_TERRAIN blend with a mask
+// atlas the texels along an edge of the masks of a tile | the cells across the atlas << 16.
 struct BlendUniforms {
     transforms: array<vec4f, 4>,
     count: u32,
     flags: u32,
     contrast: f32,
+    terrain: u32,
 };
 
 // The mask is loaded; without it layer 0 shows alone.
@@ -27,6 +29,11 @@ const BLEND_SINGLE: u32 = 2u;
 const BLEND_HEIGHT: u32 = 4u;
 
 const BLEND_TILES: u32 = 256u;
+
+// The tiles of a Terrain with masks (BOX_GPU_BLEND_TERRAIN): the mask is the mask atlas of their
+// grid mesh, read at the cell of the tile of a fragment (terrain_mask of mesh_blend.wgsl); the
+// fragment carries its grid uv in uv.xy and its mapping offset in flat4.w.
+const BLEND_TERRAIN: u32 = 512u;
 
 // Share of the shaped weights below which a layer of a blend with a contrast is dropped, under a
 // step of an 8 bit channel, so the fragments past a border sample the maps of one layer only.
@@ -107,7 +114,7 @@ fn blend_alpha(albedo: texture_2d_array<f32>, mask: texture_2d<f32>,
     heights: texture_2d_array<f32>, smp: sampler, u: BlendUniforms, uv: vec2f, mapped: f32,
     object: vec4f, normal: vec3f) -> f32 {
     var alpha = 0.0;
-    if ((u.flags & BLEND_TILES) != 0u) {
+    if ((u.flags & (BLEND_TILES | BLEND_TERRAIN)) != 0u) {
         alpha = 1.0;
     } else if (mapped > 1.0) {
         let dx = dpdx(object);

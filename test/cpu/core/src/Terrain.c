@@ -64,6 +64,49 @@ static void tt_ready(
     }
 }
 
+/** Mark the masks and the coarse masks of every tile of a terrain ready, or loading as before
+ * their first image (without a render backend a graph is ready at once).
+ *
+ * @param world The world
+ * @param terrain The terrain
+ * @param ready Whether they are ready
+ */
+static void tt_masks_ready(
+    ecs_world_t *world,
+    ecs_entity_t terrain,
+    bool ready)
+{
+    int32_t count, i;
+    box_terrain_tile_t *const *tiles = box_terrain_tiles(world, terrain, &count);
+    for (i = 0; i < count; i ++) {
+        test_assert(tiles[i]->masks != 0);
+        test_assert(tiles[i]->coarse != 0);
+        ecs_set(world, tiles[i]->masks, TextureStatus, {
+            .state = ready ? TextureReady : TextureLoading, .revision = ready });
+        ecs_set(world, tiles[i]->coarse, TextureStatus, {
+            .state = ready ? TextureReady : TextureLoading, .revision = ready });
+    }
+}
+
+/** Give a terrain a masks node of a constant vector.
+ *
+ * @param world The world
+ * @param terrain The terrain
+ * @return The masks node
+ */
+static ecs_entity_t tt_masks(
+    ecs_world_t *world,
+    ecs_entity_t terrain)
+{
+    ecs_entity_t node = ecs_new(world);
+    ecs_set(world, node, TexConstant, {.value = {1, 0, 0, 0}});
+    Terrain *t = ecs_get_mut(world, terrain, Terrain);
+    t->masks = node;
+    ecs_modified(world, terrain, Terrain);
+
+    return node;
+}
+
 /** Get the distance from a point to the rectangle of a tile.
  *
  * @param t The tile
@@ -450,5 +493,172 @@ void Terrain_script(void) {
     test_flt(t->tile_size, 8);
     ecs_progress(world, 0);
     test_int(ecs_get(world, ground, TerrainStatus)->count, 3);
+    ecs_fini(world);
+}
+
+void Terrain_masks_graph_windows(void) {
+    ecs_entity_t terrain, focus;
+    ecs_world_t *world = tt_world(&terrain, &focus, 1000);
+    ecs_entity_t masks = tt_masks(world, terrain);
+    ecs_progress(world, 0);
+    int32_t count, i, n = 17, texels = n + 2 * BOX_TERRAIN_BORDER;
+    box_terrain_tile_t *const *tiles = box_terrain_tiles(world, terrain, &count);
+    test_assert(count > 0);
+    test_int(box_terrain_coarse_texels(n), (texels + 1) / 2);
+    bool coarse_level = false;
+    for (i = 0; i < count; i ++) {
+        const box_terrain_tile_t *t = tiles[i];
+        const TextureGraph *heights = ecs_get(world, t->texture, TextureGraph);
+        const TextureGraph *fine = ecs_get(world, t->masks, TextureGraph);
+        const TextureGraph *coarse = ecs_get(world, t->coarse, TextureGraph);
+        test_assert(fine != NULL);
+        test_assert(coarse != NULL);
+        test_assert(ecs_has_pair(world, t->masks, EcsChildOf, t->entity));
+        test_assert(ecs_has_pair(world, t->coarse, EcsChildOf, t->entity));
+        test_int(fine->format, GraphLinear);
+        test_int(coarse->format, GraphLinear);
+        test_int(fine->domain, DomainWorld);
+        test_int(coarse->domain, DomainWorld);
+        test_int(fine->width, texels);
+        test_int(fine->height, texels);
+        test_int(coarse->width, (texels + 1) / 2);
+        test_int(coarse->height, (texels + 1) / 2);
+
+        // The same window as the heights: the coarse texels are every second one
+        test_assert(fine->window.x == heights->window.x);
+        test_assert(fine->window.z == heights->window.z);
+        test_flt(fine->window.width, heights->window.width);
+        test_assert(coarse->window.x == heights->window.x);
+        test_assert(coarse->window.z == heights->window.z);
+        test_flt(coarse->window.width, heights->window.width);
+        test_flt(coarse->window.depth, heights->window.depth);
+
+        // Level 0 reads the masks node, the levels above through a TexBlur of a level
+        test_int(fine->output, box_terrain_mask_node(world, terrain, t->level));
+        test_int(coarse->output, box_terrain_mask_node(world, terrain, t->level + 1));
+        if (t->level == 0) {
+            test_int(fine->output, masks);
+        } else {
+            const TexBlur *blur = ecs_get(world, fine->output, TexBlur);
+            double cell = TT_TILE * (double)(1 << t->level) / (double)(n - 1);
+            test_assert(blur != NULL);
+            test_int(blur->input, masks);
+            test_flt(blur->radius, (float)(1.5 * cell));
+            coarse_level = true;
+        }
+
+        const TexBlur *up = ecs_get(world, coarse->output, TexBlur);
+        test_assert(up != NULL);
+        test_int(up->input, masks);
+    }
+
+    test_bool(coarse_level, true);
+    ecs_fini(world);
+}
+
+void Terrain_masks_wait_ready(void) {
+    ecs_entity_t terrain, focus;
+    ecs_world_t *world = tt_world(&terrain, &focus, 1000);
+    tt_masks(world, terrain);
+    ecs_progress(world, 0);
+    tt_masks_ready(world, terrain, false);
+    tt_ready(world, terrain);
+    ecs_progress(world, 0);
+
+    // The heights alone do not make a tile with masks ready
+    const TerrainStatus *status = ecs_get(world, terrain, TerrainStatus);
+    test_int(status->drawn, 0);
+    test_assert(status->pending > 0);
+
+    tt_masks_ready(world, terrain, true);
+    ecs_progress(world, 0);
+    status = ecs_get(world, terrain, TerrainStatus);
+    int32_t count;
+    box_terrain_tiles(world, terrain, &count);
+    test_int(status->pending, 0);
+    test_int(status->drawn, count);
+    ecs_fini(world);
+}
+
+void Terrain_masks_blend_surface(void) {
+    ecs_entity_t terrain, focus;
+    ecs_world_t *world = tt_world(&terrain, &focus, 4);
+    tt_masks(world, terrain);
+    ecs_progress(world, 0);
+    int32_t count, i;
+    box_terrain_tile_t *const *tiles = box_terrain_tiles(world, terrain, &count);
+    test_int(count, 4);
+
+    // Masks without a TextureBlend keep the plain material of the tiles
+    for (i = 0; i < count; i ++) {
+        const ShapeMesh *sm = ecs_get(world, tiles[i]->entity, ShapeMesh);
+        test_flt(sm->surface.p[3][0], 0.0f);
+        test_bool(ecs_get(world, tiles[i]->entity, TerrainTile)->masked, false);
+        test_assert(!ecs_has(world, tiles[i]->entity, TextureMapping));
+    }
+
+    // With a TextureBlend the tiles blend by their masks, mapped on the world by default
+    ecs_entity_t rock = ecs_new(world);
+    ecs_set(world, terrain, TextureBlend, {.layers = {rock}});
+    ecs_progress(world, 0);
+    tiles = box_terrain_tiles(world, terrain, &count);
+    for (i = 0; i < count; i ++) {
+        const ShapeMesh *sm = ecs_get(world, tiles[i]->entity, ShapeMesh);
+        test_flt(sm->surface.p[3][0], 1.0f);
+        test_bool(ecs_get(world, tiles[i]->entity, TerrainTile)->masked, true);
+        const TextureBlend *b = ecs_get(world, tiles[i]->entity, TextureBlend);
+        test_assert(b != NULL);
+        test_int(b->layers[0], rock);
+        const TextureMapping *m = ecs_get(world, tiles[i]->entity, TextureMapping);
+        test_assert(m != NULL);
+        test_int(m->mode, MappingWorld);
+        test_flt(m->size, 1.0f);
+    }
+
+    // The TextureMapping of the terrain wins
+    ecs_set(world, terrain, TextureMapping, {.mode = MappingWorld, .size = 4, .blend = 0.5f});
+    ecs_progress(world, 0);
+    tiles = box_terrain_tiles(world, terrain, &count);
+    for (i = 0; i < count; i ++) {
+        const TextureMapping *m = ecs_get(world, tiles[i]->entity, TextureMapping);
+        test_flt(m->size, 4.0f);
+        test_flt(m->blend, 0.5f);
+    }
+
+    ecs_remove(world, terrain, TextureBlend);
+    ecs_progress(world, 0);
+    tiles = box_terrain_tiles(world, terrain, &count);
+    for (i = 0; i < count; i ++) {
+        const ShapeMesh *sm = ecs_get(world, tiles[i]->entity, ShapeMesh);
+        test_flt(sm->surface.p[3][0], 0.0f);
+        test_assert(!ecs_has(world, tiles[i]->entity, TextureBlend));
+    }
+
+    ecs_fini(world);
+}
+
+void Terrain_masks_change_remakes_tiles(void) {
+    ecs_entity_t terrain, focus;
+    ecs_world_t *world = tt_world(&terrain, &focus, 4);
+    ecs_progress(world, 0);
+    int32_t count, i;
+    box_terrain_tile_t *const *tiles = box_terrain_tiles(world, terrain, &count);
+    test_int(count, 4);
+    for (i = 0; i < count; i ++) {
+        test_int(tiles[i]->masks, 0);
+        test_int(tiles[i]->coarse, 0);
+    }
+
+    test_int(box_terrain_mask_node(world, terrain, 1), 0);
+    tt_masks(world, terrain);
+    ecs_progress(world, 0);
+    tiles = box_terrain_tiles(world, terrain, &count);
+    test_int(count, 4);
+    test_int(ecs_get(world, terrain, TerrainStatus)->created, 8);
+    for (i = 0; i < count; i ++) {
+        test_assert(tiles[i]->masks != 0);
+        test_assert(tiles[i]->coarse != 0);
+    }
+
     ecs_fini(world);
 }
