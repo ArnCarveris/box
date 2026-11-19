@@ -372,17 +372,24 @@ static ecs_entity_t bench_picking_system(
     return result;
 }
 
-/** Get the time a system spent so far.
+/** Get the time a system spent in the last frame, over every stage.
  *
  * @param world The world
  * @param system The system
- * @return Seconds the system spent since time measurement was enabled
+ * @return Seconds the system spent in the last frame
  */
 static double bench_picking_time(
     ecs_world_t *world,
     ecs_entity_t system)
 {
-    return (double)ecs_system_get(world, system)->time_spent;
+    const ecs_system_t *s = ecs_system_get(world, system);
+    double result = 0;
+    int32_t i;
+    for (i = 0; s && i < ecs_vec_count(&s->time_spent); i ++) {
+        result += (double)*ecs_vec_get_t(&s->time_spent, ecs_ftime_t, i);
+    }
+
+    return result;
 }
 
 /** Run frames with a still cursor over a wave of critters of 8 parts, none Interactive, each
@@ -450,21 +457,20 @@ static void bench_picking_wave(
     box_input_mouse_move(world, 640, 360, false);
     ecs_progress(world, 0.016f);
     ecs_progress(world, 0.016f);
-    double picking_start = bench_picking_time(world, picking);
-    double spatial_start = bench_picking_time(world, spatial);
+    double picking_time = 0, spatial_time = 0;
     int32_t frames = 0;
     while (bench_iter(b)) {
         ecs_progress(world, 0.016f);
+        picking_time += bench_picking_time(world, picking);
+        spatial_time += bench_picking_time(world, spatial);
         frames ++;
     }
 
     double scale = frames ? 1000.0 / frames : 0;
     box_spatial_stats_t stats;
     box_spatial_stats(world, &stats);
-    bench_counter(b, "picking_ms_per_frame",
-        (bench_picking_time(world, picking) - picking_start) * scale);
-    bench_counter(b, "spatial_ms_per_frame",
-        (bench_picking_time(world, spatial) - spatial_start) * scale);
+    bench_counter(b, "picking_ms_per_frame", picking_time * scale);
+    bench_counter(b, "spatial_ms_per_frame", spatial_time * scale);
     bench_counter(b, "indexed", stats.entities);
     bench_counter(b, "rebound", stats.rebound);
     ecs_fini(world);

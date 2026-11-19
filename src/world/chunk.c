@@ -33,6 +33,7 @@ typedef struct box_chunk_state_t {
     bool scanned;                  /**< Whether config holds a scan */
     ecs_vec_t foci;                /**< double[3], absolute foci of the last scan */
     ecs_vec_t work;                /**< box_chunk_work_t of the last scan */
+    int32_t unloading;             /**< Cells out of range that wait for the budget */
     uint64_t stamp;                /**< Number of the last scan */
 } box_chunk_state_t;
 
@@ -564,6 +565,24 @@ static void box_chunk_set_level(
     }
 }
 
+/** Delete the entity of a cell and count the time it took.
+ *
+ * @param world The world
+ * @param e The cell entity
+ * @param status Counts the deleted cell and its time
+ */
+static void box_chunk_delete(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    ChunkGridStatus *status)
+{
+    ecs_time_t t;
+    ecs_os_get_time(&t);
+    ecs_delete(world, e);
+    status->delete_ms += (float)(ecs_time_measure(&t) * 1000.0);
+    status->deleted ++;
+}
+
 /** Delete every cell of a grid.
  *
  * @param world The world
@@ -581,13 +600,13 @@ static void box_chunk_unload_all(
     for (i = 0; i < ecs_vec_count(&cells); i ++) {
         box_chunk_cell_t *cell = *ecs_vec_get_t(&cells, box_chunk_cell_t*, i);
         if (ecs_is_alive(world, cell->entity)) {
-            ecs_delete(world, cell->entity);
-            status->deleted ++;
+            box_chunk_delete(world, cell->entity, status);
         }
     }
 
     ecs_vec_fini_t(NULL, &cells, box_chunk_cell_t*);
     box_chunk_state_clear(state);
+    state->unloading = 0;
 }
 
 /** Get the absolute positions of the foci of a grid: those in its scene, else all of them.
@@ -641,22 +660,21 @@ static int box_chunk_work_compare(
     return result;
 }
 
-/** Visit a cell in range of a scan: queue its load or level change, or unload it.
+/** Visit a cell in range of a scan: queue its load or level change. A loaded cell past the
+ * last ring is left unseen, which box_chunk_unload_unseen deletes.
  *
  * @param world The world
  * @param state The state of the grid
  * @param config The grid
  * @param c The cell
  * @param d Distance of the cell from the nearest focus
- * @param status Counts the deleted cells
  */
 static void box_chunk_visit(
     ecs_world_t *world,
     box_chunk_state_t *state,
     const ChunkGrid *config,
     const int32_t c[3],
-    double d,
-    ChunkGridStatus *status)
+    double d)
 {
     int32_t count = box_chunk_level_count(config);
     box_chunk_cell_t *cell = box_chunk_find(state, c);
@@ -667,17 +685,13 @@ static void box_chunk_visit(
     }
 
     if (cell) {
-        cell->seen = state->stamp;
         level = box_chunk_level_next(config, count, cell->level, d);
+        cell->seen = level >= 0 ? state->stamp : cell->seen;
     } else {
         level = box_chunk_level_at(config, count, d, 0.0);
     }
 
-    if (cell && level < 0) {
-        ecs_delete(world, cell->entity);
-        box_chunk_remove(state, cell);
-        status->deleted ++;
-    } else if (level >= 0 && (!cell || level != cell->level)) {
+    if (level >= 0 && (!cell || level != cell->level)) {
         box_chunk_work_t *work = ecs_vec_append_t(NULL, &state->work, box_chunk_work_t);
         ecs_os_memcpy_n(work->c, c, int32_t, 3);
         work->level = level;
@@ -691,13 +705,11 @@ static void box_chunk_visit(
  * @param world The world
  * @param state The state of the grid, its foci set
  * @param config The grid
- * @param status Counts the deleted cells
  */
 static void box_chunk_scan(
     ecs_world_t *world,
     box_chunk_state_t *state,
-    const ChunkGrid *config,
-    ChunkGridStatus *status)
+    const ChunkGrid *config)
 {
     int32_t count = box_chunk_level_count(config), nf = ecs_vec_count(&state->foci), f, g;
     double h = config->hysteresis > 0 ? (double)config->hysteresis : 0.0;
@@ -724,7 +736,7 @@ static void box_chunk_scan(
                     }
 
                     if (!visited) {
-                        box_chunk_visit(world, state, config, c, d, status);
+                        box_chunk_visit(world, state, config, c, d);
                     }
                 }
             }
@@ -736,41 +748,63 @@ static void box_chunk_scan(
     ecs_os_free(valid);
 }
 
-/** Delete the cells that no focus reached in the last scan, past the last radius.
+/** Delete the cells that the last scan left unseen, out of range of every focus, within the
+ * budget_ms of the frame. The cells over the budget stay loaded and unseen until a later scan
+ * deletes them, or finds them in range again and keeps them.
  *
  * @param world The world
  * @param state The state of the grid
- * @param status Counts the deleted cells
+ * @param config The grid
+ * @param start Start of the work of the grid this frame
+ * @param status Counts the deleted cells and those left unloading
  */
 static void box_chunk_unload_unseen(
     ecs_world_t *world,
     box_chunk_state_t *state,
+    const ChunkGrid *config,
+    const ecs_time_t *start,
     ChunkGridStatus *status)
 {
     ecs_vec_t cells;
-    int32_t i;
+    int32_t i, done = 0;
     box_chunk_collect(state, &cells);
+    state->unloading = 0;
     for (i = 0; i < ecs_vec_count(&cells); i ++) {
         box_chunk_cell_t *cell = *ecs_vec_get_t(&cells, box_chunk_cell_t*, i);
-        if (cell->seen != state->stamp) {
-            if (ecs_is_alive(world, cell->entity)) {
-                ecs_delete(world, cell->entity);
-                status->deleted ++;
-            }
-
-            box_chunk_remove(state, cell);
+        if (cell->seen == state->stamp) {
+            continue;
         }
+
+        ecs_time_t t = *start;
+        if (done > 0 && config->budget_ms > 0 &&
+            ecs_time_measure(&t) * 1000.0 >= config->budget_ms)
+        {
+            state->unloading ++;
+            continue;
+        }
+
+        if (ecs_is_alive(world, cell->entity)) {
+            box_chunk_delete(world, cell->entity, status);
+            done ++;
+        }
+
+        box_chunk_remove(state, cell);
     }
 
+    status->unloading = state->unloading;
     ecs_vec_fini_t(NULL, &cells, box_chunk_cell_t*);
 }
 
 /** Load and change cells from the queued work, in order, within the budget.
  *
+ * The budget_ms counts from the start of the work of the grid, the deletions of the frame
+ * included, but at least one cell goes per frame.
+ *
  * @param world The world
  * @param grid The grid entity
  * @param state The state of the grid
  * @param config The grid
+ * @param start Start of the work of the grid this frame
  * @param status Counts the created, changed, pending and held cells
  */
 static void box_chunk_apply(
@@ -778,14 +812,14 @@ static void box_chunk_apply(
     ecs_entity_t grid,
     box_chunk_state_t *state,
     const ChunkGrid *config,
+    const ecs_time_t *start,
     ChunkGridStatus *status)
 {
     int32_t count = ecs_vec_count(&state->work), i, done = 0;
     box_chunk_work_t *work = ecs_vec_first_t(&state->work, box_chunk_work_t);
     double anchor[3] = {0, 0, 0};
     vec3 local = {0, 0, 0};
-    ecs_time_t start, t;
-    ecs_os_get_time(&start);
+    ecs_time_t t, op;
     box_world_position(world, grid, local);
     box_world_to_absolute(world, local, anchor);
     if (count > 1) {
@@ -793,7 +827,7 @@ static void box_chunk_apply(
     }
 
     for (i = 0; i < count; i ++) {
-        t = start;
+        t = *start;
         bool over = (config->budget > 0 && done >= config->budget) || (done > 0 &&
             config->budget_ms > 0 && ecs_time_measure(&t) * 1000.0 >= config->budget_ms);
         if (over) {
@@ -804,20 +838,26 @@ static void box_chunk_apply(
         if (!box_chunk_ready(world, grid, &work[i])) {
             status->pending ++;
             status->held ++;
-        } else if (work[i].cell) {
+            continue;
+        }
+
+        ecs_os_get_time(&op);
+        if (work[i].cell) {
             box_chunk_set_level(world, config, work[i].cell, work[i].level);
             status->changed ++;
-            done ++;
         } else {
             ecs_entity_t e = box_chunk_create(world, grid, config, anchor, &work[i]);
             box_chunk_insert(state, work[i].c, work[i].level, e);
             status->created ++;
-            done ++;
         }
+
+        status->create_ms += (float)(ecs_time_measure(&op) * 1000.0);
+        done ++;
     }
 }
 
-/** Check whether a grid needs a scan: its foci or config changed or work is pending.
+/** Check whether a grid needs a scan: its foci or config changed or work or deletions are
+ * pending.
  *
  * @param state The state of the grid
  * @param config The grid
@@ -829,7 +869,7 @@ static bool box_chunk_dirty(
     const ChunkGrid *config,
     const ecs_vec_t *foci)
 {
-    bool result = !state->scanned || ecs_vec_count(&state->work) > 0 ||
+    bool result = !state->scanned || ecs_vec_count(&state->work) > 0 || state->unloading > 0 ||
         ecs_os_memcmp(&state->config, config, ECS_SIZEOF(ChunkGrid)) != 0 ||
         ecs_vec_count(foci) != ecs_vec_count(&state->foci);
     if (!result) {
@@ -919,9 +959,9 @@ static void box_chunk_update(
             ecs_vec_count(&foci)), ecs_vec_first(&foci),
             ECS_SIZEOF(double) * 3 * ecs_vec_count(&foci));
         ecs_vec_clear(&state->work);
-        box_chunk_scan(world, state, &config, &status);
-        box_chunk_unload_unseen(world, state, &status);
-        box_chunk_apply(world, grid, state, &config, &status);
+        box_chunk_scan(world, state, &config);
+        box_chunk_unload_unseen(world, state, &config, &start, &status);
+        box_chunk_apply(world, grid, state, &config, &start, &status);
         if (!status.pending) {
             ecs_vec_clear(&state->work);
         }

@@ -250,6 +250,22 @@ const box_mesh_t* box_mesh_cache_get(
 int32_t box_mesh_cache_count(
     const box_mesh_cache_t *cache);
 
+/** Counters of a mesh cache since it was created */
+typedef struct box_mesh_cache_stats_t {
+    int64_t acquired;   /**< Meshes acquired from a shape value, found or generated */
+    int64_t generated;  /**< Meshes generated because the cache did not hold them */
+    double generate_ms; /**< Milliseconds spent generating them */
+} box_mesh_cache_stats_t;
+
+/** Get the counters of a cache.
+ *
+ * @param cache The cache
+ * @param stats Receives the counters
+ */
+void box_mesh_cache_stats(
+    const box_mesh_cache_t *cache,
+    box_mesh_cache_stats_t *stats);
+
 /** Add a shape to the registry of a cache.
  *
  * @param cache The cache

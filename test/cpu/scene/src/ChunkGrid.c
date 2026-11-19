@@ -785,3 +785,84 @@ void ChunkGrid_endless_walk(void) {
 
     ecs_fini(world);
 }
+
+void ChunkGrid_budget_ms_spreads_deletes(void) {
+    // scenes/chunk_grid
+    ecs_world_t *world = chunk_world();
+    ecs_entity_t grid = chunk_grid(world, "Chunk", 15, 0, 2, 0);
+    ecs_entity_t focus = chunk_focus(world, 5, 0, 5);
+    ecs_progress(world, 0);
+    const ChunkGridStatus *s = ecs_get(world, grid, ChunkGridStatus);
+    int32_t count = s->cells;
+    test_assert(count > 2);
+    test_int(s->pending, 0);
+    test_assert(s->create_ms > 0);
+    test_flt(s->delete_ms, 0);
+    ecs_entity_t near = chunk_cell(world, grid, 0, 0, NULL);
+    test_assert(near != 0);
+
+    // A budget that the first deletion uses up: one cell unloads and one loads per frame
+    ChunkGrid *g = ecs_get_mut(world, grid, ChunkGrid);
+    g->budget_ms = 0.000001f;
+    ecs_modified(world, grid, ChunkGrid);
+    chunk_move(world, focus, 1005, 5);
+    ecs_progress(world, 0);
+    s = ecs_get(world, grid, ChunkGridStatus);
+    test_int(s->deleted, 1);
+    test_int(s->unloading, count - 1);
+    test_int(s->created, 1);
+    test_assert(s->delete_ms > 0);
+
+    int32_t deleted = 1, frames = 0;
+    while ((s->unloading || s->pending) && frames < 100) {
+        ecs_progress(world, 0);
+        s = ecs_get(world, grid, ChunkGridStatus);
+        test_assert(s->deleted <= 1);
+        deleted += s->deleted;
+        frames ++;
+    }
+
+    test_int(s->unloading, 0);
+    test_int(s->pending, 0);
+    test_int(deleted, count);
+    test_assert(!ecs_is_alive(world, near));
+    test_assert(chunk_cell(world, grid, 100, 0, NULL) != 0);
+    test_int(ecs_get(world, grid, ChunkGridStatus)->cells, count);
+    test_int(chunk_children(world, grid), count);
+
+    ecs_fini(world);
+}
+
+void ChunkGrid_budget_ms_keeps_returning_cells(void) {
+    // scenes/chunk_grid
+    ecs_world_t *world = chunk_world();
+    ecs_entity_t grid = chunk_grid(world, "Chunk", 15, 0, 2, 0);
+    ecs_entity_t focus = chunk_focus(world, 5, 0, 5);
+    ecs_progress(world, 0);
+    int32_t count = ecs_get(world, grid, ChunkGridStatus)->cells;
+    ChunkGrid *g = ecs_get_mut(world, grid, ChunkGrid);
+    g->budget_ms = 0.000001f;
+    ecs_modified(world, grid, ChunkGrid);
+
+    // The focus leaves for a frame: one cell is deleted, the others wait
+    chunk_move(world, focus, 1005, 5);
+    ecs_progress(world, 0);
+    test_int(ecs_get(world, grid, ChunkGridStatus)->unloading, count - 1);
+
+    // It comes back before they go: they stay, and only the deleted one loads again
+    chunk_move(world, focus, 5, 5);
+    int32_t frames = 0;
+    const ChunkGridStatus *s;
+    do {
+        ecs_progress(world, 0);
+        s = ecs_get(world, grid, ChunkGridStatus);
+        frames ++;
+    } while ((s->unloading || s->pending) && frames < 100);
+
+    test_int(s->unloading, 0);
+    test_int(s->pending, 0);
+    test_int(chunk_check_rings(world, grid, 5, 5, 15, 0), count);
+    test_int(chunk_children(world, grid), count);
+
+    ecs_fini(world);
+}

@@ -320,7 +320,7 @@ static void bench_tr_frame(
     ecs_progress(world, 0);
 }
 
-/** Get the time a system spent so far.
+/** Get the time a system spent in the last frame, over every stage.
  *
  * @param world The world
  * @param name Path of the system
@@ -332,8 +332,13 @@ static double bench_tr_system_time(
 {
     ecs_entity_t e = ecs_lookup(world, name);
     const ecs_system_t *s = e ? ecs_system_get(world, e) : NULL;
+    double result = 0;
+    int32_t i;
+    for (i = 0; s && i < ecs_vec_count(&s->time_spent); i ++) {
+        result += (double)*ecs_vec_get_t(&s->time_spent, ecs_ftime_t, i);
+    }
 
-    return s ? (double)s->time_spent : 0;
+    return result;
 }
 
 /** Run frames of a case and report its counters.
@@ -364,14 +369,13 @@ static void bench_tr_run(
     bench_counter(bench, "resolver_active", (double)box_render_transition_test_active(world));
 
     ecs_measure_system_time(world, true);
-    double extract = bench_tr_system_time(world, "box.render.extract.Transitions");
-    double slots = bench_tr_system_time(world, "box.render.extract.TransitionSlots");
+    double extract = 0, slots = 0;
     for (i = 0; i < BENCH_TR_TIMED; i ++) {
         bench_tr_frame(b);
+        extract += bench_tr_system_time(world, "box.render.extract.Transitions");
+        slots += bench_tr_system_time(world, "box.render.extract.TransitionSlots");
     }
 
-    extract = bench_tr_system_time(world, "box.render.extract.Transitions") - extract;
-    slots = bench_tr_system_time(world, "box.render.extract.TransitionSlots") - slots;
     bench_counter(bench, "transitions_ms", (extract + slots) * 1000.0 / BENCH_TR_TIMED);
 
     box_render_sync(world);

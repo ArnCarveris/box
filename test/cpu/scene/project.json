@@ -222,7 +222,9 @@
                     "gate",
                     "template_change",
                     "script",
-                    "endless_walk"
+                    "endless_walk",
+                    "budget_ms_spreads_deletes",
+                    "budget_ms_keeps_returning_cells"
                 ]
             }
         ]

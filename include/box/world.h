@@ -98,8 +98,9 @@ ECS_STRUCT(ChunkGrid, {
     float hysteresis;    /**< Meters past a radius before a cell changes level or unloads,
                           *   default 8 */
     int32_t budget;      /**< Cells created or changed per frame, 0 for no limit, default 16 */
-    float budget_ms;     /**< Milliseconds of creations per frame, 0 for no limit, default 0;
-                          *   at least one cell goes per frame */
+    float budget_ms;     /**< Milliseconds of creations, level changes and deletions per
+                          *   frame, 0 for no limit, default 0; at least one cell loads and
+                          *   one unloads per frame, the others wait for the next frames */
     int32_t extent[3];   /**< Cells span -extent to extent - 1 along an axis, 0 for unbounded */
     int32_t seed;        /**< Set as the seed prop of the cells */
 });
@@ -113,7 +114,12 @@ ECS_STRUCT(ChunkGridStatus, {
     int32_t created;     /**< Cells created this frame */
     int32_t changed;     /**< Cells that changed level this frame */
     int32_t deleted;     /**< Cells deleted this frame */
+    int32_t unloading;   /**< Cells out of range that wait for the budget_ms of a later frame
+                          *   to be deleted */
     float time_ms;       /**< Milliseconds the grid took this frame */
+    float create_ms;     /**< Of time_ms, the creations and level changes: the evaluation of
+                          *   the template and everything its entities trigger */
+    float delete_ms;     /**< Of time_ms, the deletions of cells */
 });
 
 /** Callback of a ChunkGridGate: whether a cell may load or change level now.

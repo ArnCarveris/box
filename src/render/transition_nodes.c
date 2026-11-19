@@ -343,6 +343,23 @@ static void BoxTransitionsOnChange(
     }
 }
 
+/** Add the entities of an event that have Transition, owned or inherited, to the changed ones.
+ *
+ * The Transition filter runs in the callback instead of in a second term, because a multi-term
+ * observer evaluates its query for every event, which every instantiated entity paid for.
+ *
+ * @param it The iterator of the observer
+ */
+static void BoxTransitionsOnComponent(
+    ecs_iter_t *it)
+{
+    if (ecs_search_relation(it->world, it->table, 0, ecs_id(Transition), EcsIsA,
+        EcsSelf | EcsUp, NULL, NULL, NULL) != -1)
+    {
+        BoxTransitionsOnChange(it);
+    }
+}
+
 /** Add the nodes whose entity a set of a transitioned component changes: the ones whose
  * Transition lists the component or whose slot of it is live. An entity without a node gets one
  * when it gets the component or Transition, which the observers of those events add.
@@ -425,11 +442,8 @@ void box_transitions_observers(
         .query.terms = {{ .id = ecs_id(Transition), .src.id = EcsSelf | EcsUp, .trav = EcsIsA }},
         .events = { EcsOnAdd, EcsOnSet, EcsOnRemove } }, BoxTransitionsOnChange);
     box_transitions_observer(world, s, "TransitionsOnDisabled", (ecs_observer_desc_t){
-        .query.terms = {{ .id = EcsDisabled }, {
-            .id = ecs_id(Transition), .src.id = EcsSelf | EcsUp, .trav = EcsIsA,
-            .inout = EcsInOutFilter
-        }},
-        .events = { EcsOnAdd, EcsOnRemove } }, BoxTransitionsOnChange);
+        .query.terms = {{ .id = EcsDisabled }},
+        .events = { EcsOnAdd, EcsOnRemove } }, BoxTransitionsOnComponent);
     box_transitions_observer(world, s, "TransitionsOnNodeRemove", (ecs_observer_desc_t){
         .query.terms = {{ .id = ecs_id(TransitionNode) }},
         .events = { EcsOnRemove } }, BoxTransitionsOnNodeRemove);
@@ -446,10 +460,7 @@ void box_transitions_observers(
                 .id = id,
                 .src.id = inherit ? EcsSelf | EcsUp : EcsSelf,
                 .trav = inherit ? EcsIsA : 0
-            }, {
-                .id = ecs_id(Transition), .src.id = EcsSelf | EcsUp, .trav = EcsIsA,
-                .inout = EcsInOutFilter
             }},
-            .events = { EcsOnAdd, EcsOnRemove } }, BoxTransitionsOnChange);
+            .events = { EcsOnAdd, EcsOnRemove } }, BoxTransitionsOnComponent);
     }
 }

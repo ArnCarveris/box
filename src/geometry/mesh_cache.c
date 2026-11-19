@@ -29,6 +29,7 @@ struct box_mesh_cache_t {
     ecs_map_t lookup;    /**< Hash to the first handle with that hash */
     ecs_vec_t shapes;    /**< box_shape_t* registered shapes */
     int32_t alive;       /**< Number of live meshes */
+    box_mesh_cache_stats_t stats; /**< Counters since the cache was created */
 };
 
 /** Get the entry of a handle.
@@ -192,6 +193,8 @@ static uint32_t box_mesh_cache_insert(
     uint32_t handle = box_mesh_cache_find(cache, shape, &key, hash);
     if (!handle) {
         box_mesh_t mesh = {0};
+        ecs_time_t start;
+        ecs_os_get_time(&start);
         if (shape->desc.generate_world) {
             shape->desc.generate_world(shape->world, value, &key, &mesh);
         } else {
@@ -199,6 +202,8 @@ static uint32_t box_mesh_cache_insert(
         }
 
         box_mesh_bounds(&mesh);
+        cache->stats.generated ++;
+        cache->stats.generate_ms += ecs_time_measure(&start) * 1000.0;
         if (ecs_vec_count(&cache->free_list)) {
             handle = *ecs_vec_last_t(&cache->free_list, uint32_t);
             ecs_vec_remove_last(&cache->free_list);
@@ -244,6 +249,7 @@ uint32_t box_mesh_cache_acquire(
     }
 
     uint32_t handle = box_mesh_cache_insert(cache, shape, value, &key);
+    cache->stats.acquired ++;
     box_mesh_entry_t *entry = box_mesh_cache_entry(cache, handle);
     if (!entry->value && (shape->desc.lod || shape->desc.lod_world) && shape->size > 0) {
         entry->value = ecs_os_malloc(shape->size);
@@ -391,6 +397,13 @@ int32_t box_mesh_cache_count(
     const box_mesh_cache_t *cache)
 {
     return cache->alive;
+}
+
+void box_mesh_cache_stats(
+    const box_mesh_cache_t *cache,
+    box_mesh_cache_stats_t *stats)
+{
+    *stats = cache->stats;
 }
 
 box_shape_t* box_mesh_cache_add_shape(
