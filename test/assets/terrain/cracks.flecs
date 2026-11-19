@@ -1,0 +1,39 @@
+// An unbounded terrain of rugged ridged noise, 5 levels of 16 m tiles with a range of 4 tiles,
+// seen from a camera 300 m above it that is the focus, looking down steeply so the terrain
+// fills the image. The clear is magenta: a magenta pixel is a crack or a hole in the terrain.
+
+using box.transform
+using box.material
+using box.texture
+using box.terrain
+using box.camera
+using box.view
+using box.light
+using box.world
+
+terrain_cracks {
+  camera {
+    Position: {0, 300, 0}
+    Rotation: {-1.1, 0, 0}
+    Camera: {fov: 60, near_: 1, far_: 4000}
+    WorldFocus
+  }
+
+  view {
+    View: {camera: camera, clear: {enabled: true, color: {255, 0, 255, 255}}}
+  }
+
+  sun {
+    Rotation: {1.0, 0.6, 0}
+    DirectionalLight: {intensity: 3.14}
+  }
+
+  ridges {
+    noise     { nodes.Noise: {frequency: 0.02, octaves: 5, seed: 3, fractal: NoiseRidged} }
+    elevation { nodes.Multiply: {a: noise, b_value: {60, 60, 60, 60}} }
+    Terrain: {height: elevation, tile_size: 16, resolution: 17, levels: 5, lod_distance: 64,
+              min_height: -10, max_height: 130, budget: 128}
+    Rgb: {90, 150, 70}
+    PbrMaterial: {roughness: 1}
+  }
+}

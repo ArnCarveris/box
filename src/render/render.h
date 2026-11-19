@@ -753,6 +753,14 @@ int32_t box_render_planar_select(
 void box_render_planar_init(
     ecs_world_t *world);
 
+/** Register the system that appends the heights of the terrain tiles that draw to the packet,
+ * which the backend copies into the surface assets of their grid mesh (gpu_draw.c).
+ *
+ * @param world The world
+ */
+void box_render_terrain_init(
+    ecs_world_t *world);
+
 /** Register the system that steps the fields of WaterRipples on the main thread: the water
  * frame of each field, its window, its steps and its sources, appended to the packet for the
  * backend (gpu_ripples.c), after the views.

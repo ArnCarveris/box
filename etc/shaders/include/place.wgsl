@@ -68,6 +68,10 @@ fn place(v: VertexIn) -> Placed {
         normal = v.normal;
     } else if (surface_data.p[0].x == 7.0) {
         position.y *= surface_data.p[1].y;
+    } else if (surface_data.p[0].x == TERRAIN_SURFACE) {
+        let t = terrain_vertex(v.position);
+        position = t.position;
+        normal = t.normal;
     } else if (surface_data.p[0].x == 1.0 && v.position.z < 2.0) {
         let sample = surface_sweep_sample(i32(v.position.z), v.position.x, v.position.y);
         position = sample.position;

@@ -1,10 +1,11 @@
 /**
  * @file box/terrain.h
- * @brief Tile terrain: a flat grid of tiles of a kind, drawn with hand painted transition
- * atlases where kinds meet.
+ * @brief Terrains: a flat grid of tiles of a kind, drawn with hand painted transition atlases
+ * where kinds meet, and height fields of a texture graph drawn as tiles with levels of detail.
  *
  * The box.terrain module registers TileTerrain as a shape and turns its grid into the image the
- * texture_blend variant of the mesh pipeline reads.
+ * texture_blend variant of the mesh pipeline reads. A Terrain makes the tiles around the focus
+ * of the world (box/world.h), each a shape displaced on the GPU by the heights of its tile.
  */
 
 #ifndef BOX_TERRAIN_H
@@ -72,6 +73,74 @@ ECS_STRUCT(TileTerrain, {
     float size;             /**< Edge of a tile in world units, not positive or finite is 1 */
     ecs_vec(TileKind) kinds; /**< Kinds in the order they draw, at most BOX_TERRAIN_KINDS */
     char *tiles;            /**< The grid, a line of symbols per row */
+});
+
+/** Levels of detail a Terrain has at most */
+#define BOX_TERRAIN_LEVELS (16)
+
+/** Height field drawn as tiles around the WorldFocus entities (or the camera of the first View)
+ * with levels of detail, its heights from a node of a texture graph over the world.
+ *
+ * Each tile is a TextureGraph of the node on DomainWorld (GraphFloat) over its rectangle with a
+ * border of two texels, its first channel the height in meters. Every tile shares the node
+ * entities of the graph, so editing a node updates the whole terrain. The rectangles are in the
+ * frame of the terrain entity: a terrain without a transform is at the absolute origin, a
+ * function of the absolute position fixed in the world across shifts of the WorldOrigin; the
+ * Position of the terrain offsets it (only its translation applies). Height fields cannot
+ * overhang: cliffs are steep slopes, best textured triplanar.
+ *
+ * The tiles form a quadtree: a tile of level L has an edge of tile_size * 2^L meters, and splits
+ * into the four tiles of level L - 1 while a focus is closer than lod_distance * 2^(L - 1).
+ * Tiles are made nearest first, at most budget per frame, and a coarse tile draws until the
+ * finer tiles that replace it have their heights, so the terrain has no holes. Unbounded, the
+ * coarsest level reaches lod_distance * 2^(levels - 1) from each focus.
+ *
+ * The tiles share one grid mesh per resolution and draw in one batch; the vertex stage displaces
+ * it by the heights of the tile and takes the normals from them. Near the end of the range of
+ * its level a tile morphs into the grid of the next coarser level, so the levels meet without
+ * cracks or pops, and skirts below the edges hide what rounding leaves. The material
+ * components of the terrain entity (Rgb, PbrMaterial, PbrTextures, TextureMapping, TextureLayers,
+ * ...) apply to its tiles; TextureMapping MappingWorld with a triplanar blend suits steep slopes.
+ *
+ * @code
+ * hills {
+ *   noise { nodes.Noise: {frequency: 0.004, octaves: 5, fractal: NoiseRidged} }
+ *   height { nodes.Multiply: {a: noise, b_value: {120, 120, 120, 120}} }
+ *   Terrain: {height: height, tile_size: 32, levels: 6, max_height: 130}
+ *   Rgb: {110, 130, 80}
+ * }
+ * @endcode
+ */
+ECS_STRUCT(Terrain, {
+    ecs_entity_t height;    /**< Texture graph node whose first channel is the height in meters */
+    float tile_size;        /**< Meters along the edge of a tile of the finest level, 0 for 32 */
+    int32_t resolution;     /**< Vertices along the edge of a tile, 0 for 65: rounded up to an
+                             *   odd count, 5 to 257 */
+    int32_t levels;         /**< Levels of detail, each doubling the tile size, 0 for 6, at most
+                             *   BOX_TERRAIN_LEVELS */
+    float lod_distance;     /**< Radius around a focus of the finest level in meters, each
+                             *   coarser level twice the one before; 0 for 4 tile sizes,
+                             *   clamped to 3 to 16 tile sizes */
+    float extent;           /**< Half size of a bounded terrain around the entity in meters along
+                             *   x and z, 0 for an unbounded terrain */
+    float max_height;       /**< Highest height of the terrain, the top of the culling bounds of
+                             *   the tiles; with min_height 0 or above it for -256 and 1024 */
+    float min_height;       /**< Lowest height of the terrain, the bottom of the culling bounds */
+    int32_t budget;         /**< Tiles made per frame at most, 0 for 8; four times as many are
+                             *   dropped */
+});
+
+/** Tiles of a Terrain, written by the engine on the terrain entity, read only for
+ * applications */
+ECS_STRUCT(TerrainStatus, {
+    int32_t tiles[16];      /**< Tiles drawn per level, the finest first */
+    int32_t drawn;          /**< Tiles drawn */
+    int32_t pending;        /**< Tiles the focus needs whose heights are not computed yet */
+    int32_t count;          /**< Tiles that exist, drawn, pending or kept until replaced */
+    int32_t created;        /**< Tiles made since the terrain was set */
+    int32_t dropped;        /**< Tiles deleted since the terrain was set */
+    int64_t gpu_bytes;      /**< Bytes of the height images of the tiles and of their copies the
+                             *   vertex stage reads */
 });
 
 /** Register the box.terrain module.

@@ -331,6 +331,23 @@
                 ]
             },
             {
+                "id": "Terrain",
+                "testcases": [
+                    "budget_nearest_first",
+                    "levels_follow_ranges",
+                    "tile_graph_window",
+                    "tile_shape",
+                    "ready_tiles_draw",
+                    "coarse_kept_until_ready",
+                    "drops_within_budget",
+                    "origin_shift_keeps_tiles",
+                    "materials_copied",
+                    "bounded_extent",
+                    "remove_deletes_tiles",
+                    "script"
+                ]
+            },
+            {
                 "id": "TextureGen",
                 "testcases": [
                     "noise_tiles",

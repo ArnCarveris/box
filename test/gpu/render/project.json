@@ -12,7 +12,8 @@
             "../../../src/render",
             "../../../src/texture",
             "../../../src/geometry",
-            "../../../src/spatial"
+            "../../../src/spatial",
+            "../../../src/terrain"
         ]
     },
     "test": {
@@ -1957,6 +1958,15 @@
                     "sphere_seam",
                     "zero_strength",
                     "strength_edit_no_recompile"
+                ]
+            },
+            {
+                "id": "Terrain",
+                "testcases": [
+                    "bounded_renders",
+                    "levels_no_cracks",
+                    "focus_refines",
+                    "origin_shift_same_image"
                 ]
             },
             {

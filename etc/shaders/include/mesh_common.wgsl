@@ -454,8 +454,8 @@ fn vertex_shading(v: VertexIn, shading: MeshShading, material: Material, p: Plac
 fn vertex_shading_surface(v: VertexIn, shading: MeshShading, material: Material, p: Placed,
     scale: vec3f, normal: vec3f) -> VertexShading {
     var o = vertex_base(v, shading, material);
-    if (material_mapped(material) &&
-        (surface_data.p[0].x == 0.0 || material_frame(material))) {
+    if (material_mapped(material) && (surface_data.p[0].x == 0.0 ||
+        surface_data.p[0].x == TERRAIN_SURFACE || material_frame(material))) {
         vertex_mapping(&o, v, material, p, scale, normal);
     }
     if (material_mapped(material) && !material_world(material) && !material_frame(material) &&

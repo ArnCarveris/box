@@ -2003,6 +2003,20 @@ typedef struct box_render_copy_t {
     uint32_t size;          /**< Bytes copied */
 } box_render_copy_t;
 
+/** Copy of the heights of a tile of a Terrain into its slot of the surface assets of its grid
+ * mesh, which the vertex stages of the tile read (terrain.wgsl).
+ *
+ * The backend copies the R32Float image of the texture into the slot when the image changed since
+ * it last copied it there, after the texture graphs evaluated and before the views render. A
+ * slot holds the rows of the image, each aligned to 256 bytes (box_terrain_row_bytes); the
+ * assets grow to hold the highest slot, which copies every slot again.
+ */
+typedef struct box_render_terrain_height_t {
+    uint32_t mesh;          /**< Handle of the grid mesh of the tile */
+    uint32_t slot;          /**< Slot of the tile */
+    uint32_t texture;       /**< Handle of the texture with the heights of the tile */
+} box_render_terrain_height_t;
+
 /** Description of a BOX_RENDER_SHADER create or update, followed by its code and its label.
  *
  * The preprocessed WGSL code and the label each end with a terminator that their size counts.
@@ -2399,6 +2413,8 @@ typedef struct box_render_packet_t {
                              *   stepped before the targets */
     ecs_vec_t ripple_sources; /**< box_render_ripple_source_t of those fields */
     ecs_vec_t ripple_flows; /**< box_render_ripple_flow_t of those fields */
+    ecs_vec_t terrain_heights; /**< box_render_terrain_height_t, the heights of the terrain
+                             *   tiles that draw, copied after the texture graphs evaluated */
     ecs_vec_t debug_boxes;  /**< box_render_debug_box_t, the boxes of the spatial index trees
                              *   of the views */
     ecs_vec_t debug_poses;  /**< mat4, the matrices that place the boxes of the views */

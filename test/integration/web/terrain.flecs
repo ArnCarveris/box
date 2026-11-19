@@ -1,0 +1,49 @@
+// The scene of the browser check of Terrain (terrain.mjs), which renders on the main thread. The
+// page opens a window only for a scene with a Surface; its 640x480 points fill the viewport of
+// the check. An unbounded terrain of ridged noise in 4 levels of 16 m tiles, seen steeply from
+// above by the camera that is its focus, lit by a sun with shadows, over a magenta clear: a
+// magenta pixel is a crack or a hole between the tiles.
+using box.transform
+using box.material
+using box.texture
+using box.terrain
+using box.camera
+using box.view
+using box.light
+using box.world
+using box.surface
+
+window {
+  Surface: {width: 640, height: 480}
+}
+
+camera {
+  Position: {0, 200, 0}
+  Rotation: {-1.1, 0, 0}
+  Camera: {fov: 50, near_: 1, far_: 4000}
+  WorldFocus
+}
+
+main_view {
+  View: {
+    camera: camera
+    clear: {enabled: true, color: {255, 0, 255, 255}}
+    lighting: {enabled: true}
+    culling: {enabled: true, occlusion: true}
+    shadows: {enabled: true, cascades: 2, resolution: 2048, max_distance: 400}
+  }
+}
+
+sun {
+  Rotation: {0.9, 2.4, 0}
+  DirectionalLight: {intensity: 3.14}
+}
+
+ridges {
+  noise     { nodes.Noise: {frequency: 0.02, octaves: 5, seed: 3, fractal: NoiseRidged} }
+  elevation { nodes.Multiply: {a: noise, b_value: {50, 50, 50, 50}} }
+  Terrain: {height: elevation, tile_size: 16, resolution: 33, levels: 4, lod_distance: 64,
+            min_height: -10, max_height: 100, budget: 32}
+  Rgb: {90, 150, 70}
+  PbrMaterial: {roughness: 1}
+}

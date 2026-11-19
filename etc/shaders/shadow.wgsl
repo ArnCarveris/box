@@ -149,6 +149,8 @@ fn caster_world(slot: u32, vertex: vec3f) -> vec3f {
         position = vertex;
     } else if (surface_data.p[0].x == 7.0) {
         position.y *= surface_data.p[1].y;
+    } else if (surface_data.p[0].x == TERRAIN_SURFACE) {
+        position = terrain_vertex(vertex).position;
     } else if (surface_data.p[0].x != 0.0) {
         position = surface_position(i32(position.z), position.x, position.y);
     }
@@ -171,6 +173,10 @@ fn caster_local(v: VertexIn) -> CasterLocal {
         position = v.position;
     } else if (surface_data.p[0].x == 7.0) {
         position.y *= surface_data.p[1].y;
+    } else if (surface_data.p[0].x == TERRAIN_SURFACE) {
+        let t = terrain_vertex(v.position);
+        position = t.position;
+        normal = t.normal;
     } else if (surface_data.p[0].x == 1.0 && v.position.z < 2.0) {
         let sample = surface_sweep_sample(i32(v.position.z), v.position.x, v.position.y);
         position = sample.position;

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "curve.wgsl"
+#include "terrain.wgsl"
 
 struct SurfaceData {
     p: array<vec4f, 24>,

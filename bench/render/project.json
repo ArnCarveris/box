@@ -2,7 +2,7 @@
     "id": "bench_render",
     "type": "application",
     "value": {
-        "description": "Benchmarks for the packet data, the extract of the instanced batches and lights, the shadow pass, the frustum, occlusion and draw range cull passes, the effect passes, the fragment cost of the texture mappings, the fog volumes, the star fields, the baked lighting, prefab instantiation, the atmosphere extract, the GPU cost of the cloud layers of the sky, the cost of the planet surface light without planets, the particle passes, the transitions, the GPU cost of Polygon2D next to the other 2D shapes, the cost of TextureLayers for the shapes without them and a scene with parametric surfaces and the levels of detail of round shapes of box.render, and a 300 shape hierarchy against the same content as one MeshGraph",
+        "description": "Benchmarks for the packet data, the extract of the instanced batches and lights, the shadow pass, the frustum, occlusion and draw range cull passes, the effect passes, the fragment cost of the texture mappings, the fog volumes, the star fields, the baked lighting, prefab instantiation, the atmosphere extract, the GPU cost of the cloud layers of the sky, the cost of the planet surface light without planets, the particle passes, the transitions, the GPU cost of Polygon2D next to the other 2D shapes, the cost of TextureLayers for the shapes without them and a scene with parametric surfaces and the levels of detail of round shapes of box.render, a 300 shape hierarchy against the same content as one MeshGraph, and the frame cost and memory of an unbounded Terrain of 6 levels",
         "public": false,
         "use": [
             "box"
@@ -255,6 +255,12 @@
                     "gpu_100_no_glass",
                     "gpu_100_glass_one_layer",
                     "gpu_100_glass_budget_layers"
+                ]
+            },
+            {
+                "id": "Terrain",
+                "benchcases": [
+                    "unbounded_6_levels"
                 ]
             },
             {

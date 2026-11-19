@@ -319,6 +319,7 @@ static void box_gpu_mesh_free(
 {
     box_gpu_debug_mesh_free(m);
     wgpuBufferRelease(m->surface_assets);
+    ecs_os_free(m->terrain_serials);
     if (m->buffer) {
         box_gpu_mesh_pool_free(gpu, m->page, m->offset, m->alloc_size);
     }

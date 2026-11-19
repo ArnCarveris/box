@@ -1080,6 +1080,17 @@ void box_gpu_copy(
     box_gpu_t *gpu,
     const box_render_packet_t *packet);
 
+/** Copy the heights of the terrain tiles of a packet into the surface assets of their grid
+ * meshes (box_render_terrain_height_t): the assets of a mesh grow to hold its highest slot, and
+ * a slot is copied when the image of its texture changed since it was copied there.
+ *
+ * @param gpu The backend
+ * @param packet The packet
+ */
+void box_gpu_terrain_heights(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet);
+
 /** Write the uploads of a packet into their buffers.
  *
  * @param gpu The backend
