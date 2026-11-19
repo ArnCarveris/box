@@ -83,7 +83,8 @@ view {
     shadows: {
       enabled: true,
       cascades: 3,
-      resolution: 1024,
+      resolution: 2048,
+      interval: [1, 2, 2],
       max_distance: liner ? 200 * LINER_SCALE : 200,
       filter_size: 2
     },

@@ -263,7 +263,9 @@ view {
     },
     shadows: {
       enabled: hud.screen.options.body.shadows[Checkbox.mut].current,
+      cascades: 3,
       resolution: 2048,
+      interval: [1, 2, 2],
       max_distance: 110
     },
     effects: [

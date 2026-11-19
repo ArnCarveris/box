@@ -670,7 +670,7 @@ view {
     camera: camera.eye,
     clear: {enabled: true, color: {51, 56, 81, 255}},
     lighting: {enabled: true, baked: true, reflections: true},
-    shadows: {enabled: true, resolution: 2048, max_distance: 85},
+    shadows: {enabled: true, cascades: 3, resolution: 2048, interval: [1, 2, 2], max_distance: 85},
     effects: [{effect: gtao}, {effect: bloom}, {effect: tonemap}, {effect: smaa}]
   }
 }

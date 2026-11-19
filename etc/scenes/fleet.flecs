@@ -72,7 +72,14 @@ view {
   View: {
     camera: camera,
     clear: {enabled: true, color: {3, 5, 10, 255}},
-    shadows: {enabled: true, cascades: 4, resolution: 2048, max_distance: 14000, filter_size: 2},
+    shadows: {
+      enabled: true,
+      cascades: 3,
+      resolution: 2048,
+      interval: [1, 2, 2],
+      max_distance: 14000,
+      filter_size: 2
+    },
     lighting: {
       reflections: true,
       baked: false,

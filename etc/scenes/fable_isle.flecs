@@ -164,7 +164,7 @@ view {
       atmosphere: true,
       environment: {source: sky, intensity: 1, background: false}
     },
-    shadows: {enabled: true, resolution: 4096, max_distance: 220},
+    shadows: {enabled: true, cascades: 3, resolution: 2048, interval: [1, 2, 2], max_distance: 220},
     effects: [
       {effect: isle_contact},
       {effect: sky},

@@ -322,7 +322,7 @@ view {
       atmosphere: true,
       environment: {source: sky, intensity: 0.6, yaw: 0, background: false}
     },
-    shadows: {enabled: true, resolution: 2048, max_distance: 90},
+    shadows: {enabled: true, cascades: 3, resolution: 2048, interval: [1, 2, 2], max_distance: 90},
     effects: [
       {effect: gtao},
       {effect: sky},

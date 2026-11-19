@@ -380,7 +380,7 @@ template Gallery {
           "Dusk": {196, 128, 110, 255}
           _: {150, 186, 226, 255}
         }},
-        shadows: {enabled: true}
+        shadows: {enabled: true, cascades: 3, resolution: 2048, interval: [1, 2, 2]}
       }
     }
   }

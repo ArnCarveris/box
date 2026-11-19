@@ -85,8 +85,9 @@ view {
     },
     shadows: {
       enabled: true,
-      cascades: 2,
-      resolution: 1024,
+      cascades: 3,
+      resolution: 2048,
+      interval: [1, 2, 2],
       max_distance: 200,
       split_lambda: 0.7,
       depth_bias: 2,

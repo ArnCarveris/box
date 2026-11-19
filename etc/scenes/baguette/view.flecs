@@ -37,7 +37,7 @@ view {
   View: {
     camera: camera,
     clear: {enabled: true, color: {20, 16, 14, 255}},
-    shadows: {enabled: true},
+    shadows: {enabled: true, cascades: 3, resolution: 2048, interval: [1, 2, 2]},
     effects: [
       {effect: occlusion},
       {effect: focus},

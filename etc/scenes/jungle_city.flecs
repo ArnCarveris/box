@@ -155,6 +155,7 @@ view {
       enabled: hud.screen.options.body.shadows[Checkbox.mut].current,
       cascades: 3,
       resolution: 2048,
+      interval: [1, 2, 2],
       max_distance: 620,
       split_lambda: 0.72,
       min_caster_texels: 2

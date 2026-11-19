@@ -251,7 +251,7 @@ main_view {
     clear: {enabled: true, color: {176, 200, 224, 255}},
     lighting: {enabled: true, reflections: true, atmosphere: true,
       environment: {source: sun, intensity: 1, yaw: 0, background: false}},
-    shadows: {enabled: true, cascades: 2, resolution: 2048, max_distance: 60},
+    shadows: {enabled: true, cascades: 3, resolution: 2048, interval: [1, 2, 2], max_distance: 60},
     culling: {enabled: true, min_dimension_px: 2},
     effects: [{effect: fog}, {effect: gtao}, {effect: sun}, {effect: bloom}, {effect: tonemap},
       {effect: grade}]

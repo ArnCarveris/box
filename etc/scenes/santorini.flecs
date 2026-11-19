@@ -417,7 +417,7 @@ view {
     camera: camera,
     clear: {enabled: true, color: {139, 191, 214, 255}},
     lighting: {enabled: true, baked: true, reflections: true},
-    shadows: {enabled: true, resolution: 2048, max_distance: 120},
+    shadows: {enabled: true, cascades: 3, resolution: 2048, interval: [1, 2, 2], max_distance: 120},
     effects: [{effect: gtao}, {effect: bloom}, {effect: tonemap}, {effect: smaa}]
   }
 }

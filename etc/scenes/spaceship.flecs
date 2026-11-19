@@ -54,7 +54,7 @@ view {
   View: {
     camera: camera,
     clear: {enabled: true, color: {3, 6, 12, 255}},
-    shadows: {enabled: true, max_distance: 600},
+    shadows: {enabled: true, cascades: 3, resolution: 2048, interval: [1, 2, 2], max_distance: 600},
     lighting: {environment: {source: assets.starfield, intensity: 0.035, background: true}},
     effects: [
       {effect: contact_shadows},

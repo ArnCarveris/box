@@ -64,7 +64,7 @@ view {
   View: {
     camera: camera,
     clear: {enabled: true, color: {120, 150, 190, 255}},
-    shadows: {enabled: true},
+    shadows: {enabled: true, cascades: 3, resolution: 2048, interval: [1, 2, 2]},
     effects: [{effect: gtao}, {effect: bloom}, {effect: tonemap}, {effect: smaa}]
   }
 }
