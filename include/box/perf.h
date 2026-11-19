@@ -127,6 +127,7 @@ ECS_STRUCT(PerfStatus, {
     PerfRange visible;    /**< Instances those views drew, summed per sample */
     PerfRange frustum_culled;   /**< Instances outside the frustum or too small, per sample */
     PerfRange occlusion_culled; /**< Instances hidden behind closer geometry, per sample */
+    PerfRange range_culled;     /**< Instances outside their DrawRange, per sample */
     PerfRange batches_skipped;  /**< Batches the views skipped by their bounds, per sample */
     PerfRange casters_skipped;  /**< Batches their shadow cascades skipped by their bounds, per
                                  *   sample */

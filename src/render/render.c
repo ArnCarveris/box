@@ -427,6 +427,8 @@ void BoxRenderImport(
     ECS_COMPONENT_DEFINE(world, RenderRing);
     ecs_set_name_prefix(world, NULL);
     ECS_META_COMPONENT(world, CullStatus);
+    ECS_META_COMPONENT(world, DrawRange);
+    ecs_add_pair(world, ecs_id(DrawRange), EcsOnInstantiate, EcsInherit);
 
     ecs_set_hooks(world, RenderRing, {
         .ctor = flecs_default_ctor,

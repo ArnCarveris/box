@@ -25,7 +25,7 @@
 /** Workgroups along x of a cull_write dispatch at most, the WebGPU dispatch size limit */
 #define BOX_GPU_CULL_WRITE_ROW (65535)
 
-/** Words of the counters of a cull view: drawn, frustum culled and two unused */
+/** Words of the counters of a cull view: drawn, frustum culled, range culled and one unused */
 #define BOX_GPU_CULL_COUNTERS (4)
 
 /** Cull passes between two releases of the unused histories and pyramids */
@@ -418,13 +418,15 @@ static void box_gpu_cull_publish(
 
         int32_t visible = (int32_t)words[0];
         int32_t frustum = (int32_t)words[1] + rec->untested;
-        int32_t hidden = rec->tested - visible - frustum;
+        int32_t range = (int32_t)words[2];
+        int32_t hidden = rec->tested - visible - frustum - range;
         st->status = (CullStatus){
             .frame = r->frame,
             .instances = rec->tested,
             .visible = visible,
             .frustum_culled = frustum,
             .occlusion_culled = hidden > 0 ? hidden : 0,
+            .range_culled = range,
             .batches_skipped = rec->skipped,
             .casters_skipped = rec->casters_skipped
         };

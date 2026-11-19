@@ -26,6 +26,8 @@
 _Static_assert(sizeof(box_render_transform_t) == 48, "InstanceTransform of instance.wgsl");
 _Static_assert(sizeof(box_render_shading_t) == 64, "Shape2DShading of shape2d.wgsl");
 _Static_assert(sizeof(box_render_mesh_shading_t) == 16, "MeshShading of instance.wgsl");
+_Static_assert(BOX_DRAWS_PAGE_BYTES / sizeof(box_render_transform_t) <= (1u << 22),
+    "A visible slot keeps the bits above RANGE_SLOT_BITS of draw_range.wgsl for its dither code");
 _Static_assert(sizeof(box_render_material_t) == 256, "Material of material.wgsl");
 _Static_assert(BOX_RENDER_MATERIALS_MAX <= BOX_RENDER_MESH_MATERIAL_MASK,
     "the material slots fit below the planet light slot of a mesh shading");
@@ -61,6 +63,8 @@ static uint64_t box_draws_hash(
     h ^= ((uint64_t)key->features + 1) * 0xA0761D6478BD642Full;
     h ^= ((uint64_t)key->planet + 1) * 0xE7037ED1A0B428DBull;
     h ^= (key->atmosphere + 1) * 0x8EBC6AF09C88C6E3ull;
+    h ^= ((uint64_t)(key->range[0] * 1024.0f) + (uint64_t)(key->range[1] * 32.0f) * 0x10001ull +
+        (uint64_t)(key->range[2] * 1024.0f) * 0x1000001ull) * 0xBF58476D1CE4E5B9ull;
 
     return h ^ (h >> 29);
 }
@@ -86,7 +90,8 @@ static bool box_draws_key_eq(
         a->atlas == b->atlas && a->features == b->features && a->planet == b->planet &&
         a->atmosphere == b->atmosphere && a->surface == b->surface && a->frame == b->frame &&
         a->box_shadow == b->box_shadow && a->slice == b->slice &&
-        a->texture_blend == b->texture_blend && a->polygon == b->polygon && a->wind == b->wind;
+        a->texture_blend == b->texture_blend && a->polygon == b->polygon && a->wind == b->wind &&
+        !ecs_os_memcmp(a->range, b->range, ECS_SIZEOF(a->range));
 }
 
 box_draw_batch_t* box_draws_batch(
@@ -1038,32 +1043,6 @@ static uint64_t box_draws_segment_size(
         : 0;
 }
 
-void box_draws_batch_textures(
-    const box_render_draws_t *d,
-    const box_draw_batch_t *b,
-    box_render_batch_t *out)
-{
-    int32_t i;
-    for (i = 0; i < BOX_RENDER_TEXTURE_SLOTS; i ++) {
-        ecs_entity_t e = b->key.textures[i];
-        out->textures[i] = e ? box_textures_handle(d->textures, e) : 0;
-        if (e && !out->textures[i] && d->world) {
-            out->textures[i] = box_render_texture_target_handle(d->world, e);
-        }
-    }
-
-    if (b->key.atlas) {
-        out->textures[2] = b->key.atlas;
-    }
-
-    out->foam = b->key.foam ? box_textures_handle(d->textures, b->key.foam) : 0;
-    if (b->key.foam && !out->foam && d->world) {
-        out->foam = box_render_texture_target_handle(d->world, b->key.foam);
-    }
-
-    out->wrap = b->key.wrap;
-}
-
 void box_draws_batch_blend(
     box_render_packet_t *p,
     const box_render_draws_t *d,
@@ -1318,6 +1297,7 @@ static void box_draws_send_batch(
     out->surface = b->key.surface;
     out->wind = b->key.wind;
     out->wind_reach = b->key.wind ? b->wind_reach : 0.0f;
+    ecs_os_memcpy_n(out->range, b->key.range, float, 3);
     out->mesh = b->key.mesh;
     ecs_os_memcpy_n(out->lods, b->lods, uint32_t, BOX_LOD_LEVELS_MAX);
     box_draws_batch_textures(d, b, out);
@@ -1463,6 +1443,7 @@ static void box_draws_send_blended(
             out->surface = b->key.surface;
             out->wind = b->key.wind;
             out->wind_reach = b->key.wind ? b->wind_reach : 0.0f;
+            ecs_os_memcpy_n(out->range, b->key.range, float, 3);
             out->mesh = b->key.mesh;
             box_draws_batch_textures(d, b, out);
             box_draws_batch_blend(p, d, b, out);

@@ -1331,6 +1331,7 @@ fn water_caustics(f: VertexOut, world: vec3f, d: f32, n: vec3f) -> vec3f {
 // as every shape), adds on top. Nothing
 // behind (the sky) is infinitely deep. It writes no depth and takes no ambient occlusion.
 fn water_lit(f: VertexOut, shaded: Surface) -> vec4f {
+    range_fragment(f);
     planet_fragment(f);
     let m = vo_water(f);
     var s = shaded;
@@ -1420,6 +1421,7 @@ fn fresnel_rim(f: VertexOut, shaded: Surface, v: vec3f) -> Surface {
 // Opaque and transmissive fragments share one call of shade_split, as D3D compilers inline every
 // call.
 fn lit(f: VertexOut, shaded: Surface) -> vec4f {
+    range_fragment(f);
     planet_fragment(f);
     var s = shaded;
     if (!transmissive && kind.blend_mode == 0u) {

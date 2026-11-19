@@ -4,13 +4,15 @@
 // compacted per draw, with the instance count of its indexed indirect draw arguments.
 
 #include "include/instance.wgsl"
+#include "include/draw_range.wgsl"
 
 struct Cull {
     jobs: vec4u,
     view_proj: mat4x4f,
     hiz: vec4u,
     scan: vec4u,
-    // World position of the camera that picks the levels of detail.
+    // World position of the camera that picks the levels of detail and that the draw ranges
+    // are measured from, w 1; w 0 culls no instance by its range.
     camera: vec4f,
     // Distance at which level i starts, for levels 1 to 3.
     lod: vec4f,
@@ -45,6 +47,8 @@ struct Job {
     // most, which the world box of each instance grows by; 0 for the other batches. The level
     // jobs of cull_lod use it otherwise.
     reach: u32,
+    // DrawRange near, far and fade of the batch, 0 for none (draw_range.wgsl).
+    range: vec4f,
 };
 
 // World space box around an instance.
@@ -56,7 +60,7 @@ struct Bounds {
 // Words of the indexed indirect draw arguments of a draw; the instance count is the second.
 const ARGS: u32 = 5u;
 
-// Words of the counters of a cull view: drawn, frustum culled and two unused.
+// Words of the counters of a cull view: drawn, frustum culled, range culled and one unused.
 const COUNTERS: u32 = 4u;
 
 // Job without history: a blended draw, or a draw of a view without occlusion.
@@ -112,6 +116,7 @@ const SCAN_WORDS: u32 = 3u;
 
 var<workgroup> group_masks: array<atomic<u32>, 64>;
 var<workgroup> group_culled: array<atomic<u32>, 32>;
+var<workgroup> group_ranged: array<atomic<u32>, 32>;
 var<workgroup> scan_sums: array<u32, 256>;
 var<workgroup> hiz_tile: array<f32, 64>;
 
@@ -224,6 +229,22 @@ fn occluded(job: Job, m: mat4x4f) -> bool {
     return depth < far;
 }
 
+// Thresholds of the draw range of a job for an instance seen from the camera of the group: its
+// origin beyond far + fade or nearer than near - fade is hidden (range_hidden). Every pixel draws
+// without a range or for a group without a camera (cull.camera.w 0).
+fn range_at(job: Job, m: mat4x4f) -> vec2u {
+    var result = vec2u(255u, 0u);
+    if (cull.camera.w != 0.0 && range_set(job.range)) {
+        result = range_thresholds(job.range, length(m[3].xyz - cull.camera.xyz));
+    }
+    return result;
+}
+
+// Visible slot of an instance: its slot with the dither code of its thresholds above it.
+fn ranged_slot(slot: u32, t: vec2u) -> u32 {
+    return slot | (range_code(t) << RANGE_SLOT_BITS);
+}
+
 // Whether the light of a frustum is inside a world space box, inclusive; false for a frustum
 // without a light.
 fn holds(b: Bounds, f: u32) -> bool {
@@ -237,11 +258,13 @@ fn phase_of(f: u32) -> u32 {
     return select(PHASE_ALL, cull.jobs.z, (frustums[f].flags.y & FRUSTUM_HISTORY) != 0u);
 }
 
-// Whether a frustum draws an instance in its phase, and whether it is in the frustum. The late
-// phase writes the history of a job that has one.
-fn decide(job: Job, slot: u32, m: mat4x4f, b: Bounds, f: u32) -> vec2<bool> {
+// Whether a frustum draws an instance in its phase, and whether it is outside the frustum. An
+// instance out of its draw range (ranged) is never drawn, the callers count it as range culled.
+// The late phase writes the history of a job that has one.
+fn decide(job: Job, slot: u32, m: mat4x4f, b: Bounds, f: u32, ranged: bool) -> vec2<bool> {
     let phase = phase_of(f);
-    let inside = visible(b, f) && slot + 1u != job.exclude;
+    let framed = visible(b, f) && slot + 1u != job.exclude;
+    let inside = framed && !ranged;
     var draw = inside;
     if (phase == PHASE_EARLY) {
         draw = inside && (job.history == NONE || history[job.history + slot] == 0u);
@@ -254,7 +277,7 @@ fn decide(job: Job, slot: u32, m: mat4x4f, b: Bounds, f: u32) -> vec2<bool> {
         }
     }
 
-    return vec2<bool>(draw, !inside);
+    return vec2<bool>(draw, !framed);
 }
 
 @compute @workgroup_size(64)
@@ -278,9 +301,11 @@ fn cull_instances(
     let word = local / 32u;
     let bit = local % 32u;
     var own = 0u;
+    var packed = 0u;
     atomicStore(&group_masks[local], 0u);
     if (local < GROUP_VIEWS) {
         atomicStore(&group_culled[local], 0u);
+        atomicStore(&group_ranged[local], 0u);
     }
 
     workgroupBarrier();
@@ -290,25 +315,33 @@ fn cull_instances(
         let b = bounds(job, m);
         var drawn = 0u;
         var culled = 0u;
+        var ranged = 0u;
         var bits = job.mask;
         let fixture = job.fixture != 0u;
+        let range = range_at(job, m);
+        let hidden = range_hidden(range);
         while (bits != 0u) {
             let f = firstTrailingBit(bits);
             bits &= bits - 1u;
             var d = vec2<bool>(false, true);
             if (!fixture || !holds(b, f)) {
-                d = decide(job, slot, m, b, f);
+                d = decide(job, slot, m, b, f, hidden);
             }
             if (d.x) {
                 drawn |= 1u << f;
             }
 
-            if (d.y && phase_of(f) != PHASE_EARLY) {
-                culled |= 1u << f;
+            if (phase_of(f) != PHASE_EARLY) {
+                if (hidden) {
+                    ranged |= 1u << f;
+                } else if (d.y) {
+                    culled |= 1u << f;
+                }
             }
         }
 
         own = drawn;
+        packed = ranged_slot(slot, range);
         while (drawn != 0u) {
             let f = firstTrailingBit(drawn);
             drawn &= drawn - 1u;
@@ -319,6 +352,12 @@ fn cull_instances(
             let f = firstTrailingBit(culled);
             culled &= culled - 1u;
             atomicAdd(&group_culled[f], 1u);
+        }
+
+        while (ranged != 0u) {
+            let f = firstTrailingBit(ranged);
+            ranged &= ranged - 1u;
+            atomicAdd(&group_ranged[f], 1u);
         }
     }
 
@@ -333,11 +372,11 @@ fn cull_instances(
             let below = countOneBits(mask & ((1u << bit) - 1u)) +
                 select(countOneBits(low), 0u, local < 32u);
             let e = entry + k * ENTRY_WORDS;
-            visible_slots[scan_words[e + 4u] + below] = job.first + index;
+            visible_slots[scan_words[e + 4u] + below] = packed;
             let early = scan_words[e + 6u];
             if (early != 0u) {
                 let kept = atomicLoad(&args[(early - 1u) * ARGS + 1u]);
-                visible_slots[scan_words[e + 7u] + kept + below] = job.first + index;
+                visible_slots[scan_words[e + 7u] + kept + below] = packed;
             }
         }
     }
@@ -369,6 +408,11 @@ fn cull_instances(
         let culled = atomicLoad(&group_culled[local]);
         if (culled > 0u) {
             atomicAdd(&counters[frustums[local].flags.x * COUNTERS + 1u], culled);
+        }
+
+        let ranged = atomicLoad(&group_ranged[local]);
+        if (ranged > 0u) {
+            atomicAdd(&counters[frustums[local].flags.x * COUNTERS + 2u], ranged);
         }
     }
 }
@@ -458,6 +502,8 @@ fn cull_write(
     let scan = scan_words[at + 1u];
     let bit = local % 32u;
     let frustums = countOneBits(job.mask);
+    let slot = job.first + index;
+    let packed = ranged_slot(slot, range_at(job, instance_model(transforms[slot])));
     for (var k = 0u; k < frustums; k++) {
         let words = scan + (k * job_groups + part) * SCAN_WORDS;
         let low = scan_words[words];
@@ -467,12 +513,12 @@ fn cull_write(
                 select(countOneBits(low), 0u, local < 32u);
             let e = entry + k * ENTRY_WORDS;
             let offset = scan_words[words + 2u] + below;
-            visible_slots[scan_words[e + 4u] + offset] = job.first + index;
+            visible_slots[scan_words[e + 4u] + offset] = packed;
             let early = scan_words[e + 6u];
             if (early != 0u) {
                 let kept = atomicLoad(&args[(early - 1u) * ARGS + 1u]) -
                     atomicLoad(&args[scan_words[e + 3u] * ARGS + 1u]);
-                visible_slots[scan_words[e + 7u] + kept + offset] = job.first + index;
+                visible_slots[scan_words[e + 7u] + kept + offset] = packed;
             }
         }
     }
@@ -495,6 +541,7 @@ fn cull_ordered(
     var count = 0u;
     if (local == 0u) {
         atomicStore(&group_culled[0], 0u);
+        atomicStore(&group_ranged[0], 0u);
     }
 
     for (var at = 0u; at < job.count; at += 64u) {
@@ -502,6 +549,7 @@ fn cull_ordered(
         workgroupBarrier();
         let i = at + local;
         var slot = 0u;
+        var packed = 0u;
         var draw = false;
         if (i < job.count) {
             slot = job.first + i;
@@ -510,13 +558,18 @@ fn cull_ordered(
             }
 
             let m = instance_model(transforms[slot]);
-            let d = decide(job, slot, m, bounds(job, m), f);
+            let range = range_at(job, m);
+            let hidden = range_hidden(range);
+            let d = decide(job, slot, m, bounds(job, m), f, hidden);
             draw = d.x;
+            packed = ranged_slot(slot, range);
             if (draw) {
                 atomicOr(&group_masks[local / 32u], 1u << bit);
             }
 
-            if (d.y) {
+            if (hidden) {
+                atomicAdd(&group_ranged[0], 1u);
+            } else if (d.y) {
                 atomicAdd(&group_culled[0], 1u);
             }
         }
@@ -528,7 +581,7 @@ fn cull_ordered(
             let mask = select(high, low, local < 32u);
             let below = countOneBits(mask & ((1u << bit) - 1u)) +
                 select(countOneBits(low), 0u, local < 32u);
-            visible_slots[job.base + count + below] = slot;
+            visible_slots[job.base + count + below] = packed;
         }
 
         count += countOneBits(low) + countOneBits(high);
@@ -540,6 +593,7 @@ fn cull_ordered(
         atomicStore(&args[job.args * ARGS + 1u], count);
         atomicAdd(&counters[counter], count);
         atomicAdd(&counters[counter + 1u], atomicLoad(&group_culled[0]));
+        atomicAdd(&counters[counter + 2u], atomicLoad(&group_ranged[0]));
     }
 }
 
@@ -570,7 +624,7 @@ fn cull_lod(
     let levels = min(job.mask, LOD_LEVELS);
     for (var i = group.x * 64u + local; i < total; i += groups.x * 64u) {
         let slot = visible_slots[job.first + i];
-        let m = instance_model(transforms[slot]);
+        let m = instance_model(transforms[slot_of(slot)]);
         let center = (m * vec4f(job.center, 1.0)).xyz;
         let scale = max(max(length(m[0].xyz), length(m[1].xyz)), length(m[2].xyz));
         let radius = length(job.extent) * scale;

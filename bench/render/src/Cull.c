@@ -5,7 +5,8 @@
  * Headless worlds render about 100k static boxes into a 1280x720 offscreen surface on the main
  * thread and wait for the GPU after every frame, so a case measures a whole frame.
  *
- * The offscreen cases see a tenth of the boxes; the city hides most of its street boxes.
+ * The offscreen cases see a tenth of the boxes; the city hides most of its street boxes. The
+ * range case gives every box a DrawRange that keeps about one in twenty of them.
  * The instructions counter is what the process retired over the measured frames (macOS).
  */
 
@@ -88,12 +89,14 @@ static void bench_cull_frames(
  * @param culled Whether the view culls
  * @param fov Vertical field of view of the camera in degrees
  * @param shadows Whether the view renders shadows
+ * @param far DrawRange.far of every box, with a fade of a tenth of it, 0 for no DrawRange
  */
 static void bench_cull(
     bench_t *b,
     bool culled,
     float fov,
-    bool shadows)
+    bool shadows,
+    float far)
 {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
@@ -129,6 +132,9 @@ static void bench_cull(
                 0.3f + (float)(x % 5) * 0.1f, (float)z * 0.5f - 62.25f});
             ecs_set(world, e, Box, {0.35f, 0.6f + (float)(x % 5) * 0.2f, 0.35f});
             ecs_set(world, e, Rgb, {200, 120, 80});
+            if (far > 0) {
+                ecs_set(world, e, DrawRange, {.far_ = far, .fade = far * 0.1f});
+            }
         }
     }
 
@@ -215,21 +221,28 @@ void Cull_offscreen_100k(
     bench_t *b)
 {
     // culling/frustum
-    bench_cull(b, true, 15, false);
+    bench_cull(b, true, 15, false, 0);
 }
 
 void Cull_offscreen_100k_unculled(
     bench_t *b)
 {
     // culling/frustum
-    bench_cull(b, false, 15, false);
+    bench_cull(b, false, 15, false, 0);
 }
 
 void Cull_shadows_100k(
     bench_t *b)
 {
     // culling/frustum
-    bench_cull(b, true, 50, true);
+    bench_cull(b, true, 50, true, 0);
+}
+
+void Cull_range_100k_shadows(
+    bench_t *b)
+{
+    // culling/draw_range
+    bench_cull(b, true, 50, true, 125);
 }
 
 void Cull_occluded_city_100k(

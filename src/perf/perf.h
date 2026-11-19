@@ -29,9 +29,9 @@ typedef struct box_perf_t {
     float distance;       /**< Distance of the camera from the center */
     ecs_vec_t intervals;  /**< Measured frame intervals in milliseconds, of double */
     int64_t cull_frame;   /**< Render frame of the last culling sample, -1 for none */
-    int32_t cull_last[5]; /**< Visible, frustum culled, occlusion culled, batches skipped and
-                           *   casters skipped counts of the last sample */
-    double cull_sum[5];   /**< Sums of those counts over the samples */
+    int32_t cull_last[6]; /**< Visible, frustum culled, occlusion culled, range culled, batches
+                           *   skipped and casters skipped counts of the last sample */
+    double cull_sum[6];   /**< Sums of those counts over the samples */
     double begin;         /**< Perf clock at the start of the current frame, 0 for none */
     double os_begin;      /**< OS clock at the start of the previous frame, 0 for none */
     double cpu;           /**< Process CPU seconds when the measurement started */

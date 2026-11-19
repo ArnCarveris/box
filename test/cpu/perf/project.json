@@ -20,6 +20,7 @@
                     "no_shapes",
                     "period",
                     "cull_ranges",
+                    "range_culled_sampled",
                     "views_of_orbit",
                     "revolutions"
                 ]

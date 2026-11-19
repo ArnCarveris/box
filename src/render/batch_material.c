@@ -1291,3 +1291,54 @@ void box_draws_batch_layers(
 done:
     return;
 }
+
+void box_draws_batch_textures(
+    const box_render_draws_t *d,
+    const box_draw_batch_t *b,
+    box_render_batch_t *out)
+{
+    int32_t i;
+    for (i = 0; i < BOX_RENDER_TEXTURE_SLOTS; i ++) {
+        ecs_entity_t e = b->key.textures[i];
+        out->textures[i] = e ? box_textures_handle(d->textures, e) : 0;
+        if (e && !out->textures[i] && d->world) {
+            out->textures[i] = box_render_texture_target_handle(d->world, e);
+        }
+    }
+
+    if (b->key.atlas) {
+        out->textures[2] = b->key.atlas;
+    }
+
+    out->foam = b->key.foam ? box_textures_handle(d->textures, b->key.foam) : 0;
+    if (b->key.foam && !out->foam && d->world) {
+        out->foam = box_render_texture_target_handle(d->world, b->key.foam);
+    }
+
+    out->wrap = b->key.wrap;
+}
+
+bool box_draws_range(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    float *out)
+{
+    const DrawRange *range = NULL;
+    ecs_entity_t cur = e;
+    out[0] = out[1] = out[2] = 0.0f;
+    while (cur && !range) {
+        range = ecs_get(world, cur, DrawRange);
+        cur = ecs_get_parent(world, cur);
+    }
+
+    if (range) {
+        out[0] = isfinite(range->near_) && range->near_ > 0.0f ? range->near_ : 0.0f;
+        out[1] = isfinite(range->far_) && range->far_ > 0.0f ? range->far_ : 0.0f;
+        out[2] = isfinite(range->fade) && range->fade > 0.0f ? range->fade : 0.0f;
+        if (out[0] == 0.0f && out[1] == 0.0f) {
+            out[2] = 0.0f;
+        }
+    }
+
+    return out[0] > 0.0f || out[1] > 0.0f;
+}

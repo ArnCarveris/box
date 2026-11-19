@@ -232,6 +232,10 @@ typedef struct box_draw_key_t {
     bool wind;              /**< 3D shapes that have or inherit a WindSway in a scene with
                              *   Scene.wind: their pipelines move the vertices
                              *   (material_wind), other batches keep those without it */
+    float range[3];         /**< DrawRange near, far and fade of 3D shapes that have or whose
+                             *   ChildOf ancestor has one (box_draws_range), all 0 without: the
+                             *   cull pass drops the instances out of range and the pipelines
+                             *   dither the fades (draw_range) */
     bool texture_blend;     /**< 3D shapes with a TextureBlend (texture_blend pipeline):
                              *   textures[0] is the owner of the TextureBlend, textures[2] and
                              *   textures[3] are 0, so the key does not grow */
@@ -2264,6 +2268,20 @@ void box_draws_mark(
     box_render_draws_t *d,
     ecs_entity_t e,
     uint8_t kinds);
+
+/** Resolve the DrawRange of a shape: its own, inherited from a prefab, or else that of its
+ * nearest ChildOf ancestor that has one. A near or far that is not positive is none, and so is
+ * the fade without either.
+ *
+ * @param world The world
+ * @param e The entity
+ * @param out Receives near, far and fade, all 0 without a DrawRange
+ * @return Whether the shape has a near or a far distance
+ */
+bool box_draws_range(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    float *out);
 
 /** Multiply the Opacity and compose the Tint of the ancestors, through ChildOf and Parent.
  *

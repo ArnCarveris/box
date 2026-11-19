@@ -27,6 +27,29 @@
                 ]
             },
             {
+                "id": "DrawRange",
+                "testcases": [
+                    "beyond_far_not_drawn",
+                    "inside_range_drawn",
+                    "nearer_than_near_not_drawn",
+                    "fade_out_band_draws_share",
+                    "fade_in_band_draws_share",
+                    "fade_is_stable",
+                    "complementary_cover_once",
+                    "complementary_opaque_no_holes",
+                    "inherited_from_prefab",
+                    "inherited_from_parent",
+                    "own_range_overrides_parent",
+                    "set_and_removed_after_drawn",
+                    "stats_count_range_culled",
+                    "out_of_frustum_counts_as_range_culled",
+                    "with_levels_of_detail",
+                    "beyond_far_casts_no_shadow",
+                    "inside_range_casts_shadow",
+                    "fade_band_dims_shadow"
+                ]
+            },
+            {
                 "id": "MeshLod",
                 "testcases": [
                     "far_sphere_level_2",

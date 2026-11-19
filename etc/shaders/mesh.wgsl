@@ -105,6 +105,7 @@ fn shade(s: Surface, v: vec3f, world: vec3f) -> Lit {
 }
 
 fn lit(f: VertexOut, shaded: Surface) -> vec4f {
+    range_fragment(f);
     planet_fragment(f);
     var s = shaded;
     if (kind.blend_mode == 0u) {

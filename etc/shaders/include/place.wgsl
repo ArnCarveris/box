@@ -6,6 +6,7 @@
 #include "instance.wgsl"
 #include "material.wgsl"
 #include "wind.wgsl"
+#include "draw_range.wgsl"
 
 struct VertexIn {
     @builtin(vertex_index) vertex: u32,
@@ -32,7 +33,7 @@ struct Placed {
 };
 
 fn place_at(v: VertexIn, position: vec3f, normal: vec3f) -> Placed {
-    let model = instance_model(transforms[v.slot]);
+    let model = instance_model(transforms[slot_of(v.slot)]);
     let world = model * vec4f(position, 1.0);
     return Placed(model, normal, world, view.view_proj * world, position, vec3f(0.0));
 }
@@ -53,8 +54,8 @@ fn place_mesh(v: VertexIn) -> Placed {
 }
 
 fn place(v: VertexIn) -> Placed {
-    if (v.slot < arrayLength(&surfaces)) {
-        surface_data = surfaces[v.slot];
+    if (slot_of(v.slot) < arrayLength(&surfaces)) {
+        surface_data = surfaces[slot_of(v.slot)];
     }
     var position = v.position;
     var normal = v.normal;

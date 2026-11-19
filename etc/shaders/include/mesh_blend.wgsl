@@ -17,6 +17,7 @@
 // fs_blend_cutout discards; the forward pass after the prepass does not alpha test, its Equal
 // depth test rejects those.
 @fragment fn fs_depth_cutout_blend(f: CutoutOut) {
+    range_discard(f.range, f.pos);
     let albedo = blend_alpha(blend_albedo, blend_mask, blend_heights, material_sampler, blending,
         f.uv, cutout_scalars(f).w, f.object, f.object_normal);
     if (f.alpha * albedo < cutout_scalars(f).x) {
@@ -25,6 +26,7 @@
 }
 
 @fragment fn fs_count_cutout_blend(f: CutoutOut) -> @location(0) vec4f {
+    range_discard(f.range, f.pos);
     let albedo = blend_alpha(blend_albedo, blend_mask, blend_heights, material_sampler, blending,
         f.uv, cutout_scalars(f).w, f.object, f.object_normal);
     if (f.alpha * albedo < cutout_scalars(f).x) {

@@ -898,6 +898,10 @@ static void box_draws_key(
         ecs_get_target_for_id(world, e, EcsChildOf, LightFixture) != 0);
     key->wind = !shape2d && (key->features & BOX_RENDER_FEATURE_WIND) &&
         ecs_get(world, e, WindSway) != NULL;
+    if (!shape2d) {
+        box_draws_range(world, e, key->range);
+    }
+
     key->transmissive = !shape2d && (key->features & BOX_RENDER_FEATURE_TRANSMISSION) &&
         ecs_get(world, e, Transmission) != NULL;
     key->transmissive = key->transmissive ||
@@ -1249,10 +1253,10 @@ write:
         box_render_mesh_shading_t *out = box_draws_slot_mesh_shading(b, s->slot);
         box_draws_mesh_shading(out, out->material, &material);
     } else if (kinds & BOX_DRAW_SHADING) {
-        box_draws_mesh_shading(box_draws_slot_mesh_shading(b, s->slot),
-            box_draws_planet_material(
-                box_draws_material_id(world, d, e, true, b->key.dynamic_material),
-                b->key.planet), &material);
+        box_render_mesh_shading_t *out = box_draws_slot_mesh_shading(b, s->slot);
+        box_draws_mesh_shading(out, box_draws_planet_material(
+            box_draws_material_id(world, d, e, true, b->key.dynamic_material),
+            b->key.planet), &material);
     }
 
     if (kinds & BOX_DRAW_SURFACE) {
@@ -1527,6 +1531,13 @@ static void box_draws_material_observers(
     box_draws_observer(world, d, "DrawsOnTint", (ecs_observer_desc_t){
         .query.terms = {{ .id = ecs_id(Tint) }},
         .events = { EcsOnSet, EcsOnRemove } }, BoxDrawsOnShadingMove);
+    box_draws_observer(world, d, "DrawsOnDrawRange", (ecs_observer_desc_t){
+        .query.terms = {{
+            .id = ecs_id(DrawRange),
+            .src.id = EcsSelf | EcsUp,
+            .trav = EcsIsA
+        }},
+        .events = { EcsOnSet, EcsOnRemove } }, BoxDrawsOnMove);
 }
 
 /** Register the observers that collect changed entities and changed subtrees.

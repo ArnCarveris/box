@@ -430,6 +430,10 @@ static uint32_t box_gpu_cull_job(
         job->exclude = c->exclude_slot + 1u;
     }
 
+    if (b->range[0] > 0.0f || b->range[1] > 0.0f) {
+        ecs_os_memcpy_n(job->range, b->range, float, 3);
+    }
+
     if (b->bounded) {
         glm_vec3_copy(ECS_CONST_CAST(float*, b->center), job->center);
         glm_vec3_copy(ECS_CONST_CAST(float*, b->extent), job->extent);
@@ -1167,7 +1171,8 @@ static void box_gpu_cull_frustum_all(
 }
 
 /** Give the groups of a view the levels of detail of the view (LodSettings), picked by the
- * distance from a camera, until box_gpu_cull_lod_end.
+ * distance from a camera, until box_gpu_cull_lod_end. The camera is also the one the draw
+ * ranges of the instances are measured from, with or without levels.
  *
  * @param c The cull state
  * @param v The view
@@ -1181,13 +1186,13 @@ static void box_gpu_cull_lod_begin(
     box_gpu_cull_uniforms_t *base)
 {
     int32_t i;
+    glm_vec3_copy(ECS_CONST_CAST(float*, camera), base->camera);
+    base->camera[3] = 1.0f;
     c->lod_levels = v->lod.levels > 1 ? v->lod.levels : 0;
     if (!c->lod_levels) {
         goto done;
     }
 
-    glm_vec3_copy(ECS_CONST_CAST(float*, camera), base->camera);
-    base->camera[3] = 1.0f;
     for (i = 0; i < BOX_LOD_LEVELS_MAX; i ++) {
         base->lod[i] = v->lod.distances[i];
     }

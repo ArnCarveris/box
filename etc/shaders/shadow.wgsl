@@ -8,10 +8,17 @@ enable clip_distances;
 #include "include/material.wgsl"
 #include "include/blend.wgsl"
 #include "include/wind.wgsl"
+#include "include/draw_range.wgsl"
 
 // The casters of a WindSway material move by the Wind (Scene.wind) as the mesh shaders move
 // them, set per pipeline for the batches whose shapes have one (caster_wind).
 override material_wind: bool = false;
+
+// The casters of the batch have a DrawRange (box_render_batch_t.range), set per pipeline of the
+// cascades: the vertex stages pass the dither code the cull pass of the view packed above the
+// slot of the caster (range_of), and the fragment stages discard the texels the dither drops, so
+// the shadow fades with the shape.
+override draw_range: bool = false;
 
 // Uniforms of a cascade, a spot light tile or an octant of a point light tile.
 struct Cascade {
@@ -66,6 +73,8 @@ struct CasterOut {
     @location(3) @interpolate(flat) mapped: f32,
     @location(4) object: vec4f,
     @location(5) object_normal: vec3f,
+    // Dither code of the DrawRange of the caster with draw_range, 0 without
+    @location(7) @interpolate(flat) range: u32,
 };
 
 // A vertex of a caster in an octant of a point light tile, with the 3 half space distances of
@@ -83,10 +92,14 @@ struct PointOut {
 #else
     @location(6) clip: vec3f,
 #endif
+    // 0: a point light tile draws its casters whole
+    @location(7) @interpolate(flat) range: u32,
 };
 
 struct ShadowOut {
     @builtin(position) pos: vec4f,
+    // Dither code of the DrawRange of the caster with draw_range, 0 without
+    @location(0) @interpolate(flat) range: u32,
 };
 
 struct PointShadowOut {
@@ -166,6 +179,19 @@ fn caster_local(v: VertexIn) -> CasterLocal {
     return CasterLocal(position, normal);
 }
 
+// Dither code of the DrawRange of a caster from its visible slot, 0 without draw_range. The
+// casters of a tile have none: its cull group has no camera.
+fn caster_range(slot: u32) -> u32 {
+    return select(0u, range_of(slot), draw_range);
+}
+
+// Discard a texel the dither of the DrawRange of its caster drops, with draw_range.
+fn caster_dither(range: u32, pos: vec4f) {
+    if (draw_range && !range_keeps(range, pos.xy)) {
+        discard;
+    }
+}
+
 // Position of a vertex of a caster in the clip space of the cascade.
 fn caster_position(slot: u32, vertex: vec3f) -> vec4f {
     return cascade.matrix * vec4f(caster_world(slot, vertex), 1.0);
@@ -211,7 +237,7 @@ fn octant_distances(world: vec3f) -> vec3f {
 // The alpha test attributes of a vertex, with the UV transformed as vs of mesh.wgsl does. Reads
 // surface_data, so the position comes first.
 fn cutout_attributes(v: VertexIn, o: ptr<function, CasterOut>) {
-    let shading = shadings[v.slot];
+    let shading = shadings[slot_of(v.slot)];
     let material = material_fetch(shading.material & 0xFFFFFFu);
     (*o).uv = v.uv * material.uv.xy + material.uv.zw;
     if (surface_data.p[0].x == 7.0 && v.uv.x >= 2.0 &&
@@ -238,13 +264,13 @@ fn cutout_attributes(v: VertexIn, o: ptr<function, CasterOut>) {
 // position and normal: the object position and normal of the vertex.
 fn cutout_mapping(v: VertexIn, material: Material, position: vec3f, normal: vec3f,
     o: ptr<function, CasterOut>) {
-    let model = instance_model(transforms[v.slot]);
+    let model = instance_model(transforms[slot_of(v.slot)]);
     let c0 = model[0].xyz;
     let c1 = model[1].xyz;
     let c2 = model[2].xyz;
     var scaled = model;
-    if (v.slot < arrayLength(&frames)) {
-        scaled = instance_frame(frames[v.slot], model);
+    if (slot_of(v.slot) < arrayLength(&frames)) {
+        scaled = instance_frame(frames[slot_of(v.slot)], model);
     }
     let scale = vec3f(length(scaled[0].xyz), length(scaled[1].xyz), length(scaled[2].xyz));
     (*o).mapped = 1.0 + material_blend(material);
@@ -259,8 +285,8 @@ fn cutout_mapping(v: VertexIn, material: Material, position: vec3f, normal: vec3
             normal * flip;
     } else if (material_frame(material)) {
         var relative = model;
-        if (v.slot < arrayLength(&frames)) {
-            relative = instance_frame(frames[v.slot], model);
+        if (slot_of(v.slot) < arrayLength(&frames)) {
+            relative = instance_frame(frames[slot_of(v.slot)], model);
         }
         let f = mapping_frame(material, relative, position, normal);
         (*o).object = f.object;
@@ -269,7 +295,7 @@ fn cutout_mapping(v: VertexIn, material: Material, position: vec3f, normal: vec3
 }
 
 fn cutout_attributes_mesh(v: VertexIn, o: ptr<function, CasterOut>) {
-    let shading = shadings[v.slot];
+    let shading = shadings[slot_of(v.slot)];
     let material = material_fetch(shading.material & 0xFFFFFFu);
     (*o).uv = v.uv * material.uv.xy + material.uv.zw;
     (*o).mapped = 0.0;
@@ -283,23 +309,26 @@ fn cutout_attributes_mesh(v: VertexIn, o: ptr<function, CasterOut>) {
 }
 
 @vertex fn vs(v: VertexIn) -> ShadowOut {
-    return ShadowOut(cascade.matrix * vec4f(caster_world_mesh(v.slot, v.position), 1.0));
+    return ShadowOut(cascade.matrix * vec4f(caster_world_mesh(slot_of(v.slot), v.position), 1.0),
+        caster_range(v.slot));
 }
 
 @vertex fn vs_surface(v: VertexIn) -> ShadowOut {
-    return ShadowOut(caster_position(v.slot, v.position));
+    return ShadowOut(caster_position(slot_of(v.slot), v.position), caster_range(v.slot));
 }
 
 @vertex fn vs_cutout(v: VertexIn) -> CasterOut {
     var o: CasterOut;
-    o.pos = cascade.matrix * vec4f(caster_world_mesh(v.slot, v.position), 1.0);
+    o.range = caster_range(v.slot);
+    o.pos = cascade.matrix * vec4f(caster_world_mesh(slot_of(v.slot), v.position), 1.0);
     cutout_attributes_mesh(v, &o);
     return o;
 }
 
 @vertex fn vs_cutout_surface(v: VertexIn) -> CasterOut {
     var o: CasterOut;
-    o.pos = caster_position(v.slot, v.position);
+    o.range = caster_range(v.slot);
+    o.pos = caster_position(slot_of(v.slot), v.position);
     cutout_attributes(v, &o);
     return o;
 }
@@ -318,7 +347,13 @@ fn cutout_test(uv: vec2f, alpha: f32, cutoff: f32, mapped: f32, object: vec4f,
 @fragment fn fs() {
 }
 
+// fs of the casters with a DrawRange (draw_range).
+@fragment fn fs_range(f: ShadowOut) {
+    caster_dither(f.range, f.pos);
+}
+
 @fragment fn fs_cutout(f: CasterOut) {
+    caster_dither(f.range, f.pos);
     cutout_test(f.uv, f.alpha, f.cutoff, f.mapped, f.object, f.object_normal);
 }
 
@@ -334,6 +369,7 @@ fn cutout_test_blend(uv: vec2f, alpha: f32, cutoff: f32, mapped: f32, object: ve
 }
 
 @fragment fn fs_cutout_blend(f: CasterOut) {
+    caster_dither(f.range, f.pos);
     cutout_test_blend(f.uv, f.alpha, f.cutoff, f.mapped, f.object, f.object_normal);
 }
 
@@ -357,29 +393,30 @@ fn point_out(world: vec3f, c: CasterOut) -> PointOut {
     o.mapped = c.mapped;
     o.object = c.object;
     o.object_normal = c.object_normal;
+    o.range = 0u;
     o.clip = octant_clip(world);
     return o;
 }
 
 @vertex fn vs_point(v: VertexIn) -> PointShadowOut {
-    let world = caster_world_mesh(v.slot, v.position);
+    let world = caster_world_mesh(slot_of(v.slot), v.position);
     return PointShadowOut(octant_position(world), octant_clip(world));
 }
 
 @vertex fn vs_point_surface(v: VertexIn) -> PointShadowOut {
-    let world = caster_world(v.slot, v.position);
+    let world = caster_world(slot_of(v.slot), v.position);
     return PointShadowOut(octant_position(world), octant_clip(world));
 }
 
 @vertex fn vs_point_cutout(v: VertexIn) -> PointOut {
-    let world = caster_world_mesh(v.slot, v.position);
+    let world = caster_world_mesh(slot_of(v.slot), v.position);
     var c: CasterOut;
     cutout_attributes_mesh(v, &c);
     return point_out(world, c);
 }
 
 @vertex fn vs_point_cutout_surface(v: VertexIn) -> PointOut {
-    let world = caster_world(v.slot, v.position);
+    let world = caster_world(slot_of(v.slot), v.position);
     var c: CasterOut;
     cutout_attributes(v, &c);
     return point_out(world, c);

@@ -17,6 +17,7 @@
 #include "probes.wgsl"
 #include "aerial.wgsl"
 #include "planet_light.wgsl"
+#include "draw_range.wgsl"
 
 // Probe volume irradiance with the visibility of the probes (Scene.baked).
 override scene_baked: bool = false;
@@ -69,6 +70,12 @@ override material_distortion: bool = false;
 // batches whose shapes have one: every vertex stage reads the material of its instance and
 // places the vertex with place_wind. The other batches leave it false.
 override material_wind: bool = false;
+
+// The instances of the batch have a DrawRange (box_render_batch_t.range), set per pipeline: the
+// vertex stages pass the dither code the cull pass packed above the slot of the instance
+// (range_of), and the fragment stages discard the pixels the dither drops. The other batches
+// leave it false and never discard for it.
+override draw_range: bool = false;
 
 const PI: f32 = 3.141592653589793;
 const MIN_ROUGHNESS: f32 = 0.045;
@@ -168,9 +175,10 @@ struct VertexOut {
     // material_distortion pipelines, the Distortion of the material (vo_distortion).
     @location(8) @interpolate(flat) flat4: vec4u,
     // Low byte: planar reflection slot of the view plus one whose image the instance shows, 0
-    // for none or without scene_planar (planar_owner). Above it: the planet light slot of the
-    // instance, 0 for none or without scene_planet_light; one varying, as the fragment stage
-    // has no inter stage variable left.
+    // for none or without scene_planar (planar_owner). Second byte: the planet light slot of the
+    // instance, 0 for none or without scene_planet_light. High half: the dither code of the
+    // DrawRange of the instance with draw_range (range_code), 0 without. One varying, as the
+    // fragment stage has no inter stage variable left.
     @location(9) @interpolate(flat) planar: u32,
 };
 
@@ -189,7 +197,7 @@ fn shading_planet(s: MeshShading) -> u32 {
 fn placed_wind(v: VertexIn, p: Placed) -> Placed {
     var result = p;
     if (material_wind) {
-        let m = material_fetch(shading_material(shadings[v.slot]));
+        let m = material_fetch(shading_material(shadings[slot_of(v.slot)]));
         if (wind_sways(m)) {
             result = place_wind(p, m);
         }
@@ -200,8 +208,20 @@ fn placed_wind(v: VertexIn, p: Placed) -> Placed {
 // Make the sun of the planet of a fragment light it, with scene_planet_light.
 fn planet_fragment(f: VertexOut) {
     if (scene_planet_light) {
-        fragment_planet = f.planar >> 8u;
+        fragment_planet = (f.planar >> 8u) & 0xFFu;
     }
+}
+
+// Discard a fragment the dither of the DrawRange of its instance drops, with draw_range.
+fn range_fragment(f: VertexOut) {
+    if (draw_range && !range_keeps(f.planar >> 16u, f.pos.xy)) {
+        discard;
+    }
+}
+
+// Dither code of the DrawRange of an instance from its visible slot; 0 without draw_range.
+fn vertex_range(slot: u32) -> u32 {
+    return select(0u, range_of(slot), draw_range);
 }
 
 // UVs of the normal map of a fragment: the UVs moved by the TextureScroll.normal_velocity offset
@@ -380,7 +400,7 @@ fn vertex_mapping(o: ptr<function, VertexShading>, v: VertexIn, material: Materi
         (*o).object = mapping_object(material, p.world.xyz, vec3f(1.0));
         (*o).object_normal = normal;
     } else if (material_frame(material)) {
-        let relative = frame_model(v.slot, p.model);
+        let relative = frame_model(slot_of(v.slot), p.model);
         let f = mapping_frame(material, relative, p.local, p.normal);
         (*o).object = f.object;
         (*o).object_normal = f.normal;
@@ -388,7 +408,8 @@ fn vertex_mapping(o: ptr<function, VertexShading>, v: VertexIn, material: Materi
             (*o).rotation = mapping_frame_rotation(p.model, relative);
         }
     } else {
-        (*o).object = mapping_object(material, v.position, object_scale(v.slot, p.model, scale));
+        (*o).object = mapping_object(material, v.position,
+            object_scale(slot_of(v.slot), p.model, scale));
         (*o).object_normal = v.normal;
         if (blend > 0.0) {
             (*o).rotation = mapping_rotation(p.model[0].xyz, p.model[1].xyz, p.model[2].xyz);
@@ -559,8 +580,10 @@ fn vertex_out(p: Placed, material: Material, frame: ModelFrame, s: VertexShading
     return o;
 }
 
+// range: the dither code of the DrawRange of the instance with draw_range, 0 without.
 struct DepthOut {
     @builtin(position) @invariant pos: vec4f,
+    @location(0) @interpolate(flat) range: u32,
 };
 
 struct CutoutOut {
@@ -570,11 +593,24 @@ struct CutoutOut {
     @location(2) @interpolate(flat) scalars: vec2u,
     @location(3) object: vec4f,
     @location(4) object_normal: vec3f,
+    @location(5) @interpolate(flat) range: u32,
 };
 
-fn cutout_out(p: Placed, material: Material, s: VertexShading) -> CutoutOut {
-    return CutoutOut(p.pos, s.uv, s.color.a, vertex_scalars(material, s.mapped), s.object,
-        s.object_normal);
+fn cutout_out(p: Placed, material: Material, s: VertexShading, range: u32) -> CutoutOut {
+    return CutoutOut(p.pos, s.uv, s.color.a,
+        vertex_scalars(material, s.mapped), s.object, s.object_normal, range);
+}
+
+fn depth_out(slot: u32, p: Placed) -> DepthOut {
+    return DepthOut(p.pos, vertex_range(slot));
+}
+
+// Discard a prepass fragment the dither of the DrawRange of its instance drops, with
+// draw_range.
+fn range_discard(range: u32, pos: vec4f) {
+    if (draw_range && !range_keeps(range, pos.xy)) {
+        discard;
+    }
 }
 
 fn cutout_scalars(f: CutoutOut) -> vec4f {
@@ -599,62 +635,71 @@ fn planar_owner(slot: u32) -> u32 {
     return result;
 }
 
+// Pass the dither code of the DrawRange of an instance with draw_range.
+fn vertex_range_out(o: ptr<function, VertexOut>, v: VertexIn) {
+    (*o).planar |= vertex_range(v.slot) << 16u;
+}
+
 @vertex fn vs(v: VertexIn) -> VertexOut {
-    let shading = shadings[v.slot];
+    let shading = shadings[slot_of(v.slot)];
     let material = material_fetch(shading_material(shading));
     let p = placed_wind(v, place_mesh(v));
     let frame = model_frame(p);
     var o = vertex_out(p, material, frame,
         vertex_shading(v, shading, material, p, frame.scale, frame.normal));
     if (scene_planar) {
-        o.planar = planar_owner(v.slot);
+        o.planar = planar_owner(slot_of(v.slot));
     }
     if (scene_planet_light) {
         o.planar |= shading_planet(shading) << 8u;
     }
+    vertex_range_out(&o, v);
     return o;
 }
 
 @vertex fn vs_surface(v: VertexIn) -> VertexOut {
-    let shading = shadings[v.slot];
+    let shading = shadings[slot_of(v.slot)];
     let material = material_fetch(shading_material(shading));
     let p = placed_wind(v, place(v));
     let frame = model_frame(p);
     var o = vertex_out(p, material, frame,
         vertex_shading_surface(v, shading, material, p, frame.scale, frame.normal));
     if (scene_planar) {
-        o.planar = planar_owner(v.slot);
+        o.planar = planar_owner(slot_of(v.slot));
     }
     if (scene_planet_light) {
         o.planar |= shading_planet(shading) << 8u;
     }
+    vertex_range_out(&o, v);
     return o;
 }
 
 @vertex fn vs_depth(v: VertexIn) -> DepthOut {
-    return DepthOut(placed_wind(v, place_mesh(v)).pos);
+    return depth_out(v.slot, placed_wind(v, place_mesh(v)));
 }
 
 @vertex fn vs_depth_surface(v: VertexIn) -> DepthOut {
-    return DepthOut(placed_wind(v, place(v)).pos);
+    return depth_out(v.slot, placed_wind(v, place(v)));
 }
 
 @vertex fn vs_cutout(v: VertexIn) -> CutoutOut {
-    let shading = shadings[v.slot];
+    let shading = shadings[slot_of(v.slot)];
     let material = material_fetch(shading_material(shading));
     let p = placed_wind(v, place_mesh(v));
     let frame = model_frame(p);
     return cutout_out(p, material,
-        vertex_shading(v, shading, material, p, frame.scale, frame.normal));
+        vertex_shading(v, shading, material, p, frame.scale, frame.normal),
+        vertex_range(v.slot));
 }
 
 @vertex fn vs_cutout_surface(v: VertexIn) -> CutoutOut {
-    let shading = shadings[v.slot];
+    let shading = shadings[slot_of(v.slot)];
     let material = material_fetch(shading_material(shading));
     let p = placed_wind(v, place(v));
     let frame = model_frame(p);
     return cutout_out(p, material,
-        vertex_shading_surface(v, shading, material, p, frame.scale, frame.normal));
+        vertex_shading_surface(v, shading, material, p, frame.scale, frame.normal),
+        vertex_range(v.slot));
 }
 
 struct DrawKind {
@@ -709,6 +754,11 @@ fn output(color: vec3f, alpha: f32) -> vec4f {
 @fragment fn fs_depth() {
 }
 
+// fs_depth of a batch with a DrawRange (draw_range): discards what the dither drops.
+@fragment fn fs_depth_range(f: DepthOut) {
+    range_discard(f.range, f.pos);
+}
+
 // Overdraw heat map of a view (box_gpu_debug_overdraw_record): the prepass again, each entry
 // point adding one to the count of its kind where its fragment passes, the plain meshes in red
 // and the alpha tested ones in green.
@@ -716,7 +766,13 @@ fn output(color: vec3f, alpha: f32) -> vec4f {
     return vec4f(1.0, 0.0, 0.0, 0.0);
 }
 
+@fragment fn fs_count_range(f: DepthOut) -> @location(0) vec4f {
+    range_discard(f.range, f.pos);
+    return vec4f(1.0, 0.0, 0.0, 0.0);
+}
+
 @fragment fn fs_depth_cutout(f: CutoutOut) {
+    range_discard(f.range, f.pos);
     let albedo = mapping_alpha(albedo_map, material_sampler, f.uv, cutout_scalars(f).w, f.object,
         f.object_normal);
     if (f.alpha * albedo < cutout_scalars(f).x) {
@@ -725,6 +781,7 @@ fn output(color: vec3f, alpha: f32) -> vec4f {
 }
 
 @fragment fn fs_count_cutout(f: CutoutOut) -> @location(0) vec4f {
+    range_discard(f.range, f.pos);
     let albedo = mapping_alpha(albedo_map, material_sampler, f.uv, cutout_scalars(f).w, f.object,
         f.object_normal);
     if (f.alpha * albedo < cutout_scalars(f).x) {

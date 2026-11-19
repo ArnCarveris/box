@@ -2108,6 +2108,10 @@ typedef struct box_render_batch_t {
     float wind_reach;           /**< Largest world distance the WindSway of an instance moves a
                                  *   vertex in the wind of the frame, which the cull pass grows
                                  *   the world box of each instance by; 0 without wind */
+    float range[3];             /**< DrawRange near, far and fade of the instances, all 0 for
+                                 *   none: the cull pass drops the instances out of range and
+                                 *   every pass draws them with the draw_range override, which
+                                 *   dithers the fades */
     uint32_t mesh;              /**< Mesh handle */
     uint32_t lods[BOX_LOD_LEVELS_MAX]; /**< Mesh handle of each level of detail of an opaque 3D
                                  *   batch, lods[0] being mesh and a level that does not reduce
@@ -2151,6 +2155,18 @@ typedef struct box_render_batch_t {
                                  *   view space x and y over -z for a perspective camera, of view
                                  *   space x and y for an orthographic one */
 } box_render_batch_t;
+
+/** Check whether the instances of a batch have a DrawRange: a near or a far distance.
+ *
+ * @param b The batch
+ * @return Whether the passes draw it with the draw_range override and the cull pass culls its
+ * instances by their range
+ */
+static inline bool box_render_batch_ranged(
+    const box_render_batch_t *b)
+{
+    return box_render_is_mesh(b->pipeline) && (b->range[0] > 0.0f || b->range[1] > 0.0f);
+}
 
 /** Components whose rendered value can transition, the index of their entry in the layout table
  * of the resolver (box_render_transition_layout) */

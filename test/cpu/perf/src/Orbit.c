@@ -336,6 +336,53 @@ void Orbit_cull_ranges(void) {
     fake_os_end();
 }
 
+void Orbit_range_culled_sampled(void) {
+    // testing/perf_orbit
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    fake_time = 100;
+    fake_work_ms = 0;
+    fake_slept_ms = 0;
+    box_perf_clock = fake_now;
+    fake_os_begin();
+
+    ecs_entity_t a = ecs_new(world);
+    ecs_set(world, a, Position, {0, 0, 0});
+    ecs_set(world, a, Box, {1, 1, 1});
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera});
+
+    ecs_singleton_set(world, PerfRun, {
+        .fps = 120, .warmup = 2, .frames = 4, .period = 1, .camera = camera });
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+
+    int32_t ranged[4] = {5, 8, 8, 3};
+    for (int i = 0; i < 4; i ++) {
+        ecs_set(world, view, CullStatus, {
+            .frame = i + 1,
+            .instances = 20,
+            .visible = 20 - ranged[i],
+            .range_culled = ranged[i] });
+        ecs_progress(world, 0);
+    }
+
+    const PerfStatus *status = ecs_singleton_get(world, PerfStatus);
+    test_int(status->state, PerfDone);
+    test_int(status->cull_samples, 4);
+    test_int(status->cull_changes, 2);
+    test_int(status->range_culled.min, 3);
+    test_int(status->range_culled.max, 8);
+    test_assert(fabs(status->range_culled.mean - 24.0 / 4.0) < 1e-6);
+    test_int(status->frustum_culled.max, 0);
+
+    ecs_fini(world);
+    box_perf_clock = NULL;
+    fake_os_end();
+}
+
 void Orbit_views_of_orbit(void) {
     // testing/perf_orbit
     ecs_world_t *world = ecs_init();

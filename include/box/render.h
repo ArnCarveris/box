@@ -68,8 +68,8 @@ ECS_STRUCT(RenderStatus, {
 
 /** How a view culled its instances in the last frame the GPU finished, set on the View entity.
  *
- * Read only for applications. Every instance of the scene counts once: drawn, frustum (or size)
- * culled, or hidden behind closer geometry.
+ * Read only for applications. Every instance of the scene counts once: drawn, out of its
+ * DrawRange, frustum (or size) culled, or hidden behind closer geometry.
  *
  * The counts are read back from the GPU without waiting and arrive a variable number of frames
  * late, many while the GPU is behind as headless rendering does not wait for it; wait for `frame`
@@ -81,11 +81,39 @@ ECS_STRUCT(CullStatus, {
     int32_t visible;        /**< Instances the view drew */
     int32_t frustum_culled; /**< Instances outside the frustum or below the smallest size */
     int32_t occlusion_culled; /**< Instances in the frustum hidden behind closer geometry */
+    int32_t range_culled;   /**< Instances outside their DrawRange from the camera of the view,
+                             *   in the frustum or not; not counted as frustum culled */
     int32_t batches_skipped; /**< Batches whose draws the view skipped by their bounds
                              *   (CullSettings.bounds), 0 without; their instances count as
                              *   frustum culled */
     int32_t casters_skipped; /**< Batches whose draws the shadow cascades of the view skipped by
                              *   their bounds, summed over the cascades */
+});
+
+/** Distances from the camera of a view between which a shape draws, set on a shape or on any
+ * ancestor of shapes, a prefab or a template part; inherited by the instances of a prefab.
+ *
+ * The nearest DrawRange of a shape, its own or that of the closest ChildOf ancestor, applies to
+ * it. The distance is measured from the camera of the view to the origin of the shape (the
+ * translation of its world transform), so a near and a far version at the same place measure
+ * the same distance. Each view measures from its own camera, and the shadow cascades of a view
+ * from the camera of the view, so shadows fade with the shape.
+ *
+ * Beyond far + fade or nearer than near - fade the GPU cull pass drops the instance
+ * (CullStatus.range_culled). Within fade of near or far it draws with a screen door dither in
+ * the depth prepass, the color and the shadow passes: the share of pixels drawn goes from 0 to
+ * 1 over [near - fade, near + fade] and from 1 to 0 over [far - fade, far + fade]. The dither
+ * threshold of a fade in mirrors that of a fade out, so a shape with far F and another with near
+ * F and the same fade draw exactly one of the two at each pixel.
+ *
+ * The shapes of one batch share their range: shapes with different ranges draw in different
+ * batches. Planar reflections measure from their mirrored camera; bakes, captures and the shadow
+ * tiles of spot and point lights ignore the range. */
+ECS_STRUCT(DrawRange, {
+    float near_;    /**< Distance in meters below which the shape does not draw, 0 for none */
+    float far_;     /**< Distance in meters beyond which the shape does not draw, 0 for none */
+    float fade;     /**< Half width in meters of the dithered crossfade around near and far, 0
+                     *   for a hard cut */
 });
 
 /** Register the box.render module.

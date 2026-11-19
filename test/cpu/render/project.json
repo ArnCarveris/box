@@ -17,6 +17,22 @@
     "test": {
         "testsuites": [
             {
+                "id": "DrawRangeKey",
+                "testcases": [
+                    "none",
+                    "own",
+                    "invalid_values_ignored",
+                    "from_parent",
+                    "nearest_ancestor",
+                    "from_prefab",
+                    "prefab_child",
+                    "different_ranges_split_batches",
+                    "removed",
+                    "kept_by_tint",
+                    "packet_batch"
+                ]
+            },
+            {
                 "id": "Camera",
                 "testcases": [
                     "perspective_near_is_one",

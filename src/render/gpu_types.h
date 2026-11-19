@@ -57,8 +57,8 @@
 #define BOX_GPU_CASCADE_STRIDE (256)
 
 /** Bytes of the uniforms of one cascade, tile or octant of the shadow pass, Cascade of
- * etc/shaders/shadow.wgsl: the matrix, the light of a point light tile and its octant, its near
- * and far plane */
+ * etc/shaders/shadow.wgsl: the matrix, the light of a point light tile and its octant, and its
+ * near and far plane */
 #define BOX_GPU_SHADOW_UNIFORM_SIZE (sizeof(mat4) + 2 * sizeof(vec4))
 
 /** Depth format of the shadow maps, cleared to 0 and compared with greater for reversed Z */
@@ -67,8 +67,8 @@
 /** Shadow pipelines made on first use per kind of tile (box_gpu_shadow_variant): the alpha
  * tested one with a TextureBlend and the three of the parametric surfaces, then the same six of
  * the casters with a WindSway (plain, alpha tested, with a TextureBlend, of meshes then of
- * surfaces) */
-#define BOX_GPU_SHADOW_VARIANTS (10)
+ * surfaces), then those twelve of the casters with a DrawRange (draw_range) */
+#define BOX_GPU_SHADOW_VARIANTS (22)
 
 /** Color format of the HDR target a view with effects renders into */
 #define BOX_GPU_HDR_FORMAT (WGPUTextureFormat_RGBA16Float)
@@ -580,6 +580,9 @@ typedef struct box_gpu_cull_job_t {
     uint32_t reach;                 /**< Bits of the float world distance the vertices of a
                                      *   batch with a WindSway move at most, which the world box
                                      *   of each instance grows by; 0 for other batches */
+    float range[4];                 /**< DrawRange near, far and fade of the batch, all 0 for
+                                     *   none, w unused: the instances out of range from the
+                                     *   camera of the uniforms are culled */
 } box_gpu_cull_job_t;
 
 /** Workgroups along x of a cull_lod dispatch at most; each one strides over the instances */
@@ -648,7 +651,9 @@ typedef struct box_gpu_cull_uniforms_t {
     uint32_t hiz[4];                /**< Pyramid width, height and levels, 0 levels for none */
     uint32_t scan[4];               /**< Table entries, their count, workgroup list, workgroups */
     float camera[4];                /**< World position of the camera that picks the levels of
-                                     *   detail, w unused */
+                                     *   detail and that the draw ranges are measured from, w 1,
+                                     *   w 0 for a group without a camera, which culls no
+                                     *   instance by its range */
     float lod[4];                   /**< Distance at which level i starts, LodSettings.distances */
 } box_gpu_cull_uniforms_t;
 

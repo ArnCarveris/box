@@ -109,7 +109,8 @@ fn wire_vertex(i: u32, slot: u32, m: Material, wind: bool) -> WireOut {
 }
 
 @vertex fn vs_wind(@builtin(vertex_index) i: u32, @location(0) slot: u32) -> WireOut {
-    return wire_vertex(i, slot, material_fetch(shadings[slot].material & 0xFFFFFFu), true);
+    let m = material_fetch(shadings[slot_of(slot)].material & 0xFFFFFFu);
+    return wire_vertex(i, slot, m, true);
 }
 
 // A triangle covers its side of an edge up to width - 0.5 pixels from it. The line of an edge
