@@ -3792,3 +3792,211 @@ void Material_water_scatter_pack(void) {
     box_draws_transition_encode(&target, &encoded);
     test_assert(!ecs_os_memcmp_t(&encoded, &record, box_render_material_t));
 }
+
+/** A constructed Water has no shore waves and a shore reach of 0.3; a script sets both, they
+ * are reachable through the reflection data, and an instance inherits them. */
+void Material_water_shore_defaults(void) {
+    // materials/water
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    test_assert(ecs_script_run(world, "water_shore",
+        "using box.material\n"
+        "beach { Water: {shore_period: 6, shore_reach: 0.8} }\n"
+        "lagoon { Water: {shore_period: 4} }\n", NULL) == 0);
+
+    ecs_entity_t added = ecs_new(world);
+    ecs_add(world, added, Water);
+    const Water *w = ecs_get(world, added, Water);
+    test_assert(w != NULL);
+    test_flt(w->shore_period, BOX_MATERIAL_WATER_SHORE_PERIOD);
+    test_flt(w->shore_period, 0);
+    test_flt(w->shore_reach, BOX_MATERIAL_WATER_SHORE_REACH);
+    test_flt(w->shore_reach, 0.3f);
+    test_flt(w->foam_width, BOX_MATERIAL_WATER_FOAM_WIDTH);
+
+    w = ecs_get(world, ecs_lookup(world, "beach"), Water);
+    test_assert(w != NULL);
+    test_flt(w->shore_period, 6);
+    test_flt(w->shore_reach, 0.8f);
+    test_flt(w->depth, 3);
+    test_flt(w->scatter, 0);
+
+    w = ecs_get(world, ecs_lookup(world, "lagoon"), Water);
+    test_assert(w != NULL);
+    test_flt(w->shore_period, 4);
+    test_flt(w->shore_reach, 0.3f);
+
+    /* Script access through the reflection data */
+    ecs_entity_t beach = ecs_lookup(world, "beach");
+    Water *mw = ecs_get_mut(world, beach, Water);
+    ecs_meta_cursor_t cur = ecs_meta_cursor(world, ecs_id(Water), mw);
+    test_int(ecs_meta_push(&cur), 0);
+    test_int(ecs_meta_member(&cur, "shore_period"), 0);
+    test_int(ecs_meta_set_float(&cur, 3.5), 0);
+    test_int(ecs_meta_member(&cur, "shore_reach"), 0);
+    test_int(ecs_meta_set_float(&cur, 0.45), 0);
+    test_int(ecs_meta_pop(&cur), 0);
+    ecs_modified(world, beach, Water);
+    w = ecs_get(world, beach, Water);
+    test_flt(w->shore_period, 3.5f);
+    test_flt(w->shore_reach, 0.45f);
+
+    ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
+    ecs_add(world, prefab, Water);
+    ecs_get_mut(world, prefab, Water)->shore_period = 5;
+    ecs_modified(world, prefab, Water);
+    ecs_entity_t instance = ecs_new_w_pair(world, EcsIsA, prefab);
+    test_bool(ecs_owns(world, instance, Water), false);
+    test_flt(ecs_get(world, instance, Water)->shore_period, 5);
+    test_flt(ecs_get(world, instance, Water)->shore_reach, 0.3f);
+
+    ecs_fini(world);
+}
+
+/** The shore waves of a Water take the DiffuseTransmission thickness and blur words of its
+ * record: the phase at the time and the reach with a shore_period above 0, both 0 without one,
+ * so a Water without shore waves packs the same words whatever its reach and time; a record
+ * without Water keeps its DiffuseTransmission. */
+void Material_water_shore_pack(void) {
+    // materials/water
+    box_render_material_t record, base;
+    box_draws_tables_init();
+    test_int(offsetof(box_render_material_t, water_shore_phase),
+        offsetof(box_render_material_t, thickness));
+    test_int(offsetof(box_render_material_t, water_shore_reach),
+        offsetof(box_render_material_t, diffuse_blur));
+    test_int(ECS_SIZEOF(box_render_material_t), 256);
+
+    Water sea = {
+        .shallow_color = {60, 170, 160}, .deep_color = {8, 40, 64},
+        .depth = 3, .visibility = 2, .refraction = 0.02f, .foam_color = {240, 245, 245},
+        .foam_width = 0.3f, .foam_scale = 1, .shore_period = 0, .shore_reach = 0.3f
+    };
+    box_draws_material_pack(&base, &(box_draw_material_t){
+        .water = &sea, .time = 1.25, .fade = 1 });
+    test_flt(base.water_shore_phase, 0);
+    test_flt(base.water_shore_reach, 0);
+
+    /* Without a period neither the reach nor the time change the record */
+    Water other = sea;
+    other.shore_reach = 2;
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .water = &other, .time = 7.5, .fade = 1 });
+    test_assert(!ecs_os_memcmp_t(&record, &base, box_render_material_t));
+
+    /* With a period: the reach and the time over the period wrapped to 0..1 */
+    Water beach = sea;
+    beach.shore_period = 4;
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .water = &beach, .time = 9, .fade = 1 });
+    test_assert(fabsf(record.water_shore_phase - 0.25f) < 1e-6f);
+    test_flt(record.water_shore_reach, 0.3f);
+
+    /* The shore words differ, the rest is the record without shore waves */
+    record.water_shore_phase = 0;
+    record.water_shore_reach = 0;
+    test_assert(!ecs_os_memcmp_t(&record, &base, box_render_material_t));
+
+    /* A whole period later the record is the same */
+    box_render_material_t later;
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .water = &beach, .time = 9, .fade = 1 });
+    box_draws_material_pack(&later, &(box_draw_material_t){
+        .water = &beach, .time = 13, .fade = 1 });
+    test_assert(!ecs_os_memcmp_t(&record, &later, box_render_material_t));
+
+    /* A Water ignores DiffuseTransmission: its words hold the shore waves */
+    DiffuseTransmission dt = { .factor = 1, .color = {255, 255, 255}, .thickness = 0.5f,
+        .blur = 0.25f };
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .water = &sea, .diffuse_transmission = &dt, .time = 9, .fade = 1 });
+    test_flt(record.water_shore_phase, 0);
+    test_flt(record.water_shore_reach, 0);
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .water = &beach, .diffuse_transmission = &dt, .time = 9, .fade = 1 });
+    test_assert(fabsf(record.water_shore_phase - 0.25f) < 1e-6f);
+    test_flt(record.water_shore_reach, 0.3f);
+
+    /* Without Water they pack as before */
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .diffuse_transmission = &dt, .fade = 1 });
+    test_flt(record.thickness, 0.5f);
+    test_flt(record.diffuse_blur, 0.25f);
+
+    /* Negative or non finite periods and reaches are none */
+    Water broken = beach;
+    broken.shore_period = -1;
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .water = &broken, .time = 9, .fade = 1 });
+    test_flt(record.water_shore_phase, 0);
+    test_flt(record.water_shore_reach, 0);
+    broken.shore_period = NAN;
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .water = &broken, .time = 9, .fade = 1 });
+    test_flt(record.water_shore_reach, 0);
+    broken.shore_period = INFINITY;
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .water = &broken, .time = 9, .fade = 1 });
+    test_flt(record.water_shore_reach, 0);
+    broken = beach;
+    broken.shore_reach = -0.5f;
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .water = &broken, .time = 9, .fade = 1 });
+    test_flt(record.water_shore_phase, 0);
+    test_flt(record.water_shore_reach, 0);
+    broken.shore_reach = NAN;
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .water = &broken, .time = 9, .fade = 1 });
+    test_flt(record.water_shore_reach, 0);
+
+    /* A transition encodes the shore waves like the rest of the Water */
+    PbrMaterial pbr = { .metallic = 0, .roughness = 0.05f };
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .water = &beach, .pbr = &pbr, .time = 2, .fade = 1 });
+    box_draw_transition_material_t target;
+    box_render_material_t encoded;
+    box_draws_transition_target(&target, &(box_draw_material_t){
+        .water = &beach, .pbr = &pbr, .time = 2, .fade = 1 }, BOX_DRAW_TRANSITION_TABLE);
+    box_draws_transition_encode(&target, &encoded);
+    test_assert(!ecs_os_memcmp_t(&encoded, &record, box_render_material_t));
+}
+
+/** The phase of the shore waves is the time over the period wrapped to [0, 1) in double
+ * precision: it moves on smoothly after hours of render time and is 0 for a period or a time
+ * that is not usable. */
+void Material_water_shore_wrap(void) {
+    // materials/water
+    test_flt(box_draws_water_shore_phase(0, 10), 0);
+    test_flt(box_draws_water_shore_phase(-2, 10), 0);
+    test_flt(box_draws_water_shore_phase(NAN, 10), 0);
+    test_flt(box_draws_water_shore_phase(INFINITY, 10), 0);
+    test_flt(box_draws_water_shore_phase(4, NAN), 0);
+    test_flt(box_draws_water_shore_phase(4, INFINITY), 0);
+    test_flt(box_draws_water_shore_phase(4, 0), 0);
+    test_assert(fabsf(box_draws_water_shore_phase(4, 1) - 0.25f) < 1e-6f);
+    test_assert(fabsf(box_draws_water_shore_phase(4, 6) - 0.5f) < 1e-6f);
+    test_flt(box_draws_water_shore_phase(4, 8), 0);
+
+    /* A negative time wraps to a positive phase */
+    test_assert(fabsf(box_draws_water_shore_phase(4, -1) - 0.75f) < 1e-6f);
+
+    /* After hours the phase still advances by a frame over the period every frame */
+    float period = 5.5f;
+    double starts[3] = { 1e6, 4.0 * 3600.0, 1e6 + 12345.678 };
+    int32_t s, f;
+    for (s = 0; s < 3; s ++) {
+        for (f = 0; f < 600; f ++) {
+            double t = starts[s] + (double)f / 60.0;
+            float a = box_draws_water_shore_phase(period, t);
+            float b = box_draws_water_shore_phase(period, t + 1.0 / 60.0);
+            test_assert(a >= 0.0f && a < 1.0f);
+            float d = b - a;
+            if (d < -0.5f) {
+                d += 1.0f;
+            }
+
+            test_assert(fabsf(d - 1.0f / (60.0f * period)) < 1e-4f);
+        }
+    }
+}

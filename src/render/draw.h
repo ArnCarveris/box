@@ -2047,6 +2047,17 @@ float box_draws_distortion_phase(
     float speed,
     double time);
 
+/** Phase of the shore waves of a Water at a time: time over Water.shore_period wrapped to
+ * [0, 1) in double precision, so it stays precise however long the render runs.
+ *
+ * @param period Water.shore_period, seconds
+ * @param time Total render time
+ * @return The phase, 0 for a period that is not positive and finite or a time that is not finite
+ */
+float box_draws_water_shore_phase(
+    float period,
+    double time);
+
 /** Phase of the two phase flow mapping of WaterFlow.textures at a time: time over
  * BOX_RENDER_WATER_FLOW_PERIOD wrapped to [0, 1) in double precision.
  *

@@ -840,6 +840,42 @@ fn water_flow_noise(xz: vec2f) -> f32 {
         w.y);
 }
 
+// World units of a cell of the noise that offsets the phase of the shore waves of a Water, a
+// power of two, and the share of a period the offset spans.
+const WATER_SHORE_NOISE_CELL: f32 = 16.0;
+const WATER_SHORE_NOISE_SHIFT: u32 = 4u;
+const WATER_SHORE_SPREAD: f32 = 0.6;
+
+// Smooth value noise over the world XZ in cells of WATER_SHORE_NOISE_CELL, 0..1, of the absolute
+// position like water_flow_noise, so it stays put across a shift of the origin.
+fn water_shore_noise(xz: vec2f) -> f32 {
+    let o = world_origin(view.origin);
+    let whole = o.whole.xz;
+    let mask = vec2i(i32(WATER_SHORE_NOISE_CELL) - 1);
+    let rest = (vec2f(whole & mask) + o.rest.xz) / WATER_SHORE_NOISE_CELL;
+    let p = xz / WATER_SHORE_NOISE_CELL + rest;
+    let c = vec2i(floor(p)) + (whole >> vec2u(WATER_SHORE_NOISE_SHIFT));
+    let t = p - floor(p);
+    let w = t * t * (3.0 - 2.0 * t);
+    return mix(
+        mix(water_flow_hash(c), water_flow_hash(c + vec2i(1, 0)), w.x),
+        mix(water_flow_hash(c + vec2i(0, 1)), water_flow_hash(c + vec2i(1, 1)), w.x),
+        w.y);
+}
+
+// Foam of the shore waves of the material of a Water fragment at the water depth d
+// (water_shore): their phase moved back by up to WATER_SHORE_SPREAD of a period by a noise that
+// changes slowly along the shore, so the waves do not arrive everywhere at once and their lines
+// are not parallel to the depth contours. 0 without shore waves.
+fn water_shore_foam(world: vec3f, m: Material, d: f32, deep: bool) -> f32 {
+    let reach = water_shore_reach(m);
+    if (reach <= 0.0) {
+        return 0.0;
+    }
+    let phase = fract(water_shore_phase(m) - WATER_SHORE_SPREAD * water_shore_noise(world.xz));
+    return water_shore(d, reach, phase, deep);
+}
+
 // World velocity of a cell of the window of the field of WaterRipples, clamped to the window.
 fn water_ripple_flow_cell(cell: vec2i) -> vec2f {
     let r = view.ripple_c.x;
@@ -1184,16 +1220,18 @@ fn water_ripples_foam(world: vec3f) -> f32 {
     return saturate(foam) * smoothstep(0.0, max(view.ripple_b.z, 1.0), edge);
 }
 
-// Foam of a Water fragment: the shore band of water_foam and the foam of the field, the larger
-// covering, cut by the foam texture like the band alone. The field covers the square root of its
-// foam, so thin foam still shows as lace the texture breaks up instead of being cut away whole.
-// Without field foam it is water_foam.
+// Foam of a Water fragment: the shore band of water_foam, the foam of the field and that of the
+// shore waves (water_shore_foam), the larger covering, cut by the foam texture like the band
+// alone. The field covers the square root of its foam, so thin foam still shows as lace the
+// texture breaks up instead of being cut away whole. Without field foam and shore waves it is
+// water_foam.
 fn water_foam_mixed(d: f32, foam_width: f32, deep: bool, textured: bool, tex: f32,
-    field: f32) -> f32 {
-    if (field <= 0.0) {
+    field: f32, shore: f32) -> f32 {
+    if (field <= 0.0 && shore <= 0.0) {
         return water_foam(d, foam_width, deep, textured, tex);
     }
-    let band = max(water_foam(d, foam_width, deep, false, 1.0), sqrt(field));
+    let band = max(max(water_foam(d, foam_width, deep, false, 1.0), sqrt(max(field, 0.0))),
+        shore);
     if (textured) {
         let t = 1.0 - band;
         return smoothstep(t, t + 0.1, tex);
@@ -1431,9 +1469,9 @@ fn water_caustics(f: VertexOut, world: vec3f, d: f32, n: vec3f) -> vec3f {
 // shows through exp(-3 ray / visibility) of the body, tinted per channel by the absorption to
 // the power of ray / visibility; the body, shallow_color mixed toward
 // deep_color by the water depth along the geometric normal, covers the rest. The foam band
-// replaces both, and so does the foam of the field of WaterRipples, drawn the same way (the
-// larger of the two covers, see water_foam_mixed). The WaterCaustics of the material light the
-// scene behind before it is tinted (water_caustics). Body and foam are lit diffusely with the
+// replaces both, and so does the foam of the field of WaterRipples and of the waves rolling in
+// at the shore, drawn the same way (the larger covers, see water_foam_mixed). The
+// WaterCaustics of the material light the scene behind before it is tinted (water_caustics). Body and foam are lit diffusely with the
 // light of the surface; the specular of an F0 of 0.02, direct and indirect (indirect_lobes, or the planar reflection of its entity,
 // as every shape), adds on top. The scatter of the material, the sunlight scattered inside the
 // body (water_scatter_light) at the height of its waves (water_waves_height, 0 without), adds to
@@ -1496,7 +1534,7 @@ fn water_lit(f: VertexOut, shaded: Surface, height: f32) -> vec4f {
     let through = water_transmittance(ray, m.water_visibility, deep);
     let foam = water_foam_mixed(d, m.water_foam_width, deep,
         (m.water_flags & WATER_FOAM_TEXTURE) != 0u, water_foam_texture(f, m),
-        water_ripples_foam(f.world));
+        water_ripples_foam(f.world), water_shore_foam(f.world, m, d, deep));
 
     let ndv = saturate(dot(s.normal, v));
     let fresnel = fresnel_schlick(ndv, vec3f(WATER_F0)).x;

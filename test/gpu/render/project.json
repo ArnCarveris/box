@@ -395,6 +395,14 @@
                 ]
             },
             {
+                "id": "WaterShore",
+                "testcases": [
+                    "waves_move",
+                    "beyond_reach_clear",
+                    "zero_period_unchanged"
+                ]
+            },
+            {
                 "id": "WaterGlint",
                 "testcases": [
                     "far_glitter_wider",

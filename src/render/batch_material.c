@@ -512,6 +512,51 @@ static void box_draws_water_scatter_pack(
     }
 }
 
+float box_draws_water_shore_phase(
+    float period,
+    double time)
+{
+    float result = 0.0f;
+    if (isfinite(period) && period > 0.0f && isfinite(time)) {
+        double v = fmod(time / (double)period, 1.0);
+        if (v < 0.0) {
+            v += 1.0;
+        }
+
+        result = (float)v;
+        if (result >= 1.0f) {
+            result = 0.0f;
+        }
+    }
+
+    return result;
+}
+
+/** Pack the shore waves of a Water into the shore words of its record, which hold the
+ * DiffuseTransmission thickness and blur of a record without Water.
+ *
+ * With a finite shore_period above 0 and a positive, finite shore_reach they are its phase at
+ * the time and the reach; both 0 otherwise, which draws as without shore waves.
+ *
+ * @param out The record
+ * @param water The component
+ * @param time Total render time the phase is computed at
+ */
+static void box_draws_water_shore_pack(
+    box_render_material_t *out,
+    const Water *water,
+    double time)
+{
+    out->water_shore_phase = 0.0f;
+    out->water_shore_reach = 0.0f;
+    if (isfinite(water->shore_period) && water->shore_period > 0.0f &&
+        isfinite(water->shore_reach) && water->shore_reach > 0.0f)
+    {
+        out->water_shore_reach = water->shore_reach;
+        out->water_shore_phase = box_draws_water_shore_phase(water->shore_period, time);
+    }
+}
+
 float box_draws_water_flow_phase(
     double time)
 {
@@ -843,14 +888,19 @@ void box_draws_material_pack(
         box_draws_distortion_pack(out, material->distortion, transmission, material->time);
     }
 
-    out->thickness = material->diffuse_transmission &&
-        isfinite(material->diffuse_transmission->thickness) &&
-        material->diffuse_transmission->thickness > 0.0f
-        ? material->diffuse_transmission->thickness : 0.0f;
-    out->diffuse_blur = material->diffuse_transmission &&
-        isfinite(material->diffuse_transmission->blur) &&
-        material->diffuse_transmission->blur > 0.0f
-        ? material->diffuse_transmission->blur : 0.0f;
+    if (material->water) {
+        box_draws_water_shore_pack(out, material->water, material->time);
+    } else {
+        out->thickness = material->diffuse_transmission &&
+            isfinite(material->diffuse_transmission->thickness) &&
+            material->diffuse_transmission->thickness > 0.0f
+            ? material->diffuse_transmission->thickness : 0.0f;
+        out->diffuse_blur = material->diffuse_transmission &&
+            isfinite(material->diffuse_transmission->blur) &&
+            material->diffuse_transmission->blur > 0.0f
+            ? material->diffuse_transmission->blur : 0.0f;
+    }
+
     out->mapping = (uint32_t)MappingUv;
     out->mapping_size = 0.0f;
     if (material->mapping && (material->mapping->mode == MappingObject ||

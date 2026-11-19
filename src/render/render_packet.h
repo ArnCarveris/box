@@ -1648,9 +1648,23 @@ typedef struct box_render_material_t {
                              *   finite, which tells a record without scatter */
         };
     };
-    float thickness;        /**< DiffuseTransmission.thickness, 0 without one */
-    float diffuse_blur;     /**< DiffuseTransmission.blur, 0 without one or with a negative or
-                             *   non finite blur */
+    union {                 /**< The DiffuseTransmission of a record without Water, the shore
+                             *   waves of one with Water */
+        struct {            /**< The DiffuseTransmission of a record without Water */
+            float thickness; /**< DiffuseTransmission.thickness, 0 without one */
+            float diffuse_blur; /**< DiffuseTransmission.blur, 0 without one or with a negative
+                             *   or non finite blur */
+        };
+
+        struct {            /**< The shore waves of a record with Water, which ignores
+                             *   DiffuseTransmission */
+            float water_shore_phase; /**< Total render time over Water.shore_period wrapped to
+                             *   0..1 (box_draws_water_shore_phase), 0 without shore waves */
+            float water_shore_reach; /**< Water.shore_reach of a Water with a shore_period
+                             *   above 0, 0 without shore waves or when negative or not finite,
+                             *   which tells a record without them */
+        };
+    };
     uint32_t mapping;       /**< TextureMapping.mode | blend << 16, the blend a unorm16
                              *   clamped to 0..1 (0 when not finite); MappingUv (0) without one
                              *   or for MappingUv, whose blend is dropped */

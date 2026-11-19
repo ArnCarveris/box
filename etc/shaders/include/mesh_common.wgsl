@@ -175,8 +175,10 @@ struct VertexOut {
     // (pack2x16float) and ripple offset of a Water pipeline (water), which reuses flat2 (the
     // colors, the absorption in their top bytes), flat3.zw, flat1.zw and flat0.w (the flow
     // mapping, vo_water_flow) and the high half of flat1.x (the scatter, in place of the
-    // thickness of a diffuse transmission) for the other Water fields: Water
-    // ignores Transmission, and the fragment stage cannot read the material table. Of the other
+    // thickness of a diffuse transmission) for the other Water fields, and the low half of flat1.y
+    // (the blur of a diffuse transmission) and bits 1..15 of flat0.w for its shore waves
+    // (vo_water_shore): Water ignores Transmission, and the fragment stage cannot read the
+    // material table. Of the other
     // material_distortion pipelines, the Distortion of the material (vo_distortion).
     @location(8) @interpolate(flat) flat4: vec4u,
     // Low byte: planar reflection slot of the view plus one whose image the instance shows, 0
@@ -239,7 +241,8 @@ fn normal_uv(f: VertexOut, uv: vec2f) -> vec2f {
 }
 
 // The Water fields of the material of a fragment of a Water pipeline, the others zero but the
-// scatter words (water_scatter_color, water_scatter).
+// scatter words (water_scatter_color, water_scatter) and the shore words (water_shore_phase,
+// water_shore_reach).
 fn vo_water(f: VertexOut) -> Material {
     var m: Material;
     m.water_shallow = f.flat2.x & 0xFFFFFFu;
@@ -256,8 +259,13 @@ fn vo_water(f: VertexOut) -> Material {
     m.water_ripple_offset = bitcast<vec2f>(f.flat4.zw);
     m.sheen = f.fresnel_color.x >> 8u;
     m.diffuse_transmission = bitcast<u32>(unpack2x16float(f.flat1.x).y);
+    m.thickness = f32((f.flat0.w >> 1u) & WATER_SHORE_PHASE_MAX) / f32(WATER_SHORE_PHASE_MAX);
+    m.diffuse_blur = unpack2x16float(f.flat1.y).x;
     return m;
 }
+
+// Largest phase of the shore waves of a Water in bits 1..15 of flat0.w, which is a phase of 1.
+const WATER_SHORE_PHASE_MAX: u32 = 0x7FFFu;
 
 // The flow mapping of the textures of the material of a fragment of a Water pipeline
 // (WaterFlow.textures): its WaterFlow velocity in world X and Z, the phase of the flow mapping
@@ -585,7 +593,12 @@ fn vertex_out(p: Placed, material: Material, frame: ModelFrame, s: VertexShading
         o.flat1.z = bitcast<u32>(material.distortion_strength);
         o.flat1.w = bitcast<u32>(material.distortion_frequency);
         o.flat0.w = (material.distortion_flags & WATER_FLOW_TEXTURES) |
+            (u32(round(saturate(water_shore_phase(material)) * f32(WATER_SHORE_PHASE_MAX))) <<
+                1u) |
             (u32(round(saturate(material.distortion_phase) * 65535.0)) << 16u);
+        // Water ignores DiffuseTransmission: the blur half holds the reach of its shore waves
+        o.flat1.y = pack2x16float(vec2f(min(max(water_shore_reach(material), 0.0), 6e4),
+            s.mapped));
         o.flat4 = vec4u((bitcast<u32>(material.water_foam_width) & 0x7FFFFFFFu) |
             ((material.water_flags & WATER_FOAM_TEXTURE) << 31u),
             pack2x16float(vec2f(material.water_ripple_scale, material.water_foam_scale)),

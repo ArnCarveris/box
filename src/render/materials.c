@@ -242,8 +242,9 @@ static uint32_t box_materials_features(
     return box_render_scene_features(world, box_render_scene_of(world, owner));
 }
 
-/** Check whether a Water moves its ripples over time: a ripple_scale above 0 with a ripple
- * velocity, the only part of its record that changes with the time.
+/** Check whether a Water changes over time: a ripple_scale above 0 with a ripple velocity, or
+ * waves lapping at the shore (a shore_period above 0), the parts of its record that change with
+ * the time.
  *
  * @param water The component, NULL for none
  * @return Whether its record changes every frame
@@ -251,8 +252,9 @@ static uint32_t box_materials_features(
 static bool box_materials_water_moves(
     const Water *water)
 {
-    return water && isfinite(water->ripple_scale) && water->ripple_scale > 0.0f &&
-        (water->ripple_velocity[0] != 0.0f || water->ripple_velocity[1] != 0.0f);
+    return water && ((isfinite(water->ripple_scale) && water->ripple_scale > 0.0f &&
+        (water->ripple_velocity[0] != 0.0f || water->ripple_velocity[1] != 0.0f)) ||
+        (isfinite(water->shore_period) && water->shore_period > 0.0f));
 }
 
 /** Check whether the WaterFlow of a Water moves its textures (WaterFlow.textures), whose flow
@@ -291,9 +293,10 @@ static bool box_materials_distortion_moves(
  * @param owner The owner, 0 for the default material
  * @param out The record
  * @return Whether the record changes with the time: the owner has or inherits a TextureScroll,
- * a WindSway, a Water whose ripples move (box_materials_water_moves), that has WaterWaves,
- * WaterCaustics that move (box_draws_water_caustics_moves) or a WaterFlow that moves its
- * textures (box_materials_water_flows), or a Distortion that moves
+ * a WindSway, a Water whose ripples move or whose shore waves roll in
+ * (box_materials_water_moves), that has WaterWaves, WaterCaustics that move
+ * (box_draws_water_caustics_moves) or a WaterFlow that moves its textures
+ * (box_materials_water_flows), or a Distortion that moves
  * (box_materials_distortion_moves) without Water
  */
 static bool box_materials_pack(
@@ -325,8 +328,9 @@ static bool box_materials_pack(
 
 /** Check whether an entity has or inherits a component whose record changes every frame.
  *
- * Those are a TextureScroll, a WindSway, a Water whose ripples move, that has WaterWaves,
- * WaterCaustics that move or a WaterFlow with textures, or a Distortion that moves.
+ * Those are a TextureScroll, a WindSway, a Water whose ripples move or whose shore waves roll
+ * in, that has WaterWaves, WaterCaustics that move or a WaterFlow with textures, or a
+ * Distortion that moves.
  *
  * Only in a scene that enables it (Scene.texture_scroll, Scene.wind, Scene.water,
  * Scene.distortion).
@@ -1277,7 +1281,8 @@ void box_draws_materials_send(
             if (!sharp &&
                 (records[i].transmission_factor > 0 || records[i].water_depth > 0))
             {
-                float r = records[i].diffuse_blur > 0 ? 1.0f : records[i].roughness;
+                float r = records[i].water_depth == 0 && records[i].diffuse_blur > 0
+                    ? 1.0f : records[i].roughness;
                 if (r > m->transmission_roughness) {
                     m->transmission_roughness = r;
                 }

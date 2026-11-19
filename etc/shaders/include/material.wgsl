@@ -49,6 +49,9 @@ struct Material {
     thickness: f32,
     // DiffuseTransmission.blur, world units of blur radius per world unit behind the surface of
     // a Transmission shape, 0 without one
+    // A Water material, which ignores DiffuseTransmission, holds its shore waves in these two
+    // words instead, both 0 without: the phase of the waves (0..1 over Water.shore_period,
+    // water_shore_phase) and Water.shore_reach (0 for none, water_shore_reach)
     diffuse_blur: f32,
     // TextureMapping.mode | blend << 16, the blend a unorm16 (unpack2x16unorm): mode 0 the UVs
     // of the mesh, 1 projected from the object position, 2 from the world position
@@ -135,6 +138,16 @@ fn water_scatter_color(m: Material) -> u32 {
 // Water.scatter of a Water record, 0 for none.
 fn water_scatter(m: Material) -> f32 {
     return bitcast<f32>(m.diffuse_transmission);
+}
+
+// Phase of the shore waves of a Water record, 0..1 over Water.shore_period.
+fn water_shore_phase(m: Material) -> f32 {
+    return m.thickness;
+}
+
+// Water.shore_reach of a Water record with shore waves, 0 for none.
+fn water_shore_reach(m: Material) -> f32 {
+    return m.diffuse_blur;
 }
 
 // Smallest depth and visibility of a Water record (BOX_RENDER_WATER_MIN).
@@ -516,6 +529,58 @@ fn water_foam(d: f32, foam_width: f32, deep: bool, textured: bool, tex: f32) -> 
         band = select(0.0, smoothstep(t, t + 0.1, tex), band > 0.0);
     }
     return band;
+}
+
+// Share of a period of the shore waves of a Water over which a line rolls in from shore_reach
+// to the waterline; over the rest the band it turns into washes back.
+const WATER_SHORE_ARRIVE: f32 = 0.6;
+
+// Half width of a wave line where it forms and where it reaches the waterline, in shore_reach.
+const WATER_SHORE_LINE_START: f32 = 0.05;
+const WATER_SHORE_LINE_END: f32 = 0.35;
+
+// Extent of the foam band at the waterline when the line breaks into it and after it washed
+// back, in shore_reach, and its foam then.
+const WATER_SHORE_BAND_START: f32 = 0.35;
+const WATER_SHORE_BAND_END: f32 = 0.12;
+const WATER_SHORE_WASH: f32 = 0.5;
+const WATER_SHORE_REST: f32 = 0.3;
+
+// Foam of the shore waves of a Water at a water depth d, 0..1, at a phase of its period (0..1);
+// 0 for a reach of 0 or where nothing is behind (deep).
+//
+// Over the first WATER_SHORE_ARRIVE of the period a line forms at the depth reach and rolls in
+// toward d = 0, eased (its distance from the waterline falls with the square of the time, so it
+// comes in faster and faster), fading in as it forms and widening from WATER_SHORE_LINE_START to
+// WATER_SHORE_LINE_END. At the waterline it breaks into a band of full foam
+// WATER_SHORE_BAND_START wide (both smooth edged, so the one turns into the other), which then washes back to WATER_SHORE_BAND_END and thins out to
+// WATER_SHORE_WASH, and on to WATER_SHORE_REST while the next line rolls in. The larger of line
+// and band covers.
+fn water_shore(d: f32, reach: f32, phase: f32, deep: bool) -> f32 {
+    if (reach <= 0.0 || deep) {
+        return 0.0;
+    }
+    let u = max(d, 0.0) / reach;
+    let p = fract(phase);
+    var crest = 0.0;
+    var extent = WATER_SHORE_BAND_END;
+    var strength = 0.0;
+    if (p < WATER_SHORE_ARRIVE) {
+        let t = p / WATER_SHORE_ARRIVE;
+        let x = 1.0 - t * t;
+        let w = mix(WATER_SHORE_LINE_START, WATER_SHORE_LINE_END, t * t);
+        let k = saturate(1.0 - abs(u - x) / w);
+        crest = smoothstep(0.0, 0.2, t) * k * k * (3.0 - 2.0 * k);
+        strength = mix(WATER_SHORE_WASH, WATER_SHORE_REST, t);
+    } else {
+        let q = (p - WATER_SHORE_ARRIVE) / (1.0 - WATER_SHORE_ARRIVE);
+        let e = 1.0 - (1.0 - q) * (1.0 - q);
+        extent = mix(WATER_SHORE_BAND_START, WATER_SHORE_BAND_END, e);
+        strength = mix(1.0, WATER_SHORE_WASH, e);
+    }
+    let b = saturate(1.0 - u / extent);
+    let band = strength * b * b * (3.0 - 2.0 * b);
+    return max(crest, band);
 }
 
 // Display encoded color to linear light.

@@ -505,7 +505,7 @@ static void box_material_ripples_free(
 
 /** Construct Water values: a teal shallow and a dark blue deep body, depth 3, visibility 2, a
  * white absorption, a refraction of 0.02, an off white foam band of width 0.3 without
- * texture or ripples and no scatter of a turquoise color.
+ * texture or ripples, no scatter of a turquoise color and no shore waves of a reach of 0.3.
  *
  * @param ptr The components
  * @param count Number of components
@@ -539,7 +539,9 @@ static void box_water_ctor(
             .ripple_velocity = { 0.0f, 0.0f },
             .scatter_color = { BOX_MATERIAL_WATER_SCATTER_R, BOX_MATERIAL_WATER_SCATTER_G,
                 BOX_MATERIAL_WATER_SCATTER_B },
-            .scatter = BOX_MATERIAL_WATER_SCATTER };
+            .scatter = BOX_MATERIAL_WATER_SCATTER,
+            .shore_period = BOX_MATERIAL_WATER_SHORE_PERIOD,
+            .shore_reach = BOX_MATERIAL_WATER_SHORE_REACH };
     }
 }
 

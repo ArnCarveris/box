@@ -359,10 +359,16 @@ ECS_STRUCT(Distortion, {
 /** Scatter of a constructed Water: no subsurface glow */
 #define BOX_MATERIAL_WATER_SCATTER (0.0f)
 
+/** Shore period of a constructed Water: no waves rolling in at the shore */
+#define BOX_MATERIAL_WATER_SHORE_PERIOD (0.0f)
+
+/** Shore reach of a constructed Water: the water depth at which a wave line forms, world units */
+#define BOX_MATERIAL_WATER_SHORE_REACH (0.3f)
+
 /** Surface of a body of water seen from above (ponds, lakes, canals, the sea), on a 3D mesh,
  * default a teal shallow and a dark blue deep color, depth 3, visibility 2, a white absorption,
- * refraction 0.02, an off white foam of width 0.3 without a texture, no ripples and no scatter
- * (a turquoise scatter_color). Inherited
+ * refraction 0.02, an off white foam of width 0.3 without a texture, no ripples, no scatter
+ * (a turquoise scatter_color) and no shore waves (a shore_reach of 0.3). Inherited
  * by instances like Rgb; a field a scene does not set keeps its default.
  *
  * It draws like Transmission: in the sorted blended pass without depth writes, casting no
@@ -387,6 +393,17 @@ ECS_STRUCT(Distortion, {
  * viewer, and a little on the faces turned to the viewer, with a small part of the ambient light.
  * It is covered by the foam and by the scene behind like the body, and fogged by the aerial
  * perspective; 0 adds nothing.
+ *
+ * A shore_period above 0 makes waves lap at the shore every shore_period seconds: a thin line of
+ * foam forms where the water depth d is shore_reach, rolls in faster and faster toward d = 0 and
+ * turns into foam at the waterline, which washes back a little while the next line forms.
+ *
+ * The phase of the shore waves varies slowly along the shore (a low frequency noise of the world
+ * XZ), so they do not arrive everywhere at once. Their lines add to the foam (the larger covers)
+ * and are broken up by the foam texture and lit like it.
+ *
+ * With shore waves the record is packed every frame, the time wrapped in double precision like
+ * that of a TextureScroll; a shore_period of 0 draws as without shore waves.
  *
  * Distant water keeps its sparkle: the slope variance that filtering takes away, of the minified
  * normal map (from the shortened length of its filtered normals, Toksvig) and of the WaterWaves
@@ -437,6 +454,8 @@ ECS_STRUCT(Water, {
     Rgb scatter_color;      /**< Color of the sunlight scattered inside the body, display
                              *   encoded */
     float scatter;          /**< Strength of the scattered sunlight, 0 for none */
+    float shore_period;     /**< Seconds between two waves arriving at the shore, 0 for none */
+    float shore_reach;      /**< Water depth at which a wave line forms, world units */
 });
 
 /** Waves a WaterWaves holds at most */
