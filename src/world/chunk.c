@@ -471,23 +471,61 @@ static bool box_chunk_is_template(
     return script && script->template_ && ecs_get_type_info(world, e);
 }
 
-/** Ask the gates of a grid whether a cell may go ahead: the gate of the grid entity and the
- * singleton gate.
+/** Check whether the terrain a grid stands on has the heights under a cell, asking for them
+ * when not: the rectangle of the cell in XZ, in the frame of the terrain.
+ *
+ * @param world The world
+ * @param config The grid
+ * @param work The cell
+ * @return Whether the cell may go ahead, always without a ground
+ */
+static bool box_chunk_ground_ready(
+    ecs_world_t *world,
+    const ChunkGrid *config,
+    const box_chunk_work_t *work)
+{
+    const WorldOrigin *o = ecs_id(WorldOrigin) ? ecs_singleton_get(world, WorldOrigin) : NULL;
+    double frame[3], r[4];
+    bool result = true;
+    if (!config->ground || !ecs_id(Terrain) || !ecs_is_alive(world, config->ground) ||
+        !ecs_has(world, config->ground, Terrain))
+    {
+        goto done;
+    }
+
+    box_terrain_origin(world, config->ground, frame);
+    r[0] = (double)work->c[0] * (double)config->cell_size[0] - (o ? o->x : 0.0) - frame[0];
+    r[1] = (double)work->c[2] * (double)config->cell_size[2] - (o ? o->z : 0.0) - frame[2];
+    r[2] = r[0] + (double)config->cell_size[0];
+    r[3] = r[1] + (double)config->cell_size[2];
+    result = box_terrain_resident(world, config->ground, r[0], r[1], r[2], r[3]);
+    if (!result) {
+        box_terrain_request(world, config->ground, r[0], r[1], r[2], r[3]);
+    }
+
+done:
+    return result;
+}
+
+/** Ask the gates of a grid whether a cell may go ahead: the terrain it stands on, the gate of
+ * the grid entity and the singleton gate.
  *
  * @param world The world
  * @param grid The grid entity
+ * @param config The grid
  * @param work The cell
  * @return Whether it goes ahead
  */
 static bool box_chunk_ready(
     ecs_world_t *world,
     ecs_entity_t grid,
+    const ChunkGrid *config,
     const box_chunk_work_t *work)
 {
     const ChunkGridGate *own = ecs_get(world, grid, ChunkGridGate);
     const ChunkGridGate *all = ecs_singleton_get(world, ChunkGridGate);
-    bool result = true;
-    if (own && own->ready) {
+    bool result = box_chunk_ground_ready(world, config, work);
+    if (result && own && own->ready) {
         result = own->ready(world, grid, work->c, work->level, own->ctx);
     }
 
@@ -835,7 +873,7 @@ static void box_chunk_apply(
             break;
         }
 
-        if (!box_chunk_ready(world, grid, &work[i])) {
+        if (!box_chunk_ready(world, grid, config, &work[i])) {
             status->pending ++;
             status->held ++;
             continue;

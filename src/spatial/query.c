@@ -8,6 +8,7 @@
  */
 
 #include "index.h"
+#include "../terrain/terrain.h"
 
 /** State of one query over the trees of a scene */
 typedef struct box_spatial_walk_t {
@@ -44,7 +45,8 @@ static bool box_spatial_ray_bounds(
     const vec3 max,
     float *t)
 {
-    bool result = box_bvh_ray_box(&w->ray, min, max, w->reach, t);
+    bool result = !box_terrain_is_tile(w->world, e) &&
+        box_bvh_ray_box(&w->ray, min, max, w->reach, t);
     if (result && w->desc->filter) {
         result = w->desc->filter(w->desc->ctx, e, t) && *t <= w->reach;
     }
@@ -268,6 +270,28 @@ static bool box_spatial_ray_walk(
     return w->scene && box_bvh_ray_init(&w->ray, ray->origin, ray->dir);
 }
 
+/** Hit the height fields of the terrains of the scene of a ray, the terrain entity standing
+ * for its tiles, after the filter of the ray accepts it.
+ *
+ * @param world The world
+ * @param ray The ray
+ * @param w The walk
+ */
+static void box_spatial_ray_terrain(
+    const ecs_world_t *world,
+    const box_spatial_ray_t *ray,
+    box_spatial_walk_t *w)
+{
+    ecs_entity_t terrain = 0;
+    float t = 0;
+    if (box_terrain_ray(world, ray->scene, ray->origin, ray->dir,
+        w->reach < FLT_MAX ? w->reach : 0, &terrain, &t) &&
+        (!ray->filter || ray->filter(ray->ctx, terrain, &t)) && t <= w->reach)
+    {
+        box_spatial_ray_keep(w, terrain, t);
+    }
+}
+
 bool box_spatial_ray(
     const ecs_world_t *world,
     const box_spatial_ray_t *ray,
@@ -280,6 +304,8 @@ bool box_spatial_ray(
             box_bvh_ray(&w.scene->trees[i], &w.ray, &w.reach, box_spatial_visit_nearest, &w);
         }
     }
+
+    box_spatial_ray_terrain(world, ray, &w);
 
     if (w.found) {
         *hit = w.best;
@@ -318,6 +344,9 @@ int32_t box_spatial_ray_all(
             box_bvh_ray(&w.scene->trees[i], &w.ray, &w.reach, box_spatial_visit_all, &w);
         }
     }
+
+    w.out = hits;
+    box_spatial_ray_terrain(world, ray, &w);
 
     if (w.count > 1) {
         qsort(ecs_vec_get_t(hits, box_spatial_hit_t, first), (size_t)w.count,

@@ -142,6 +142,7 @@ typedef struct box_controller_hit_t {
 
 /** Resolve the collider of an indexed shape.
  *
+ * The tiles a Terrain draws have none: bodies collide with its height field instead.
  * Boxes are exact, Sphere and IcoSphere become balls, Cylinder a cylinder and Capsule a
  * capsule while their scale keeps them round; every other mesh is its oriented bounding box.
  *
@@ -225,7 +226,8 @@ bool box_collider_ray(
     float *t,
     vec3 normal);
 
-/** Move a body by its velocity over a frame, sliding along the shapes of its scene.
+/** Move a body by its velocity over a frame, sliding along the shapes of its scene and the
+ * height fields of its terrains where their heights are resident.
  *
  * Only the shapes the spatial index finds around the swept capsule are tested. A body that
  * walks into a ledge up to its step height steps onto it, and a body with a probe sticks to
@@ -260,12 +262,13 @@ bool box_controller_fits(
     const box_controller_body_t *body,
     const Position *feet);
 
-/** Test whether a shape of the scene of a body lies anywhere below its feet.
+/** Test whether a shape or a resident terrain of the scene of a body lies anywhere below its
+ * feet.
  *
  * @param world The world
  * @param body The body
  * @param feet The bottom of the capsule
- * @return true when a ray down from the lower cap hits a shape
+ * @return true when a ray down from the lower cap hits a shape or a terrain
  */
 bool box_controller_ground_below(
     ecs_world_t *world,

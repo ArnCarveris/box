@@ -128,7 +128,8 @@ ECS_STRUCT(TileTerrain, {
 ECS_STRUCT(Terrain, {
     ecs_entity_t height;    /**< Texture graph node whose first channel is the height in meters */
     ecs_entity_t masks;     /**< Texture graph node whose four channels weigh the layers of the
-                             *   TextureBlend of the terrain, 0 for TextureBlend.mask */
+                             *   TextureBlend of the terrain, 0 for TextureBlend.mask; also the
+                             *   masks (such as rock, grass, snow) that box_terrain_mask reads */
     float tile_size;        /**< Meters along the edge of a tile of the finest level, 0 for 32 */
     int32_t resolution;     /**< Vertices along the edge of a tile, 0 for 65: rounded up to an
                              *   odd count, 5 to 257 */
@@ -143,7 +144,12 @@ ECS_STRUCT(Terrain, {
                              *   the tiles; with min_height 0 or above it for -256 and 1024 */
     float min_height;       /**< Lowest height of the terrain, the bottom of the culling bounds */
     int32_t budget;         /**< Tiles made per frame at most, 0 for 8; four times as many are
-                             *   dropped */
+                             *   dropped. Query tiles have a budget of their own as large */
+    float query_spacing;    /**< Meters between the heights the CPU queries read near a focus,
+                             *   0 for 0.5 */
+    float query_radius;     /**< Radius around a focus in meters within which the heights are
+                             *   on the CPU at query_spacing, 0 for 64; coarser heights reach
+                             *   BOX_TERRAIN_QUERY_SCALE times as far */
 });
 
 /** Tiles of a Terrain, written by the engine on the terrain entity, read only for
@@ -158,6 +164,217 @@ ECS_STRUCT(TerrainStatus, {
     int64_t gpu_bytes;      /**< Bytes of the height and mask images of the tiles and of their
                              *   copies the shaders read */
 });
+
+/** Query tiles of a Terrain, written by the engine on the terrain entity, read only for
+ * applications */
+ECS_STRUCT(TerrainQueryStatus, {
+    int32_t tiles;          /**< Query tiles that exist, all levels */
+    int32_t resident;       /**< Query tiles whose heights are on the CPU */
+    int32_t pending;        /**< Query tiles the foci and requests want that are not resident */
+    int32_t requested;      /**< Query tiles kept for box_terrain_request */
+    int64_t cpu_bytes;      /**< Bytes of the CPU copies of the heights and masks */
+});
+
+/** Levels of the query tiles of a Terrain: the finest at query_spacing, each next one
+ * BOX_TERRAIN_QUERY_SCALE times coarser and reaching as many times further */
+#define BOX_TERRAIN_QUERY_LEVELS (2)
+
+/** Factor between the spacing and the reach of two levels of query tiles */
+#define BOX_TERRAIN_QUERY_SCALE (8)
+
+/** @defgroup terrain_query Terrain queries
+ *
+ * A Terrain keeps CPU copies (TextureReadback) of its heights, and of its masks when it has a
+ * masks node, in query tiles of its own: square windows of the height graph at query_spacing
+ * within query_radius of every focus and coarser ones further out, made nearest first within
+ * the budget, independent of the tiles it draws. So a query gives the same answer whatever the
+ * level of detail the terrain draws with.
+ *
+ * Queries take x and z in the frame of the terrain, the coordinates its height graph is
+ * evaluated at: for a terrain without a transform the absolute position in the world (as
+ * box.world.absolute_x gives it), else relative to its Position. Heights are in that frame too.
+ * The finest resident level answers; where no level is resident a query returns false and
+ * leaves out zero rather than guessing.
+ *
+ * In script the functions of box.terrain take the terrain entity and f64 coordinates and return
+ * 0 where the terrain is not known:
+ *
+ * @code
+ * template Rock {
+ *   prop cell_x = i32: 0
+ *   prop cell_z = i32: 0
+ *   const x = cell_x * 32 + 16
+ *   const z = cell_z * 32 + 16
+ *   rock {
+ *     Position: {16, box.terrain.height(hills, x, z), 16}
+ *     Box: {}
+ *   }
+ * }
+ * @endcode
+ *
+ * height(terrain, x, z), normal_x, normal_y and normal_z(terrain, x, z), slope(terrain, x, z) in
+ * radians, mask(terrain, x, z, channel), resident(terrain, x, z) and known(terrain, x, z), whether
+ * the height there is resident at query_spacing or at any level.
+ * @{
+ */
+
+/** Get the height of a Terrain at a point.
+ *
+ * @param world The world
+ * @param terrain The terrain entity
+ * @param x X in the frame of the terrain
+ * @param z Z in the frame of the terrain
+ * @param out Receives the height in meters in the frame of the terrain, 0 when not known
+ * @return Whether the height there is resident
+ */
+bool box_terrain_height(
+    const ecs_world_t *world,
+    ecs_entity_t terrain,
+    double x,
+    double z,
+    float *out);
+
+/** Get the normal of a Terrain at a point, from the differences of its heights a spacing of
+ * the level that answers apart.
+ *
+ * @param world The world
+ * @param terrain The terrain entity
+ * @param x X in the frame of the terrain
+ * @param z Z in the frame of the terrain
+ * @param out Receives the unit normal, up when not known
+ * @return Whether the heights around the point are resident
+ */
+bool box_terrain_normal(
+    const ecs_world_t *world,
+    ecs_entity_t terrain,
+    double x,
+    double z,
+    vec3 out);
+
+/** Get the slope of a Terrain at a point: the angle of its surface to the horizontal.
+ *
+ * @param world The world
+ * @param terrain The terrain entity
+ * @param x X in the frame of the terrain
+ * @param z Z in the frame of the terrain
+ * @param out Receives the angle in radians, 0 when not known
+ * @return Whether the heights around the point are resident
+ */
+bool box_terrain_slope(
+    const ecs_world_t *world,
+    ecs_entity_t terrain,
+    double x,
+    double z,
+    float *out);
+
+/** Get the four mask channels of a Terrain at a point, the value of its masks node.
+ *
+ * @param world The world
+ * @param terrain The terrain entity, with a masks node
+ * @param x X in the frame of the terrain
+ * @param z Z in the frame of the terrain
+ * @param out Receives the channels, zero when not known
+ * @return Whether the masks there are resident
+ */
+bool box_terrain_mask(
+    const ecs_world_t *world,
+    ecs_entity_t terrain,
+    double x,
+    double z,
+    vec4 out);
+
+/** Check whether the heights of a rectangle of a Terrain are resident at query_spacing, and its
+ * masks too when it has a masks node.
+ *
+ * @param world The world
+ * @param terrain The terrain entity
+ * @param x0 Minimum x in the frame of the terrain
+ * @param z0 Minimum z in the frame of the terrain
+ * @param x1 Maximum x
+ * @param z1 Maximum z
+ * @return Whether every point of the rectangle within the terrain is resident
+ */
+bool box_terrain_resident(
+    const ecs_world_t *world,
+    ecs_entity_t terrain,
+    double x0,
+    double z0,
+    double x1,
+    double z1);
+
+/** Ask a Terrain to make the query tiles of a rectangle resident at query_spacing, also beyond
+ * query_radius. The terrain keeps them while it is asked every few frames, so ask again each
+ * frame until box_terrain_resident is true.
+ *
+ * @param world The world
+ * @param terrain The terrain entity
+ * @param x0 Minimum x in the frame of the terrain
+ * @param z0 Minimum z in the frame of the terrain
+ * @param x1 Maximum x
+ * @param z1 Maximum z
+ */
+void box_terrain_request(
+    ecs_world_t *world,
+    ecs_entity_t terrain,
+    double x0,
+    double z0,
+    double x1,
+    double z1);
+
+/** Get the local world position of the origin of the frame of a Terrain: a point (x, h, z) of
+ * the terrain is at origin + (x, h, z) in the local frame of the world (box/world.h).
+ *
+ * @param world The world
+ * @param terrain The terrain entity
+ * @param out Receives the position
+ */
+void box_terrain_origin(
+    const ecs_world_t *world,
+    ecs_entity_t terrain,
+    double out[3]);
+
+/** Get the ground of a Terrain below a point of the local frame of the world, as the
+ * controllers and particles collide with it.
+ *
+ * @param world The world
+ * @param terrain The terrain entity
+ * @param x Local world x
+ * @param z Local world z
+ * @param y Receives the local world y of the surface, may be NULL
+ * @param normal Receives the unit normal, may be NULL
+ * @return Whether the terrain is resident there
+ */
+bool box_terrain_ground(
+    const ecs_world_t *world,
+    ecs_entity_t terrain,
+    float x,
+    float z,
+    float *y,
+    vec3 normal);
+
+/** Find where a ray first hits the surface of a Terrain of a scene, marching through its
+ * resident heights. A ray that starts below a terrain hits it where it comes out and goes in
+ * again; parts of the ray over heights that are not resident do not hit.
+ *
+ * @param world The world
+ * @param scene The scene, 0 for the default scene
+ * @param origin Origin of the ray in the local frame of the world
+ * @param dir Direction of the ray, need not be normalized
+ * @param max_distance Longest distance along the unit direction that counts, 0 for no limit
+ * @param terrain Receives the terrain entity hit, may be NULL
+ * @param distance Receives the distance of the hit along the unit direction, may be NULL
+ * @return Whether the ray hit a terrain
+ */
+bool box_terrain_ray(
+    const ecs_world_t *world,
+    ecs_entity_t scene,
+    const vec3 origin,
+    const vec3 dir,
+    float max_distance,
+    ecs_entity_t *terrain,
+    float *distance);
+
+/** @} */
 
 /** Register the box.terrain module.
  *

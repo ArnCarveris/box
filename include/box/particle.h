@@ -101,6 +101,9 @@ ECS_STRUCT(ParticleCollision, {
     float friction;         /**< Share of the speed along the plane a hit loses, 0 to 1,
                              *   default 0.2 */
     bool die;               /**< Kill a particle that hits the plane instead, default false */
+    ecs_entity_t terrain;   /**< Terrain whose height below the emitter the plane takes every
+                             *   frame instead of height, where the terrain is resident there;
+                             *   0 for the plane at height */
 });
 
 /** An emitter that spawns rate times the frame delta particles a frame, carrying the fraction.

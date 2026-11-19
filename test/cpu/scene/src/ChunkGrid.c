@@ -2,7 +2,7 @@
  * @file ChunkGrid.c
  * @brief ChunkGrid: cells of a template in rings around the foci with their props, loads and
  * unloads as a focus moves with hysteresis, the budget nearest first, levels, 3D grids, world
- * origin shifts, gates and deleting the grid.
+ * origin shifts, gates, a terrain the cells wait for and deleting the grid.
  *
  * The templates are in test/assets/world/chunk_grid.flecs. Most cases use 10 m cells and a
  * focus at the center of cell 0 0, so distances to the nearest point of a cell are multiples of 5.
@@ -11,6 +11,8 @@
 #include <box.h>
 #include <bake_test.h>
 #include <math.h>
+#include "texture.h"
+#include "terrain.h"
 
 /** Create a world with box and the templates of the tests.
  *
@@ -782,6 +784,101 @@ void ChunkGrid_endless_walk(void) {
     test_int((int32_t)chunk_prop(world, cell, "Chunk", "cell_x"), cx);
     test_flt(ecs_get(world, cell, WorldTransform)->m[3][0], (float)(cx * 10.0 - o->x));
     test_int(chunk_children(world, grid), ecs_get(world, grid, ChunkGridStatus)->cells);
+
+    ecs_fini(world);
+}
+
+/** Height of the terrain of ChunkGrid_ground at a point of its frame.
+ *
+ * @param x X
+ * @param z Z
+ * @return The height
+ */
+static float chunk_ground_height(
+    double x,
+    double z)
+{
+    return (float)(0.1 * x - 0.05 * z + 2.0);
+}
+
+/** Store the copies of the query tiles of a terrain that have none, the null backend computing
+ * no image.
+ *
+ * @param world The world
+ * @param terrain The terrain
+ */
+static void chunk_ground_fill(
+    ecs_world_t *world,
+    ecs_entity_t terrain)
+{
+    int32_t count, i, j, k;
+    box_terrain_query_tile_t *const *tiles = box_terrain_query_tiles(world, terrain, &count);
+    for (k = 0; k < count; k ++) {
+        const box_terrain_query_tile_t *t = tiles[k];
+        box_texture_copy_t copy;
+        int32_t n = t->texels;
+        if (box_texture_readback(world, t->heights, &copy)) {
+            continue;
+        }
+
+        float *data = ecs_os_malloc_n(float, n * n);
+        for (j = 0; j < n; j ++) {
+            for (i = 0; i < n; i ++) {
+                data[j * n + i] = chunk_ground_height(
+                    t->window[0] + (double)i * t->window[2] / (n - 1),
+                    t->window[1] + (double)j * t->window[2] / (n - 1));
+            }
+        }
+
+        box_texture_readback_store(box_texture_readback_ensure(box_textures_get(world),
+            t->heights), data, n, n, ReadbackR32Float, 1, 0);
+    }
+}
+
+void ChunkGrid_ground(void) {
+    // scenes/chunk_grid
+    ecs_world_t *world = chunk_world();
+    char *path = box_app_locate("test/assets/world/chunk_grid_ground.flecs");
+    test_assert(path != NULL);
+    test_assert(ecs_script_run_file(world, path) == 0);
+    ecs_os_free(path);
+    ecs_entity_t terrain = ecs_lookup(world, "ground_terrain");
+    test_assert(terrain != 0);
+    ecs_entity_t grid = chunk_grid(world, "GroundChunk", 15, 0, 2, 0);
+    ecs_get_mut(world, grid, ChunkGrid)->ground = terrain;
+    ecs_modified(world, grid, ChunkGrid);
+    chunk_focus(world, 5, 0, 5);
+    ecs_progress(world, 0);
+
+    const ChunkGridStatus *s = ecs_get(world, grid, ChunkGridStatus);
+    test_assert(s->held > 0);
+    test_int(s->cells, 0);
+    test_assert(chunk_cell(world, grid, 0, 0, NULL) == 0);
+    ecs_progress(world, 0);
+    test_assert(chunk_cell(world, grid, 0, 0, NULL) == 0);
+
+    int32_t i;
+    for (i = 0; i < 5; i ++) {
+        chunk_ground_fill(world, terrain);
+        ecs_progress(world, 0);
+    }
+
+    s = ecs_get(world, grid, ChunkGridStatus);
+    test_int(s->held, 0);
+    test_int(s->pending, 0);
+    test_assert(s->cells >= 9);
+    int32_t cx, cz;
+    for (cz = -1; cz <= 1; cz ++) {
+        for (cx = -1; cx <= 1; cx ++) {
+            ecs_entity_t cell = chunk_cell(world, grid, cx, cz, NULL);
+            test_assert(cell != 0);
+            ecs_entity_t rock = ecs_lookup_child(world, cell, "rock");
+            test_assert(rock != 0);
+            const Position *p = ecs_get(world, rock, Position);
+            test_assert(p != NULL);
+            test_assert(fabsf(p->y - chunk_ground_height(cx * 10 + 5, cz * 10 + 5)) < 1e-3f);
+        }
+    }
 
     ecs_fini(world);
 }

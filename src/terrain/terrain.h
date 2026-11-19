@@ -162,4 +162,100 @@ void box_terrain_tile_surface(
 uint32_t box_terrain_row_bytes(
     int32_t resolution);
 
+/** Foci a terrain follows at most */
+#define BOX_TERRAIN_FOCI (8)
+
+/** Get the local position of a terrain: the Position of a root, else the translation of its
+ * world transform; a terrain without a transform is at the absolute origin of the world, so it
+ * stays in place when the origin shifts.
+ *
+ * @param world The world
+ * @param e The terrain
+ * @param out Receives the position
+ */
+void box_terrain_local(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    double out[3]);
+
+/** Get the foci of a terrain in its frame: those of its scene, else every focus.
+ *
+ * @param world The world
+ * @param e The terrain
+ * @param local The local position of the terrain
+ * @param out Receives x and z of each focus
+ * @return Number of foci
+ */
+int32_t box_terrain_foci(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    const double local[3],
+    double out[BOX_TERRAIN_FOCI][2]);
+
+/** Cells along the edge of a query tile of a Terrain */
+#define BOX_TERRAIN_QUERY_CELLS (64)
+
+/** Texels of the heights of a query tile beyond each of its edges */
+#define BOX_TERRAIN_QUERY_BORDER (1)
+
+/** A query tile of a Terrain: square windows of its height node, and of its masks node when it
+ * has one, with a TextureReadback each, set by the engine */
+typedef struct box_terrain_query_tile_t {
+    ecs_entity_t heights;   /**< Texture entity of the GraphFloat heights */
+    ecs_entity_t masks;     /**< Texture entity of the GraphFloat4 masks, 0 without */
+    int32_t level;          /**< Level, 0 at query_spacing */
+    int32_t ix;             /**< Column of the tile in the grid of its level */
+    int32_t iz;             /**< Row of the tile in the grid of its level */
+    int32_t texels;         /**< Texels along an edge of its windows */
+    double window[3];       /**< X and z of the first texel in the frame of the terrain and the
+                             *   meters from the first texel of a row to the last */
+    double distance;        /**< Distance to the nearest focus when it was last wanted */
+    bool wanted;            /**< The foci or a request want it this frame */
+} box_terrain_query_tile_t;
+
+/** Get the query tiles of a terrain, for tests.
+ *
+ * @param world The world
+ * @param terrain The terrain entity
+ * @param count Receives the number of tiles
+ * @return The tiles, NULL without any
+ */
+box_terrain_query_tile_t* const* box_terrain_query_tiles(
+    const ecs_world_t *world,
+    ecs_entity_t terrain,
+    int32_t *count);
+
+/** Get the terrains of a scene whose heights can be queried.
+ *
+ * @param world The world
+ * @param scene The scene, 0 for the default scene
+ * @param out Receives the terrain entities
+ * @param max Entities out holds
+ * @return Number of terrains written
+ */
+int32_t box_terrain_scene(
+    const ecs_world_t *world,
+    ecs_entity_t scene,
+    ecs_entity_t *out,
+    int32_t max);
+
+/** Check whether an entity is a tile a Terrain draws, which rays and collisions skip for the
+ * height field of the terrain.
+ *
+ * @param world The world
+ * @param e The entity
+ * @return Whether it has a TerrainTile
+ */
+bool box_terrain_is_tile(
+    const ecs_world_t *world,
+    ecs_entity_t e);
+
+/** Register TerrainQueryStatus, the system that keeps the query tiles of every terrain and the
+ * script functions of the queries, part of BoxTerrainImport after Terrain.
+ *
+ * @param world The world
+ */
+void box_terrain_query_import(
+    ecs_world_t *world);
+
 #endif

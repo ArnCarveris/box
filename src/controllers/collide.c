@@ -8,6 +8,7 @@
 
 #include "controllers.h"
 #include "../geometry/mesh_cache.h"
+#include "../terrain/terrain.h"
 #include <math.h>
 
 /** Iterations that close in on the nearest points of a segment and a shape */
@@ -150,7 +151,7 @@ bool box_collider_resolve(
     const box_mesh_t *mesh = cache && shape && shape->mesh
         ? box_mesh_cache_get(cache, shape->mesh)
         : NULL;
-    bool result = mesh && mesh->vertex_count;
+    bool result = mesh && mesh->vertex_count && !box_terrain_is_tile(world, e);
     vec3 c, e3;
     int32_t i, j;
     if (!result) {

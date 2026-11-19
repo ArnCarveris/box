@@ -7,6 +7,12 @@
             "box"
         ]
     },
+    "lang.c": {
+        "include": [
+            "../../../src/texture",
+            "../../../src/terrain"
+        ]
+    },
     "test": {
         "testsuites": [
             {
@@ -173,6 +179,15 @@
                     "crowded_stretch_walls",
                     "acute_corner_still",
                     "idle_keeps_position"
+                ]
+            },
+            {
+                "id": "TerrainWalk",
+                "testcases": [
+                    "walks_up_slope",
+                    "stops_at_cliff",
+                    "lands_on_terrain",
+                    "camera_collides"
                 ]
             }
         ]

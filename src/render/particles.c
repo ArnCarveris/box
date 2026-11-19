@@ -979,6 +979,35 @@ static void box_particles_block_forces(
     box_particles_block_wind(world, forces->global_wind * scale, out);
 }
 
+/** Get the ground collision of an emitter, its plane at the height of its terrain below the
+ * emitter where the terrain is resident there.
+ *
+ * @param world The world
+ * @param e The emitter
+ * @param transform World transform of the emitter
+ * @param buf Holds the collision with the height of the terrain
+ * @return The collision, NULL for none
+ */
+static const ParticleCollision* box_particles_collision(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    const WorldTransform *transform,
+    ParticleCollision *buf)
+{
+    const ParticleCollision *result = ecs_get(world, e, ParticleCollision);
+    float y = 0;
+    if (result && result->ground && result->terrain && ecs_is_alive(world, result->terrain) &&
+        box_terrain_ground(world, result->terrain, transform->m[3][0], transform->m[3][2], &y,
+            NULL))
+    {
+        *buf = *result;
+        buf->height = y;
+        result = buf;
+    }
+
+    return result;
+}
+
 /** Write the parameters of an emitter for this frame but its forces.
  *
  * @param emitter The emitter values
@@ -1466,8 +1495,9 @@ static void box_particles_emitter(
     float scale = box_transform_world_scale(transform);
     vec3 acceleration;
     glm_vec3_scale(ECS_CONST_CAST(float*, emitter->acceleration), scale, acceleration);
-    box_particles_block(emitter, transform, ecs_get(world, e, ParticleCollision), velocity,
-        age_us ? p->delta : 0.0f, scale, &entry->block);
+    ParticleCollision ground;
+    box_particles_block(emitter, transform, box_particles_collision(world, e, transform, &ground),
+        velocity, age_us ? p->delta : 0.0f, scale, &entry->block);
     if (timeline) {
         float speed = box_particle_timeline_speed(timeline, pool->time);
         entry->block.speed[0] *= speed;

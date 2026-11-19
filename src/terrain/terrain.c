@@ -270,4 +270,7 @@ void BoxTerrainImport(
     ECS_META_COMPONENT(world, TerrainStatus);
     ecs_add_pair(world, ecs_id(TerrainStatus), EcsOnInstantiate, EcsDontInherit);
     box_terrain_tiles_import(world);
+    ECS_META_COMPONENT(world, TerrainQueryStatus);
+    ecs_add_pair(world, ecs_id(TerrainQueryStatus), EcsOnInstantiate, EcsDontInherit);
+    box_terrain_query_import(world);
 }

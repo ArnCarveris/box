@@ -86,6 +86,10 @@ typedef struct box_spatial_layout_stats_t {
 
 /** Find the nearest entity a ray hits.
  *
+ * The ray also hits the height field of every Terrain of the scene where its heights are
+ * resident (box_terrain_ray): the hit entity is the terrain, whose filter call gets the distance
+ * of the surface, and the tiles the terrain draws are skipped.
+ *
  * @param world The world
  * @param ray The ray
  * @param hit Receives the entity and distance
@@ -96,7 +100,7 @@ bool box_spatial_ray(
     const box_spatial_ray_t *ray,
     box_spatial_hit_t *hit);
 
-/** Find every entity a ray hits, nearest first.
+/** Find every entity a ray hits, nearest first, the terrains as box_spatial_ray hits them.
  *
  * @param world The world
  * @param ray The ray

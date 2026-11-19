@@ -10,7 +10,9 @@
     "lang.c": {
         "include": [
             "../../../src/render",
-            "../../../src/spatial"
+            "../../../src/spatial",
+            "../../../src/texture",
+            "../../../src/terrain"
         ]
     },
     "test": {
@@ -223,6 +225,7 @@
                     "template_change",
                     "script",
                     "endless_walk",
+                    "ground",
                     "budget_ms_spreads_deletes",
                     "budget_ms_keeps_returning_cells"
                 ]

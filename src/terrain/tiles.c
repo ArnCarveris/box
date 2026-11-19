@@ -21,9 +21,6 @@
 
 ECS_COMPONENT_DECLARE(TerrainTile);
 
-/** Foci a terrain follows at most */
-#define BOX_TERRAIN_FOCI (8)
-
 /** Tiles the focus of a terrain wants at most */
 #define BOX_TERRAIN_MAX_TILES (4096)
 
@@ -881,15 +878,7 @@ static void box_terrain_resolve(
     }
 }
 
-/** Get the local position of a terrain: the Position of a root, else the translation of its
- * world transform; a terrain without a transform is at the absolute origin of the world, so it
- * stays in place when the origin shifts.
- *
- * @param world The world
- * @param e The terrain
- * @param out Receives the position
- */
-static void box_terrain_local(
+void box_terrain_local(
     const ecs_world_t *world,
     ecs_entity_t e,
     double out[3])
@@ -913,15 +902,7 @@ static void box_terrain_local(
     }
 }
 
-/** Get the foci of a terrain in its frame: those of its scene, else every focus.
- *
- * @param world The world
- * @param e The terrain
- * @param local The local position of the terrain
- * @param out Receives x and z of each focus
- * @return Number of foci
- */
-static int32_t box_terrain_foci(
+int32_t box_terrain_foci(
     const ecs_world_t *world,
     ecs_entity_t e,
     const double local[3],
@@ -1508,4 +1489,11 @@ void box_terrain_tiles_import(
         .callback = BoxTerrainOnRemoveTiles,
         .ctx = ctx
     });
+}
+
+bool box_terrain_is_tile(
+    const ecs_world_t *world,
+    ecs_entity_t e)
+{
+    return ecs_id(TerrainTile) && ecs_has(world, e, TerrainTile);
 }

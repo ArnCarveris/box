@@ -103,6 +103,10 @@ ECS_STRUCT(ChunkGrid, {
                           *   one unloads per frame, the others wait for the next frames */
     int32_t extent[3];   /**< Cells span -extent to extent - 1 along an axis, 0 for unbounded */
     int32_t seed;        /**< Set as the seed prop of the cells */
+    ecs_entity_t ground; /**< Terrain whose heights under a cell must be resident at its
+                          *   query_spacing before the cell loads or changes level, so its
+                          *   template can read them with box.terrain.height; 0 for none.
+                          *   The grid asks the terrain for them (box_terrain_request) */
 });
 
 /** Cells of a ChunkGrid, written by the engine next to it every frame */

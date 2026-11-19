@@ -352,6 +352,22 @@
                 ]
             },
             {
+                "id": "TerrainQuery",
+                "testcases": [
+                    "tiles_around_focus",
+                    "unknown_fails",
+                    "height_bilinear",
+                    "coarse_beyond_radius",
+                    "masks",
+                    "bounded",
+                    "request_beyond_radius",
+                    "terrain_position",
+                    "ray",
+                    "script",
+                    "remove_deletes_tiles"
+                ]
+            },
+            {
                 "id": "TextureGen",
                 "testcases": [
                     "noise_tiles",

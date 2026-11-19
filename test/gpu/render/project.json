@@ -2020,6 +2020,15 @@
                 ]
             },
             {
+                "id": "TerrainQuery",
+                "testcases": [
+                    "heights_match_graph",
+                    "ray_hits",
+                    "walk_slope_stop_at_cliff",
+                    "chunk_waits_for_terrain"
+                ]
+            },
+            {
                 "id": "TerrainMaterial",
                 "testcases": [
                     "mask_matches_graph",
