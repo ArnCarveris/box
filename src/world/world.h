@@ -57,4 +57,12 @@ void box_world_origin_import(
 void box_world_chunk_import(
     ecs_world_t *world);
 
+/** Register the hooks of Scatter, which the module registers, and the system that places
+ * its instances. Registered after ChunkGrid, so cells created in a frame scatter in it.
+ *
+ * @param world The world
+ */
+void box_world_scatter_import(
+    ecs_world_t *world);
+
 #endif

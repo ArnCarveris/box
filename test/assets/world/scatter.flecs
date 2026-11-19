@@ -1,0 +1,25 @@
+// Prefabs and a ChunkGrid template for the Scatter tests of test/cpu/scene/src/Scatter.c: every
+// 20 m cell scatters two prefabs on the plane, 4 per 100 m² at level 0 and 2 beyond.
+
+using box.transform
+using box.world
+
+prefab ScatterTree {}
+prefab ScatterBush {}
+
+// A cell whose ground child scatters trees and bushes, denser at level 0
+template ScatterCell {
+  prop level: i32 = 0
+
+  if level == 0 {
+    ground {
+      Position: {0, 0, 0}
+      Scatter: {items: [{ScatterTree, 1}, {ScatterBush, 1}], density: 4, spacing: 1, seed: 7}
+    }
+  } else {
+    ground {
+      Position: {0, 0, 0}
+      Scatter: {items: [{ScatterTree, 1}, {ScatterBush, 1}], density: 2, spacing: 1, seed: 7}
+    }
+  }
+}

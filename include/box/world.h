@@ -126,6 +126,13 @@ ECS_STRUCT(ChunkGridStatus, {
     float delete_ms;     /**< Of time_ms, the deletions of cells */
 });
 
+/** Cell of a ChunkGrid, set by the grid on every cell entity before its template */
+ECS_STRUCT(ChunkGridCell, {
+    int32_t cell[3];     /**< Absolute cell coordinate */
+    int32_t level;       /**< Level of the cell */
+    vec3 size;           /**< Cell size of the grid, its absolute corner is cell * size */
+});
+
 /** Callback of a ChunkGridGate: whether a cell may load or change level now.
  *
  * @param world The world
@@ -152,6 +159,93 @@ typedef struct ChunkGridGate {
 } ChunkGridGate;
 
 extern ECS_COMPONENT_DECLARE(ChunkGridGate);
+
+/** Prefabs a Scatter places at most */
+#define BOX_WORLD_SCATTER_ITEMS (16)
+
+/** Scatter entities a Scatter keeps clear of at most */
+#define BOX_WORLD_SCATTER_AVOID (4)
+
+/** How a Scatter spreads its candidates */
+ECS_ENUM(ScatterMode, {
+    ScatterJittered,     /**< One candidate per cell of a grid as large as the density asks,
+                          *   jittered within it but spacing from the edges of the cell */
+    ScatterPoisson       /**< Poisson disk: candidates on a grid of spacing / sqrt(2), each
+                          *   kept when no candidate within spacing has a higher priority */
+});
+
+/** A prefab of a Scatter and how often it is picked. In script {tree, 3}. */
+ECS_STRUCT(ScatterItem, {
+    ecs_entity_t prefab; /**< The prefab, 0 for an unused slot */
+    float weight;        /**< Weight of the prefab among the items, 0 or less for never */
+});
+
+/** Places instances of weighted prefabs over a region, as IsA children of the entity.
+ *
+ * The region is the cell of the nearest ChunkGrid ancestor (ChunkGridCell), or extent meters
+ * along X and Z from the entity. Placement is a function of absolute positions and the seed, so
+ * adjacent cells join without seams or duplicates and a revisited cell is the same.
+ *
+ * Candidates are thinned by density, then filtered by a mask channel of the ground (its soft
+ * edge thins them gradually), height and slope, and kept clear of the instances the avoid
+ * entities would place. Instances get Position, Rotation and Scale and are created in bulk.
+ *
+ * @par Ground
+ * A ground Terrain places them on its heights through its CPU queries and holds the scatter
+ * until they are resident under the region, asking the terrain for them; without one they
+ * stand on the plane Y 0 of the parent of the entity, flat. Positions assume that the entity
+ * and its ancestors up to the cell are neither rotated nor scaled.
+ *
+ * @code
+ * Scatter: {items: [{oak, 2}, {birch, 1}], density: 2, spacing: 4, ground: hills,
+ *           mask_channel: 1, mask_min: 0.5, mask_max: 1, mask_edge: 0.2, slope_max: 30}
+ * @endcode
+ */
+ECS_STRUCT(Scatter, {
+    ScatterItem items[16]; /**< Prefabs with their weights, unused slots 0 */
+    float density;       /**< Instances per 100 square meters, default 1; spacing caps it */
+    float spacing;       /**< Least distance between two instances in meters, default 0 */
+    ScatterMode mode;    /**< How candidates spread, default ScatterJittered */
+    int32_t seed;        /**< Seed of the placement */
+    float extent[2];     /**< Size of the region along X and Z from the entity, 0 0 for the
+                          *   cell of the ChunkGrid ancestor */
+    ecs_entity_t ground; /**< Terrain to place on, 0 for the plane Y 0 of the parent */
+    int32_t mask_channel; /**< Channel 0 to 3 of the masks of the ground Terrain that filters,
+                          *   -1 for none, default -1 */
+    float mask_min;      /**< Least value of the mask channel, default 0.5 */
+    float mask_max;      /**< Greatest value of the mask channel, default 1 */
+    float mask_edge;     /**< Width of the band outside min and max over which the density
+                          *   fades to 0, default 0 */
+    float height_min;    /**< Least height of the ground, applies when below height_max */
+    float height_max;    /**< Greatest height of the ground, default 0 for no height filter */
+    float slope_min;     /**< Least slope of the ground in degrees, default 0 */
+    float slope_max;     /**< Greatest slope of the ground in degrees, default 90 */
+    float align;         /**< 0 stands upright, 1 along the normal of the ground, default 0 */
+    float yaw;           /**< Random yaw range in degrees, default 360 */
+    float scale_min;     /**< Least uniform scale, default 1 */
+    float scale_max;     /**< Greatest uniform scale, default 1 */
+    float sink;          /**< Meters an instance is lowered into the ground, default 0 */
+    ecs_entity_t avoid[4]; /**< Scatter entities whose instances these keep clear of: their
+                          *   placement is evaluated where it would be, across cells */
+    float avoid_radius;  /**< Least distance from the instances of avoid in meters */
+    bool spatial_ignore; /**< Add box.spatial.SpatialIgnore to the instances */
+});
+
+/** What the last evaluation of a Scatter placed, written by the engine next to it */
+ECS_STRUCT(ScatterStatus, {
+    int32_t instances;   /**< Instances placed */
+    int32_t candidates;  /**< Candidates in the region */
+    int32_t thinned;     /**< Candidates removed by the density or the Poisson spacing */
+    int32_t filtered;    /**< Candidates removed by the mask, height or slope filters, or
+                          *   where the ground is not known */
+    int32_t avoided;     /**< Candidates removed by avoid */
+    int32_t evaluations; /**< Evaluations since the Scatter was added */
+    bool waiting;        /**< Waits for the heights of the ground under its region */
+    float time_ms;       /**< Milliseconds of the last evaluation, deletion included */
+    float create_ms;     /**< Of time_ms, the bulk creation of the instances */
+    float delete_ms;     /**< Of time_ms, the deletion of the instances before */
+    float per_ms;        /**< Instances placed per millisecond of time_ms */
+});
 
 /** A focus of the streaming systems: a WorldFocus entity or the camera of the first View */
 typedef struct box_world_focus_t {

@@ -536,7 +536,8 @@ static bool box_chunk_ready(
     return result;
 }
 
-/** Create the entity of a cell: a child of the grid at its corner with the template set.
+/** Create the entity of a cell: a child of the grid at its corner with its ChunkGridCell and
+ * the template set.
  *
  * @param world The world
  * @param grid The grid entity
@@ -565,6 +566,12 @@ static ecs_entity_t box_chunk_create(
         (float)(corner[2] - anchor[2])
     });
 
+    ecs_set(world, result, ChunkGridCell, {
+        .cell = {work->c[0], work->c[1], work->c[2]},
+        .level = work->level,
+        .size = {config->cell_size[0], config->cell_size[1], config->cell_size[2]}
+    });
+
     ecs_value_t value = ecs_value_new(world, config->template);
     box_chunk_prop_int(world, config->template, value.ptr, "cell_x", work->c[0]);
     box_chunk_prop_int(world, config->template, value.ptr, "cell_y", work->c[1]);
@@ -579,7 +586,8 @@ static ecs_entity_t box_chunk_create(
     return result;
 }
 
-/** Set the level prop of a loaded cell, which the template re-evaluates.
+/** Set the level of a loaded cell in its ChunkGridCell and its level prop, which the template
+ * re-evaluates.
  *
  * @param world The world
  * @param config The grid
@@ -592,9 +600,16 @@ static void box_chunk_set_level(
     box_chunk_cell_t *cell,
     int32_t level)
 {
-    const void *ptr = ecs_get_id(world, cell->entity, config->template);
+    const void *ptr = NULL;
     const ecs_type_info_t *ti = ecs_get_type_info(world, config->template);
+    ChunkGridCell *own = ecs_get_mut(world, cell->entity, ChunkGridCell);
     cell->level = level;
+    if (own) {
+        own->level = level;
+        ecs_modified(world, cell->entity, ChunkGridCell);
+    }
+
+    ptr = ecs_get_id(world, cell->entity, config->template);
     if (ptr && ti) {
         ecs_value_t value = ecs_value_init(world, config->template, ptr);
         box_chunk_prop_int(world, config->template, value.ptr, "level", level);

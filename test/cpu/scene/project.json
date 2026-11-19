@@ -229,6 +229,24 @@
                     "budget_ms_spreads_deletes",
                     "budget_ms_keeps_returning_cells"
                 ]
+            },
+            {
+                "id": "Scatter",
+                "testcases": [
+                    "defaults",
+                    "density_counts",
+                    "spacing_holds",
+                    "cells_seamless",
+                    "deterministic",
+                    "avoid",
+                    "reevaluate_on_change",
+                    "bulk_instances",
+                    "filter_mask",
+                    "filter_slope",
+                    "filter_height",
+                    "terrain_waits_and_aligns",
+                    "chunk_grid_script"
+                ]
             }
         ]
     }
