@@ -372,6 +372,13 @@ ECS_STRUCT(Distortion, {
  * saturate(1 - d / foam_width), broken up by the red of foam_texture. The direct and indirect
  * specular of PbrMaterial.roughness with an F0 of 0.02 (ior 1.33) adds on top.
  *
+ * Distant water keeps its sparkle: the slope variance that filtering takes away, of the minified
+ * normal map (from the shortened length of its filtered normals, Toksvig) and of the WaterWaves
+ * that fade out, widens the roughness (alpha squared grows by twice the variance) up to 0.5, or
+ * PbrMaterial.roughness if that is larger. The sun shows a broad glitter path in the distance and
+ * the reflections, the planar reflection and the blur of the scene behind soften there, while
+ * close water, whose waves and normal map are resolved, keeps PbrMaterial.roughness.
+ *
  * Waves are the PbrTextures.normal of the shape, scrolled by TextureScroll, under the travelling
  * waves of a WaterWaves if any; ripple_scale adds a second sample of it, moved by ripple_velocity
  * and whiteout blended. With a ripple_scale above 0 and a ripple_velocity its record is packed
@@ -450,7 +457,9 @@ ECS_STRUCT(WaterWave, {
  * in the frame the WaterFlow of the shape moves, and blends the normal map of the Water (its
  * PbrTextures.normal and ripples), weighted by detail, over it (whiteout blend). The refraction,
  * the planar reflection, the Fresnel and the glints follow that normal. A wave fades out where
- * it gets shorter than 4 pixels, so distant water does not shimmer.
+ * it gets shorter than 4 pixels, so distant water does not shimmer; the slope variance of what
+ * faded widens the roughness of the Water instead (see Water), so far water glitters rather
+ * than turning into a mirror.
  *
  * The phases are integrated in double precision on the CPU every frame with the total render
  * time and wrapped to 0..2 pi, so a speed or a WaterFlow velocity that changes moves the waves

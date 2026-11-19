@@ -924,6 +924,34 @@ fn water_flow_map(f: VertexOut, uv: vec2f) -> WaterFlowMap {
     return o;
 }
 
+// Shortening of a normal map normal that Toksvig ignores: that of the 8 bit quantization of an
+// unfiltered one, so water whose normal map is not minified keeps its roughness.
+const WATER_TOKSVIG_DEAD: f32 = 0.01;
+
+// Largest roughness the slope variance lost to filtering widens a Water to, so far water does
+// not look milky; a rougher material keeps its roughness.
+const WATER_MAX_ROUGHNESS: f32 = 0.5;
+
+// Slope variance a filtered (mip mapped) normal map normal n in tangent space lost, from how
+// much shorter than 1 it is (Toksvig): (1 - |n|) / |n|, less the quantization of an unfiltered
+// one.
+fn water_normal_variance(n: vec3f) -> f32 {
+    let len = length(n);
+    return max(1.0 - WATER_TOKSVIG_DEAD - len, 0.0) / max(len, 1e-3);
+}
+
+// Roughness of a Water widened by the slope variance lost to filtering (specular
+// antialiasing): alpha^2 grows by twice the variance (Toksvig, LEAN mapping), alpha the square
+// of the roughness, up to WATER_MAX_ROUGHNESS; without variance the roughness is unchanged.
+fn water_roughness(roughness: f32, variance: f32) -> f32 {
+    if (variance <= 0.0) {
+        return roughness;
+    }
+    let a = roughness * roughness;
+    let widened = sqrt(sqrt(a * a + 2.0 * variance));
+    return max(roughness, min(widened, WATER_MAX_ROUGHNESS));
+}
+
 // A sample of the normal map of a Water in tangent space at UVs, with the level of detail of
 // the derivatives.
 fn water_normal_sample(uv: vec2f, dx: vec2f, dy: vec2f) -> vec3f {
@@ -931,43 +959,64 @@ fn water_normal_sample(uv: vec2f, dx: vec2f, dy: vec2f) -> vec3f {
 }
 
 // The normal map of a Water at its UVs moved by the flow mapping (scaled by scale, then moved by
-// offset): the two phase samples cross faded.
-fn water_normal_flowed(flow: WaterFlowMap, uv: vec2f, scale: f32, offset: vec2f) -> vec3f {
+// offset): the two phase samples cross faded (xyz), and their slope variance lost to filtering
+// (water_normal_variance) cross faded the same way (w).
+fn water_normal_flowed(flow: WaterFlowMap, uv: vec2f, scale: f32, offset: vec2f) -> vec4f {
     let dx = flow.dx * scale;
     let dy = flow.dy * scale;
     let a = water_normal_sample((uv - flow.a) * scale + offset, dx, dy);
     let b = water_normal_sample((uv - flow.b) * scale + offset, dx, dy);
-    return mix(b, a, flow.weight);
+    return vec4f(mix(b, a, flow.weight),
+        mix(water_normal_variance(b), water_normal_variance(a), flow.weight));
 }
+
+// The layers of a Water fragment and the slope variance its normal map samples lost to
+// filtering (water_normal_variance), which widens its roughness (water_roughness).
+struct WaterLayers {
+    layers: Layers,
+    variance: f32,
+};
 
 // The layers of a Water fragment: those of hard_layers, its normal map blended with a second
 // sample at ripple_scale times the UVs moved by the ripple offset (whiteout blend). With
 // WaterFlow.textures both samples move with the flow (water_flow_map), the TextureScroll offset
 // on top. Water draws with the hard projection of a TextureMapping. ripple_scale is flat, the
-// same for every fragment of a quad, so the implicit derivatives hold.
+// same for every fragment of a quad, so the implicit derivatives hold. The variance is the sum
+// of that of the samples, as the whiteout blend adds their slopes.
 @diagnostic(off, derivative_uniformity)
-fn water_layers(f: VertexOut, geometric: vec3f, m: Material) -> Layers {
-    var layers = hard_layers(f, geometric);
+fn water_layers(f: VertexOut, geometric: vec3f, m: Material) -> WaterLayers {
+    var o: WaterLayers;
+    o.layers = hard_layers(f, geometric);
     let uv = water_uv(f);
     let flow = water_flow_map(f, uv);
     let flows = vo_water_flow(f).on;
     if (m.water_ripple_scale > 0.0) {
-        var n1: vec3f;
-        var n2: vec3f;
+        var n1: vec4f;
+        var n2: vec4f;
         if (flows) {
             n1 = water_normal_flowed(flow, uv, 1.0, normal_uv(f, vec2f(0.0)));
             n2 = water_normal_flowed(flow, uv, m.water_ripple_scale, m.water_ripple_offset);
         } else {
-            n1 = textureSample(normal_map, material_sampler, normal_uv(f, uv)).xyz * 2.0 - 1.0;
-            n2 = textureSample(normal_map, material_sampler,
+            let a = textureSample(normal_map, material_sampler, normal_uv(f, uv)).xyz * 2.0 -
+                1.0;
+            let b = textureSample(normal_map, material_sampler,
                 uv * m.water_ripple_scale + m.water_ripple_offset).xyz * 2.0 - 1.0;
+            n1 = vec4f(a, water_normal_variance(a));
+            n2 = vec4f(b, water_normal_variance(b));
         }
-        layers.normal = perturb(geometric, layers.frame, vec3f(n1.xy + n2.xy, n1.z * n2.z));
+        o.layers.normal = perturb(geometric, o.layers.frame,
+            vec3f(n1.xy + n2.xy, n1.z * n2.z));
+        o.variance = n1.w + n2.w;
     } else if (flows) {
         let n1 = water_normal_flowed(flow, uv, 1.0, normal_uv(f, vec2f(0.0)));
-        layers.normal = perturb(geometric, layers.frame, n1);
+        o.layers.normal = perturb(geometric, o.layers.frame, n1.xyz);
+        o.variance = n1.w;
+    } else {
+        // The sample of hard_layers again
+        let n1 = textureSample(normal_map, material_sampler, normal_uv(f, uv)).xyz * 2.0 - 1.0;
+        o.variance = water_normal_variance(n1);
     }
-    return layers;
+    return o;
 }
 
 // The normal of a Water fragment under the travelling waves of a set of the wave table: the
@@ -976,6 +1025,7 @@ fn water_layers(f: VertexOut, geometric: vec3f, m: Material) -> Layers {
 // to face +Y, as Water is seen from above. Each wave fades out as its wavelength shrinks from 4
 // to 2 pixels along the screen axes (dx and dy, the world XZ derivatives of the fragment), so
 // distant water does not alias; the steepness lifts by Q / count of the waves (Gerstner).
+// water_waves_variance gives the slope variance the fading takes away.
 fn water_waves_normal(index: u32, xz: vec2f, dx: vec2f, dy: vec2f, mapped: vec3f) -> vec3f {
     let s = water_wave_sets[min(index, WATER_WAVE_SETS - 1u)];
     let count = f32(max(s.count, 1u));
@@ -987,8 +1037,7 @@ fn water_waves_normal(index: u32, xz: vec2f, dx: vec2f, dy: vec2f, mapped: vec3f
         if (k <= 0.0 || w.b.x <= 0.0) {
             continue;
         }
-        let per_pixel = k * max(abs(dot(w.a.xy, dx)), abs(dot(w.a.xy, dy)));
-        let fade = smoothstep(2.0, 4.0, 6.2831853 / max(per_pixel, 1e-6));
+        let fade = water_wave_fade(w, dx, dy);
         let theta = k * dot(w.a.xy, xz) - w.a.w;
         slope += w.a.xy * (w.b.x * fade * cos(theta));
         lift += w.b.y * fade * sin(theta) / count;
@@ -997,6 +1046,31 @@ fn water_waves_normal(index: u32, xz: vec2f, dx: vec2f, dy: vec2f, mapped: vec3f
     let detail = normalize(vec3f(mapped.x * s.detail, max(mapped.y, 1e-3),
         mapped.z * s.detail));
     return normalize(vec3f(waves.x + detail.x, waves.y * detail.y, waves.z + detail.z));
+}
+
+// Weight of a wave of the wave table at a fragment of world XZ derivatives dx and dy: 1 where its
+// wavelength is at least 4 pixels along the screen axes, fading to 0 at 2 pixels.
+fn water_wave_fade(w: WaterWave, dx: vec2f, dy: vec2f) -> f32 {
+    let per_pixel = w.a.z * max(abs(dot(w.a.xy, dx)), abs(dot(w.a.xy, dy)));
+    return smoothstep(2.0, 4.0, 6.2831853 / max(per_pixel, 1e-6));
+}
+
+// Slope variance of a Water fragment under the travelling waves of a set of the wave table that
+// filtering took away: for every wave the variance of its slope, (amplitude times k)^2 / 2,
+// times how much it faded (water_wave_fade), plus the variance the normal map lost (mapped),
+// scaled by the square of the detail that scales its slopes. Close water, whose waves are all
+// resolved, adds nothing for the waves.
+fn water_waves_variance(index: u32, dx: vec2f, dy: vec2f, mapped: f32) -> f32 {
+    let s = water_wave_sets[min(index, WATER_WAVE_SETS - 1u)];
+    var variance = mapped * s.detail * s.detail;
+    for (var i = 0u; i < 4u; i++) {
+        let w = s.waves[i];
+        if (w.a.z <= 0.0 || w.b.x <= 0.0) {
+            continue;
+        }
+        variance += 0.5 * w.b.x * w.b.x * (1.0 - water_wave_fade(w, dx, dy));
+    }
+    return variance;
 }
 
 // Height of a cell of the window of the field of WaterRipples, 0 outside the window.
@@ -1450,13 +1524,18 @@ fn lit(f: VertexOut, shaded: Surface) -> vec4f {
         let geometric = normalize(f.normal);
         let dx = dpdx(f.world.xz);
         let dy = dpdy(f.world.xz);
-        var layers = water_layers(f, geometric, vo_water(f));
+        let w = water_layers(f, geometric, vo_water(f));
+        var layers = w.layers;
+        var variance = w.variance;
         let waves = vo_water_waves(f);
         if (waves != 0u) {
+            variance = water_waves_variance(waves, dx, dy, variance);
             layers.normal = water_waves_normal(waves, f.world.xz, dx, dy, layers.normal);
         }
         layers.normal = water_ripples_normal(f.world, layers.normal);
-        return water_lit(f, surface_of(f, front, geometric, layers));
+        var s = surface_of(f, front, geometric, layers);
+        s.roughness = water_roughness(s.roughness, variance);
+        return water_lit(f, s);
     }
 
     return lit(f, surface(f, front));
@@ -1535,7 +1614,9 @@ fn layered(f: VertexOut, front: bool, s: Surface, maps: texture_2d_array<f32>, f
     let geometric = normalize(f.normal);
     let dx = dpdx(f.world.xz);
     let dy = dpdy(f.world.xz);
-    var layers = water_layers(f, geometric, vo_water(f));
+    let w = water_layers(f, geometric, vo_water(f));
+    var layers = w.layers;
+    var variance = w.variance;
     let l = apply_layers(layer_maps, 0u, f, LayerSurface(layers.albedo.rgb, 0.0, layers.orm.g,
         1.0, layers.normal, geometric, 0.0));
     if (front) {
@@ -1543,10 +1624,13 @@ fn layered(f: VertexOut, front: bool, s: Surface, maps: texture_2d_array<f32>, f
     }
     let waves = vo_water_waves(f);
     if (waves != 0u) {
+        variance = water_waves_variance(waves, dx, dy, variance);
         layers.normal = water_waves_normal(waves, f.world.xz, dx, dy, layers.normal);
     }
     layers.normal = water_ripples_normal(f.world, layers.normal);
-    return water_lit(f, surface_of(f, front, geometric, layers));
+    var s = surface_of(f, front, geometric, layers);
+    s.roughness = water_roughness(s.roughness, variance);
+    return water_lit(f, s);
 }
 
 @fragment fn fs_layers(f: VertexOut, @builtin(front_facing) front: bool) -> @location(0) vec4f {

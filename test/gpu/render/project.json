@@ -364,6 +364,13 @@
                 ]
             },
             {
+                "id": "WaterGlint",
+                "testcases": [
+                    "far_glitter_wider",
+                    "near_unchanged"
+                ]
+            },
+            {
                 "id": "WaterCaustics",
                 "testcases": [
                     "lit_floor_varies",
