@@ -7,8 +7,8 @@ using state
 using assets
 
 // The ground of the forest: the floor in strips along X that leave the brook bed open, the bed
-// itself (slabs along the brook), gentle mounds, mossy boulders, and past the world a darker
-// floor, a dense tree line and hills that close the horizon.
+// itself (slabs along the brook), gentle mounds, mossy boulders (boulders.flecs), and past the
+// world a darker floor, a dense tree line and hills that close the horizon.
 assets {
   // A slab of the brook bed: its top runs across the brook (local Z) from (z1, y1) to (z2, y2),
   // len along it (local X) around x
@@ -54,33 +54,6 @@ assets {
     ForestBedSlab outer_n(len: slab_len, x: slab_x, z1: BROOK_STEP, y1: step_y, z2: BROOK_BANK, y2: BROOK_RIM_Y)
     ForestBedSlab rim_s(len: slab_len, x: slab_x, z1: 0 - BROOK_RIM, y1: 0 - BROOK_RIM_Y, z2: 0 - BROOK_BANK, y2: BROOK_RIM_Y)
     ForestBedSlab rim_n(len: slab_len, x: slab_x, z1: BROOK_BANK, y1: BROOK_RIM_Y, z2: BROOK_RIM, y2: 0 - BROOK_RIM_Y)
-  }
-
-  // A mossy boulder of size meters across, half buried, with a smaller stone against it
-  template ForestBoulderStone {
-    prop size: f32 = 1
-    prop seed: i32 = 1
-
-    const rng: flecs.script.math.Rng = {seed: seed}
-    const sx = 1 + rng.f(0.4)
-    const sy = 0.62 + rng.f(0.25)
-    const sz = 0.85 + rng.f(0.3)
-    const yaw = rng.f(6.28)
-    const ca = yaw + 1.2 + rng.f(1.5)
-
-    stone : ForestBoulder {
-      Position: {0, size * sy * 0.28, 0}
-      Rotation: {rng.f(0.3) - 0.15, yaw, rng.f(0.3) - 0.15}
-      Scale: {size * sx * 0.5, size * sy * 0.5, size * sz * 0.5}
-      IcoSphere: {radius: 1, segments: 2, smooth: true}
-    }
-
-    chip : ForestBoulder {
-      Position: {cos(ca) * size * 0.55, size * 0.06, sin(ca) * size * 0.55}
-      Rotation: {rng.f(0.4), rng.f(6.28), rng.f(0.4)}
-      Scale: {size * 0.2, size * 0.13, size * 0.17}
-      IcoSphere: {radius: 1, segments: 2, smooth: true}
-    }
   }
 }
 

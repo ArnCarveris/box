@@ -1,0 +1,37 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using state
+using assets
+
+// The boulders of the forest, of the ForestBoulder material of materials.flecs.
+assets {
+  // A mossy boulder of size meters across, half buried, with a smaller stone against it
+  template ForestBoulderStone {
+    prop size: f32 = 1
+    prop seed: i32 = 1
+
+    const rng: flecs.script.math.Rng = {seed: seed}
+    const sx = 1 + rng.f(0.4)
+    const sy = 0.62 + rng.f(0.25)
+    const sz = 0.85 + rng.f(0.3)
+    const yaw = rng.f(6.28)
+    const ca = yaw + 1.2 + rng.f(1.5)
+
+    stone : ForestBoulder {
+      Position: {0, size * sy * 0.28, 0}
+      Rotation: {rng.f(0.3) - 0.15, yaw, rng.f(0.3) - 0.15}
+      Scale: {size * sx * 0.5, size * sy * 0.5, size * sz * 0.5}
+      IcoSphere: {radius: 1, segments: 2, smooth: true}
+    }
+
+    chip : ForestBoulder {
+      Position: {cos(ca) * size * 0.55, size * 0.06, sin(ca) * size * 0.55}
+      Rotation: {rng.f(0.4), rng.f(6.28), rng.f(0.4)}
+      Scale: {size * 0.2, size * 0.13, size * 0.17}
+      IcoSphere: {radius: 1, segments: 2, smooth: true}
+    }
+  }
+}

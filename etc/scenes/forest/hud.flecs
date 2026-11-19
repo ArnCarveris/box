@@ -9,6 +9,7 @@ using box.layout
 using box.text
 using box.input
 using box.picking
+using box.surface
 using box.ui
 using box.widgets
 using box.transition
@@ -150,6 +151,11 @@ box {
   }
 }
 
+// The window of the scene, which the panel fills
+window {
+  Surface: {width: 1440, height: 960, vsync: true}
+}
+
 hud {
   Scene: {blend_modes: true}
 
@@ -251,7 +257,8 @@ hud {
   }
 
   view {
-    View: {camera: hud.camera, lighting: {enabled: false}, culling: {enabled: false}}
+    // Over the view of the scene, which is created after it
+    View: {camera: hud.camera, order: 1, lighting: {enabled: false}, culling: {enabled: false}}
   }
 }
 

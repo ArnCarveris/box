@@ -1,0 +1,26 @@
+using flecs.script
+using flecs.script.math
+using state
+
+// Helpers of the forest that every part uses: seeded hashes for scatter and seeds, and easing.
+state {
+  // Seeded hash of an index, 0..1: the same index and seed give the same value
+  fn forest_hash(i: f64, seed: f64) -> f64 {
+    const v = sin(i * 12.9898 + seed * 78.233 + 4.1414) * 43758.5453
+    v - floor(v)
+  }
+
+  // Hash of a position, 0..1, for scatter that depends on where a thing is
+  fn forest_hash2(x: f64, z: f64, seed: f64) -> f64 {
+    forest_hash(x * 0.731 + z * 1.913, seed)
+  }
+
+  fn forest_smooth(e0: f64, e1: f64, v: f64) -> f64 {
+    const t = clamp((v - e0) / (e1 - e0), 0, 1)
+    t * t * (3 - 2 * t)
+  }
+
+  fn forest_lerp(a: f64, b: f64, t: f64) -> f64 {
+    a + (b - a) * t
+  }
+}

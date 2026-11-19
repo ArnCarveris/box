@@ -14,7 +14,7 @@ using state
 // (forest_brook_bed_y); its water is at forest_brook_water_y. The brook flows east (+X) and drops
 // CASCADE_DROP over a rock ledge at CASCADE_X: east of it its bed and water are that much lower.
 //
-// The layout mask of the forest floor (materials.flecs) evaluates the same curves on the GPU,
+// The layout mask of the forest floor (floor.flecs) evaluates the same curves on the GPU,
 // from the same constants, so the path and the pebbles of the floor line up with these
 // functions.
 state {
@@ -88,26 +88,6 @@ state {
   export const ZONE_CLEARING: i32 = 0
   export const ZONE_FOREST: i32 = 1
   export const ZONE_BACKDROP: i32 = 2
-
-  // Seeded hash of an index, 0..1: the same index and seed give the same value
-  fn forest_hash(i: f64, seed: f64) -> f64 {
-    const v = sin(i * 12.9898 + seed * 78.233 + 4.1414) * 43758.5453
-    v - floor(v)
-  }
-
-  // Hash of a position, 0..1, for scatter that depends on where a thing is
-  fn forest_hash2(x: f64, z: f64, seed: f64) -> f64 {
-    forest_hash(x * 0.731 + z * 1.913, seed)
-  }
-
-  fn forest_smooth(e0: f64, e1: f64, v: f64) -> f64 {
-    const t = clamp((v - e0) / (e1 - e0), 0, 1)
-    t * t * (3 - 2 * t)
-  }
-
-  fn forest_lerp(a: f64, b: f64, t: f64) -> f64 {
-    a + (b - a) * t
-  }
 
   // Z of the brook centerline at x
   fn forest_brook_z(x: f64) -> f64 {

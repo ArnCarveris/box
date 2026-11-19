@@ -8,10 +8,6 @@ using box.surface
 using box.controllers
 using state
 
-window {
-  Surface: {width: 1440, height: 960, vsync: true}
-}
-
 // At eye height in the clearing, beside the path, looking down it to where it crosses the brook
 // and to the boulder on the far bank
 camera {

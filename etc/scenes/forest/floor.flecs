@@ -1,0 +1,151 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+using state
+using assets
+
+// The floor of this forest: the ground materials of materials.flecs blended by
+// forest_layout_mask, a mask over exactly the world that follows the layout functions of
+// layout.flecs, so the path and the pebbles of the floor line up with the brook and the path.
+assets {
+  // Weights of the floor layers over the whole world: red moss, green litter, blue path, alpha
+  // pebbles. With MappingWorld at WORLD_SIZE a top face samples it at u = z / WORLD_SIZE + 0.5,
+  // v = 0.5 - x / WORLD_SIZE, so the graph turns its coordinates back to world x and z and
+  // evaluates the brook, path and clearing of layout.flecs on them
+  forest_layout_mask {
+    uv { nodes.Coords: {} }
+    u { nodes.Split: {input: uv, channel: ChannelR} }
+    v { nodes.Split: {input: uv, channel: ChannelG} }
+    wx { nodes.Remap: {input: v, from_min: 0, from_max: 1, to_min: WORLD_HALF, to_max: 0 - WORLD_HALF} }
+    wz { nodes.Remap: {input: u, from_min: 0, from_max: 1, to_min: 0 - WORLD_HALF, to_max: WORLD_HALF} }
+
+    // forest_brook_distance
+    b1_k { nodes.Multiply: {a: wx, b_value: {BROOK_K1, 0, 0, 0}} }
+    b1_p { nodes.Add: {a: b1_k, b_value: {BROOK_P1, 0, 0, 0}} }
+    b1_sin { nodes.Sin: {input: b1_p} }
+    b1_cos { nodes.Cos: {input: b1_p} }
+    b2_k { nodes.Multiply: {a: wx, b_value: {BROOK_K2, 0, 0, 0}} }
+    b2_p { nodes.Add: {a: b2_k, b_value: {BROOK_P2, 0, 0, 0}} }
+    b2_sin { nodes.Sin: {input: b2_p} }
+    b2_cos { nodes.Cos: {input: b2_p} }
+    b1_z { nodes.Multiply: {a: b1_sin, b_value: {BROOK_A1, 0, 0, 0}} }
+    b2_z { nodes.Multiply: {a: b2_sin, b_value: {BROOK_A2, 0, 0, 0}} }
+    b_waves { nodes.Add: {a: b1_z, b: b2_z} }
+    b_z { nodes.Add: {a: b_waves, b_value: {BROOK_Z, 0, 0, 0}} }
+    b_dz { nodes.Subtract: {a: wz, b: b_z} }
+    b_adz { nodes.Abs: {input: b_dz} }
+    b1_s { nodes.Multiply: {a: b1_cos, b_value: {BROOK_A1 * BROOK_K1, 0, 0, 0}} }
+    b2_s { nodes.Multiply: {a: b2_cos, b_value: {BROOK_A2 * BROOK_K2, 0, 0, 0}} }
+    b_slope { nodes.Add: {a: b1_s, b: b2_s} }
+    b_tangent { nodes.Combine: {r_value: 1, g: b_slope, b_value: 0, a_value: 0} }
+    b_len { nodes.Length: {input: b_tangent} }
+    brook_d { nodes.Divide: {a: b_adz, b: b_len} }
+
+    // forest_path_distance
+    p1_k { nodes.Multiply: {a: wz, b_value: {PATH_K1, 0, 0, 0}} }
+    p1_p { nodes.Add: {a: p1_k, b_value: {PATH_P1, 0, 0, 0}} }
+    p1_sin { nodes.Sin: {input: p1_p} }
+    p1_cos { nodes.Cos: {input: p1_p} }
+    p2_k { nodes.Multiply: {a: wz, b_value: {PATH_K2, 0, 0, 0}} }
+    p2_p { nodes.Add: {a: p2_k, b_value: {PATH_P2, 0, 0, 0}} }
+    p2_sin { nodes.Sin: {input: p2_p} }
+    p2_cos { nodes.Cos: {input: p2_p} }
+    p1_x { nodes.Multiply: {a: p1_sin, b_value: {PATH_A1, 0, 0, 0}} }
+    p2_x { nodes.Multiply: {a: p2_sin, b_value: {PATH_A2, 0, 0, 0}} }
+    p_waves { nodes.Add: {a: p1_x, b: p2_x} }
+    p_x { nodes.Add: {a: p_waves, b_value: {PATH_X, 0, 0, 0}} }
+    p_dx { nodes.Subtract: {a: wx, b: p_x} }
+    p_adx { nodes.Abs: {input: p_dx} }
+    p1_s { nodes.Multiply: {a: p1_cos, b_value: {PATH_A1 * PATH_K1, 0, 0, 0}} }
+    p2_s { nodes.Multiply: {a: p2_cos, b_value: {PATH_A2 * PATH_K2, 0, 0, 0}} }
+    p_slope { nodes.Add: {a: p1_s, b: p2_s} }
+    p_tangent { nodes.Combine: {r_value: 1, g: p_slope, b_value: 0, a_value: 0} }
+    p_len { nodes.Length: {input: p_tangent} }
+    path_d { nodes.Divide: {a: p_adx, b: p_len} }
+
+    // forest_clearing_distance
+    c1_k { nodes.Multiply: {a: wx, b_value: {CLEARING_K1, 0, 0, 0}} }
+    c1_p { nodes.Add: {a: c1_k, b_value: {CLEARING_P1, 0, 0, 0}} }
+    c1_sin { nodes.Sin: {input: c1_p} }
+    c1_r { nodes.Multiply: {a: c1_sin, b_value: {CLEARING_A1, 0, 0, 0}} }
+    c2_k { nodes.Multiply: {a: wz, b_value: {CLEARING_K2, 0, 0, 0}} }
+    c2_p { nodes.Add: {a: c2_k, b_value: {CLEARING_P2, 0, 0, 0}} }
+    c2_cos { nodes.Cos: {input: c2_p} }
+    c2_r { nodes.Multiply: {a: c2_cos, b_value: {CLEARING_A2, 0, 0, 0}} }
+    c_waves { nodes.Add: {a: c1_r, b: c2_r} }
+    c_edge { nodes.Add: {a: c_waves, b_value: {CLEARING_R, 0, 0, 0}} }
+    c_xz { nodes.Combine: {r: wx, g: wz, b_value: 0, a_value: 0} }
+    c_r { nodes.Length: {input: c_xz} }
+    clearing_d { nodes.Subtract: {a: c_r, b: c_edge} }
+    outside { nodes.Smoothstep: {input: clearing_d, edge0_value: {-2, 0, 0, 0}, edge1_value: {3, 0, 0, 0}} }
+    inside { nodes.Subtract: {a_value: {1, 0, 0, 0}, b: outside} }
+
+    // Noise that breaks up the borders and spreads the moss
+    spread { nodes.Noise: {frequency: 12, octaves: 4, seed: 61} }
+    ragged { nodes.Noise: {frequency: 96, octaves: 3, seed: 62} }
+
+    // Pebbles over the bed and the lower banks, out to about BROOK_HALF_WIDTH + 0.6
+    pebble_jitter { nodes.Remap: {input: ragged, from_min: 0, from_max: 1, to_min: -0.45, to_max: 0.45} }
+    pebble_d { nodes.Add: {a: brook_d, b: pebble_jitter} }
+    pebble_out {
+      nodes.Smoothstep: {
+        input: pebble_d,
+        edge0_value: {BROOK_HALF_WIDTH + 0.2, 0, 0, 0},
+        edge1_value: {BROOK_HALF_WIDTH + 1, 0, 0, 0}
+      }
+    }
+
+    pebble { nodes.Subtract: {a_value: {1, 0, 0, 0}, b: pebble_out} }
+
+    // The path, PATH_HALF_WIDTH to either side with a ragged edge
+    path_jitter { nodes.Remap: {input: ragged, from_min: 0, from_max: 1, to_min: -0.25, to_max: 0.25} }
+    path_dj { nodes.Add: {a: path_d, b: path_jitter} }
+    path_out {
+      nodes.Smoothstep: {
+        input: path_dj,
+        edge0_value: {PATH_HALF_WIDTH - 0.2, 0, 0, 0},
+        edge1_value: {PATH_HALF_WIDTH + 0.25, 0, 0, 0}
+      }
+    }
+
+    path { nodes.Subtract: {a_value: {1, 0, 0, 0}, b: path_out} }
+
+    // Moss in patches through the forest, more of it in the clearing and along the brook
+    near_out { nodes.Smoothstep: {input: brook_d, edge0_value: {2.5, 0, 0, 0}, edge1_value: {8, 0, 0, 0}} }
+    near { nodes.Subtract: {a_value: {1, 0, 0, 0}, b: near_out} }
+    moss_in { nodes.Multiply: {a: inside, b_value: {0.22, 0, 0, 0}} }
+    moss_near { nodes.Multiply: {a: near, b_value: {0.25, 0, 0, 0}} }
+    moss_a { nodes.Add: {a: spread, b: moss_in} }
+    moss_b { nodes.Add: {a: moss_a, b: moss_near} }
+    moss { nodes.Smoothstep: {input: moss_b, edge0_value: {0.5, 0, 0, 0}, edge1_value: {0.66, 0, 0, 0}} }
+    litter { nodes.Subtract: {a_value: {1, 0, 0, 0}, b: moss} }
+
+    // The pebbles cover the path where it crosses, both cover the moss and litter
+    dry { nodes.Subtract: {a_value: {1, 0, 0, 0}, b: pebble} }
+    path_w { nodes.Multiply: {a: path, b: dry} }
+    open { nodes.Subtract: {a_value: {1, 0, 0, 0}, b: path_w} }
+    rest { nodes.Multiply: {a: open, b: dry} }
+    moss_w { nodes.Multiply: {a: moss, b: rest} }
+    litter_w { nodes.Multiply: {a: litter, b: rest} }
+    weights { nodes.Combine: {r: moss_w, g: litter_w, b: path_w, a: pebble} }
+
+    Graph: {output: weights, width: 2048, format: GraphLinear}
+  }
+
+  // The forest floor, the mounds on it and the brook bed
+  prefab ForestFloor {
+    Rgb: {forest_seasonal(season, 255, 255, 250, 226), forest_seasonal(season, 255, 255, 244, 216), forest_seasonal(season, 255, 255, 236, 204)}
+    PbrMaterial: {roughness: 1}
+    texture.Blend: {
+      mask: forest_layout_mask,
+      layers: [layer_moss, layer_litter, layer_path, layer_pebbles],
+      heights: [moss_height, litter_height, path_height, pebble_height],
+      contrast: 12
+    }
+    texture.Layers: {layers: [layer_fallen_leaves]}
+    texture.Mapping: {mode: MappingWorld, size: WORLD_SIZE}
+  }
+}
