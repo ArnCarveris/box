@@ -277,6 +277,51 @@ ECS_STRUCT(MeshNormals, {
     bool flat;         /**< Give every triangle its face normal */
 });
 
+/** Node of a MeshGraph that cuts a Mesh with a plane: the vertices in front of the plane, on the
+ * side its normal points to, move onto it, so the mesh gets a flat face there, as a boulder
+ * split along a joint or a slab with a flat bed. The topology is kept.
+ *
+ * With a relief the face is not quite flat: each moved vertex sinks below the plane by fractal
+ * noise of its position, up to relief. Normals are kept; a Normals node with an angle after it
+ * gives the face a hard edge.
+ */
+ECS_STRUCT(MeshCut, {
+    ecs_entity_t mesh; /**< Mesh input node */
+    vec3 position;     /**< A point of the plane */
+    vec3 normal;       /**< Normal of the plane toward the part cut away, zero for +Y */
+    float relief;      /**< Largest depth of the noise on the face, 0 for a flat face */
+    float frequency;   /**< Noise cells per unit of length of the relief, 0 for 1 */
+    int32_t seed;      /**< Seed of the relief */
+});
+
+/** Node of a MeshGraph that layers a Mesh into strata along an axis, as bedded sandstone or
+ * shale: the mesh is cut into layers of a thickness that each pull in or stand out by a random
+ * fraction across the axis, and the coordinate along the axis steps into terraces, flat at the
+ * bed of every layer and steep between them.
+ */
+ECS_STRUCT(MeshStrata, {
+    ecs_entity_t mesh; /**< Mesh input node */
+    vec3 axis;         /**< Direction across the layers through the origin, zero for +Y */
+    float thickness;   /**< Thickness of a layer, 0 for 0.2 */
+    float sharpness;   /**< 0 keeps the coordinate along the axis, 1 steps it into flat
+                        *   terraces; clamped to 0..1 */
+    float inset;       /**< Largest fraction a layer pulls in toward the axis, chosen per layer */
+    int32_t seed;      /**< Seed of the insets and of the phase of the layers */
+});
+
+/** Node of a MeshGraph that turns and scales the points of a Points at random, so the copies of
+ * an InstanceOnPoints differ: each point spins about its Y axis, tilts its Y axis and scales
+ * uniformly between scale_min and scale_max. Attributes are kept.
+ */
+ECS_STRUCT(MeshJitter, {
+    ecs_entity_t points; /**< Points input node */
+    float spin;          /**< Largest turn about the Y axis of a point in radians, both ways */
+    float tilt;          /**< Largest tilt of the Y axis of a point in radians */
+    float scale_min;     /**< Least factor of the scale, 0 for 1 */
+    float scale_max;     /**< Largest factor of the scale, below scale_min for scale_min */
+    int32_t seed;        /**< Seed of the turns and scales */
+});
+
 /** Float attribute of the elements of a value, such as the fraction along a curve */
 typedef struct box_mg_attr_t {
     char name[BOX_MESH_ATTR_NAME]; /**< Name, unique in the value */

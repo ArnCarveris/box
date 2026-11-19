@@ -585,6 +585,9 @@ static void box_mesh_register(
     ECS_META_COMPONENT(world, MeshInstanceOnPoints);
     ECS_META_COMPONENT(world, MeshDisplace);
     ECS_META_COMPONENT(world, MeshNormals);
+    ECS_META_COMPONENT(world, MeshCut);
+    ECS_META_COMPONENT(world, MeshStrata);
+    ECS_META_COMPONENT(world, MeshJitter);
     ecs_set_name_prefix(world, NULL);
     ecs_set_scope(world, module);
 

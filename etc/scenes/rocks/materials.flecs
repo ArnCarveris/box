@@ -1,0 +1,214 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+
+// Procedural textures and materials of the rocks. Every stone is a set of texture graphs made by
+// one template with a map prop (albedo, normal and ORM), drawn with a triplanar object mapping
+// so a rock of any shape shows no seams or stretching, and a moss TextureLayer that settles on
+// the faces that look up.
+rocks {
+  // The stones of a Rock (its stone prop)
+  export const ROCK_GRANITE: i32 = 0
+  export const ROCK_SANDSTONE: i32 = 1
+  export const ROCK_FOREST: i32 = 2
+
+  // The maps of a stone template
+  export const ROCK_MAP_ALBEDO: i32 = 0
+  export const ROCK_MAP_NORMAL: i32 = 1
+  export const ROCK_MAP_ORM: i32 = 2
+
+  // Meters one repeat of the stone textures covers
+  export const ROCK_MAP_SIZE: f32 = 2.5
+  export const ROCK_MAP_RES: i32 = 1024
+
+  // Granite: a fine grain of gray quartz, pink feldspar and black mica, weathered in broad
+  // light and dark blotches, with hairline cracks
+  template RockGraniteMap {
+    prop map: i32 = 0
+
+    grain { nodes.Cells: {distance: CellsNearest, count: 60000, seed: 21} }
+    grain_id { nodes.Split: {input: grain, channel: ChannelG} }
+    speck { nodes.Noise: {frequency: 360, octaves: 2, seed: 22} }
+    mica { nodes.Smoothstep: {input: speck, edge0_value: {0.66, 0, 0, 0}, edge1_value: {0.7, 0, 0, 0}} }
+    blotch { nodes.Noise: {frequency: 5, octaves: 5, seed: 23} }
+    warp_n { nodes.Noise: {channels: 3, frequency: 4, octaves: 3, seed: 25} }
+    warp { nodes.Warp: {offset: warp_n, amount_value: 0.06} }
+    hair_c { nodes.Cells: {coords: warp, distance: CellsEdge, count: 10, edge: 0.012, seed: 24} }
+    hair { nodes.Split: {input: hair_c, channel: ChannelR} }
+    hair_shade { nodes.Remap: {input: hair, from_min: 0, from_max: 1, to_min: 0.6, to_max: 1, clamp: true} }
+    relief { nodes.Mix: {a: blotch, b: grain_id, factor_value: {0.25, 0, 0, 0}} }
+    height { nodes.Multiply: {a: relief, b: hair_shade} }
+
+    if map == ROCK_MAP_ALBEDO {
+      crystals {
+        nodes.Ramp: {
+          input: grain_id,
+          keys: [
+            {0.15, {104, 104, 106}}, {0.4, {168, 166, 164}}, {0.6, {196, 194, 190}},
+            {0.75, {204, 178, 166}}, {0.9, {222, 220, 216}}
+          ]
+        }
+      }
+
+      micaed { nodes.Mix: {a: crystals, b_value: {0.02, 0.02, 0.022, 1}, factor: mica} }
+      weather { nodes.Ramp: {input: blotch, keys: [{0.3, {150, 152, 150}}, {0.55, {214, 212, 206}}, {0.8, {255, 250, 240}}]} }
+      weathered { nodes.Multiply: {a: micaed, b: weather} }
+      color { nodes.Multiply: {a: weathered, b: hair_shade} }
+      Graph: {output: color, width: ROCK_MAP_RES}
+    } else if map == ROCK_MAP_NORMAL {
+      bumps { nodes.Normal: {height: height, strength: 2} }
+      Graph: {output: bumps, width: ROCK_MAP_RES, format: GraphLinear}
+    } else {
+      occlusion { nodes.Remap: {input: hair_shade, from_min: 0.6, from_max: 1, to_min: 0.6, to_max: 1, clamp: true} }
+      rough { nodes.Remap: {input: mica, from_min: 0, from_max: 1, to_min: 0.9, to_max: 0.55, clamp: true} }
+      orm { nodes.Combine: {r: occlusion, g: rough, b_value: 0, a_value: 1} }
+      Graph: {output: orm, width: ROCK_MAP_RES, format: GraphLinear}
+    }
+  }
+
+  // Sandstone: beds of ochre, buff and rust stretched along the layers (the v of the side
+  // projections), cross bedded by a warp, with a fine sandy grain
+  template RockSandstoneMap {
+    prop map: i32 = 0
+
+    warp_n { nodes.Noise: {channels: 3, frequency: 3, octaves: 3, seed: 31} }
+    warp { nodes.Warp: {offset: warp_n, amount_value: 0.08} }
+    stretched { nodes.Transform: {coords: warp, scale: {1, 14, 1}} }
+    beds { nodes.Noise: {coords: stretched, frequency: 2, octaves: 4, seed: 32} }
+    sand { nodes.Noise: {frequency: 300, octaves: 2, seed: 33} }
+    stain { nodes.Noise: {frequency: 6, octaves: 4, seed: 34} }
+    height { nodes.Mix: {a: beds, b: sand, factor_value: {0.55, 0, 0, 0}} }
+
+    if map == ROCK_MAP_ALBEDO {
+      layers {
+        nodes.Ramp: {
+          input: beds,
+          keys: [
+            {0.25, {150, 92, 58}}, {0.4, {196, 136, 86}}, {0.5, {214, 168, 112}},
+            {0.6, {226, 192, 142}}, {0.72, {184, 118, 72}}, {0.85, {222, 180, 128}}
+          ]
+        }
+      }
+
+      stained { nodes.Ramp: {input: stain, keys: [{0.3, {190, 180, 176}}, {0.6, {255, 250, 244}}]} }
+      grained { nodes.Ramp: {input: sand, keys: [{0.3, {222, 222, 222}}, {0.7, {255, 255, 255}}]} }
+      tinted { nodes.Multiply: {a: layers, b: stained} }
+      color { nodes.Multiply: {a: tinted, b: grained} }
+      Graph: {output: color, width: ROCK_MAP_RES}
+    } else if map == ROCK_MAP_NORMAL {
+      bumps { nodes.Normal: {height: height, strength: 2} }
+      Graph: {output: bumps, width: ROCK_MAP_RES, format: GraphLinear}
+    } else {
+      occlusion { nodes.Remap: {input: height, from_min: 0.1, from_max: 0.6, to_min: 0.6, to_max: 1, clamp: true} }
+      orm { nodes.Combine: {r: occlusion, g_value: 0.94, b_value: 0, a_value: 1} }
+      Graph: {output: orm, width: ROCK_MAP_RES, format: GraphLinear}
+    }
+  }
+
+  // Forest stone: a dark gray green gneiss of ridged folds, darkened by weather, with spots of
+  // pale lichen
+  template RockForestMap {
+    prop map: i32 = 0
+
+    ridges { nodes.Noise: {frequency: 5, octaves: 6, fractal: NoiseRidged, seed: 41} }
+    grain { nodes.Noise: {frequency: 128, octaves: 2, seed: 42} }
+    warp_n { nodes.Noise: {channels: 3, frequency: 4, octaves: 3, seed: 45} }
+    warp { nodes.Warp: {offset: warp_n, amount_value: 0.08} }
+    cracks_c { nodes.Cells: {coords: warp, distance: CellsEdge, count: 12, edge: 0.015, seed: 43} }
+    cracks { nodes.Split: {input: cracks_c, channel: ChannelR} }
+    crack_shade { nodes.Remap: {input: cracks, from_min: 0, from_max: 1, to_min: 0.65, to_max: 1, clamp: true} }
+    relief { nodes.Mix: {a: ridges, b: grain, factor_value: {0.25, 0, 0, 0}} }
+    height { nodes.Multiply: {a: relief, b: crack_shade} }
+
+    if map == ROCK_MAP_ALBEDO {
+      stone {
+        nodes.Ramp: {
+          input: relief,
+          keys: [{0.2, {56, 58, 54}}, {0.45, {92, 94, 86}}, {0.7, {128, 128, 116}}, {0.9, {150, 148, 134}}]
+        }
+      }
+
+      spots { nodes.Noise: {frequency: 40, octaves: 3, seed: 44} }
+      lichen { nodes.Smoothstep: {input: spots, edge0_value: {0.66, 0, 0, 0}, edge1_value: {0.7, 0, 0, 0}} }
+      shaded { nodes.Multiply: {a: stone, b: crack_shade} }
+      color { nodes.Mix: {a: shaded, b_value: {0.2, 0.22, 0.15, 1}, factor: lichen} }
+      Graph: {output: color, width: ROCK_MAP_RES}
+    } else if map == ROCK_MAP_NORMAL {
+      bumps { nodes.Normal: {height: height, strength: 3} }
+      Graph: {output: bumps, width: ROCK_MAP_RES, format: GraphLinear}
+    } else {
+      occlusion { nodes.Remap: {input: crack_shade, from_min: 0.65, from_max: 1, to_min: 0.5, to_max: 1, clamp: true} }
+      orm { nodes.Combine: {r: occlusion, g_value: 0.86, b_value: 0, a_value: 1} }
+      Graph: {output: orm, width: ROCK_MAP_RES, format: GraphLinear}
+    }
+  }
+
+  // Moss: cushions of small lumps from deep green to a sunlit yellow green
+  template RockMossMap {
+    prop map: i32 = 0
+
+    cushion { nodes.Noise: {frequency: 90, octaves: 4, fractal: NoiseBillow, seed: 51} }
+    patch { nodes.Noise: {frequency: 6, octaves: 4, seed: 52} }
+    height { nodes.Mix: {a: cushion, b: patch, factor_value: {0.3, 0, 0, 0}} }
+
+    if map == ROCK_MAP_ALBEDO {
+      color {
+        nodes.Ramp: {
+          input: height,
+          keys: [{0.2, {30, 42, 16}}, {0.4, {54, 76, 22}}, {0.6, {84, 104, 30}}, {0.8, {128, 134, 54}}]
+        }
+      }
+
+      Graph: {output: color, width: ROCK_MAP_RES}
+    } else if map == ROCK_MAP_NORMAL {
+      bumps { nodes.Normal: {height: height, strength: 3} }
+      Graph: {output: bumps, width: ROCK_MAP_RES, format: GraphLinear}
+    } else {
+      occlusion { nodes.Remap: {input: height, from_min: 0.1, from_max: 0.6, to_min: 0.5, to_max: 1, clamp: true} }
+      orm { nodes.Combine: {r: occlusion, g_value: 0.95, b_value: 0, a_value: 1} }
+      Graph: {output: orm, width: ROCK_MAP_RES, format: GraphLinear}
+    }
+  }
+
+  RockGraniteMap rock_granite_albedo(map: ROCK_MAP_ALBEDO)
+  RockGraniteMap rock_granite_normal(map: ROCK_MAP_NORMAL)
+  RockGraniteMap rock_granite_orm(map: ROCK_MAP_ORM)
+  RockSandstoneMap rock_sandstone_albedo(map: ROCK_MAP_ALBEDO)
+  RockSandstoneMap rock_sandstone_normal(map: ROCK_MAP_NORMAL)
+  RockSandstoneMap rock_sandstone_orm(map: ROCK_MAP_ORM)
+  RockForestMap rock_forest_albedo(map: ROCK_MAP_ALBEDO)
+  RockForestMap rock_forest_normal(map: ROCK_MAP_NORMAL)
+  RockForestMap rock_forest_orm(map: ROCK_MAP_ORM)
+  RockMossMap rock_moss_albedo(map: ROCK_MAP_ALBEDO)
+  RockMossMap rock_moss_normal(map: ROCK_MAP_NORMAL)
+  RockMossMap rock_moss_orm(map: ROCK_MAP_ORM)
+
+  // Where moss grows on a rock, in patches, sampled with the world mapping of the moss layer
+  rock_moss_mask {
+    patches { nodes.Noise: {frequency: 4, octaves: 4, seed: 61} }
+    moss { nodes.Smoothstep: {input: patches, edge0_value: {0.38, 0, 0, 0}, edge1_value: {0.52, 0, 0, 0}} }
+    Graph: {output: moss, width: 512, format: GraphSingle}
+  }
+
+  // Moss on the faces of a rock that look up, in patches; a Rock makes one with its moss as
+  // the amount
+  template RockMossLayer {
+    prop amount: f32 = 0.5
+
+    texture.Layer: {
+      amount: amount,
+      facing: 0.6,
+      mask: rock_moss_mask,
+      cavity: 0.2,
+      contrast: 6,
+      normal: 0.8
+    }
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 0.95}
+    PbrTextures: {albedo: rock_moss_albedo, normal: rock_moss_normal, orm: rock_moss_orm}
+    texture.Mapping: {mode: MappingWorld, size: 1.5, blend: 0.5}
+  }
+}

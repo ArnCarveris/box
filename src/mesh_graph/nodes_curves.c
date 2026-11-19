@@ -1,7 +1,7 @@
 /**
  * @file mesh_graph/nodes_curves.c
- * @brief Nodes of mesh graphs for curves and points: Tube, PointsOnCurves, PointsOnMesh and
- * InstanceOnPoints.
+ * @brief Nodes of mesh graphs for curves and points: Tube, PointsOnCurves, PointsOnMesh,
+ * Jitter and InstanceOnPoints.
  */
 
 #include "mesh_graph.h"
@@ -660,6 +660,53 @@ done:
     return 0;
 }
 
+/** Turn and scale the points of a Points at random.
+ *
+ * @param node The MeshJitter
+ * @param inputs The points
+ * @param counts Values per port
+ * @param out The points
+ * @param error Unused
+ * @return 0
+ */
+static int box_mesh_jitter_eval(
+    const void *node,
+    const box_mg_value_t *const *inputs,
+    const int32_t *counts,
+    box_mg_value_t *out,
+    char **error)
+{
+    const MeshJitter *n = node;
+    float lo = n->scale_min > 0.0f ? n->scale_min : 1.0f;
+    float hi = n->scale_max > lo ? n->scale_max : lo;
+    box_mg_rand_t rand;
+    int32_t i;
+    (void)counts;
+    (void)error;
+    box_mg_value_copy(out, inputs[0]);
+    box_mg_points_t *p = &out->points;
+    box_mg_rand_seed(&rand, n->seed, 0);
+    for (i = 0; i < p->count; i ++) {
+        float spin = (box_mg_rand_float(&rand) * 2.0f - 1.0f) * n->spin;
+        float tilt = box_mg_rand_float(&rand) * n->tilt;
+        float heading = box_mg_rand_float(&rand) * 2.0f * GLM_PIf;
+        float scale = lo + (hi - lo) * box_mg_rand_float(&rand);
+        float ss, sc, ts, tc, hs, hc;
+        versor turn, lean, local, turned;
+        box_mg_sincos(spin * 0.5f, &ss, &sc);
+        box_mg_sincos(tilt * 0.5f, &ts, &tc);
+        box_mg_sincos(heading, &hs, &hc);
+        glm_quat_init(turn, 0.0f, ss, 0.0f, sc);
+        glm_quat_init(lean, hc * ts, 0.0f, hs * ts, tc);
+        glm_quat_mul(lean, turn, local);
+        glm_quat_mul(p->rotations[i], local, turned);
+        glm_quat_normalize_to(turned, p->rotations[i]);
+        glm_vec3_scale(p->scales[i], scale, p->scales[i]);
+    }
+
+    return 0;
+}
+
 /** Copy a mesh to every point of a Points.
  *
  * @param node The MeshInstanceOnPoints
@@ -807,5 +854,19 @@ void box_mesh_nodes_curves_register(
             { "ignore_scale", offsetof(MeshInstanceOnPoints, ignore_scale), ECS_SIZEOF(bool) }
         },
         .eval = box_mesh_instance_eval
+    });
+    box_mesh_node_register(world, &(box_mesh_node_desc_t){
+        .component = ecs_id(MeshJitter),
+        .output = MeshValuePoints,
+        .inputs = {{ "points", offsetof(MeshJitter, points), MeshValuePoints }},
+        .params = {
+            { "spin", offsetof(MeshJitter, spin), ECS_SIZEOF(float) },
+            { "tilt", offsetof(MeshJitter, tilt), ECS_SIZEOF(float) },
+            { "scale_min", offsetof(MeshJitter, scale_min), ECS_SIZEOF(float) },
+            { "scale_max", offsetof(MeshJitter, scale_max), ECS_SIZEOF(float) },
+            { "seed", offsetof(MeshJitter, seed), ECS_SIZEOF(int32_t) }
+        },
+        .eval = box_mesh_jitter_eval,
+        .flags = BOX_MESH_NODE_RANDOM
     });
 }

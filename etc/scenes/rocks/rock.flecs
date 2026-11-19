@@ -1,0 +1,116 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using box.mesh
+using rocks
+
+// The Rock template: one rock as one MeshGraph shape. An icosphere is stretched to the
+// proportions of the rock, displaced by broad lumps and finer fractal noise, layered into strata,
+// split along joint planes (Cut) and cut flat underneath so it sits on the ground, then shaded
+// with hard edges where the faces meet at an angle.
+rocks {
+  // The spheres the rocks are made of, sources of the mesh graphs; prefabs do not draw
+  prefab RockSphere { IcoSphere: {radius: 1, segments: 5, smooth: true} }
+  prefab RockPebble { IcoSphere: {radius: 1, segments: 2, smooth: true} }
+
+  // Distance of a joint plane of a rock from its center (in units of its half size) for a
+  // cracks amount: joint k splits off a face when cracks is above k / 4, closer for more cracks;
+  // far away it cuts nothing
+  fn rock_joint(cracks: f64, k: f64, r: f64) -> f64 {
+    cracks > k * 0.25 ? 0.95 - cracks * 0.45 + r * 0.15 : 10
+  }
+
+  template Rock {
+    prop seed: i32 = 1
+    prop size: f32 = 1           // Meters across the widest axis
+    prop roundness: f32 = 0.5    // 0 craggy with hard edges, 1 worn smooth
+    prop strata: f32 = 0         // 0 massive, 1 strongly bedded in layers
+    prop cracks: f32 = 0.3       // 0 whole, 1 split along up to four joint planes
+    prop flatness: f32 = 0.2     // 0 as tall as wide, 1 a flat slab with a flat top
+    prop octaves: i32 = 5        // Octaves of the fine displacement
+    prop strength: f32 = 0.5     // Strength of the displacement, 0 a smooth ellipsoid
+    prop moss: f32 = 0           // Amount of moss on the faces that look up, 0 none
+    prop stone: i32 = ROCK_GRANITE
+
+    const rng: flecs.script.math.Rng = {seed: seed}
+    const sx = 1
+    const sy = (0.85 + rng.f(0.25)) * (1 - flatness * 0.72)
+    const sz = 0.72 + rng.f(0.25)
+    const yaw = rng.f(6.28)
+    const half = size * 0.5
+    const lean = rng.f(0.5) - 0.25
+
+    // The bed underneath and, for a slab, the top
+    const bed = sy * (0.62 + roundness * 0.1)
+    const top = flatness > 0.45 ? sy * (1.15 - flatness * 0.35) : 10
+
+    // Joint planes around the sides, tilted up or down
+    const a0 = rng.f(6.28)
+    const a1 = a0 + 1.6 + rng.f(1.2)
+    const a2 = a1 + 1.4 + rng.f(1.2)
+    const a3 = a2 + 1.2 + rng.f(1)
+    const t0 = rng.f(1.2) - 0.4
+    const t1 = rng.f(1.2) - 0.4
+    const t2 = rng.f(1.2) - 0.6
+    const t3 = rng.f(1.4) - 0.2
+    const d0 = rock_joint(cracks, 0, rng.f(1))
+    const d1 = rock_joint(cracks, 1, rng.f(1))
+    const d2 = rock_joint(cracks, 2, rng.f(1))
+    const d3 = rock_joint(cracks, 3, rng.f(1))
+    const relief = 0.025 + (1 - roundness) * 0.03
+
+    sphere { nodes.Shape: {entity: RockSphere} }
+    shaped { nodes.Transform: {input: sphere, scale: {sx, sy, sz}} }
+    lumps { nodes.Displace: {mesh: shaped, amount: strength * 0.65, frequency: 0.8, octaves: 3, seed: seed} }
+    detail {
+      nodes.Displace: {
+        mesh: lumps,
+        amount: strength * (0.16 - roundness * 0.1),
+        frequency: 2.2,
+        octaves: octaves,
+        seed: seed + 101
+      }
+    }
+    layered {
+      nodes.Strata: {
+        mesh: detail,
+        axis: {lean * 0.3, 1, 0},
+        thickness: 0.07 + (1 - strata) * 0.12,
+        sharpness: strata * 0.9,
+        inset: strata * 0.14,
+        seed: seed + 202
+      }
+    }
+    joint0 { nodes.Cut: {mesh: layered, position: {cos(a0) * d0, 0, sin(a0) * d0}, normal: {cos(a0), t0, sin(a0)}, relief: relief, frequency: 3, seed: seed + 1} }
+    joint1 { nodes.Cut: {mesh: joint0, position: {cos(a1) * d1, 0, sin(a1) * d1}, normal: {cos(a1), t1, sin(a1)}, relief: relief, frequency: 3, seed: seed + 2} }
+    joint2 { nodes.Cut: {mesh: joint1, position: {cos(a2) * d2, 0, sin(a2) * d2}, normal: {cos(a2), t2, sin(a2)}, relief: relief, frequency: 3, seed: seed + 3} }
+    joint3 { nodes.Cut: {mesh: joint2, position: {cos(a3) * d3, 0, sin(a3) * d3}, normal: {cos(a3), t3, sin(a3)}, relief: relief, frequency: 3, seed: seed + 4} }
+    topped { nodes.Cut: {mesh: joint3, position: {0, top, 0}, normal: {lean * 0.2, 1, 0}, relief: relief * 0.6, frequency: 2, seed: seed + 5} }
+    bedded { nodes.Cut: {mesh: topped, position: {0, 0 - bed, 0}, normal: {0, -1, 0}} }
+    shaded { nodes.Normals: {mesh: bedded, angle: 0.55 + roundness * 0.5} }
+    placed { nodes.Transform: {input: shaded, position: {0, (bed - 0.04) * half, 0}, rotation: {0, yaw, 0}, scale: {half, half, half}} }
+    Graph: {output: placed}
+
+    Rgb: {255, 255, 255}
+    if stone == ROCK_SANDSTONE {
+      PbrMaterial: {roughness: 0.95}
+      PbrTextures: {albedo: rock_sandstone_albedo, normal: rock_sandstone_normal, orm: rock_sandstone_orm}
+      texture.Mapping: {mode: MappingObject, size: ROCK_MAP_SIZE * 1.6, blend: 0.4}
+    } else if stone == ROCK_FOREST {
+      PbrMaterial: {roughness: 0.9}
+      PbrTextures: {albedo: rock_forest_albedo, normal: rock_forest_normal, orm: rock_forest_orm}
+      texture.Mapping: {mode: MappingObject, size: ROCK_MAP_SIZE, blend: 0.4}
+    } else {
+      PbrMaterial: {roughness: 0.85}
+      PbrTextures: {albedo: rock_granite_albedo, normal: rock_granite_normal, orm: rock_granite_orm}
+      texture.Mapping: {mode: MappingObject, size: ROCK_MAP_SIZE, blend: 0.4}
+    }
+
+    if moss > 0 {
+      RockMossLayer moss_layer(amount: moss)
+      texture.Layers: {layers: [moss_layer]}
+    }
+  }
+}

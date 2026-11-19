@@ -1,6 +1,7 @@
 /**
  * @file mesh_graph/nodes_mesh.c
- * @brief Nodes of mesh graphs that change values: Transform, Merge, Displace and Normals.
+ * @brief Nodes of mesh graphs that change values: Transform, Merge, Displace, Normals, Cut and
+ * Strata.
  */
 
 #include "mesh_graph.h"
@@ -330,6 +331,154 @@ static int box_mesh_displace_eval(
         float n = box_mg_noise(q, octaves, d->seed);
         glm_vec3_scale(m->normals[i], n * d->amount, offset);
         glm_vec3_add(m->positions[i], offset, m->positions[i]);
+    }
+
+    return 0;
+}
+
+/** Unit direction of a vector, +Y for a zero vector.
+ *
+ * @param in The vector
+ * @param out Receives the direction
+ */
+static void box_mg_direction(
+    const vec3 in,
+    vec3 out)
+{
+    float length = glm_vec3_norm((float*)in);
+    if (length > 0.0f) {
+        glm_vec3_scale((float*)in, 1.0f / length, out);
+    } else {
+        glm_vec3_copy((vec3){ 0.0f, 1.0f, 0.0f }, out);
+    }
+}
+
+/** Move the vertices of a mesh in front of a plane onto it.
+ *
+ * @param node The MeshCut
+ * @param inputs The mesh
+ * @param counts Values per port
+ * @param out The mesh
+ * @param error Unused
+ * @return 0
+ */
+static int box_mesh_cut_eval(
+    const void *node,
+    const box_mg_value_t *const *inputs,
+    const int32_t *counts,
+    box_mg_value_t *out,
+    char **error)
+{
+    const MeshCut *c = node;
+    float frequency = c->frequency > 0.0f ? c->frequency : 1.0f;
+    vec3 normal;
+    int32_t i;
+    (void)counts;
+    (void)error;
+    box_mg_direction(c->normal, normal);
+    float plane = glm_vec3_dot(normal, (float*)c->position);
+    box_mg_value_copy(out, inputs[0]);
+    box_mg_mesh_t *m = &out->mesh;
+    for (i = 0; i < m->vertex_count; i ++) {
+        float d = glm_vec3_dot(normal, m->positions[i]) - plane;
+        if (d <= 0.0f) {
+            continue;
+        }
+
+        float depth = 0.0f;
+        if (c->relief > 0.0f) {
+            vec3 q;
+            glm_vec3_scale(m->positions[i], frequency, q);
+            depth = (box_mg_noise(q, 3, c->seed) * 0.5f + 0.5f) * c->relief;
+            if (depth > d) {
+                depth = d;
+            }
+        }
+
+        glm_vec3_muladds(normal, -(d + depth), m->positions[i]);
+    }
+
+    return 0;
+}
+
+/** Step of the terraces of strata: flat at 0 and 1, steep at 0.5.
+ *
+ * @param f Fraction of a layer, 0..1
+ * @param sharpness 0 for f, 1 for the steepest step
+ * @return The stepped fraction
+ */
+static float box_mg_strata_step(
+    float f,
+    float sharpness)
+{
+    float x = f < 0.5f ? 2.0f * f : 2.0f - 2.0f * f;
+    float x4 = x * x * x * x;
+    float s = f < 0.5f ? 0.5f * x4 : 1.0f - 0.5f * x4;
+
+    return f + (s - f) * sharpness;
+}
+
+/** Inset of a layer of strata from the seed of the node.
+ *
+ * @param seed The seed
+ * @param layer The layer
+ * @param inset The largest inset
+ * @return The inset of the layer
+ */
+static float box_mg_strata_inset(
+    int32_t seed,
+    int32_t layer,
+    float inset)
+{
+    box_mg_rand_t rand;
+    box_mg_rand_seed(&rand, seed, (uint32_t)layer + 1u);
+
+    return box_mg_rand_float(&rand) * inset;
+}
+
+/** Layer a mesh into strata along an axis.
+ *
+ * @param node The MeshStrata
+ * @param inputs The mesh
+ * @param counts Values per port
+ * @param out The mesh
+ * @param error Unused
+ * @return 0
+ */
+static int box_mesh_strata_eval(
+    const void *node,
+    const box_mg_value_t *const *inputs,
+    const int32_t *counts,
+    box_mg_value_t *out,
+    char **error)
+{
+    const MeshStrata *n = node;
+    float thickness = n->thickness > 0.0f ? n->thickness : 0.2f;
+    float sharpness = n->sharpness < 0.0f ? 0.0f : (n->sharpness > 1.0f ? 1.0f : n->sharpness);
+    vec3 axis;
+    box_mg_rand_t rand;
+    int32_t i;
+    (void)counts;
+    (void)error;
+    box_mg_direction(n->axis, axis);
+    box_mg_rand_seed(&rand, n->seed, 0);
+    float phase = box_mg_rand_float(&rand);
+    box_mg_value_copy(out, inputs[0]);
+    box_mg_mesh_t *m = &out->mesh;
+    for (i = 0; i < m->vertex_count; i ++) {
+        float h = glm_vec3_dot(axis, m->positions[i]);
+        float t = h / thickness + phase;
+        float layer = floorf(t);
+        float step = box_mg_strata_step(t - layer, sharpness);
+        int32_t k = (int32_t)layer;
+        float a = box_mg_strata_inset(n->seed, k, n->inset);
+        float b = box_mg_strata_inset(n->seed, k + 1, n->inset);
+        float scale = 1.0f - (a + (b - a) * step);
+        vec3 across;
+        glm_vec3_scale(axis, h, across);
+        glm_vec3_sub(m->positions[i], across, across);
+        glm_vec3_scale(across, scale, m->positions[i]);
+        glm_vec3_muladds(axis, (layer + step - phase) * thickness, m->positions[i]);
     }
 
     return 0;
@@ -721,5 +870,33 @@ void box_mesh_nodes_mesh_register(
             { "flat", offsetof(MeshNormals, flat), ECS_SIZEOF(bool) }
         },
         .eval = box_mesh_normals_eval
+    });
+    box_mesh_node_register(world, &(box_mesh_node_desc_t){
+        .component = ecs_id(MeshCut),
+        .output = MeshValueMesh,
+        .inputs = {{ "mesh", offsetof(MeshCut, mesh), MeshValueMesh }},
+        .params = {
+            { "position", offsetof(MeshCut, position), ECS_SIZEOF(vec3) },
+            { "normal", offsetof(MeshCut, normal), ECS_SIZEOF(vec3) },
+            { "relief", offsetof(MeshCut, relief), ECS_SIZEOF(float) },
+            { "frequency", offsetof(MeshCut, frequency), ECS_SIZEOF(float) },
+            { "seed", offsetof(MeshCut, seed), ECS_SIZEOF(int32_t) }
+        },
+        .eval = box_mesh_cut_eval,
+        .flags = BOX_MESH_NODE_RANDOM
+    });
+    box_mesh_node_register(world, &(box_mesh_node_desc_t){
+        .component = ecs_id(MeshStrata),
+        .output = MeshValueMesh,
+        .inputs = {{ "mesh", offsetof(MeshStrata, mesh), MeshValueMesh }},
+        .params = {
+            { "axis", offsetof(MeshStrata, axis), ECS_SIZEOF(vec3) },
+            { "thickness", offsetof(MeshStrata, thickness), ECS_SIZEOF(float) },
+            { "sharpness", offsetof(MeshStrata, sharpness), ECS_SIZEOF(float) },
+            { "inset", offsetof(MeshStrata, inset), ECS_SIZEOF(float) },
+            { "seed", offsetof(MeshStrata, seed), ECS_SIZEOF(int32_t) }
+        },
+        .eval = box_mesh_strata_eval,
+        .flags = BOX_MESH_NODE_RANDOM
     });
 }
