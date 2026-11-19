@@ -564,6 +564,7 @@ assets {
   prefab ForestGrass : ForestClumpMesh {
     Rgb: {forest_seasonal(season, 118, 104, 150, 156), forest_seasonal(season, 158, 134, 138, 146), forest_seasonal(season, 58, 54, 70, 118)}
     PbrMaterial: {roughness: 0.8}
+    WindSway: {bend: SWAY_GRASS_BEND, height: SWAY_GRASS_HEIGHT, base: 0, flutter: 0.03, flutter_frequency: 4, flutter_reach: 0.25}
     AlphaCutoff: {forest_seasonal(season, LEAF_FULL, LEAF_FULL, 0.5, 0.8)}
     DiffuseTransmission: {factor: 0.6, color: {forest_leaf_glow_r(season), forest_leaf_glow_g(season), forest_leaf_glow_b(season)}}
     PbrTextures: {albedo: grass_albedo, normal: grass_normal}
@@ -579,6 +580,7 @@ assets {
   prefab ForestFlower : ForestClumpMesh {
     Rgb: {forest_seasonal(season, 255, 240, 232, 204), forest_seasonal(season, 255, 242, 214, 182), forest_seasonal(season, 255, 230, 170, 140)}
     PbrMaterial: {roughness: 0.75}
+    WindSway: {bend: SWAY_FLOWER_BEND, height: SWAY_FLOWER_HEIGHT, base: 0, flutter: 0.025, flutter_frequency: 4.5, flutter_reach: 0.2}
     AlphaCutoff: {forest_flower_cutoff(0, season)}
     DiffuseTransmission: {factor: 0.5, color: {240, 255, 200}}
     PbrTextures: {albedo: bloom_yellow_albedo, normal: bloom_normal}
@@ -601,6 +603,7 @@ assets {
   prefab ForestReed : ForestClumpMesh {
     Rgb: {forest_seasonal(season, 170, 166, 206, 196), forest_seasonal(season, 206, 192, 182, 170), forest_seasonal(season, 128, 120, 118, 124)}
     PbrMaterial: {roughness: 0.7}
+    WindSway: {bend: SWAY_REED_BEND, height: SWAY_REED_HEIGHT, base: SWAY_REED_BASE, flutter: 0.03, flutter_frequency: 3, flutter_reach: 0.4}
     AlphaCutoff: {0.4}
     DiffuseTransmission: {factor: 0.45, color: {220, 255, 150}}
     PbrTextures: {albedo: reed_albedo, normal: reed_normal}
@@ -612,6 +615,7 @@ assets {
   prefab ForestFern : ForestFernMesh {
     Rgb: {forest_seasonal(season, 128, 92, 168, 124), forest_seasonal(season, 176, 140, 120, 96), forest_seasonal(season, 60, 48, 62, 66)}
     PbrMaterial: {roughness: 0.8}
+    WindSway: {bend: SWAY_FERN_BEND, height: SWAY_FERN_HEIGHT, base: 0, flutter: 0.035, flutter_frequency: 3, flutter_reach: 0.4}
     AlphaCutoff: {forest_seasonal(season, 0.7, LEAF_FULL, 0.5, 0.93)}
     DiffuseTransmission: {factor: 0.6, color: {forest_leaf_glow_r(season), forest_leaf_glow_g(season), forest_leaf_glow_b(season)}}
     PbrTextures: {albedo: fern_albedo, normal: fern_normal}
@@ -636,6 +640,7 @@ assets {
   prefab ForestShrubHazel : ForestCardTripleMesh {
     Rgb: {forest_foliage(season, 130, 100, 204, 140), forest_foliage(season, 174, 140, 168, 110), forest_foliage(season, 58, 50, 50, 60)}
     PbrMaterial: {roughness: 0.78}
+    WindSway: {bend: SWAY_SHRUB_BEND, height: SWAY_SHRUB_HEIGHT, base: 0, flutter: 0.05, flutter_frequency: 3.5, flutter_reach: 0.3}
     AlphaCutoff: {forest_seasonal(season, 0.6, LEAF_FULL, 0.78, LEAF_BARE)}
     DiffuseTransmission: {factor: 0.6, color: {forest_leaf_glow_r(season), forest_leaf_glow_g(season), forest_leaf_glow_b(season)}}
     PbrTextures: {albedo: leaf_beech_albedo, normal: leaf_beech_normal}
@@ -645,6 +650,7 @@ assets {
   prefab ForestShrubElder : ForestCardTripleMesh {
     Rgb: {forest_foliage(season, 240, 68, 128, 104), forest_foliage(season, 236, 104, 104, 84), forest_foliage(season, 222, 42, 48, 52)}
     PbrMaterial: {roughness: 0.78}
+    WindSway: {bend: SWAY_SHRUB_BEND, height: SWAY_SHRUB_HEIGHT, base: 0, flutter: 0.05, flutter_frequency: 3.5, flutter_reach: 0.3}
     AlphaCutoff: {forest_seasonal(season, 0.5, LEAF_FULL, 0.86, LEAF_BARE)}
     DiffuseTransmission: {factor: 0.55, color: {forest_leaf_glow_r(season), forest_leaf_glow_g(season), forest_leaf_glow_b(season)}}
     PbrTextures: {albedo: leaf_birch_albedo, normal: leaf_birch_normal}
@@ -654,6 +660,7 @@ assets {
   prefab ForestShrubCore {
     Rgb: {forest_seasonal(season, 26, 22, 40, 44), forest_seasonal(season, 44, 40, 34, 38), forest_seasonal(season, 12, 8, 14, 34)}
     PbrMaterial: {roughness: 0.95}
+    WindSway: {bend: SWAY_SHRUB_BEND, height: SWAY_SHRUB_HEIGHT, base: 0}
     AlphaCutoff: {forest_seasonal(season, 0.5, 0.01, 0.4, 0.88)}
     PbrTextures: {albedo: canopy_leaf_albedo, normal: canopy_normal}
     texture.Mapping: {mode: MappingWorld, size: 3, blend: 0.5}

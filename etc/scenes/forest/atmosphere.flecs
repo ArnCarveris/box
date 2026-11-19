@@ -45,13 +45,14 @@ state {
     0.9 * m * forest_seasonal(season, 1, 0.7, 1.3, 0.9)
   }
 
-  // Drift of the fog billows and the motes in m/s along X and Z for a wind
+  // Drift of the fog billows and the motes in m/s along X and Z for a wind, along the Wind
+  // (wind.flecs): still in a calm
   fn forest_fog_wind_x(w: f64) -> f64 {
-    0.12 + w * 0.09
+    w * 0.1 * WIND_DIR_X
   }
 
   fn forest_fog_wind_z(w: f64) -> f64 {
-    0.04 + w * 0.03
+    w * 0.1 * WIND_DIR_Z
   }
 
   // Pollen in the air through the year, 0..1: spring and early summer
@@ -164,7 +165,8 @@ forest {
         wind: {fog_wind_x, 0, fog_wind_z},
         drag: 0.6,
         turbulence: 0.06,
-        turbulence_scale: 1.4
+        turbulence_scale: 1.4,
+        global_wind: 0.08
       }
       Appearance: {shape: Circle, blend: Additive, lit: 1}
       Curves: {opacity: {keys: [{0, 0}, {0.15, 1}, {0.85, 1}, {1, 0}]}}
@@ -186,7 +188,8 @@ forest {
         wind: {fog_wind_x * 1.5, 0, fog_wind_z * 1.5},
         drag: 0.8,
         turbulence: 0.1,
-        turbulence_scale: 0.9
+        turbulence_scale: 0.9,
+        global_wind: 0.12
       }
       Appearance: {shape: Circle, blend: Additive, lit: 1}
       Curves: {opacity: {keys: [{0, 0}, {0.15, 1}, {0.85, 1}, {1, 0}]}}

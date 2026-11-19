@@ -1,11 +1,12 @@
 // Forest: a clearing in a deep forest with a brook, through the seasons, rain and snow, wind and
 // the time of day, set with the sliders of the panel (H hides it). Fly with the camera controller.
 //
-// The forest library (forest/library) brings the state the sliders write, the materials, the
-// bark, leaves and trees, the undergrowth, the boulders, the sky and light and the HUD. This
-// scene adds one file per concern in forest/: the layout functions that place things, the
-// floor, the ground, the brook, the stands the trees grow in, the undergrowth scattered on the
-// floor, the air (light shafts, mist over the brook and motes), and the view.
+// The forest library (forest/library) brings the state the sliders write, the wind, the
+// materials, the bark, leaves and trees, the undergrowth, the boulders, the sky and light and the
+// HUD. This scene adds one file per concern in forest/: the layout functions that place things,
+// the floor, the ground, the brook, the stands the trees grow in, the undergrowth scattered on
+// the floor, what falls from the trees in the wind, the air (light shafts, mist over the brook
+// and motes), and the view.
 include ui/widgets
 include forest/library
 include forest/layout
@@ -14,6 +15,7 @@ include forest/ground
 include forest/brook
 include forest/stands
 include forest/scatter
+include forest/fall
 include forest/atmosphere
 include forest/view
 
@@ -34,6 +36,7 @@ $ {
     diffuse_transmission: true,
     texture_scroll: true,
     water: true,
-    planar_reflections: true
+    planar_reflections: true,
+    wind: true
   }
 }

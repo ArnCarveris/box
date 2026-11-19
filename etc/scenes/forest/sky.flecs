@@ -35,13 +35,14 @@ state {
     forest_seasonal(season, 0.6, 0.63, 0.57, 0.56) - 0.34 * p
   }
 
-  // Cloud drift in m/s along X and Z for a wind
+  // Cloud drift in m/s along X and Z for a wind, along the Wind (wind.flecs): the wind aloft
+  // is stronger than in the forest, and still in a calm
   fn forest_cloud_drift_x(w: f64) -> f64 {
-    3 + w * 2.4
+    w * 2.6 * WIND_DIR_X
   }
 
   fn forest_cloud_drift_z(w: f64) -> f64 {
-    1 + w * 0.9
+    w * 2.6 * WIND_DIR_Z
   }
 
   // Velocity of the cumulus and of the cookie on the sun that casts their shadows in m/s along X
@@ -171,7 +172,7 @@ cloud_high {
     softness: 0.18,
     density: 0.45,
     offset: {900, 400},
-    velocity: {cloud_velocity_x * 2, 2}
+    velocity: {cloud_velocity_x * 2, cloud_velocity_z * 2}
   }
 }
 

@@ -25,7 +25,8 @@ $ {
     texture_blend: true,
     texture_layers: true,
     triplanar: true,
-    diffuse_transmission: true
+    diffuse_transmission: true,
+    wind: true
   }
 }
 

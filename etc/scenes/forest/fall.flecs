@@ -1,0 +1,186 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.texture
+using box.particle
+using state
+using assets
+
+// Falling cards: the wind strips the trees and the shrubs. Card particles of a leaf, a petal, a
+// needle and a winged seed fall and tumble from the crowns, carried by the gusts of the Wind
+// (wind.flecs) through ParticleForces.global_wind, and come to rest flat on the ground. What
+// falls follows the season: petals in spring, a few green leaves and seeds in summer, a storm of
+// copper, russet and gold leaves in autumn, the last dead leaves of the beech in winter, and
+// needles all year. Nothing falls in a calm, and the harder the wind blows the more falls.
+state {
+  // How much the wind strips from the trees, 0 in a calm to 1 in a gale
+  fn forest_shed(w: f64) -> f64 {
+    const s = clamp(w / WIND_MAX, 0, 1)
+    s * (0.55 + 0.45 * s)
+  }
+
+  // How many of the leaves of the broadleaves fall through the year, 0..1: a few green ones in a
+  // summer storm, most of them in autumn, the last dead ones of the beech in winter
+  fn forest_leaf_fall(season: f64) -> f64 {
+    forest_seasonal(season, 0.03, 0.1, 1, 0.07)
+  }
+
+  // Petals of the elder and the flowers of the floor, in spring
+  fn forest_petal_fall(season: f64) -> f64 {
+    forest_seasonal(season, 1, 0.12, 0, 0)
+  }
+
+  // Needles of the spruces and firs, all year, more in winter
+  fn forest_needle_fall(season: f64) -> f64 {
+    forest_seasonal(season, 0.6, 0.5, 0.8, 1)
+  }
+
+  // Winged seeds of the birches and limes, from late summer through autumn
+  fn forest_seed_fall(season: f64) -> f64 {
+    forest_seasonal(season, 0, 0.5, 0.8, 0.12)
+  }
+
+  // The color of a falling leaf of a broadleaf species (0 beech, 1 oak, 2 birch) by channel:
+  // the leaf colors of leaves.flecs, but brown and dead in winter
+  fn forest_fall_r(species: f64, season: f64) -> f64 {
+    species < 0.5 ? forest_seasonal(season, 138, 86, 190, 120) : (
+      species < 1.5 ? forest_seasonal(season, 124, 66, 160, 112) : forest_seasonal(season, 150, 104, 222, 156))
+  }
+
+  fn forest_fall_g(species: f64, season: f64) -> f64 {
+    species < 0.5 ? forest_seasonal(season, 180, 126, 94, 74) : (
+      species < 1.5 ? forest_seasonal(season, 164, 102, 106, 80) : forest_seasonal(season, 188, 144, 176, 122))
+  }
+
+  fn forest_fall_b(species: f64, season: f64) -> f64 {
+    species < 0.5 ? forest_seasonal(season, 58, 44, 26, 38) : (
+      species < 1.5 ? forest_seasonal(season, 52, 36, 34, 42) : forest_seasonal(season, 66, 50, 40, 58))
+  }
+
+  // The falling cards spawn in FALL_HALF meters to either side of the clearing, from FALL_LOW to
+  // FALL_HIGH up in the crowns; the petals lower, in the shrubs and the flowers
+  export const FALL_HALF: f32 = 34
+  export const FALL_LOW: f32 = 4
+  export const FALL_HIGH: f32 = 19
+  export const PETAL_HALF: f32 = 22
+  export const PETAL_HIGH: f32 = 6
+}
+
+assets {
+  // The albedo of a falling card from the data of one blade (leaves.flecs): nearly white, the
+  // veins lighter, the coverage as alpha; the particle color tints it
+  template ForestFallMap {
+    prop data: entity = 0
+
+    img { nodes.Image: {texture: data, linear: true} }
+    cover { nodes.Split: {input: img, channel: ChannelR} }
+    vein { nodes.Split: {input: img, channel: ChannelG} }
+    tone { nodes.Remap: {input: vein, from_min: 0, from_max: 1, to_min: 0.84, to_max: 1, clamp: true} }
+    color { nodes.Combine: {r: tone, g: tone, b: tone, a: cover} }
+    Graph: {output: color, width: BLADE_RES}
+  }
+
+  // A rounded petal, a needle and the wing of a seed, as blades
+  ForestBladeMap fall_petal_blade(width: 0.46, shape: 0.75, veins: 3, stem: 0.02)
+  ForestBladeMap fall_needle_blade(width: 0.05, shape: 0.35, veins: 0, stem: 0.02)
+  ForestBladeMap fall_seed_blade(width: 0.2, shape: 0.45, veins: 9, stem: 0.12)
+
+  ForestFallMap fall_beech_albedo(data: leaf_beech_blade)
+  ForestFallMap fall_oak_albedo(data: leaf_oak_blade)
+  ForestFallMap fall_birch_albedo(data: leaf_birch_blade)
+  ForestFallMap fall_petal_albedo(data: fall_petal_blade)
+  ForestFallMap fall_needle_albedo(data: fall_needle_blade)
+  ForestFallMap fall_seed_albedo(data: fall_seed_blade)
+
+  // The fall of the cards: gravity against a drag that holds them to a slow, fluttering fall,
+  // the wind and its gusts through the drag, and a wander for the tumble; on the ground they
+  // stop and lie flat, but a gale still drags them along it
+  prefab ForestFall {
+    Collision: {ground: true, height: 0, bounce: 0.05, friction: 0.25}
+    Curves: {opacity: {keys: [{0, 0}, {0.04, 1}, {0.86, 1}, {1, 0}]}}
+  }
+}
+
+forest {
+  falling {
+    // Leaves of the three broadleaves
+    for s in 0..3 {
+      const amount = forest_leaf_fall(season - (s == 1 ? LEAF_LAG : 0)) * forest_shed(wind)
+
+      "leaves_{s}" : assets.ForestFall {
+        Position: {0, (FALL_LOW + FALL_HIGH) / 2, 0}
+        Emitter: {
+          max: 24000, rate: 950 * amount, shape: EmitterBox,
+          extents: {FALL_HALF, (FALL_HIGH - FALL_LOW) / 2, FALL_HALF},
+          direction: {0, 0, 0}, lifetime: {16, 24}, size: {0.1, 0.16},
+          rotation: {0, 360}, spin: {-260, 260}, opacity: {1, 1},
+          color: {forest_fall_r(s, season), forest_fall_g(s, season), forest_fall_b(s, season)},
+          color_variance: {26, 22, 12}, seed: 300 + s
+        }
+        Forces: {
+          gravity: {0, -3.2, 0}, drag: 2.4, turbulence: 1.5, turbulence_scale: 1.4,
+          global_wind: 0.7
+        }
+
+        if s == 0 {
+          Appearance: {shape: Card, blend: Alpha, texture: assets.fall_beech_albedo, lit: 1}
+        } else if s == 1 {
+          Appearance: {shape: Card, blend: Alpha, texture: assets.fall_oak_albedo, lit: 1}
+        } else {
+          Appearance: {shape: Card, blend: Alpha, texture: assets.fall_birch_albedo, lit: 1}
+        }
+      }
+    }
+
+    // Petals, white and pale pink, from the elder and the flowers
+    petals : assets.ForestFall {
+      Position: {0, (0.4 + PETAL_HIGH) / 2, 0}
+      Emitter: {
+        max: 8000, rate: 420 * forest_petal_fall(season) * forest_shed(wind), shape: EmitterBox,
+        extents: {PETAL_HALF, (PETAL_HIGH - 0.4) / 2, PETAL_HALF},
+        direction: {0, 0, 0}, lifetime: {12, 18}, size: {0.035, 0.055},
+        rotation: {0, 360}, spin: {-300, 300}, opacity: {1, 1},
+        color: {255, 246, 242}, color_variance: {0, 14, 10}, seed: 310
+      }
+      Forces: {
+        gravity: {0, -1.6, 0}, drag: 2.6, turbulence: 1.4, turbulence_scale: 1.8,
+        global_wind: 0.8
+      }
+      Appearance: {shape: Card, blend: Alpha, texture: assets.fall_petal_albedo, lit: 1}
+    }
+
+    // Needles, faded to rust, falling straight and quick
+    needles : assets.ForestFall {
+      Position: {0, (FALL_LOW + FALL_HIGH) / 2, 0}
+      Emitter: {
+        max: 10000, rate: 380 * forest_needle_fall(season) * forest_shed(wind), shape: EmitterBox,
+        extents: {FALL_HALF, (FALL_HIGH - FALL_LOW) / 2, FALL_HALF},
+        direction: {0, 0, 0}, lifetime: {10, 16}, size: {0.05, 0.07},
+        rotation: {0, 360}, spin: {-500, 500}, opacity: {1, 1},
+        color: {150, 104, 62}, color_variance: {20, 18, 12}, seed: 311
+      }
+      Forces: {
+        gravity: {0, -6, 0}, drag: 2.4, turbulence: 0.8, turbulence_scale: 1.4,
+        global_wind: 0.5
+      }
+      Appearance: {shape: Card, blend: Alpha, texture: assets.fall_needle_albedo, lit: 1}
+    }
+
+    // Winged seeds that spin as they fall
+    seeds : assets.ForestFall {
+      Position: {0, (FALL_LOW + FALL_HIGH) / 2, 0}
+      Emitter: {
+        max: 8000, rate: 300 * forest_seed_fall(season) * forest_shed(wind), shape: EmitterBox,
+        extents: {FALL_HALF, (FALL_HIGH - FALL_LOW) / 2, FALL_HALF},
+        direction: {0, 0, 0}, lifetime: {14, 20}, size: {0.05, 0.07},
+        rotation: {0, 360}, spin: {600, 1100}, opacity: {1, 1},
+        color: {178, 150, 102}, color_variance: {18, 16, 12}, seed: 312
+      }
+      Forces: {
+        gravity: {0, -2.6, 0}, drag: 3, turbulence: 1, turbulence_scale: 1.6,
+        global_wind: 0.75
+      }
+      Appearance: {shape: Card, blend: Alpha, texture: assets.fall_seed_albedo, lit: 1}
+    }
+  }
+}

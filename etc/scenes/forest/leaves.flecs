@@ -641,6 +641,7 @@ assets {
   prefab ForestLeafBeech : ForestCardTripleMesh {
     Rgb: {forest_leaf_r(0, season), forest_leaf_g(0, season), forest_leaf_b(0, season)}
     PbrMaterial: {roughness: 0.75}
+    WindSway: {bend: SWAY_BROADLEAF_BEND, height: SWAY_BROADLEAF_HEIGHT, base: 0, flutter: SWAY_LEAF_FLUTTER, flutter_frequency: SWAY_LEAF_FREQUENCY, flutter_reach: SWAY_LEAF_REACH}
     AlphaCutoff: {forest_leaf_cutoff(0, season)}
     DiffuseTransmission: {factor: 0.65, color: {forest_leaf_glow_r(season), forest_leaf_glow_g(season), forest_leaf_glow_b(season)}}
     PbrTextures: {albedo: leaf_beech_albedo, normal: leaf_beech_normal}
@@ -657,6 +658,7 @@ assets {
   prefab ForestLeafOak : ForestCardTripleMesh {
     Rgb: {forest_leaf_r(1, season), forest_leaf_g(1, season), forest_leaf_b(1, season)}
     PbrMaterial: {roughness: 0.8}
+    WindSway: {bend: SWAY_BROADLEAF_BEND, height: SWAY_BROADLEAF_HEIGHT, base: 0, flutter: SWAY_LEAF_FLUTTER, flutter_frequency: SWAY_LEAF_FREQUENCY, flutter_reach: SWAY_LEAF_REACH}
     AlphaCutoff: {forest_leaf_cutoff(1, season)}
     DiffuseTransmission: {factor: 0.5, color: {forest_leaf_glow_r(season), forest_leaf_glow_g(season), forest_leaf_glow_b(season)}}
     PbrTextures: {albedo: leaf_oak_albedo, normal: leaf_oak_normal}
@@ -673,6 +675,7 @@ assets {
   prefab ForestLeafBirch : ForestCardTripleMesh {
     Rgb: {forest_leaf_r(2, season), forest_leaf_g(2, season), forest_leaf_b(2, season)}
     PbrMaterial: {roughness: 0.72}
+    WindSway: {bend: SWAY_BIRCH_BEND, height: SWAY_BIRCH_HEIGHT, base: 0, flutter: SWAY_LEAF_FLUTTER, flutter_frequency: SWAY_LEAF_FREQUENCY, flutter_reach: SWAY_LEAF_REACH}
     AlphaCutoff: {forest_leaf_cutoff(2, season)}
     DiffuseTransmission: {factor: 0.7, color: {forest_leaf_glow_r(season), forest_leaf_glow_g(season), forest_leaf_glow_b(season)}}
     PbrTextures: {albedo: leaf_birch_albedo, normal: leaf_birch_normal}
@@ -690,6 +693,7 @@ assets {
   prefab ForestNeedleSpruce : ForestFrondPairMesh {
     Rgb: {52, 86, 50}
     PbrMaterial: {roughness: 0.85}
+    WindSway: {bend: SWAY_CONIFER_BEND, height: SWAY_CONIFER_HEIGHT, base: 0, flutter: SWAY_NEEDLE_FLUTTER, flutter_frequency: SWAY_NEEDLE_FREQUENCY, flutter_reach: SWAY_NEEDLE_REACH}
     AlphaCutoff: {0.4}
     DiffuseTransmission: {factor: 0.15, color: {150, 200, 120}}
     PbrTextures: {albedo: leaf_spruce_albedo, normal: leaf_spruce_normal}
@@ -698,6 +702,7 @@ assets {
   prefab ForestNeedleFir : ForestFrondPairMesh {
     Rgb: {44, 80, 54}
     PbrMaterial: {roughness: 0.85}
+    WindSway: {bend: SWAY_CONIFER_BEND, height: SWAY_CONIFER_HEIGHT, base: 0, flutter: SWAY_NEEDLE_FLUTTER, flutter_frequency: SWAY_NEEDLE_FREQUENCY, flutter_reach: SWAY_NEEDLE_REACH}
     AlphaCutoff: {0.4}
     DiffuseTransmission: {factor: 0.12, color: {150, 200, 120}}
     PbrTextures: {albedo: leaf_fir_albedo, normal: leaf_fir_normal}

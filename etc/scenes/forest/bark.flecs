@@ -366,6 +366,7 @@ assets {
   prefab ForestBarkBeech {
     Rgb: {255, 255, 255}
     PbrMaterial: {roughness: 1}
+    WindSway: {bend: SWAY_BROADLEAF_BEND, height: SWAY_BROADLEAF_HEIGHT, base: 0}
     texture.Blend: {
       mask: forest_bark_moss_mask,
       layers: [layer_bark_beech, layer_bark_moss],
@@ -378,6 +379,7 @@ assets {
   prefab ForestBarkOak {
     Rgb: {255, 255, 255}
     PbrMaterial: {roughness: 1}
+    WindSway: {bend: SWAY_BROADLEAF_BEND, height: SWAY_BROADLEAF_HEIGHT, base: 0}
     texture.Blend: {
       mask: forest_bark_moss_mask,
       layers: [layer_bark_oak, layer_bark_moss],
@@ -390,6 +392,7 @@ assets {
   prefab ForestBarkBirch {
     Rgb: {255, 255, 255}
     PbrMaterial: {roughness: 1}
+    WindSway: {bend: SWAY_BIRCH_BEND, height: SWAY_BIRCH_HEIGHT, base: 0}
     texture.Blend: {
       mask: forest_bark_moss_mask,
       layers: [layer_bark_birch, layer_bark_moss],
@@ -402,6 +405,7 @@ assets {
   prefab ForestBarkSpruce {
     Rgb: {255, 255, 255}
     PbrMaterial: {roughness: 1}
+    WindSway: {bend: SWAY_CONIFER_BEND, height: SWAY_CONIFER_HEIGHT, base: 0}
     texture.Blend: {
       mask: forest_bark_moss_mask,
       layers: [layer_bark_spruce, layer_bark_moss],
@@ -415,6 +419,7 @@ assets {
   prefab ForestBarkFir {
     Rgb: {170, 172, 178}
     PbrMaterial: {roughness: 1}
+    WindSway: {bend: SWAY_CONIFER_BEND, height: SWAY_CONIFER_HEIGHT, base: 0}
     texture.Blend: {
       mask: forest_bark_moss_mask,
       layers: [layer_bark_beech, layer_bark_moss],
@@ -440,6 +445,7 @@ assets {
   prefab ForestLimbBeech {
     Rgb: {255, 255, 255}
     PbrMaterial: {roughness: 1}
+    WindSway: {bend: SWAY_BROADLEAF_BEND, height: SWAY_BROADLEAF_HEIGHT, base: 0}
     PbrTextures: {albedo: bark_beech_albedo, normal: bark_beech_normal, orm: bark_beech_orm}
     texture.Mapping: {mode: MappingObject, size: BARK_LIMB_TILE}
   }
@@ -447,6 +453,7 @@ assets {
   prefab ForestLimbOak {
     Rgb: {255, 255, 255}
     PbrMaterial: {roughness: 1}
+    WindSway: {bend: SWAY_BROADLEAF_BEND, height: SWAY_BROADLEAF_HEIGHT, base: 0}
     PbrTextures: {albedo: bark_oak_albedo, normal: bark_oak_normal, orm: bark_oak_orm}
     texture.Mapping: {mode: MappingObject, size: BARK_LIMB_TILE}
   }
@@ -454,6 +461,7 @@ assets {
   prefab ForestLimbBirch {
     Rgb: {255, 255, 255}
     PbrMaterial: {roughness: 1}
+    WindSway: {bend: SWAY_BIRCH_BEND, height: SWAY_BIRCH_HEIGHT, base: 0}
     PbrTextures: {albedo: bark_birch_albedo, normal: bark_birch_normal, orm: bark_birch_orm}
     texture.Mapping: {mode: MappingObject, size: BARK_LIMB_TILE}
   }
@@ -461,6 +469,7 @@ assets {
   prefab ForestLimbSpruce {
     Rgb: {120, 102, 92}
     PbrMaterial: {roughness: 1}
+    WindSway: {bend: SWAY_CONIFER_BEND, height: SWAY_CONIFER_HEIGHT, base: 0}
     PbrTextures: {albedo: bark_spruce_albedo, normal: bark_spruce_normal, orm: bark_spruce_orm}
     texture.Mapping: {mode: MappingObject, size: BARK_LIMB_TILE}
   }
@@ -468,6 +477,7 @@ assets {
   prefab ForestLimbFir {
     Rgb: {170, 172, 178}
     PbrMaterial: {roughness: 1}
+    WindSway: {bend: SWAY_CONIFER_BEND, height: SWAY_CONIFER_HEIGHT, base: 0}
     PbrTextures: {albedo: bark_beech_albedo, normal: bark_beech_normal, orm: bark_beech_orm}
     texture.Mapping: {mode: MappingObject, size: BARK_LIMB_TILE}
   }
@@ -490,6 +500,7 @@ assets {
   prefab ForestConiferCore {
     Rgb: {40, 62, 40}
     PbrMaterial: {roughness: 0.95}
+    WindSway: {bend: SWAY_CONIFER_BEND, height: SWAY_CONIFER_HEIGHT, base: 0}
     PbrTextures: {albedo: canopy_albedo, normal: canopy_normal}
     texture.Mapping: {mode: MappingWorld, size: 6, blend: 0.5}
   }
@@ -499,6 +510,7 @@ assets {
   prefab ForestBroadleafCore {
     Rgb: {forest_foliage(season, 34, 27, 66, 50), forest_foliage(season, 50, 43, 38, 36), forest_foliage(season, 14, 13, 12, 22)}
     PbrMaterial: {roughness: 0.95}
+    WindSway: {bend: SWAY_BROADLEAF_BEND, height: SWAY_BROADLEAF_HEIGHT, base: 0}
     AlphaCutoff: {forest_seasonal(season, 0.55, 0.01, 0.4, LEAF_BARE)}
     PbrTextures: {albedo: canopy_leaf_albedo, normal: canopy_normal}
     texture.Mapping: {mode: MappingWorld, size: 8, blend: 0.5}
