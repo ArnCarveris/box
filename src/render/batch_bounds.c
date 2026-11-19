@@ -408,10 +408,12 @@ void box_draws_wind(
 
         const ecs_entity_t *entities = ecs_vec_first(&b->entities);
         float reach = 0.0f;
+        float size = b->world_valid
+            ? 2.0f * glm_max(b->world_radius - b->world_wind * 1.7321f, 0.0f) : 0.0f;
         for (s = 0; blowing && s < ecs_vec_count(&b->entities); s ++) {
             if (entities[s] && ecs_is_alive(world, entities[s])) {
                 reach = glm_max(reach, box_render_wind_reach(
-                    ecs_get(world, entities[s], WindSway), &d->wind));
+                    ecs_get(world, entities[s], WindSway), &d->wind, size));
             }
         }
 

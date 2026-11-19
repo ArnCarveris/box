@@ -28,7 +28,7 @@ _Static_assert(sizeof(box_render_shading_t) == 64, "Shape2DShading of shape2d.wg
 _Static_assert(sizeof(box_render_mesh_shading_t) == 16, "MeshShading of instance.wgsl");
 _Static_assert(BOX_DRAWS_PAGE_BYTES / sizeof(box_render_transform_t) <= (1u << 22),
     "A visible slot keeps the bits above RANGE_SLOT_BITS of draw_range.wgsl for its dither code");
-_Static_assert(sizeof(box_render_material_t) == 256, "Material of material.wgsl");
+_Static_assert(sizeof(box_render_material_t) == 272, "Material of material.wgsl");
 _Static_assert(BOX_RENDER_MATERIALS_MAX <= BOX_RENDER_MESH_MATERIAL_MASK,
     "the material slots fit below the planet light slot of a mesh shading");
 

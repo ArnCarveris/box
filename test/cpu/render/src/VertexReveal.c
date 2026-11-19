@@ -208,7 +208,7 @@ void VertexReveal_pack(void) {
     test_uint(record.flags, 0);
     test_flt(record.reveal_threshold, 0);
     plain = record;
-    test_int(ECS_SIZEOF(box_render_material_t), 256);
+    test_int(ECS_SIZEOF(box_render_material_t), 272);
 
     VertexReveal reveal = { .channel = 5, .threshold = 0.25f, .softness = 0.5f,
         .invert = true };

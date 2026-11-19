@@ -422,6 +422,9 @@ typedef struct box_render_wind_t {
 /** Relative amplitude of the sway of a plant across the wind */
 #define BOX_RENDER_WIND_CROSS (0.12f)
 
+/** Relative amplitude of the turn of a branch of a WindSway with pivots about the wind axis */
+#define BOX_RENDER_WIND_BRANCH_CROSS (0.3f)
+
 /** Frequency of the sway in Hz in a calm, and the Hz it gains per world unit per second of wind
  * speed, up to BOX_RENDER_WIND_SWAY_MAX */
 #define BOX_RENDER_WIND_SWAY_BASE (0.25)
@@ -476,7 +479,8 @@ void box_render_wind_frame(
     box_render_wind_t *out);
 
 /** Pack the WindSway fields of a material record: the wind of the frame and the sway, the flutter
- * phase computed from the time of the wind in double precision; all 0 without a sway.
+ * and branch phases computed from the time of the wind in double precision; all 0 without a
+ * sway.
  *
  * @param out The record
  * @param sway The WindSway, NULL for none
@@ -489,15 +493,30 @@ void box_render_wind_pack(
 
 /** Largest world distance a WindSway moves a vertex in a wind, which the bounds of its shapes
  * grow by: the bend along and across the wind at the strongest gust and sway (the drop that keeps
- * the length is below it) plus 1.15 times the flutter, the longest flutter vector; 0 when calm.
+ * the length is below it) plus 1.15 times the flutter, the longest flutter vector; with pivots
+ * plus twice the chord of the largest turn of a branch over size, which a branch and its parent
+ * turn by; 0 when calm.
  *
  * @param sway The WindSway
  * @param wind The wind of the frame
+ * @param size Largest world distance of a vertex of a shape from a pivot of its branch, the
+ *   diameter of its bounds; ignored without pivots
  * @return The distance
  */
 float box_render_wind_reach(
     const WindSway *sway,
-    const box_render_wind_t *wind);
+    const box_render_wind_t *wind,
+    float size);
+
+/** Largest angle in radians a branch of a WindSway with pivots turns about its pivot: its
+ * branch along and BOX_RENDER_WIND_BRANCH_CROSS of it across the wind, at most pi; 0 without
+ * pivots or branch.
+ *
+ * @param sway The WindSway
+ * @return The angle
+ */
+float box_render_wind_turn(
+    const WindSway *sway);
 
 /** Register the system that advances the WindStatus of the Wind and the observer that adds it,
  * called by the import of box.atmosphere.

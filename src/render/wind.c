@@ -174,6 +174,10 @@ void box_render_wind_pack(
         out->wind_flutter_phase = 0.0f;
         out->flags = 0u;
         out->reveal_threshold = 0.0f;
+        out->wind_branch = 0.0f;
+        out->wind_branch_phase = 0.0f;
+        out->wind_pad[0] = 0.0f;
+        out->wind_pad[1] = 0.0f;
         goto done;
     }
 
@@ -197,13 +201,37 @@ void box_render_wind_pack(
     out->wind_flutter_phase = box_wind_wrap_float(frequency * wind->time, 1.0);
     out->flags = BOX_RENDER_WIND_PRESENT;
     out->reveal_threshold = 0.0f;
+    out->wind_branch = 0.0f;
+    out->wind_branch_phase = 0.0f;
+    out->wind_pad[0] = 0.0f;
+    out->wind_pad[1] = 0.0f;
+    if (sway->pivots) {
+        double branch = isfinite(sway->branch_frequency)
+            ? (double)sway->branch_frequency : 0.0;
+        out->flags |= BOX_RENDER_WIND_PIVOTS;
+        out->wind_branch = isfinite(sway->branch) ? sway->branch : 0.0f;
+        out->wind_branch_phase = box_wind_wrap_float(branch * wind->time, 1.0);
+    }
 done:
     return;
 }
 
+float box_render_wind_turn(
+    const WindSway *sway)
+{
+    float result = 0.0f;
+    if (sway && sway->pivots && isfinite(sway->branch)) {
+        result = glm_min(fabsf(sway->branch) * sqrtf(1.0f +
+            BOX_RENDER_WIND_BRANCH_CROSS * BOX_RENDER_WIND_BRANCH_CROSS), GLM_PIf);
+    }
+
+    return result;
+}
+
 float box_render_wind_reach(
     const WindSway *sway,
-    const box_render_wind_t *wind)
+    const box_render_wind_t *wind,
+    float size)
 {
     float result = 0.0f;
     if (!sway || !(wind->speed > 0.0f)) {
@@ -215,6 +243,10 @@ float box_render_wind_reach(
     float flutter = isfinite(sway->flutter) && sway->flutter > 0.0f ? sway->flutter : 0.0f;
     result = bend * strength * (1.0f + BOX_RENDER_WIND_SWAY + BOX_RENDER_WIND_CROSS) +
         1.15f * flutter * glm_min(strength / BOX_WIND_FULL_SPEED, 1.0f);
+    if (sway->pivots && isfinite(size) && size > 0.0f) {
+        result += 4.0f * sinf(0.5f * box_render_wind_turn(sway)) * size;
+    }
+
     result = isfinite(result) ? result : 0.0f;
 done:
     return result;

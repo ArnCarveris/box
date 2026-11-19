@@ -483,6 +483,15 @@
                 ]
             },
             {
+                "id": "WindHierarchy",
+                "testcases": [
+                    "branches_turn_about_pivots",
+                    "stiff_branches_still",
+                    "without_data_unchanged",
+                    "shadow_follows_branch"
+                ]
+            },
+            {
                 "id": "VertexData",
                 "testcases": [
                     "draws_same_without",

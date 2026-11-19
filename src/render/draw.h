@@ -1071,7 +1071,9 @@ void box_draws_shadow_movers(
     box_render_draws_t *d);
 
 /** Follow the Wind of this extract in the batches with a WindSway (box_draw_key_t.wind):
- * resolve the wind, compute the reach of every ready wind batch, record the regions of its
+ * resolve the wind, compute the reach of every ready wind batch (with pivots over the diameter of
+ * the world box of a slot, which bounds the distance of a vertex from a pivot of its branch, as
+ * last computed without the reach), record the regions of its
  * casters while the wind blows so the shadow tiles they reach render again, and list the scenes
  * with swaying casters (swaying). Batches without one are left as they are.
  *

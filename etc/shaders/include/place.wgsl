@@ -30,23 +30,28 @@ struct Placed {
     // Derivative along world Y of the world offset a WindSway moved the vertex by, which bends
     // the normal; 0 for a vertex the wind does not move
     slope: vec3f,
+    // Turn of the branch of the vertex about its pivot by a WindSway with pivots (WindMove.turn),
+    // a unit quaternion which turns the world normal before the slope bends it; the identity
+    // without one
+    turn: vec4f,
 };
 
 fn place_at(v: VertexIn, position: vec3f, normal: vec3f) -> Placed {
     let model = instance_model(transforms[slot_of(v.slot)]);
     let world = model * vec4f(position, 1.0);
-    return Placed(model, normal, world, view.view_proj * world, position, vec3f(0.0));
+    return Placed(model, normal, world, view.view_proj * world, position, vec3f(0.0),
+        vec4f(0.0, 0.0, 0.0, 1.0));
 }
 
 // A placed vertex moved by the wind (wind.wgsl): its world and clip position move, the origin of
 // its shape is the translation of its model matrix.
 fn place_wind(p: Placed, m: Material) -> Placed {
     var result = p;
-    let w = wind_move(p.world.xyz, p.model[3].xyz, m,
-        world_origin(view.origin));
+    let w = wind_move(p.world.xyz, p.model, m, world_origin(view.origin));
     result.world = vec4f(p.world.xyz + w.offset, p.world.w);
     result.pos = view.view_proj * result.world;
     result.slope = w.slope;
+    result.turn = w.turn;
     return result;
 }
 

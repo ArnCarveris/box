@@ -77,8 +77,11 @@
  *
  * Then the alpha tested ones of the meshes with per vertex data, which read it for a
  * VertexReveal (with and without a TextureBlend, of meshes then of surfaces, without then with
- * a WindSway), without then with a DrawRange */
-#define BOX_GPU_SHADOW_VARIANTS (38)
+ * a WindSway), without then with a DrawRange.
+ *
+ * Then the plain ones of the swaying meshes with per vertex data, which read it for the pivots of
+ * a WindSway (of meshes then of surfaces, without then with a DrawRange) */
+#define BOX_GPU_SHADOW_VARIANTS (42)
 
 /** Color format of the HDR target a view with effects renders into */
 #define BOX_GPU_HDR_FORMAT (WGPUTextureFormat_RGBA16Float)

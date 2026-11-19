@@ -370,8 +370,9 @@ static WGPURenderPipeline box_gpu_forward_create(
  * the forward pipeline of the batch does (material_wind)
  * @param layers Whether the batch binds the layers group of TextureLayers (the layers layouts);
  * the prepass does not apply the layers, which do not change the alpha
- * @param data Whether the alpha tested vertex stage reads the per vertex data of the mesh for
- * its VertexReveal (vs_cutout_data, vs_cutout_surface_data); ignored without cutout
+ * @param data Whether the vertex stage reads the per vertex data of the mesh for its
+ * VertexReveal (vs_cutout_data, vs_cutout_surface_data) or the pivots of its WindSway
+ * (vs_depth_data, vs_depth_surface_data); ignored without cutout or wind
  * @param range Whether the instances have a DrawRange: both stages have the draw_range override
  * and a plain batch discards with fs_depth_range (fs_count_range)
  * @return The pipeline
@@ -413,9 +414,10 @@ static WGPURenderPipeline box_gpu_prepass_create(
         : (counts ? "fs_count_cutout" : "fs_depth_cutout");
     const char *vertex = cutout ? (surface ? "vs_cutout_surface" : "vs_cutout")
         : (surface ? "vs_depth_surface" : "vs_depth");
-    data = data && cutout;
+    data = data && (cutout || wind);
     if (data) {
-        vertex = surface ? "vs_cutout_surface_data" : "vs_cutout_data";
+        vertex = cutout ? (surface ? "vs_cutout_surface_data" : "vs_cutout_data")
+            : (surface ? "vs_depth_surface_data" : "vs_depth_data");
     }
 
     WGPUVertexAttribute vertex_attrs[3] = {
@@ -717,7 +719,7 @@ WGPURenderPipeline box_gpu_prepass_pipeline(
 
     texture_blend = box_gpu_texture_blends(b);
     layers = box_gpu_layered(b);
-    data = b->cutout && box_gpu_vertex_data(gpu, b);
+    data = (b->cutout || b->wind) && box_gpu_vertex_data(gpu, b);
     range = box_render_batch_ranged(b);
     key = box_gpu_forward_key(b->pipeline, count, Opaque, b->back_face, b->cutout,
         false, texture_blend, b->surface,

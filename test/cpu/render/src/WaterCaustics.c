@@ -268,7 +268,7 @@ void WaterCaustics_pack(void) {
     };
     WaterCaustics caustics = { .strength = 0.75f, .scale = 2, .speed = 0.5f, .depth = 1.5f };
     /* The caustics words of a Water are the Fresnel words, which a Water ignores */
-    test_int(ECS_SIZEOF(box_render_material_t), 256);
+    test_int(ECS_SIZEOF(box_render_material_t), 272);
     test_int(offsetof(box_render_material_t, caustics_offset),
         offsetof(box_render_material_t, fresnel_color));
     test_int(offsetof(box_render_material_t, caustics_strength),

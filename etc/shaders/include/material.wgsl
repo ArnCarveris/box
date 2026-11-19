@@ -121,12 +121,18 @@ struct Material {
     wind_flutter: f32,
     wind_reach: f32,
     wind_flutter_phase: f32,
-    // WIND_PRESENT with a WindSway; REVEAL_PRESENT with a VertexReveal, REVEAL_INVERT, its data
-    // channel 0..7 at REVEAL_CHANNEL_SHIFT and its softness (0 for a hard edge) as a half float
-    // in the high 16 bits (unpack2x16float); 0 without either
+    // WIND_PRESENT with a WindSway, WIND_PIVOTS with its pivots; REVEAL_PRESENT with a
+    // VertexReveal, REVEAL_INVERT, its data channel 0..7 at REVEAL_CHANNEL_SHIFT and its softness
+    // (0 for a hard edge) as a half float in the high 16 bits (unpack2x16float); 0 without
+    // either
     flags: u32,
     // VertexReveal threshold, 0 without one
     reveal_threshold: f32,
+    // WindSway branch and the phase of the swing of its branches of level 1 (0..1) with
+    // WIND_PIVOTS, 0 without
+    wind_branch: f32,
+    wind_branch_phase: f32,
+    wind_pad: vec2f,
 };
 
 // Water.scatter_color of a Water record, display encoded, r | g << 8 | b << 16, 0 without a

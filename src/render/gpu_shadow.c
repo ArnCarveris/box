@@ -676,8 +676,9 @@ done:
  * @param surface Whether the casters are parametric surfaces
  * @param wind Whether the vertex stage moves the vertices by the WindSway of their material
  * (the material_wind constant), as the mesh shaders do
- * @param data Whether the alpha tested vertex stage reads the per vertex data of the mesh for
- * its VertexReveal (the _data entry points, a third vertex buffer); ignored without cutout
+ * @param data Whether the vertex stage reads the per vertex data of the mesh for its
+ * VertexReveal or the pivots of its WindSway (the _data entry points, a third vertex buffer);
+ * ignored without cutout or wind
  * @param range Whether the casters have a DrawRange: both stages have the draw_range constant
  * and a plain caster discards with fs_range; ignored by the point light pipelines
  * @return The pipeline
@@ -716,12 +717,14 @@ static WGPURenderPipeline box_gpu_shadow_create(
         { { "vs", "vs_surface" }, { "vs_cutout", "vs_cutout_surface" } },
         { { "vs_point", "vs_point_surface" }, { "vs_point_cutout", "vs_point_cutout_surface" } }
     };
-    static const char *vertex_data[2][2] = {
-        { "vs_cutout_data", "vs_cutout_surface_data" },
-        { "vs_point_cutout_data", "vs_point_cutout_surface_data" }
+    static const char *vertex_data[2][2][2] = {
+        { { "vs_data", "vs_surface_data" }, { "vs_cutout_data", "vs_cutout_surface_data" } },
+        { { "vs_point_data", "vs_point_surface_data" },
+          { "vs_point_cutout_data", "vs_point_cutout_surface_data" } }
     };
-    data = data && cutout;
-    const char *vs = data ? vertex_data[point][surface] : vertex[point][cutout][surface];
+    data = data && (cutout || wind);
+    const char *vs = data ? vertex_data[point][cutout][surface]
+        : vertex[point][cutout][surface];
     const char *fs = point
         ? (cutout ? "fs_point_cutout" : (discard ? "fs_point" : "fs"))
         : (cutout ? "fs_cutout" : (range ? "fs_range" : "fs"));
@@ -967,8 +970,8 @@ done:
  * @param texture_blend Whether the alpha tested casters blend the layers of a TextureBlend
  * @param surface Whether the casters are parametric surfaces
  * @param wind Whether the casters sway (the material_wind constant)
- * @param data Whether the alpha tested casters read the per vertex data of their mesh
- * (box_gpu_vertex_data); ignored without cutout
+ * @param data Whether the alpha tested or swaying casters read the per vertex data of their
+ * mesh (box_gpu_vertex_data); ignored without cutout or wind
  * @param range Whether the casters have a DrawRange (the draw_range constant), ignored by the
  * point light tiles
  * @return The pipeline, NULL without a shader module or while it is being created
@@ -984,7 +987,7 @@ static WGPURenderPipeline box_gpu_shadow_variant(
     bool range)
 {
     texture_blend = texture_blend && cutout;
-    data = data && cutout;
+    data = data && (cutout || wind);
     range = range && !point;
     int32_t index = surface ? 1 + (int32_t)cutout + (int32_t)texture_blend : 0;
     if (wind) {
@@ -996,9 +999,11 @@ static WGPURenderPipeline box_gpu_shadow_variant(
             (int32_t)texture_blend;
     }
 
-    if (data) {
+    if (data && cutout) {
         index = 22 + (range ? 8 : 0) + (wind ? 4 : 0) + (surface ? 2 : 0) +
             (int32_t)texture_blend;
+    } else if (data) {
+        index = 38 + (range ? 2 : 0) + (surface ? 1 : 0);
     }
 
     WGPURenderPipeline *slot = &gpu->shadow_variants[point][index];
@@ -1027,7 +1032,7 @@ void box_gpu_shadow_request(
     for (i = 0; i < ecs_vec_count(&packet->batches); i ++) {
         const box_render_batch_t *b = ecs_vec_get_t(&packet->batches, box_render_batch_t, i);
         bool blend = b->cutout && box_gpu_texture_blends(b);
-        bool data = b->cutout && box_gpu_vertex_data(gpu, b);
+        bool data = (b->cutout || b->wind) && box_gpu_vertex_data(gpu, b);
         bool range = box_render_batch_ranged(b);
         if (b->shadow && b->view == -1 && b->blend == Opaque &&
             box_render_is_mesh(b->pipeline) && (b->surface || blend || b->wind || data || range))
@@ -1085,7 +1090,7 @@ static bool box_gpu_shadow_draw(
             &packet->batches, box_render_batch_t, d->batch);
         bool cutout = b->cutout && alpha;
         bool blend = cutout && box_gpu_texture_blends(b);
-        bool data = cutout && box_gpu_vertex_data(gpu, b);
+        bool data = (cutout || b->wind) && box_gpu_vertex_data(gpu, b);
         bool range = !point && box_render_batch_ranged(b);
         WGPURenderPipeline pipeline = cutout ? alpha : plain;
         if (blend || b->surface || b->wind || data || range) {

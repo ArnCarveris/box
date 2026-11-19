@@ -839,7 +839,7 @@ void Material_specular_anisotropy_pack(void) {
     box_draws_material_pack(&record, &(box_draw_material_t){ .fade = 1 });
     test_uint(record.anisotropy, 0);
     plain = record;
-    test_int(ECS_SIZEOF(box_render_material_t), 256);
+    test_int(ECS_SIZEOF(box_render_material_t), 272);
 
     SpecularAnisotropy full = { .strength = 1, .rotation = 0 };
     box_draws_material_pack(&record, &(box_draw_material_t){ .anisotropy = &full, .fade = 1 });
@@ -955,7 +955,7 @@ void Material_sheen_pack(void) {
     test_uint(record.diffuse_transmission, 0);
     test_flt(record.thickness, 0);
     plain = record;
-    test_int(ECS_SIZEOF(box_render_material_t), 256);
+    test_int(ECS_SIZEOF(box_render_material_t), 272);
 
     Sheen white = { .color = {255, 255, 255}, .roughness = 1 };
     box_draws_material_pack(&record, &(box_draw_material_t){ .sheen = &white, .fade = 1 });
@@ -1070,7 +1070,7 @@ void Material_diffuse_transmission_defaults(void) {
 void Material_diffuse_transmission_pack(void) {
     // materials/pbr
     box_render_material_t record, plain;
-    test_int(ECS_SIZEOF(box_render_material_t), 256);
+    test_int(ECS_SIZEOF(box_render_material_t), 272);
     test_int(offsetof(box_render_material_t, diffuse_transmission), 76);
     test_int(offsetof(box_render_material_t, thickness), 80);
     ecs_os_memset_t(&record, 0x55, box_render_material_t);
@@ -1184,7 +1184,7 @@ void Material_diffuse_transmission_blur_defaults(void) {
 void Material_diffuse_transmission_blur_pack(void) {
     // materials/pbr
     box_render_material_t record, plain;
-    test_int(ECS_SIZEOF(box_render_material_t), 256);
+    test_int(ECS_SIZEOF(box_render_material_t), 272);
     test_int(offsetof(box_render_material_t, diffuse_blur), 84);
     ecs_os_memset_t(&record, 0x55, box_render_material_t);
     box_draws_material_pack(&record, &(box_draw_material_t){ .fade = 1 });
@@ -2876,7 +2876,7 @@ void Material_texture_scroll_pack(void) {
     test_uint(record.fresnel_color[0], 0);
     test_uint(record.fresnel_color[1], 0);
     plain = record;
-    test_int(ECS_SIZEOF(box_render_material_t), 256);
+    test_int(ECS_SIZEOF(box_render_material_t), 272);
 
     box_draws_material_pack(&record, &(box_draw_material_t){
         .uv = &uv, .fade = 1, .time = 1000 });
@@ -3057,7 +3057,7 @@ void Material_fresnel_pack(void) {
     test_flt(record.fresnel_bias, 0);
     test_flt(record.fresnel_opacity, 0);
     plain = record;
-    test_int(ECS_SIZEOF(box_render_material_t), 256);
+    test_int(ECS_SIZEOF(box_render_material_t), 272);
     test_int(ECS_SIZEOF(box_render_material_t) % 16, 0);
     test_int(offsetof(box_render_material_t, fresnel_color), 104);
     test_int(offsetof(box_render_material_t, fresnel_strength), 112);
@@ -3253,7 +3253,7 @@ void Material_water_pack(void) {
     test_flt(record.water_ripple_scale, 0);
     test_uint(record.water_flags, 0);
     plain = record;
-    test_int(ECS_SIZEOF(box_render_material_t), 256);
+    test_int(ECS_SIZEOF(box_render_material_t), 272);
     test_int(offsetof(box_render_material_t, water_ripple_offset), 128);
     test_int(offsetof(box_render_material_t, water_shallow), 136);
     test_int(offsetof(box_render_material_t, water_depth), 148);
@@ -3541,7 +3541,7 @@ void Material_distortion_pack(void) {
     test_uint(record.distortion_flags, 0);
     test_flt(record.transmission_factor, 0);
     plain = record;
-    test_int(ECS_SIZEOF(box_render_material_t), 256);
+    test_int(ECS_SIZEOF(box_render_material_t), 272);
     test_int(offsetof(box_render_material_t, distortion_strength), 176);
     test_int(offsetof(box_render_material_t, distortion_flags), 188);
 
@@ -3722,7 +3722,7 @@ void Material_water_scatter_pack(void) {
         offsetof(box_render_material_t, sheen));
     test_int(offsetof(box_render_material_t, water_scatter),
         offsetof(box_render_material_t, diffuse_transmission));
-    test_int(ECS_SIZEOF(box_render_material_t), 256);
+    test_int(ECS_SIZEOF(box_render_material_t), 272);
 
     Water sea = {
         .shallow_color = {60, 170, 160}, .deep_color = {8, 40, 64},
@@ -3866,7 +3866,7 @@ void Material_water_shore_pack(void) {
         offsetof(box_render_material_t, thickness));
     test_int(offsetof(box_render_material_t, water_shore_reach),
         offsetof(box_render_material_t, diffuse_blur));
-    test_int(ECS_SIZEOF(box_render_material_t), 256);
+    test_int(ECS_SIZEOF(box_render_material_t), 272);
 
     Water sea = {
         .shallow_color = {60, 170, 160}, .deep_color = {8, 40, 64},

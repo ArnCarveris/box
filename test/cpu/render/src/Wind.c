@@ -238,13 +238,19 @@ void Wind_sway_defaults(void) {
     test_flt(s->flutter_frequency, 2);
     test_flt(s->flutter_reach, BOX_MATERIAL_SWAY_FLUTTER_REACH);
     test_flt(s->flutter_reach, 0.3f);
+    test_bool(s->pivots, false);
+    test_flt(s->branch, 0);
+    test_flt(s->branch_frequency, BOX_MATERIAL_SWAY_BRANCH_FREQUENCY);
+    test_flt(s->branch_frequency, 0.5f);
     test_bool(ecs_owns(world, added, MaterialId), true);
 
     test_assert(ecs_script_run(world, "sway",
         "using box.material\n"
         "tree { WindSway: {bend: 0.05, height: 4, base: -1, flutter: 0.1, "
             "flutter_frequency: 3, flutter_reach: 0.5} }\n"
-        "grass { WindSway: {bend: 0.02} }\n", NULL) == 0);
+        "grass { WindSway: {bend: 0.02} }\n"
+        "oak { WindSway: {bend: 0.03, pivots: true, branch: 0.2, branch_frequency: 0.7} }\n",
+        NULL) == 0);
     s = ecs_get(world, ecs_lookup(world, "tree"), WindSway);
     test_assert(s != NULL);
     test_flt(s->bend, 0.05f);
@@ -258,6 +264,13 @@ void Wind_sway_defaults(void) {
     test_flt(s->height, 1);
     test_flt(s->flutter_frequency, 2);
     test_flt(s->flutter_reach, 0.3f);
+    test_bool(s->pivots, false);
+    s = ecs_get(world, ecs_lookup(world, "oak"), WindSway);
+    test_assert(s != NULL);
+    test_bool(s->pivots, true);
+    test_flt(s->branch, 0.2f);
+    test_flt(s->branch_frequency, 0.7f);
+    test_flt(s->height, 1);
 
     /* Inherited by instances */
     ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
@@ -456,9 +469,11 @@ void Wind_pack(void) {
     test_uint(record.flags, 0);
     test_flt(record.reveal_threshold, 0);
     plain = record;
-    test_int(ECS_SIZEOF(box_render_material_t), 256);
+    test_int(ECS_SIZEOF(box_render_material_t), 272);
     test_int(offsetof(box_render_material_t, wind_direction), 192);
     test_int(offsetof(box_render_material_t, flags), 248);
+    test_int(offsetof(box_render_material_t, wind_branch), 256);
+    test_int(offsetof(box_render_material_t, wind_branch_phase), 260);
 
     /* A wind without a WindSway changes nothing */
     box_render_wind_t wind = {
@@ -543,8 +558,8 @@ void Wind_reach(void) {
     WindSway sway = { .bend = 0.1f, .height = 2, .flutter = 0.2f, .flutter_frequency = 2,
         .flutter_reach = 0.3f };
     box_render_wind_t calm = { .direction = {1, 0}, .frequency = 0.05f };
-    test_flt(box_render_wind_reach(&sway, &calm), 0);
-    test_flt(box_render_wind_reach(NULL, &calm), 0);
+    test_flt(box_render_wind_reach(&sway, &calm, 0), 0);
+    test_flt(box_render_wind_reach(NULL, &calm, 0), 0);
 
     box_render_wind_t wind = calm;
     wind.speed = 5;
@@ -552,14 +567,149 @@ void Wind_reach(void) {
     float strength = 5 * 1.5f;
     float expect = 0.1f * strength * (1 + BOX_RENDER_WIND_SWAY + BOX_RENDER_WIND_CROSS) +
         1.15f * 0.2f * strength / BOX_WIND_FULL_SPEED;
-    test_assert(fabsf(box_render_wind_reach(&sway, &wind) - expect) < 1e-5f);
+    test_assert(fabsf(box_render_wind_reach(&sway, &wind, 0) - expect) < 1e-5f);
 
     WindSway rigid = { .height = 1, .flutter_reach = 0.3f };
-    test_flt(box_render_wind_reach(&rigid, &wind), 0);
+    test_flt(box_render_wind_reach(&rigid, &wind, 0), 0);
     WindSway backwards = sway;
     backwards.bend = -0.1f;
-    test_assert(fabsf(box_render_wind_reach(&backwards, &wind) - expect) < 1e-5f);
-    test_flt(box_render_wind_reach(NULL, &wind), 0);
+    test_assert(fabsf(box_render_wind_reach(&backwards, &wind, 0) - expect) < 1e-5f);
+    test_flt(box_render_wind_reach(NULL, &wind, 0), 0);
+}
+
+/** With pivots the record holds the flag, the branch and the branch phase, wrapped in double
+ * precision; without pivots they are 0 whatever the branch */
+void Wind_pack_pivots(void) {
+    // materials/wind_sway
+    box_render_material_t record;
+    box_render_wind_t wind = {
+        .direction = {1, 0}, .speed = 6, .frequency = 0.05f, .sway = 0.25f, .time = 1000.25
+    };
+    WindSway sway = { .bend = 0.05f, .height = 4, .flutter = 0.1f, .flutter_frequency = 3,
+        .flutter_reach = 0.5f, .branch = 0.3f, .branch_frequency = 0.5f };
+    ecs_os_memset_t(&record, 0x55, box_render_material_t);
+    box_render_wind_pack(&record, &sway, &wind);
+    test_uint(record.flags, BOX_RENDER_WIND_PRESENT);
+    test_flt(record.wind_branch, 0);
+    test_flt(record.wind_branch_phase, 0);
+    test_flt(record.wind_pad[0], 0);
+    test_flt(record.wind_pad[1], 0);
+    box_render_material_t plain = record;
+
+    sway.pivots = true;
+    box_render_wind_pack(&record, &sway, &wind);
+    test_uint(record.flags, BOX_RENDER_WIND_PRESENT | BOX_RENDER_WIND_PIVOTS);
+    test_flt(record.wind_branch, 0.3f);
+    test_flt(record.wind_branch_phase, 0.125f);
+    test_flt(record.wind_pad[0], 0);
+    test_flt(record.wind_pad[1], 0);
+
+    /* The pivots leave the other words as they are */
+    record.flags = plain.flags;
+    record.wind_branch = 0;
+    record.wind_branch_phase = 0;
+    test_assert(!ecs_os_memcmp_t(&record, &plain, box_render_material_t));
+
+    /* The flag does not collide with the VertexReveal bits */
+    test_uint(BOX_RENDER_WIND_PIVOTS & (BOX_RENDER_WIND_PRESENT | BOX_RENDER_REVEAL_PRESENT |
+        BOX_RENDER_REVEAL_INVERT | (7u << BOX_RENDER_REVEAL_CHANNEL_SHIFT) |
+        (0xFFFFu << BOX_RENDER_REVEAL_SOFTNESS_SHIFT)), 0);
+
+    /* Broken values are 0 */
+    sway.branch = NAN;
+    sway.branch_frequency = INFINITY;
+    box_render_wind_pack(&record, &sway, &wind);
+    test_flt(record.wind_branch, 0);
+    test_flt(record.wind_branch_phase, 0);
+
+    /* The branch phase keeps its steps after hours */
+    int32_t f;
+    box_render_material_t a, b;
+    sway.branch = 0.3f;
+    sway.branch_frequency = 0.7f;
+    for (f = 0; f < 600; f ++) {
+        wind.time = 4.0 * 3600.0 + (double)f / 60.0;
+        box_render_wind_pack(&a, &sway, &wind);
+        wind.time += 1.0 / 60.0;
+        box_render_wind_pack(&b, &sway, &wind);
+        test_assert(a.wind_branch_phase >= 0.0f && a.wind_branch_phase < 1.0f);
+        test_assert(fabs(wind_step(a.wind_branch_phase, b.wind_branch_phase, 1.0) -
+            (double)0.7f / 60.0) < 1e-5);
+    }
+}
+
+/** With pivots the reach grows by the chords of the largest turns of a branch and its parent
+ * over the size; the size is ignored without pivots */
+void Wind_reach_pivots(void) {
+    // materials/wind_sway
+    WindSway sway = { .bend = 0.1f, .height = 2, .flutter = 0.2f, .flutter_frequency = 2,
+        .flutter_reach = 0.3f, .branch = 0.4f, .branch_frequency = 0.5f };
+    box_render_wind_t wind = { .direction = {1, 0}, .speed = 5, .gust = 0.5f,
+        .frequency = 0.05f };
+    float plain = box_render_wind_reach(&sway, &wind, 0);
+    test_flt(box_render_wind_reach(&sway, &wind, 3), plain);
+    test_flt(box_render_wind_turn(&sway), 0);
+
+    sway.pivots = true;
+    float turn = 0.4f * sqrtf(1.0f + BOX_RENDER_WIND_BRANCH_CROSS *
+        BOX_RENDER_WIND_BRANCH_CROSS);
+    test_assert(fabsf(box_render_wind_turn(&sway) - turn) < 1e-6f);
+    test_assert(fabsf(box_render_wind_reach(&sway, &wind, 0) - plain) < 1e-6f);
+    float expect = plain + 4.0f * sinf(0.5f * turn) * 3.0f;
+    test_assert(fabsf(box_render_wind_reach(&sway, &wind, 3) - expect) < 1e-5f);
+
+    /* A backwards branch reaches as far, a huge one at most the diameter four times */
+    sway.branch = -0.4f;
+    test_assert(fabsf(box_render_wind_reach(&sway, &wind, 3) - expect) < 1e-5f);
+    sway.branch = 100;
+    test_flt(box_render_wind_turn(&sway), GLM_PIf);
+    test_assert(box_render_wind_reach(&sway, &wind, 3) <= plain + 12.0f + 1e-5f);
+
+    /* Calm or broken values reach nothing more */
+    box_render_wind_t calm = wind;
+    calm.speed = 0;
+    test_flt(box_render_wind_reach(&sway, &calm, 3), 0);
+    sway.branch = NAN;
+    test_flt(box_render_wind_turn(&sway), 0);
+    test_assert(fabsf(box_render_wind_reach(&sway, &wind, 3) - plain) < 1e-6f);
+    sway.branch = 0.4f;
+    test_assert(fabsf(box_render_wind_reach(&sway, &wind, NAN) - plain) < 1e-6f);
+}
+
+/** box_wind_sway_vertex packs the level with the flutter weight and the two stiffnesses so the
+ * shaders unpack them, clamped */
+void Wind_sway_vertex(void) {
+    // materials/wind_sway
+    vec4 data0, data1;
+    box_wind_sway_vertex(data0, data1, (vec3){1, 2, 3}, 2, 0.4f, 1.0f, (vec3){4, 5, 6}, 0.8f);
+    test_flt(data0[0], 1);
+    test_flt(data0[1], 2);
+    test_flt(data0[2], 3);
+    test_flt(data0[3], 2.5f);
+    test_flt(data1[0], 4);
+    test_flt(data1[1], 5);
+    test_flt(data1[2], 6);
+    test_flt(data1[3], 102.0f + 256.0f * 204.0f);
+
+    /* Unpacked as wind.wgsl does */
+    float level = floorf(data0[3]);
+    float weight = 2.0f * (data0[3] - level);
+    float parent = floorf(data1[3] / 256.0f);
+    test_flt(level, 2);
+    test_flt(weight, 1);
+    test_assert(fabsf((data1[3] - 256.0f * parent) / 255.0f - 0.4f) < 0.5f / 255.0f);
+    test_assert(fabsf(parent / 255.0f - 0.8f) < 0.5f / 255.0f);
+
+    /* Without a parent, out of range or broken values */
+    box_wind_sway_vertex(data0, data1, (vec3){1, 2, 3}, 9, 2.0f, NAN, NULL, -1.0f);
+    test_flt(data0[3], (float)BOX_MATERIAL_SWAY_LEVELS);
+    test_flt(data1[0], 0);
+    test_flt(data1[1], 0);
+    test_flt(data1[2], 0);
+    test_flt(data1[3], 255);
+    box_wind_sway_vertex(data0, data1, (vec3){1, 2, 3}, -1, 0, 0.5f, NULL, 0);
+    test_flt(data0[3], 0.25f);
+    test_flt(data1[3], 0);
 }
 
 /** Scene.wind is a feature of the scene that turns on no override of the mesh shaders: the
@@ -623,7 +773,7 @@ void Wind_batches(void) {
     WindSway sway = *ecs_get(world, tree, WindSway);
     box_render_wind_t frame;
     box_render_wind_frame(world, &frame);
-    float reach = box_render_wind_reach(&sway, &frame);
+    float reach = box_render_wind_reach(&sway, &frame, 0);
     test_assert(reach > 0.0f);
     test_flt(td->wind_reach, reach);
 

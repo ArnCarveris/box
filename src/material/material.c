@@ -585,8 +585,9 @@ static void box_texture_scroll_ctor(
     }
 }
 
-/** Construct WindSway values that do not bend, with a height of 1 at a base of 0 and a 2 Hz
- * flutter of no amplitude that reaches full over 0.3 world units.
+/** Construct WindSway values that do not bend, with a height of 1 at a base of 0, a 2 Hz
+ * flutter of no amplitude that reaches full over 0.3 world units, and rigid branches that would
+ * swing at 0.5 Hz.
  *
  * @param ptr The components
  * @param count Number of components
@@ -604,8 +605,49 @@ static void box_wind_sway_ctor(
         values[i] = (WindSway){
             .height = BOX_MATERIAL_SWAY_HEIGHT,
             .flutter_frequency = BOX_MATERIAL_SWAY_FLUTTER_FREQUENCY,
-            .flutter_reach = BOX_MATERIAL_SWAY_FLUTTER_REACH };
+            .flutter_reach = BOX_MATERIAL_SWAY_FLUTTER_REACH,
+            .branch_frequency = BOX_MATERIAL_SWAY_BRANCH_FREQUENCY };
     }
+}
+
+/** Quantize a stiffness to 0..255, 0 when not finite.
+ *
+ * @param stiffness The stiffness, 0..1
+ * @return The quantized stiffness
+ */
+static float box_wind_sway_stiffness(
+    float stiffness)
+{
+    return isfinite(stiffness) ? roundf(glm_clamp(stiffness, 0.0f, 1.0f) * 255.0f) : 0.0f;
+}
+
+void box_wind_sway_vertex(
+    vec4 data0,
+    vec4 data1,
+    const vec3 pivot,
+    int32_t level,
+    float stiffness,
+    float weight,
+    const vec3 parent,
+    float parent_stiffness)
+{
+    float w = isfinite(weight) ? glm_clamp(weight, 0.0f, 1.0f) : 0.0f;
+    if (level < 0) {
+        level = 0;
+    } else if (level > BOX_MATERIAL_SWAY_LEVELS) {
+        level = BOX_MATERIAL_SWAY_LEVELS;
+    }
+
+    glm_vec3_copy(ECS_CONST_CAST(float*, pivot), data0);
+    data0[3] = (float)level + 0.5f * w;
+    if (parent) {
+        glm_vec3_copy(ECS_CONST_CAST(float*, parent), data1);
+    } else {
+        glm_vec3_zero(data1);
+    }
+
+    data1[3] = box_wind_sway_stiffness(stiffness) +
+        256.0f * box_wind_sway_stiffness(parent_stiffness);
 }
 
 /** Construct TextureMapping values that keep the UVs of the mesh, with a size of 1 and no
