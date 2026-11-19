@@ -364,6 +364,39 @@ void box_gpu_shadow_cascade_uniforms(
     u->shadow_offset[index] = normal_offset * cascade->texel;
 }
 
+void box_gpu_origin_split(
+    const double origin[3],
+    int32_t out[4])
+{
+    const double units = (double)(1 << BOX_GPU_ORIGIN_REST_BITS);
+    uint32_t rests = 0;
+    int32_t k;
+    for (k = 0; k < 3; k ++) {
+        double v = isfinite(origin[k]) ? origin[k] : 0.0;
+        v = v < -2147483648.0 ? -2147483648.0 : v > 2147483647.0 ? 2147483647.0 : v;
+        double whole = floor(v);
+        double rest = round((v - whole) * units);
+        if (rest >= units) {
+            rest = 0.0;
+            whole += whole < 2147483647.0 ? 1.0 : 0.0;
+        }
+
+        out[k] = (int32_t)whole;
+        rests |= (uint32_t)rest << (k * BOX_GPU_ORIGIN_REST_BITS);
+    }
+
+    out[3] = (int32_t)rests;
+}
+
+void box_gpu_shadow_origin(
+    const double origin[3],
+    void *block)
+{
+    int32_t split[4];
+    box_gpu_origin_split(origin, split);
+    ecs_os_memcpy((uint8_t*)block + BOX_GPU_SHADOW_ORIGIN, split, ECS_SIZEOF(split));
+}
+
 void box_gpu_shadow_filter_uniforms(
     box_gpu_view_uniforms_t *u,
     int32_t cascades,
@@ -574,9 +607,10 @@ void box_gpu_shadow_uniforms(
             cascade = store->fits[i];
         }
 
-        uint8_t *data = ecs_vec_get_t(&gpu->shadow_data, uint8_t,
+        uint8_t *block = ecs_vec_get_t(&gpu->shadow_data, uint8_t,
             (slot * BOX_RENDER_SHADOW_CASCADES + i) * BOX_GPU_CASCADE_STRIDE);
-        ecs_os_memcpy(data, cascade.matrix, sizeof(mat4));
+        ecs_os_memcpy(block, cascade.matrix, sizeof(mat4));
+        box_gpu_shadow_origin(gpu->origin, block);
         box_gpu_shadow_cascade_uniforms(u, i, &cascade, s->depth_bias, s->normal_offset,
             s->resolution);
     }
@@ -1285,8 +1319,10 @@ WGPUTextureView box_gpu_shadow_capture(
     }
 
     box_gpu_shadow_capture_ensure(gpu);
-    wgpuQueueWriteBuffer(gpu->queue, gpu->capture_shadow_buffer, 0, cascade->matrix,
-        sizeof(mat4));
+    uint8_t block[BOX_GPU_SHADOW_UNIFORM_SIZE] = {0};
+    ecs_os_memcpy(block, cascade->matrix, sizeof(mat4));
+    box_gpu_shadow_origin(packet->origin, block);
+    wgpuQueueWriteBuffer(gpu->queue, gpu->capture_shadow_buffer, 0, block, sizeof(block));
     WGPURenderPassDepthStencilAttachment depth = {
         .view = gpu->capture_shadow_layer,
         .depthLoadOp = WGPULoadOp_Clear,
@@ -1451,8 +1487,10 @@ static void box_gpu_atlas_matrices(
             &packet->shadow_tiles, box_render_shadow_tile_t, i);
         int32_t first = *ecs_vec_get_t(&gpu->atlas_blocks, int32_t, i);
         if (tile->projection != BOX_RENDER_SHADOW_OCTAHEDRAL) {
-            ecs_os_memcpy(ecs_vec_get_t(&gpu->atlas_data, uint8_t,
-                first * BOX_GPU_CASCADE_STRIDE), tile->matrix, sizeof(mat4));
+            uint8_t *block = ecs_vec_get_t(&gpu->atlas_data, uint8_t,
+                first * BOX_GPU_CASCADE_STRIDE);
+            ecs_os_memcpy(block, tile->matrix, sizeof(mat4));
+            box_gpu_shadow_origin(packet->origin, block);
             continue;
         }
 
@@ -1465,6 +1503,7 @@ static void box_gpu_atlas_matrices(
             u[19] = (float)o;
             u[20] = tile->near_;
             u[21] = tile->far_;
+            box_gpu_shadow_origin(packet->origin, u);
         }
     }
 

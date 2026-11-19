@@ -241,17 +241,19 @@ void box_render_fog_offset(
 
 /** Write the record of a FogVolume: its box placed by the rotation and position of the world
  * transform, scale ignored, its values clamped to their ranges and the offset of its noise at a
- * time.
+ * time, moved back by the absolute position of the local origin.
  *
  * @param fog The FogVolume
  * @param transform World transform of the entity
  * @param time Seconds the world has advanced in total, the time of the packet
+ * @param origin Absolute position of the local origin (WorldOrigin)
  * @param out Receives the record
  */
 static void box_fog_record(
     const FogVolume *fog,
     const WorldTransform *transform,
     double time,
+    const double *origin,
     box_render_fog_volume_t *out)
 {
     int32_t k;
@@ -282,6 +284,14 @@ static void box_fog_record(
     out->noise_strength = glm_clamp(fog->noise_strength, 0.0f, 1.0f);
     out->noise_scale = glm_max(fog->noise_scale, BOX_RENDER_FOG_NOISE_SCALE_MIN);
     box_render_fog_offset(fog, time, out->offset);
+    if (origin[0] != 0.0 || origin[1] != 0.0 || origin[2] != 0.0) {
+        double period = BOX_RENDER_FOG_NOISE_PERIOD * (double)out->noise_scale;
+        for (k = 0; k < 3; k ++) {
+            out->offset[k] = box_render_origin_wrap_float(
+                (double)out->offset[k] - origin[k], period);
+        }
+    }
+
     out->color[0] = box_fog_linear(fog->color.r);
     out->color[1] = box_fog_linear(fog->color.g);
     out->color[2] = box_fog_linear(fog->color.b);
@@ -298,6 +308,8 @@ static void box_fog_collect(
     box_render_fog_t *l,
     double time)
 {
+    double origin[3];
+    box_render_origin(world, origin);
     ecs_vec_clear(&l->fog_volumes);
     ecs_iter_t it = ecs_query_iter(world, l->query);
     while (ecs_query_next(&it)) {
@@ -309,7 +321,7 @@ static void box_fog_collect(
             f->scene = box_render_scene_field(&it, 2, i);
             WorldTransform buf;
             box_fog_record(&fogs[i], box_transform_world_field(world, &it, transforms, i, &buf),
-                time, &f->record);
+                time, origin, &f->record);
         }
     }
 }

@@ -907,6 +907,7 @@ static void box_gpu_bake_face(
     u->viewport[2] = 1.0f / edge;
     u->viewport[3] = 1.0f / edge;
     box_gpu_light_uniforms(gpu, rv, proj, u);
+    box_gpu_origin_split(gpu->origin, u->origin);
     u->grid[0] = 1;
     u->grid[1] = 1;
     u->grid[2] = 1;

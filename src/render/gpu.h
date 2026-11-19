@@ -1784,6 +1784,32 @@ void box_gpu_ripples_uniforms(
     const box_render_view_t *v,
     box_gpu_view_uniforms_t *u);
 
+/** Split the absolute position of the local origin (WorldOrigin) as the shaders take it (View
+ * and Cascade, world_origin of world_origin.wgsl): the whole world units of X, Y and Z, clamped
+ * to 32 bits, and in w the rest of a unit of each in BOX_GPU_ORIGIN_REST_BITS bits, X lowest;
+ * split in double precision, so a shader computes a world space pattern of the absolute position
+ * without losing precision (origin_phase). 0 for an origin of 0.
+ *
+ * @param origin Absolute position of the local origin
+ * @param out Receives the split
+ */
+void box_gpu_origin_split(
+    const double origin[3],
+    int32_t out[4]);
+
+/** Bits of the rest of a world unit of each axis of the split origin (box_gpu_origin_split) */
+#define BOX_GPU_ORIGIN_REST_BITS (10)
+
+/** Write the absolute position of the local origin into the uniforms of a cascade, tile or
+ * octant of the shadow pass at BOX_GPU_SHADOW_ORIGIN (box_gpu_origin_split).
+ *
+ * @param origin Absolute position of the local origin
+ * @param block The uniforms of the cascade
+ */
+void box_gpu_shadow_origin(
+    const double origin[3],
+    void *block);
+
 /** Check whether a pool of the scene of a view fades in front of the depth of the view, so the
  * view draws its particles in a pass that reads the depth instead of writing it.
  *

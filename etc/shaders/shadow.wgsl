@@ -28,6 +28,9 @@ struct Cascade {
     light: vec4f,
     // A point light tile: x the near plane, y the far plane
     planes: vec4f,
+    // The absolute position of the local origin (WorldOrigin) as box_gpu_origin_split packs it
+    // (world_origin.wgsl)
+    origin: vec4i,
 };
 
 // 1 / sqrt(3), the length of the axis of an octant of a point light tile
@@ -122,7 +125,8 @@ fn caster_wind(slot: u32, world: vec3f, model: mat4x4f) -> vec3f {
     if (material_wind) {
         let m = material_fetch(shadings[slot].material & 0xFFFFFFu);
         if (wind_sways(m)) {
-            result = world + wind_move(world, model[3].xyz, m).offset;
+            result = world + wind_move(world, model[3].xyz, m,
+                world_origin(cascade.origin)).offset;
         }
     }
     return result;
@@ -284,17 +288,23 @@ fn cutout_mapping(v: VertexIn, material: Material, position: vec3f, normal: vec3
     (*o).object_normal = normal;
     if (material_world(material)) {
         let flip = select(1.0, -1.0, dot(c0, cross(c1, c2)) < 0.0);
-        (*o).object = mapping_object(material, (model * vec4f(position, 1.0)).xyz,
-            vec3f(1.0));
+        (*o).object = mapping_world(material, (model * vec4f(position, 1.0)).xyz,
+            world_origin(cascade.origin));
         (*o).object_normal = mat3x3f(cross(c1, c2), cross(c2, c0), cross(c0, c1)) *
             normal * flip;
     } else if (material_frame(material)) {
         var relative = model;
+        var framed = false;
         if (slot_of(v.slot) < arrayLength(&frames)) {
             relative = instance_frame(frames[slot_of(v.slot)], model);
+            framed = instance_framed(frames[slot_of(v.slot)], transforms[slot_of(v.slot)]);
         }
         let f = mapping_frame(material, relative, position, normal);
         (*o).object = f.object;
+        if (!framed) {
+            (*o).object += mapping_origin(material,
+                world_origin(cascade.origin));
+        }
         (*o).object_normal = f.normal;
     }
 }

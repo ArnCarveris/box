@@ -290,7 +290,13 @@ static void box_effects_entity(
     const Vignette *vignette = ecs_get(world, e, Vignette);
     const Smaa *smaa = ecs_get(world, e, Smaa);
     if (fog) {
-        box_render_fog_settings(fog, &box_effects_append(p, v, BOX_RENDER_EFFECT_FOG, e)->fog);
+        HeightFog *out = &box_effects_append(p, v, BOX_RENDER_EFFECT_FOG, e)->fog;
+        double origin[3];
+        box_render_fog_settings(fog, out);
+        box_render_origin(world, origin);
+        if (origin[1] != 0.0) {
+            out->base_height = (float)((double)fog->base_height - origin[1]);
+        }
     }
 
     if (dof) {

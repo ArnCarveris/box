@@ -85,6 +85,9 @@ struct View {
     ripple_a: vec4f,
     ripple_b: vec4f,
     ripple_c: vec4u,
+    // The absolute position of the local origin (WorldOrigin) as box_gpu_origin_split packs it:
+    // its whole world units (xyz) and the rest of a unit of each (w), see world_origin.wgsl
+    origin: vec4i,
 };
 
 // shadow is the index of the tile record of a spot or point light in the shadow atlas of the

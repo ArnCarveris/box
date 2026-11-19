@@ -1077,6 +1077,9 @@ static int32_t box_gpu_view_write(
 {
     int32_t i, result = 0, extra = 0, slot = 0, count = ecs_vec_count(&packet->views);
     ecs_vec_set_count_t(NULL, &gpu->view_data, uint8_t, count * BOX_GPU_VIEW_STRIDE);
+    gpu->origin[0] = packet->origin[0];
+    gpu->origin[1] = packet->origin[1];
+    gpu->origin[2] = packet->origin[2];
     box_gpu_cull_begin(gpu, packet);
     box_gpu_planar_begin(gpu);
     box_gpu_shadow_begin(gpu, packet->frame);
@@ -1107,6 +1110,7 @@ static int32_t box_gpu_view_write(
         box_gpu_environment_uniforms(gpu, v, u);
         box_gpu_cookie_uniforms(gpu, v, u);
         box_gpu_ripples_uniforms(gpu, v, u);
+        box_gpu_origin_split(packet->origin, u->origin);
         box_gpu_cull_add(gpu, t, packet, i, result, proj, u);
         result ++;
     }

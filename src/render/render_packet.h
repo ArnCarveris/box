@@ -2040,7 +2040,7 @@ typedef struct box_render_texture_blend_t {
 } box_render_texture_blend_t;
 
 /** The values of one TextureLayer as the mesh shaders read them (TextureLayer of
- * mesh_layers.wgsl), the uniform buffer of its layer entity. 112 bytes. */
+ * mesh_layers.wgsl), the uniform buffer of its layer entity. 128 bytes. */
 typedef struct box_render_texture_layer_t {
     float color[4];         /**< Linear albedo constant (Rgb), then the amount clamped to 0..1;
                              *   0 does nothing */
@@ -2055,6 +2055,9 @@ typedef struct box_render_texture_layer_t {
     uint32_t modes[4];      /**< TextureLayerBlend of the albedo, roughness, metallic and
                              *   occlusion */
     uint32_t flags[4];      /**< BOX_RENDER_LAYER_HAS_* and BOX_RENDER_LAYER_UV, then 0 */
+    float origin[4];        /**< Wrapped offset of the world projection for the absolute
+                             *   position of the local origin (box_render_origin_mapping); 0 with
+                             *   BOX_RENDER_LAYER_UV */
 } box_render_texture_layer_t;
 
 /** The layers of a TextureLayers as a batch draws them, in the packet data of a batch with
@@ -2342,6 +2345,8 @@ typedef struct box_render_transition_record_t {
 typedef struct box_render_packet_t {
     int64_t frame;          /**< Frame the packet was extracted in */
     double time;            /**< World time at the end of the frame, in seconds */
+    double origin[3];       /**< Absolute position of the local origin (WorldOrigin) of the
+                             *   frame, which the world space patterns of the shaders add */
     float delta;            /**< Seconds the frame advanced the world */
     float fps;              /**< Frame rate cap of the frame, box_app_fps, 0 uncapped */
     bool headless;          /**< App.headless: the frame waits for the pipelines it draws

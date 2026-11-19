@@ -29,7 +29,7 @@
  * buffers */
 #define BOX_GPU_BLEND_LAYER_ENTRIES (BOX_GPU_BLEND_ENTRIES + BOX_RENDER_LAYERS)
 
-_Static_assert(sizeof(box_render_texture_layer_t) == 112, "TextureLayer of mesh_layers.wgsl");
+_Static_assert(sizeof(box_render_texture_layer_t) == 128, "TextureLayer of mesh_layers.wgsl");
 
 /** Make a fragment texture entry of a bind group layout.
  *

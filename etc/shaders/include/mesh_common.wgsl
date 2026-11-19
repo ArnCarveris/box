@@ -381,6 +381,16 @@ fn frame_model(slot: u32, model: mat4x4f) -> mat4x4f {
     return result;
 }
 
+// Whether the instance of a slot is under a texture frame, for a MappingFrame material: else it
+// projects from its world position, as MappingWorld does.
+fn frame_placed(slot: u32) -> bool {
+    var result = false;
+    if (slot < arrayLength(&frames)) {
+        result = instance_framed(frames[slot], transforms[slot]);
+    }
+    return result;
+}
+
 // Scale of the instance of a slot for a MappingObject material: the lengths of the columns of its
 // frame record when it is under a texture frame (the model matrix over the uniform world scale
 // of the frame), else scale, the lengths of the model matrix columns.
@@ -400,12 +410,17 @@ fn vertex_mapping(o: ptr<function, VertexShading>, v: VertexIn, material: Materi
     (*o).mapped = 1.0 + blend;
     (*o).uv = mapping_offset(material);
     if (material_world(material)) {
-        (*o).object = mapping_object(material, p.world.xyz, vec3f(1.0));
+        (*o).object = mapping_world(material, p.world.xyz,
+            world_origin(view.origin));
         (*o).object_normal = normal;
     } else if (material_frame(material)) {
         let relative = frame_model(slot_of(v.slot), p.model);
         let f = mapping_frame(material, relative, p.local, p.normal);
         (*o).object = f.object;
+        if (!frame_placed(slot_of(v.slot))) {
+            (*o).object += mapping_origin(material,
+                world_origin(view.origin));
+        }
         (*o).object_normal = f.normal;
         if (blend > 0.0) {
             (*o).rotation = mapping_frame_rotation(p.model, relative);

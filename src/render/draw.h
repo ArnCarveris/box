@@ -300,6 +300,8 @@ typedef struct box_draw_material_t {
                                  *   by 2D shapes */
     const TextureScroll *scroll; /**< Endless UV scrolling of a 3D shape, ignored by 2D shapes */
     double time;                /**< Total render time the scroll offsets are computed at */
+    double origin[3];           /**< Absolute position of the local origin (WorldOrigin) the
+                                 *   world space patterns are packed for, 0 without one */
     const Transmission *transmission; /**< Light passing through a 3D shape */
     const ClearCoat *clear_coat; /**< Dielectric layer over a 3D shape, ignored by 2D shapes */
     const SpecularAnisotropy *anisotropy; /**< Stretched highlight of a 3D shape, ignored by 2D
@@ -371,6 +373,8 @@ typedef struct box_draw_transition_material_t {
     TextureScroll scroll;   /**< TextureScroll, which has no transition: the record keeps it */
     bool scrolled;          /**< The material has a TextureScroll */
     double time;            /**< Total render time the scroll offsets are computed at */
+    double origin[3];       /**< Absolute position of the local origin the world space
+                             *   patterns are packed for */
     Transmission transmission; /**< Transmission */
     ClearCoat clear_coat;   /**< ClearCoat */
     SpecularAnisotropy anisotropy; /**< SpecularAnisotropy */
@@ -734,6 +738,8 @@ typedef struct box_draw_materials_t {
     box_draw_water_waves_t *waves; /**< The wave table, NULL until a Water has WaterWaves */
     ecs_map_t caustics;     /**< Owner whose Water has WaterCaustics and a WaterFlow to its
                              *   box_draw_water_caustics_state_t, allocated */
+    double origin[3];       /**< Absolute position of the local origin (WorldOrigin) the
+                             *   records were packed for; a change packs every owner again */
 } box_draw_materials_t;
 
 /** The root of a changed subtree and the streams the change writes for each of its entities */
@@ -1557,6 +1563,12 @@ void box_draws_color_unpack(
  * Transmission the transmission of a factor of 1 (box_draws_distortion_pack). A Water packs its
  * WaterCaustics in the words of the Fresnel, which it ignores (box_draws_water_caustics_pack).
  * Opacity, tints and the 2D shape are not.
+ *
+ * The shaders wrap the projection of the absolute position of the local origin of a world mapped
+ * Water to BOX_RENDER_WATER_ORIGIN_PERIOD repeats; its ripple offset takes the whole periods that
+ * leaves out times the ripple scale as the fragments read it (a half float), so the second normal
+ * sample stays continuous across a shift of the origin, for an up facing surface: u along Z, v
+ * along -X.
  *
  * @param out The record
  * @param material Material components of the owner

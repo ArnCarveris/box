@@ -57,9 +57,13 @@
 #define BOX_GPU_CASCADE_STRIDE (256)
 
 /** Bytes of the uniforms of one cascade, tile or octant of the shadow pass, Cascade of
- * etc/shaders/shadow.wgsl: the matrix, the light of a point light tile and its octant, and its
- * near and far plane */
-#define BOX_GPU_SHADOW_UNIFORM_SIZE (sizeof(mat4) + 2 * sizeof(vec4))
+ * etc/shaders/shadow.wgsl: the matrix, the light of a point light tile and its octant, its near
+ * and far plane, then the absolute position of the local origin (BOX_GPU_SHADOW_ORIGIN) */
+#define BOX_GPU_SHADOW_UNIFORM_SIZE (sizeof(mat4) + 3 * sizeof(vec4))
+
+/** Byte offset of the absolute position of the local origin in the uniforms of a cascade, tile
+ * or octant, as box_gpu_origin_split packs it */
+#define BOX_GPU_SHADOW_ORIGIN (sizeof(mat4) + 2 * sizeof(vec4))
 
 /** Depth format of the shadow maps, cleared to 0 and compared with greater for reversed Z */
 #define BOX_GPU_SHADOW_FORMAT (WGPUTextureFormat_Depth32Float)
@@ -895,6 +899,8 @@ typedef struct box_gpu_view_uniforms_t {
     vec4 ripple_b;                  /**< World Y of its Water, tolerance, border cells, cell */
     uint32_t ripple_c[4];           /**< Resolution, texel of the window corner X and Z, 1 for a
                                      *   field and 0 without one */
+    int32_t origin[4];              /**< Absolute position of the local origin (WorldOrigin)
+                                     *   as box_gpu_origin_split packs it */
 } box_gpu_view_uniforms_t;
 
 _Static_assert(sizeof(box_gpu_view_uniforms_t) <= BOX_GPU_VIEW_STRIDE,
@@ -1161,6 +1167,8 @@ typedef struct box_gpu_t {
     WGPUBuffer shadow_buffer;       /**< Cascade matrices of the views of a target */
     int32_t shadow_capacity;        /**< Views the cascade buffer holds */
     ecs_vec_t shadow_data;          /**< Bytes of the cascade matrices of a target */
+    double origin[3];               /**< Absolute position of the local origin of the packet
+                                     *   the views are written for, which the cascades take */
     WGPUTexture capture_shadow;     /**< Shadow map of the probe captures, one cascade */
     WGPUTextureView capture_shadow_view; /**< Array view the captures sample */
     WGPUTextureView capture_shadow_layer; /**< View the casters render into */

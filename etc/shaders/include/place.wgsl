@@ -42,7 +42,8 @@ fn place_at(v: VertexIn, position: vec3f, normal: vec3f) -> Placed {
 // its shape is the translation of its model matrix.
 fn place_wind(p: Placed, m: Material) -> Placed {
     var result = p;
-    let w = wind_move(p.world.xyz, p.model[3].xyz, m);
+    let w = wind_move(p.world.xyz, p.model[3].xyz, m,
+        world_origin(view.origin));
     result.world = vec4f(p.world.xyz + w.offset, p.world.w);
     result.pos = view.view_proj * result.world;
     result.slope = w.slope;

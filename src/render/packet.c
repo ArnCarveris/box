@@ -78,6 +78,7 @@ void box_render_packet_reset(
     int32_t capacity = ecs_vec_size(&p->data);
     p->frame = 0;
     p->time = 0;
+    p->origin[0] = p->origin[1] = p->origin[2] = 0;
     p->delta = 0;
     p->fps = 0;
     p->vsync = false;
@@ -152,6 +153,9 @@ void box_render_packet_copy(
 {
     dst->frame = src->frame;
     dst->time = src->time;
+    dst->origin[0] = src->origin[0];
+    dst->origin[1] = src->origin[1];
+    dst->origin[2] = src->origin[2];
     dst->delta = src->delta;
     dst->fps = src->fps;
     dst->vsync = src->vsync;

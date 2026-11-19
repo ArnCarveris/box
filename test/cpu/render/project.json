@@ -1224,6 +1224,20 @@
                     "ignored",
                     "water"
                 ]
+            },
+            {
+                "id": "WorldOriginShading",
+                "testcases": [
+                    "wrap",
+                    "origin_of_world",
+                    "mapping_pack",
+                    "mapping_record",
+                    "water_ripple_pack",
+                    "mapping_continuous",
+                    "layer_pack",
+                    "wind_frame",
+                    "wind_pack_base"
+                ]
             }
         ]
     }

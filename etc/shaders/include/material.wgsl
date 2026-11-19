@@ -8,6 +8,8 @@
 //   @group(2) @binding(4) var<storage, read> materials: array<Material>;
 #pragma once
 
+#include "world_origin.wgsl"
+
 struct Material {
     // Display encoded base color (Rgb), r | g << 8 | b << 16
     color: u32,
@@ -227,6 +229,36 @@ fn material_blend(m: Material) -> f32 {
 fn mapping_object(m: Material, position: vec3f, scale: vec3f) -> vec4f {
     let p = position * scale / m.mapping_size;
     return vec4f(p.x * m.uv.x, p.y * m.uv.y, p.z * m.uv.x, p.x * m.uv.y);
+}
+
+// Repeats the projection of the origin of a Water record wraps to
+// (BOX_RENDER_WATER_ORIGIN_PERIOD): its foam samples scale the UVs by Water.foam_scale and by a
+// second, rotated scale of 1.63 (0.8, 0.6), which stay whole repeats over this many for foam
+// scales of a few binary decimals.
+const WATER_ORIGIN_PERIOD: f32 = 5000.0;
+
+// The projection of the absolute position of the local origin for a MappingWorld material, and a
+// MappingFrame one without a frame: the origin as mapping_object projects it, each component
+// wrapped to whole repeats of the texture (origin_phase), 0 at an origin of 0. Of a Water record
+// wrapped to WATER_ORIGIN_PERIOD repeats instead: the whole repeats come from the phase over the
+// period, which is precise to far less than a repeat, rounded, and the precise phase is added.
+fn mapping_origin(m: Material, o: WorldOrigin) -> vec4f {
+    let a = m.uv.x / m.mapping_size;
+    let b = m.uv.y / m.mapping_size;
+    var p = vec4f(origin_phase(o, vec3f(a, b, a)), origin_phase(o, vec3f(b)).x);
+    if (m.water_depth > 0.0) {
+        let k = vec3f(a, b, a) / WATER_ORIGIN_PERIOD;
+        let c = vec4f(origin_phase(o, k), origin_phase(o, vec3f(b / WATER_ORIGIN_PERIOD)).x);
+        p += round(c * WATER_ORIGIN_PERIOD - p);
+    }
+    return p;
+}
+
+// What a vertex of a MappingWorld material passes on: mapping_object of its local world position
+// plus mapping_origin, so the texture stays where it is in the world across a shift of the
+// origin and precise far from it.
+fn mapping_world(m: Material, position: vec3f, o: WorldOrigin) -> vec4f {
+    return mapping_object(m, position, vec3f(1.0)) + mapping_origin(m, o);
 }
 
 // What a vertex of a MappingFrame material passes on: its object position moved by relative,

@@ -14,6 +14,7 @@
  */
 
 #include "gpu.h"
+#include <math.h>
 
 #ifdef BOX_RENDER_WGPU
 

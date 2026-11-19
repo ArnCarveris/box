@@ -963,8 +963,14 @@ static void box_particles_block_forces(
     out->turbulence[0] = forces->turbulence * scale;
     out->turbulence[1] = frequency;
     out->turbulence[2] = scale;
+    double origin[3], frame[3];
+    box_render_origin(world, origin);
+    for (c = 0; c < 3; c ++) {
+        frame[c] = pool->frame[c] - origin[c];
+    }
+
     box_particle_phase(out->seed, phase);
-    box_particle_frame_phase(phase, pool->frame, frequency, out->wander);
+    box_particle_frame_phase(phase, frame, frequency, out->wander);
     glm_vec3_scale(ECS_CONST_CAST(float*, forces->drift), scale, out->drift);
     for (c = 0; c < 3; c ++) {
         pool->frame[c] += moves ? (double)out->drift[c] * (double)out->acceleration[3] : 0.0;

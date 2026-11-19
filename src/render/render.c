@@ -113,6 +113,7 @@ box_render_packet_t* box_render_packet(
         result = box_render_ring_acquire(ring);
         result->frame = info->frame_count_total;
         result->time = info->world_time_total;
+        box_render_origin(real, result->origin);
         result->delta = info->delta_time;
         result->fps = ecs_id(App) ? box_app_fps(real) : 0;
         result->headless = app && app->headless;

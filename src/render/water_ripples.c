@@ -9,7 +9,8 @@
  * WaterFlow over the window give the rectangles the backend takes the velocity of each cell from.
  *
  * A RippleSource pushes the water and lays down foam by its speed relative to the local flow at
- * its position (box_render_ripples_flow_at), from the change of its world position.
+ * its position (box_render_ripples_flow_at), from the change of its absolute world position.
+ * Frames, windows and sources are absolute (origin plus local), so a shift moves no water.
  */
 
 #include "render.h"
@@ -30,7 +31,8 @@ typedef struct box_ripple_field_t {
 
 /** A RippleSource the extract keeps between frames for its velocity */
 typedef struct box_ripple_mover_t {
-    double position[3];     /**< World position at the end of the frame it was seen last */
+    double position[3];     /**< Absolute world position at the end of the frame it was seen
+                             *   last */
     float velocity[3];      /**< World velocity of that frame */
     int64_t seen;           /**< Extract frame that saw it last */
 } box_ripple_mover_t;
@@ -38,8 +40,8 @@ typedef struct box_ripple_mover_t {
 /** A RippleSource of this frame */
 typedef struct box_ripple_entry_t {
     ecs_entity_t scene;     /**< Scene root of the source, 0 for the default scene */
-    double from[3];         /**< World position at the start of the frame */
-    double to[3];           /**< World position at the end of the frame */
+    double from[3];         /**< Absolute world position at the start of the frame */
+    double to[3];           /**< Absolute world position at the end of the frame */
     float velocity[3];      /**< World velocity */
     float axis[2];          /**< Its X axis in world XZ, normalized */
     float extents[2];       /**< World units of its half size along its X and Z */
@@ -68,6 +70,7 @@ typedef struct box_render_ripples_state_t {
     ecs_vec_t scenes;       /**< ecs_entity_t, scratch: the scenes that have a field this frame */
     ecs_vec_t keep;         /**< box_material_ripple_t, scratch: the disturbances that wait */
     ecs_vec_t candidates;   /**< box_ripple_candidate_t, scratch: the flowing Water of a field */
+    double origin[3];       /**< Absolute position of the local origin of this frame */
     int64_t frame;          /**< Frames extracted */
     bool warned;            /**< A scene with more than one field was reported */
 } box_render_ripples_state_t;
@@ -296,7 +299,7 @@ static void box_ripples_sources(
             ecs_os_memset_t(e, 0, box_ripple_entry_t);
             e->scene = box_render_scene_field(&it, 2, i);
             for (k = 0; k < 3; k ++) {
-                e->to[k] = t->m[3][k];
+                e->to[k] = (double)t->m[3][k] + l->origin[k];
                 e->from[k] = known ? m->position[k] : e->to[k];
                 m->velocity[k] = known && delta > 0.0
                     ? (float)((e->to[k] - e->from[k]) / delta) : 0.0f;
@@ -498,8 +501,8 @@ static void box_ripples_push_flows(
     const box_mesh_cache_t *cache = box_mesh_cache_of(world);
     double cell = f->cell, half = (double)f->resolution * cell * 0.5;
     double corner[2] = {
-        (double)f->origin[0] * cell + f->frame[0],
-        (double)f->origin[1] * cell + f->frame[1]
+        (double)f->origin[0] * cell + f->frame[0] - l->origin[0],
+        (double)f->origin[1] * cell + f->frame[1] - l->origin[2]
     };
     int32_t i, count;
     ecs_vec_clear(&l->candidates);
@@ -635,6 +638,7 @@ static void box_ripples_push_sources(
  * frame, and mark the ones it took.
  *
  * @param p The packet
+ * @param l The state
  * @param queue The queue, box_material_ripple_t
  * @param taken One flag per entry of the queue, set for the ones applied
  * @param rec The record of the field
@@ -642,6 +646,7 @@ static void box_ripples_push_sources(
  */
 static void box_ripples_push_impulses(
     box_render_packet_t *p,
+    const box_render_ripples_state_t *l,
     const ecs_vec_t *queue,
     bool *taken,
     box_render_water_ripples_t *rec,
@@ -658,10 +663,10 @@ static void box_ripples_push_impulses(
 
         taken[i] = true;
         ecs_os_memset_t(&s, 0, box_render_ripple_source_t);
-        s.to[0] = s.from[0] = (float)(((double)r->position[0] - f->frame[0]) / cell -
-            (double)f->origin[0]);
-        s.to[1] = s.from[1] = (float)(((double)r->position[2] - f->frame[1]) / cell -
-            (double)f->origin[1]);
+        s.to[0] = s.from[0] = (float)(((double)r->position[0] + l->origin[0] - f->frame[0]) /
+            cell - (double)f->origin[0]);
+        s.to[1] = s.from[1] = (float)(((double)r->position[2] + l->origin[2] - f->frame[1]) /
+            cell - (double)f->origin[1]);
         s.extents[0] = s.extents[1] = (float)((double)r->radius / cell);
         s.axis[0] = 1.0f;
         s.amount = -r->strength;
@@ -770,8 +775,8 @@ static void box_ripples_field(
         center = ft ? ft : center;
     }
 
-    double cx = center ? (double)center->m[3][0] : 0.0;
-    double cz = center ? (double)center->m[3][2] : 0.0;
+    double cx = (center ? (double)center->m[3][0] : 0.0) + l->origin[0];
+    double cz = (center ? (double)center->m[3][2] : 0.0) + l->origin[2];
     int64_t origin[2];
     box_render_ripples_window(cx - f->frame[0], cz - f->frame[1], cell, resolution, origin);
 
@@ -793,8 +798,8 @@ static void box_ripples_field(
 
     rec->cell = cell;
     box_render_ripples_wave(ripples, cell, &rec->courant2, &rec->keep);
-    rec->corner[0] = (float)((double)origin[0] * cell + f->frame[0]);
-    rec->corner[1] = (float)((double)origin[1] * cell + f->frame[1]);
+    rec->corner[0] = (float)((double)origin[0] * cell + f->frame[0] - l->origin[0]);
+    rec->corner[1] = (float)((double)origin[1] * cell + f->frame[1] - l->origin[2]);
     rec->height = t ? t->m[3][1] : 0.0f;
     rec->strength = isfinite(ripples->strength) ? ripples->strength : 0.0f;
     box_render_ripples_foam(ripples, cell, &rec->foam_spread, &rec->foam_keep, &rec->crest);
@@ -807,7 +812,7 @@ static void box_ripples_field(
     box_ripples_push_flows(world, p, l, rec, f);
     if (steps) {
         box_ripples_push_sources(p, l, rec, from_frame, f);
-        box_ripples_push_impulses(p, queue, taken, rec, f);
+        box_ripples_push_impulses(p, l, queue, taken, rec, f);
     }
 }
 
@@ -827,6 +832,7 @@ static void BoxRenderExtractRipples(
     bool *known = queued ? ecs_os_calloc_n(bool, queued) : NULL;
     double delta = isfinite(p->delta) && p->delta > 0.0f ? (double)p->delta : 0.0;
     l->frame ++;
+    box_render_origin(world, l->origin);
     ecs_vec_clear(&l->scenes);
     box_ripples_sources(world, l, delta);
 

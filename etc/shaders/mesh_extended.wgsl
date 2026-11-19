@@ -817,10 +817,16 @@ fn water_flow_hash(c: vec2i) -> f32 {
 
 // Smooth value noise over the world XZ, 0..1, the phase offset of the flow mapping: it changes
 // slowly across the surface, so neighbouring pixels reset at different times without tearing
-// the pattern apart.
+// the pattern apart. The noise is that of the absolute position: the cells of the local origin
+// (world_origin of View.origin, its whole units over the 4 of a cell, and the rest) join the
+// local ones as a whole number and a rest, so it is the same across a shift of the origin and
+// precise far from it.
 fn water_flow_noise(xz: vec2f) -> f32 {
-    let p = xz / WATER_FLOW_NOISE_CELL;
-    let c = vec2i(floor(p));
+    let o = world_origin(view.origin);
+    let whole = o.whole.xz;
+    let rest = (vec2f(whole & vec2i(3)) + o.rest.xz) / WATER_FLOW_NOISE_CELL;
+    let p = xz / WATER_FLOW_NOISE_CELL + rest;
+    let c = vec2i(floor(p)) + (whole >> vec2u(2u));
     let t = p - floor(p);
     let w = t * t * (3.0 - 2.0 * t);
     return mix(

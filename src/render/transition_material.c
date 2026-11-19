@@ -96,6 +96,9 @@ void box_draws_transition_target(
     }
 
     out->time = material->time;
+    out->origin[0] = material->origin[0];
+    out->origin[1] = material->origin[1];
+    out->origin[2] = material->origin[2];
 
     if (material->transmission) {
         out->present |= 1u << BOX_RENDER_TRANSITION_TRANSMISSION;
@@ -247,6 +250,7 @@ static void box_draws_transition_parts(
         .mapping = material->mapped ? &material->mapping : NULL,
         .scroll = material->scrolled ? &material->scroll : NULL,
         .time = material->time,
+        .origin = { material->origin[0], material->origin[1], material->origin[2] },
         .transmission = box_draws_transition_part(material, BOX_RENDER_TRANSITION_TRANSMISSION,
             &material->transmission),
         .clear_coat = box_draws_transition_part(material, BOX_RENDER_TRANSITION_CLEAR_COAT,

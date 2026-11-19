@@ -362,7 +362,16 @@ typedef struct box_render_wind_t {
     float frequency;        /**< 1 over the gust scale, gust patches per world unit */
     float sway;             /**< Phase of the sway, 0..1 */
     double time;            /**< Seconds the wind was advanced, the clock of the flutter */
+    double origin_y;        /**< Absolute Y of the local origin, which the WindSway.base of a
+                             *   record is made local by */
 } box_render_wind_t;
+
+/** Axis the phase of the flutter of a vertex runs along, WIND_FLUTTER_AXIS of wind.wgsl */
+#define BOX_RENDER_WIND_FLUTTER_AXIS {3.1f, 1.7f, 2.3f}
+
+/** Period the flutter offset wraps to: 20 pi, over which the three sines of the flutter, at 1,
+ * 1.3 and 0.7 times its phase, repeat */
+#define BOX_RENDER_WIND_FLUTTER_PERIOD (62.83185307179586)
 
 /** Smallest Wind.gust_scale the engine uses */
 #define BOX_RENDER_WIND_GUST_SCALE_MIN (0.01f)
@@ -418,6 +427,10 @@ void box_render_wind_advance(
 /** Get the Wind of a world as the WindSway records pack it: the singleton Wind, resolved, with
  * the state of its WindStatus; a calm wind without one.
  *
+ * The gust offset moves back by the absolute position of the local origin (WorldOrigin), the
+ * sway phase by the wave across it along the wind, and the flutter offset is the origin along
+ * the flutter axis, all wrapped in double precision, so the patterns hold across a shift.
+ *
  * @param world The world
  * @param out Receives the wind
  */
@@ -469,6 +482,65 @@ void box_render_fog_offset(
     const FogVolume *fog,
     double time,
     float *out);
+
+/** Get the absolute world position of the local origin, the WorldOrigin singleton; 0 without
+ * one or when it is not finite.
+ *
+ * The world space patterns of the shaders sample the local position plus this origin, which
+ * the CPU splits per use in double precision and wraps to the period of each pattern.
+ *
+ * @param world The world
+ * @param out Receives X, Y and Z
+ */
+void box_render_origin(
+    const ecs_world_t *world,
+    double out[3]);
+
+/** Wrap a value to [0, period) in double precision, 0 when it or the period is not finite or
+ * the period not above 0.
+ *
+ * @param v The value
+ * @param period The period
+ * @return The wrapped value
+ */
+double box_render_origin_wrap(
+    double v,
+    double period);
+
+/** Wrap a value to [0, period) in double precision and round it to a float below the period.
+ *
+ * @param v The value
+ * @param period The period
+ * @return The wrapped value
+ */
+float box_render_origin_wrap_float(
+    double v,
+    double period);
+
+/** Get the offset a MappingWorld projection (and a MappingFrame one without a frame) adds to the
+ * projected local position of a fragment for the absolute position.
+ *
+ * The origin over the size times the TextureTransform scale, as mapping_object of material.wgsl
+ * makes it, (x * su, y * sv, z * su, x * sv), each wrapped to [0, 1). 0 at an origin of 0.
+ *
+ * @param origin The absolute position of the local origin
+ * @param size TextureMapping.size, 1 when it is not above 0 and finite
+ * @param scale_u TextureTransform.scale_x
+ * @param scale_v TextureTransform.scale_y
+ * @param out Receives the four components
+ */
+void box_render_origin_mapping(
+    const double origin[3],
+    float size,
+    float scale_u,
+    float scale_v,
+    float out[4]);
+
+/** Repeats the projection of the absolute position of the local origin of a Water record wraps
+ * to in the shaders (WATER_ORIGIN_PERIOD of material.wgsl): its foam samples scale the UVs by
+ * Water.foam_scale and by a second, rotated scale of 1.63 (0.8, 0.6), which stay whole repeats
+ * over this many for foam scales of a few binary decimals */
+#define BOX_RENDER_WATER_ORIGIN_PERIOD (5000.0)
 
 /** Star fields the light extract gives the views, see box_render_star_views */
 typedef struct box_render_stars_t box_render_stars_t;

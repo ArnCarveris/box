@@ -147,6 +147,38 @@ void box_draws_water_waves_pack(
     }
 }
 
+/** Pack the waves of a set for the absolute position of the local origin: the phase of each
+ * wave moves back by k times the origin along it, so the waves at a local position are those at
+ * its absolute position.
+ *
+ * @param out The set
+ * @param waves The WaterWaves
+ * @param phases The phases of its waves
+ * @param origin Absolute position of the local origin
+ */
+static void box_water_waves_pack_at(
+    box_render_water_waves_t *out,
+    const WaterWaves *waves,
+    const double *phases,
+    const double *origin)
+{
+    double shifted[BOX_MATERIAL_WATER_WAVES];
+    float direction[2];
+    double k;
+    int32_t i;
+    for (i = 0; i < BOX_MATERIAL_WATER_WAVES; i ++) {
+        shifted[i] = phases[i];
+        if ((origin[0] != 0.0 || origin[2] != 0.0) &&
+            box_draws_water_wave_resolve(&waves->waves[i], direction, &k, NULL))
+        {
+            shifted[i] = box_draws_water_phase_wrap(phases[i] -
+                k * ((double)direction[0] * origin[0] + (double)direction[1] * origin[2]));
+        }
+    }
+
+    box_draws_water_waves_pack(out, waves, shifted);
+}
+
 uint32_t box_draws_water_waves_find(
     const box_draw_materials_t *m,
     ecs_entity_t owner)
@@ -204,7 +236,7 @@ uint32_t box_draws_water_waves_set(
     s->owner = owner;
     s->time = m->time;
     box_draws_water_waves_step(s->phases, waves, flow, m->time);
-    box_draws_water_waves_pack(&w->table[result], waves, s->phases);
+    box_water_waves_pack_at(&w->table[result], waves, s->phases, m->origin);
     if (result >= w->used) {
         w->used = result + 1;
     }
@@ -246,7 +278,7 @@ void box_draws_water_waves_advance(
 
         box_draws_water_waves_step(s->phases, material.waves, material.flow, m->time - s->time);
         s->time = m->time;
-        box_draws_water_waves_pack(&w->table[i], material.waves, s->phases);
+        box_water_waves_pack_at(&w->table[i], material.waves, s->phases, material.origin);
         w->dirty = true;
     }
 

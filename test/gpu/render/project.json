@@ -1944,6 +1944,18 @@
                     "rebase_same_image",
                     "particles_same_image"
                 ]
+            },
+            {
+                "id": "WorldOriginShading",
+                "testcases": [
+                    "mapping_world_shift",
+                    "triplanar_shift",
+                    "mapping_frame_shift",
+                    "texture_layer_shift",
+                    "wind_sway_shift",
+                    "fog_volume_shift",
+                    "far_origin_not_blocky"
+                ]
             }
         ]
     }

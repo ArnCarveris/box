@@ -155,6 +155,21 @@ static uint32_t box_draws_unorm16(
     return (uint32_t)(glm_clamp(value, 0.0f, 1.0f) * 65535.0f + 0.5f);
 }
 
+/** A value as a half float holds it (pack2x16float of the shaders): rounded to 11 significant
+ * bits, for a normal half float.
+ *
+ * @param value The value
+ * @return The rounded value
+ */
+static double box_draws_half_round(
+    float value)
+{
+    int exponent;
+    double m = frexp((double)value, &exponent);
+
+    return ldexp(round(m * 2048.0) / 2048.0, exponent);
+}
+
 void box_draws_color_pack(
     uint32_t *out,
     const float *color)
@@ -536,12 +551,14 @@ done:
  * @param out The record
  * @param caustics The component, NULL for none
  * @param frame Offset of its water frame in cells, wrapped
+ * @param origin Absolute position of the local origin, which the frame moves back by
  * @param time Total render time the phase is computed at
  */
 static void box_draws_water_caustics_pack(
     box_render_material_t *out,
     const WaterCaustics *caustics,
     const float *frame,
+    const double *origin,
     double time)
 {
     out->caustics_offset[0] = 0.0f;
@@ -560,6 +577,16 @@ static void box_draws_water_caustics_pack(
         ? caustics->depth : BOX_RENDER_CAUSTICS_MIN;
     out->caustics_offset[0] = isfinite(frame[0]) ? frame[0] : 0.0f;
     out->caustics_offset[1] = isfinite(frame[1]) ? frame[1] : 0.0f;
+    if (origin[0] != 0.0 || origin[2] != 0.0) {
+        double frequency = (double)out->caustics_frequency;
+        out->caustics_offset[0] = box_render_origin_wrap_float(
+            (double)out->caustics_offset[0] - origin[0] * frequency,
+            BOX_RENDER_CAUSTICS_PERIOD);
+        out->caustics_offset[1] = box_render_origin_wrap_float(
+            (double)out->caustics_offset[1] - origin[2] * frequency,
+            BOX_RENDER_CAUSTICS_PERIOD);
+    }
+
     out->caustics_phase = box_draws_water_caustics_phase(caustics->speed, time);
 done:
     return;
@@ -767,7 +794,7 @@ void box_draws_material_pack(
     box_draws_water_pack(out, material->water, material->water_waves, material->time);
     if (material->water) {
         box_draws_water_caustics_pack(out, material->caustics, material->caustics_frame,
-            material->time);
+            material->origin, material->time);
     } else {
         box_draws_fresnel_pack(out, material->fresnel);
     }
@@ -809,6 +836,21 @@ void box_draws_material_pack(
         out->mapping = (uint32_t)material->mapping->mode |
             (box_draws_unorm16(isfinite(blend) ? blend : 0.0f) << 16);
         out->mapping_size = isfinite(size) && size > 0.0f ? size : 1.0f;
+    }
+
+    if (material->water && material->mapping && out->water_ripple_scale > 0.0f &&
+        (material->mapping->mode == MappingWorld || material->mapping->mode == MappingFrame) &&
+        (material->origin[0] != 0.0 || material->origin[2] != 0.0))
+    {
+        double s = (double)out->mapping_size, rs = box_draws_half_round(out->water_ripple_scale);
+        double u = material->origin[2] / s * (double)out->uv[0];
+        double v = material->origin[0] / s * (double)out->uv[1];
+        u -= box_render_origin_wrap(u, BOX_RENDER_WATER_ORIGIN_PERIOD);
+        v -= box_render_origin_wrap(v, BOX_RENDER_WATER_ORIGIN_PERIOD);
+        out->water_ripple_offset[0] = box_render_origin_wrap_float(
+            (double)out->water_ripple_offset[0] + rs * u, 1.0);
+        out->water_ripple_offset[1] = box_render_origin_wrap_float(
+            (double)out->water_ripple_offset[1] - rs * v, 1.0);
     }
 }
 
@@ -1273,6 +1315,12 @@ void box_draws_layer_pack(
         (textures && textures->normal ? BOX_RENDER_LAYER_HAS_NORMAL : 0u) |
         (l->mask ? BOX_RENDER_LAYER_HAS_MASK : 0u) |
         (mapping && mapping->mode == MappingUv ? BOX_RENDER_LAYER_UV : 0u);
+    if (!(out->flags[0] & BOX_RENDER_LAYER_UV)) {
+        double origin[3];
+        box_render_origin(world, origin);
+        box_render_origin_mapping(origin, out->material[2], out->transform[0],
+            out->transform[1], out->origin);
+    }
 done:
     return;
 }

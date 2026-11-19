@@ -696,12 +696,53 @@ static void box_materials_transitions_end(
     ecs_vec_set_count_t(NULL, &m->transiting, uint32_t, kept);
 }
 
+/** Pack every owner again when the absolute position of the local origin changed since the
+ * records were packed, for the world space patterns of the records: the WaterCaustics frame and
+ * the WindSway base.
+ *
+ * An owner whose record does not depend on the origin hashes to the slot it has.
+ *
+ * @param world The world
+ * @param d The state
+ */
+static void box_materials_origin(
+    const ecs_world_t *world,
+    box_render_draws_t *d)
+{
+    box_draw_materials_t *m = &d->materials;
+    double origin[3];
+    box_render_origin(world, origin);
+    if (origin[0] == m->origin[0] && origin[1] == m->origin[1] && origin[2] == m->origin[2]) {
+        goto done;
+    }
+
+    m->origin[0] = origin[0];
+    m->origin[1] = origin[1];
+    m->origin[2] = origin[2];
+    ecs_vec_t owners;
+    int32_t i;
+    ecs_vec_init_t(NULL, &owners, ecs_entity_t, 0);
+    ecs_map_iter_t it = ecs_map_iter(&m->owned);
+    while (ecs_map_next(&it)) {
+        *ecs_vec_append_t(NULL, &owners, ecs_entity_t) = (ecs_entity_t)ecs_map_key(&it);
+    }
+
+    for (i = 0; i < ecs_vec_count(&owners); i ++) {
+        box_draws_material_changed(d, *ecs_vec_get_t(&owners, ecs_entity_t, i));
+    }
+
+    ecs_vec_fini_t(NULL, &owners, ecs_entity_t);
+done:
+    return;
+}
+
 void box_draws_materials_resolve(
     ecs_world_t *world,
     box_render_draws_t *d)
 {
     box_draw_materials_t *m = &d->materials;
     int32_t i;
+    box_materials_origin(world, d);
     box_materials_transitions_end(world, d);
     for (i = 0; i < ecs_vec_count(&m->pending); i ++) {
         ecs_entity_t e = *ecs_vec_get_t(&m->pending, ecs_entity_t, i);
@@ -1047,6 +1088,7 @@ void box_draws_material_of(
     box_draw_material_t *out)
 {
     *out = (box_draw_material_t){ .fade = 1.0f, .time = time };
+    box_render_origin(world, out->origin);
     if (owner) {
         out->color = ecs_get(world, owner, Rgb);
         out->pbr = ecs_get(world, owner, PbrMaterial);

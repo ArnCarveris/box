@@ -127,12 +127,24 @@ void box_render_wind_frame(
     out->gust = w.gust;
     out->frequency = 1.0f / w.gust_scale;
 
+    double origin[3];
+    box_render_origin(world, origin);
+    out->origin_y = origin[1];
+
     const WindStatus *s = ecs_get(world, ecs_id(Wind), WindStatus);
+    double period = BOX_WIND_GUST_PERIOD * (double)w.gust_scale;
+    double sx = s ? s->offset_x : 0.0, sz = s ? s->offset_z : 0.0, sway = s ? s->sway : 0.0;
+    double along = (double)out->direction[0] * origin[0] +
+        (double)out->direction[1] * origin[2];
+    if (!isfinite(sway)) {
+        sway = 0.0;
+    }
+
+    out->offset[0] = box_wind_wrap_float(sx - origin[0], period);
+    out->offset[1] = box_wind_wrap_float(sz - origin[2], period);
+    out->sway = box_wind_wrap_float(
+        sway - 0.5 * along * (double)out->frequency / (2.0 * GLM_PI), 1.0);
     if (s) {
-        double period = BOX_WIND_GUST_PERIOD * (double)w.gust_scale;
-        out->offset[0] = box_wind_wrap_float(s->offset_x, period);
-        out->offset[1] = box_wind_wrap_float(s->offset_z, period);
-        out->sway = box_wind_wrap_float(s->sway, 1.0);
         out->time = isfinite(s->time) ? s->time : 0.0;
     }
 
@@ -177,7 +189,8 @@ void box_render_wind_pack(
     out->wind_bend = isfinite(sway->bend) ? sway->bend : 0.0f;
     out->wind_height = isfinite(sway->height)
         ? glm_max(sway->height, BOX_RENDER_WIND_MIN) : BOX_MATERIAL_SWAY_HEIGHT;
-    out->wind_base = isfinite(sway->base) ? sway->base : 0.0f;
+    out->wind_base = isfinite(sway->base)
+        ? (float)((double)sway->base - wind->origin_y) : (float)(0.0 - wind->origin_y);
     out->wind_flutter = isfinite(sway->flutter) && sway->flutter > 0.0f ? sway->flutter : 0.0f;
     out->wind_reach = isfinite(sway->flutter_reach)
         ? glm_max(sway->flutter_reach, BOX_RENDER_WIND_MIN) : BOX_MATERIAL_SWAY_FLUTTER_REACH;

@@ -10,7 +10,10 @@
 // nothing), direction.w the facing, coverage the cavity, edge width, normal and porosity,
 // material the roughness and metallic constants, the world size of one repeat and the
 // triplanar blend, transform the scale and offset of the UVs, modes the LAYER_* blend of the
-// albedo, roughness, metallic and occlusion, flags.x the LAYER_HAS_* and LAYER_UV flags.
+// albedo, roughness, metallic and occlusion, flags.x the LAYER_HAS_* and LAYER_UV flags,
+// origin the offset of the world projection for the absolute position of the local origin
+// (WorldOrigin), the origin projected as mapping_object projects a position (x * su, y * sv,
+// z * su, x * sv) and wrapped to whole repeats on the CPU, 0 at an origin of 0.
 struct TextureLayer {
     color: vec4f,
     direction: vec4f,
@@ -19,6 +22,7 @@ struct TextureLayer {
     transform: vec4f,
     modes: vec4u,
     flags: vec4u,
+    origin: vec4f,
 };
 
 const LAYER_KEEP: u32 = 0u;
@@ -171,7 +175,10 @@ fn layer_sample(maps: texture_2d_array<f32>, first: u32, l: TextureLayer, f: Ver
         let one = vec3f(select(0.0, 1.0, axis == 0u), select(0.0, 1.0, axis == 1u),
             select(0.0, 1.0, axis == 2u));
         let w = select(one, mapping_weights(n, l.material.w), l.material.w > 0.0);
-        let planes = mapping_planes(vec4f(p, p.x), sg);
+        // The UV scale applies before the projection, so the wrapped origin adds to whole
+        // repeats of the texture
+        let scaled = vec4f(p.x * t.x, p.y * t.y, p.z * t.x, p.x * t.y) + l.origin;
+        let planes = mapping_planes(scaled, sg);
         let gx = mapping_planes(vec4f(px, px.x), sg);
         let gy = mapping_planes(vec4f(py, py.x), sg);
         for (var k = 0u; k < 3u; k++) {
@@ -180,7 +187,7 @@ fn layer_sample(maps: texture_2d_array<f32>, first: u32, l: TextureLayer, f: Ver
             }
             let tangent = layer_along(mapping_tangent(k, sg), n);
             let bitangent = layer_along(mapping_bitangent(k), n);
-            layer_taps(maps, first, flags, planes[k] * t.xy + t.zw, gx[k] * t.xy, gy[k] * t.xy,
+            layer_taps(maps, first, flags, planes[k] + t.zw, gx[k] * t.xy, gy[k] * t.xy,
                 tangent, bitangent, n, w[k], &o);
         }
     }

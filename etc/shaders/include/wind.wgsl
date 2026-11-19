@@ -2,6 +2,10 @@
 // places them: the forward and depth prepass vertex stages of the mesh shaders, the shadow
 // casters and the wireframe. The includer declares the material table (material.wgsl).
 //
+// The patterns over the world (the gust field, the wave of the sway and the base) come from the
+// CPU packed for the absolute position of the local origin (WorldOrigin), the phase of the
+// flutter adds that of the origin, so plants sway the same across a shift of the origin.
+//
 // The main bend is a function of the world position of a vertex only, so every shape of a plant
 // with the same bend, height and base moves together without cracks: the height above the base
 // over the height, clamped and squared, times the bend and the strength of the wind there. The
@@ -27,6 +31,13 @@ const WIND_PRESENT: u32 = 1u;
 
 const WIND_TAU: f32 = 6.283185307179586;
 
+// Axis the phase of the flutter of a vertex runs along (BOX_RENDER_WIND_FLUTTER_AXIS); its
+// dot product with the absolute position of the local origin is wrapped to 20 pi
+// (WIND_FLUTTER_PERIOD, BOX_RENDER_WIND_FLUTTER_PERIOD), the period of the three sines of the
+// flutter in it.
+const WIND_FLUTTER_AXIS: vec3f = vec3f(3.1, 1.7, 2.3);
+const WIND_FLUTTER_PERIOD: f32 = 62.83185307179586;
+
 // World offset of a vertex and the derivative of its horizontal offset along world Y, which the
 // normal bends by.
 struct WindMove {
@@ -40,8 +51,9 @@ fn wind_sways(m: Material) -> bool {
 }
 
 // The move of a vertex at a world position of a shape whose origin is at origin, by the
-// WindSway and the wind of its material; wind_sways(m) is true.
-fn wind_move(world: vec3f, origin: vec3f, m: Material) -> WindMove {
+// WindSway and the wind of its material; wind_sways(m) is true. absolute is the absolute
+// position of the local origin, which the phase of the flutter takes.
+fn wind_move(world: vec3f, origin: vec3f, m: Material, absolute: WorldOrigin) -> WindMove {
     let dir = m.wind_direction;
     let across = vec2f(-dir.y, dir.x);
     let strength = m.wind_speed * wind_gust(world.xz, m.wind_offset, m.wind_frequency,
@@ -65,7 +77,8 @@ fn wind_move(world: vec3f, origin: vec3f, m: Material) -> WindMove {
     if (m.wind_flutter > 0.0) {
         let reach = clamp(length(world - origin) / m.wind_reach, 0.0, 1.0);
         let size = m.wind_flutter * clamp(strength / WIND_FULL, 0.0, 1.0) * reach;
-        let q = dot(world, vec3f(3.1, 1.7, 2.3));
+        let q = dot(world, WIND_FLUTTER_AXIS) + WIND_FLUTTER_PERIOD *
+            origin_phase_dot(absolute, WIND_FLUTTER_AXIS / WIND_FLUTTER_PERIOD);
         let a = WIND_TAU * m.wind_flutter_phase;
         o.offset += size * vec3f(0.4 * sin(a + q), sin(2.0 * a + 1.3 * q),
             0.4 * sin(a + 0.7 * q + 1.0));
