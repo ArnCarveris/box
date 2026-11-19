@@ -854,7 +854,8 @@ typedef struct box_gpu_view_uniforms_t {
     vec4 ambient_sky;               /**< Linear ambient light from above */
     vec4 ambient_ground;            /**< Linear ambient light from below */
     vec4 cluster;                   /**< Inverse projection scale of x and y, slice near, far */
-    uint32_t lights[4];             /**< Directional lights, lights, lit, orthographic */
+    uint32_t lights[4];             /**< Directional lights, lights, 1 lit or 0 unlit (an
+                                     *   impostor channel plus one), orthographic */
     uint32_t grid[4];               /**< Clusters per axis, reflection probes the clusters list */
     mat4 shadow_matrix[BOX_RENDER_SHADOW_CASCADES]; /**< World to shadow clip per cascade */
     vec4 shadow_depth;              /**< Clip depth range of each cascade over its half
@@ -1279,6 +1280,7 @@ typedef struct box_gpu_t {
                                                     *   created by the first image */
     box_gpu_particles_t *particles; /**< Particle passes */
     box_gpu_ripples_t *ripples;     /**< Fields of WaterRipples */
+    struct box_gpu_impostor_t *impostor; /**< Impostor frame copies, created by the first */
     box_gpu_fog_volumes_t *fog_volumes; /**< Fog volume draws */
     box_gpu_star_fields_t *star_fields; /**< Star field draws */
     box_gpu_planets_t *planets;     /**< Planet atmosphere shell draws */

@@ -76,11 +76,16 @@ fn light_lobes(s: Surface, v: vec3f, l: vec3f, radiance: vec3f, side: u32) -> Li
     return Lit(diffuse * radiance * shaded, specular * radiance * shaded);
 }
 
-// An unlit view shows the albedo as the diffuse part and the emission as the specular one. The
-// split sum scale and bias already integrate the Fresnel over the GGX lobe of the roughness, so
-// the grazing reflection of a rough surface fades without a roughness aware f90. What the lobe
-// reflects is not available to the diffuse term, as 1 - F in light_lobes().
+// An unlit view shows the albedo as the diffuse part and the emission as the specular one, a
+// view of an impostor frame its channel (impostor_channel). The split sum scale and bias already
+// integrate the Fresnel over the GGX lobe of the roughness, so the grazing reflection of a rough
+// surface fades without a roughness aware f90. What the lobe reflects is not available to the
+// diffuse term, as 1 - F in light_lobes().
 fn shade(s: Surface, v: vec3f, world: vec3f) -> Lit {
+    if (view.lights.z > 1u) {
+        return impostor_channel(s.albedo, s.normal, world);
+    }
+
     if (view.lights.z == 0u) {
         return Lit(s.albedo, s.emissive);
     }

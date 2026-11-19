@@ -531,6 +531,10 @@ static bool box_shader_used(
         result = true;
     }
 
+    if (handle == BOX_RENDER_SHADER_IMPOSTOR && ecs_vec_count(&p->impostor_blits)) {
+        result = true;
+    }
+
     if (handle == BOX_RENDER_SHADER_PLANET_ATMOSPHERE &&
         ecs_vec_count(&p->planet_atmospheres))
     {
@@ -1021,6 +1025,8 @@ void BoxShaderImport(
         BOX_RENDER_SHADER_PLANAR, true);
     box_shader_builtin(world, state, builtin, "water_ripples",
         "etc/shaders/water_ripples.wgsl", BOX_RENDER_SHADER_WATER_RIPPLES, true);
+    box_shader_builtin(world, state, builtin, "impostor", "etc/shaders/impostor.wgsl",
+        BOX_RENDER_SHADER_IMPOSTOR, true);
     box_shader_builtin(world, state, builtin, "fog_volume", "etc/shaders/fog_volume.wgsl",
         BOX_RENDER_SHADER_FOG_VOLUME, true);
     box_shader_builtin(world, state, builtin, "planet_atmosphere",

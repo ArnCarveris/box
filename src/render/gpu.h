@@ -2562,6 +2562,50 @@ void box_gpu_capture_write(
     box_gpu_target_t *t,
     const char *path);
 
+/** Record a copy of mip 0 of an RGBA8 texture into a readback buffer of its own, such as an
+ * impostor atlas.
+ *
+ * @param gpu The backend
+ * @param encoder The encoder the copy is recorded in
+ * @param texture The texture
+ * @return The capture, which box_gpu_capture_texture_write maps once the encoder is submitted
+ */
+box_gpu_capture_t* box_gpu_capture_texture(
+    box_gpu_t *gpu,
+    WGPUCommandEncoder encoder,
+    WGPUTexture texture);
+
+/** Map the copy of a texture capture after its encoder was submitted, which writes the PNG
+ * file like box_gpu_capture_write.
+ *
+ * @param gpu The backend
+ * @param capture The capture of box_gpu_capture_texture, owned by the map from here on
+ * @param path The file
+ */
+void box_gpu_capture_texture_write(
+    box_gpu_t *gpu,
+    box_gpu_capture_t *capture,
+    const char *path);
+
+/** Copy the frames of the impostors of a packet that its targets rendered into their atlases,
+ * dilating the colors of the covered texels, generate the mips of the atlases a bake finished,
+ * and write the atlases the packet reads. A frame whose shader or pipeline does not exist yet
+ * keeps its image until a later packet copies it.
+ *
+ * @param gpu The backend
+ * @param packet The packet, after its targets rendered
+ */
+void box_gpu_impostor_render(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet);
+
+/** Release the frames of the impostors that wait for their copy and the impostor pipelines.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_impostor_fini(
+    box_gpu_t *gpu);
+
 /** Release the idle readback buffer of a target. Captures of the target that are still
  * mapping complete on their own.
  *

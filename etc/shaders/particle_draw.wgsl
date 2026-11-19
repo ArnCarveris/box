@@ -305,7 +305,7 @@ fn fs(in: VertexOut) -> @location(0) vec4f {
         discard;
     }
 
-    if (in.params.y > 0.0 && view.lights.z != 0u) {
+    if (in.params.y > 0.0 && view.lights.z == 1u) {
         let lit = particle_light(in.world, normalize(in.normal));
         color *= mix(vec3f(1.0), lit, in.params.y);
     }

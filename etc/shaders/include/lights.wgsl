@@ -21,7 +21,8 @@ struct View {
     ambient_ground: vec4f,
     // x, y: inverse projection scale of x and y, z, w: near and far of the depth slices
     cluster: vec4f,
-    // x: directional lights, y: lights, z: 1 when lit, w: 1 for an orthographic camera
+    // x: directional lights, y: lights, z: 1 when lit, 0 unlit, above 1 the channel of an
+    // impostor frame (impostor_channel), w: 1 for an orthographic camera
     lights: vec4u,
     // x, y, z: clusters per axis, w: reflection probes the clusters list, the first ones of the
     // reflection probe buffer

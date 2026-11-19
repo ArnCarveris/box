@@ -1,0 +1,45 @@
+// A closed box of six thin plates, each face its own color, for the impostor tests: +X red,
+// -X green, +Y magenta, -Y cyan, +Z blue and -Z yellow. Its bounds are 2.02 wide around the
+// origin, so a view straight along an axis shows the face of that axis in its center.
+
+using box.geometry
+using box.material
+using box.transform
+
+prefab ColorCube {
+  px {
+    Position: {1, 0, 0}
+    Box: {0.02, 2, 2}
+    Rgb: {255, 0, 0}
+  }
+
+  nx {
+    Position: {-1, 0, 0}
+    Box: {0.02, 2, 2}
+    Rgb: {0, 255, 0}
+  }
+
+  py {
+    Position: {0, 1, 0}
+    Box: {2, 0.02, 2}
+    Rgb: {255, 0, 255}
+  }
+
+  ny {
+    Position: {0, -1, 0}
+    Box: {2, 0.02, 2}
+    Rgb: {0, 255, 255}
+  }
+
+  pz {
+    Position: {0, 0, 1}
+    Box: {2, 2, 0.02}
+    Rgb: {0, 0, 255}
+  }
+
+  nz {
+    Position: {0, 0, -1}
+    Box: {2, 2, 0.02}
+    Rgb: {255, 255, 0}
+  }
+}

@@ -337,7 +337,7 @@ void box_gpu_light_uniforms(
     u->cluster[3] = far_;
     u->lights[1] = glm_min(l->count, capacity);
     u->lights[0] = glm_min(l->directional, u->lights[1]);
-    u->lights[2] = l->enabled ? 1u : 0u;
+    u->lights[2] = l->enabled ? 1u : v->impostor ? v->impostor + 1u : 0u;
     u->lights[3] = c->ortho ? 1u : 0u;
     u->grid[0] = BOX_GPU_CLUSTER_X;
     u->grid[1] = BOX_GPU_CLUSTER_Y;

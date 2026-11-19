@@ -2143,6 +2143,27 @@ typedef struct box_render_capture_desc_t {
 void box_render_captures_init(
     ecs_world_t *world);
 
+/** Register the impostor bakes: the hooks of Impostor and the system that adds the views of
+ * the bakes to the packet, after the captures.
+ *
+ * @param world The world
+ */
+void box_render_impostors_init(
+    ecs_world_t *world);
+
+/** Get the texture handle of an atlas of the last complete bake of an impostor, which every
+ * instance of its prefab samples.
+ *
+ * @param world The world
+ * @param impostor Entity with Impostor
+ * @param channel The atlas
+ * @return The handle, 0 while the impostor has no complete bake
+ */
+uint32_t box_render_impostor_atlas(
+    const ecs_world_t *world,
+    ecs_entity_t impostor,
+    ImpostorChannel channel);
+
 /** Ask for a capture in the next extracted frame.
  *
  * The image is written on the thread that renders the packet of that frame, through a

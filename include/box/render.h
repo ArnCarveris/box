@@ -116,6 +116,153 @@ ECS_STRUCT(DrawRange, {
                      *   for a hard cut */
 });
 
+/** Views per axis of the octahedral grid of an Impostor at most */
+#define BOX_IMPOSTOR_FRAMES_MAX (32)
+
+/** Largest width and height of an impostor atlas in pixels, frames times resolution */
+#define BOX_IMPOSTOR_ATLAS_MAX (8192)
+
+/** Octahedral impostor of a prefab, or of a template instance used as one: the engine renders
+ * the hierarchy under it from a grid of directions into three atlases, which ImpostorDraw draws
+ * on a card in place of its far instances.
+ *
+ * The bake renders a private copy of the hierarchy in a scene of its own, with the transform of
+ * the root left out, so the atlases are in the frame of the root: an instance turned or scaled
+ * shows them turned or scaled. Its shapes draw as in the scene of the source, with their
+ * materials, alpha cutout, texture blends and layers, but unlit, without emission and without
+ * Wind.
+ *
+ * Each view is orthographic, along a direction toward the center of the bounds of the
+ * hierarchy, framed by the sphere around those bounds with a margin of resolution / 16 pixels
+ * (at least 1) on every side, at resolution by resolution pixels. View (x, y) of the frames by
+ * frames grid looks from the direction box_impostor_frame_direction returns, with the up axis
+ * of the image along world +Y, or -Z for a view straight down or up; it fills the cell whose
+ * top left pixel is (x * resolution, y * resolution) of every atlas:
+ *
+ * - albedo (ImpostorAlbedo): the base color, display encoded, and in alpha its coverage
+ * - normal (ImpostorNormal): the normal in the frame of the root as n * 0.5 + 0.5, coverage in
+ *   alpha
+ * - depth (ImpostorDepth): the depth across the bounding sphere in every color channel, 0 where
+ *   the sphere is nearest the view and 1 where it is farthest, coverage in alpha
+ *
+ * The empty texels of a cell take the color of the nearest covered texels (dilation) with an
+ * alpha of 0, so the mips and filtering of an atlas do not bleed the background into the edges.
+ *
+ * The atlases are baked over several frames, at most ImpostorBudget.frames views per frame over
+ * every impostor, and shared by every instance. A change to the shapes, materials or
+ * transforms of the hierarchy (the components of box.geometry and box.material and Position,
+ * Rotation and Scale, on its entities and their prefabs, and the loads of the textures they
+ * refer to), to the bounds of the hierarchy or to frames, resolution or hemisphere bakes them
+ * again, keeping the previous atlases until the new ones are complete; box_impostor_rebake asks
+ * for a bake for other changes. Removing the component frees the atlases and the copy.
+ *
+ * Instances do not inherit it. Adding it adds ImpostorStatus.
+ */
+ECS_STRUCT(Impostor, {
+    int32_t frames;     /**< Views per axis of the octahedral grid, frames * frames views,
+                         *   default 8, from 2 to BOX_IMPOSTOR_FRAMES_MAX */
+    int32_t resolution; /**< Width and height of a view in pixels, default 128, from 16; an atlas
+                         *   wider than BOX_IMPOSTOR_ATLAS_MAX lowers it */
+    bool hemisphere;    /**< Views from above the horizon only, for things standing on the
+                         *   ground, default true; else from the whole sphere */
+    float distance;     /**< Distance in meters from the camera beyond which ImpostorDraw draws
+                         *   the impostor, default 100 */
+    float fade;         /**< Half width in meters of the crossfade of ImpostorDraw around
+                         *   distance, default 10 */
+});
+
+/** Bake state of an Impostor, written by the engine and read only for applications */
+ECS_STRUCT(ImpostorStatus, {
+    bool ready;         /**< The atlases hold a complete bake */
+    bool baking;        /**< A bake is in progress, the atlases hold the previous one */
+    int32_t revision;   /**< Bakes completed, the first one is 1 */
+    int32_t atlas_size; /**< Width and height in pixels of the atlases of the last bake */
+    int32_t frames;     /**< Views per axis of the last bake */
+    int32_t resolution; /**< Width and height of a view of the last bake */
+    bool hemisphere;    /**< The last bake has views from above the horizon only */
+    int32_t baked;      /**< Views of the bake in progress sent to the renderer */
+    float bake_time;    /**< Seconds the last bake took, from its first views to its last */
+    vec3 center;        /**< Center of the views of the last bake in the frame of the root */
+    float radius;       /**< Radius of the sphere the views of the last bake frame */
+});
+
+/** Views of impostors the engine renders per frame at most, over every Impostor, set as a
+ * singleton; each view is three passes (albedo, normal and depth) of resolution by resolution
+ * pixels. Default 8. */
+ECS_STRUCT(ImpostorBudget, {
+    int32_t frames;     /**< Views per frame, at least 1 */
+});
+
+/** An atlas of an Impostor */
+ECS_ENUM(ImpostorChannel, {
+    ImpostorAlbedo = 0, /**< Display encoded base color, coverage in alpha */
+    ImpostorNormal = 1, /**< Normal in the frame of the root as n * 0.5 + 0.5 */
+    ImpostorDepth = 2   /**< Depth across the bounding sphere along the view */
+});
+
+/** Get the direction of a view of the octahedral grid of an impostor, from the center of the
+ * object toward the viewer, in the frame of the root of the prefab.
+ *
+ * The cell (x, y) maps to e = 2 * (x, y) / (frames - 1) - 1, so the outer cells lie on the
+ * border of the octahedron. A hemisphere grid unfolds the upper half: d = (t.x, 1 - |t.x| -
+ * |t.y|, t.y) with t = ((e.x + e.y) / 2, (e.x - e.y) / 2), whose border is the horizon. A sphere
+ * grid unfolds the whole octahedron: d = (e.x, 1 - |e.x| - |e.y|, e.y), with the lower half
+ * folded out to the corners, (1 - |d.z|, 1 - |d.x|) with the signs of d.x and d.z.
+ *
+ * @param frames Views per axis
+ * @param hemisphere Whether the grid covers the upper hemisphere only
+ * @param x Column of the view
+ * @param y Row of the view, 0 at the top of the atlas
+ * @param out Receives the unit direction
+ */
+void box_impostor_frame_direction(
+    int32_t frames,
+    bool hemisphere,
+    int32_t x,
+    int32_t y,
+    vec3 out);
+
+/** Find the view of the octahedral grid of an impostor that looks from the direction nearest a
+ * direction, the inverse of box_impostor_frame_direction.
+ *
+ * @param frames Views per axis
+ * @param hemisphere Whether the grid covers the upper hemisphere only, which takes a direction
+ *        below the horizon as on it
+ * @param dir Direction from the center toward the viewer, of any length
+ * @param x Receives the column
+ * @param y Receives the row
+ */
+void box_impostor_frame_of(
+    int32_t frames,
+    bool hemisphere,
+    const vec3 dir,
+    int32_t *x,
+    int32_t *y);
+
+/** Bake the atlases of an impostor again, as a change of its hierarchy does.
+ *
+ * @param world The world
+ * @param impostor Entity with Impostor
+ */
+void box_impostor_rebake(
+    ecs_world_t *world,
+    ecs_entity_t impostor);
+
+/** Write an atlas of an impostor to a PNG file in the next frame, the RGBA8 pixels as they are
+ * stored: the albedo display encoded, the normal and the depth as values. For tests and tools.
+ *
+ * @param world The world
+ * @param impostor Entity with a ready Impostor (ImpostorStatus.ready)
+ * @param channel The atlas
+ * @param path The file, written by the renderer; box_render_sync waits for it
+ * @return 0 when the write was queued, -1 when the impostor has no ready atlas
+ */
+int box_impostor_write(
+    ecs_world_t *world,
+    ecs_entity_t impostor,
+    ImpostorChannel channel,
+    const char *path);
+
 /** Register the box.render module.
  *
  * @param world The world

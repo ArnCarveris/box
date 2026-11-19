@@ -156,6 +156,10 @@
 #define BOX_RENDER_SHADOW_NEAR_MIN (0.001f)
 
 
+/** Shader handle of the engine shader that copies an impostor frame into its atlas, dilating
+ * the colors of the covered texels into the empty ones */
+#define BOX_RENDER_SHADER_IMPOSTOR (16)
+
 /** Shader handle of the engine compute shader that steps the fields of WaterRipples */
 #define BOX_RENDER_SHADER_WATER_RIPPLES (15)
 
@@ -409,6 +413,12 @@ static inline uint32_t box_render_page_kind(
 
 /** First target handle of captures, the handles below belong to surfaces */
 #define BOX_RENDER_CAPTURE_TARGET_FIRST (0x40000000u)
+
+/** First target handle of the impostor frames, see render/impostor.c */
+#define BOX_RENDER_IMPOSTOR_TARGET_FIRST (0x70000000u)
+
+/** First texture handle of the impostor atlases, see render/impostor.c */
+#define BOX_RENDER_IMPOSTOR_TEXTURE_FIRST (0x70000000u)
 
 /** First shader handle of application shaders, the handles below are engine shaders */
 #define BOX_RENDER_SHADER_FIRST (64)
@@ -1083,7 +1093,40 @@ typedef struct box_render_view_t {
                                  *   packet */
     int32_t planar_count;       /**< Planar reflections the view renders, nearest first, at most
                                  *   BOX_PLANAR_REFLECTION_MAX */
+    uint32_t impostor;          /**< BOX_RENDER_IMPOSTOR_* channel of an impostor frame the view
+                                 *   renders unlit, 0 for any other view */
 } box_render_view_t;
+
+/** Channels of an impostor frame (box_render_view_t.impostor), each its own view and atlas.
+ * The shaders see the channel plus one in view.lights.z, above the 0 and 1 of an unlit and a
+ * lit view (impostor_channel in mesh_direct.wgsl). */
+#define BOX_RENDER_IMPOSTOR_ALBEDO (1u)
+#define BOX_RENDER_IMPOSTOR_NORMAL (2u)
+#define BOX_RENDER_IMPOSTOR_DEPTH (3u)
+
+/** Channels of an impostor */
+#define BOX_RENDER_IMPOSTOR_CHANNELS (3)
+
+/** An impostor frame the targets of a packet rendered, copied into a cell of its atlas.
+ *
+ * The backend creates the atlas texture of the handle on its first blit, RGBA8 with mips, and
+ * generates its mips after the last blit of a bake (last). */
+typedef struct box_render_impostor_blit_t {
+    uint32_t target;        /**< Target the frame rendered into, the size of a cell */
+    uint32_t atlas;         /**< Texture handle of the atlas */
+    uint32_t channel;       /**< BOX_RENDER_IMPOSTOR_* channel, the albedo is sRGB encoded */
+    uint32_t atlas_size;    /**< Width and height of the atlas in pixels */
+    uint32_t x;             /**< Left column of the cell in the atlas */
+    uint32_t y;             /**< Top row of the cell in the atlas */
+    uint32_t dilate;        /**< Texels an empty texel looks for a covered one, 0 for none */
+    bool last;              /**< The last blit of the bake into this atlas */
+} box_render_impostor_blit_t;
+
+/** An impostor atlas written to a PNG file, for tests and tools */
+typedef struct box_render_impostor_read_t {
+    uint32_t atlas;         /**< Texture handle of the atlas */
+    uint32_t path;          /**< Offset of the path in the packet data, with its terminator */
+} box_render_impostor_read_t;
 
 /** Kind of an effect pass of a view */
 typedef enum box_render_effect_kind_t {
@@ -2413,6 +2456,10 @@ typedef struct box_render_packet_t {
                              *   stepped before the targets */
     ecs_vec_t ripple_sources; /**< box_render_ripple_source_t of those fields */
     ecs_vec_t ripple_flows; /**< box_render_ripple_flow_t of those fields */
+    ecs_vec_t impostor_blits; /**< box_render_impostor_blit_t, the impostor frames copied into
+                             *   their atlases after the targets rendered */
+    ecs_vec_t impostor_reads; /**< box_render_impostor_read_t, impostor atlases written to PNG
+                             *   files after the blits */
     ecs_vec_t terrain_heights; /**< box_render_terrain_height_t, the heights of the terrain
                              *   tiles that draw, copied after the texture graphs evaluated */
     ecs_vec_t debug_boxes;  /**< box_render_debug_box_t, the boxes of the spatial index trees

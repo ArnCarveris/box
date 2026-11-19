@@ -527,11 +527,16 @@ fn planar_radiance(p: PlanarLookup, n: vec3f, geometric: vec3f, roughness: f32,
     return mix(fallback, radiance, coverage * fade);
 }
 
-// An unlit view shows the albedo as the diffuse part and the emission as the specular one. The
-// back lobe of a diffuse transmission takes no ambient occlusion, which describes the front.
+// An unlit view shows the albedo as the diffuse part and the emission as the specular one, a
+// view of an impostor frame its channel (impostor_channel). The back lobe of a diffuse
+// transmission takes no ambient occlusion, which describes the front.
 // The shape of a planar reflection reflects its image (planar_radiance) in place of the probes,
 // with the base and the clear coat.
 fn shade_split(s: Surface, v: vec3f, world: vec3f, planar: PlanarLookup) -> Lit {
+    if (view.lights.z > 1u) {
+        return impostor_channel(s.albedo, s.normal, world);
+    }
+
     if (view.lights.z == 0u) {
         return Lit(s.albedo, s.emissive);
     }

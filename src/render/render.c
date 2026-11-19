@@ -430,6 +430,10 @@ void BoxRenderImport(
     ECS_META_COMPONENT(world, CullStatus);
     ECS_META_COMPONENT(world, DrawRange);
     ecs_add_pair(world, ecs_id(DrawRange), EcsOnInstantiate, EcsInherit);
+    ECS_META_COMPONENT(world, Impostor);
+    ECS_META_COMPONENT(world, ImpostorStatus);
+    ECS_META_COMPONENT(world, ImpostorBudget);
+    ECS_META_COMPONENT(world, ImpostorChannel);
 
     ecs_set_hooks(world, RenderRing, {
         .ctor = flecs_default_ctor,
@@ -474,6 +478,7 @@ void BoxRenderImport(
     box_render_transitions_init(world);
     box_render_scenes_init(world);
     box_render_captures_init(world);
+    box_render_impostors_init(world);
     box_render_textures_init(world);
     box_render_texture_previews_init(world);
     box_render_texture_readbacks_init(world);

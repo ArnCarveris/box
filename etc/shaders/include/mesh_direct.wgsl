@@ -14,6 +14,26 @@ struct Lit {
     specular: vec3f,
 };
 
+// What a view of an impostor frame (render/impostor.c) shows, unlit and without the emission:
+// view.lights.z 2 the albedo, 3 the world space normal as n * 0.5 + 0.5, 4 the depth of the
+// fragment in the box of the frame, 0 at the near plane and 1 at the far plane of the
+// orthographic camera.
+fn impostor_channel(albedo: vec3f, normal: vec3f, world: vec3f) -> Lit {
+    switch view.lights.z {
+        case 3u: {
+            return Lit(normalize(normal) * 0.5 + 0.5, vec3f(0.0));
+        }
+        case 4u: {
+            let d = -(view.view * vec4f(world, 1.0)).z;
+            let range = max(view.cluster.w - view.cluster.z, 1e-6);
+            return Lit(vec3f(clamp((d - view.cluster.z) / range, 0.0, 1.0)), vec3f(0.0));
+        }
+        default: {
+            return Lit(albedo, vec3f(0.0));
+        }
+    }
+}
+
 fn distribution_ggx(ndh: f32, a: f32) -> f32 {
     let a2 = a * a;
     let d = ndh * ndh * (a2 - 1.0) + 1.0;

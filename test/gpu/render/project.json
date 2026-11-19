@@ -28,6 +28,27 @@
                 ]
             },
             {
+                "id": "Impostor",
+                "testcases": [
+                    "direction_round_trip",
+                    "hemisphere_layout",
+                    "sphere_layout",
+                    "status_after_bake",
+                    "instances_share_prefab",
+                    "hemisphere_colors_match_directions",
+                    "sphere_colors_match_directions",
+                    "background_uncovered",
+                    "dilation_fills_border",
+                    "normal_and_depth",
+                    "cutout_coverage",
+                    "material_change_rebakes",
+                    "unchanged_does_not_rebake",
+                    "budget_spreads_bake",
+                    "remove_frees_atlases",
+                    "not_ready_cannot_write"
+                ]
+            },
+            {
                 "id": "DrawRange",
                 "testcases": [
                     "beyond_far_not_drawn",

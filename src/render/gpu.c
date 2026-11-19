@@ -556,6 +556,7 @@ static void box_gpu_render(
     box_gpu_bake_capture(gpu, packet);
     box_gpu_atlas_render(gpu, packet);
     box_gpu_targets_render(gpu, packet);
+    box_gpu_impostor_render(gpu, packet);
     box_gpu_pace(gpu);
 
     box_gpu_effects_sweep(gpu, packet);
@@ -614,6 +615,7 @@ static void box_gpu_fini(
     box_gpu_pipelines_fini(gpu);
     if (gpu->device) {
         box_gpu_texture_graphs_fini(gpu);
+        box_gpu_impostor_fini(gpu);
         box_gpu_target_fini(gpu);
         ecs_map_fini(&gpu->targets);
         box_gpu_shader_fini(gpu);
