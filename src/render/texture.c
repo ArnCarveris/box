@@ -559,6 +559,8 @@ bool box_render_texture_graph_reads_take(
             ? tex->graph->nodes[r->index].entity : 0;
     }
 
+    box_render_texture_readbacks_filter(world, out, first);
+
     return result;
 }
 

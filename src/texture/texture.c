@@ -67,6 +67,7 @@ static void box_textures_free(
     }
 
     box_texture_graphs_fini(t);
+    box_texture_readbacks_fini(t);
     ecs_map_fini(&t->textures);
     ecs_vec_fini_t(NULL, &t->queued, ecs_entity_t);
     ecs_vec_fini_t(NULL, &t->released, uint32_t);
@@ -1509,6 +1510,9 @@ static void box_texture_register(
     ECS_META_COMPONENT(world, TextureGraph);
     ECS_META_COMPONENT(world, TextureState);
     ECS_META_COMPONENT(world, TextureStatus);
+    ECS_META_COMPONENT(world, TextureReadbackFormat);
+    ECS_META_COMPONENT(world, TextureReadback);
+    ECS_META_COMPONENT(world, TextureReadbackStatus);
     ECS_COMPONENT_DEFINE(world, TextureRegistry);
     ECS_COMPONENT_DEFINE(world, TexturePixels);
     ecs_set_name_prefix(world, NULL);
@@ -1601,6 +1605,7 @@ void BoxTextureImport(
     t->watch = box_file_watch_kind(world, "texture", box_texture_changed, NULL);
     ecs_singleton_ensure(world, TextureRegistry)->textures = t;
     box_texture_graphs_init(world, t);
+    box_texture_readbacks_init(world, t);
     ecs_entity_t module = ecs_get_scope(world);
     ecs_entity_t gen = ecs_lookup_child(world, module, "gen");
     ecs_entity_t graph = ecs_lookup_child(world, module, "graph");

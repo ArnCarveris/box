@@ -197,6 +197,26 @@ void box_render_texture_previews_filter(
     }
 }
 
+void box_render_texture_previews_return(
+    ecs_world_t *world,
+    ecs_vec_t *reads)
+{
+    box_render_previews_t *p = box_render_previews_get(world);
+    int32_t i;
+    for (i = 0; i < ecs_vec_count(reads); i ++) {
+        box_render_texture_read_t *r = ecs_vec_get_t(reads, box_render_texture_read_t, i);
+        if (!p) {
+            ecs_os_free(r->texels);
+        } else if (r->ticket & BOX_RENDER_PREVIEW_TICKET) {
+            *ecs_vec_append_t(NULL, &p->delivered, box_render_texture_read_t) = *r;
+        } else {
+            *ecs_vec_append_t(NULL, &p->kept, box_render_texture_read_t) = *r;
+        }
+    }
+
+    ecs_vec_clear(reads);
+}
+
 /** Find the index of a node in the compiled graph of a texture.
  *
  * @param tex The texture, may be NULL

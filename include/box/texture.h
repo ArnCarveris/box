@@ -1424,6 +1424,149 @@ ECS_STRUCT(TextureStatus, {
     char *error;        /**< Why the last load failed, NULL unless state is TextureFailed */
 });
 
+/** Layout of the texels of the CPU copy of a texture image, see TextureReadback */
+ECS_ENUM(TextureReadbackFormat, {
+    ReadbackNone = 0,     /**< No copy */
+    ReadbackR8 = 1,       /**< One byte per texel, read as (r / 255, 0, 0, 1): GraphSingle and
+                           *   GenHeight images */
+    ReadbackRGBA8 = 2,    /**< Four bytes per texel as stored, read as 0..1: GraphColor,
+                           *   GraphLinear, TexturePath and TextureGen images */
+    ReadbackR32Float = 3, /**< One float per texel, read as (r, 0, 0, 1): GraphFloat images */
+    ReadbackRGBA32Float = 4 /**< Four floats per texel: GraphHdr (RGBA16Float) and GraphFloat4
+                           *   images */
+});
+
+/** CPU copy of the image of a texture entity (TextureGraph, TextureGen, TexturePath or
+ * TexturePixels) that the engine keeps up to date: after every new revision of the image it
+ * copies it to the CPU without waiting for the GPU, and writes TextureReadbackStatus when the
+ * copy arrives. Read it with box_texture_readback_sample, box_texture_readback_texel or
+ * box_texture_readback, or from script with box.texture.sample.
+ *
+ * The image of a TextureGraph is read back from the GPU backend, so it gets a copy only with
+ * that backend; images made on the CPU are copied from their pixels. Removing the component or
+ * deleting the texture frees the copy.
+ *
+ *   Heights: {
+ *     TextureGraph: {output: height, domain: DomainWorld, format: GraphFloat}
+ *     TextureReadback: {}
+ *   }
+ */
+ECS_STRUCT(TextureReadback, {
+    int32_t level; /**< Mip level of the copy: each level halves the width and the height,
+                    *   averaging 2 x 2 texels; 0 for the image as it is */
+    bool keep;     /**< Keep the previous copy readable until the copy of a new revision
+                    *   arrives, default true; when false there is no copy in between */
+});
+
+/** State of the CPU copy of a TextureReadback, written by the engine and read only for
+ * applications */
+ECS_STRUCT(TextureReadbackStatus, {
+    int32_t revision;             /**< Revision of the image the copy is of, which increments
+                                   *   with every new image of the texture, 0 for none */
+    int32_t width;                /**< Width of the copy in texels */
+    int32_t height;               /**< Height of the copy in texels */
+    TextureReadbackFormat format; /**< Layout of the texels of the copy */
+    bool ready;                   /**< A copy can be read */
+});
+
+/** A CPU copy of a texture image, see TextureReadback */
+typedef struct box_texture_copy_t {
+    const void *data;             /**< Texels in rows from the top row, tightly packed in
+                                   *   format, NULL for none */
+    int32_t width;                /**< Width in texels */
+    int32_t height;               /**< Height in texels */
+    TextureReadbackFormat format; /**< Layout of the texels */
+    int32_t revision;             /**< Revision of the image the copy is of */
+} box_texture_copy_t;
+
+/** Get the bytes of a texel of a copy format.
+ *
+ * @param format The format
+ * @return Bytes per texel, 0 for ReadbackNone
+ */
+int32_t box_texture_copy_texel_size(
+    TextureReadbackFormat format);
+
+/** Read a texel of a copy as four floats: floats as stored, 8 bit channels as 0..1, a single
+ * channel as (r, 0, 0, 1).
+ *
+ * @param copy The copy
+ * @param x Column, clamped to the image
+ * @param y Row from the top, clamped to the image
+ * @param out Receives the value
+ * @return Whether the copy has texels, out is zero when not
+ */
+bool box_texture_copy_texel(
+    const box_texture_copy_t *copy,
+    int32_t x,
+    int32_t y,
+    float out[4]);
+
+/** Sample a copy bilinearly by uv: u from the left edge (0) to the right edge (1), v from the
+ * top edge to the bottom edge, so the center of texel (x, y) is at ((x + 0.5) / width,
+ * (y + 0.5) / height).
+ *
+ * @param copy The copy
+ * @param u Horizontal coordinate
+ * @param v Vertical coordinate
+ * @param address Texels outside the image: AddressWrap repeats it, AddressClamp extends the
+ * edge texels
+ * @param out Receives the value, as box_texture_copy_texel
+ * @return Whether the copy has texels, out is zero when not
+ */
+bool box_texture_copy_sample(
+    const box_texture_copy_t *copy,
+    float u,
+    float v,
+    TextureAddress address,
+    float out[4]);
+
+/** Get the CPU copy of the image of a texture entity with a TextureReadback.
+ *
+ * @param world The world
+ * @param texture The texture entity
+ * @param out Receives the copy, which stays valid until the next frame
+ * @return Whether a copy is ready
+ */
+bool box_texture_readback(
+    const ecs_world_t *world,
+    ecs_entity_t texture,
+    box_texture_copy_t *out);
+
+/** Read a texel of the CPU copy of a texture entity, see box_texture_copy_texel.
+ *
+ * @param world The world
+ * @param texture The texture entity, with a TextureReadback
+ * @param x Column, clamped
+ * @param y Row from the top, clamped
+ * @param out Receives the value
+ * @return Whether a copy is ready, out is zero when not
+ */
+bool box_texture_readback_texel(
+    const ecs_world_t *world,
+    ecs_entity_t texture,
+    int32_t x,
+    int32_t y,
+    float out[4]);
+
+/** Sample the CPU copy of a texture entity bilinearly by uv, see box_texture_copy_sample.
+ *
+ * @param world The world
+ * @param texture The texture entity, with a TextureReadback
+ * @param u Horizontal coordinate, 0 at the left edge
+ * @param v Vertical coordinate, 0 at the top edge
+ * @param address AddressWrap or AddressClamp
+ * @param out Receives the value
+ * @return Whether a copy is ready, out is zero when not
+ */
+bool box_texture_readback_sample(
+    const ecs_world_t *world,
+    ecs_entity_t texture,
+    float u,
+    float v,
+    TextureAddress address,
+    float out[4]);
+
 /** Preview of the value of a node of a TextureGraph, which a tool such as tools/texgraph sets
  * on a node entity to see it. With the GPU backend the engine reads the value of the node back
  * at most rate times per second, scales it down to size and writes TextureNodePreviewStatus.

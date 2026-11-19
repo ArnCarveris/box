@@ -10,6 +10,7 @@
     "lang.c": {
         "include": [
             "../../../src/render",
+            "../../../src/texture",
             "../../../src/geometry",
             "../../../src/spatial"
         ]
@@ -1225,6 +1226,26 @@
                     "record_maps",
                     "ignored",
                     "water"
+                ]
+            },
+            {
+                "id": "TextureReadback",
+                "testcases": [
+                    "texel_formats",
+                    "texel_clamps",
+                    "sample_bilinear",
+                    "sample_clamp",
+                    "sample_wrap",
+                    "sample_rgba8",
+                    "sample_empty",
+                    "defaults",
+                    "before_copy",
+                    "pixels_copy",
+                    "single_channel",
+                    "level",
+                    "follows_revision",
+                    "remove_frees",
+                    "script_sample"
                 ]
             },
             {

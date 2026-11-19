@@ -476,6 +476,7 @@ void BoxRenderImport(
     box_render_captures_init(world);
     box_render_textures_init(world);
     box_render_texture_previews_init(world);
+    box_render_texture_readbacks_init(world);
     box_render_draws_init(world);
     box_render_transitions_slots_init(world);
     box_render_atmosphere_init(world);

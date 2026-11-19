@@ -153,6 +153,25 @@ typedef struct box_texture_graph_t {
     uint64_t param_hash;        /**< Hash of the parameter bytes */
 } box_texture_graph_t;
 
+/** The CPU copy of a texture entity with a TextureReadback and its readback in flight */
+typedef struct box_texture_readback_t {
+    ecs_entity_t entity;        /**< The texture entity */
+    void *data;                 /**< Texels of the copy in format, owned, NULL for none */
+    int32_t width;              /**< Width of the copy */
+    int32_t height;             /**< Height of the copy */
+    TextureReadbackFormat format; /**< Layout of the texels */
+    uint32_t revision;          /**< Image revision of the copy, 0 for none */
+    int32_t level;              /**< Mip level of the copy */
+    uint32_t requested;         /**< Image revision last requested, 0 for none */
+    int32_t requested_level;    /**< Mip level last requested */
+    uint32_t ticket;            /**< Ticket of the readback in flight, 0 for none */
+    TextureGraphFormat graph_format; /**< Format of the graph image in flight */
+    double sent;                /**< World time the readback in flight was requested */
+    bool failed;                /**< The last readback failed */
+    TextureReadbackStatus status; /**< Last status written */
+    bool status_written;        /**< status was written */
+} box_texture_readback_t;
+
 /** Main thread state of the textures of a world */
 typedef struct box_textures_t {
     ecs_map_t textures;         /**< Entity to box_texture_t* */
@@ -175,6 +194,9 @@ typedef struct box_textures_t {
     ecs_vec_t graph_released;   /**< uint32_t, handles of sent graphs to destroy */
     ecs_vec_t reload;           /**< ecs_entity_t, textures to load at the next graph build,
                                  *   once a component being removed is gone */
+    ecs_map_t readbacks;        /**< Entity to box_texture_readback_t*, the CPU copies of the
+                                 *   textures with a TextureReadback */
+    uint32_t readback_ticket;   /**< Number of the next readback of a copy */
 } box_textures_t;
 
 /** Singleton that holds the registry of a world */
@@ -580,6 +602,68 @@ uint32_t box_textures_handle(
 uint32_t box_textures_revision(
     const box_textures_t *t,
     ecs_entity_t e);
+
+/** Get the CPU copy of a texture entity.
+ *
+ * @param t The registry, may be NULL
+ * @param e The texture entity
+ * @return The copy, NULL when the entity has no TextureReadback state
+ */
+box_texture_readback_t* box_texture_readback_get(
+    const box_textures_t *t,
+    ecs_entity_t e);
+
+/** Get or create the CPU copy of a texture entity.
+ *
+ * @param t The registry
+ * @param e The texture entity
+ * @return The copy
+ */
+box_texture_readback_t* box_texture_readback_ensure(
+    box_textures_t *t,
+    ecs_entity_t e);
+
+/** Free the texels of a CPU copy, which is then not ready.
+ *
+ * @param rb The copy
+ */
+void box_texture_readback_clear(
+    box_texture_readback_t *rb);
+
+/** Replace the texels of a CPU copy, scaled down to a mip level.
+ *
+ * @param rb The copy
+ * @param data The texels in format, taken
+ * @param width Their width
+ * @param height Their height
+ * @param format Their layout
+ * @param revision Image revision they are of
+ * @param level Mip level of the copy, each level halves the size
+ */
+void box_texture_readback_store(
+    box_texture_readback_t *rb,
+    void *data,
+    int32_t width,
+    int32_t height,
+    TextureReadbackFormat format,
+    uint32_t revision,
+    int32_t level);
+
+/** Register the TextureReadback observers and the script functions of the copies.
+ *
+ * @param world The world, in the scope of box.texture
+ * @param t The registry
+ */
+void box_texture_readbacks_init(
+    ecs_world_t *world,
+    box_textures_t *t);
+
+/** Free the CPU copies of a registry.
+ *
+ * @param t The registry
+ */
+void box_texture_readbacks_fini(
+    box_textures_t *t);
 
 /** Load textures again, for a new backend or a new texture quality.
  *

@@ -270,6 +270,43 @@ void box_render_texture_previews_filter(
     ecs_vec_t *out,
     int32_t first);
 
+/** Bit set in the tickets of the readbacks of the TextureReadback copies */
+#define BOX_RENDER_READBACK_TICKET (0x40000000u)
+
+/** Bits of a ticket that tell its owner: the readback bit and the bit of the previews */
+#define BOX_RENDER_READBACK_TICKET_MASK (0xC0000000u)
+
+/** Move the readbacks of the previews in a vector to the previews, which encode them in their
+ * next frame, and the others to the readbacks kept for box_render_texture_graph_reads.
+ *
+ * @param world The world
+ * @param reads The readbacks, cleared
+ */
+void box_render_texture_previews_return(
+    ecs_world_t *world,
+    ecs_vec_t *reads);
+
+/** Store the readbacks of the TextureReadback copies among the ones a caller took into their
+ * copies, removing them from the vector.
+ *
+ * @param world The world
+ * @param out The readbacks, compacted
+ * @param first Index of the first readback the caller took
+ */
+void box_render_texture_readbacks_filter(
+    ecs_world_t *world,
+    ecs_vec_t *out,
+    int32_t first);
+
+/** Register the system that keeps the CPU copies of the textures with a TextureReadback after
+ * every new revision of their image and writes TextureReadbackStatus. It runs after the texture
+ * extract.
+ *
+ * @param world The world
+ */
+void box_render_texture_readbacks_init(
+    ecs_world_t *world);
+
 /** Register the system that reads back the nodes with a TextureNodePreview and writes their
  * TextureNodePreviewStatus, and TextureGraphStats. It runs after the texture extract.
  *

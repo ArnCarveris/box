@@ -1830,6 +1830,19 @@
                 ]
             },
             {
+                "id": "TextureReadback",
+                "testcases": [
+                    "r32float",
+                    "rgba16float",
+                    "rgba8",
+                    "r32float_raw",
+                    "before_first_copy",
+                    "graph_change",
+                    "keep_off",
+                    "level"
+                ]
+            },
+            {
                 "id": "TextureBlur",
                 "testcases": [
                     "constant_plane",
