@@ -1165,6 +1165,14 @@ uint32_t box_render_shadow_rendered(
     const ecs_world_t *world,
     ecs_entity_t view);
 
+/** Render every shadow cascade of every view in the next extract, as when the views are new:
+ * after a shift of the world origin the cascades kept from earlier frames show the old place.
+ *
+ * @param world The world
+ */
+void box_render_shadows_reset(
+    ecs_world_t *world);
+
 /** Resolve shadow settings: every field is clamped to its valid range and an even
  * filter_size rounds up to the next odd one, other values apply as set.
  *
@@ -1590,6 +1598,19 @@ typedef struct box_render_reflection_probe_t {
  */
 void box_render_reflect_init(
     ecs_world_t *world);
+
+/** Move the reflection probes of a scene, its scene probe and its static bounds by the offset
+ * of a shift of the world origin, and take the moves of the probes in this frame by the offset
+ * alone as no change, so a shift captures nothing again.
+ *
+ * @param world The world
+ * @param scene The scene, 0 for the default scene
+ * @param offset Added to the world positions
+ */
+void box_render_reflect_shift(
+    ecs_world_t *world,
+    ecs_entity_t scene,
+    const vec3 offset);
 
 /** Get the resident reflection probes of a scene.
  *

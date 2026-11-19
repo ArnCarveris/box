@@ -37,7 +37,8 @@ struct Emitter {
     extents: vec4f,
     // xyz: world acceleration plus gravity, w: seconds of the frame
     acceleration: vec4f,
-    // rgb: display encoded color
+    // rgb: display encoded color, w: X of the world offset added to the live particles before
+    // they move, the shift of the world origin of the frame for a world space pool
     color: vec4f,
     // xy: speed range, zw: size range
     speed_size: vec4f,
@@ -62,12 +63,12 @@ struct Emitter {
     // xyz: phase of the wander field drawn from the seed, offset by the displacement of the
     // frame of reference, w: wrapped world X offset of the gust field of the global wind
     wander: vec4f,
-    // rgb: display encoded color variance
+    // rgb: display encoded color variance, w: Y of the shift
     variance: vec4f,
     // xyz: world velocity every spawn of the frame gets, w: wrapped world Z offset of the gust
     // field of the global wind
     inherit: vec4f,
-    // x: height of the ground plane, y: bounce, z: friction
+    // x: height of the ground plane, y: bounce, z: friction, w: Z of the shift
     ground: vec4f,
     // World velocity of the frame of reference, added to the position only
     drift: vec3f,

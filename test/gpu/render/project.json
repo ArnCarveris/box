@@ -1875,6 +1875,14 @@
                     "zero_strength",
                     "strength_edit_no_recompile"
                 ]
+            },
+            {
+                "id": "WorldOrigin",
+                "testcases": [
+                    "shift_same_image",
+                    "rebase_same_image",
+                    "particles_same_image"
+                ]
             }
         ]
     }

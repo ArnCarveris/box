@@ -172,6 +172,36 @@
                 "testcases": [
                     "offscreen_surface_resize"
                 ]
+            },
+            {
+                "id": "WorldOrigin",
+                "testcases": [
+                    "defaults",
+                    "no_origin_no_shift",
+                    "within_threshold",
+                    "shift_past_threshold",
+                    "shift_whole_steps",
+                    "shift_per_axis",
+                    "disabled",
+                    "roots_shift_children_dont",
+                    "scope_without_transform",
+                    "dynamic_root",
+                    "camera_shifts",
+                    "focus_default_camera",
+                    "focus_entities",
+                    "fixed_stays",
+                    "ui_stays",
+                    "focus_in_scene",
+                    "event",
+                    "walk_1000_km",
+                    "to_local",
+                    "script_functions",
+                    "manual_shift",
+                    "path_follow",
+                    "ground_heights",
+                    "spatial_same_hits",
+                    "spatial_before_transforms"
+                ]
             }
         ]
     }

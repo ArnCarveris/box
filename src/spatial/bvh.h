@@ -176,6 +176,16 @@ void box_bvh_build(
     box_bvh_leaf_t *leaves,
     int32_t count);
 
+/** Translate every box of a hierarchy, which keeps its shape: the items moved by the same
+ * offset, as a shift of the world origin moves them.
+ *
+ * @param tree The tree
+ * @param offset Added to every box
+ */
+void box_bvh_shift(
+    box_bvh_t *tree,
+    const vec3 offset);
+
 /** Get the surface area heuristic cost of a hierarchy: the summed area of its nodes over the
  * area of its root, the number of nodes a random ray through the root visits.
  *

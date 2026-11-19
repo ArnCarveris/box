@@ -148,6 +148,7 @@ typedef struct box_render_reflect_t {
     const void *lights_state; /**< State of the light extract, looked up once */
     ecs_map_t light_map;    /**< Light entity to its index in a light record, scratch */
     box_task_id_t task;     /**< Report of the captures left, 0 while no scene progresses */
+    bool shifting;          /**< The world origin shifted since the last extract */
 } box_render_reflect_t;
 
 /** Find the probes of a scene.
@@ -393,22 +394,47 @@ static bool box_reflect_waiting(
     return !probe->packet && (!probe->captured || probe->queued);
 }
 
+/** Check whether two points differ, or differ by more than the rounding of a shift of the
+ * world origin.
+ *
+ * @param a The first point
+ * @param b The second point
+ * @param shifting Whether the world origin shifted, which allows the rounding
+ * @return Whether the points differ
+ */
+static bool box_reflect_point_moved(
+    const float *a,
+    const float *b,
+    bool shifting)
+{
+    bool result = false;
+    int32_t i;
+    for (i = 0; i < 3; i ++) {
+        float tolerance = shifting ? 1e-4f * (1.0f + fabsf(a[i])) : 0.0f;
+        result = result || fabsf(a[i] - b[i]) > tolerance || isnan(a[i]) != isnan(b[i]);
+    }
+
+    return result;
+}
+
 /** Check whether the data of a probe captures something else than before: its boxes or its
  * capture point moved or resized. Blend and priority only change how it is blended.
  *
- * @param a The data before
+ * @param a The data before, moved by a shift of the world origin
  * @param b The data now
+ * @param shifting Whether the world origin shifted, so the points may differ by its rounding
  * @return Whether the probe needs a new capture
  */
 static bool box_reflect_moved(
     const box_render_reflection_probe_t *a,
-    const box_render_reflection_probe_t *b)
+    const box_render_reflection_probe_t *b,
+    bool shifting)
 {
-    return ecs_os_memcmp(a->center, b->center, ECS_SIZEOF(a->center)) ||
+    return box_reflect_point_moved(a->center, b->center, shifting) ||
         ecs_os_memcmp(a->axes, b->axes, ECS_SIZEOF(a->axes)) ||
         ecs_os_memcmp(a->extent, b->extent, ECS_SIZEOF(a->extent)) ||
         ecs_os_memcmp(a->projection, b->projection, ECS_SIZEOF(a->projection)) ||
-        ecs_os_memcmp(a->capture, b->capture, ECS_SIZEOF(a->capture));
+        box_reflect_point_moved(a->capture, b->capture, shifting);
 }
 
 /** Check whether a box padded by the half size of another box, then by a radius, reaches the
@@ -924,7 +950,7 @@ static void box_reflect_bakes(
                 : box_reflect_add_probe(s, 0);
             box_render_reflection_probe_t was = probe->data;
             box_reflect_scene_data(s, &probe->data);
-            if (box_reflect_moved(&was, &probe->data)) {
+            if (box_reflect_moved(&was, &probe->data, r->shifting)) {
                 box_reflect_queue(probe);
             }
 
@@ -965,7 +991,7 @@ static void box_reflect_probes(
             WorldTransform buf;
             box_reflect_place(&probe->data, &probes[row],
                 box_transform_world_field(world, &qit, transforms, row, &buf));
-            if (box_reflect_moved(&was, &probe->data)) {
+            if (box_reflect_moved(&was, &probe->data, r->shifting)) {
                 box_reflect_queue(probe);
             }
 
@@ -1532,6 +1558,7 @@ static void BoxRenderExtractReflect(
     }
 
     box_reflect_probes(world, r);
+    r->shifting = false;
     box_reflect_views(world, r, p, true);
     box_reflect_timing(world, r);
     box_reflect_captured(world, r);
@@ -1646,6 +1673,40 @@ static const box_render_reflect_t* box_reflect_state(
     const ecs_system_t *sys = system ? ecs_system_get(world, system) : NULL;
 
     return sys ? sys->ctx : NULL;
+}
+
+void box_render_reflect_shift(
+    ecs_world_t *world,
+    ecs_entity_t scene,
+    const vec3 offset)
+{
+    box_render_reflect_t *r = ECS_CONST_CAST(box_render_reflect_t*, box_reflect_state(world));
+    box_reflect_scene_t *s = r ? box_reflect_find(r, scene) : NULL;
+    int32_t i;
+    if (r) {
+        r->shifting = true;
+    }
+
+    if (!s) {
+        goto done;
+    }
+
+    glm_vec3_add(s->scene_capture, ECS_CONST_CAST(float*, offset), s->scene_capture);
+    glm_vec3_add(s->min, ECS_CONST_CAST(float*, offset), s->min);
+    glm_vec3_add(s->max, ECS_CONST_CAST(float*, offset), s->max);
+    for (i = 0; i < ecs_vec_count(&s->cameras); i ++) {
+        float *camera = *ecs_vec_get_t(&s->cameras, vec3, i);
+        glm_vec3_add(camera, ECS_CONST_CAST(float*, offset), camera);
+    }
+
+    for (i = 0; i < ecs_vec_count(&s->probes); i ++) {
+        box_reflect_probe_t *probe = ecs_vec_get_t(&s->probes, box_reflect_probe_t, i);
+        glm_vec3_add(probe->data.center, ECS_CONST_CAST(float*, offset), probe->data.center);
+        glm_vec3_add(probe->data.capture, ECS_CONST_CAST(float*, offset), probe->data.capture);
+    }
+
+done:
+    return;
 }
 
 const box_render_reflection_probe_t* box_render_reflect_probes(

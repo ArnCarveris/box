@@ -80,6 +80,8 @@ typedef struct box_particle_pool_t {
     vec3 table_scale;       /**< Shape scale the table was sampled with */
     uint32_t table_seed;    /**< Seed the table was sampled with */
     vec3 last_position;     /**< World position of the emitter in the last frame */
+    vec3 shift;             /**< World offset of the shifts of the world origin that its
+                             *   particles did not get yet */
     bool has_last;          /**< last_position holds a position */
     bool linger;            /**< ParticleEmitter.linger of the last frame the emitter was seen */
     bool local;             /**< ParticleEmitter.local its particles were spawned with */
@@ -1009,7 +1011,6 @@ static void box_particles_block(
     out->color[0] = (float)emitter->color.r / 255.0f;
     out->color[1] = (float)emitter->color.g / 255.0f;
     out->color[2] = (float)emitter->color.b / 255.0f;
-    out->color[3] = 1.0f;
     out->speed[0] = emitter->speed.min * scale;
     out->speed[1] = emitter->speed.max * scale;
     out->radial[0] = emitter->radial.min * scale;
@@ -1067,7 +1068,21 @@ _Static_assert(offsetof(box_render_particle_block_t, global_wind) ==
     "the curves of a block end at gradient_row");
 _Static_assert(sizeof(box_render_particle_block_t) ==
     offsetof(box_render_particle_block_t, motion_force) + 4 * sizeof(float),
-    "the max curves and the motion of a block are its last members");
+    "the motion is the last member of a block");
+
+/** Write the shift of the world origin of a pool into the w lanes of its block.
+ *
+ * @param out The block
+ * @param shift World offset added to the live particles before they move
+ */
+static void box_particles_block_shift(
+    box_render_particle_block_t *out,
+    const vec3 shift)
+{
+    out->color[3] = shift[0];
+    out->variance[3] = shift[1];
+    out->ground[3] = shift[2];
+}
 
 /** The curves and motion of the block of an emitter without ParticleCurves and ParticleMotion,
  * which change nothing */
@@ -1416,6 +1431,7 @@ static void box_particles_emitter(
     stats->spawned += (int32_t)count;
     stats->particles += pool->live;
     if (!pool->used) {
+        glm_vec3_zero(pool->shift);
         goto done;
     }
 
@@ -1477,6 +1493,8 @@ static void box_particles_emitter(
     entry->block.life_min = life_min;
     entry->block.life_span = life_max > life_min ? life_max - life_min : 0;
     entry->block.cards = pool->card ? pool->capacity : 0u;
+    box_particles_block_shift(&entry->block, pool->shift);
+    glm_vec3_zero(pool->shift);
     pool->fresh = false;
     if (emitter->linger) {
         pool->entry = *entry;
@@ -1531,6 +1549,8 @@ static bool box_particles_linger(
     box_render_particle_pool_t *entry = ecs_vec_append_t(
         NULL, &p->particles, box_render_particle_pool_t);
     *entry = pool->entry;
+    box_particles_block_shift(&entry->block, pool->shift);
+    glm_vec3_zero(pool->shift);
     entry->clear = false;
     entry->slots = slots;
     entry->block.acceleration[3] = delta_us ? p->delta : 0.0f;
@@ -1813,6 +1833,31 @@ box_render_particles_t* box_render_particles_get(
     box_render_particles_t *result = box_particles_state(world);
 
     return result && result->emitters ? result : NULL;
+}
+
+void box_render_particles_shift(
+    box_render_particles_t *s,
+    ecs_entity_t scene,
+    const vec3 offset,
+    box_render_particles_shifts_t shifts,
+    void *ctx)
+{
+    int32_t i, count = s ? ecs_vec_count(&s->pools) : 0;
+    for (i = 0; i < count; i ++) {
+        box_particle_pool_t *pool = *ecs_vec_get_t(&s->pools, box_particle_pool_t*, i);
+        if (pool->scene != scene) {
+            continue;
+        }
+
+        if (!pool->lingering && shifts && !shifts(ctx, pool->entity)) {
+            continue;
+        }
+
+        glm_vec3_add(pool->last_position, ECS_CONST_CAST(float*, offset), pool->last_position);
+        if (!pool->local) {
+            glm_vec3_add(pool->shift, ECS_CONST_CAST(float*, offset), pool->shift);
+        }
+    }
 }
 
 int32_t box_render_particles_live(

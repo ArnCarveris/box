@@ -731,6 +731,20 @@ done:
     return;
 }
 
+void box_spatial_shift(
+    ecs_world_t *world,
+    ecs_entity_t scene,
+    const vec3 offset,
+    box_spatial_shifts_t shifts,
+    void *ctx)
+{
+    box_spatial_t *index = box_spatial_get(world);
+    box_spatial_scene_t *s = index ? box_spatial_scene(index, scene) : NULL;
+    if (s) {
+        box_spatial_scene_shift(index, s, offset, shifts, ctx);
+    }
+}
+
 void box_spatial_stats(
     const ecs_world_t *world,
     box_spatial_stats_t *stats)

@@ -269,6 +269,35 @@ void box_spatial_update(
 void box_spatial_rebuild(
     ecs_world_t *world);
 
+/** Tell whether an entity of the index moved with a shift of the world origin.
+ *
+ * @param ctx Context of the shift
+ * @param e The indexed entity or mover
+ * @return true when the entity moved by the offset of the shift
+ */
+typedef bool (*box_spatial_shifts_t)(
+    void *ctx,
+    ecs_entity_t e);
+
+/** Move the bounds of the entities of a scene that a shift of the world origin moved, so that
+ * queries find them at their new place before the next update and no leaf counts as moved.
+ *
+ * When every entity of the scene moved, the trees translate as they are, else they are built
+ * again. The transforms of the entities are written by the caller.
+ *
+ * @param world The world
+ * @param scene The scene, 0 for the default scene
+ * @param offset Added to the world positions of the moved entities
+ * @param shifts Tells which entities moved, NULL for all of them
+ * @param ctx Context passed to shifts
+ */
+void box_spatial_shift(
+    ecs_world_t *world,
+    ecs_entity_t scene,
+    const vec3 offset,
+    box_spatial_shifts_t shifts,
+    void *ctx);
+
 /** Read the counters of the spatial index.
  *
  * @param world The world

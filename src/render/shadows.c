@@ -462,6 +462,26 @@ uint32_t box_render_shadow_rendered(
     return h && h->seen == state->extract ? h->rendered : 0;
 }
 
+void box_render_shadows_reset(
+    ecs_world_t *world)
+{
+    ecs_entity_t system = ecs_lookup(world, "box.render.extract.Shadows");
+    const ecs_system_t *sys = system ? ecs_system_get(world, system) : NULL;
+    box_shadows_t *state = sys ? sys->ctx : NULL;
+    if (!state) {
+        goto done;
+    }
+
+    ecs_map_iter_t it = ecs_map_iter(&state->views);
+    while (ecs_map_next(&it)) {
+        box_shadows_history_t *h = ecs_map_ptr(&it);
+        h->count = -1;
+    }
+
+done:
+    return;
+}
+
 void box_render_shadows_init(
     ecs_world_t *world)
 {

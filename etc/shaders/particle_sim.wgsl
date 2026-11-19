@@ -103,6 +103,7 @@ fn integrate(@builtin(workgroup_id) group: vec3u, @builtin(local_invocation_id) 
         return;
     }
 
+    p.position += vec3f(emitter.color.w, emitter.variance.w, emitter.ground.w);
     p.remaining = particle_age(p.remaining, emitter.life.x);
     if (p.remaining != 0u) {
         // Keep one integrate after the check: a second call in an else branch can change the

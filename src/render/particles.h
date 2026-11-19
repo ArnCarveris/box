@@ -44,7 +44,10 @@ typedef struct box_render_particle_block_t {
                              *   spread */
     float extents[4];       /**< Half size of a box, w the radius of a sphere or disc */
     float acceleration[4];  /**< World acceleration plus gravity, w the seconds of the frame */
-    float color[4];         /**< Display encoded color, 0 to 1, w unused */
+    float color[4];         /**< Display encoded color, 0 to 1, w the X of the shift: the
+                             *   world offset added to the live particles before they move,
+                             *   the shift of the world origin of the frame for a world space
+                             *   pool, zero otherwise */
     float speed[2];         /**< Range of the initial speed */
     float size[2];          /**< Range of the diameter */
     float rotation[2];      /**< Range of the initial rotation in degrees */
@@ -74,11 +77,12 @@ typedef struct box_render_particle_block_t {
     float wander[4];        /**< Phase of the wander field drawn from the seed, offset by the
                              *   displacement of the frame of reference, w the wrapped world X
                              *   offset of the gust field of the global wind */
-    float variance[4];      /**< Display encoded color variance, 0 to 1, w unused */
+    float variance[4];      /**< Display encoded color variance, 0 to 1, w the Y of the
+                             *   shift */
     float inherit[4];       /**< World velocity every spawn of the frame gets, w the wrapped
                              *   world Z offset of the gust field of the global wind */
     float ground[4];        /**< Height of the ground plane, y the bounce, z the friction, w
-                             *   unused */
+                             *   the Z of the shift */
     float drift[3];         /**< World velocity of the frame of reference, added to the
                              *   position only */
     uint32_t collide;       /**< BOX_PARTICLE_GROUND_NONE, _BOUNCE or _DIE */
@@ -170,6 +174,33 @@ void box_render_particles_import(
  */
 box_render_particles_t* box_render_particles_get(
     const ecs_world_t *world);
+
+/** Tell whether an emitter moved with a shift of the world origin.
+ *
+ * @param ctx Context of the shift
+ * @param e The emitter
+ * @return true when the emitter moved by the offset of the shift
+ */
+typedef bool (*box_render_particles_shifts_t)(
+    void *ctx,
+    ecs_entity_t e);
+
+/** Move the world space particles of the pools of a scene by the offset of a shift of the
+ * world origin in the next frame, and at once the last emitter positions that their inherited
+ * velocity is measured from, so a shift gives them no velocity.
+ *
+ * @param s The state of the extract, NULL for none
+ * @param scene The scene, 0 for the default scene
+ * @param offset Added to the world positions
+ * @param shifts Tells whether an emitter moved with the shift, NULL for all of them
+ * @param ctx Context passed to shifts
+ */
+void box_render_particles_shift(
+    box_render_particles_t *s,
+    ecs_entity_t scene,
+    const vec3 offset,
+    box_render_particles_shifts_t shifts,
+    void *ctx);
 
 /** Get the particles alive in the pool of an emitter after the last extract.
  *

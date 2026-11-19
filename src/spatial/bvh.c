@@ -1414,3 +1414,26 @@ bool box_bvh_ray(
 {
     return box_bvh_ray_placed(tree, NULL, ray, reach, visit, ctx);
 }
+
+void box_bvh_shift(
+    box_bvh_t *tree,
+    const vec3 offset)
+{
+    int32_t i, k, count = ecs_vec_count(&tree->nodes);
+    box_bvh_node_t *nodes = ecs_vec_first(&tree->nodes);
+    for (i = 0; i < count; i ++) {
+        if (nodes[i].height < 0) {
+            continue;
+        }
+
+        for (k = 0; k < 2; k ++) {
+            glm_vec3_add(nodes[i].min[k], ECS_CONST_CAST(float*, offset), nodes[i].min[k]);
+            glm_vec3_add(nodes[i].max[k], ECS_CONST_CAST(float*, offset), nodes[i].max[k]);
+        }
+    }
+
+    if (tree->root != BOX_BVH_NULL) {
+        glm_vec3_add(tree->min, ECS_CONST_CAST(float*, offset), tree->min);
+        glm_vec3_add(tree->max, ECS_CONST_CAST(float*, offset), tree->max);
+    }
+}

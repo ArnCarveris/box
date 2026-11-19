@@ -1657,6 +1657,7 @@ static void BoxRenderExtractBake(
     }
 
     box_bake_changes(world, b);
+    b->shifting = false;
     for (i = 0; i < ecs_vec_count(&b->volumes); i ++) {
         box_bake_lights(b, ecs_vec_get_t(&b->volumes, box_bake_volume_t, i));
     }
@@ -1736,6 +1737,50 @@ box_render_bake_t* box_bake_state(
     const ecs_system_t *s = system ? ecs_system_get(world, system) : NULL;
 
     return s ? s->ctx : NULL;
+}
+
+/** Add an offset to every point of a vector of vec3.
+ *
+ * @param points The vector
+ * @param offset The offset
+ */
+static void box_bake_shift_points(
+    ecs_vec_t *points,
+    const vec3 offset)
+{
+    int32_t i;
+    for (i = 0; i < ecs_vec_count(points); i ++) {
+        float *point = *ecs_vec_get_t(points, vec3, i);
+        glm_vec3_add(point, ECS_CONST_CAST(float*, offset), point);
+    }
+}
+
+void box_render_bake_shift(
+    ecs_world_t *world,
+    ecs_entity_t scene,
+    const vec3 offset)
+{
+    box_render_bake_t *b = box_bake_state(world);
+    box_bake_volume_t *v = b ? box_bake_find(b, scene) : NULL;
+    int32_t i;
+    if (b) {
+        b->shifting = true;
+    }
+
+    if (!v) {
+        goto done;
+    }
+
+    for (i = 0; i < 3; i ++) {
+        v->grid.origin[i] += offset[i];
+    }
+
+    glm_vec3_add(v->min, ECS_CONST_CAST(float*, offset), v->min);
+    glm_vec3_add(v->max, ECS_CONST_CAST(float*, offset), v->max);
+    box_bake_shift_points(&v->cameras, offset);
+    box_bake_shift_points(&v->sorted, offset);
+done:
+    return;
 }
 
 bool box_render_bake_probe(
