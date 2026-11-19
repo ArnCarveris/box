@@ -196,17 +196,24 @@ fn layer_sample(maps: texture_2d_array<f32>, first: u32, l: TextureLayer, f: Ver
     return o;
 }
 
+// How far a local world height is into the altitude band of a layer, 0 below its altitude to 1
+// at its altitude plus its fade; 1 for a layer without a fade
+fn layer_altitude(l: TextureLayer, y: f32) -> f32 {
+    let fade = bitcast<f32>(l.flags.z);
+    return select(1.0, clamp((y - bitcast<f32>(l.flags.y)) / fade, 0.0, 1.0), fade > 0.0);
+}
+
 // How much of a fragment a layer covers. The score is how well the normal faces the direction
 // of the layer (allowed above a cosine of 2 facing - 1, ignored at a facing of 0), times the
 // mask raised by the cavity times how occluded or low the surface is (lowered for a negative
-// cavity),
+// cavity), times how far it is into the altitude band of the layer,
 // so crevices come first without holding back open surfaces. The normal is the shading normal
 // mixed toward the geometric one by the normal of the layer: a layer that flattens the surface
 // (a water film) fills its bumps, so they do not decide where it lies. The amount moves a
 // threshold over the score from 1 (nothing) to below 0 (everything allowed), the edge width
 // soft. A score of 0 (not allowed by the rules) stays uncovered at any amount, faded over the
 // edge width.
-fn layer_coverage(l: TextureLayer, s: LayerSurface, mask: f32) -> f32 {
+fn layer_coverage(l: TextureLayer, s: LayerSurface, mask: f32, altitude: f32) -> f32 {
     let facing = l.direction.w;
     let n = mix(s.normal, s.geometric, l.coverage.z);
     let d = dot(n, l.direction.xyz) * inverseSqrt(max(dot(n, n), 1e-12));
@@ -215,7 +222,7 @@ fn layer_coverage(l: TextureLayer, s: LayerSurface, mask: f32) -> f32 {
     let allowed = select(1.0, clamp(toward * 16.0, 0.0, 1.0), facing > 0.0);
     let orientation = mix(1.0, toward, facing) * allowed;
     let cavity = l.coverage.x * max(1.0 - clamp(s.occlusion, 0.0, 1.0), s.low);
-    let score = orientation * clamp(clamp(mask, 0.0, 1.0) + cavity, 0.0, 1.0);
+    let score = orientation * clamp(clamp(mask, 0.0, 1.0) + cavity, 0.0, 1.0) * altitude;
     let edge = max(l.coverage.y, 1e-4);
     let threshold = (1.0 - l.color.a) * (1.0 + edge) - edge;
     return smoothstep(threshold, threshold + edge, score) * clamp(score / edge, 0.0, 1.0) *
@@ -269,7 +276,7 @@ fn apply_layers(maps: texture_2d_array<f32>, first: u32, f: VertexOut, surface: 
             continue;
         }
         let m = layer_sample(maps, first + k * LAYER_MAPS, l, f, s, dx, dy, ux, uy);
-        let covered = layer_coverage(l, s, m.mask);
+        let covered = layer_coverage(l, s, m.mask, layer_altitude(l, f.world.y));
         if (covered <= 0.0) {
             continue;
         }

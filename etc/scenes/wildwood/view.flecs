@@ -1,0 +1,87 @@
+using flecs.script
+using flecs.script.math
+using box.view
+using box.effects
+using box.light
+using box.world
+using state
+
+// The view of the player, set up like the forest's (forest/view.flecs): ambient occlusion, the
+// height fog of the sky, bloom, auto exposure into the Tony McMapface tone map, the grade of the
+// season and the weather, a vignette and SMAA. The aerial perspective of the sky hazes the
+// terrain over the kilometers so it fades into the sky instead of ending. The shadow cascades
+// reach over the near forest; the mountains need none.
+view {
+  occlusion { Gtao: {radius: 0.7, final_value_power: 1.8, quality: GtaoHigh} }
+  bloom { Bloom: {intensity: 0.12, threshold: 1.2, threshold_softness: 0.5} }
+  exposure {
+    AutoExposure: {min_log_luma: -10.8, exposure_compensation: 0.35, max_exposure: 20}
+  }
+
+  film { Tonemap: {auto_exposure: exposure, operator_: TonyMcMapface} }
+  grade {
+    ColorGrading: {
+      temperature: forest_seasonal(season, -0.02, 0.03, 0.05, -0.1) - 0.06 * precipitation,
+      tint: forest_seasonal(season, -0.04, 0, 0.02, 0.01),
+      contrast: forest_seasonal(season, 1.04, 1.06, 1.08, 1.02),
+      saturation: forest_seasonal(season, 1.1, 1.06, 1.04, 0.84) * (1 - 0.22 * precipitation),
+      vibrance: forest_seasonal(season, 0.18, 0.12, 0.1, 0.02),
+      lift: {0, 0, forest_seasonal(season, 0, 0, 0, 0.012)}
+    }
+  }
+  vignette { Vignette: {intensity: 0.2, radius: 0.8, smoothness: 0.5} }
+  edges { Smaa: {} }
+
+  View: {
+    camera: player,
+    clear: {enabled: true, color: {120, 140, 160, 255}},
+    lighting: {
+      enabled: true,
+      baked: false,
+      reflections: true,
+      atmosphere: true,
+      environment: {source: sky, intensity: forest_seasonal(season, 1.04, 1, 0.97, 1.08), background: false}
+    },
+    shadows: {
+      enabled: true,
+      cascades: 4,
+      resolution: 2048,
+      interval: [1, 2, 2, 4],
+      max_distance: 400,
+      split_lambda: 0.85,
+      filter_size: 5,
+      fade: 0.2,
+      blend: 0.15
+    },
+    effects: [
+      {effect: occlusion},
+      {effect: sky},
+      {effect: bloom},
+      {effect: film},
+      {effect: grade},
+      {effect: vignette},
+      {effect: edges}
+    ]
+  }
+}
+
+// The local origin follows the player, so the far walk stays precise
+$ {
+  WorldOrigin: {enabled: true}
+}
+
+// The scene probe of the forest library (sky.flecs) follows the player and recaptures as it
+// moves on, ignoring the churn of far tiles
+$ {
+  ReflectionBake: {
+    resolution: 128,
+    budget_ms: 1,
+    scene_probe: true,
+    scene_probe_height: 2.4,
+    follow_focus: true,
+    follow_distance: PROBE_FOLLOW,
+    follow_radius: TERRAIN_QUERY_RADIUS,
+    environment: sky,
+    light_threshold: 4
+  }
+}

@@ -1,0 +1,133 @@
+using flecs.script
+using flecs.script.math
+using box.material
+using box.texture
+using state
+using assets
+
+// The materials of the wildwood terrain. Its TextureBlend has four layers, weighed by the masks
+// of terrain.flecs: the forest floor (the leaf litter of the forest library), the grass of the
+// clearings and the alpine meadows, the dirt of the trails and the rock of the walls, mapped
+// triplanar so steep faces do not stretch. Scree is rock half buried in dirt, which the height
+// based contrast of the blend breaks into stones. Over them lie four TextureLayers: moss on what
+// faces up, the rock tops among it, snow on the high peaks, more of it in winter, and the wet
+// and the snow of the weather of the forest library.
+assets {
+  // Grass: tufts of blades in greens from shade to sun, drier straw in patches and soil showing
+  // between the tufts
+  template WildwoodGrassMap {
+    prop map: i32 = 0
+    prop res: i32 = GROUND_RES
+
+    warp_n { nodes.Noise: {channels: 3, frequency: 5, octaves: 2, seed: 70} }
+    warp { nodes.Warp: {offset: warp_n, amount_value: 0.05} }
+    tufts { nodes.Noise: {coords: warp, frequency: 48, octaves: 3, fractal: NoiseBillow, seed: 71} }
+    blades { nodes.Noise: {coords: warp, frequency: 320, octaves: 2, seed: 72} }
+    patch { nodes.Noise: {frequency: 6, octaves: 3, seed: 73} }
+    height { nodes.Mix: {a: tufts, b: blades, factor_value: {0.45, 0, 0, 0}} }
+    soil { nodes.Smoothstep: {input: height, edge0_value: {0.32, 0, 0, 0}, edge1_value: {0.22, 0, 0, 0}} }
+
+    if map == MAP_ALBEDO {
+      tone {
+        nodes.Ramp: {
+          input: height,
+          keys: [
+            {0.2, {38, 52, 18}}, {0.4, {62, 88, 26}}, {0.55, {86, 110, 34}},
+            {0.7, {112, 128, 44}}, {0.85, {146, 148, 70}}
+          ]
+        }
+      }
+
+      straw {
+        nodes.Ramp: {input: patch, keys: [{0.35, {230, 245, 225}}, {0.55, {255, 255, 255}}, {0.75, {255, 232, 178}}]}
+      }
+
+      dried { nodes.Multiply: {a: tone, b: straw} }
+      color { nodes.Mix: {a: dried, b_value: {0.045, 0.034, 0.02, 1}, factor: soil} }
+      Graph: {output: color, width: res}
+    } else if map == MAP_NORMAL {
+      bumps { nodes.Normal: {height: height, strength: 2.5} }
+      Graph: {output: bumps, width: res, format: GraphLinear}
+    } else if map == MAP_HEIGHT {
+      Graph: {output: height, width: res, format: GraphSingle}
+    } else {
+      occlusion { nodes.Remap: {input: height, from_min: 0.15, from_max: 0.6, to_min: 0.55, to_max: 1, clamp: true} }
+      orm { nodes.Combine: {r: occlusion, g_value: 0.9, b_value: 0, a_value: 1} }
+      Graph: {output: orm, width: res}
+    }
+  }
+
+  WildwoodGrassMap wildwood_grass_albedo(map: MAP_ALBEDO)
+  WildwoodGrassMap wildwood_grass_normal(map: MAP_NORMAL)
+  WildwoodGrassMap wildwood_grass_height(map: MAP_HEIGHT)
+  WildwoodGrassMap wildwood_grass_orm(map: MAP_ORM)
+
+  // The layers of the blend, tiling every GROUND_MAP_SIZE / scale meters
+  wildwood_floor {
+    PbrTextures: {albedo: litter_albedo, normal: litter_normal, orm: litter_orm}
+    texture.Transform: {scale_x: 24, scale_y: 24}
+  }
+
+  wildwood_grass {
+    PbrTextures: {albedo: wildwood_grass_albedo, normal: wildwood_grass_normal, orm: wildwood_grass_orm}
+    texture.Transform: {scale_x: 40, scale_y: 40}
+  }
+
+  wildwood_dirt {
+    PbrTextures: {albedo: path_albedo, normal: path_normal, orm: path_orm}
+    texture.Transform: {scale_x: 56, scale_y: 56}
+  }
+
+  wildwood_rock {
+    PbrTextures: {albedo: rock_albedo, normal: rock_normal, orm: rock_orm}
+    texture.Transform: {scale_x: 16, scale_y: 16}
+  }
+
+  // Moss in patches on what faces up: the rock tops, the flats and the forest floor
+  wildwood_moss_patches {
+    n { nodes.Noise: {frequency: 6, octaves: 4, seed: 81} }
+    Graph: {output: n, width: 512, format: GraphSingle}
+  }
+
+  wildwood_moss {
+    texture.Layer: {
+      amount: forest_seasonal(season, 0.42, 0.36, 0.4, 0.3),
+      direction: {0, 1, 0},
+      facing: 0.78,
+      mask: wildwood_moss_patches,
+      cavity: -0.2,
+      contrast: 5,
+      albedo: LayerMix,
+      roughness: LayerMix,
+      normal: 0.6
+    }
+    PbrMaterial: {roughness: 0.95}
+    PbrTextures: {albedo: moss_albedo, normal: moss_normal, orm: moss_orm}
+    texture.Mapping: {mode: MappingWorld, size: GROUND_MAP_SIZE}
+    texture.Transform: {scale_x: 20, scale_y: 20}
+  }
+
+  // Snow on the peaks above SNOW_LINE on what faces up, drifting in patches: on the summits in
+  // summer, down to the snow line in winter, and wherever the weather lets snow lie
+  wildwood_peak_snow {
+    texture.Layer: {
+      amount: max(forest_seasonal(season, 0.62, 0.38, 0.55, 1), forest_snow_amount(snow)),
+      direction: {0, 1, 0},
+      facing: 0.45,
+      mask: forest_snow_drifts,
+      cavity: 0.3,
+      contrast: 5,
+      albedo: LayerMix,
+      roughness: LayerMix,
+      metallic: LayerMix,
+      occlusion: LayerKeep,
+      normal: 0.6,
+      altitude: SNOW_LINE,
+      altitude_fade: SNOW_FADE
+    }
+    Rgb: {238, 242, 250}
+    PbrMaterial: {roughness: 0.7, metallic: 0}
+    PbrTextures: {normal: forest_snow_n}
+    texture.Mapping: {mode: MappingWorld, size: 60}
+  }
+}

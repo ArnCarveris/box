@@ -1,0 +1,35 @@
+// Wildwood: an endless forest to walk through. This is its ground, sky and player: terrain
+// without end, rolling forest floor with flat shelves, clearings, a network of trails, tall rock
+// walls with scree at their feet and mountain ranges with snow on their peaks in the distance.
+// Walk with WASD, F switches to flying and back; the panel of the forest library (H hides it)
+// sets the season, the weather, the wind and the time of day.
+//
+// The forest library (forest/library) brings the state the sliders write, the materials, the
+// weather, the sky and the HUD. This scene adds one file per concern in wildwood/: its constants
+// and the fly toggle, the terrain materials, the terrain, the player and the view.
+include ui/widgets
+include forest/library
+include wildwood/state
+include wildwood/materials
+include wildwood/terrain
+include wildwood/player
+include wildwood/view
+
+using box.view
+
+$ {
+  box.app.FpsTarget: {60}
+  Scene: {
+    reflections: true,
+    environment: true,
+    aerial_perspective: true,
+    cookies: true,
+    alpha_cutout: true,
+    blend_modes: true,
+    texture_blend: true,
+    texture_layers: true,
+    triplanar: true,
+    diffuse_transmission: true,
+    wind: true
+  }
+}

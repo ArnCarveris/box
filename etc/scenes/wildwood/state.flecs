@@ -1,0 +1,61 @@
+using flecs.script
+using flecs.script.math
+using box.input
+
+// The constants of the wildwood and the state its parts share: where the walk starts, the
+// streaming radii around the focus (the player, walking or flying), the sizes and heights of
+// the terrain features and the snow line of the peaks.
+state {
+  // The player starts on a trail in a clearing: the one nearest to START_X, START_Z (absolute
+  // world meters) within START_SEARCH, sought every START_STEP meters, looking along the trail
+  export const START_X: f32 = 0
+  export const START_Z: f32 = 0
+  export const START_SEARCH: f32 = 180
+  export const START_STEP: f32 = 5
+
+  // Eye height above the ground and walking speed
+  export const EYE: f32 = 1.7
+  export const WALK_SPEED: f32 = 4
+  export const FLY_SPEED: f32 = 30
+
+  // Streaming radii around the focus, whatever entity it is. The terrain draws its finest tiles
+  // of TERRAIN_TILE within TERRAIN_DETAIL and doubles them TERRAIN_LEVELS - 1 times, so its
+  // coarsest tiles reach TERRAIN_DETAIL * 2^(TERRAIN_LEVELS - 1); the CPU heights the player
+  // walks on are at TERRAIN_QUERY_SPACING within TERRAIN_QUERY_RADIUS. The reflection probe
+  // recaptures above the focus every PROBE_FOLLOW meters
+  export const TERRAIN_TILE: f32 = 32
+  export const TERRAIN_RESOLUTION: i32 = 65
+  export const TERRAIN_LEVELS: i32 = 8
+  export const TERRAIN_DETAIL: f32 = 160
+  export const TERRAIN_BUDGET: i32 = 24
+  export const TERRAIN_QUERY_SPACING: f32 = 0.5
+  export const TERRAIN_QUERY_RADIUS: f32 = 128
+  export const PROBE_FOLLOW: f32 = 24
+  export const VIEW_FAR: f32 = 24000
+
+  // Bounds of the heights of the terrain in meters, for the culling of its tiles
+  export const GROUND_MIN: f32 = -20
+  export const GROUND_MAX: f32 = 900
+
+  // Peaks above SNOW_LINE carry snow, more of it higher up, filling the band of SNOW_FADE
+  // meters above it in winter
+  export const SNOW_LINE: f32 = 330
+  export const SNOW_FADE: f32 = 320
+
+  // Whether the player flies with the camera controller instead of walking, toggled by F
+  export mut flying: bool = false
+
+  actions {
+    toggle_fly {
+      Action: {description: "Switch between walking and flying"}
+      Binding: {key: F}
+    }
+  }
+}
+
+async {
+  while true {
+    await on.pressed(state.actions.toggle_fly)
+    state.flying = !state.flying
+  }
+}

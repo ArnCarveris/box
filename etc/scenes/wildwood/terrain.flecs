@@ -1,0 +1,209 @@
+using flecs.script
+using flecs.script.math
+using box.material
+using box.texture
+using box.terrain
+using state
+using assets
+
+// The ground of the wildwood: an endless Terrain whose heights and masks are texture graphs over
+// the absolute world (DomainWorld), so it never repeats and stays the same across shifts of the
+// WorldOrigin.
+//
+// Heights in meters, from the largest features to the smallest:
+// - mountain ranges: ridged noise under a very low frequency range mask that lifts their
+//   foothills, rising several hundred meters above the forest, kilometers apart
+// - terraces: broad noise through a stepped curve, flat shelves joined by gentle rises
+// - the rolling forest floor: low frequency fbm, and finer bumps outside the clearings
+// - escarpments: a steep step in a curve of a band noise, a rock wall tens of meters tall where
+//   a second noise lets it stand, tapering into a slope where it does not, with crags on its face
+// - clearings: the cells of a TexCells nearest their point, for about half of the cells,
+//   flattened (no bumps)
+// - trails: the edges between the cells of another TexCells (CellsEdge), sunk a little into the
+//   ground
+// Both TexCells read warped coordinates, so the clearings are not round and the trails wind.
+//
+// Masks, four weights that add up to 1 and paint the TextureBlend of materials.flecs:
+// red the forest floor, green the grass of the clearings and the alpine meadows (where later
+// scatter keeps the trees out), blue the dirt of the trails and the scree, alpha the rock of the
+// steep slopes and walls.
+wildwood {
+  land {
+    // Rolling forest floor
+    roll { nodes.Noise: {frequency: 0.0032, octaves: 4, seed: 21} }
+    roll_h { nodes.Multiply: {a: roll, b_value: {34, 34, 34, 34}} }
+
+    // Terraces: shelves of the broad noise
+    broad { nodes.Noise: {frequency: 0.0009, octaves: 3, seed: 23} }
+    terraces {
+      nodes.Curve: {input: broad, curve: {keys: [
+        {0, 0}, {0.36, 0.1}, {0.42, 0.12}, {0.49, 0.24}, {0.55, 0.26}, {0.62, 0.38},
+        {0.68, 0.4}, {1, 0.6}
+      ]}}
+    }
+
+    terraces_h { nodes.Multiply: {a: terraces, b_value: {110, 110, 110, 110}} }
+
+    // The cells of the clearings and the trails are warped by a noise, so the clearings are not
+    // round and the trails wind
+    coords { nodes.Coords: {} }
+    meander { nodes.Noise: {channels: 3, frequency: 0.004, octaves: 2, seed: 25} }
+    warped { nodes.Warp: {coords: coords, offset: meander, amount_value: 36} }
+
+    // Clearings: near the point of about half of the cells, fading out at their rim
+    clear_cells { nodes.Cells: {distance: CellsNearest, size: 300, seed: 31, coords: warped} }
+    clear_d { nodes.Split: {input: clear_cells, channel: ChannelR} }
+    clear_r { nodes.Split: {input: clear_cells, channel: ChannelB} }
+    clear_in {
+      nodes.Smoothstep: {input: clear_d, edge0_value: {0.19, 0, 0, 0}, edge1_value: {0.11, 0, 0, 0}}
+    }
+
+    clear_kept {
+      nodes.Smoothstep: {input: clear_r, edge0_value: {0.5, 0, 0, 0}, edge1_value: {0.46, 0, 0, 0}}
+    }
+
+    clearing { nodes.Multiply: {a: clear_in, b: clear_kept} }
+
+    wooded { nodes.Subtract: {a_value: {1, 1, 1, 1}, b: clearing} }
+
+    // Bumps of the forest floor, smoothed out in the clearings
+    bumps { nodes.Noise: {frequency: 0.018, octaves: 3, seed: 22} }
+    bumps_c { nodes.Remap: {input: bumps, from_min: 0, from_max: 1, to_min: -4, to_max: 4} }
+    bumps_h { nodes.Multiply: {a: bumps_c, b: wooded} }
+
+    // Escarpments: a band noise steps up where it crosses 0.5; the wall stands where the second
+    // noise is high and leans into a slope where it is low
+    band_n { nodes.Noise: {frequency: 0.0014, octaves: 2, seed: 41} }
+    jag { nodes.Noise: {frequency: 0.012, octaves: 3, seed: 43} }
+    jag_d { nodes.Remap: {input: jag, from_min: 0, from_max: 1, to_min: -0.012, to_max: 0.012} }
+    band { nodes.Add: {a: band_n, b: jag_d} }
+    step {
+      nodes.Curve: {input: band, curve: {keys: [
+        {0, 0}, {0.494, 0}, {0.4975, 0.4}, {0.4995, 0.48}, {0.503, 0.94}, {0.506, 1}, {1, 1}
+      ]}}
+    }
+
+    wall_n { nodes.Noise: {frequency: 0.0011, octaves: 2, seed: 42} }
+    wall_where {
+      nodes.Smoothstep: {input: wall_n, edge0_value: {0.44, 0, 0, 0}, edge1_value: {0.58, 0, 0, 0}}
+    }
+
+    wall_s { nodes.Multiply: {a: step, b: wall_where} }
+    wall_h { nodes.Multiply: {a: wall_s, b_value: {38, 38, 38, 38}} }
+
+    // Buttresses and gullies on the face of the wall
+    face_lo {
+      nodes.Smoothstep: {input: band, edge0_value: {0.49, 0, 0, 0}, edge1_value: {0.497, 0, 0, 0}}
+    }
+
+    face_hi {
+      nodes.Smoothstep: {input: band, edge0_value: {0.51, 0, 0, 0}, edge1_value: {0.503, 0, 0, 0}}
+    }
+
+    face_b { nodes.Multiply: {a: face_lo, b: face_hi} }
+    face { nodes.Multiply: {a: face_b, b: wall_where} }
+    crags { nodes.Noise: {frequency: 0.045, octaves: 3, fractal: NoiseRidged, seed: 44} }
+    crags_f { nodes.Multiply: {a: crags, b: face} }
+    crags_h { nodes.Multiply: {a: crags_f, b_value: {6, 6, 6, 6}} }
+
+    // Mountain ranges: ridged noise under a very low frequency mask, on foothills it lifts
+    range_n { nodes.Noise: {frequency: 0.00021, octaves: 2, seed: 51} }
+    range {
+      nodes.Smoothstep: {input: range_n, edge0_value: {0.54, 0, 0, 0}, edge1_value: {0.72, 0, 0, 0}}
+    }
+
+    ridges { nodes.Noise: {frequency: 0.0008, octaves: 6, fractal: NoiseRidged, seed: 52} }
+    peaks_r { nodes.Multiply: {a: ridges, b: range} }
+    peaks_h { nodes.Multiply: {a: peaks_r, b_value: {560, 560, 560, 560}} }
+    foothills_h { nodes.Multiply: {a: range, b_value: {90, 90, 90, 90}} }
+
+    // Trails along the edges of the cells: 1 on the trail, 0 off it
+    trail_cells { nodes.Cells: {distance: CellsEdge, size: 190, edge: 0.1, seed: 61, coords: warped} }
+    trail_e { nodes.Split: {input: trail_cells, channel: ChannelR} }
+    track {
+      nodes.Remap: {input: trail_e, from_min: 0.03, from_max: 0.1, to_min: 1, to_max: 0, clamp: true}
+    }
+
+    trail_h { nodes.Multiply: {a: track, b_value: {-0.35, -0.35, -0.35, -0.35}} }
+
+    h1 { nodes.Add: {a: roll_h, b: terraces_h} }
+    h2 { nodes.Add: {a: h1, b: bumps_h} }
+    h3 { nodes.Add: {a: h2, b: wall_h} }
+    h3c { nodes.Add: {a: h3, b: crags_h} }
+    h4 { nodes.Add: {a: h3c, b: peaks_h} }
+    h5 { nodes.Add: {a: h4, b: foothills_h} }
+    height { nodes.Add: {a: h5, b: trail_h} }
+
+    // Rock on the steep slopes and walls
+    slope { nodes.Slope: {height: height} }
+    rock {
+      nodes.Smoothstep: {input: slope, edge0_value: {0.72, 0, 0, 0}, edge1_value: {1.15, 0, 0, 0}}
+    }
+
+    open { nodes.Subtract: {a_value: {1, 1, 1, 1}, b: rock} }
+
+    // Scree at the foot of the walls, on the low side of the step, and on the mountain slopes
+    foot_lo {
+      nodes.Smoothstep: {input: band, edge0_value: {0.476, 0, 0, 0}, edge1_value: {0.489, 0, 0, 0}}
+    }
+
+    foot_hi {
+      nodes.Smoothstep: {input: band, edge0_value: {0.505, 0, 0, 0}, edge1_value: {0.496, 0, 0, 0}}
+    }
+
+    foot_b { nodes.Multiply: {a: foot_lo, b: foot_hi} }
+    foot { nodes.Multiply: {a: foot_b, b: wall_where} }
+    talus_s {
+      nodes.Smoothstep: {input: slope, edge0_value: {0.48, 0, 0, 0}, edge1_value: {0.72, 0, 0, 0}}
+    }
+
+    talus { nodes.Multiply: {a: talus_s, b: range} }
+    scree { nodes.Max: {a: foot, b: talus} }
+    scree_w { nodes.Multiply: {a: scree, b: open} }
+    rest_a { nodes.Subtract: {a: open, b: scree_w} }
+
+    // Trails, where the ground is not steep
+    trail_w { nodes.Multiply: {a: track, b: rest_a} }
+    rest_b { nodes.Subtract: {a: rest_a, b: trail_w} }
+
+    // Grass in the clearings and above the tree line
+    alpine {
+      nodes.Smoothstep: {input: height, edge0_value: {210, 0, 0, 0}, edge1_value: {300, 0, 0, 0}}
+    }
+
+    meadow { nodes.Max: {a: clearing, b: alpine} }
+    grass_w { nodes.Multiply: {a: meadow, b: rest_b} }
+    floor_w { nodes.Subtract: {a: rest_b, b: grass_w} }
+
+    scree_dirt { nodes.Multiply: {a: scree_w, b_value: {0.4, 0.4, 0.4, 0.4}} }
+    scree_rock { nodes.Multiply: {a: scree_w, b_value: {0.6, 0.6, 0.6, 0.6}} }
+    dirt_w { nodes.Add: {a: trail_w, b: scree_dirt} }
+    rock_w { nodes.Add: {a: rock, b: scree_rock} }
+    masks { nodes.Combine: {r: floor_w, g: grass_w, b: dirt_w, a: rock_w} }
+
+    Terrain: {
+      height: height,
+      masks: masks,
+      tile_size: TERRAIN_TILE,
+      resolution: TERRAIN_RESOLUTION,
+      levels: TERRAIN_LEVELS,
+      lod_distance: TERRAIN_DETAIL,
+      min_height: GROUND_MIN,
+      max_height: GROUND_MAX,
+      budget: TERRAIN_BUDGET,
+      query_spacing: TERRAIN_QUERY_SPACING,
+      query_radius: TERRAIN_QUERY_RADIUS
+    }
+
+    texture.Blend: {
+      layers: [wildwood_floor, wildwood_grass, wildwood_dirt, wildwood_rock],
+      heights: [litter_height, wildwood_grass_height, path_height, rock_height],
+      contrast: 6
+    }
+
+    texture.Mapping: {mode: MappingWorld, size: GROUND_MAP_SIZE, blend: 0.4}
+    texture.Layers: {layers: [wildwood_moss, wildwood_peak_snow, layer_wet, layer_snow]}
+    Rgb: {212, 206, 196}
+    PbrMaterial: {roughness: 0.95}
+  }
+}

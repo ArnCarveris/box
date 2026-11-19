@@ -1390,11 +1390,17 @@ void box_draws_layer_pack(
         (textures && textures->normal ? BOX_RENDER_LAYER_HAS_NORMAL : 0u) |
         (l->mask ? BOX_RENDER_LAYER_HAS_MASK : 0u) |
         (mapping && mapping->mode == MappingUv ? BOX_RENDER_LAYER_UV : 0u);
+    double origin[3];
+    box_render_origin(world, origin);
     if (!(out->flags[0] & BOX_RENDER_LAYER_UV)) {
-        double origin[3];
-        box_render_origin(world, origin);
         box_render_origin_mapping(origin, out->material[2], out->transform[0],
             out->transform[1], out->origin);
+    }
+
+    if (isfinite(l->altitude) && isfinite(l->altitude_fade) && l->altitude_fade > 0.0f) {
+        float altitude = (float)((double)l->altitude - origin[1]);
+        ecs_os_memcpy(&out->flags[1], &altitude, ECS_SIZEOF(float));
+        ecs_os_memcpy(&out->flags[2], &l->altitude_fade, ECS_SIZEOF(float));
     }
 done:
     return;
