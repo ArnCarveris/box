@@ -232,6 +232,10 @@ extern ECS_TAG_DECLARE(NoBake);
  *
  * Values apply as specified: budget_ms 0 captures nothing, a resolution outside 8 to 512
  * captures nothing and sets ReflectionBakeStatus.error.
+ *
+ * With follow_focus the scene probe follows the first WorldFocus of the scene (box_world_focus)
+ * for streamed worlds; without one it stays over the static bounds. A shift of the world origin
+ * moves it without a capture.
  */
 ECS_STRUCT(ReflectionBake, {
     int32_t resolution;   /**< Face edge of a probe cubemap in texels, 8 to 512, default 128 */
@@ -239,7 +243,17 @@ ECS_STRUCT(ReflectionBake, {
                            *   milliseconds, default 1 */
     bool scene_probe;     /**< The engine adds a probe covering the whole scene, default true */
     float scene_probe_height; /**< Height of the scene probe above the bottom of the static
-                               *   bounds of the scene, default 2 */
+                               *   bounds of the scene, or above the focus with follow_focus,
+                               *   default 2 */
+    bool follow_focus;    /**< The scene probe captures above the focus of the scene, again once
+                           *   the focus moved more than follow_distance, blending to the new
+                           *   capture over follow_blend, default false */
+    float follow_distance; /**< Distance the focus moves before the scene probe captures again,
+                            *   default 16 */
+    float follow_radius;  /**< Changes of static shapes or lights farther than this from a scene
+                           *   probe that follows the focus do not recapture it, default 64 */
+    float follow_blend;   /**< Seconds over which the scene probe blends from its old capture to
+                           *   the one at its new place, default 0.5, 0 switches at once */
     ecs_entity_t environment; /**< Environment source the captures see where no shape covers
                                *   them, default 0 for the hemisphere of the AmbientLight */
     float light_threshold; /**< Degrees a directional light turns from the direction it was

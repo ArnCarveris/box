@@ -162,8 +162,10 @@ int32_t box_world_focus(
     int32_t max)
 {
     int32_t result = 0, i;
-    ecs_iter_t it = ecs_each_id(ECS_CONST_CAST(ecs_world_t*, world), WorldFocus);
-    while (ecs_each_next(&it)) {
+    ecs_iter_t it = WorldFocus
+        ? ecs_each_id(ECS_CONST_CAST(ecs_world_t*, world), WorldFocus)
+        : (ecs_iter_t){0};
+    while (WorldFocus && ecs_each_next(&it)) {
         for (i = 0; i < it.count; i ++) {
             box_world_focus_add(world, it.entities[i], out, max, &result);
         }

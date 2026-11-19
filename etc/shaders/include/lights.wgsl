@@ -119,9 +119,11 @@ struct ReflectionProbe {
     capture: vec3f,
     scene: u32,
     ready: u32,
+    // Slot of the previous capture of the scene probe and its weight, fading out after the
+    // probe followed the focus; fade 0 for none
+    previous: u32,
+    fade: f32,
     pad0: u32,
-    pad1: u32,
-    pad2: u32,
 };
 
 // Reflection probes a cluster lists at most.

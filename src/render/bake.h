@@ -131,6 +131,9 @@ typedef struct box_bake_volume_t {
     bool resort;            /**< The queue is sorted again before the next probes are taken */
     bool debug_warned;      /**< A view with ViewDebug.light_probes was warned that the grid has
                              *   more than BOX_RENDER_DEBUG_PROBES_MAX probes */
+    int32_t regrids;        /**< Times the grid was placed again after it had probes */
+    bool stream_warned;     /**< The warning that the bake does not support streamed scenes,
+                             *   whose static bounds keep changing, was logged */
     float sh[BOX_RENDER_SH_COEFFICIENTS][4]; /**< Irradiance the probes are filled with */
     ecs_entity_t environment; /**< LightBake.environment of this frame */
     uint32_t env_handle;    /**< Cubemap of that source the captures see where nothing covers

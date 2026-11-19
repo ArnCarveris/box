@@ -211,6 +211,9 @@ static void box_reflection_bake_ctor(
             .budget_ms = 1.0f,
             .scene_probe = true,
             .scene_probe_height = 2.0f,
+            .follow_distance = 16.0f,
+            .follow_radius = 64.0f,
+            .follow_blend = 0.5f,
             .light_threshold = 2.0f,
             .color_threshold = 0.05f
         };

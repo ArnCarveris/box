@@ -1702,7 +1702,10 @@ typedef struct box_render_reflection_probe_t {
     uint32_t scene;         /**< 1 for the scene probe, 0 for a ReflectionProbe */
     uint32_t ready;         /**< 1 when views can sample the slot: its capture was reported or
                              *   runs before the targets of this packet */
-    uint32_t pad[3];        /**< Unused */
+    uint32_t previous;      /**< Slot of the previous capture of the scene probe that fades out
+                             *   after it followed the focus, valid while fade is above 0 */
+    float fade;             /**< Weight of the previous capture, 1 to 0, 0 for none */
+    uint32_t pad;           /**< Unused */
 } box_render_reflection_probe_t;
 
 /** Register the system that keeps the reflection probes of every scene with ReflectionBake.

@@ -1294,6 +1294,16 @@
                 ]
             },
             {
+                "id": "ReflectionFollow",
+                "testcases": [
+                    "captures_at_focus",
+                    "recaptures_after_distance",
+                    "blends_previous_capture",
+                    "far_shapes_do_not_queue",
+                    "origin_shift_does_not_recapture"
+                ]
+            },
+            {
                 "id": "ReflectionPrefilter",
                 "testcases": [
                     "uniform_emissive_matches_uniform_environment",

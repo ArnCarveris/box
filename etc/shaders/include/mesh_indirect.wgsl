@@ -217,6 +217,20 @@ fn probe_radiance(p: ReflectionProbe, world: vec3f, spec: vec3f, mip: f32, grid:
     return radiance * clamp(scale, REFLECTION_NORMALIZE_MIN, REFLECTION_NORMALIZE_MAX);
 }
 
+// Prefiltered radiance of the scene probe, mixed with its previous capture while that fades out
+// after the probe followed the focus to a new place.
+fn scene_probe_radiance(p: ReflectionProbe, world: vec3f, spec: vec3f, mip: f32, grid: vec3f)
+    -> vec3f {
+    let radiance = probe_radiance(p, world, spec, mip, grid);
+    if (p.fade <= 0.0) {
+        return radiance;
+    }
+
+    var old = p;
+    old.slot = p.previous;
+    return mix(radiance, probe_radiance(old, world, spec, mip, grid), clamp(p.fade, 0.0, 1.0));
+}
+
 // Prefiltered radiance of the environment of the view along spec, an infinitely distant probe.
 // For a view that samples baked lighting it is normalized as probe_radiance normalizes a probe.
 fn environment_radiance(spec: vec3f, roughness: f32, grid: vec3f) -> vec3f {
@@ -259,7 +273,7 @@ fn reflections(world: vec3f, spec: vec3f, roughness: f32, cluster: u32, fallback
         let last = view.reflection.x - 1u;
         var rest = fallback;
         if (view.reflection.x > view.grid.w && reflection_probes[last].ready != 0u) {
-            rest = probe_radiance(reflection_probes[last], world, spec, mip, fallback);
+            rest = scene_probe_radiance(reflection_probes[last], world, spec, mip, fallback);
         } else if (scene_environment && view.environment.w > 0.0) {
             rest = environment_radiance(spec, roughness, fallback);
         }
@@ -433,10 +447,10 @@ fn reflections_lobes(world: vec3f, spec: vec3f, roughness: f32, fallback: vec3f,
         var rest = fallback;
         var rest_coat = coat_fallback;
         if (view.reflection.x > view.grid.w && reflection_probes[last].ready != 0u) {
-            rest = probe_radiance(reflection_probes[last], world, spec, mip, fallback);
+            rest = scene_probe_radiance(reflection_probes[last], world, spec, mip, fallback);
             if (coat) {
-                rest_coat = probe_radiance(reflection_probes[last], world, spec_coat, mip_coat,
-                    coat_fallback);
+                rest_coat = scene_probe_radiance(reflection_probes[last], world, spec_coat,
+                    mip_coat, coat_fallback);
             }
         } else if (scene_environment && view.environment.w > 0.0) {
             rest = environment_radiance(spec, roughness, fallback);
