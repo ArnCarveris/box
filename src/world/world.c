@@ -9,6 +9,7 @@
 
 ECS_TAG_DECLARE(WorldFocus);
 ECS_TAG_DECLARE(WorldOriginFixed);
+ECS_COMPONENT_DECLARE(ChunkGridGate);
 
 /** Construct WorldOrigin values at the absolute origin with the default threshold and step.
  *
@@ -73,15 +74,7 @@ bool box_world_is_root(
     return result;
 }
 
-/** Get the local world position of an entity as of now: the Position of a root, which the
- * transforms of this frame did not compute yet, else the translation of its world transform.
- *
- * @param world The world
- * @param e The entity
- * @param out Receives the position
- * @return Whether the entity has a place in the world
- */
-static bool box_world_position(
+bool box_world_position(
     const ecs_world_t *world,
     ecs_entity_t e,
     vec3 out)
@@ -312,6 +305,8 @@ void BoxWorldImport(
     ECS_META_COMPONENT(world, WorldOrigin);
     ECS_META_COMPONENT(world, WorldOriginStatus);
     ECS_META_COMPONENT(world, WorldOriginShift);
+    ECS_META_COMPONENT(world, ChunkGrid);
+    ECS_META_COMPONENT(world, ChunkGridStatus);
 
     ecs_set_hooks(world, WorldOrigin, { .ctor = box_world_origin_ctor });
     ecs_observer(world, {
@@ -322,4 +317,5 @@ void BoxWorldImport(
 
     box_world_functions_init(world);
     box_world_origin_import(world);
+    box_world_chunk_import(world);
 }

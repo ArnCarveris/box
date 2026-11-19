@@ -202,6 +202,28 @@
                     "spatial_same_hits",
                     "spatial_before_transforms"
                 ]
+            },
+            {
+                "id": "ChunkGrid",
+                "testcases": [
+                    "rings",
+                    "props_declared_only",
+                    "move_loads_unloads",
+                    "hysteresis_no_thrash",
+                    "hysteresis_levels",
+                    "budget_nearest_first",
+                    "budget_more_detail_first",
+                    "levels_update",
+                    "grid_3d",
+                    "origin_shift_no_reload",
+                    "delete_grid",
+                    "multiple_foci",
+                    "extent",
+                    "gate",
+                    "template_change",
+                    "script",
+                    "endless_walk"
+                ]
             }
         ]
     }

@@ -77,6 +77,72 @@ ECS_STRUCT(WorldOriginShift, {
     ecs_entity_t scene;  /**< Scene whose content moved, 0 for the default scene */
 });
 
+/** Most ring radii of a ChunkGrid */
+#define BOX_WORLD_CHUNK_LEVELS (8)
+
+/** Streams a template around the foci: a child entity per cell of a 2D or 3D grid in range.
+ *
+ * Cells are child entities of the grid entity with the template set on them. The template gets
+ * the props it declares of cell_x, cell_y, cell_z (i32 absolute cell), level (i32), size (cell
+ * size, a vec3 or the X of it for a number) and seed; the Position of a cell is its corner.
+ *
+ * A cell is at level l when its nearest point is within levels[l] of a focus, in 3D for a 3D
+ * grid, horizontally for a 2D grid. Loads go nearest first, more detail before less, within the
+ * budget; a cell moves past a radius by hysteresis before it changes level or unloads.
+ */
+ECS_STRUCT(ChunkGrid, {
+    ecs_entity_t template; /**< Script template set on every cell */
+    vec3 cell_size;      /**< Size of a cell in meters, Y 0 for a 2D grid in XZ, default 32 0 32 */
+    float levels[8];     /**< Increasing ring radii in meters, the first 0 ends them; beyond the
+                          *   last a cell unloads, default 128 */
+    float hysteresis;    /**< Meters past a radius before a cell changes level or unloads,
+                          *   default 8 */
+    int32_t budget;      /**< Cells created or changed per frame, 0 for no limit, default 16 */
+    float budget_ms;     /**< Milliseconds of creations per frame, 0 for no limit, default 0;
+                          *   at least one cell goes per frame */
+    int32_t extent[3];   /**< Cells span -extent to extent - 1 along an axis, 0 for unbounded */
+    int32_t seed;        /**< Set as the seed prop of the cells */
+});
+
+/** Cells of a ChunkGrid, written by the engine next to it every frame */
+ECS_STRUCT(ChunkGridStatus, {
+    int32_t loaded[8];   /**< Loaded cells per level */
+    int32_t cells;       /**< Loaded cells */
+    int32_t pending;     /**< Cells waiting to load or change level */
+    int32_t held;        /**< Of the pending cells, those a ChunkGridGate holds back */
+    int32_t created;     /**< Cells created this frame */
+    int32_t changed;     /**< Cells that changed level this frame */
+    int32_t deleted;     /**< Cells deleted this frame */
+    float time_ms;       /**< Milliseconds the grid took this frame */
+});
+
+/** Callback of a ChunkGridGate: whether a cell may load or change level now.
+ *
+ * @param world The world
+ * @param grid The ChunkGrid entity
+ * @param cell The absolute cell
+ * @param level The level it would get
+ * @param ctx The ctx of the gate
+ * @return Whether the cell goes ahead, else it waits and asks again next frame
+ */
+typedef bool (*box_chunk_ready_t)(
+    ecs_world_t *world,
+    ecs_entity_t grid,
+    const int32_t cell[3],
+    int32_t level,
+    void *ctx);
+
+/** Holds cells back until a condition is met, on a ChunkGrid entity or as a singleton for all.
+ *
+ * Every gate that applies must agree. A held cell does not count against the budget.
+ */
+typedef struct ChunkGridGate {
+    box_chunk_ready_t ready; /**< Whether a cell may go ahead, NULL for always */
+    void *ctx;               /**< Passed to ready */
+} ChunkGridGate;
+
+extern ECS_COMPONENT_DECLARE(ChunkGridGate);
+
 /** A focus of the streaming systems: a WorldFocus entity or the camera of the first View */
 typedef struct box_world_focus_t {
     ecs_entity_t entity; /**< The focus entity */
@@ -134,6 +200,20 @@ void box_world_origin_shift(
     ecs_world_t *world,
     ecs_entity_t scene,
     const double offset[3]);
+
+/** Get the loaded cell of a ChunkGrid at an absolute cell coordinate.
+ *
+ * @param world The world
+ * @param grid The ChunkGrid entity
+ * @param cell The absolute cell, Y 0 for a 2D grid
+ * @param level Receives the level of the cell, NULL to ignore it
+ * @return The cell entity, 0 when the cell is not loaded
+ */
+ecs_entity_t box_chunk_grid_cell(
+    const ecs_world_t *world,
+    ecs_entity_t grid,
+    const int32_t cell[3],
+    int32_t *level);
 
 /** Register the box.world module.
  *

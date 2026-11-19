@@ -1,0 +1,37 @@
+// Templates of the ChunkGrid tests of test/cpu/scene/src/ChunkGrid.c: a 2D chunk with every
+// prop, one without level, and a 3D voxel with a vec3 size.
+
+// A chunk with every prop of a cell: a marker child always, a detail child at level 0
+template Chunk {
+  prop cell_x: i32 = 0
+  prop cell_y: i32 = 0
+  prop cell_z: i32 = 0
+  prop level: i32 = -1
+  prop size: f32 = 0
+  prop seed: i32 = 0
+
+  marker {}
+
+  if level == 0 {
+    detail {}
+  }
+}
+
+// A chunk that declares only its X and Z cell, so it gets no level, size or seed
+template PlainChunk {
+  prop cell_x: i32 = 0
+  prop cell_z: i32 = 0
+
+  marker {}
+}
+
+// A cell of a 3D grid with the cell size as a vec3
+template Voxel {
+  prop cell_x: i32 = 0
+  prop cell_y: i32 = 0
+  prop cell_z: i32 = 0
+  prop level: i32 = -1
+  prop size: box.types.vec3 = {0, 0, 0}
+
+  marker {}
+}

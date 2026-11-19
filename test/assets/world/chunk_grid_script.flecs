@@ -1,0 +1,14 @@
+// A ChunkGrid configured from script, for the ChunkGrid.script test; runs after chunk_grid.flecs.
+
+using box.world
+
+script_grid {
+  ChunkGrid: {
+    template: Chunk,
+    cell_size: {10, 0, 10},
+    levels: [15, 30],
+    hysteresis: 2,
+    budget: 0,
+    seed: 7
+  }
+}
