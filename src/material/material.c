@@ -720,6 +720,7 @@ void BoxMaterialImport(
     ecs_set_hooks(world, WaterWaves, { .ctor = box_water_waves_ctor });
     ecs_add_pair(world, ecs_id(WaterWaves), EcsOnInstantiate, EcsInherit);
     ecs_add_pair(world, ecs_id(WaterFlow), EcsOnInstantiate, EcsInherit);
+    ecs_add_pair(world, ecs_id(WaterFlow), EcsWith, ecs_id(MaterialId));
     ecs_set_hooks(world, WaterCaustics, { .ctor = box_water_caustics_ctor });
     ecs_add_pair(world, ecs_id(WaterCaustics), EcsOnInstantiate, EcsInherit);
     ecs_set_hooks(world, WaterRipples, { .ctor = box_water_ripples_ctor });

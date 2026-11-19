@@ -6,6 +6,7 @@ using box.view
 using box.effects
 using box.surface
 using box.controllers
+using box.material
 using state
 
 // At eye height in the clearing, beside the path, looking down it to where it crosses the brook
@@ -15,6 +16,27 @@ camera {
   Rotation: {-0.06, 0.266, 0}
   Camera: {fov: 50, near_: 0.1, far_: 1500}
   CameraController: {speed: 4}
+}
+
+// The field of ripples and foam of the brook (brook.flecs) stays centered on the camera. It is on
+// the pool, so the water both above the cascade and CASCADE_DROP below it lies within its height
+// band. Ripples stay subtle and fade soon; foam fades slowly so the trails off the stones and
+// the cascade reach several meters downstream before they thin out
+forest {
+  brook {
+    pool {
+      WaterRipples: {
+        size: BROOK_RIPPLES_SIZE,
+        resolution: BROOK_RIPPLES_RESOLUTION,
+        follow: camera,
+        wave_speed: 1.2,
+        damping: 0.7,
+        strength: 0.5,
+        foam_decay: BROOK_FOAM_DECAY,
+        foam_spread: BROOK_FOAM_SPREAD
+      }
+    }
+  }
 }
 
 // Round shapes and sweeps (the trunks and limbs of the trees) lose segments with distance (lod).
