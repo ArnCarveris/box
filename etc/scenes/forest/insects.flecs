@@ -1,0 +1,930 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using box.light
+using box.particle
+using box.animation
+using state
+using assets
+
+// The insects that bring the forest to life: fireflies blinking over the grass on summer
+// evenings, a few of them real lights, butterflies that fly from flower to flower and settle on
+// them, bees that hover at the flowers, dragonflies that hover and dart over the brook, and
+// swarms of gnats dancing in the sunbeams. Each kind follows the season, the hour, the
+// temperature, the wind and the rain (forest_*_activity): none in winter, in the cold or in
+// heavy rain, and fewer the harder the wind blows.
+//
+// The async block at the end turns the activities into counts; the loops below create and
+// delete the insects as the counts change, and Animators fly them, so the script does not run
+// again every frame. The butterflies and the bees visit the wildflowers of scatter.flecs:
+// forest_flower_* mirror where it places them.
+state {
+  // The most insects of each kind, at their most active
+  export const BUTTERFLY_MAX: i32 = 16
+  export const BEE_MAX: i32 = 20
+  export const DRAGONFLY_MAX: i32 = 6
+  export const FIREFLY_LIGHT_MAX: i32 = 8
+  export const GNAT_SWARM_MAX: i32 = 6
+
+  // Particles a second of the fireflies over the grass, at their most active
+  export const FIREFLY_RATE: f32 = 60
+
+  // The butterflies and the bees visit the flowers of the flower cells from (VISIT_GX, VISIT_GZ)
+  // on, VISIT_W by VISIT_H cells: the sunny middle of the clearing in front of the start view
+  export const VISIT_GX: i32 = 20
+  export const VISIT_GZ: i32 = 19
+  export const VISIT_W: i32 = 4
+  export const VISIT_H: i32 = 3
+
+  // The dragonflies patrol DRAGON_REACH meters of the brook each, the reaches DRAGON_GAP apart
+  export const DRAGON_REACH: f32 = 6
+  export const DRAGON_GAP: f32 = 4.5
+
+  // X of hover spot k of dragonfly d on its reach of the brook: the even ones upstream of the
+  // bridge, the odd ones downstream, so none flies through it
+  fn forest_dragon_x(d: f64, k: f64) -> f64 {
+    const n = floor(d / 2)
+    const u = DRAGON_REACH * forest_hash(d, 610 + k)
+    d - 2 * n < 0.5 ? CROSSING_X - BRIDGE_HALF_WIDTH - 1.2 - n * DRAGON_GAP - u :
+      CROSSING_X + BRIDGE_HALF_WIDTH + 1.2 + n * DRAGON_GAP + u
+  }
+
+  // Speed of the flap Animator of a butterfly sitting on a flower: its wings open and close
+  // slowly
+  export const FLAP_REST: f32 = 0.1
+
+  // The flower spots of scatter.flecs: spot j is spot j % 4 of flower cell floor(j / 4), and
+  // cell i is (floor(i / FLOWER_GRID), i % FLOWER_GRID)
+  fn forest_flower_cell_x(gx: f64) -> f64 {
+    (gx + 0.5) * FLOWER_CELL - UNDER_EDGE
+  }
+
+  fn forest_flower_spot_x(j: f64) -> f64 {
+    const i = floor(j / 4)
+    const k = j - i * 4
+    const gx = floor(i / FLOWER_GRID)
+    (gx + 0.5 * (k - 2 * floor(k / 2)) + 0.05 + 0.4 * forest_hash(j, 311)) * FLOWER_CELL - UNDER_EDGE
+  }
+
+  fn forest_flower_spot_z(j: f64) -> f64 {
+    const i = floor(j / 4)
+    const k = j - i * 4
+    const gz = i - floor(i / FLOWER_GRID) * FLOWER_GRID
+    (gz + 0.5 * floor(k / 2) + 0.05 + 0.4 * forest_hash(j, 312)) * FLOWER_CELL - UNDER_EDGE
+  }
+
+  // A flower grows at spot j, as scatter.flecs decides
+  fn forest_flower_placed(j: f64) -> bool {
+    const i = floor(j / 4)
+    const gx = floor(i / FLOWER_GRID)
+    const cx = forest_flower_cell_x(gx)
+    const cz = forest_flower_cell_x(i - gx * FLOWER_GRID)
+    const dens = forest_under_density(cx, cz)
+    const light = forest_light(cx, cz)
+    const x = forest_flower_spot_x(j)
+    const z = forest_flower_spot_z(j)
+    dens <= 0 ? false : (forest_hash(j, 313) >= dens * light * light * 0.8 ? false : (
+      forest_floor_free(x, z, 0.15) ? !forest_feature_near(x, z, 0.2) : false))
+  }
+
+  // Height of the flower heads of the flower at spot j: its scale by its kind, the heads
+  // stand at about 0.72 of the clump
+  fn forest_flower_top(j: f64) -> f64 {
+    const s = 0.32 + 0.22 * forest_hash(j, 314)
+    const patch = forest_hash2(floor(forest_flower_spot_x(j) / 4), floor(forest_flower_spot_z(j) / 4), 51)
+    0.72 * (patch < 0.45 ? s * 1.1 : (patch < 0.8 ? s : s * 1.3))
+  }
+
+  // A flower of cell (gx, gz): the first one that grows from spot start on, -1 for none
+  fn forest_flower_pick(gx: f64, gz: f64, start: f64) -> f64 {
+    const i = (gx * FLOWER_GRID + gz) * 4
+    const a = i + start - 4 * floor(start / 4)
+    const b = i + (start + 1) - 4 * floor((start + 1) / 4)
+    const c = i + (start + 2) - 4 * floor((start + 2) / 4)
+    const d = i + (start + 3) - 4 * floor((start + 3) / 4)
+    forest_flower_placed(a) ? a : (forest_flower_placed(b) ? b : (
+      forest_flower_placed(c) ? c : (forest_flower_placed(d) ? d : 0 - 1)))
+  }
+
+  // Where an insect visits the flower of cell (gx, gz): the heads of the flower, or the grass
+  // in the middle of the cell when no flower grows in it
+  fn forest_visit_x(gx: f64, gz: f64, start: f64) -> f64 {
+    const j = forest_flower_pick(gx, gz, start)
+    j < 0 ? forest_flower_cell_x(gx) : forest_flower_spot_x(j)
+  }
+
+  fn forest_visit_z(gx: f64, gz: f64, start: f64) -> f64 {
+    const j = forest_flower_pick(gx, gz, start)
+    j < 0 ? forest_flower_cell_x(gz) : forest_flower_spot_z(j)
+  }
+
+  fn forest_visit_y(gx: f64, gz: f64, start: f64) -> f64 {
+    const j = forest_flower_pick(gx, gz, start)
+    j < 0 ? 0.3 : forest_flower_top(j)
+  }
+
+  // An angle moved by whole turns to within half a turn of 0
+  fn forest_wrap_angle(a: f64) -> f64 {
+    a - 2 * PI * round(a / (2 * PI))
+  }
+
+  // Yaw that faces local -Z along (dx, dz)
+  fn forest_heading(dx: f64, dz: f64) -> f64 {
+    atan2(0 - dx, 0 - dz)
+  }
+
+  // How the weather lets the insects fly, 0..1: warm enough, out of the rain and the wind. cold
+  // and warm are the temperatures in °C between which they take wing, rain the precipitation
+  // that grounds them all, gust the wind in m/s
+  fn forest_insect_weather(t: f64, p: f64, w: f64, cold: f64, warm: f64, rain: f64, gust: f64) -> f64 {
+    forest_smooth(cold, warm, t) * (1 - forest_smooth(rain * 0.15, rain, p)) *
+      (1 - forest_smooth(gust * 0.4, gust, w))
+  }
+
+  // The insects of a kind on the wing, 0..1, at a season, hour, temperature, precipitation and
+  // wind. Fireflies glow from sunset into the night of summer, in the warmth and still air
+  fn forest_firefly_activity(season: f64, hour: f64, t: f64, p: f64, w: f64) -> f64 {
+    const dusk = forest_smooth(forest_sunset(season) - 0.8, forest_sunset(season) + 0.6, hour)
+    forest_seasonal(season, 0.12, 1, 0.08, 0) * dusk * forest_insect_weather(t, p, w, 11, 16, 0.25, 8)
+  }
+
+  // Butterflies in the sun of spring and summer, warm and calm days
+  fn forest_butterfly_activity(season: f64, hour: f64, t: f64, p: f64, w: f64) -> f64 {
+    const sun = forest_smooth(6, 22, forest_sun_elevation(season, hour))
+    forest_seasonal(season, 0.85, 1, 0.3, 0) * sun * forest_insect_weather(t, p, w, 7, 13, 0.18, 12)
+  }
+
+  // Bees from the first warm days of spring to autumn, from the morning to the evening
+  fn forest_bee_activity(season: f64, hour: f64, t: f64, p: f64, w: f64) -> f64 {
+    const sun = forest_smooth(3, 16, forest_sun_elevation(season, hour))
+    forest_seasonal(season, 1, 1, 0.35, 0) * sun * forest_insect_weather(t, p, w, 6, 11, 0.3, 13)
+  }
+
+  // Dragonflies over the brook in the warm days of summer
+  fn forest_dragonfly_activity(season: f64, hour: f64, t: f64, p: f64, w: f64) -> f64 {
+    const sun = forest_smooth(8, 24, forest_sun_elevation(season, hour))
+    forest_seasonal(season, 0.1, 1, 0.4, 0) * sun * forest_insect_weather(t, p, w, 13, 18, 0.25, 12)
+  }
+
+  // Gnats dance in the beams of the low sun (forest_beam) of the mornings and evenings from
+  // spring to autumn, in still air
+  fn forest_gnat_activity(season: f64, hour: f64, t: f64, p: f64, w: f64) -> f64 {
+    forest_seasonal(season, 0.7, 1, 0.75, 0) * forest_smooth(0.15, 0.6, forest_beam(season, hour)) *
+      forest_insect_weather(t, p, w, 5, 10, 0.25, 7)
+  }
+
+  // The counts the activities give, kept up to date by the async block at the end; the glow of
+  // the fireflies over the grass in steps of a twentieth
+  export mut butterfly_count: i32 = 0
+  export mut bee_count: i32 = 0
+  export mut dragonfly_count: i32 = 0
+  export mut firefly_lights: i32 = 0
+  export mut gnat_swarms: i32 = 0
+  export mut firefly_glow: f32 = 0
+}
+
+assets {
+  // Seconds of a wing beat of a butterfly, of the buzz of the wings of a bee and of the flutter
+  // of a dragonfly
+  const FLAP_TIME = 0.18
+  const BUZZ_TIME = 0.05
+  const FLUTTER_TIME = 0.06
+
+  // The bodies: dark chitin, the amber and the dark thorax of a bee, the metallic blue, green
+  // and red of the dragonflies and their large eyes, the glowing tail of a firefly
+  prefab ForestInsectDark { Rgb: {34, 28, 24}; PbrMaterial: {roughness: 0.6}; NoShadow }
+  prefab ForestBeeAmber { Rgb: {178, 120, 34}; PbrMaterial: {roughness: 0.75}; NoShadow }
+  prefab ForestDragonBlue { Rgb: {36, 112, 214}; PbrMaterial: {metallic: 0.35, roughness: 0.3}; NoShadow }
+  prefab ForestDragonGreen { Rgb: {82, 156, 56}; PbrMaterial: {metallic: 0.35, roughness: 0.3}; NoShadow }
+  prefab ForestDragonRed { Rgb: {196, 48, 26}; PbrMaterial: {metallic: 0.2, roughness: 0.35}; NoShadow }
+  prefab ForestDragonEye { Rgb: {58, 96, 78}; PbrMaterial: {roughness: 0.15}; NoShadow }
+  prefab ForestFireflyGlow {
+    Rgb: {214, 240, 120}
+    PbrMaterial: {roughness: 0.5}
+    Emissive: {strength: 0, color: {196, 255, 84}}
+    NoShadow
+  }
+
+  // The wings: a butterfly wing one unit across, the forewing ahead (-Z) and the hindwing behind
+  // it, darker toward its tip and its edges, its root at the body; and a clear wing of a bee or
+  // a dragonfly, long and narrow with a dark spot at its tip. R spreads to +X, L to -X. Both
+  // sides are faces, the backs reversed copies. The butterfly wings let light through, the clear
+  // wings are glass
+
+  prefab ForestButterflyWing {
+    PbrMaterial: {roughness: 0.65}
+    DiffuseTransmission: {factor: 0.45, color: {255, 250, 235}}
+    NoShadow
+  }
+
+  prefab ForestClearWing {
+    Rgb: {226, 236, 244}
+    Opacity: {0.32}
+    PbrMaterial: {roughness: 0.12}
+    NoShadow
+  }
+
+  prefab ForestButterflyWingR : ForestButterflyWing {
+    Mesh3: {
+      vertices: [
+        {0.06, 0, 0}, {0, 0, -0.12}, {0.3, 0, -0.5}, {0.68, 0, -0.7}, {0.95, 0, -0.66}, {1, 0, -0.5},
+        {0.86, 0, -0.2}, {0.6, 0, -0.04}, {0.74, 0, 0.22}, {0.66, 0, 0.52}, {0.4, 0, 0.66}, {0.16, 0, 0.56},
+        {0.02, 0, 0.2}, {0.06, 0, 0}, {0, 0, -0.12}, {0.3, 0, -0.5}, {0.68, 0, -0.7}, {0.95, 0, -0.66},
+        {1, 0, -0.5}, {0.86, 0, -0.2}, {0.6, 0, -0.04}, {0.74, 0, 0.22}, {0.66, 0, 0.52}, {0.4, 0, 0.66},
+        {0.16, 0, 0.56}, {0.02, 0, 0.2}
+      ],
+      normals: [
+        {0, 1, 0}, {0, 1, 0}, {0, 1, 0}, {0, 1, 0}, {0, 1, 0}, {0, 1, 0}, {0, 1, 0}, {0, 1, 0},
+        {0, 1, 0}, {0, 1, 0}, {0, 1, 0}, {0, 1, 0}, {0, 1, 0}, {0, -1, 0}, {0, -1, 0}, {0, -1, 0},
+        {0, -1, 0}, {0, -1, 0}, {0, -1, 0}, {0, -1, 0}, {0, -1, 0}, {0, -1, 0}, {0, -1, 0}, {0, -1, 0},
+        {0, -1, 0}, {0, -1, 0}
+      ],
+      uvs: [
+        {0.06, 0.5}, {0, 0.44}, {0.3, 0.25}, {0.68, 0.15}, {0.95, 0.17}, {1, 0.25}, {0.86, 0.4}, {0.6, 0.48},
+        {0.74, 0.61}, {0.66, 0.76}, {0.4, 0.83}, {0.16, 0.78}, {0.02, 0.6}, {0.06, 0.5}, {0, 0.44}, {0.3, 0.25},
+        {0.68, 0.15}, {0.95, 0.17}, {1, 0.25}, {0.86, 0.4}, {0.6, 0.48}, {0.74, 0.61}, {0.66, 0.76}, {0.4, 0.83},
+        {0.16, 0.78}, {0.02, 0.6}
+      ],
+      indices: [
+        0, 2, 1, 13, 14, 15, 0, 3, 2, 13, 15, 16, 0, 4, 3, 13, 16, 17, 0, 5, 4, 13, 17, 18,
+        0, 6, 5, 13, 18, 19, 0, 7, 6, 13, 19, 20, 0, 8, 7, 13, 20, 21, 0, 9, 8, 13, 21, 22,
+        0, 10, 9, 13, 22, 23, 0, 11, 10, 13, 23, 24, 0, 12, 11, 13, 24, 25, 0, 1, 12, 13, 25, 14
+      ],
+      colors: [
+        {255, 255, 255, 255}, {215, 205, 195, 255}, {150, 140, 130, 255}, {50, 42, 38, 255}, {50, 42, 38, 255}, {50, 42, 38, 255},
+        {150, 140, 130, 255}, {235, 228, 220, 255}, {150, 140, 130, 255}, {150, 140, 130, 255}, {150, 140, 130, 255}, {150, 140, 130, 255},
+        {215, 205, 195, 255}, {255, 255, 255, 255}, {215, 205, 195, 255}, {150, 140, 130, 255}, {50, 42, 38, 255}, {50, 42, 38, 255},
+        {50, 42, 38, 255}, {150, 140, 130, 255}, {235, 228, 220, 255}, {150, 140, 130, 255}, {150, 140, 130, 255}, {150, 140, 130, 255},
+        {150, 140, 130, 255}, {215, 205, 195, 255}
+      ]
+    }
+  }
+
+  prefab ForestButterflyWingL : ForestButterflyWing {
+    Mesh3: {
+      vertices: [
+        {-0.06, 0, 0}, {0, 0, -0.12}, {-0.3, 0, -0.5}, {-0.68, 0, -0.7}, {-0.95, 0, -0.66}, {-1, 0, -0.5},
+        {-0.86, 0, -0.2}, {-0.6, 0, -0.04}, {-0.74, 0, 0.22}, {-0.66, 0, 0.52}, {-0.4, 0, 0.66}, {-0.16, 0, 0.56},
+        {-0.02, 0, 0.2}, {-0.06, 0, 0}, {0, 0, -0.12}, {-0.3, 0, -0.5}, {-0.68, 0, -0.7}, {-0.95, 0, -0.66},
+        {-1, 0, -0.5}, {-0.86, 0, -0.2}, {-0.6, 0, -0.04}, {-0.74, 0, 0.22}, {-0.66, 0, 0.52}, {-0.4, 0, 0.66},
+        {-0.16, 0, 0.56}, {-0.02, 0, 0.2}
+      ],
+      normals: [
+        {0, 1, 0}, {0, 1, 0}, {0, 1, 0}, {0, 1, 0}, {0, 1, 0}, {0, 1, 0}, {0, 1, 0}, {0, 1, 0},
+        {0, 1, 0}, {0, 1, 0}, {0, 1, 0}, {0, 1, 0}, {0, 1, 0}, {0, -1, 0}, {0, -1, 0}, {0, -1, 0},
+        {0, -1, 0}, {0, -1, 0}, {0, -1, 0}, {0, -1, 0}, {0, -1, 0}, {0, -1, 0}, {0, -1, 0}, {0, -1, 0},
+        {0, -1, 0}, {0, -1, 0}
+      ],
+      uvs: [
+        {0.06, 0.5}, {0, 0.44}, {0.3, 0.25}, {0.68, 0.15}, {0.95, 0.17}, {1, 0.25}, {0.86, 0.4}, {0.6, 0.48},
+        {0.74, 0.61}, {0.66, 0.76}, {0.4, 0.83}, {0.16, 0.78}, {0.02, 0.6}, {0.06, 0.5}, {0, 0.44}, {0.3, 0.25},
+        {0.68, 0.15}, {0.95, 0.17}, {1, 0.25}, {0.86, 0.4}, {0.6, 0.48}, {0.74, 0.61}, {0.66, 0.76}, {0.4, 0.83},
+        {0.16, 0.78}, {0.02, 0.6}
+      ],
+      indices: [
+        0, 1, 2, 13, 15, 14, 0, 2, 3, 13, 16, 15, 0, 3, 4, 13, 17, 16, 0, 4, 5, 13, 18, 17,
+        0, 5, 6, 13, 19, 18, 0, 6, 7, 13, 20, 19, 0, 7, 8, 13, 21, 20, 0, 8, 9, 13, 22, 21,
+        0, 9, 10, 13, 23, 22, 0, 10, 11, 13, 24, 23, 0, 11, 12, 13, 25, 24, 0, 12, 1, 13, 14, 25
+      ],
+      colors: [
+        {255, 255, 255, 255}, {215, 205, 195, 255}, {150, 140, 130, 255}, {50, 42, 38, 255}, {50, 42, 38, 255}, {50, 42, 38, 255},
+        {150, 140, 130, 255}, {235, 228, 220, 255}, {150, 140, 130, 255}, {150, 140, 130, 255}, {150, 140, 130, 255}, {150, 140, 130, 255},
+        {215, 205, 195, 255}, {255, 255, 255, 255}, {215, 205, 195, 255}, {150, 140, 130, 255}, {50, 42, 38, 255}, {50, 42, 38, 255},
+        {50, 42, 38, 255}, {150, 140, 130, 255}, {235, 228, 220, 255}, {150, 140, 130, 255}, {150, 140, 130, 255}, {150, 140, 130, 255},
+        {150, 140, 130, 255}, {215, 205, 195, 255}
+      ]
+    }
+  }
+
+  prefab ForestClearWingR : ForestClearWing {
+    Mesh3: {
+      vertices: [
+        {0.03, 0, 0}, {0, 0, -0.07}, {0.3, 0, -0.13}, {0.7, 0, -0.12}, {0.95, 0, -0.07}, {1, 0, 0},
+        {0.9, 0, 0.07}, {0.5, 0, 0.09}, {0.15, 0, 0.08}, {0, 0, 0.05}, {0.03, 0, 0}, {0, 0, -0.07},
+        {0.3, 0, -0.13}, {0.7, 0, -0.12}, {0.95, 0, -0.07}, {1, 0, 0}, {0.9, 0, 0.07}, {0.5, 0, 0.09},
+        {0.15, 0, 0.08}, {0, 0, 0.05}
+      ],
+      normals: [
+        {0, 1, 0}, {0, 1, 0}, {0, 1, 0}, {0, 1, 0}, {0, 1, 0}, {0, 1, 0}, {0, 1, 0}, {0, 1, 0},
+        {0, 1, 0}, {0, 1, 0}, {0, -1, 0}, {0, -1, 0}, {0, -1, 0}, {0, -1, 0}, {0, -1, 0}, {0, -1, 0},
+        {0, -1, 0}, {0, -1, 0}, {0, -1, 0}, {0, -1, 0}
+      ],
+      uvs: [
+        {0.03, 0.5}, {0, 0.465}, {0.3, 0.435}, {0.7, 0.44}, {0.95, 0.465}, {1, 0.5}, {0.9, 0.535}, {0.5, 0.545},
+        {0.15, 0.54}, {0, 0.525}, {0.03, 0.5}, {0, 0.465}, {0.3, 0.435}, {0.7, 0.44}, {0.95, 0.465}, {1, 0.5},
+        {0.9, 0.535}, {0.5, 0.545}, {0.15, 0.54}, {0, 0.525}
+      ],
+      indices: [
+        0, 2, 1, 10, 11, 12, 0, 3, 2, 10, 12, 13, 0, 4, 3, 10, 13, 14, 0, 5, 4, 10, 14, 15,
+        0, 6, 5, 10, 15, 16, 0, 7, 6, 10, 16, 17, 0, 8, 7, 10, 17, 18, 0, 9, 8, 10, 18, 19,
+        0, 1, 9, 10, 19, 11
+      ],
+      colors: [
+        {255, 255, 255, 255}, {235, 242, 248, 255}, {235, 242, 248, 255}, {235, 242, 248, 255}, {40, 36, 30, 255}, {40, 36, 30, 255},
+        {235, 242, 248, 255}, {235, 242, 248, 255}, {235, 242, 248, 255}, {235, 242, 248, 255}, {255, 255, 255, 255}, {235, 242, 248, 255},
+        {235, 242, 248, 255}, {235, 242, 248, 255}, {40, 36, 30, 255}, {40, 36, 30, 255}, {235, 242, 248, 255}, {235, 242, 248, 255},
+        {235, 242, 248, 255}, {235, 242, 248, 255}
+      ]
+    }
+  }
+
+  prefab ForestClearWingL : ForestClearWing {
+    Mesh3: {
+      vertices: [
+        {-0.03, 0, 0}, {0, 0, -0.07}, {-0.3, 0, -0.13}, {-0.7, 0, -0.12}, {-0.95, 0, -0.07}, {-1, 0, 0},
+        {-0.9, 0, 0.07}, {-0.5, 0, 0.09}, {-0.15, 0, 0.08}, {0, 0, 0.05}, {-0.03, 0, 0}, {0, 0, -0.07},
+        {-0.3, 0, -0.13}, {-0.7, 0, -0.12}, {-0.95, 0, -0.07}, {-1, 0, 0}, {-0.9, 0, 0.07}, {-0.5, 0, 0.09},
+        {-0.15, 0, 0.08}, {0, 0, 0.05}
+      ],
+      normals: [
+        {0, 1, 0}, {0, 1, 0}, {0, 1, 0}, {0, 1, 0}, {0, 1, 0}, {0, 1, 0}, {0, 1, 0}, {0, 1, 0},
+        {0, 1, 0}, {0, 1, 0}, {0, -1, 0}, {0, -1, 0}, {0, -1, 0}, {0, -1, 0}, {0, -1, 0}, {0, -1, 0},
+        {0, -1, 0}, {0, -1, 0}, {0, -1, 0}, {0, -1, 0}
+      ],
+      uvs: [
+        {0.03, 0.5}, {0, 0.465}, {0.3, 0.435}, {0.7, 0.44}, {0.95, 0.465}, {1, 0.5}, {0.9, 0.535}, {0.5, 0.545},
+        {0.15, 0.54}, {0, 0.525}, {0.03, 0.5}, {0, 0.465}, {0.3, 0.435}, {0.7, 0.44}, {0.95, 0.465}, {1, 0.5},
+        {0.9, 0.535}, {0.5, 0.545}, {0.15, 0.54}, {0, 0.525}
+      ],
+      indices: [
+        0, 1, 2, 10, 12, 11, 0, 2, 3, 10, 13, 12, 0, 3, 4, 10, 14, 13, 0, 4, 5, 10, 15, 14,
+        0, 5, 6, 10, 16, 15, 0, 6, 7, 10, 17, 16, 0, 7, 8, 10, 18, 17, 0, 8, 9, 10, 19, 18,
+        0, 9, 1, 10, 11, 19
+      ],
+      colors: [
+        {255, 255, 255, 255}, {235, 242, 248, 255}, {235, 242, 248, 255}, {235, 242, 248, 255}, {40, 36, 30, 255}, {40, 36, 30, 255},
+        {235, 242, 248, 255}, {235, 242, 248, 255}, {235, 242, 248, 255}, {235, 242, 248, 255}, {255, 255, 255, 255}, {235, 242, 248, 255},
+        {235, 242, 248, 255}, {235, 242, 248, 255}, {40, 36, 30, 255}, {40, 36, 30, 255}, {235, 242, 248, 255}, {235, 242, 248, 255},
+        {235, 242, 248, 255}, {235, 242, 248, 255}
+      ]
+    }
+  }
+
+  // A butterfly beats its wings up until they nearly meet over its back and down past level;
+  // the right wing (+X) lifts with +Z rotation, the left one mirrors it
+  prefab forest_butterfly_flap {
+    Clip: {duration: FLAP_TIME}
+    beat_r { Track: {component: Rotation, member: "z", target: "wing_r", curve: {kind: CurveCatmullRom, keys: [
+      {0, -0.35}, {FLAP_TIME * 0.45, 1.32}, {FLAP_TIME, -0.35}
+    ]}} }
+    beat_l { Track: {component: Rotation, member: "z", target: "wing_l", curve: {kind: CurveCatmullRom, keys: [
+      {0, 0.35}, {FLAP_TIME * 0.45, -1.32}, {FLAP_TIME, 0.35}
+    ]}} }
+  }
+
+  // The buzz of the wings of a bee, a blur of a few poses
+  prefab forest_bee_buzz {
+    Clip: {duration: BUZZ_TIME}
+    beat_r { Track: {component: Rotation, member: "z", target: "wing_r", curve: {kind: CurveCatmullRom, keys: [
+      {0, -0.1}, {BUZZ_TIME * 0.5, 0.8}, {BUZZ_TIME, -0.1}
+    ]}} }
+    beat_l { Track: {component: Rotation, member: "z", target: "wing_l", curve: {kind: CurveCatmullRom, keys: [
+      {0, 0.1}, {BUZZ_TIME * 0.5, -0.8}, {BUZZ_TIME, 0.1}
+    ]}} }
+  }
+
+  // The flutter of the four wings of a dragonfly, the hindwings out of phase with the forewings
+  prefab forest_dragon_flutter {
+    Clip: {duration: FLUTTER_TIME}
+    fore_r { Track: {component: Rotation, member: "z", target: "fore_r", curve: {kind: CurveCatmullRom, keys: [
+      {0, -0.22}, {FLUTTER_TIME * 0.5, 0.32}, {FLUTTER_TIME, -0.22}
+    ]}} }
+    fore_l { Track: {component: Rotation, member: "z", target: "fore_l", curve: {kind: CurveCatmullRom, keys: [
+      {0, 0.22}, {FLUTTER_TIME * 0.5, -0.32}, {FLUTTER_TIME, 0.22}
+    ]}} }
+    hind_r { Track: {component: Rotation, member: "z", target: "hind_r", curve: {kind: CurveCatmullRom, keys: [
+      {0, 0.32}, {FLUTTER_TIME * 0.5, -0.22}, {FLUTTER_TIME, 0.32}
+    ]}} }
+    hind_l { Track: {component: Rotation, member: "z", target: "hind_l", curve: {kind: CurveCatmullRom, keys: [
+      {0, -0.32}, {FLUTTER_TIME * 0.5, 0.22}, {FLUTTER_TIME, -0.32}
+    ]}} }
+  }
+
+  // The unsteady hover of a bee or a dragonfly at a spot, a centimeter or so each way
+  prefab forest_hover_wobble {
+    Clip: {duration: 1.3}
+    x { Track: {component: Position, member: "x", curve: {kind: CurveCatmullRom, keys: [
+      {0, 0}, {0.33, 0.01}, {0.7, -0.008}, {1, 0.006}, {1.3, 0}
+    ]}} }
+    y { Track: {component: Position, member: "y", curve: {kind: CurveCatmullRom, keys: [
+      {0, 0}, {0.25, 0.008}, {0.6, -0.01}, {0.95, 0.006}, {1.3, 0}
+    ]}} }
+    z { Track: {component: Position, member: "z", curve: {kind: CurveCatmullRom, keys: [
+      {0, 0}, {0.4, -0.007}, {0.8, 0.009}, {1.3, 0}
+    ]}} }
+  }
+
+  // A firefly drifts over the grass and flashes: a soft rise of its glow, a peak and a fade,
+  // three times in the clip with dark between. The glow child carries the light
+  prefab forest_firefly_drift {
+    Clip: {duration: 9}
+    x { Track: {component: Position, member: "x", curve: {kind: CurveCatmullRom, keys: [
+      {0, 0}, {2.2, 0.35}, {4.5, 0.1}, {6.8, -0.3}, {9, 0}
+    ]}} }
+    y { Track: {component: Position, member: "y", curve: {kind: CurveCatmullRom, keys: [
+      {0, 0}, {1.6, 0.18}, {3.4, -0.05}, {5.5, 0.22}, {7.4, 0.06}, {9, 0}
+    ]}} }
+    z { Track: {component: Position, member: "z", curve: {kind: CurveCatmullRom, keys: [
+      {0, 0}, {3, -0.3}, {6, 0.25}, {9, 0}
+    ]}} }
+    light { Track: {component: PointLight, member: "intensity", target: "glow", curve: {kind: CurveCatmullRom, keys: [
+      {0, 0}, {0.35, 2.4}, {0.8, 0}, {3.1, 0}, {3.45, 2.4}, {3.95, 0}, {6.2, 0}, {6.5, 2},
+      {6.9, 0}, {9, 0}
+    ]}} }
+    glow { Track: {component: Emissive, member: "strength", target: "glow", curve: {kind: CurveCatmullRom, keys: [
+      {0, 0}, {0.35, 60}, {0.8, 0}, {3.1, 0}, {3.45, 60}, {3.95, 0}, {6.2, 0}, {6.5, 48},
+      {6.9, 0}, {9, 0}
+    ]}} }
+  }
+
+  // A swarm of gnats rises and sinks and wanders a little in its sunbeam
+  prefab forest_gnat_bob {
+    Clip: {duration: 4}
+    x { Track: {component: Position, member: "x", curve: {kind: CurveCatmullRom, keys: [
+      {0, 0}, {1.5, 0.14}, {3, -0.1}, {4, 0}
+    ]}} }
+    y { Track: {component: Position, member: "y", curve: {kind: CurveCatmullRom, keys: [
+      {0, 0}, {1, 0.28}, {2, -0.04}, {3, 0.34}, {4, 0}
+    ]}} }
+  }
+
+  // The flight of an insect around four stops, a clip for an Animator on the insect: it rests
+  // or hovers at stop k (xk, yk, zk) for hold to hold + hold_var seconds, turns toward the next
+  // one over turn seconds as it takes off, and flies to it in fly to fly + fly_var seconds,
+  // weaving up to wander meters to the side and rising rise meters over the higher stop, from
+  // stop 3 back to stop 0. Its keys rest with a zero slope, so it settles on a stop and sits
+  // still. With flap a track sets the speed of the Animator of its child flap: slow while it
+  // rests, full in flight (the flap of ForestButterfly model)
+  template ForestFlight {
+    prop x0: f32 = 0
+    prop y0: f32 = 0
+    prop z0: f32 = 0
+    prop x1: f32 = 0
+    prop y1: f32 = 0
+    prop z1: f32 = 0
+    prop x2: f32 = 0
+    prop y2: f32 = 0
+    prop z2: f32 = 0
+    prop x3: f32 = 0
+    prop y3: f32 = 0
+    prop z3: f32 = 0
+    prop seed: f32 = 0
+    prop hold: f32 = 2
+    prop hold_var: f32 = 2
+    prop fly: f32 = 2
+    prop fly_var: f32 = 1
+    prop rise: f32 = 0.5
+    prop wander: f32 = 0.3
+    prop turn: f32 = 0.3
+    prop flap: bool = false
+
+    // Take off (t) and landing (l) times
+    const t0 = hold + hold_var * forest_hash(seed, 1)
+    const l1 = t0 + fly + fly_var * forest_hash(seed, 5)
+    const t1 = l1 + hold + hold_var * forest_hash(seed, 2)
+    const l2 = t1 + fly + fly_var * forest_hash(seed, 6)
+    const t2 = l2 + hold + hold_var * forest_hash(seed, 3)
+    const l3 = t2 + fly + fly_var * forest_hash(seed, 7)
+    const t3 = l3 + hold + hold_var * forest_hash(seed, 4)
+    const end = t3 + fly + fly_var * forest_hash(seed, 8)
+
+    // The legs: their run, their sideways weave, their speed and the height of their arc
+    const dx0 = x1 - x0
+    const dz0 = z1 - z0
+    const dx1 = x2 - x1
+    const dz1 = z2 - z1
+    const dx2 = x3 - x2
+    const dz2 = z3 - z2
+    const dx3 = x0 - x3
+    const dz3 = z0 - z3
+    const w0 = wander * (forest_hash(seed, 11) * 2 - 1) / max(sqrt(dx0 * dx0 + dz0 * dz0), 0.2)
+    const w1 = wander * (forest_hash(seed, 12) * 2 - 1) / max(sqrt(dx1 * dx1 + dz1 * dz1), 0.2)
+    const w2 = wander * (forest_hash(seed, 13) * 2 - 1) / max(sqrt(dx2 * dx2 + dz2 * dz2), 0.2)
+    const w3 = wander * (forest_hash(seed, 14) * 2 - 1) / max(sqrt(dx3 * dx3 + dz3 * dz3), 0.2)
+    const f0 = l1 - t0
+    const f1 = l2 - t1
+    const f2 = l3 - t2
+    const f3 = end - t3
+    const a0 = max(y0, y1) + rise * (0.7 + 0.6 * forest_hash(seed, 15))
+    const a1 = max(y1, y2) + rise * (0.7 + 0.6 * forest_hash(seed, 16))
+    const a2 = max(y2, y3) + rise * (0.7 + 0.6 * forest_hash(seed, 17))
+    const a3 = max(y3, y0) + rise * (0.7 + 0.6 * forest_hash(seed, 18))
+
+    // Headings of the legs, each within half a turn of the one before, so it turns the short
+    // way; it starts on stop 0 facing as it came in from stop 3
+    const h3 = forest_heading(dx3, dz3)
+    const h0 = h3 + forest_wrap_angle(forest_heading(dx0, dz0) - h3)
+    const h1 = h0 + forest_wrap_angle(forest_heading(dx1, dz1) - h0)
+    const h2 = h1 + forest_wrap_angle(forest_heading(dx2, dz2) - h1)
+    const h4 = h2 + forest_wrap_angle(forest_heading(dx3, dz3) - h2)
+
+    Clip: {duration: end}
+
+    x { Track: {component: Position, member: "x", curve: {kind: CurveBezier, keys: [
+      {0, x0, 0, 0}, {t0, x0, 0, 0},
+      {t0 + f0 * 0.25, x0 + dx0 * 0.25 - dz0 * w0, dx0 / f0, dx0 / f0},
+      {t0 + f0 * 0.5, x0 + dx0 * 0.5 + dz0 * w0 * 0.6, dx0 / f0, dx0 / f0},
+      {t0 + f0 * 0.75, x0 + dx0 * 0.75 - dz0 * w0 * 0.8, dx0 / f0, dx0 / f0},
+      {l1, x1, 0, 0}, {t1, x1, 0, 0},
+      {t1 + f1 * 0.25, x1 + dx1 * 0.25 - dz1 * w1, dx1 / f1, dx1 / f1},
+      {t1 + f1 * 0.5, x1 + dx1 * 0.5 + dz1 * w1 * 0.6, dx1 / f1, dx1 / f1},
+      {t1 + f1 * 0.75, x1 + dx1 * 0.75 - dz1 * w1 * 0.8, dx1 / f1, dx1 / f1},
+      {l2, x2, 0, 0}, {t2, x2, 0, 0},
+      {t2 + f2 * 0.25, x2 + dx2 * 0.25 - dz2 * w2, dx2 / f2, dx2 / f2},
+      {t2 + f2 * 0.5, x2 + dx2 * 0.5 + dz2 * w2 * 0.6, dx2 / f2, dx2 / f2},
+      {t2 + f2 * 0.75, x2 + dx2 * 0.75 - dz2 * w2 * 0.8, dx2 / f2, dx2 / f2},
+      {l3, x3, 0, 0}, {t3, x3, 0, 0},
+      {t3 + f3 * 0.25, x3 + dx3 * 0.25 - dz3 * w3, dx3 / f3, dx3 / f3},
+      {t3 + f3 * 0.5, x3 + dx3 * 0.5 + dz3 * w3 * 0.6, dx3 / f3, dx3 / f3},
+      {t3 + f3 * 0.75, x3 + dx3 * 0.75 - dz3 * w3 * 0.8, dx3 / f3, dx3 / f3},
+      {end, x0, 0, 0}
+    ]}} }
+
+    z { Track: {component: Position, member: "z", curve: {kind: CurveBezier, keys: [
+      {0, z0, 0, 0}, {t0, z0, 0, 0},
+      {t0 + f0 * 0.25, z0 + dz0 * 0.25 + dx0 * w0, dz0 / f0, dz0 / f0},
+      {t0 + f0 * 0.5, z0 + dz0 * 0.5 - dx0 * w0 * 0.6, dz0 / f0, dz0 / f0},
+      {t0 + f0 * 0.75, z0 + dz0 * 0.75 + dx0 * w0 * 0.8, dz0 / f0, dz0 / f0},
+      {l1, z1, 0, 0}, {t1, z1, 0, 0},
+      {t1 + f1 * 0.25, z1 + dz1 * 0.25 + dx1 * w1, dz1 / f1, dz1 / f1},
+      {t1 + f1 * 0.5, z1 + dz1 * 0.5 - dx1 * w1 * 0.6, dz1 / f1, dz1 / f1},
+      {t1 + f1 * 0.75, z1 + dz1 * 0.75 + dx1 * w1 * 0.8, dz1 / f1, dz1 / f1},
+      {l2, z2, 0, 0}, {t2, z2, 0, 0},
+      {t2 + f2 * 0.25, z2 + dz2 * 0.25 + dx2 * w2, dz2 / f2, dz2 / f2},
+      {t2 + f2 * 0.5, z2 + dz2 * 0.5 - dx2 * w2 * 0.6, dz2 / f2, dz2 / f2},
+      {t2 + f2 * 0.75, z2 + dz2 * 0.75 + dx2 * w2 * 0.8, dz2 / f2, dz2 / f2},
+      {l3, z3, 0, 0}, {t3, z3, 0, 0},
+      {t3 + f3 * 0.25, z3 + dz3 * 0.25 + dx3 * w3, dz3 / f3, dz3 / f3},
+      {t3 + f3 * 0.5, z3 + dz3 * 0.5 - dx3 * w3 * 0.6, dz3 / f3, dz3 / f3},
+      {t3 + f3 * 0.75, z3 + dz3 * 0.75 + dx3 * w3 * 0.8, dz3 / f3, dz3 / f3},
+      {end, z0, 0, 0}
+    ]}} }
+
+    // Up and down over the arc of a leg, settling onto the next stop
+    y { Track: {component: Position, member: "y", curve: {kind: CurveBezier, keys: [
+      {0, y0, 0, 0}, {t0, y0, 0, 0},
+      {t0 + f0 * 0.25, a0, 0, 0}, {t0 + f0 * 0.5, a0 - rise * 0.35, 0, 0}, {t0 + f0 * 0.75, a0, 0, 0},
+      {l1, y1, 0, 0}, {t1, y1, 0, 0},
+      {t1 + f1 * 0.25, a1, 0, 0}, {t1 + f1 * 0.5, a1 - rise * 0.35, 0, 0}, {t1 + f1 * 0.75, a1, 0, 0},
+      {l2, y2, 0, 0}, {t2, y2, 0, 0},
+      {t2 + f2 * 0.25, a2, 0, 0}, {t2 + f2 * 0.5, a2 - rise * 0.35, 0, 0}, {t2 + f2 * 0.75, a2, 0, 0},
+      {l3, y3, 0, 0}, {t3, y3, 0, 0},
+      {t3 + f3 * 0.25, a3, 0, 0}, {t3 + f3 * 0.5, a3 - rise * 0.35, 0, 0}, {t3 + f3 * 0.75, a3, 0, 0},
+      {end, y0, 0, 0}
+    ]}} }
+
+    yaw { Track: {component: Rotation, member: "y", curve: {kind: CurveBezier, keys: [
+      {0, h3, 0, 0}, {t0, h3, 0, 0}, {t0 + turn, h0, 0, 0},
+      {t1, h0, 0, 0}, {t1 + turn, h1, 0, 0},
+      {t2, h1, 0, 0}, {t2 + turn, h2, 0, 0},
+      {t3, h2, 0, 0}, {t3 + turn, h4, 0, 0},
+      {end, h4, 0, 0}
+    ]}} }
+
+    if flap {
+      beat { Track: {component: Animator, member: "speed", target: "model.flap", curve: {keys: [
+        {0, FLAP_REST}, {t0, FLAP_REST}, {t0 + 0.15, 1}, {l1 - 0.2, 1},
+        {l1, FLAP_REST}, {t1, FLAP_REST}, {t1 + 0.15, 1}, {l2 - 0.2, 1},
+        {l2, FLAP_REST}, {t2, FLAP_REST}, {t2 + 0.15, 1}, {l3 - 0.2, 1},
+        {l3, FLAP_REST}, {t3, FLAP_REST}, {t3 + 0.15, 1}, {end - 0.2, 1},
+        {end, FLAP_REST}
+      ]}} }
+    }
+  }
+
+  // A butterfly about 6 cm across facing -Z, in the colors of a kind: 0 brimstone, 1 cabbage
+  // white, 2 peacock, 3 small tortoiseshell, 4 common blue
+  template ForestButterfly {
+    prop kind: i32 = 0
+    prop phase: f32 = 0
+
+    const r = kind == 0 ? 238 : (kind == 1 ? 246 : (kind == 2 ? 178 : (kind == 3 ? 228 : 122)))
+    const g = kind == 0 ? 224 : (kind == 1 ? 244 : (kind == 2 ? 54 : (kind == 3 ? 116 : 152)))
+    const b = kind == 0 ? 96 : (kind == 1 ? 234 : (kind == 2 ? 36 : (kind == 3 ? 40 : 238)))
+
+    body : ForestInsectDark {
+      Position: {0, 0, 0.004}
+      Scale: {0.0022, 0.0022, 0.0105}
+      Sphere: {radius: 1, segments: 6}
+    }
+
+    head : ForestInsectDark {
+      Position: {0, 0.0004, -0.0078}
+      Sphere: {radius: 0.002, segments: 6}
+    }
+
+    flap {
+      Animator: {clip: forest_butterfly_flap, time: phase * FLAP_TIME, speed: 1}
+
+      wing_r : ForestButterflyWingR {
+        Position: {0.0012, 0.001, -0.001}
+        Rotation: {0, 0, 0}
+        Scale: {0.03, 0.03, 0.03}
+        Rgb: {r, g, b}
+      }
+
+      wing_l : ForestButterflyWingL {
+        Position: {-0.0012, 0.001, -0.001}
+        Rotation: {0, 0, 0}
+        Scale: {0.03, 0.03, 0.03}
+        Rgb: {r, g, b}
+      }
+    }
+  }
+
+  // A honey bee, 1.3 cm long, facing -Z, hovering with buzzing wings
+  template ForestBee {
+    prop phase: f32 = 0
+
+    hover {
+      Animator: {clip: forest_hover_wobble, time: phase * 1.3, speed: 1}
+
+      thorax : ForestInsectDark {
+        Position: {0, 0, -0.001}
+        Sphere: {radius: 0.0032, segments: 6}
+      }
+
+      head : ForestInsectDark {
+        Position: {0, -0.0005, -0.0052}
+        Sphere: {radius: 0.0022, segments: 6}
+      }
+
+      abdomen : ForestBeeAmber {
+        Position: {0, -0.0006, 0.0052}
+        Rotation: {0.2, 0, 0}
+        Scale: {0.0038, 0.0036, 0.0058}
+        Sphere: {radius: 1, segments: 10, smooth: true}
+      }
+
+      buzz {
+        Position: {0, 0.003, -0.0015}
+        Animator: {clip: forest_bee_buzz, time: phase * BUZZ_TIME, speed: 1}
+        wing_r : ForestClearWingR { Rotation: {0, 0, 0}; Scale: {0.0085, 0.0085, 0.0085} }
+        wing_l : ForestClearWingL { Rotation: {0, 0, 0}; Scale: {0.0085, 0.0085, 0.0085} }
+      }
+    }
+  }
+
+  // A dragonfly 9 cm long facing -Z: a large head of eyes, the thorax with the four wings and
+  // the long abdomen, 0 blue, 1 green, 2 red
+  template ForestDragonfly {
+    prop kind: i32 = 0
+    prop phase: f32 = 0
+
+    hover {
+      Scale: {1.25, 1.25, 1.25}
+      Animator: {clip: forest_hover_wobble, time: phase * 1.3, speed: 0.7}
+
+      head : ForestDragonEye {
+        Position: {0, 0, -0.0105}
+        Scale: {0.0052, 0.0042, 0.0042}
+        Sphere: {radius: 1, segments: 8}
+      }
+
+      if kind == 0 {
+        thorax : ForestDragonGreen { Scale: {0.0042, 0.0046, 0.0072}; Sphere: {radius: 1, segments: 6} }
+        abdomen : ForestDragonBlue {
+          Position: {0, -0.0008, 0.032}
+          Scale: {0.0022, 0.0022, 0.026}
+          Sphere: {radius: 1, segments: 6}
+        }
+      } else if kind == 1 {
+        thorax : ForestDragonGreen { Scale: {0.0042, 0.0046, 0.0072}; Sphere: {radius: 1, segments: 6} }
+        abdomen : ForestDragonGreen {
+          Position: {0, -0.0008, 0.032}
+          Scale: {0.0022, 0.0022, 0.026}
+          Sphere: {radius: 1, segments: 6}
+        }
+      } else {
+        thorax : ForestDragonRed { Scale: {0.0042, 0.0046, 0.0072}; Sphere: {radius: 1, segments: 6} }
+        abdomen : ForestDragonRed {
+          Position: {0, -0.0008, 0.03}
+          Scale: {0.002, 0.002, 0.024}
+          Sphere: {radius: 1, segments: 6}
+        }
+      }
+
+      flutter {
+        Position: {0, 0.0035, 0}
+        Animator: {clip: forest_dragon_flutter, time: phase * FLUTTER_TIME, speed: 1}
+        fore_r : ForestClearWingR { Position: {0, 0, -0.003}; Rotation: {0, 0, 0}; Scale: {0.044, 0.044, 0.044} }
+        fore_l : ForestClearWingL { Position: {0, 0, -0.003}; Rotation: {0, 0, 0}; Scale: {0.044, 0.044, 0.044} }
+        hind_r : ForestClearWingR { Position: {0, 0, 0.004}; Rotation: {0, 0, 0}; Scale: {0.041, 0.05, 0.05} }
+        hind_l : ForestClearWingL { Position: {0, 0, 0.004}; Rotation: {0, 0, 0}; Scale: {0.041, 0.05, 0.05} }
+      }
+    }
+  }
+}
+
+forest {
+  // Nothing picks, collides with or queries the insects, so they stay out of the spatial index
+  insects {
+    box.spatial.Ignore
+
+    // Fireflies over the grass of the clearing: points of yellow-green light that drift and
+    // flash, each its own pattern of flashes over its life
+    fireflies {
+      Position: {4, 0.75, 0.5}
+      Emitter: {
+        max: 900, rate: FIREFLY_RATE * firefly_glow, shape: EmitterBox, extents: {10, 0.55, 9},
+        direction: {0, 1, 0}, spread: 180, speed: {0, 0.12}, lifetime: {6, 10},
+        size: {0.045, 0.065}, opacity: {0.8, 1},
+        color: {178, 255, 62}, color_variance: {30, 0, 24}, seed: 91
+      }
+      Burst: {count: 420 * firefly_glow}
+      Forces: {
+        gravity: {0, 0, 0}, drag: 0.7, turbulence: 0.35, turbulence_scale: 1.3, global_wind: 0.04
+      }
+      Appearance: {shape: Circle, blend: Additive, lit: 0}
+      Curves: {opacity: {keys: [
+        {0, 0}, {0.04, 0}, {0.07, 1}, {0.12, 0}, {0.3, 0}, {0.33, 1}, {0.38, 0}, {0.55, 0},
+        {0.58, 1}, {0.63, 0}, {0.8, 0}, {0.83, 0.9}, {0.88, 0}, {1, 0}
+      ]}}
+    }
+
+    // A few of them light the grass: a glowing tail with a PointLight that flashes with it
+    lanterns {
+      for i in 0..firefly_lights {
+        "firefly_{i}" {
+          Position: {
+            1.5 + 8 * forest_hash(i, 701), 0.35 + 0.7 * forest_hash(i, 702), -2.5 + 7.5 * forest_hash(i, 703)
+          }
+
+          drift {
+            Position: {0, 0, 0}
+            Animator: {clip: forest_firefly_drift, time: forest_hash(i, 704) * 9, speed: 0.85 + 0.3 * forest_hash(i, 705)}
+
+            glow : ForestFireflyGlow {
+              Scale: {0.0035, 0.0035, 0.006}
+              Sphere: {radius: 1, segments: 6}
+              PointLight: {intensity: 0, range: 3, bake: Realtime}
+            }
+          }
+        }
+      }
+    }
+
+    // Butterflies over the flowers of the clearing: each visits four flowers of a square of
+    // flower cells, one way round or the other, and sits on each a while
+    butterflies {
+      for b in 0..butterfly_count {
+        const gx = VISIT_GX + floor(forest_hash(b, 501) * (VISIT_W - 1))
+        const gz = VISIT_GZ + floor(forest_hash(b, 502) * (VISIT_H - 1))
+        const ox = forest_hash(b, 503) < 0.5 ? 1 : 0
+        const oz = 1 - ox
+        const s = floor(forest_hash(b, 504) * 4)
+
+        "butterfly_{b}" {
+          Position: {forest_visit_x(gx, gz, s), forest_visit_y(gx, gz, s), forest_visit_z(gx, gz, s)}
+          Rotation: {0, 0, 0}
+
+          ForestFlight flight(
+            x0: forest_visit_x(gx, gz, s), y0: forest_visit_y(gx, gz, s), z0: forest_visit_z(gx, gz, s),
+            x1: forest_visit_x(gx + ox, gz + oz, s), y1: forest_visit_y(gx + ox, gz + oz, s),
+            z1: forest_visit_z(gx + ox, gz + oz, s),
+            x2: forest_visit_x(gx + 1, gz + 1, s), y2: forest_visit_y(gx + 1, gz + 1, s),
+            z2: forest_visit_z(gx + 1, gz + 1, s),
+            x3: forest_visit_x(gx + oz, gz + ox, s), y3: forest_visit_y(gx + oz, gz + ox, s),
+            z3: forest_visit_z(gx + oz, gz + ox, s),
+            seed: 510 + b, hold: 1.5, hold_var: 3, fly: 2.4, fly_var: 1.8, rise: 0.7, wander: 0.5,
+            turn: 0.3, flap: true)
+
+          Animator: {clip: flight, time: forest_hash(b, 505) * 14, speed: 1}
+          ForestButterfly model(kind: floor(forest_hash(b, 506) * 4.99), phase: forest_hash(b, 507))
+        }
+      }
+    }
+
+    // Bees from flower to flower of one or two cells, a moment over each
+    bees {
+      for b in 0..bee_count {
+        const gx = VISIT_GX + floor(forest_hash(b, 521) * (VISIT_W - 1))
+        const gz = VISIT_GZ + floor(forest_hash(b, 522) * VISIT_H)
+        const ox = forest_hash(b, 523) < 0.5 ? 1 : 0
+        const oz = 1 - ox
+
+        "bee_{b}" {
+          Position: {forest_visit_x(gx, gz, 0), forest_visit_y(gx, gz, 0) + 0.04, forest_visit_z(gx, gz, 0)}
+          Rotation: {0, 0, 0}
+
+          ForestFlight flight(
+            x0: forest_visit_x(gx, gz, 0), y0: forest_visit_y(gx, gz, 0) + 0.04, z0: forest_visit_z(gx, gz, 0),
+            x1: forest_visit_x(gx, gz, 2), y1: forest_visit_y(gx, gz, 2) + 0.04, z1: forest_visit_z(gx, gz, 2),
+            x2: forest_visit_x(gx + ox, gz + oz, 1), y2: forest_visit_y(gx + ox, gz + oz, 1) + 0.04,
+            z2: forest_visit_z(gx + ox, gz + oz, 1),
+            x3: forest_visit_x(gx + ox, gz + oz, 3), y3: forest_visit_y(gx + ox, gz + oz, 3) + 0.04,
+            z3: forest_visit_z(gx + ox, gz + oz, 3),
+            seed: 530 + b, hold: 0.8, hold_var: 1.6, fly: 0.6, fly_var: 0.6, rise: 0.12, wander: 0.2,
+            turn: 0.18)
+
+          Animator: {clip: flight, time: forest_hash(b, 524) * 6, speed: 1}
+          ForestBee model(phase: forest_hash(b, 525))
+        }
+      }
+    }
+
+    // Dragonflies over the brook, each on a reach of its own: they hover over the water, dart
+    // to the next spot and hover again
+    dragonflies {
+      for d in 0..dragonfly_count {
+        const x0 = forest_dragon_x(d, 0)
+        const x1 = forest_dragon_x(d, 1)
+        const x2 = forest_dragon_x(d, 2)
+        const x3 = forest_dragon_x(d, 3)
+
+        "dragonfly_{d}" {
+          Position: {x0, forest_brook_water_y(x0) + 0.5, forest_brook_z(x0)}
+          Rotation: {0, 0, 0}
+
+          ForestFlight flight(
+            x0: x0, y0: forest_brook_water_y(x0) + 0.25 + 0.6 * forest_hash(d, 620),
+            z0: forest_brook_z(x0) + 1.4 * (forest_hash(d, 630) - 0.5),
+            x1: x1, y1: forest_brook_water_y(x1) + 0.25 + 0.6 * forest_hash(d, 621),
+            z1: forest_brook_z(x1) + 1.4 * (forest_hash(d, 631) - 0.5),
+            x2: x2, y2: forest_brook_water_y(x2) + 0.25 + 0.6 * forest_hash(d, 622),
+            z2: forest_brook_z(x2) + 1.4 * (forest_hash(d, 632) - 0.5),
+            x3: x3, y3: forest_brook_water_y(x3) + 0.25 + 0.6 * forest_hash(d, 623),
+            z3: forest_brook_z(x3) + 1.4 * (forest_hash(d, 633) - 0.5),
+            seed: 640 + d, hold: 0.8, hold_var: 2.4, fly: 0.4, fly_var: 0.45, rise: 0.08, wander: 0.15,
+            turn: 0.14)
+
+          Animator: {clip: flight, time: forest_hash(d, 614) * 5, speed: 1}
+          ForestDragonfly model(kind: floor(forest_hash(d, 615) * 2.99), phase: forest_hash(d, 616))
+        }
+      }
+    }
+
+    // Swarms of gnats in the sunbeams of the clearing, toward the low sun: specks that dance
+    // around the middle of the swarm as it rises and sinks, bright where the sun catches them
+    // and dark against the light in the shade; the gusts carry them a little
+    gnats {
+      for g in 0..gnat_swarms {
+        "swarm_{g}" {
+          Position: {2 + 8 * forest_hash(g, 801), 1.3 + 1 * forest_hash(g, 802), -3 + 6.5 * forest_hash(g, 803)}
+
+          dance {
+            Position: {0, 0, 0}
+            Animator: {clip: forest_gnat_bob, time: forest_hash(g, 804) * 4, speed: 0.8 + 0.4 * forest_hash(g, 805)}
+            Emitter: {
+              max: 500, rate: 220, shape: EmitterSphere, radius: 0.35,
+              direction: {0, 1, 0}, spread: 180, speed: {0.3, 0.8}, lifetime: {1.8, 2.2},
+              size: {0.014, 0.019}, opacity: {0.8, 1},
+              color: {120, 108, 88}, color_variance: {16, 14, 12}, seed: 810 + g, local: true
+            }
+            Burst: {count: 400}
+            Forces: {
+              gravity: {0, 0, 0}, drag: 3.5, turbulence: 9, turbulence_scale: 5, global_wind: 0.05
+            }
+            Appearance: {shape: Circle, blend: Alpha, stretch: 0.4, lit: 1}
+            Curves: {opacity: {keys: [{0, 0}, {0.15, 1}, {0.85, 1}, {1, 0}]}}
+          }
+        }
+      }
+    }
+  }
+}
+
+// The counts follow the sliders
+async {
+  while true {
+    await next_frame()
+    const s = state.season
+    const h = state.hour
+    const t = state.temperature
+    const p = state.precipitation
+    const w = state.wind
+    const nb: i32 = round(state.BUTTERFLY_MAX * state.forest_butterfly_activity(s, h, t, p, w))
+    const ne: i32 = round(state.BEE_MAX * state.forest_bee_activity(s, h, t, p, w))
+    const nd: i32 = round(state.DRAGONFLY_MAX * state.forest_dragonfly_activity(s, h, t, p, w))
+    const fa = state.forest_firefly_activity(s, h, t, p, w)
+    const nf: i32 = round(state.FIREFLY_LIGHT_MAX * fa)
+    const fg: f32 = floor(fa * 20 + 0.5) / 20
+    const ng: i32 = round(state.GNAT_SWARM_MAX * state.forest_gnat_activity(s, h, t, p, w))
+
+    if nb != state.butterfly_count {
+      state.butterfly_count = nb
+    }
+
+    if ne != state.bee_count {
+      state.bee_count = ne
+    }
+
+    if nd != state.dragonfly_count {
+      state.dragonfly_count = nd
+    }
+
+    if nf != state.firefly_lights {
+      state.firefly_lights = nf
+    }
+
+    if fg != state.firefly_glow {
+      state.firefly_glow = fg
+    }
+
+    if ng != state.gnat_swarms {
+      state.gnat_swarms = ng
+    }
+  }
+}
