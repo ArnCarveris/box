@@ -1797,6 +1797,8 @@
                     "time_zero_scale_still",
                     "rate_limits_updates",
                     "undrawn_skips_update",
+                    "layer_amount_zero_skips_update",
+                    "layer_normal_zero_skips_update",
                     "downstream_edit_keeps_upstream",
                     "shared_subgraph",
                     "toggle_back_reuses",

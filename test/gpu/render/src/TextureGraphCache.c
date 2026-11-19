@@ -441,6 +441,70 @@ void TextureGraphCache_undrawn_skips_update(void) {
     ecs_fini(world);
 }
 
+void TextureGraphCache_layer_amount_zero_skips_update(void) {
+    ecs_world_t *world = tg_world();
+    ecs_singleton_set(world, Scene, {.texture_layers = true});
+    tg_run_file(world, GRAPH_ANIMATED);
+    ecs_entity_t tex = ecs_lookup(world, "graph_animated.image");
+    ecs_entity_t quad = ecs_lookup(world, "graph_animated.quad");
+    test_assert(tex != 0);
+    test_assert(quad != 0);
+    ecs_entity_t layer = ecs_new(world);
+    ecs_set(world, layer, TextureLayer, {.amount = 0, .direction = {0, 1, 0}, .contrast = 8,
+        .albedo = LayerMix, .roughness = LayerKeep, .metallic = LayerKeep,
+        .occlusion = LayerKeep, .normal = 1});
+    ecs_set(world, layer, PbrTextures, {.albedo = tex, .normal = tex});
+    ecs_set(world, quad, PbrTextures, {0});
+    ecs_set(world, quad, TextureLayers, {.layers = {layer}});
+    tg_wait(world, tex, 1);
+
+    tg_frames(world, 3);
+    box_render_gpu_stats_t before = tg_stats(world);
+    tg_frames(world, 10);
+    box_render_gpu_stats_t after = tg_stats(world);
+    test_int(after.texture_graph_updates, before.texture_graph_updates);
+    test_int(after.texture_graph_dispatches, before.texture_graph_dispatches);
+
+    ecs_get_mut(world, layer, TextureLayer)->amount = 1;
+    ecs_modified(world, layer, TextureLayer);
+    tg_frames(world, 3);
+    box_render_gpu_stats_t shown = tg_stats(world);
+    test_assert(shown.texture_graph_updates > after.texture_graph_updates);
+    ecs_fini(world);
+}
+
+void TextureGraphCache_layer_normal_zero_skips_update(void) {
+    ecs_world_t *world = tg_world();
+    ecs_singleton_set(world, Scene, {.texture_layers = true});
+    tg_run_file(world, GRAPH_ANIMATED);
+    ecs_entity_t tex = ecs_lookup(world, "graph_animated.image");
+    ecs_entity_t quad = ecs_lookup(world, "graph_animated.quad");
+    test_assert(tex != 0);
+    test_assert(quad != 0);
+    ecs_entity_t layer = ecs_new(world);
+    ecs_set(world, layer, TextureLayer, {.amount = 1, .direction = {0, 1, 0}, .contrast = 8,
+        .albedo = LayerKeep, .roughness = LayerKeep, .metallic = LayerKeep,
+        .occlusion = LayerKeep, .normal = 0});
+    ecs_set(world, layer, PbrTextures, {.normal = tex});
+    ecs_set(world, quad, PbrTextures, {0});
+    ecs_set(world, quad, TextureLayers, {.layers = {layer}});
+    tg_wait(world, tex, 1);
+
+    tg_frames(world, 3);
+    box_render_gpu_stats_t before = tg_stats(world);
+    tg_frames(world, 10);
+    box_render_gpu_stats_t after = tg_stats(world);
+    test_int(after.texture_graph_updates, before.texture_graph_updates);
+    test_int(after.texture_graph_dispatches, before.texture_graph_dispatches);
+
+    ecs_get_mut(world, layer, TextureLayer)->normal = 0.5f;
+    ecs_modified(world, layer, TextureLayer);
+    tg_frames(world, 3);
+    box_render_gpu_stats_t shown = tg_stats(world);
+    test_assert(shown.texture_graph_updates > after.texture_graph_updates);
+    ecs_fini(world);
+}
+
 /** An edit of a parameter after a materialized node evaluates only the stages after it: one
  * dispatch, no new cached value; an edit before it runs both stages and caches a new value. */
 void TextureGraphCache_downstream_edit_keeps_upstream(void) {

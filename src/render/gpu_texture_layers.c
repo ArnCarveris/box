@@ -367,8 +367,11 @@ static WGPUBindGroup box_gpu_layer_group(
     box_gpu_layer_layouts(gpu);
     ecs_os_memset_t(&key, 0, box_gpu_layer_key_t);
     for (k = 0; k < BOX_RENDER_LAYERS; k ++) {
-        for (m = 0; m < BOX_RENDER_LAYER_MAPS; m ++) {
-            box_gpu_texture_graph_sampled(gpu, l->maps[k][m]);
+        bool shows = l->values[k].color[3] > 0.0f;
+        for (m = 0; shows && m < BOX_RENDER_LAYER_MAPS; m ++) {
+            if (m != BOX_RENDER_LAYER_NORMAL || l->values[k].coverage[2] > 0.0f) {
+                box_gpu_texture_graph_sampled(gpu, l->maps[k][m]);
+            }
         }
 
         buffers[k] = l->entities[k]
