@@ -492,6 +492,26 @@ done:
     return;
 }
 
+/** Pack the scatter of a Water into the scatter words of its record, which hold the Sheen and
+ * DiffuseTransmission of a record without Water: its strength when positive and finite and its
+ * color display encoded; both 0 without a strength, which draws as without scatter.
+ *
+ * @param out The record
+ * @param water The component
+ */
+static void box_draws_water_scatter_pack(
+    box_render_material_t *out,
+    const Water *water)
+{
+    out->water_scatter_color = 0u;
+    out->water_scatter = 0.0f;
+    if (isfinite(water->scatter) && water->scatter > 0.0f) {
+        out->water_scatter = water->scatter;
+        out->water_scatter_color = (uint32_t)water->scatter_color.r |
+            ((uint32_t)water->scatter_color.g << 8) | ((uint32_t)water->scatter_color.b << 16);
+    }
+}
+
 float box_draws_water_flow_phase(
     double time)
 {
@@ -809,9 +829,14 @@ void box_draws_material_pack(
     out->clear_coat = coat && box_draws_unorm16(coat->strength)
         ? box_draws_unorm16(coat->strength) | (box_draws_unorm16(coat->roughness) << 16) : 0u;
     out->anisotropy = box_draws_anisotropy_pack(material->anisotropy);
-    out->sheen = box_draws_sheen_pack(material->sheen);
-    out->diffuse_transmission = box_draws_diffuse_transmission_pack(
-        material->diffuse_transmission);
+    if (material->water) {
+        box_draws_water_scatter_pack(out, material->water);
+    } else {
+        out->sheen = box_draws_sheen_pack(material->sheen);
+        out->diffuse_transmission = box_draws_diffuse_transmission_pack(
+            material->diffuse_transmission);
+    }
+
     if (material->water) {
         box_draws_water_flow_pack(out, material->flow, material->time);
     } else {

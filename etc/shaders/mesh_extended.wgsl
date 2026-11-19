@@ -1054,6 +1054,28 @@ fn water_waves_normal(index: u32, xz: vec2f, dx: vec2f, dy: vec2f, mapped: vec3f
     return normalize(vec3f(waves.x + detail.x, waves.y * detail.y, waves.z + detail.z));
 }
 
+// Height of the travelling waves of a set of the wave table at the world XZ of a fragment over
+// the sum of their amplitudes, -1 in the troughs to 1 on the crests: the sum of the heights
+// (amplitude times sin theta, whose slope water_waves_normal follows) of the waves faded like
+// their normals (water_wave_fade), so distant water flattens toward 0. 0 without waves.
+fn water_waves_height(index: u32, xz: vec2f, dx: vec2f, dy: vec2f) -> f32 {
+    let s = water_wave_sets[min(index, WATER_WAVE_SETS - 1u)];
+    var height = 0.0;
+    var total = 0.0;
+    for (var i = 0u; i < 4u; i++) {
+        let w = s.waves[i];
+        let k = w.a.z;
+        if (k <= 0.0 || w.b.x <= 0.0) {
+            continue;
+        }
+        let amplitude = w.b.x / k;
+        let theta = k * dot(w.a.xy, xz) - w.a.w;
+        height += amplitude * water_wave_fade(w, dx, dy) * sin(theta);
+        total += amplitude;
+    }
+    return select(0.0, clamp(height / total, -1.0, 1.0), total > 0.0);
+}
+
 // Weight of a wave of the wave table at a fragment of world XZ derivatives dx and dy: 1 where its
 // wavelength is at least 4 pixels along the screen axes, fading to 0 at 2 pixels.
 fn water_wave_fade(w: WaterWave, dx: vec2f, dy: vec2f) -> f32 {
@@ -1408,9 +1430,11 @@ fn water_caustics(f: VertexOut, world: vec3f, d: f32, n: vec3f) -> vec3f {
 // larger of the two covers, see water_foam_mixed). The WaterCaustics of the material light the
 // scene behind before it is tinted (water_caustics). Body and foam are lit diffusely with the
 // light of the surface; the specular of an F0 of 0.02, direct and indirect (indirect_lobes, or the planar reflection of its entity,
-// as every shape), adds on top. Nothing
+// as every shape), adds on top. The scatter of the material, the sunlight scattered inside the
+// body (water_scatter_light) at the height of its waves (water_waves_height, 0 without), adds to
+// the body and is covered like it. Nothing
 // behind (the sky) is infinitely deep. It writes no depth and takes no ambient occlusion.
-fn water_lit(f: VertexOut, shaded: Surface) -> vec4f {
+fn water_lit(f: VertexOut, shaded: Surface, height: f32) -> vec4f {
     range_fragment(f);
     planet_fragment(f);
     let m = vo_water(f);
@@ -1473,10 +1497,51 @@ fn water_lit(f: VertexOut, shaded: Surface) -> vec4f {
     let fresnel = fresnel_schlick(ndv, vec3f(WATER_F0)).x;
     let tint = water_absorbed(water_absorption(m), ray, m.water_visibility, deep);
     let seen = background * tint * (1.0 - fresnel) * through * (1.0 - foam);
-    let own = body * (1.0 - through) * (1.0 - foam) + foam_color * reflected.diffuse * foam +
+    var glow = body;
+    let scatter = water_scatter(m);
+    if (scatter > 0.0 && view.lights.z != 0u) {
+        let scatter_color = material_linear(unpack4x8unorm(water_scatter_color(m)).rgb);
+        glow += scatter_color * (scatter * water_scatter_light(f.world, s, v, height,
+            reflected.diffuse));
+    }
+    let own = glow * (1.0 - through) * (1.0 - foam) + foam_color * reflected.diffuse * foam +
         reflected.specular;
     let veil = 1.0 - through * (1.0 - foam);
     return vec4f(own * ap.a + ap.rgb * veil + seen, 1.0);
+}
+
+// Weights of the scatter of a Water (water_scatter_light): the crests seen against the sun, the
+// faces turned to the viewer in the sunlight and the ambient light.
+const WATER_SCATTER_CREST: f32 = 1.0;
+const WATER_SCATTER_FACE: f32 = 0.001;
+const WATER_SCATTER_AMBIENT: f32 = 0.006;
+
+// Sunlight scattered inside the body of a Water toward the viewer, before its color and
+// strength: the light of the first directional light, times its shadow (and cookie) at the
+// fragment, times WATER_SCATTER_CREST max(height, 0) saturate(v . -l)^4
+// saturate(0.5 - 0.5 l . n)^3, which glows through the crests seen against the sun where they
+// turn away from it, plus WATER_SCATTER_FACE saturate(v . n)^2 on the faces turned to the
+// viewer, and WATER_SCATTER_AMBIENT saturate(v . n)^2 of the diffuse light of the surface
+// (ambient). height is that of the waves, -1..1 (water_waves_height).
+fn water_scatter_light(world: vec3f, s: Surface, v: vec3f, height: f32, ambient: vec3f)
+    -> vec3f
+{
+    let ndv = saturate(dot(s.normal, v));
+    var light = ambient * (WATER_SCATTER_AMBIENT * ndv * ndv);
+    if (view.lights.x == 0u) {
+        return light;
+    }
+
+    let l = normalize(lights[0].position);
+    var visible = shadow_factor(world, s.geometric);
+    if (scene_cookies) {
+        visible *= light_cookie(world, l, s.geometric);
+    }
+    let toward = pow(saturate(dot(v, -l)), 4.0);
+    let away = pow(saturate(0.5 - 0.5 * dot(l, s.normal)), 3.0);
+    let k = WATER_SCATTER_CREST * max(height, 0.0) * toward * away +
+        WATER_SCATTER_FACE * ndv * ndv;
+    return light + lights[0].color * (visible * k);
 }
 
 // The artistic rim of a Fresnel (not the physical term of the lobes): its color times its
@@ -1534,14 +1599,16 @@ fn lit(f: VertexOut, shaded: Surface) -> vec4f {
         var layers = w.layers;
         var variance = w.variance;
         let waves = vo_water_waves(f);
+        var height = 0.0;
         if (waves != 0u) {
             variance = water_waves_variance(waves, dx, dy, variance);
             layers.normal = water_waves_normal(waves, f.world.xz, dx, dy, layers.normal);
+            height = water_waves_height(waves, f.world.xz, dx, dy);
         }
         layers.normal = water_ripples_normal(f.world, layers.normal);
         var s = surface_of(f, front, geometric, layers);
         s.roughness = water_roughness(s.roughness, variance);
-        return water_lit(f, s);
+        return water_lit(f, s, height);
     }
 
     return lit(f, surface(f, front));
@@ -1629,14 +1696,16 @@ fn layered(f: VertexOut, front: bool, s: Surface, maps: texture_2d_array<f32>, f
         layers.normal = l.normal;
     }
     let waves = vo_water_waves(f);
+    var height = 0.0;
     if (waves != 0u) {
         variance = water_waves_variance(waves, dx, dy, variance);
         layers.normal = water_waves_normal(waves, f.world.xz, dx, dy, layers.normal);
+        height = water_waves_height(waves, f.world.xz, dx, dy);
     }
     layers.normal = water_ripples_normal(f.world, layers.normal);
     var s = surface_of(f, front, geometric, layers);
     s.roughness = water_roughness(s.roughness, variance);
-    return water_lit(f, s);
+    return water_lit(f, s, height);
 }
 
 @fragment fn fs_layers(f: VertexOut, @builtin(front_facing) front: bool) -> @location(0) vec4f {

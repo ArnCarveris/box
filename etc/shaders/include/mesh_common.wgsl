@@ -167,13 +167,15 @@ struct VertexOut {
     @location(12) @interpolate(flat) fresnel: vec4f,
     // Fresnel color of the material in linear light as unorm16: r | g << 16, b. Of a Water
     // pipeline (water), which ignores Fresnel, x is the set of the WaterWaves of the material in
-    // the wave table, 0 for none (vo_water_waves), and y the strength and depth of its
-    // WaterCaustics (pack2x16float), 0 for none (vo_water_caustics).
+    // the wave table in its low byte, 0 for none (vo_water_waves), and its Water.scatter_color
+    // display encoded above it (vo_water); y the strength and depth of its WaterCaustics
+    // (pack2x16float), 0 for none (vo_water_caustics).
     @location(13) @interpolate(flat) fresnel_color: vec2u,
     // Water foam width (its sign bit the WATER_FOAM_TEXTURE flag), ripple and foam scale
     // (pack2x16float) and ripple offset of a Water pipeline (water), which reuses flat2 (the
     // colors, the absorption in their top bytes), flat3.zw, flat1.zw and flat0.w (the flow
-    // mapping, vo_water_flow) for the other Water fields: Water
+    // mapping, vo_water_flow) and the high half of flat1.x (the scatter, in place of the
+    // thickness of a diffuse transmission) for the other Water fields: Water
     // ignores Transmission, and the fragment stage cannot read the material table. Of the other
     // material_distortion pipelines, the Distortion of the material (vo_distortion).
     @location(8) @interpolate(flat) flat4: vec4u,
@@ -236,7 +238,8 @@ fn normal_uv(f: VertexOut, uv: vec2f) -> vec2f {
     return uv;
 }
 
-// The Water fields of the material of a fragment of a Water pipeline, the others zero.
+// The Water fields of the material of a fragment of a Water pipeline, the others zero but the
+// scatter words (water_scatter_color, water_scatter).
 fn vo_water(f: VertexOut) -> Material {
     var m: Material;
     m.water_shallow = f.flat2.x & 0xFFFFFFu;
@@ -251,6 +254,8 @@ fn vo_water(f: VertexOut) -> Material {
     m.water_ripple_scale = unpack2x16float(f.flat4.y).x;
     m.water_foam_scale = unpack2x16float(f.flat4.y).y;
     m.water_ripple_offset = bitcast<vec2f>(f.flat4.zw);
+    m.sheen = f.fresnel_color.x >> 8u;
+    m.diffuse_transmission = bitcast<u32>(unpack2x16float(f.flat1.x).y);
     return m;
 }
 
@@ -271,7 +276,7 @@ fn vo_water_flow(f: VertexOut) -> WaterFlowOut {
 // Set of the WaterWaves of the material of a fragment of a Water pipeline in the wave table, 0
 // for none.
 fn vo_water_waves(f: VertexOut) -> u32 {
-    return f.fresnel_color.x;
+    return f.fresnel_color.x & 0xFFu;
 }
 
 // The WaterCaustics of the material of a fragment of a Water pipeline: the offset of its water
@@ -585,8 +590,13 @@ fn vertex_out(p: Placed, material: Material, frame: ModelFrame, s: VertexShading
             ((material.water_flags & WATER_FOAM_TEXTURE) << 31u),
             pack2x16float(vec2f(material.water_ripple_scale, material.water_foam_scale)),
             bitcast<vec2u>(material.water_ripple_offset));
-        // The Fresnel words of a Water material hold its WaterCaustics
-        o.fresnel_color = vec2u((material.water_flags >> WATER_WAVES_SHIFT) & WATER_WAVES_MASK,
+        // Water ignores DiffuseTransmission: the thickness half holds the scatter
+        o.flat1.x = pack2x16float(vec2f(material.cutoff,
+            min(max(water_scatter(material), 0.0), 6e4)));
+        // The Fresnel words of a Water material hold its WaterCaustics, the waves its scatter
+        // color
+        o.fresnel_color = vec2u(((material.water_flags >> WATER_WAVES_SHIFT) & WATER_WAVES_MASK) |
+            ((water_scatter_color(material) & 0xFFFFFFu) << 8u),
             pack2x16float(vec2f(min(material.fresnel_strength, 1e4),
                 min(material.fresnel_bias, 6e4))));
         o.fresnel = vec4f(bitcast<vec2f>(material.fresnel_color), material.fresnel_power,

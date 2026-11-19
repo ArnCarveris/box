@@ -42,6 +42,9 @@ struct Material {
     // DiffuseTransmission r | g << 8 | b << 16 | factor << 24 as unorm8 (unpack4x8unorm), the
     // color display encoded, 0 without one
     diffuse_transmission: u32,
+    // A Water material, which ignores Sheen and DiffuseTransmission, holds its scatter in these
+    // two words instead, both 0 without one: Water.scatter_color display encoded,
+    // r | g << 8 | b << 16 (water_scatter_color), and the bits of Water.scatter (water_scatter)
     // DiffuseTransmission.thickness, world units behind the surface of its shadow lookup
     thickness: f32,
     // DiffuseTransmission.blur, world units of blur radius per world unit behind the surface of
@@ -122,6 +125,17 @@ struct Material {
     // VertexReveal threshold, 0 without one
     reveal_threshold: f32,
 };
+
+// Water.scatter_color of a Water record, display encoded, r | g << 8 | b << 16, 0 without a
+// scatter.
+fn water_scatter_color(m: Material) -> u32 {
+    return m.sheen;
+}
+
+// Water.scatter of a Water record, 0 for none.
+fn water_scatter(m: Material) -> f32 {
+    return bitcast<f32>(m.diffuse_transmission);
+}
 
 // Smallest depth and visibility of a Water record (BOX_RENDER_WATER_MIN).
 const WATER_MIN: f32 = 1e-3;

@@ -351,9 +351,18 @@ ECS_STRUCT(Distortion, {
 /** Ripple scale of a constructed Water: no second normal sample */
 #define BOX_MATERIAL_WATER_RIPPLE_SCALE (0.0f)
 
+/** Scatter color of a constructed Water, display encoded: a turquoise */
+#define BOX_MATERIAL_WATER_SCATTER_R (40)
+#define BOX_MATERIAL_WATER_SCATTER_G (200)
+#define BOX_MATERIAL_WATER_SCATTER_B (170)
+
+/** Scatter of a constructed Water: no subsurface glow */
+#define BOX_MATERIAL_WATER_SCATTER (0.0f)
+
 /** Surface of a body of water seen from above (ponds, lakes, canals, the sea), on a 3D mesh,
  * default a teal shallow and a dark blue deep color, depth 3, visibility 2, a white absorption,
- * refraction 0.02, an off white foam of width 0.3 without a texture and no ripples. Inherited
+ * refraction 0.02, an off white foam of width 0.3 without a texture, no ripples and no scatter
+ * (a turquoise scatter_color). Inherited
  * by instances like Rgb; a field a scene does not set keeps its default.
  *
  * It draws like Transmission: in the sorted blended pass without depth writes, casting no
@@ -371,6 +380,13 @@ ECS_STRUCT(Distortion, {
  * Below foam_width the opaque, diffusely lit foam replaces both by
  * saturate(1 - d / foam_width), broken up by the red of foam_texture. The direct and indirect
  * specular of PbrMaterial.roughness with an F0 of 0.02 (ior 1.33) adds on top.
+ *
+ * scatter adds the sunlight scattered inside the body, scatter_color times scatter times the
+ * light of the first directional light (and its shadow): it glows through the crests of the
+ * WaterWaves seen against the sun, most where the wave faces turn away from the sun toward the
+ * viewer, and a little on the faces turned to the viewer, with a small part of the ambient light.
+ * It is covered by the foam and by the scene behind like the body, and fogged by the aerial
+ * perspective; 0 adds nothing.
  *
  * Distant water keeps its sparkle: the slope variance that filtering takes away, of the minified
  * normal map (from the shortened length of its filtered normals, Toksvig) and of the WaterWaves
@@ -418,6 +434,9 @@ ECS_STRUCT(Water, {
                              *   none */
     vec2 ripple_velocity;   /**< Texture widths per second the second sample moves, wrapped
                              *   in double precision like TextureScroll */
+    Rgb scatter_color;      /**< Color of the sunlight scattered inside the body, display
+                             *   encoded */
+    float scatter;          /**< Strength of the scattered sunlight, 0 for none */
 });
 
 /** Waves a WaterWaves holds at most */

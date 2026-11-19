@@ -1586,12 +1586,25 @@ typedef struct box_render_material_t {
     uint32_t anisotropy;    /**< SpecularAnisotropy strength | rotation << 16, two unorm16, the
                              *   strength clamped to 0..1 and the rotation wrapped to 0..2 pi
                              *   over 2 pi, 0 without one or with a strength of 0 */
-    uint32_t sheen;         /**< Sheen r | g << 8 | b << 16 | roughness << 24, the color display
-                             *   encoded and the roughness a unorm8 clamped to 0..1, 0 without
-                             *   one or with a black color */
-    uint32_t diffuse_transmission; /**< DiffuseTransmission r | g << 8 | b << 16 | factor << 24,
-                             *   the color display encoded and the factor a unorm8 clamped to
-                             *   0..1, 0 without one */
+    union {                 /**< The Sheen and DiffuseTransmission of a record without Water,
+                             *   the scatter of one with Water */
+        struct {            /**< The Sheen and DiffuseTransmission of a record without Water */
+            uint32_t sheen; /**< Sheen r | g << 8 | b << 16 | roughness << 24, the color
+                             *   display encoded and the roughness a unorm8 clamped to 0..1, 0
+                             *   without one or with a black color */
+            uint32_t diffuse_transmission; /**< DiffuseTransmission r | g << 8 | b << 16 |
+                             *   factor << 24, the color display encoded and the factor a
+                             *   unorm8 clamped to 0..1, 0 without one */
+        };
+
+        struct {            /**< The scatter of a record with Water, which ignores Sheen and
+                             *   DiffuseTransmission */
+            uint32_t water_scatter_color; /**< Water.scatter_color, display encoded bytes:
+                             *   r | g << 8 | b << 16, 0 without a scatter */
+            float water_scatter; /**< Water.scatter, 0 without one or when negative or not
+                             *   finite, which tells a record without scatter */
+        };
+    };
     float thickness;        /**< DiffuseTransmission.thickness, 0 without one */
     float diffuse_blur;     /**< DiffuseTransmission.blur, 0 without one or with a negative or
                              *   non finite blur */

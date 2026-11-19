@@ -102,6 +102,8 @@
                     "fresnel_factor",
                     "water_defaults",
                     "water_pack",
+                    "water_scatter_defaults",
+                    "water_scatter_pack",
                     "water_depth_mix",
                     "water_transmittance",
                     "water_absorption",

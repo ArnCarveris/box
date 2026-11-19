@@ -3641,3 +3641,154 @@ void Material_distortion_phase(void) {
         test_assert(p >= 0.0f && p < 1.0f);
     }
 }
+
+/** A constructed Water has a turquoise scatter color and no scatter; a script sets both, and an
+ * instance inherits them. */
+void Material_water_scatter_defaults(void) {
+    // materials/water
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    test_assert(ecs_script_run(world, "water_scatter",
+        "using box.material\n"
+        "sea { Water: {scatter_color: {30, 180, 150}, scatter: 1.5} }\n"
+        "lake { Water: {scatter: 0.5} }\n", NULL) == 0);
+
+    ecs_entity_t added = ecs_new(world);
+    ecs_add(world, added, Water);
+    const Water *w = ecs_get(world, added, Water);
+    test_assert(w != NULL);
+    test_uint(w->scatter_color.r, BOX_MATERIAL_WATER_SCATTER_R);
+    test_uint(w->scatter_color.g, BOX_MATERIAL_WATER_SCATTER_G);
+    test_uint(w->scatter_color.b, BOX_MATERIAL_WATER_SCATTER_B);
+    test_uint(w->scatter_color.r, 40);
+    test_uint(w->scatter_color.g, 200);
+    test_uint(w->scatter_color.b, 170);
+    test_flt(w->scatter, BOX_MATERIAL_WATER_SCATTER);
+    test_flt(w->scatter, 0);
+
+    w = ecs_get(world, ecs_lookup(world, "sea"), Water);
+    test_assert(w != NULL);
+    test_uint(w->scatter_color.r, 30);
+    test_uint(w->scatter_color.g, 180);
+    test_uint(w->scatter_color.b, 150);
+    test_flt(w->scatter, 1.5f);
+    test_flt(w->depth, 3);
+
+    w = ecs_get(world, ecs_lookup(world, "lake"), Water);
+    test_assert(w != NULL);
+    test_uint(w->scatter_color.g, 200);
+    test_flt(w->scatter, 0.5f);
+
+    /* Script access through the reflection data */
+    ecs_entity_t sea = ecs_lookup(world, "sea");
+    Water *mw = ecs_get_mut(world, sea, Water);
+    ecs_meta_cursor_t cur = ecs_meta_cursor(world, ecs_id(Water), mw);
+    test_int(ecs_meta_push(&cur), 0);
+    test_int(ecs_meta_member(&cur, "scatter"), 0);
+    test_int(ecs_meta_set_float(&cur, 2.0), 0);
+    test_int(ecs_meta_member(&cur, "scatter_color"), 0);
+    test_int(ecs_meta_push(&cur), 0);
+    test_int(ecs_meta_member(&cur, "g"), 0);
+    test_int(ecs_meta_set_uint(&cur, 99), 0);
+    test_int(ecs_meta_pop(&cur), 0);
+    test_int(ecs_meta_pop(&cur), 0);
+    ecs_modified(world, sea, Water);
+    w = ecs_get(world, sea, Water);
+    test_flt(w->scatter, 2.0f);
+    test_uint(w->scatter_color.g, 99);
+
+    ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
+    ecs_add(world, prefab, Water);
+    ecs_get_mut(world, prefab, Water)->scatter = 0.75f;
+    ecs_modified(world, prefab, Water);
+    ecs_entity_t instance = ecs_new_w_pair(world, EcsIsA, prefab);
+    test_bool(ecs_owns(world, instance, Water), false);
+    test_flt(ecs_get(world, instance, Water)->scatter, 0.75f);
+    test_uint(ecs_get(world, instance, Water)->scatter_color.b, 170);
+
+    ecs_fini(world);
+}
+
+/** The scatter of a Water takes the Sheen and DiffuseTransmission words of its record: its color
+ * display encoded and its strength when positive and finite, both 0 without one, so a Water
+ * without scatter packs the same words whatever its scatter color; a record without Water keeps
+ * its Sheen and DiffuseTransmission. */
+void Material_water_scatter_pack(void) {
+    // materials/water
+    box_render_material_t record, base;
+    box_draws_tables_init();
+    test_int(offsetof(box_render_material_t, water_scatter_color),
+        offsetof(box_render_material_t, sheen));
+    test_int(offsetof(box_render_material_t, water_scatter),
+        offsetof(box_render_material_t, diffuse_transmission));
+    test_int(ECS_SIZEOF(box_render_material_t), 256);
+
+    Water sea = {
+        .shallow_color = {60, 170, 160}, .deep_color = {8, 40, 64},
+        .depth = 3, .visibility = 2, .refraction = 0.02f, .foam_color = {240, 245, 245},
+        .foam_width = 0.3f, .foam_scale = 1, .scatter_color = {40, 200, 170}, .scatter = 0
+    };
+    box_draws_material_pack(&base, &(box_draw_material_t){ .water = &sea, .fade = 1 });
+    test_uint(base.water_scatter_color, 0);
+    test_flt(base.water_scatter, 0);
+
+    /* Without scatter the color does not change the record */
+    Water other = sea;
+    other.scatter_color = (Rgb){1, 2, 3};
+    box_draws_material_pack(&record, &(box_draw_material_t){ .water = &other, .fade = 1 });
+    test_assert(!ecs_os_memcmp_t(&record, &base, box_render_material_t));
+
+    Water lit = sea;
+    lit.scatter = 1;
+    box_draws_material_pack(&record, &(box_draw_material_t){ .water = &lit, .fade = 1 });
+    test_uint(record.water_scatter_color, 40u | (200u << 8) | (170u << 16));
+    test_flt(record.water_scatter, 1);
+
+    /* The scatter words differ, the rest is the record without scatter */
+    record.water_scatter_color = 0;
+    record.water_scatter = 0;
+    test_assert(!ecs_os_memcmp_t(&record, &base, box_render_material_t));
+
+    /* A Water ignores Sheen and DiffuseTransmission: their words hold the scatter */
+    Sheen sheen = { .color = {255, 255, 255}, .roughness = 1 };
+    DiffuseTransmission dt = { .factor = 1, .color = {255, 255, 255} };
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .water = &lit, .sheen = &sheen, .diffuse_transmission = &dt, .fade = 1 });
+    test_uint(record.water_scatter_color, 40u | (200u << 8) | (170u << 16));
+    test_flt(record.water_scatter, 1);
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .water = &sea, .sheen = &sheen, .diffuse_transmission = &dt, .fade = 1 });
+    test_uint(record.water_scatter_color, 0);
+    test_flt(record.water_scatter, 0);
+
+    /* Without Water they pack as before */
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .sheen = &sheen, .diffuse_transmission = &dt, .fade = 1 });
+    test_assert(record.sheen != 0);
+    test_assert(record.diffuse_transmission != 0);
+
+    /* Negative or non finite strengths are none */
+    Water broken = sea;
+    broken.scatter = -1;
+    box_draws_material_pack(&record, &(box_draw_material_t){ .water = &broken, .fade = 1 });
+    test_flt(record.water_scatter, 0);
+    test_uint(record.water_scatter_color, 0);
+    broken.scatter = NAN;
+    box_draws_material_pack(&record, &(box_draw_material_t){ .water = &broken, .fade = 1 });
+    test_flt(record.water_scatter, 0);
+    broken.scatter = INFINITY;
+    box_draws_material_pack(&record, &(box_draw_material_t){ .water = &broken, .fade = 1 });
+    test_flt(record.water_scatter, 0);
+
+    /* A transition encodes the scatter like the rest of the Water */
+    PbrMaterial pbr = { .metallic = 0, .roughness = 0.05f };
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .water = &lit, .pbr = &pbr, .time = 2, .fade = 1 });
+    box_draw_transition_material_t target;
+    box_render_material_t encoded;
+    box_draws_transition_target(&target, &(box_draw_material_t){
+        .water = &lit, .pbr = &pbr, .time = 2, .fade = 1 }, BOX_DRAW_TRANSITION_TABLE);
+    box_draws_transition_encode(&target, &encoded);
+    test_assert(!ecs_os_memcmp_t(&encoded, &record, box_render_material_t));
+}

@@ -364,6 +364,15 @@
                 ]
             },
             {
+                "id": "WaterScatter",
+                "testcases": [
+                    "crests_glow_toward_sun",
+                    "sun_behind_small",
+                    "zero_unchanged",
+                    "without_waves_faint"
+                ]
+            },
+            {
                 "id": "WaterGlint",
                 "testcases": [
                     "far_glitter_wider",
