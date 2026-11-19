@@ -308,7 +308,8 @@ typedef struct box_draw_material_t {
                                  *   shapes and by Water */
     const Water *water;         /**< Water surface of a 3D shape, ignored by 2D shapes */
     const WaterWaves *waves;    /**< Travelling waves of the Water, NULL without Water */
-    const WaterFlow *flow;      /**< Velocity the waves move with, NULL without Water */
+    const WaterFlow *flow;      /**< Velocity the waves, caustics and, with its textures, the
+                                 *   normal map and foam texture move with, NULL without Water */
     uint32_t water_waves;       /**< Set of the waves in the wave table, 0 for none */
     const WaterCaustics *caustics; /**< Caustics of the Water, NULL without Water */
     float caustics_frame[2];    /**< Offset of the water frame of the caustics in cells, wrapped
@@ -376,6 +377,8 @@ typedef struct box_draw_transition_material_t {
     uint32_t water_waves;   /**< Set of the WaterWaves of the Water in the wave table, which
                              *   has no transition: the record keeps it */
     WaterCaustics caustics; /**< WaterCaustics, which has no transition: the record keeps it */
+    bool flowed;            /**< The Water has a WaterFlow */
+    WaterFlow flow;         /**< Its WaterFlow, read with flowed */
     bool causticked;        /**< The Water has a WaterCaustics */
     float caustics_frame[2]; /**< Offset of the water frame of the caustics in cells */
     WindSway sway;          /**< WindSway, which has no transition: the record keeps it */
@@ -2022,6 +2025,15 @@ float box_draws_fresnel_factor(
  */
 float box_draws_distortion_phase(
     float speed,
+    double time);
+
+/** Phase of the two phase flow mapping of WaterFlow.textures at a time: time over
+ * BOX_RENDER_WATER_FLOW_PERIOD wrapped to [0, 1) in double precision.
+ *
+ * @param time Total render time
+ * @return The phase, 0 for a time that is not finite
+ */
+float box_draws_water_flow_phase(
     double time);
 
 /** Mix factor of the deep color of a Water body, the C twin of water_depth_mix of

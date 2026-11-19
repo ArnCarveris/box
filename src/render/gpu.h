@@ -1704,8 +1704,8 @@ void box_gpu_ripples_simulate(
 
 /** Fill the view layout entries of the heights and the foam of the field of WaterRipples.
  *
- * @param entries The entries of the view layout, of which BOX_GPU_RIPPLES_HEIGHTS_BINDING and
- * BOX_GPU_RIPPLES_FOAM_BINDING are filled
+ * @param entries The entries of the view layout, of which BOX_GPU_RIPPLES_HEIGHTS_BINDING,
+ * BOX_GPU_RIPPLES_FOAM_BINDING and BOX_GPU_RIPPLES_FLOW_BINDING are filled
  */
 void box_gpu_ripples_layout(
     WGPUBindGroupLayoutEntry *entries);
@@ -1715,8 +1715,8 @@ void box_gpu_ripples_layout(
  *
  * @param gpu The backend
  * @param v The view, NULL for none
- * @param entries The entries of the view group, of which BOX_GPU_RIPPLES_HEIGHTS_BINDING and
- * BOX_GPU_RIPPLES_FOAM_BINDING are filled
+ * @param entries The entries of the view group, of which BOX_GPU_RIPPLES_HEIGHTS_BINDING,
+ * BOX_GPU_RIPPLES_FOAM_BINDING and BOX_GPU_RIPPLES_FLOW_BINDING are filled
  */
 void box_gpu_ripples_bindings(
     box_gpu_t *gpu,

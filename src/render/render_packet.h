@@ -1653,13 +1653,29 @@ typedef struct box_render_material_t {
                              *   Water.absorption display encoded above them
                              *   (BOX_RENDER_WATER_ABSORPTION_SHIFT): r << 8 | g << 16 | b << 24;
                              *   0 without one */
-    float distortion_strength; /**< Distortion.strength, 0 without one or when negative or not
-                             *   finite (and for a shape with Water, which ignores it) */
-    float distortion_frequency; /**< 1 over Distortion.scale, which is at least
-                             *   BOX_RENDER_DISTORTION_MIN; 0 without one */
-    float distortion_phase; /**< Distortion.speed times the total render time wrapped to 0..1
-                             *   (box_draws_distortion_phase), 0 without one */
-    uint32_t distortion_flags; /**< BOX_RENDER_DISTORTION_* flags, 0 without one */
+    union {                 /**< The Distortion of a record without Water, the flow mapping of
+                             *   the textures of one with Water */
+        struct {            /**< The Distortion of a record without Water */
+            float distortion_strength; /**< Distortion.strength, 0 without one or when
+                                     *   negative or not finite */
+            float distortion_frequency; /**< 1 over Distortion.scale, which is at least
+                                     *   BOX_RENDER_DISTORTION_MIN; 0 without one */
+            float distortion_phase; /**< Distortion.speed times the total render time wrapped
+                                     *   to 0..1 (box_draws_distortion_phase), 0 without one */
+            uint32_t distortion_flags; /**< BOX_RENDER_DISTORTION_* flags, 0 without one */
+        };
+
+        struct {            /**< The WaterFlow.textures of a record with Water, which ignores
+                             *   Distortion */
+            float water_flow[2]; /**< WaterFlow.velocity, world X and Z, of a Water whose
+                                     *   textures flow (0 when not finite); 0 without */
+            float water_flow_phase; /**< Total render time over BOX_RENDER_WATER_FLOW_PERIOD
+                                     *   wrapped to 0..1 (box_draws_water_flow_phase), 0
+                                     *   without */
+            uint32_t water_flow_flags; /**< BOX_RENDER_WATER_FLOW_TEXTURES when the textures
+                                     *   flow, 0 without */
+        };
+    };
     float wind_direction[2]; /**< Normalized world X and Z the Wind blows toward, of a record
                              *   with a WindSway (Scene.wind), 0 without one */
     float wind_offset[2];   /**< Wrapped world X and Z offset of the gust field, 0 without one */
@@ -1710,6 +1726,14 @@ typedef struct box_render_material_t {
 
 /** Flag of a Water record: it has a foam_texture, which the foam samples */
 #define BOX_RENDER_WATER_FOAM_TEXTURE (1u << 0)
+
+/** Flag of the water_flow_flags of a Water record: WaterFlow.textures, its normal map and foam
+ * texture move with the flow (two phase flow mapping) */
+#define BOX_RENDER_WATER_FLOW_TEXTURES (1u << 0)
+
+/** Seconds of a cycle of the two phase flow mapping of WaterFlow.textures: each of the two
+ * samples moves with the flow for this long, then resets while its weight is 0 */
+#define BOX_RENDER_WATER_FLOW_PERIOD (1.0)
 
 /** Bit of the Water record flags word at which the display encoded Water.absorption starts */
 #define BOX_RENDER_WATER_ABSORPTION_SHIFT (8)

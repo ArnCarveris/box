@@ -61,6 +61,9 @@ const WATER_WAVE_SETS: u32 = 128u;
 @group(0) @binding(25) var water_ripple_heights: texture_storage_2d<r32float, read>;
 // The foam of the same field, 0..1, at the same texels; a 1x1 zero texture without one.
 @group(0) @binding(26) var water_ripple_foam: texture_storage_2d<r32float, read>;
+// The velocity of the water of the same field at the same texels: the world velocity of a cell
+// (xy) and its velocity relative to the frame of the field (zw); a 1x1 zero texture without one.
+@group(0) @binding(27) var water_ripple_flow: texture_storage_2d<rgba32float, read>;
 
 // Snapshot of the view for transmission (gpu_transmission.c): its image right before a
 // transmissive draw, with a blur pyramid, mip k + 1 downsampled from mip k. At most 4 snapshots
@@ -800,20 +803,169 @@ fn water_uv(f: VertexOut) -> vec2f {
     return uv;
 }
 
+// World units of a cell of the noise that offsets the phase of the flow mapping per pixel.
+const WATER_FLOW_NOISE_CELL: f32 = 4.0;
+
+// Hash of a cell of the phase noise of the flow mapping, 0..1.
+fn water_flow_hash(c: vec2i) -> f32 {
+    var h = (bitcast<u32>(c.x) * 0x8da6b343u) ^ (bitcast<u32>(c.y) * 0xd8163841u);
+    h = (h ^ (h >> 16u)) * 0x7feb352du;
+    h = (h ^ (h >> 15u)) * 0x846ca68bu;
+    h = h ^ (h >> 16u);
+    return f32(h & 0xFFFFu) / 65535.0;
+}
+
+// Smooth value noise over the world XZ, 0..1, the phase offset of the flow mapping: it changes
+// slowly across the surface, so neighbouring pixels reset at different times without tearing
+// the pattern apart.
+fn water_flow_noise(xz: vec2f) -> f32 {
+    let p = xz / WATER_FLOW_NOISE_CELL;
+    let c = vec2i(floor(p));
+    let t = p - floor(p);
+    let w = t * t * (3.0 - 2.0 * t);
+    return mix(
+        mix(water_flow_hash(c), water_flow_hash(c + vec2i(1, 0)), w.x),
+        mix(water_flow_hash(c + vec2i(0, 1)), water_flow_hash(c + vec2i(1, 1)), w.x),
+        w.y);
+}
+
+// World velocity of a cell of the window of the field of WaterRipples, clamped to the window.
+fn water_ripple_flow_cell(cell: vec2i) -> vec2f {
+    let r = view.ripple_c.x;
+    let c = vec2u(clamp(cell, vec2i(0), vec2i(i32(r) - 1)));
+    return textureLoad(water_ripple_flow, (c + view.ripple_c.yz) % r).xy;
+}
+
+// World units between the samples over which the textures of a Water average the velocity of
+// the field of WaterRipples. The field switches between abutting Water shapes within a cell,
+// which the offsets of the flow mapping would show as a seam; averaged they shear instead.
+const WATER_FLOW_SMOOTH: f32 = 0.75;
+
+// World velocity of the field of WaterRipples at a point of its window in cells (bilinear
+// between the four nearest cells).
+fn water_ripple_flow_at(p: vec2f) -> vec2f {
+    let base = vec2i(floor(p));
+    let t = p - floor(p);
+    return mix(
+        mix(water_ripple_flow_cell(base), water_ripple_flow_cell(base + vec2i(1, 0)), t.x),
+        mix(water_ripple_flow_cell(base + vec2i(0, 1)),
+            water_ripple_flow_cell(base + vec2i(1, 1)), t.x),
+        t.y);
+}
+
+// World XZ velocity the textures of a Water fragment flow with: inside the window of the field
+// of WaterRipples of the view, within its height band, the world velocity of the field there
+// averaged over four bilinear samples WATER_FLOW_SMOOTH apart, so it is continuous across the seams
+// between Water shapes; own (the WaterFlow of the shape) elsewhere, faded between the two over
+// the border band of the window like the ripple normals.
+fn water_flow_velocity(world: vec3f, own: vec2f) -> vec2f {
+    if (view.ripple_c.w == 0u || abs(world.y - view.ripple_b.x) > view.ripple_b.y) {
+        return own;
+    }
+    let r = f32(view.ripple_c.x);
+    let p = (world.xz - view.ripple_a.xy) * view.ripple_a.z - 0.5;
+    if (any(p < vec2f(0.0)) || any(p > vec2f(r - 1.0))) {
+        return own;
+    }
+    let s = 0.5 * WATER_FLOW_SMOOTH * view.ripple_a.z;
+    let v = 0.25 * (water_ripple_flow_at(p + vec2f(-s, -s)) +
+        water_ripple_flow_at(p + vec2f(s, -s)) + water_ripple_flow_at(p + vec2f(-s, s)) +
+        water_ripple_flow_at(p + vec2f(s, s)));
+    let edge = min(min(p.x, p.y), min(r - 1.0 - p.x, r - 1.0 - p.y));
+    return mix(own, v, smoothstep(0.0, max(view.ripple_b.z, 1.0), edge));
+}
+
+// The two phase flow mapping of the textures of a Water fragment: the UV offsets of its two
+// samples (subtracted from the UVs, so the pattern travels along the flow), the weight of the
+// first (the second weighs 1 - weight), and the screen derivatives of the UVs the samples take
+// their level of detail from. Without WaterFlow.textures both offsets are 0 and the weight 1.
+struct WaterFlowMap {
+    a: vec2f,
+    b: vec2f,
+    weight: f32,
+    dx: vec2f,
+    dy: vec2f,
+};
+
+// The flow mapping at the UVs of a Water fragment: its velocity (water_flow_velocity) is taken
+// to the texture space of the shape with the screen derivatives of the UVs and the world XZ
+// (d uv / d xz), and moved by two sawtooth phases half a period apart, each weighted by a
+// triangle that is 0 where it resets; the phase is offset per pixel by water_flow_noise. Water is
+// a flat surface, so the UVs are affine in the world XZ over a triangle.
+@diagnostic(off, derivative_uniformity)
+fn water_flow_map(f: VertexOut, uv: vec2f) -> WaterFlowMap {
+    var o: WaterFlowMap;
+    o.a = vec2f(0.0);
+    o.b = vec2f(0.0);
+    o.weight = 1.0;
+    o.dx = dpdx(uv);
+    o.dy = dpdy(uv);
+    let wx = dpdx(f.world.xz);
+    let wy = dpdy(f.world.xz);
+    let flow = vo_water_flow(f);
+    if (!flow.on) {
+        return o;
+    }
+    // d uv / d xz = [dx dy] inverse([wx wy])
+    let det = wx.x * wy.y - wy.x * wx.y;
+    if (abs(det) < 1e-20) {
+        return o;
+    }
+    let world = water_flow_velocity(f.world, flow.velocity);
+    let inv_x = vec2f(wy.y, -wx.y) / det;
+    let inv_y = vec2f(-wy.x, wx.x) / det;
+    let along = world.x * inv_x + world.y * inv_y;
+    let velocity = o.dx * along.x + o.dy * along.y;
+    let p0 = fract(flow.phase + water_flow_noise(f.world.xz));
+    let p1 = fract(p0 + 0.5);
+    o.a = velocity * ((p0 - 0.5) * WATER_FLOW_PERIOD);
+    o.b = velocity * ((p1 - 0.5) * WATER_FLOW_PERIOD);
+    o.weight = 1.0 - abs(2.0 * p0 - 1.0);
+    return o;
+}
+
+// A sample of the normal map of a Water in tangent space at UVs, with the level of detail of
+// the derivatives.
+fn water_normal_sample(uv: vec2f, dx: vec2f, dy: vec2f) -> vec3f {
+    return textureSampleGrad(normal_map, material_sampler, uv, dx, dy).xyz * 2.0 - 1.0;
+}
+
+// The normal map of a Water at its UVs moved by the flow mapping (scaled by scale, then moved by
+// offset): the two phase samples cross faded.
+fn water_normal_flowed(flow: WaterFlowMap, uv: vec2f, scale: f32, offset: vec2f) -> vec3f {
+    let dx = flow.dx * scale;
+    let dy = flow.dy * scale;
+    let a = water_normal_sample((uv - flow.a) * scale + offset, dx, dy);
+    let b = water_normal_sample((uv - flow.b) * scale + offset, dx, dy);
+    return mix(b, a, flow.weight);
+}
+
 // The layers of a Water fragment: those of hard_layers, its normal map blended with a second
-// sample at ripple_scale times the UVs moved by the ripple offset (whiteout blend). Water draws
-// with the hard projection of a TextureMapping. ripple_scale is flat, the same for every
-// fragment of a quad, so the implicit derivatives hold.
+// sample at ripple_scale times the UVs moved by the ripple offset (whiteout blend). With
+// WaterFlow.textures both samples move with the flow (water_flow_map), the TextureScroll offset
+// on top. Water draws with the hard projection of a TextureMapping. ripple_scale is flat, the
+// same for every fragment of a quad, so the implicit derivatives hold.
 @diagnostic(off, derivative_uniformity)
 fn water_layers(f: VertexOut, geometric: vec3f, m: Material) -> Layers {
     var layers = hard_layers(f, geometric);
+    let uv = water_uv(f);
+    let flow = water_flow_map(f, uv);
+    let flows = vo_water_flow(f).on;
     if (m.water_ripple_scale > 0.0) {
-        let uv = water_uv(f);
-        let n1 = textureSample(normal_map, material_sampler, normal_uv(f, uv)).xyz * 2.0 -
-            1.0;
-        let n2 = textureSample(normal_map, material_sampler,
-            uv * m.water_ripple_scale + m.water_ripple_offset).xyz * 2.0 - 1.0;
+        var n1: vec3f;
+        var n2: vec3f;
+        if (flows) {
+            n1 = water_normal_flowed(flow, uv, 1.0, normal_uv(f, vec2f(0.0)));
+            n2 = water_normal_flowed(flow, uv, m.water_ripple_scale, m.water_ripple_offset);
+        } else {
+            n1 = textureSample(normal_map, material_sampler, normal_uv(f, uv)).xyz * 2.0 - 1.0;
+            n2 = textureSample(normal_map, material_sampler,
+                uv * m.water_ripple_scale + m.water_ripple_offset).xyz * 2.0 - 1.0;
+        }
         layers.normal = perturb(geometric, layers.frame, vec3f(n1.xy + n2.xy, n1.z * n2.z));
+    } else if (flows) {
+        let n1 = water_normal_flowed(flow, uv, 1.0, normal_uv(f, vec2f(0.0)));
+        layers.normal = perturb(geometric, layers.frame, n1);
     }
     return layers;
 }
@@ -942,13 +1094,40 @@ fn water_foam_mixed(d: f32, foam_width: f32, deep: bool, textured: bool, tex: f3
     return band;
 }
 
-// Red of the foam texture of a Water at foam_scale times the UVs, 1 without one. The record is
-// flat, so the implicit derivatives hold.
+// Scale and rotation of the second sample of the foam texture relative to the first, and its
+// offset in repeats of the texture: finer, turned by about 37 degrees, so the two do not
+// repeat together.
+const WATER_FOAM_SCALE2: f32 = 1.63;
+const WATER_FOAM_ROTATION2: mat2x2f = mat2x2f(0.8, 0.6, -0.6, 0.8);
+const WATER_FOAM_OFFSET2: vec2f = vec2f(0.37, 0.71);
+
+// Red of the foam texture of a Water at UVs: the sample at foam_scale times them combined with a
+// second one at a different scale and rotation (WATER_FOAM_SCALE2, WATER_FOAM_ROTATION2): their
+// mean, its contrast raised back so the lace keeps its coverage.
+fn water_foam_sample(uv: vec2f, dx: vec2f, dy: vec2f, scale: f32) -> f32 {
+    let r = WATER_FOAM_ROTATION2 * WATER_FOAM_SCALE2;
+    let a = textureSampleGrad(foam_map, material_sampler, uv * scale, dx * scale, dy * scale).r;
+    let b = textureSampleGrad(foam_map, material_sampler, r * (uv * scale) + WATER_FOAM_OFFSET2,
+        r * (dx * scale), r * (dy * scale)).r;
+    return saturate(0.5 + (0.5 * (a + b) - 0.5) * 1.4);
+}
+
+// Red of the foam texture of a Water at foam_scale times the UVs (water_foam_sample), 1 without
+// one. With WaterFlow.textures it moves with the flow (water_flow_map). The record is flat, so
+// the implicit derivatives hold.
 @diagnostic(off, derivative_uniformity)
 fn water_foam_texture(f: VertexOut, m: Material) -> f32 {
+    let uv = water_uv(f);
+    let flow = water_flow_map(f, uv);
     var tex = 1.0;
     if ((m.water_flags & WATER_FOAM_TEXTURE) != 0u) {
-        tex = textureSample(foam_map, material_sampler, water_uv(f) * m.water_foam_scale).r;
+        let a = water_foam_sample(uv - flow.a, flow.dx, flow.dy, m.water_foam_scale);
+        if (flow.weight < 1.0) {
+            let b = water_foam_sample(uv - flow.b, flow.dx, flow.dy, m.water_foam_scale);
+            tex = mix(b, a, flow.weight);
+        } else {
+            tex = a;
+        }
     }
     return tex;
 }

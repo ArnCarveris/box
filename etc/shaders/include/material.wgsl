@@ -92,6 +92,10 @@ struct Material {
     distortion_phase: f32,
     // DISTORTION_PRESENT with a Distortion, DISTORTION_SHARP too without Transmission; 0 without
     // one
+    // A Water material, which ignores Distortion, holds the flow mapping of its textures in the
+    // four Distortion words instead, all 0 without WaterFlow.textures: its WaterFlow velocity
+    // (world X and Z), the phase of the flow mapping (0..1 over WATER_FLOW_PERIOD seconds) and
+    // WATER_FLOW_TEXTURES (vo_water_flow)
     distortion_flags: u32,
     // The Wind of a WindSway material (Scene.wind), all 0 without one: its normalized world X and
     // Z direction, the wrapped world offset of its gust field, its speed, gust (0..1), 1 over its
@@ -119,6 +123,13 @@ const WATER_MIN: f32 = 1e-3;
 
 // Flag of a Water record whose foam samples its texture (BOX_RENDER_WATER_FOAM_TEXTURE).
 const WATER_FOAM_TEXTURE: u32 = 1u;
+
+// Flag of the flow words of a Water record whose normal map and foam texture move with the
+// flow (BOX_RENDER_WATER_FLOW_TEXTURES).
+const WATER_FLOW_TEXTURES: u32 = 1u;
+
+// Seconds of a cycle of the two phase flow mapping (BOX_RENDER_WATER_FLOW_PERIOD).
+const WATER_FLOW_PERIOD: f32 = 1.0;
 
 // Bit of the flags of a Water record at which the set of its waves starts, and its mask
 // (BOX_RENDER_WATER_WAVES_SHIFT, BOX_RENDER_WATER_WAVES_MASK).

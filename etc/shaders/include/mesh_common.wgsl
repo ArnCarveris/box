@@ -162,7 +162,8 @@ struct VertexOut {
     @location(13) @interpolate(flat) fresnel_color: vec2u,
     // Water foam width (its sign bit the WATER_FOAM_TEXTURE flag), ripple and foam scale
     // (pack2x16float) and ripple offset of a Water pipeline (water), which reuses flat2 (the
-    // colors, the absorption in their top bytes) and flat3.zw for the other Water fields: Water
+    // colors, the absorption in their top bytes), flat3.zw, flat1.zw and flat0.w (the flow
+    // mapping, vo_water_flow) for the other Water fields: Water
     // ignores Transmission, and the fragment stage cannot read the material table. Of the other
     // material_distortion pipelines, the Distortion of the material (vo_distortion).
     @location(8) @interpolate(flat) flat4: vec4u,
@@ -228,6 +229,20 @@ fn vo_water(f: VertexOut) -> Material {
     m.water_foam_scale = unpack2x16float(f.flat4.y).y;
     m.water_ripple_offset = bitcast<vec2f>(f.flat4.zw);
     return m;
+}
+
+// The flow mapping of the textures of the material of a fragment of a Water pipeline
+// (WaterFlow.textures): its WaterFlow velocity in world X and Z, the phase of the flow mapping
+// (0..1 over WATER_FLOW_PERIOD seconds) and whether its textures flow; all 0 without.
+struct WaterFlowOut {
+    velocity: vec2f,
+    phase: f32,
+    on: bool,
+};
+
+fn vo_water_flow(f: VertexOut) -> WaterFlowOut {
+    return WaterFlowOut(bitcast<vec2f>(f.flat1.zw), f32(f.flat0.w >> 16u) / 65535.0,
+        (f.flat0.w & WATER_FLOW_TEXTURES) != 0u);
 }
 
 // Set of the WaterWaves of the material of a fragment of a Water pipeline in the wave table, 0
@@ -521,6 +536,12 @@ fn vertex_out(p: Placed, material: Material, frame: ModelFrame, s: VertexShading
             bitcast<u32>(material.water_depth));
         o.flat3.z = bitcast<u32>(material.water_visibility);
         o.flat3.w = bitcast<u32>(material.water_refraction);
+        // Water ignores ClearCoat, SpecularAnisotropy and Sheen: their words hold the flow
+        // mapping of its textures (vo_water_flow)
+        o.flat1.z = bitcast<u32>(material.distortion_strength);
+        o.flat1.w = bitcast<u32>(material.distortion_frequency);
+        o.flat0.w = (material.distortion_flags & WATER_FLOW_TEXTURES) |
+            (u32(round(saturate(material.distortion_phase) * 65535.0)) << 16u);
         o.flat4 = vec4u((bitcast<u32>(material.water_foam_width) & 0x7FFFFFFFu) |
             ((material.water_flags & WATER_FOAM_TEXTURE) << 31u),
             pack2x16float(vec2f(material.water_ripple_scale, material.water_foam_scale)),

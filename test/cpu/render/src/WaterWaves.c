@@ -220,8 +220,9 @@ void WaterWaves_defaults(void) {
     test_str(ecs_vec_get_t(&s->members, ecs_member_t, 1)->name, "detail");
     s = ecs_get(world, ecs_id(WaterFlow), EcsStruct);
     test_assert(s != NULL);
-    test_int(ecs_vec_count(&s->members), 1);
+    test_int(ecs_vec_count(&s->members), 2);
     test_str(ecs_vec_get_t(&s->members, ecs_member_t, 0)->name, "velocity");
+    test_str(ecs_vec_get_t(&s->members, ecs_member_t, 1)->name, "textures");
     test_assert(ecs_lookup(world, "box.material.WaterWaves") == ecs_id(WaterWaves));
     test_assert(ecs_lookup(world, "box.material.WaterFlow") == ecs_id(WaterFlow));
 
@@ -636,6 +637,193 @@ void WaterWaves_prefab_instances(void) {
     double was = d->materials.waves->states[set].phases[0];
     frame_dt(world, 0.1f);
     test_assert(phase_distance(d->materials.waves->states[set].phases[0], was) > 1e-3);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void WaterWaves_flow_textures_defaults(void) {
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    test_assert(ecs_script_run(world, "flow",
+        "using box.material\n"
+        "brook {\n"
+        "  Water: {}\n"
+        "  WaterFlow: {velocity: {0.5, -1}, textures: true}\n"
+        "}\n", NULL) == 0);
+
+    /* A constructed WaterFlow keeps its textures still */
+    ecs_entity_t added = ecs_new(world);
+    ecs_add(world, added, WaterFlow);
+    test_bool(ecs_get(world, added, WaterFlow)->textures, false);
+
+    ecs_entity_t brook = ecs_lookup(world, "brook");
+    const WaterFlow *flow = ecs_get(world, brook, WaterFlow);
+    test_assert(flow != NULL);
+    test_bool(flow->textures, true);
+    test_flt(flow->velocity[0], 0.5f);
+    test_flt(flow->velocity[1], -1);
+
+    /* Instances inherit it like Water */
+    ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
+    ecs_add(world, prefab, Water);
+    ecs_set(world, prefab, WaterFlow, {.velocity = {1, 2}, .textures = true});
+    ecs_entity_t instance = ecs_new_w_pair(world, EcsIsA, prefab);
+    test_bool(ecs_owns(world, instance, WaterFlow), false);
+    test_bool(ecs_get(world, instance, WaterFlow)->textures, true);
+    test_flt(ecs_get(world, instance, WaterFlow)->velocity[0], 1);
+
+    ecs_fini(world);
+}
+
+void WaterWaves_flow_textures_pack(void) {
+    /* The phase is the time over the period wrapped to 0..1 */
+    test_flt(box_draws_water_flow_phase(0), 0);
+    test_flt(box_draws_water_flow_phase(0.25 * BOX_RENDER_WATER_FLOW_PERIOD), 0.25f);
+    test_flt(box_draws_water_flow_phase(1000.75 * BOX_RENDER_WATER_FLOW_PERIOD), 0.75f);
+    test_flt(box_draws_water_flow_phase(-0.25 * BOX_RENDER_WATER_FLOW_PERIOD), 0.75f);
+    test_flt(box_draws_water_flow_phase(NAN), 0);
+    test_flt(box_draws_water_flow_phase(INFINITY), 0);
+
+    box_render_material_t record;
+    box_draws_tables_init();
+    Water water = {
+        .shallow_color = {60, 170, 160}, .deep_color = {8, 40, 64}, .depth = 3,
+        .visibility = 2, .foam_texture = 77, .absorption = {255, 255, 255}
+    };
+    Distortion distortion = { .strength = 0.5f, .scale = 2, .speed = 1 };
+
+    /* With textures the flow words hold the velocity, the phase and the flag */
+    WaterFlow flow = { .velocity = {1.5f, -0.5f}, .textures = true };
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .water = &water, .flow = &flow, .distortion = &distortion,
+        .time = 0.5 * BOX_RENDER_WATER_FLOW_PERIOD, .fade = 1 });
+    test_uint(record.water_flow_flags, BOX_RENDER_WATER_FLOW_TEXTURES);
+    test_flt(record.water_flow[0], 1.5f);
+    test_flt(record.water_flow[1], -0.5f);
+    test_flt(record.water_flow_phase, 0.5f);
+    test_bool((record.distortion_flags & BOX_RENDER_DISTORTION_SHARP) != 0, false);
+
+    /* A velocity that is not finite is 0 */
+    flow.velocity[0] = NAN;
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .water = &water, .flow = &flow, .fade = 1 });
+    test_flt(record.water_flow[0], 0);
+    test_flt(record.water_flow[1], -0.5f);
+    test_uint(record.water_flow_flags, BOX_RENDER_WATER_FLOW_TEXTURES);
+
+    /* Without textures, or without a WaterFlow, the words are 0 */
+    flow = (WaterFlow){ .velocity = {1.5f, -0.5f} };
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .water = &water, .flow = &flow, .time = 0.5, .fade = 1 });
+    test_uint(record.water_flow_flags, 0);
+    test_flt(record.water_flow[0], 0);
+    test_flt(record.water_flow[1], 0);
+    test_flt(record.water_flow_phase, 0);
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .water = &water, .time = 0.5, .fade = 1 });
+    test_uint(record.water_flow_flags, 0);
+
+    /* Without Water the words are the Distortion */
+    flow.textures = true;
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .flow = &flow, .distortion = &distortion, .time = 0.25, .fade = 1 });
+    test_uint(record.distortion_flags & BOX_RENDER_DISTORTION_PRESENT,
+        BOX_RENDER_DISTORTION_PRESENT);
+    test_flt(record.distortion_strength, 0.5f);
+
+    /* A transition of another component keeps the flow words */
+    box_draw_transition_material_t target;
+    box_draws_transition_target(&target, &(box_draw_material_t){
+        .water = &water, .flow = &flow, .time = 0.25 * BOX_RENDER_WATER_FLOW_PERIOD,
+        .fade = 1 }, BOX_DRAW_TRANSITION_TABLE);
+    box_draws_transition_encode(&target, &record);
+    test_uint(record.water_flow_flags, BOX_RENDER_WATER_FLOW_TEXTURES);
+    test_flt(record.water_flow[0], 1.5f);
+    test_flt(record.water_flow_phase, 0.25f);
+}
+
+void WaterWaves_flow_textures_record(void) {
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_singleton_set(world, Scene, {.water = true});
+    ecs_entity_t a = pond_new(world, 0);
+    ecs_entity_t b = pond_new(world, 2);
+
+    /* A WaterFlow without textures keeps the Water still and shared */
+    ecs_set(world, a, WaterFlow, {.velocity = {1, 0}});
+    frame_dt(world, 1.0f / 60.0f);
+    frame_dt(world, 1.0f / 60.0f);
+    uint32_t shared = id_of(world, b);
+    test_assert(shared != 0 && shared != UINT32_MAX);
+    test_uint(id_of(world, a), shared);
+    test_uint(record_of(world, shared)->water_flow_flags, 0);
+
+    /* With textures the shape gets a private slot whose record has the flag and moves */
+    ecs_set(world, a, WaterFlow, {.velocity = {1, -0.5f}, .textures = true});
+    frame_dt(world, 1.0f / 60.0f);
+    frame_dt(world, 1.0f / 60.0f);
+    uint32_t own = id_of(world, a);
+    test_assert(own != shared && own != 0 && own != UINT32_MAX);
+    test_uint(id_of(world, b), shared);
+    const box_render_material_t *r = record_of(world, own);
+    test_uint(r->water_flow_flags, BOX_RENDER_WATER_FLOW_TEXTURES);
+    test_flt(r->water_flow[0], 1);
+    test_flt(r->water_flow[1], -0.5f);
+    box_render_draws_t *d = draws_of(world);
+    test_flt(r->water_flow_phase, box_draws_water_flow_phase(d->materials.time));
+    test_uint(record_of(world, shared)->water_flow_flags, 0);
+
+    /* Its phase follows the time every frame */
+    int32_t i;
+    for (i = 0; i < 3; i ++) {
+        float was = record_of(world, own)->water_flow_phase;
+        frame_dt(world, 0.1f);
+        float now = record_of(world, own)->water_flow_phase;
+        test_assert(fabsf(now - was) > 1e-3f);
+        test_flt(now, box_draws_water_flow_phase(d->materials.time));
+        test_uint(id_of(world, a), own);
+    }
+
+    /* Without textures it shares the slot of b again */
+    ecs_set(world, a, WaterFlow, {.velocity = {1, -0.5f}});
+    frame_dt(world, 1.0f / 60.0f);
+    frame_dt(world, 1.0f / 60.0f);
+    test_uint(id_of(world, a), id_of(world, b));
+    test_uint(record_of(world, id_of(world, a))->water_flow_flags, 0);
+
+    /* A WaterFlow with textures on a shape without Water does nothing */
+    ecs_entity_t c = ecs_new(world);
+    ecs_set(world, c, Box, {1, 1, 1});
+    ecs_set(world, c, Position, {4, 0, 0});
+    ecs_set(world, c, Rgb, {40, 80, 120});
+    ecs_set(world, c, WaterFlow, {.velocity = {1, 0}, .textures = true});
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Box, {1, 1, 1});
+    ecs_set(world, e, Position, {6, 0, 0});
+    ecs_set(world, e, Rgb, {40, 80, 120});
+    frame_dt(world, 1.0f / 60.0f);
+    frame_dt(world, 1.0f / 60.0f);
+    test_uint(id_of(world, c), id_of(world, e));
+    test_uint(record_of(world, id_of(world, c))->water_flow_flags, 0);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void WaterWaves_flow_textures_water_off(void) {
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t a = pond_new(world, 0);
+    ecs_entity_t b = pond_new(world, 2);
+    ecs_set(world, a, WaterFlow, {.velocity = {1, 0}, .textures = true});
+    frame_dt(world, 1.0f / 60.0f);
+    frame_dt(world, 1.0f / 60.0f);
+
+    /* A scene without Scene.water packs no flow words */
+    test_uint(id_of(world, a), id_of(world, b));
+    test_uint(record_of(world, id_of(world, a))->water_flow_flags, 0);
 
     ecs_fini(world);
     box_render_null_free(null);

@@ -955,8 +955,14 @@ typedef struct box_gpu_atlas_read_t {
  * texture without one. */
 #define BOX_GPU_RIPPLES_FOAM_BINDING (26)
 
+/** Binding of the view group of the velocity of the field of WaterRipples of the scene of the
+ * view, a read-only rgba32float storage texture in the addressing of the heights, water_ripple_flow of
+ * mesh_extended.wgsl: the world velocity of the water of a cell (xy) and its velocity relative
+ * to the frame of the field (zw); the 1x1 zero texture without one. */
+#define BOX_GPU_RIPPLES_FLOW_BINDING (27)
+
 /** Bindings of the view group, the highest binding plus one */
-#define BOX_GPU_VIEW_BINDINGS (27)
+#define BOX_GPU_VIEW_BINDINGS (28)
 
 /** Binding of the transmittance and sky irradiance LUT array of the planet lights in the view
  * group */

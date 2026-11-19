@@ -255,6 +255,18 @@ static bool box_materials_water_moves(
         (water->ripple_velocity[0] != 0.0f || water->ripple_velocity[1] != 0.0f);
 }
 
+/** Check whether the WaterFlow of a Water moves its textures (WaterFlow.textures), whose flow
+ * mapping phase changes with the time.
+ *
+ * @param flow The WaterFlow of the Water, NULL for none
+ * @return Whether its record changes every frame
+ */
+static bool box_materials_water_flows(
+    const WaterFlow *flow)
+{
+    return flow && flow->textures;
+}
+
 /** Check whether a Distortion changes its noise over time: a speed that is not 0, the phase
  * being the only part of its record that changes with the time.
  *
@@ -279,8 +291,9 @@ static bool box_materials_distortion_moves(
  * @param owner The owner, 0 for the default material
  * @param out The record
  * @return Whether the record changes with the time: the owner has or inherits a TextureScroll,
- * a WindSway, a Water whose ripples move (box_materials_water_moves), that has WaterWaves or
- * WaterCaustics that move (box_draws_water_caustics_moves), or a Distortion that moves
+ * a WindSway, a Water whose ripples move (box_materials_water_moves), that has WaterWaves,
+ * WaterCaustics that move (box_draws_water_caustics_moves) or a WaterFlow that moves its
+ * textures (box_materials_water_flows), or a Distortion that moves
  * (box_materials_distortion_moves) without Water
  */
 static bool box_materials_pack(
@@ -306,12 +319,14 @@ static bool box_materials_pack(
     return material.scroll != NULL || material.sway != NULL ||
         box_materials_water_moves(material.water) || material.waves != NULL ||
         box_draws_water_caustics_moves(material.caustics, material.flow) ||
+        box_materials_water_flows(material.flow) ||
         (!material.water && box_materials_distortion_moves(material.distortion));
 }
 
-/** Check whether an entity has or inherits a TextureScroll, a WindSway, a Water whose ripples
- * move, that has WaterWaves or WaterCaustics that move, or a Distortion that moves, whose record
- * changes every frame.
+/** Check whether an entity has or inherits a component whose record changes every frame.
+ *
+ * Those are a TextureScroll, a WindSway, a Water whose ripples move, that has WaterWaves,
+ * WaterCaustics that move or a WaterFlow with textures, or a Distortion that moves.
  *
  * Only in a scene that enables it (Scene.texture_scroll, Scene.wind, Scene.water,
  * Scene.distortion).
@@ -330,7 +345,8 @@ static bool box_materials_scrolls(
     bool moves = box_materials_water_moves(water) ||
         (water && ecs_get(world, e, WaterWaves) != NULL) ||
         (water && box_draws_water_caustics_moves(ecs_get(world, e, WaterCaustics),
-            ecs_get(world, e, WaterFlow)));
+            ecs_get(world, e, WaterFlow))) ||
+        (water && box_materials_water_flows(ecs_get(world, e, WaterFlow)));
     bool distorts = box_materials_distortion_moves(ecs_get(world, e, Distortion));
     bool result = false;
     if (!scroll && !sway && !moves && !distorts) {
@@ -924,8 +940,8 @@ static bool box_materials_keyed(
  * changed field is left alone. 2D shapes and texts write their shading again.
  *
  * Mesh shapes write nothing, unless their batch changes (an added or removed component of
- * box_materials_keyed, or a set TextureMapping, Water or Distortion), they move between a shared
- * and a private slot (box_materials_slotted) or the owner of a shared slot moves.
+ * box_materials_keyed, a set TextureMapping, Water, Distortion or WaterFlow), they change
+ * slot (box_materials_slotted) or the owner of a shared slot moves.
  *
  * @param it The iterator of the observer
  */
@@ -947,7 +963,8 @@ static void BoxMaterialsOnComponent(
         ecs_table_has_id(world, table, ecs_id(Text));
     bool keyed = ((box_materials_keyed(it->event_id) || box_materials_slotted(it->event_id)) &&
         it->event != EcsOnSet) || it->event_id == ecs_id(TextureMapping) ||
-        it->event_id == ecs_id(Water) || it->event_id == ecs_id(Distortion);
+        it->event_id == ecs_id(Water) || it->event_id == ecs_id(Distortion) ||
+        it->event_id == ecs_id(WaterFlow);
     bool mark = !prefab && (inline_ || keyed);
     for (i = 0; i < it->count; i ++) {
         if (owners) {

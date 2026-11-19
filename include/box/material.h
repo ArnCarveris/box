@@ -373,9 +373,14 @@ ECS_STRUCT(Distortion, {
  * specular of PbrMaterial.roughness with an F0 of 0.02 (ior 1.33) adds on top.
  *
  * Waves are the PbrTextures.normal of the shape, scrolled by TextureScroll, under the travelling
- * waves of a WaterWaves if any; ripple_scale adds a second sample of it, moved by ripple_velocity and whiteout blended. With a ripple_scale above 0
- * and a ripple_velocity its record is packed every frame, like that of a TextureScroll; a still
- * Water shares its record like the other material components.
+ * waves of a WaterWaves if any; ripple_scale adds a second sample of it, moved by ripple_velocity
+ * and whiteout blended. With a ripple_scale above 0 and a ripple_velocity its record is packed
+ * every frame, like that of a TextureScroll; a still Water shares its record like the other
+ * material components. With WaterFlow.textures the normal map and the foam texture travel with
+ * the flow of the water instead of standing still (see WaterFlow).
+ *
+ * The foam texture is sampled twice, the second time at a different scale and rotation, and the
+ * two are combined, so its lace does not read as one repeating tile.
  *
  * A WaterCaustics adds the moving web of sunlight that waves focus onto the floor seen through
  * the water.
@@ -399,7 +404,8 @@ ECS_STRUCT(Water, {
     Rgb foam_color;         /**< Color of the foam, display encoded */
     float foam_width;       /**< Water depth below which foam appears, world units, 0 for none */
     ecs_entity_t foam_texture; /**< Texture whose red breaks up the foam, sampled with the UVs of
-                             *   the shape times foam_scale; 0 for a smooth band */
+                             *   the shape times foam_scale and again rotated at a coarser
+                             *   scale; 0 for a smooth band */
     float foam_scale;       /**< Repeats of the foam texture per repeat of the UVs */
     float ripple_scale;     /**< Scale of the UVs of a second sample of the normal map, 0 for
                              *   none */
@@ -468,10 +474,28 @@ ECS_STRUCT(WaterWaves, {
  * Water, and the ripples and foam over any other Water shape with a WaterFlow (the lengths of a
  * bending brook, each flowing along its chord) drift with the velocity of that shape, blended
  * smoothly across the seams between shapes. A RippleSource pushes relative to that local flow.
- * Without WaterWaves or a field it only stores the velocity; without Water it does nothing.
+ * Without WaterWaves, a field or textures it only stores the velocity; without Water it does
+ * nothing.
+ *
+ * With textures the normal map of the Water (PbrTextures.normal and its ripple_scale sample) and
+ * its foam_texture travel with the flow by two phase flow mapping: each texture is sampled twice,
+ * moved along the local velocity of the water by two sawtooth phases half a period of
+ * BOX_RENDER_WATER_FLOW_PERIOD seconds apart, and cross faded so each sample resets while it is
+ * invisible; a smooth noise over the world XZ offsets the phase per pixel, so the reset does not
+ * pulse over the whole surface. The ripples and the foam lace move downstream and bend with the
+ * water instead of standing still. The local velocity, taken in the texture space of the shape,
+ * is the velocity of the field of the WaterRipples of the view, averaged over about a world
+ * unit, where a fragment lies inside its window (and within its height band), so it is continuous
+ * across the seams between Water shapes and follows the bends, and the velocity of this WaterFlow elsewhere, faded between the two over
+ * the border band of the window like the ripple normals. Shapes that share their texture space
+ * (a TextureMapping of MappingWorld) show no seam between them. A TextureScroll of the shape still
+ * applies on top; scenes that move their textures with the flow drop it. With textures the
+ * record of the shape is packed every frame, like that of a TextureScroll. Without textures
+ * (the default) the textures do not move with the flow.
  */
 ECS_STRUCT(WaterFlow, {
     vec2 velocity; /**< World units per second (X, Z) the surface moves with */
+    bool textures; /**< Whether the normal map and foam texture of the Water move with the flow */
 });
 
 /** Strength of a constructed WaterCaustics: the pattern at its full contrast */

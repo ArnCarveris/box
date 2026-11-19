@@ -948,6 +948,16 @@ void box_gpu_ripples_layout(
             }
         };
     }
+
+    entries[BOX_GPU_RIPPLES_FLOW_BINDING] = (WGPUBindGroupLayoutEntry){
+        .binding = BOX_GPU_RIPPLES_FLOW_BINDING,
+        .visibility = WGPUShaderStage_Fragment,
+        .storageTexture = {
+            .access = WGPUStorageTextureAccess_ReadOnly,
+            .format = WGPUTextureFormat_RGBA32Float,
+            .viewDimension = WGPUTextureViewDimension_2D
+        }
+    };
 }
 
 void box_gpu_ripples_bindings(
@@ -963,6 +973,11 @@ void box_gpu_ripples_bindings(
     entries[BOX_GPU_RIPPLES_FOAM_BINDING] = (WGPUBindGroupEntry){
         .binding = BOX_GPU_RIPPLES_FOAM_BINDING,
         .textureView = field ? field->foam_views[field->current] : gpu->ripples->none_view
+    };
+    entries[BOX_GPU_RIPPLES_FLOW_BINDING] = (WGPUBindGroupEntry){
+        .binding = BOX_GPU_RIPPLES_FLOW_BINDING,
+        .textureView = field && field->velocity_view
+            ? field->velocity_view : gpu->ripples->none_flow_view
     };
 }
 

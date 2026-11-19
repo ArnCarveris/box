@@ -475,6 +475,56 @@ done:
     return;
 }
 
+float box_draws_water_flow_phase(
+    double time)
+{
+    float result = 0.0f;
+    if (isfinite(time)) {
+        double v = fmod(time / BOX_RENDER_WATER_FLOW_PERIOD, 1.0);
+        if (v < 0.0) {
+            v += 1.0;
+        }
+
+        result = (float)v;
+        if (result >= 1.0f) {
+            result = 0.0f;
+        }
+    }
+
+    return result;
+}
+
+/** Pack the WaterFlow of a Water into the flow words of its record, which hold the Distortion of
+ * a record without Water.
+ *
+ * With WaterFlow.textures they are its velocity (0 when not finite), the phase of the flow
+ * mapping at the time and BOX_RENDER_WATER_FLOW_TEXTURES; 0 without one or without textures.
+ *
+ * @param out The record
+ * @param flow The WaterFlow of the Water, NULL for none
+ * @param time Total render time the phase is computed at
+ */
+static void box_draws_water_flow_pack(
+    box_render_material_t *out,
+    const WaterFlow *flow,
+    double time)
+{
+    out->water_flow[0] = 0.0f;
+    out->water_flow[1] = 0.0f;
+    out->water_flow_phase = 0.0f;
+    out->water_flow_flags = 0u;
+    if (!flow || !flow->textures) {
+        goto done;
+    }
+
+    out->water_flow[0] = isfinite(flow->velocity[0]) ? flow->velocity[0] : 0.0f;
+    out->water_flow[1] = isfinite(flow->velocity[1]) ? flow->velocity[1] : 0.0f;
+    out->water_flow_phase = box_draws_water_flow_phase(time);
+    out->water_flow_flags = BOX_RENDER_WATER_FLOW_TEXTURES;
+done:
+    return;
+}
+
 /** Pack a WaterCaustics into the caustics words of a Water record, which hold the Fresnel of a
  * record without Water: its strength when positive and finite, the inverse of its scale and its
  * depth (at least BOX_RENDER_CAUSTICS_MIN), its water frame and its phase at the time.
@@ -682,8 +732,12 @@ void box_draws_material_pack(
     out->sheen = box_draws_sheen_pack(material->sheen);
     out->diffuse_transmission = box_draws_diffuse_transmission_pack(
         material->diffuse_transmission);
-    box_draws_distortion_pack(out, material->water ? NULL : material->distortion,
-        transmission, material->time);
+    if (material->water) {
+        box_draws_water_flow_pack(out, material->flow, material->time);
+    } else {
+        box_draws_distortion_pack(out, material->distortion, transmission, material->time);
+    }
+
     out->thickness = material->diffuse_transmission &&
         isfinite(material->diffuse_transmission->thickness) &&
         material->diffuse_transmission->thickness > 0.0f

@@ -1112,7 +1112,11 @@
                     "moving_record",
                     "without_water",
                     "water_off",
-                    "prefab_instances"
+                    "prefab_instances",
+                    "flow_textures_defaults",
+                    "flow_textures_pack",
+                    "flow_textures_record",
+                    "flow_textures_water_off"
                 ]
             },
             {

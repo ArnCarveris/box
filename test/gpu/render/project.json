@@ -351,6 +351,14 @@
                 ]
             },
             {
+                "id": "WaterFlowTextures",
+                "testcases": [
+                    "foam_moves_with_flow",
+                    "foam_still_without_textures",
+                    "no_seam_in_field"
+                ]
+            },
+            {
                 "id": "WaterRipples",
                 "testcases": [
                     "ring_spreads",

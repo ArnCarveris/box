@@ -71,6 +71,11 @@ void box_draws_transition_target(
         out->watered = true;
         out->water = *material->water;
         out->water_waves = material->water_waves;
+        if (material->flow) {
+            out->flowed = true;
+            out->flow = *material->flow;
+        }
+
         if (material->caustics) {
             out->causticked = true;
             out->caustics = *material->caustics;
@@ -253,6 +258,7 @@ static void box_draws_transition_parts(
             &material->distortion),
         .water = material->watered ? &material->water : NULL,
         .water_waves = material->watered ? material->water_waves : 0u,
+        .flow = material->watered && material->flowed ? &material->flow : NULL,
         .caustics = material->watered && material->causticked ? &material->caustics : NULL,
         .caustics_frame = { material->caustics_frame[0], material->caustics_frame[1] },
         .sway = material->swayed ? &material->sway : NULL,
