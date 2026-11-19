@@ -8,7 +8,7 @@ assets {
   lg_wave_h { Gen: {width: 256, height: 256, seed: 31, layers: [
     {kind: GenNoise, frequency: 6, octaves: 4, amount: 1}
   ]} }
-  lg_wave_n { Gen: {source: lg_wave_h, output: GenNormal, strength: 1.1} }
+  lg_wave_n { Gen: {source: lg_wave_h, output: GenNormal, strength: 0.9} }
 
   // Breaks the foam of the water (the shore band and the wake) up into lacy patches
   lg_foam_m { Gen: {width: 256, height: 256, seed: 41, layers: [
@@ -161,9 +161,17 @@ assets {
   // A light breeze over a sheltered lagoon: a long low swell runs up the lagoon, two shorter wind
   // waves cross it at angles and a faint ripple runs down it. The normal map adds the fine chop.
   // play.flecs carries them past the canoe with a WaterFlow at the speed of the world
+  //
+  // The swell glows turquoise where it is backlit by the low sun, and the slightly rough surface
+  // spreads the sun into a glitter path that widens toward the horizon. Small waves lap at the
+  // beaches every few seconds.
+  //
+  // Caustics play on the sand and the riverbed, cells about the size of the swell chop, bright in
+  // the shallows and around the canoe and fading over the deeper middle. They drift with the
+  // WaterFlow, at the speed of the world like the floor
   prefab LgWater {
     Rgb: {255, 255, 255}
-    PbrMaterial: {roughness: 0.04}
+    PbrMaterial: {roughness: 0.12}
     Water: {
       shallow_color: {64, 214, 198},
       deep_color: {10, 104, 136},
@@ -172,12 +180,17 @@ assets {
       absorption: {84, 198, 190},
       refraction: 0.012,
       foam_color: {240, 250, 248},
-      foam_width: 0.18,
+      foam_width: 0.15,
       foam_texture: lg_foam_m,
       foam_scale: 2,
-      ripple_scale: 2.1,
-      ripple_velocity: {0.015, 0.024}
+      ripple_scale: 1.7,
+      ripple_velocity: {0.015, 0.024},
+      scatter_color: {46, 214, 178},
+      scatter: 0.9,
+      shore_period: 5,
+      shore_reach: 0.4
     }
+    WaterCaustics: {strength: 1.8, scale: 1, speed: 0.35, depth: 4}
     PbrTextures: {normal: lg_wave_n}
     texture.Mapping: {mode: MappingWorld, size: 7}
     texture.Scroll: {velocity: {0.008, 0.03}}
@@ -189,7 +202,7 @@ assets {
         {direction: {-0.55, -0.85}, wavelength: 2.1, amplitude: 0.026, steepness: 0.3},
         {direction: {0.3, 0.95}, wavelength: 1.6, amplitude: 0.012, steepness: 0.2}
       ]
-      detail: 0.45
+      detail: 0.35
     }
   }
 
