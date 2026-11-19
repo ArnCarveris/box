@@ -122,8 +122,8 @@ sky {
     mie: {
       scale_height: 1.2,
       anisotropy: 0.78,
-      scattering_scale: forest_seasonal(season, 1.25, 1.45, 1.7, 1.15) + 2.5 * precipitation,
-      tint: {255, 240, 222}
+      scattering_scale: forest_seasonal(season, 1.25, 1.45, 1.7, 1.15) + 1.1 * precipitation,
+      tint: {255, 240 + 12 * precipitation, 222 + 26 * precipitation}
     },
     ozone_scale: 1,
     ground_albedo: {forest_seasonal(season, 62, 58, 92, 74), forest_seasonal(season, 88, 80, 72, 70), forest_seasonal(season, 46, 46, 40, 64)},
@@ -173,6 +173,18 @@ cloud_high {
     density: 0.45,
     offset: {900, 400},
     velocity: {cloud_velocity_x * 2, cloud_velocity_z * 2}
+  }
+}
+
+// The meshes take their ambient light from the atmosphere environment; the particles (falling
+// leaves, rain, snow, motes, insects) and the fog volumes (shafts, mist) take it from the
+// AmbientLight of the scene. It follows the daylight, so they darken at night with everything
+// else instead of glowing in the dark, and dims a little under the overcast
+$ {
+  AmbientLight: {
+    sky: {118, 130, 149},
+    ground: {79, 74, 68},
+    intensity: (0.025 + 0.975 * forest_daylight(season, hour)) * (1 - 0.3 * precipitation)
   }
 }
 

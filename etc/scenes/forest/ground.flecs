@@ -11,7 +11,7 @@ using assets
 // world a darker floor, a dense tree line and hills that close the horizon.
 assets {
   // A slab of the brook bed: its top runs across the brook (local Z) from (z1, y1) to (z2, y2),
-  // len along it (local X) around x
+  // len along it (local X) around x. A wet slab lies under the water (ForestBedFloor)
   template ForestBedSlab {
     prop len: f32 = 1
     prop x: f32 = 0
@@ -19,16 +19,25 @@ assets {
     prop y1: f32 = 0
     prop z2: f32 = 1
     prop y2: f32 = 0
+    prop wet: bool = false
 
     const t = 0.3
     const dz = z2 - z1
     const dy = y2 - y1
     const a = 0 - atan2(dy, dz)
 
-    slab : ForestFloor {
-      Position: {x, (y1 + y2) / 2 - cos(a) * t / 2, (z1 + z2) / 2 - sin(a) * t / 2}
-      Rotation: {a, 0, 0}
-      Box: {len, t, sqrt(dz * dz + dy * dy)}
+    if wet {
+      slab : ForestBedFloor {
+        Position: {x, (y1 + y2) / 2 - cos(a) * t / 2, (z1 + z2) / 2 - sin(a) * t / 2}
+        Rotation: {a, 0, 0}
+        Box: {len, t, sqrt(dz * dz + dy * dy)}
+      }
+    } else {
+      slab : ForestFloor {
+        Position: {x, (y1 + y2) / 2 - cos(a) * t / 2, (z1 + z2) / 2 - sin(a) * t / 2}
+        Rotation: {a, 0, 0}
+        Box: {len, t, sqrt(dz * dz + dy * dy)}
+      }
     }
   }
 
@@ -47,9 +56,9 @@ assets {
     const slab_len = len - trim
     const slab_x = 0 - trim / 2
 
-    ForestBedSlab bottom(len: slab_len, x: slab_x, z1: 0 - BROOK_BED_HALF, y1: bed_y, z2: BROOK_BED_HALF, y2: bed_y)
-    ForestBedSlab inner_s(len: slab_len, x: slab_x, z1: 0 - BROOK_STEP, y1: step_y, z2: 0 - BROOK_BED_HALF, y2: bed_y)
-    ForestBedSlab inner_n(len: slab_len, x: slab_x, z1: BROOK_BED_HALF, y1: bed_y, z2: BROOK_STEP, y2: step_y)
+    ForestBedSlab bottom(len: slab_len, x: slab_x, z1: 0 - BROOK_BED_HALF, y1: bed_y, z2: BROOK_BED_HALF, y2: bed_y, wet: true)
+    ForestBedSlab inner_s(len: slab_len, x: slab_x, z1: 0 - BROOK_STEP, y1: step_y, z2: 0 - BROOK_BED_HALF, y2: bed_y, wet: true)
+    ForestBedSlab inner_n(len: slab_len, x: slab_x, z1: BROOK_BED_HALF, y1: bed_y, z2: BROOK_STEP, y2: step_y, wet: true)
     ForestBedSlab outer_s(len: slab_len, x: slab_x, z1: 0 - BROOK_BANK, y1: BROOK_RIM_Y, z2: 0 - BROOK_STEP, y2: step_y)
     ForestBedSlab outer_n(len: slab_len, x: slab_x, z1: BROOK_STEP, y1: step_y, z2: BROOK_BANK, y2: BROOK_RIM_Y)
     ForestBedSlab rim_s(len: slab_len, x: slab_x, z1: 0 - BROOK_RIM, y1: 0 - BROOK_RIM_Y, z2: 0 - BROOK_BANK, y2: BROOK_RIM_Y)

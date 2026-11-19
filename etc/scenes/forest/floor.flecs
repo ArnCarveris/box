@@ -148,4 +148,9 @@ assets {
     texture.Layers: {layers: [layer_fallen_leaves, layer_wet, layer_puddles, layer_snow]}
     texture.Mapping: {mode: MappingWorld, size: WORLD_SIZE}
   }
+
+  // The floor under the water of the brook: no snow settles and no puddles stand on it
+  prefab ForestBedFloor : ForestFloor {
+    texture.Layers: {layers: [layer_fallen_leaves, layer_wet]}
+  }
 }
