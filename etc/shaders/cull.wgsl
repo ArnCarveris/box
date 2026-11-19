@@ -166,13 +166,37 @@ fn portal_entries_see(b: Bounds, base: u32, slot: vec4f) -> bool {
     return false;
 }
 
+// Share of a world space box, brought into the frame of a mover's world to rest rows at
+// rows (none for 0) and grown to PORTAL_MEMBER_THIN, that an area box holds; -1 when it reaches
+// in by no more than PORTAL_MEMBER_DEPTH (box_portal_box_share).
+fn portal_box_share(b: Bounds, rows: u32, bmin: vec3f, bmax: vec3f) -> f32 {
+    var center = b.center;
+    var extent = b.extent;
+    if (rows != 0u) {
+        let r = mat3x3f(portals[rows].xyz, portals[rows + 1u].xyz, portals[rows + 2u].xyz);
+        let t = vec3f(portals[rows].w, portals[rows + 1u].w, portals[rows + 2u].w);
+        center = b.center * r + t;
+        extent = b.extent * mat3x3f(abs(r[0]), abs(r[1]), abs(r[2]));
+    }
+
+    let half = max(extent, vec3f(PORTAL_MEMBER_THIN * 0.5));
+    let depth = min(center + half, bmax) - max(center - half, bmin);
+    if (!all(depth > vec3f(PORTAL_MEMBER_DEPTH))) {
+        return -1.0;
+    }
+
+    let size = 2.0 * half;
+    return (depth.x * depth.y * depth.z) / (size.x * size.y * size.z);
+}
+
 // Whether the portal traversal of the view of a frustum sees a world space box
 // (box_portal_block_sees). The block holds a header (boxes, areas, the entries of the
 // outdoors), two vec4 per area box (smallest corner and area, largest corner and whether the
-// box is exact), one vec4 per area (its entries) and the planes of the entries. A box is a
-// member of every area whose box it reaches into, and of the outdoors when the exact boxes do
-// not hold all of it; it is seen when an entry of one of them sees it. A frustum without a
-// block sees every box.
+// box is exact plus twice its mover slot + 1), one vec4 per area (its entries), three world to
+// rest rows per mover and the planes of the entries. The boxes of a mover's areas are at its
+// rest and tested in the frame of its rows. A box is a member of every area whose box it reaches
+// into, and of the outdoors when the exact boxes do not hold all of it; it is seen when an entry
+// of one of them sees it. A frustum without a block sees every box.
 fn portal_visible(b: Bounds, f: u32) -> bool {
     let base = frustums[f].flags.z;
     if (base == 0u) {
@@ -182,24 +206,28 @@ fn portal_visible(b: Bounds, f: u32) -> bool {
     let header = portals[base];
     let boxes = u32(header.x);
     let table = base + 1u + 2u * boxes;
-    let pad = max(vec3f(PORTAL_MEMBER_THIN * 0.5) - b.extent, vec3f(0.0));
-    let lo = b.center - b.extent - pad;
-    let hi = b.center + b.extent + pad;
-    let size = hi - lo;
+    let movers = table + u32(header.y);
     var covered = 0.0;
     for (var i = 0u; i < boxes; i++) {
         let bmin = portals[base + 1u + 2u * i];
         let bmax = portals[base + 2u + 2u * i];
-        let depth = min(hi, bmax.xyz) - max(lo, bmin.xyz);
-        if (all(depth > vec3f(PORTAL_MEMBER_DEPTH))) {
-            covered += depth.x * depth.y * depth.z * bmax.w;
+        let code = u32(bmax.w);
+        let mover = code >> 1u;
+        var rows = 0u;
+        if (mover != 0u) {
+            rows = movers + 3u * (mover - 1u);
+        }
+
+        let share = portal_box_share(b, rows, bmin.xyz, bmax.xyz);
+        if (share >= 0.0) {
+            covered += share * f32(code & 1u);
             if (portal_entries_see(b, base, portals[table + u32(bmin.w)])) {
                 return true;
             }
         }
     }
 
-    if (covered >= size.x * size.y * size.z * PORTAL_MEMBER_COVER) {
+    if (covered >= PORTAL_MEMBER_COVER) {
         return false;
     }
 

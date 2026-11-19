@@ -70,6 +70,8 @@ typedef struct box_portal_area_t {
     int32_t box_first;      /**< First of its boxes in the boxes of the index */
     int32_t box_count;      /**< Boxes that cover its volume */
     bool exact;             /**< The boxes cover its volume and nothing else */
+    int32_t mover;          /**< Slot of the mover that carries it in the movers of the index, -1
+                             *   when it does not move */
 } box_portal_area_t;
 
 /** An axis aligned box of the volume of an area, as the cull pass tests it */
@@ -102,6 +104,7 @@ typedef struct box_portal_portal_t {
     bool pass_through;      /**< It does not narrow the frustum */
     bool double_side;       /**< It leads both ways whichever side the eye is on */
     bool sky_only;          /**< It lets the sky through, not what stands outdoors */
+    int32_t mover;          /**< Slot of the mover that carries it, -1 when it does not move */
 } box_portal_portal_t;
 
 /** A flat blocker of the index */
@@ -113,7 +116,23 @@ typedef struct box_portal_occluder_t {
     vec3 normal;            /**< Unit normal */
     vec2 size;              /**< Width and height */
     bool auto_orient_y;     /**< It turns about y to face the eye */
+    int32_t mover;          /**< Slot of the mover that carries it, -1 when it does not move */
 } box_portal_occluder_t;
+
+/** An entity with DynamicTransform that carries areas, portals or occluders of the index.
+ *
+ * What it carries is kept as it was when the index was built, its rest, in the rest arrays of
+ * the index; the arrays the traversal reads hold it placed where the mover is now.
+ */
+typedef struct box_portal_mover_t {
+    ecs_entity_t entity;    /**< The mover */
+    mat4 rest;              /**< Its world transform when the index was built */
+    mat4 placed;            /**< Its world transform when what it carries was last placed */
+    mat4 delta;             /**< From the rest to where it is: placed times inverse rest */
+    mat4 inverse;           /**< From where it is to the rest: the inverse of delta */
+    bool moved;             /**< It is away from its rest */
+    bool level;             /**< delta keeps the axes of the world: boxes stay exact */
+} box_portal_mover_t;
 
 /** The areas, portals and occluders of a world, in world space */
 typedef struct box_portal_index_t {
@@ -123,6 +142,13 @@ typedef struct box_portal_index_t {
     ecs_vec_t portals;      /**< box_portal_portal_t */
     ecs_vec_t links;        /**< int32_t, the portals of each area */
     ecs_vec_t occluders;    /**< box_portal_occluder_t */
+    ecs_vec_t movers;       /**< box_portal_mover_t, the movers that carry part of it */
+    ecs_vec_t rest_areas;   /**< box_portal_area_t, the areas at the rest of their movers */
+    ecs_vec_t rest_boxes;   /**< box_portal_box_t, the boxes at the rest of their movers */
+    ecs_vec_t rest_portals; /**< box_portal_portal_t, the portals at the rest of their movers */
+    ecs_vec_t rest_occluders; /**< box_portal_occluder_t, the occluders at the rest of their
+                               *   movers */
+    int32_t placements;     /**< Times a mover moved what it carries */
     ecs_map_t frames;       /**< Entities whose world transform placed an area, a portal or an
                              *   occluder; the index is rebuilt when one of them moves */
     ecs_query_t *area_query;     /**< Entities with VisArea */
@@ -418,6 +444,25 @@ bool box_portal_block_pack(
     ecs_vec_t *out,
     int32_t max);
 
+/** Get how much of a world box an area box holds, as the cull pass and box_portal_members
+ * measure it: the world box is brought into the frame of rows (box_portal_rows_box) and grown
+ * to BOX_PORTAL_MEMBER_THIN on each axis.
+ *
+ * @param rows World to rest rows of the mover of the area box, NULL for a box that stays
+ * @param center Center of the world box
+ * @param extent Half its size
+ * @param min Smallest corner of the area box, in the frame of the rows
+ * @param max Largest corner of the area box
+ * @return The share of the grown box inside the area box, -1 when it reaches in by no more
+ * than BOX_PORTAL_MEMBER_DEPTH
+ */
+float box_portal_box_share(
+    const vec4 *rows,
+    const float *center,
+    const float *extent,
+    const float *min,
+    const float *max);
+
 /** Check whether a traversal sees a world box, exactly as the cull pass does (portal_visible of
  * cull.wgsl): it is seen when it is inside the planes of an entry of an area it is a member of.
  *
@@ -430,6 +475,93 @@ bool box_portal_block_sees(
     const vec4 *block,
     const float *min,
     const float *max);
+
+/** Find the mover that carries an entity: the entity or its nearest ancestor that owns
+ * DynamicTransform (not through the DynamicTransformSpread its descendants inherit).
+ *
+ * @param world The world
+ * @param e The entity
+ * @return The mover, 0 when nothing carries it
+ */
+ecs_entity_t box_portal_mover_of(
+    const ecs_world_t *world,
+    ecs_entity_t e);
+
+/** Get the slot of the mover that carries an entity in the movers of an index, adding the mover
+ * at its current transform when it is not there yet.
+ *
+ * @param world The world
+ * @param index The index
+ * @param e The entity
+ * @return The slot, -1 when nothing carries the entity
+ */
+int32_t box_portal_mover_slot(
+    const ecs_world_t *world,
+    box_portal_index_t *index,
+    ecs_entity_t e);
+
+/** Keep the rest of what the movers of a freshly built index carry: copy the areas, boxes,
+ * portals and occluders into the rest arrays.
+ *
+ * @param index The index
+ */
+void box_portal_movers_rest(
+    box_portal_index_t *index);
+
+/** Place what the movers of an index carry where the movers are now: the areas' height range
+ * and box, the boxes, the portals and the occluders of every mover that moved since it was
+ * last placed.
+ *
+ * @param world The world
+ * @param index The index
+ */
+void box_portal_movers_place(
+    const ecs_world_t *world,
+    box_portal_index_t *index);
+
+/** Bring a world point into the rest of the mover of an area: the point itself for an area
+ * whose mover is at its rest or that does not move.
+ *
+ * @param index The index
+ * @param area Index of the area
+ * @param p The point, in world space
+ * @param out Receives the point at the rest of the area
+ * @return Whether the mover is away from its rest: the area is then tested at its rest, in
+ *         the rest areas of the index
+ */
+bool box_portal_mover_to_rest(
+    const box_portal_index_t *index,
+    int32_t area,
+    const float *p,
+    vec3 out);
+
+/** Write the rows of the world to rest matrix of a mover, which the blocks carry so that the
+ * GPU tests world points and boxes against the boxes of its areas at their rest.
+ *
+ * @param index The index
+ * @param slot Slot of the mover in the movers of the index
+ * @param out Receives the first three rows, the last is 0, 0, 0, 1
+ */
+void box_portal_mover_rows(
+    const box_portal_index_t *index,
+    int32_t slot,
+    vec4 *out);
+
+/** Bring a world box into the frame of world to rest rows: its center by the rows, its extent
+ * by their absolute values, so the box holds the turned world box.
+ *
+ * @param rows The three rows (box_portal_mover_rows)
+ * @param center Center of the world box
+ * @param extent Half its size
+ * @param out_center Receives the center in the frame
+ * @param out_extent Receives half the size in the frame
+ */
+void box_portal_rows_box(
+    const vec4 *rows,
+    const float *center,
+    const float *extent,
+    vec3 out_center,
+    vec3 out_extent);
 
 /** Register the system that tells sensors whether an actor is near.
  *

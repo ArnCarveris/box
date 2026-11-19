@@ -532,7 +532,8 @@
                     "glyph_packed_color",
                     "mover_children_upload_mover",
                     "mover_child_local_change",
-                    "mover_child_same_local_writes_nothing"
+                    "mover_child_same_local_writes_nothing",
+                    "mover_animated_child_follows"
                 ]
             },
             {

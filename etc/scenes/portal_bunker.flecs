@@ -64,7 +64,8 @@ camera {
   box.portal.PortalActor
 }
 
-// Ladders climb; the terrain and the hull collide by their triangles, not their bounds
+// Ladders climb; the terrain and the hull collide by their triangles, not their bounds (the bulwark's
+// bounds would be a slab over the whole ship)
 BunkerModel_ladder { Climbable }
 
 island {
@@ -72,10 +73,17 @@ island {
   terrain_sand { TriangleCollider }
 }
 
+// The freighter is the mover of the whole ship: the docked pose is its local frame (the identity), and
+// moving or turning it carries the ship's rooms, portals, doors, lights, screens and props, which are
+// its children (portal_bunker/rooms, shell, props, lights, screens).
 freighter {
+  Position: {0, 0, 0}
+  Rotation: {0, 0, 0}
+  DynamicTransform
   hull { TriangleCollider }
   antifouling { TriangleCollider }
   deck { TriangleCollider }
+  bulwark { TriangleCollider }
 }
 
 sun {

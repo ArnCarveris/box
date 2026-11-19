@@ -1063,7 +1063,15 @@ bool box_controller_ground_below(
     const box_controller_body_t *body,
     const Position *feet)
 {
-    box_spatial_hit_t hit;
+    return box_controller_ground_shape(world, body, feet) != 0;
+}
+
+ecs_entity_t box_controller_ground_shape(
+    ecs_world_t *world,
+    const box_controller_body_t *body,
+    const Position *feet)
+{
+    box_spatial_hit_t hit = { 0 };
     box_move_ray_t ctx = {
         .world = world,
         .body = body,
@@ -1078,5 +1086,7 @@ bool box_controller_ground_below(
         .shapes = true
     };
 
-    return body->radius > 0 && box_spatial_ray(world, &ray, &hit);
+    bool found = body->radius > 0 && box_spatial_ray(world, &ray, &hit);
+
+    return found ? hit.entity : 0;
 }

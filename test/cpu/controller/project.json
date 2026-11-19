@@ -176,6 +176,16 @@
                 ]
             },
             {
+                "id": "Ride",
+                "testcases": [
+                    "deck_carries",
+                    "deck_turns",
+                    "ground_stays",
+                    "off_deck_drops_carrier",
+                    "bulwark_keeps_floor"
+                ]
+            },
+            {
                 "id": "Walker",
                 "testcases": [
                     "high_step",

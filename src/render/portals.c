@@ -170,6 +170,60 @@ static void box_render_portals_tree(
     }
 }
 
+/** Build the traversal camera of a view: its frustum at an aspect ratio and its eye.
+ *
+ * @param v The view, with its camera data, view matrix and camera transform
+ * @param aspect The aspect ratio of the frustum, widened to the one of the camera
+ * @param camera Receives the traversal camera
+ */
+static void box_render_portals_camera(
+    const box_render_view_t *v,
+    float aspect,
+    box_portal_camera_t *camera)
+{
+    const Camera *c = &v->camera_data;
+    mat4 proj, view, view_proj;
+
+    box_camera_projection(c, glm_max(aspect, c->aspect_ratio), 1.0f, proj);
+    glm_mat4_copy(ECS_CONST_CAST(vec4*, v->view_matrix), view);
+    glm_mat4_mul(proj, view, view_proj);
+    box_portal_camera_init(camera, view_proj, v->camera_transform[3]);
+}
+
+void box_render_portals_capture(
+    ecs_world_t *world,
+    box_render_packet_t *p,
+    box_render_view_t *v,
+    float aspect)
+{
+    const box_portal_index_t *index = box_portal_index(world);
+    box_portal_camera_t camera;
+    box_portal_vis_t vis;
+
+    v->portal_first = ecs_vec_count(&p->portals);
+    v->portal_count = 0;
+    if (!index || v->camera_data.ortho || !box_portal_index_has(index, v->scene)) {
+        goto done;
+    }
+
+    if (!(aspect > 0)) {
+        aspect = BOX_RENDER_PORTALS_ASPECT;
+    }
+
+    box_portal_vis_init(&vis);
+    box_render_portals_camera(v, aspect, &camera);
+    box_portal_traverse(index, v->scene, &camera, &vis);
+
+    if (box_portal_block_pack(index, &vis, &p->portals, BOX_PORTAL_BLOCK_MAX)) {
+        v->portal_count = ecs_vec_count(&p->portals) - v->portal_first;
+    }
+
+    box_render_portal_marks(index, &vis, camera.eye, p, v);
+    box_portal_vis_fini(&vis);
+done:
+    return;
+}
+
 void box_render_portals(
     ecs_world_t *world,
     ecs_world_t *stage,
@@ -189,7 +243,6 @@ void box_render_portals(
             : NULL;
         const Camera *c = &v->camera_data;
         box_portal_camera_t camera;
-        mat4 proj, view_proj;
         bool frozen;
 
         v->portal_first = ecs_vec_count(&p->portals);
@@ -215,9 +268,7 @@ void box_render_portals(
             aspect = box_render_portals_aspect(world);
         }
 
-        box_camera_projection(c, glm_max(aspect, c->aspect_ratio), 1.0f, proj);
-        glm_mat4_mul(proj, v->view_matrix, view_proj);
-        box_portal_camera_init(&camera, view_proj, v->camera_transform[3]);
+        box_render_portals_camera(v, aspect, &camera);
         frozen = box_portal_freeze(index, v->view, view->culling.freeze_portals, &camera);
         box_portal_traverse(index, v->scene, &camera, &vis);
 

@@ -1,6 +1,6 @@
 // Generated from the WebGPU-Entities portal-bunker-compound scenario; do not edit by hand.
 // The island: heightfield terrain (grass, sand below the beach line), the flat seabed and
-// the sea at y -1.2 with the freighter's waterline cut out so no water shows in the hull.
+// the sea at y -1.2, one plain quad without a waterline cut-out (the engine keeps water out of the hull by a stencil).
 // Terrain holes for sunken areas that reach above ground: [(-14.0, 1.0, -6.0, 5.0)].
 using box.transform
 using box.geometry
@@ -1092,13 +1092,10 @@ island {
     Position: {0, 0, 0}
     Mesh3: {
       vertices: [
-        {520, -1.2, 52}, {520, -1.2, 520}, {-420, -1.2, 520}, {-420, -1.2, -420}, {520, -1.2, -420}, {520, -1.2, 52},
-        {60.256, -1.2, 52}, {60.256, -1.2, -6}, {59.256, -1.2, -8}, {50.744, -1.2, -8}, {49.744, -1.2, -6}, {49.744, -1.2, 52},
-        {52.244, -1.2, 60}, {55, -1.2, 66}, {57.756, -1.2, 60}, {60.256, -1.2, 52}
+        {-420, -1.2, -420}, {520, -1.2, -420}, {520, -1.2, 520}, {-420, -1.2, 520}
       ],
       indices: [
-        15, 1, 0, 3, 5, 4, 5, 7, 6, 5, 8, 7, 3, 8, 5, 3, 9, 8, 2, 9, 3, 2, 10, 9,
-        2, 11, 10, 2, 12, 11, 2, 13, 12, 1, 13, 2, 1, 14, 13, 1, 15, 14
+        3, 1, 0, 1, 3, 2
       ]
     }
     NoShadow

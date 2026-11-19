@@ -1255,6 +1255,9 @@ void box_draws_composes(
  * DynamicTransformSpread, that no transform transition moves and that own no PlanarReflection,
  * whose instance the reflection passes recognize by its transform record.
  *
+ * A shape that owns DynamicTransform as well, as the target of a transform track does, is a
+ * mover itself: it moves in the frame of no other mover and draws as a dynamic shape.
+ *
  * @param world The world
  * @param table The table
  * @param flat The shapes are 2D shapes

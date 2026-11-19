@@ -1,0 +1,30 @@
+// A mover with a thin floor whose top is at height 1 and a bulwark 1 m high around its edge.
+// The bulwark collides by its triangles: by its bounds it would be a slab over the whole floor.
+using box.transform
+using box.geometry
+using box.controllers
+
+ship {
+  Position: {0, 0, 0}
+  Rotation: {0, 0, 0}
+  DynamicTransform
+
+  floor {
+    Position: {0, 0.975, 0}
+    Box: {10, 0.05, 10}
+  }
+
+  bulwark {
+    Position: {0, 0, 0}
+    Mesh3: {
+      vertices: [
+        {-5, 1, -5}, {5, 1, -5}, {5, 2, -5}, {-5, 2, -5},
+        {5, 1, -5}, {5, 1, 5}, {5, 2, 5}, {5, 2, -5},
+        {5, 1, 5}, {-5, 1, 5}, {-5, 2, 5}, {5, 2, 5},
+        {-5, 1, 5}, {-5, 1, -5}, {-5, 2, -5}, {-5, 2, 5}
+      ],
+      indices: [0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7, 8, 9, 10, 8, 10, 11, 12, 13, 14, 12, 14, 15]
+    }
+    TriangleCollider
+  }
+}

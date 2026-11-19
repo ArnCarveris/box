@@ -1233,3 +1233,93 @@ void InstanceStreams_mover_child_same_local_writes_nothing(void) {
     ecs_fini(world);
     box_render_null_free(null);
 }
+
+/** Get the world x of the instance of the shape of an entity: its slot, placed by its mover
+ * when its batch moves with one.
+ *
+ * @param world The world
+ * @param e The entity
+ * @return The x of its model matrix in the world
+ */
+static float instance_world_x(
+    ecs_world_t *world,
+    ecs_entity_t e)
+{
+    box_render_draws_t *d = box_draws_state(world);
+    const DrawSlot *ds = ecs_get(world, e, DrawSlot);
+    test_assert(ds != NULL);
+    test_assert(ds->batch >= 0);
+    box_draw_batch_t *b = box_draws_batch(d, ds->batch);
+    box_render_transform_t tmp;
+    const box_render_transform_t *t = box_draws_slot_world(d, b, ds->slot, &tmp);
+
+    return t->rows[0][3];
+}
+
+/** Run a frame of a fixed delta and wait until the backend has its packet.
+ *
+ * @param world The world
+ * @param delta Seconds of the frame
+ */
+static void frame_for(
+    ecs_world_t *world,
+    float delta)
+{
+    ecs_progress(world, delta);
+    box_render_sync(world);
+}
+
+void InstanceStreams_mover_animated_child_follows(void) {
+    // renderer/draws: an Animator under a mover slides a shape, as a door template does; the
+    // shape then owns DynamicTransform and draws where it is, also after the mover moved
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t ship = ecs_new(world);
+    ecs_set(world, ship, Position, {10, 0, 0});
+    ecs_add(world, ship, DynamicTransform);
+    ecs_entity_t door = ecs_new_w_pair(world, EcsChildOf, ship);
+    ecs_set(world, door, Position, {0, 0, 0});
+    ecs_entity_t panel = box_new(world, door, 0);
+    ecs_set_name(world, panel, "panel");
+    box_new(world, panel, 1);
+
+    ecs_entity_t clip = ecs_entity(world, { .name = "slide" });
+    ecs_set(world, clip, AnimationClip, { 0 });
+    ecs_entity_t track = ecs_entity(world, { .name = "x", .parent = clip });
+    AnimationTrack t = {
+        .component = ecs_id(Position), .member = "x", .target = "panel",
+        .curve = { .kind = CurveLinear }
+    };
+    *ecs_vec_append_t(NULL, &t.curve.keys, CurveKey) = (CurveKey){0, 0};
+    *ecs_vec_append_t(NULL, &t.curve.keys, CurveKey) = (CurveKey){2, 4};
+    ecs_set_ptr(world, track, AnimationTrack, &t);
+    ecs_vec_fini_t(NULL, &t.curve.keys, CurveKey);
+
+    frame_for(world, 0);
+    frame_for(world, 0);
+    test_flt(instance_world_x(world, panel), 10);
+
+    ecs_set(world, door, Animator, { .clip = clip, .mode = AnimationOnce, .speed = 1 });
+    frame_for(world, 1);
+    test_assert(ecs_owns_id(world, panel, DynamicTransform));
+    test_flt(ecs_get(world, panel, Position)->x, 2);
+    test_flt(instance_world_x(world, panel), 12);
+
+    ecs_set(world, ship, Position, {-4, 0, 0});
+    frame_for(world, 1);
+    test_flt(ecs_get(world, panel, Position)->x, 4);
+    test_flt(instance_world_x(world, panel), 0);
+
+    frame_for(world, 1);
+    test_flt(instance_world_x(world, panel), 0);
+
+    ecs_iter_t it = ecs_children(world, panel);
+    test_bool(ecs_children_next(&it), true);
+    test_int(it.count, 1);
+    test_flt(instance_world_x(world, it.entities[0]), 1);
+    while (ecs_children_next(&it)) {
+    }
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}

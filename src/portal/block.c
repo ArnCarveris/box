@@ -4,7 +4,8 @@
  * and the same test on the CPU.
  *
  * A block is a run of vec4, indexed from its first: a header, two vec4 per area box, one per
- * area, then BOX_PORTAL_BLOCK_PLANES planes per entry.
+ * area, three rows of the world to rest matrix per mover, then BOX_PORTAL_BLOCK_PLANES planes
+ * per entry. The boxes of a mover's areas are at its rest, tested in the frame of its rows.
  */
 
 #include "portal.h"
@@ -100,7 +101,9 @@ bool box_portal_block_pack(
 {
     const box_portal_area_t *areas = ecs_vec_first_t(&index->areas, box_portal_area_t);
     const box_portal_box_t *boxes = ecs_vec_first_t(&index->boxes, box_portal_box_t);
+    const box_portal_box_t *rest = ecs_vec_first_t(&index->rest_boxes, box_portal_box_t);
     int32_t area_count = ecs_vec_count(&index->areas), box_count = ecs_vec_count(&index->boxes);
+    int32_t movers = ecs_vec_count(&index->movers);
     int32_t first = ecs_vec_count(out), local_boxes = 0, local_areas = 0, i;
     int32_t *local = ecs_os_calloc_n(int32_t, area_count);
     int32_t at = first + 1, table = first + 1;
@@ -116,16 +119,19 @@ bool box_portal_block_pack(
         }
     }
 
-    result = result && local_areas > 0 && 1 + 2 * local_boxes + local_areas <= max;
+    result = result && local_areas > 0 &&
+        1 + 2 * local_boxes + local_areas + 3 * movers <= max;
     if (!result) {
         goto done;
     }
 
-    ecs_vec_grow_t(NULL, out, vec4, 1 + 2 * local_boxes + local_areas);
+    ecs_vec_grow_t(NULL, out, vec4, 1 + 2 * local_boxes + local_areas + 3 * movers);
     table += 2 * local_boxes;
 
     for (i = 0; i < box_count; i ++) {
-        const box_portal_box_t *b = &boxes[i];
+        int32_t mover = areas[boxes[i].area].mover;
+        const box_portal_box_t *b = mover >= 0 ? &rest[i] : &boxes[i];
+
         if (local[b->area] < 0) {
             continue;
         }
@@ -135,7 +141,11 @@ bool box_portal_block_pack(
         glm_vec3_copy(ECS_CONST_CAST(float*, b->min), lo);
         glm_vec3_copy(ECS_CONST_CAST(float*, b->max), hi);
         lo[3] = (float)local[b->area];
-        hi[3] = b->exact ? 1.0f : 0.0f;
+        hi[3] = (b->exact ? 1.0f : 0.0f) + 2.0f * (float)(mover + 1);
+    }
+
+    for (i = 0; i < movers; i ++) {
+        box_portal_mover_rows(index, i, ecs_vec_get_t(out, vec4, table + local_areas + 3 * i));
     }
 
     for (i = 1; i < area_count; i ++) {
@@ -204,15 +214,12 @@ bool box_portal_block_sees(
     const float *max)
 {
     int32_t box_count = (int32_t)block[0][0], table = 1 + 2 * box_count, i, k;
-    vec3 lo, hi, center, extent;
-    float covered = 0, volume = 1;
+    int32_t rows = table + (int32_t)block[0][1];
+    vec3 center, extent;
+    float covered = 0;
     bool result = false;
 
     for (k = 0; k < 3; k ++) {
-        float pad = glm_max(BOX_PORTAL_MEMBER_THIN - (max[k] - min[k]), 0.0f) * 0.5f;
-        lo[k] = min[k] - pad;
-        hi[k] = max[k] + pad;
-        volume *= hi[k] - lo[k];
         center[k] = (min[k] + max[k]) * 0.5f;
         extent[k] = (max[k] - min[k]) * 0.5f;
     }
@@ -220,24 +227,54 @@ bool box_portal_block_sees(
     for (i = 0; i < box_count && !result; i ++) {
         const float *bmin = block[1 + 2 * i];
         const float *bmax = block[2 + 2 * i];
-        float shared = 1;
-        bool reaches = true;
+        int32_t code = (int32_t)bmax[3], mover = code / 2;
+        const vec4 *frame = mover > 0 ? &block[rows + 3 * (mover - 1)] : NULL;
+        float share = box_portal_box_share(frame, center, extent, bmin, bmax);
 
-        for (k = 0; k < 3 && reaches; k ++) {
-            float depth = glm_min(hi[k], bmax[k]) - glm_max(lo[k], bmin[k]);
-            reaches = depth > BOX_PORTAL_MEMBER_DEPTH;
-            shared *= depth;
-        }
-
-        if (reaches) {
-            covered += shared * bmax[3];
+        if (share >= 0) {
+            covered += share * (float)(code % 2);
             result = box_portal_block_entries_see(
                 block, block[table + (int32_t)bmin[3]], center, extent);
         }
     }
 
-    if (!result && covered < volume * BOX_PORTAL_MEMBER_COVER) {
+    if (!result && covered < BOX_PORTAL_MEMBER_COVER) {
         result = box_portal_block_entries_see(block, &block[0][2], center, extent);
+    }
+
+    return result;
+}
+
+float box_portal_box_share(
+    const vec4 *rows,
+    const float *center,
+    const float *extent,
+    const float *min,
+    const float *max)
+{
+    vec3 c, e;
+    float shared = 1, volume = 1, result = -1;
+    bool reaches = true;
+    int32_t k;
+
+    if (rows) {
+        box_portal_rows_box(rows, center, extent, c, e);
+    } else {
+        glm_vec3_copy(ECS_CONST_CAST(float*, center), c);
+        glm_vec3_copy(ECS_CONST_CAST(float*, extent), e);
+    }
+
+    for (k = 0; k < 3; k ++) {
+        float half = glm_max(e[k], BOX_PORTAL_MEMBER_THIN * 0.5f);
+        float depth = glm_min(c[k] + half, max[k]) - glm_max(c[k] - half, min[k]);
+
+        reaches = reaches && depth > BOX_PORTAL_MEMBER_DEPTH;
+        shared *= depth;
+        volume *= 2 * half;
+    }
+
+    if (reaches) {
+        result = shared / volume;
     }
 
     return result;

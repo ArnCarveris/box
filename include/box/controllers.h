@@ -57,8 +57,8 @@ ECS_STRUCT(CameraController, {
  * lowers the eye and Fly toggles free flight. The constructor sets the defaults.
  *
  * The body is a capsule from the feet to just above the eye that slides along the shapes of
- * its scene, stands on them, steps onto ledges and only stands up when there is room. The
- * ground plane holds the feet only where no shape is below them.
+ * its scene, stands on them (and goes and turns with their mover, its carrier), steps onto
+ * ledges and only stands up when there is room; the ground plane holds it where none is below.
  */
 ECS_STRUCT(FirstPersonController, {
     float speed;           /**< Walking units per second, 4 by default */
@@ -93,6 +93,8 @@ ECS_STRUCT(FirstPersonController, {
     float swim_step;       /**< Height of the ledges a swimmer climbs out onto, 3.2 by default */
     bool climbing;         /**< Climbing a Climbable shape, written by the controller */
     bool swimming;         /**< Swimming in water, written by the controller */
+    ecs_entity_t carrier;  /**< Mover the feet stand on, which carries the body, written */
+    float carrier_pose[16]; /**< World transform of the carrier at the last update, written */
 });
 
 /** A shape, or the shapes below an entity, that a first person controller climbs like a ladder.

@@ -367,6 +367,21 @@ void box_render_portals(
     ecs_world_t *stage,
     box_render_packet_t *p);
 
+/** Give the view of a capture whose camera no view renders the visibility block and the
+ * stencil marks of what its camera sees, as a view of that camera that culls by portals has
+ * them: water then draws only where the capture looks outdoors.
+ *
+ * @param world The world
+ * @param p The packet
+ * @param v The view of the capture, with its scene, camera data and view matrix
+ * @param aspect The aspect ratio of the capture
+ */
+void box_render_portals_capture(
+    ecs_world_t *world,
+    box_render_packet_t *p,
+    box_render_view_t *v,
+    float aspect);
+
 /** Get the offset the wind of a FogVolume moves its noise by at a time: its wind times the time
  * on each axis, computed in double precision and wrapped to [0, BOX_RENDER_FOG_NOISE_PERIOD
  * times its noise_scale), the distance over which both noise samples of the shader repeat.

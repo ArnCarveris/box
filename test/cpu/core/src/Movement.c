@@ -127,7 +127,11 @@ void Movement_child_follows_parent(void) {
 
     test_flt(ecs_get(world, child, Position)->x, 1);
     test_flt(ecs_get(world, parent, WorldTransform)->m[3][0], 4);
-    test_flt(ecs_get(world, child, WorldTransform)->m[3][0], 5);
+
+    WorldTransform child_buf;
+    const WorldTransform *child_t = box_transform_world(world, child, &child_buf);
+    test_assert(child_t != NULL);
+    test_flt(child_t->m[3][0], 5);
 
     ecs_fini(world);
 }

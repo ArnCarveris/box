@@ -129,19 +129,26 @@ bunker {
       }
     }
 
+
+
+  }
+}
+
+// The freighter's rooms and openings: children of the freighter, which moves them as one
+// (DynamicTransform mover, etc/scenes/portal_bunker.flecs). Positions are at the docked pose.
+freighter {
+  props {
     prop_86 {
       PortalEngineScreen screen(width: 1.42, height: 0.62, ship: freighter) {
         Position: {0, 1.15, 0.827}
       }
     }
-
     prop_104 {
       PortalNavigationScreen screen(width: 1.12, height: 0.47, ship: freighter, route: ship_route) {
         Position: {0, 1.0483, 0.0938}
         Rotation: {-0.6109, 3.14159265, 0}
       }
     }
-
     prop_105 {
       PortalHelmScreen screen(width: 1.12, height: 0.47, ship: freighter) {
         Position: {0, 1.0483, 0.0938}

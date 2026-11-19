@@ -3,7 +3,8 @@
  * @brief Packs the shading block of a view: the boxes of the areas, a record per area, the
  * entries the areas are seen through with their fog chains, and the lights through portals.
  *
- * Header: boxes, records, offset of the records, 1. Box: min and area, max. Record: ambient and
+ * Header: boxes, records, offset of the records, 1. Box: min and area, max and mover slot + 1,
+ * at the rest of the mover, whose three world to rest rows follow the boxes. Record: ambient and
  * sun (ambient below 0 keeps the scene's), fog color and density, its entries and its lights.
  *
  * Entry: planes and links, the planes, then plane and fog of each link, nearest first. Light:
@@ -35,28 +36,35 @@ static bool box_portal_shade_areas(
 {
     const box_portal_index_t *index = desc->index;
     int32_t area_count = ecs_vec_count(&index->areas), box_count = ecs_vec_count(&index->boxes);
-    int32_t i, boxes = 0, at, size;
+    int32_t movers = ecs_vec_count(&index->movers);
+    int32_t i, boxes = 0, at, size, records;
     bool result;
 
     for (i = 0; i < box_count; i ++) {
         boxes += boxed[ecs_vec_get_t(&index->boxes, box_portal_box_t, i)->area] ? 1 : 0;
     }
 
-    size = 1 + 2 * boxes + BOX_PORTAL_SHADE_RECORD * area_count;
+    records = 1 + 2 * boxes + 3 * movers;
+    size = records + BOX_PORTAL_SHADE_RECORD * area_count;
     result = size <= max;
     if (result) {
         ecs_vec_grow_t(NULL, out, vec4, size);
         ecs_os_memset(ecs_vec_get_t(out, vec4, first), 0, size * ECS_SIZEOF(vec4));
-        glm_vec4_copy((vec4){ (float)boxes, (float)area_count, (float)(1 + 2 * boxes), 1.0f },
+        glm_vec4_copy((vec4){ (float)boxes, (float)area_count, (float)records, 1.0f },
             *ecs_vec_get_t(out, vec4, first));
         at = first + 1;
 
         for (i = 0; i < box_count; i ++) {
             const box_portal_box_t *b = ecs_vec_get_t(&index->boxes, box_portal_box_t, i);
+            int32_t mover = ecs_vec_get_t(&index->areas, box_portal_area_t, b->area)->mover;
             float *lo, *hi;
 
             if (!boxed[b->area]) {
                 continue;
+            }
+
+            if (mover >= 0) {
+                b = ecs_vec_get_t(&index->rest_boxes, box_portal_box_t, i);
             }
 
             lo = *ecs_vec_get_t(out, vec4, at ++);
@@ -64,6 +72,12 @@ static bool box_portal_shade_areas(
             glm_vec3_copy(ECS_CONST_CAST(float*, b->min), lo);
             glm_vec3_copy(ECS_CONST_CAST(float*, b->max), hi);
             lo[3] = (float)b->area;
+            hi[3] = (float)(mover + 1);
+        }
+
+        for (i = 0; i < movers; i ++) {
+            box_portal_mover_rows(index, i, ecs_vec_get_t(out, vec4, at));
+            at += 3;
         }
 
         for (i = 0; i < area_count; i ++) {
@@ -384,10 +398,17 @@ int32_t box_portal_shade_area(
     for (i = 0; i < boxes && !found; i ++) {
         const float *lo = block[1 + 2 * i];
         const float *hi = block[2 + 2 * i];
+        int32_t mover = (int32_t)hi[3];
+        vec3 at, point = {0, 0, 0}, spread;
+
+        glm_vec3_copy(ECS_CONST_CAST(float*, p), at);
+        if (mover > 0) {
+            box_portal_rows_box(&block[1 + 2 * boxes + 3 * (mover - 1)], p, point, at, spread);
+        }
 
         found = true;
         for (k = 0; k < 3; k ++) {
-            found = found && p[k] >= lo[k] && p[k] <= hi[k];
+            found = found && at[k] >= lo[k] && at[k] <= hi[k];
         }
 
         result = found ? (int32_t)lo[3] : 0;

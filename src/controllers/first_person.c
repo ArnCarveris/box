@@ -511,6 +511,13 @@ static bool box_first_person_step(
 
     fp->grounded = (landed || hit.grounded) && !fp->flying;
     box_first_person_swim(world, fp, &body, &feet);
+    if (fp->grounded) {
+        ecs_entity_t shape = box_controller_ground_shape(world, &body, &feet);
+        box_controller_board(world, shape, &fp->carrier, fp->carrier_pose);
+    } else if (fp->swimming || fp->flying) {
+        box_controller_board(world, 0, &fp->carrier, fp->carrier_pose);
+    }
+
     fp->height = height;
     eye_pos.x = feet.x;
     eye_pos.y = feet.y + height;
@@ -559,6 +566,11 @@ void BoxFirstPersonControllerUpdate(
         if (!read || in.scope != fp[i].actions) {
             box_first_person_read(it->world, map, fp[i].actions, &in);
             read = true;
+        }
+
+        if (box_controller_ride(it->world, &fp[i].carrier, fp[i].carrier_pose, &p[i], &r[i])) {
+            ecs_modified(it->world, e, Position);
+            ecs_modified(it->world, e, Rotation);
         }
 
         if (box_first_person_turn(&fp[i], &in, &r[i], dt)) {

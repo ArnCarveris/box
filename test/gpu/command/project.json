@@ -64,7 +64,9 @@
                     "freeze_keeps_traversal",
                     "lines_are_drawn",
                     "lines_without_culling",
-                    "areas_and_occluders_are_drawn"
+                    "areas_and_occluders_are_drawn",
+                    "capture_keeps_water_out_of_rooms",
+                    "bare_camera_capture_keeps_water_out_of_rooms"
                 ]
             }
         ]

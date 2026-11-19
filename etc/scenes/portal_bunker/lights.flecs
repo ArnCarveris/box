@@ -48,21 +48,6 @@ bunker {
     light_40 { Position: {3.7, 4, -3}; Rgb: {255, 217, 153}; PointLight: {intensity: 6, range: 9} }
     light_41 { Position: {41.7, 4, 5}; Rgb: {255, 217, 153}; PointLight: {intensity: 6, range: 10} }
     light_42 { Position: {41.7, 4, 50}; Rgb: {255, 217, 153}; PointLight: {intensity: 6, range: 10} }
-    light_43 : BunkerModel_wallLamp { Position: {55, 7.6, 5.3}; Rgb: {255, 230, 179}; PointLight: {intensity: 7.2, range: 12} }
-    light_44 { Position: {55, 14.9, 60}; Rgb: {255, 51, 26}; PointLight: {intensity: 4.8, range: 6} } // signal: pulse
-    light_45 : BunkerModel_ceilingLamp { Position: {55, 4.6, -3}; Rgb: {255, 153, 77}; PointLight: {intensity: 8.8, range: 6} }
-    light_46 : BunkerModel_ceilingLamp { Position: {55, 4.6, 4}; Rgb: {255, 153, 77}; PointLight: {intensity: 8.8, range: 6} }
-    light_47 : BunkerModel_redBeacon { Position: {50.4, 1, 6.4}; Rgb: {255, 38, 26}; PointLight: {intensity: 6.4, range: 4} } // signal: pulse
-    light_48 { Position: {56.5, 0.8, 1.5}; Rgb: {77, 255, 128}; PointLight: {intensity: 3.2, range: 3} }
-    light_49 : BunkerModel_coldLamp { Position: {55, 4.6, 10}; Rgb: {179, 204, 255}; PointLight: {intensity: 8, range: 8} }
-    light_50 : BunkerModel_coldLamp { Position: {55, 4.6, 36}; Rgb: {179, 204, 255}; PointLight: {intensity: 8, range: 8} }
-    light_51 : BunkerModel_coldLamp { Position: {55, 4.6, 46}; Rgb: {179, 204, 255}; PointLight: {intensity: 8, range: 8} } // signal: flicker
-    light_52 : BunkerModel_wallLamp { Position: {50.3, 0.5, 26}; Rgb: {255, 179, 102}; PointLight: {intensity: 4.8, range: 4} }
-    light_53 : BunkerModel_bulb { Position: {53, 7.9, 2}; Rgb: {255, 204, 140}; PointLight: {intensity: 7.2, range: 4.5} }
-    light_54 : BunkerModel_bulb { Position: {57, 7.9, 2}; Rgb: {255, 204, 140}; PointLight: {intensity: 7.2, range: 4.5} }
-    light_55 : BunkerModel_bulb { Position: {54, 7.9, -3}; Rgb: {255, 204, 140}; PointLight: {intensity: 6.4, range: 4.5} }
-    light_56 : BunkerModel_coldLamp { Position: {55, 10.9, -1}; Rgb: {179, 217, 255}; PointLight: {intensity: 6.4, range: 5} }
-    light_57 { Position: {55, 9.4, 2.7}; Rgb: {51, 255, 153}; PointLight: {intensity: 4, range: 3} }
     light_58 { Position: {-40.9, 2.95, 38}; Rgb: {255, 209, 153}; PortalLamp: {area: bunker.barracks_power, intensity: 3.6, range: 3.3974} }
     light_59 { Position: {-42, 2.95, 40.96}; Rgb: {255, 209, 153}; PortalLamp: {area: bunker.barracks_power, intensity: 3.6, range: 4.3734} }
     light_60 { Position: {-42, 2.95, 35.04}; Rgb: {255, 209, 153}; PortalLamp: {area: bunker.barracks_power, intensity: 3.6, range: 4.3734} }
@@ -125,6 +110,28 @@ bunker {
     light_117 { Position: {-48.125, 9.35, 39.83}; Rgb: {255, 209, 153}; PortalLamp: {area: bunker.barracks_power, intensity: 3.6, range: 4.3659} }
     light_118 { Position: {-42.8, 2.9, 39.74}; Rgb: {255, 209, 153}; PortalLamp: {area: bunker.barracks_power, intensity: 3.6, range: 3.84} }
     light_119 { Position: {-42.8, 6.1, 39.74}; Rgb: {255, 209, 153}; PortalLamp: {area: bunker.barracks_power, intensity: 3.6, range: 3.84} }
+  }
+}
+
+// The freighter's rooms and openings: children of the freighter, which moves them as one
+// (DynamicTransform mover, etc/scenes/portal_bunker.flecs). Positions are at the docked pose.
+freighter {
+  lights {
+    light_43 : BunkerModel_wallLamp { Position: {55, 7.6, 5.3}; Rgb: {255, 230, 179}; PointLight: {intensity: 7.2, range: 12} }
+    light_44 { Position: {55, 14.9, 60}; Rgb: {255, 51, 26}; PointLight: {intensity: 4.8, range: 6} } // signal: pulse
+    light_45 : BunkerModel_ceilingLamp { Position: {55, 4.6, -3}; Rgb: {255, 153, 77}; PointLight: {intensity: 8.8, range: 6} }
+    light_46 : BunkerModel_ceilingLamp { Position: {55, 4.6, 4}; Rgb: {255, 153, 77}; PointLight: {intensity: 8.8, range: 6} }
+    light_47 : BunkerModel_redBeacon { Position: {50.4, 1, 6.4}; Rgb: {255, 38, 26}; PointLight: {intensity: 6.4, range: 4} } // signal: pulse
+    light_48 { Position: {56.5, 0.8, 1.5}; Rgb: {77, 255, 128}; PointLight: {intensity: 3.2, range: 3} }
+    light_49 : BunkerModel_coldLamp { Position: {55, 4.6, 10}; Rgb: {179, 204, 255}; PointLight: {intensity: 8, range: 8} }
+    light_50 : BunkerModel_coldLamp { Position: {55, 4.6, 36}; Rgb: {179, 204, 255}; PointLight: {intensity: 8, range: 8} }
+    light_51 : BunkerModel_coldLamp { Position: {55, 4.6, 46}; Rgb: {179, 204, 255}; PointLight: {intensity: 8, range: 8} } // signal: flicker
+    light_52 : BunkerModel_wallLamp { Position: {50.3, 0.5, 26}; Rgb: {255, 179, 102}; PointLight: {intensity: 4.8, range: 4} }
+    light_53 : BunkerModel_bulb { Position: {53, 7.9, 2}; Rgb: {255, 204, 140}; PointLight: {intensity: 7.2, range: 4.5} }
+    light_54 : BunkerModel_bulb { Position: {57, 7.9, 2}; Rgb: {255, 204, 140}; PointLight: {intensity: 7.2, range: 4.5} }
+    light_55 : BunkerModel_bulb { Position: {54, 7.9, -3}; Rgb: {255, 204, 140}; PointLight: {intensity: 6.4, range: 4.5} }
+    light_56 : BunkerModel_coldLamp { Position: {55, 10.9, -1}; Rgb: {179, 217, 255}; PointLight: {intensity: 6.4, range: 5} }
+    light_57 { Position: {55, 9.4, 2.7}; Rgb: {51, 255, 153}; PointLight: {intensity: 4, range: 3} }
     light_120 { Position: {56.1, 7.65, 38}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 3.3974} }
     light_121 { Position: {55, 7.65, 40.86}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 4.1575} }
     light_122 { Position: {55, 7.65, 35.14}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 4.1575} }

@@ -147,6 +147,7 @@ static const box_render_view_t* box_render_capture_view_of(
  * shadows and effects, which the later extracts resolve from the view entity, and its culling
  * and debug drawing, copied together so that a WireframeOnly capture also skips occlusion.
  *
+ * It also takes the portal blocks and stencil marks the portal extract built for that view.
  * A camera without a view, or the camera of a description, draws no debug pass and has the
  * features of its scene.
  *
@@ -195,6 +196,15 @@ static int box_render_capture_camera(
         v->debug_pose_count = source->debug_pose_count;
         v->features = source->features;
         v->scene_features = source->scene_features;
+        v->portal_first = source->portal_first;
+        v->portal_count = source->portal_count;
+        v->portal_debug_first = source->portal_debug_first;
+        v->portal_debug_count = source->portal_debug_count;
+        v->portal_pose_first = source->portal_pose_first;
+        v->portal_pose_count = source->portal_pose_count;
+        v->mark_first = source->mark_first;
+        v->mark_count = source->mark_count;
+        v->stencil_clear = source->stencil_clear;
     } else {
         v->cull.enabled = true;
         v->cull.min_dimension = BOX_RENDER_CULL_MIN_DIMENSION;
@@ -222,6 +232,8 @@ done:
 
 /** Add a capture to the packet: its target, the view that renders into it and the PNG path.
  *
+ * A camera that no view renders sees through the portals itself, as a view of it would.
+ *
  * @param world The world
  * @param q The capture queue
  * @param p The packet
@@ -248,6 +260,11 @@ static void box_render_capture_send(
     desc->height = desc->render_height = d->height;
 
     glm_mat4_inv(view.camera_transform, view.view_matrix);
+    if (!view.view && d->camera) {
+        float aspect = d->height ? (float)d->width / (float)d->height : 0.0f;
+        box_render_portals_capture(world, p, &view, aspect);
+    }
+
     view.clear = d->clear;
     view.target = handle;
     box_render_view_t *v = box_render_packet_view(p);

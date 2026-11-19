@@ -1599,7 +1599,8 @@ void Spatial_dynamic_random_moves_vs_brute_force(void) {
 
         ecs_progress(world, 0);
         for (i = 0; i < COUNT; i ++) {
-            const WorldTransform *t = ecs_get(world, shapes[i], WorldTransform);
+            WorldTransform t_buf;
+            const WorldTransform *t = box_transform_world(world, shapes[i], &t_buf);
             const Box *b = ecs_get(world, shapes[i], Box);
             vec3 got_min, got_max;
             for (a = 0; a < 3; a ++) {
@@ -2219,7 +2220,8 @@ void Spatial_mover_moves_one_leaf(void) {
     test_assert(ecs_children_next(&it));
     ecs_entity_t e = it.entities[0];
     ecs_iter_fini(&it);
-    const WorldTransform *t = ecs_get(world, e, WorldTransform);
+    WorldTransform t_buf;
+    const WorldTransform *t = box_transform_world(world, e, &t_buf);
     box_spatial_hit_t hit = {0};
     box_spatial_ray_t ray = {
         .origin = {t->m[3][0], 10, t->m[3][2]}, .dir = {0, -1, 0}, .shapes = true };
@@ -2384,7 +2386,8 @@ void Spatial_mover_nested(void) {
     test_int(stats.movers, 2);
     test_int(stats.entities, 2);
 
-    const WorldTransform *t = ecs_get(world, cab, WorldTransform);
+    WorldTransform t_buf;
+    const WorldTransform *t = box_transform_world(world, cab, &t_buf);
     box_spatial_hit_t hit = {0};
     box_spatial_ray_t ray = { .origin = {t->m[3][0], t->m[3][1] + 10, t->m[3][2]},
         .dir = {0, -1, 0} };
@@ -2990,7 +2993,8 @@ void Spatial_mover_tree_nested(void) {
     test_int(box_spatial_expand_box(world, car, lo, hi, &out), 20);
     ecs_vec_fini_t(NULL, &out, ecs_entity_t);
 
-    const WorldTransform *t = ecs_get(world, inner[4], WorldTransform);
+    WorldTransform t_buf;
+    const WorldTransform *t = box_transform_world(world, inner[4], &t_buf);
     box_spatial_hit_t hit = {0};
     box_spatial_ray_t ray = { .origin = {t->m[3][0], t->m[3][1] + 50, t->m[3][2]},
         .dir = {0, -1, 0}, .shapes = true, .filter = count_filter };

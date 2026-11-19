@@ -38,6 +38,19 @@ var<private> fragment_area: i32 = -1;
 // First vec4 of the record of that area.
 var<private> fragment_record: u32 = 0u;
 
+// Bring a world point into the rest of the mover of a box: slot + 1 of the mover, 0 for a box
+// that stays, whose three world to rest rows follow the boxes of the block.
+fn area_rest(p: vec3f, mover: u32, boxes: u32) -> vec3f {
+    if (mover == 0u) {
+        return p;
+    }
+
+    let rows = 1u + 2u * boxes + 3u * (mover - 1u);
+    let q = vec4f(p, 1.0);
+    return vec3f(dot(area_block[rows], q), dot(area_block[rows + 1u], q),
+        dot(area_block[rows + 2u], q));
+}
+
 // Find the area of a fragment at world with the geometric normal, for the area functions.
 fn area_fragment(world: vec3f, geometric: vec3f) {
     fragment_area = -1;
@@ -52,7 +65,8 @@ fn area_fragment(world: vec3f, geometric: vec3f) {
     for (var i = 0u; i < boxes; i++) {
         let lo = area_block[1u + 2u * i];
         let hi = area_block[2u + 2u * i];
-        if (all(p >= lo.xyz) && all(p <= hi.xyz)) {
+        let at = area_rest(p, u32(hi.w), boxes);
+        if (all(at >= lo.xyz) && all(at <= hi.xyz)) {
             area = i32(lo.w);
             break;
         }

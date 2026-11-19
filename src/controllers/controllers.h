@@ -277,6 +277,55 @@ bool box_controller_ground_below(
     const box_controller_body_t *body,
     const Position *feet);
 
+/** Find the nearest shape of the scene of a body below its feet.
+ *
+ * @param world The world
+ * @param body The body
+ * @param feet The bottom of the capsule
+ * @return The shape a ray down from the lower cap hits first, 0 for none
+ */
+ecs_entity_t box_controller_ground_shape(
+    ecs_world_t *world,
+    const box_controller_body_t *body,
+    const Position *feet);
+
+/** Move a point and its yaw with the mover that carries it since the last call
+ * (controllers/ride.c).
+ *
+ * The carrier's world transform now, times the inverse of its pose at the last call, moves the
+ * point and adds its turn about the vertical axis to the yaw; the pose becomes the transform
+ * now. A carrier that is gone is dropped.
+ *
+ * @param world The world
+ * @param carrier The mover, 0 for none, cleared when it is gone
+ * @param pose Its world transform at the last call, 16 floats as a mat4, written
+ * @param p The point, moved in place
+ * @param r The rotation whose yaw (y) turns with the carrier, NULL to leave it
+ * @return Whether the point or the yaw changed
+ */
+bool box_controller_ride(
+    const ecs_world_t *world,
+    ecs_entity_t *carrier,
+    float *pose,
+    Position *p,
+    Rotation *r);
+
+/** Take the mover of the shape a body stands on as its carrier (controllers/ride.c).
+ *
+ * A carrier that changes starts from its world transform now, so it moves the body only from
+ * the next box_controller_ride on.
+ *
+ * @param world The world
+ * @param shape The shape below the feet, 0 for none
+ * @param carrier The carrier, written: the mover of the shape, 0 when it moves with none
+ * @param pose Its world transform, 16 floats as a mat4, written when the carrier changes
+ */
+void box_controller_board(
+    const ecs_world_t *world,
+    ecs_entity_t shape,
+    ecs_entity_t *carrier,
+    float *pose);
+
 /** Create the default actions of a controller under a scope, disabled and bound to their keys.
  *
  * @param world The world

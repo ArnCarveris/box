@@ -1,7 +1,8 @@
 // Generated from the WebGPU-Entities portal-bunker-compound scenario; do not edit by hand.
 // The freighter's exterior: hull sides tapering to the keel (paint above the band line,
 // antifouling below), the flat keel, the deck around the engine room and hold roofs, and the
-// bulwark with the gangway gap on the port side.
+// bulwark with the gangway gap on the port side. The freighter is the mover of the whole ship: its
+// rooms, portals, lights and props are its children (portal_bunker.flecs gives it the DynamicTransform).
 using box.transform
 using box.geometry
 using box.material

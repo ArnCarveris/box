@@ -3,8 +3,9 @@
  * @brief Builds the areas, portals and occluders of a world from their components, in world
  * space, and answers which area holds a point.
  *
- * The index is built again by the first query after a VisArea, VisPortal or VisOccluder was set
- * or removed, or after an entity whose world transform placed one of them moved.
+ * The first query after a VisArea, VisPortal or VisOccluder was set or removed, or a static
+ * transform that placed one moved, builds the index again; what a mover carries is only placed
+ * where the mover is (portal/mover.c).
  *
  * A VisPortal set with only its open state changed (open, slide, locked, glass) updates its portal
  * in place, so doors that move do not build the index again.
@@ -50,6 +51,11 @@ static void box_portal_index_release(
         ecs_vec_fini_t(NULL, &index->portals, box_portal_portal_t);
         ecs_vec_fini_t(NULL, &index->links, int32_t);
         ecs_vec_fini_t(NULL, &index->occluders, box_portal_occluder_t);
+        ecs_vec_fini_t(NULL, &index->movers, box_portal_mover_t);
+        ecs_vec_fini_t(NULL, &index->rest_areas, box_portal_area_t);
+        ecs_vec_fini_t(NULL, &index->rest_boxes, box_portal_box_t);
+        ecs_vec_fini_t(NULL, &index->rest_portals, box_portal_portal_t);
+        ecs_vec_fini_t(NULL, &index->rest_occluders, box_portal_occluder_t);
         ecs_map_fini(&index->frames);
         box_portal_freeze_fini(index);
         ecs_os_free(index);
@@ -258,6 +264,7 @@ static void box_portal_index_areas(
 {
     box_portal_area_t *outdoors = ecs_vec_append_t(NULL, &index->areas, box_portal_area_t);
     ecs_os_memset_t(outdoors, 0, box_portal_area_t);
+    outdoors->mover = -1;
 
     ecs_iter_t it = ecs_query_iter(world, index->area_query);
     while (ecs_query_next(&it)) {
@@ -281,6 +288,7 @@ static void box_portal_index_areas(
             ecs_os_memset_t(a, 0, box_portal_area_t);
             a->entity = it.entities[i];
             a->scene = box_portal_scene_of(world, it.entities[i]);
+            a->mover = box_portal_mover_slot(world, index, it.entities[i]);
             a->point_first = ecs_vec_count(&index->points);
             a->point_count = count;
             a->min[0] = a->min[1] = FLT_MAX;
@@ -351,6 +359,7 @@ static void box_portal_index_portals(
 
             p.entity = it.entities[i];
             p.scene = box_portal_scene_of(world, it.entities[i]);
+            p.mover = box_portal_mover_slot(world, index, it.entities[i]);
             glm_vec3_copy(frame[3], p.center);
             p.d = -glm_vec3_dot(p.normal, p.center);
             p.width = src->size[0];
@@ -458,6 +467,7 @@ static void box_portal_index_occluders(
             glm_vec3_normalize(o.normal);
             o.entity = it.entities[i];
             o.scene = box_portal_scene_of(world, it.entities[i]);
+            o.mover = box_portal_mover_slot(world, index, it.entities[i]);
             glm_vec3_copy(frame[3], o.center);
             glm_vec2_copy(ECS_CONST_CAST(float*, src->size), o.size);
             o.auto_orient_y = src->auto_orient_y;
@@ -482,12 +492,14 @@ static void box_portal_index_build(
     ecs_vec_clear(&index->portals);
     ecs_vec_clear(&index->links);
     ecs_vec_clear(&index->occluders);
+    ecs_vec_clear(&index->movers);
     ecs_map_clear(&index->frames);
 
     box_portal_index_areas(world, index);
     box_portal_index_portals(world, index);
     box_portal_index_links(index);
     box_portal_index_occluders(world, index);
+    box_portal_movers_rest(index);
 
     index->dirty = false;
     index->builds ++;
@@ -503,6 +515,10 @@ const box_portal_index_t* box_portal_index(
 
     if (result && result->dirty) {
         box_portal_index_build(world, result);
+    }
+
+    if (result && ecs_vec_count(&result->movers)) {
+        box_portal_movers_place(world, result);
     }
 
     return result;
@@ -534,9 +550,14 @@ int32_t box_portal_index_area_at(
     for (i = 1; i < count && !result; i ++) {
         const box_portal_area_t *a = &areas[i];
         bool inside = false;
+        vec3 at;
 
-        if (a->scene != scene || p[1] < a->y || p[1] >= a->top || p[0] < a->min[0] ||
-            p[0] > a->max[0] || p[2] < a->min[1] || p[2] > a->max[1])
+        if (box_portal_mover_to_rest(index, i, p, at)) {
+            a = ecs_vec_get_t(&index->rest_areas, box_portal_area_t, i);
+        }
+
+        if (a->scene != scene || at[1] < a->y || at[1] >= a->top || at[0] < a->min[0] ||
+            at[0] > a->max[0] || at[2] < a->min[1] || at[2] > a->max[1])
         {
             continue;
         }
@@ -546,8 +567,8 @@ int32_t box_portal_index_area_at(
             const float *u = points[k];
             const float *v = points[(k + 1) % a->point_count];
 
-            if ((u[1] > p[2]) != (v[1] > p[2]) &&
-                p[0] < (v[0] - u[0]) * (p[2] - u[1]) / (v[1] - u[1]) + u[0])
+            if ((u[1] > at[2]) != (v[1] > at[2]) &&
+                at[0] < (v[0] - u[0]) * (at[2] - u[1]) / (v[1] - u[1]) + u[0])
             {
                 inside = !inside;
             }
@@ -603,33 +624,36 @@ void box_portal_members(
 {
     const box_portal_index_t *index = box_portal_index(world);
     int32_t i, k, count = index ? ecs_vec_count(&index->boxes) : 0;
-    vec3 lo, hi;
-    float covered = 0, volume = 1;
+    vec3 center, extent;
+    vec4 rows[3];
+    float covered = 0;
 
     for (k = 0; k < 3; k ++) {
-        float pad = glm_max(BOX_PORTAL_MEMBER_THIN - (max[k] - min[k]), 0.0f) * 0.5f;
-        lo[k] = min[k] - pad;
-        hi[k] = max[k] + pad;
-        volume *= hi[k] - lo[k];
+        center[k] = (min[k] + max[k]) * 0.5f;
+        extent[k] = (max[k] - min[k]) * 0.5f;
     }
 
     for (i = 0; i < count; i ++) {
         const box_portal_box_t *b = ecs_vec_get_t(&index->boxes, box_portal_box_t, i);
         const box_portal_area_t *a = ecs_vec_get_t(&index->areas, box_portal_area_t, b->area);
-        float shared = 1;
-        bool reaches = a->scene == scene;
+        float share = -1;
 
-        for (k = 0; k < 3 && reaches; k ++) {
-            float depth = glm_min(hi[k], b->max[k]) - glm_max(lo[k], b->min[k]);
-            reaches = depth > BOX_PORTAL_MEMBER_DEPTH;
-            shared *= depth;
-        }
-
-        if (!reaches) {
+        if (a->scene != scene) {
             continue;
         }
 
-        covered += b->exact ? shared : 0.0f;
+        if (a->mover >= 0) {
+            b = ecs_vec_get_t(&index->rest_boxes, box_portal_box_t, i);
+            box_portal_mover_rows(index, a->mover, rows);
+        }
+
+        share = box_portal_box_share(a->mover >= 0 ? rows : NULL, center, extent, b->min,
+            b->max);
+        if (share < 0) {
+            continue;
+        }
+
+        covered += b->exact ? share : 0.0f;
 
         const ecs_entity_t *listed = ecs_vec_first_t(areas, ecs_entity_t);
         bool known = false;
@@ -642,7 +666,7 @@ void box_portal_members(
         }
     }
 
-    *outdoors = covered < volume * BOX_PORTAL_MEMBER_COVER;
+    *outdoors = covered < BOX_PORTAL_MEMBER_COVER;
 }
 
 /** Mark the index changed when an area, a portal or an occluder is set or removed.
@@ -755,6 +779,11 @@ void box_portal_index_import(
     ecs_vec_init_t(NULL, &index->portals, box_portal_portal_t, 0);
     ecs_vec_init_t(NULL, &index->links, int32_t, 0);
     ecs_vec_init_t(NULL, &index->occluders, box_portal_occluder_t, 0);
+    ecs_vec_init_t(NULL, &index->movers, box_portal_mover_t, 0);
+    ecs_vec_init_t(NULL, &index->rest_areas, box_portal_area_t, 0);
+    ecs_vec_init_t(NULL, &index->rest_boxes, box_portal_box_t, 0);
+    ecs_vec_init_t(NULL, &index->rest_portals, box_portal_portal_t, 0);
+    ecs_vec_init_t(NULL, &index->rest_occluders, box_portal_occluder_t, 0);
     ecs_map_init(&index->frames, NULL);
     ecs_map_init(&index->frozen, NULL);
     index->dirty = true;

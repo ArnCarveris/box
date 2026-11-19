@@ -134,6 +134,17 @@
                 ]
             },
             {
+                "id": "PortalMover",
+                "testcases": [
+                    "area_at_turned",
+                    "area_at_follows_moves",
+                    "traverse_turned",
+                    "members_turned",
+                    "block_sees_turned",
+                    "shade_area_turned"
+                ]
+            },
+            {
                 "id": "PortalFacility",
                 "testcases": [
                     "counts_doors_and_areas",

@@ -474,6 +474,9 @@ done:
 /** Remember the entities that got or lost an owned DynamicTransform as roots of subtrees whose
  * mover changed.
  *
+ * The root itself takes its key again: a shape under a mover that owns DynamicTransform leaves
+ * the mover batches, and joins them again when it loses it.
+ *
  * @param it The iterator of the observer
  */
 static void BoxDrawsOnMover(
@@ -482,8 +485,10 @@ static void BoxDrawsOnMover(
     box_render_draws_t *d = it->ctx;
     int32_t i;
     for (i = 0; !ecs_is_fini(it->world) && i < it->count; i ++) {
+        ecs_entity_t e = it->entities[i];
+        box_draws_mark(it->world, d, e, BOX_DRAW_ALL);
         *ecs_vec_append_t(NULL, &d->moved, box_draw_moved_t) = (box_draw_moved_t){
-            .root = it->entities[i], .kinds = BOX_DRAW_TRANSFORM | BOX_DRAW_FADE
+            .root = e, .kinds = BOX_DRAW_TRANSFORM | BOX_DRAW_FADE
         };
     }
 }
@@ -573,6 +578,7 @@ bool box_draws_mover_table(
     ecs_id_t spread)
 {
     return !flat && ecs_table_has_id(world, table, spread) &&
+        !ecs_table_has_id(world, table, DynamicTransform) &&
         !ecs_table_has_id(world, table, TransitionTransform) &&
         !ecs_table_has_id(world, table, ecs_id(PlanarReflection));
 }
