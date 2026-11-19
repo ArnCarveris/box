@@ -6,8 +6,8 @@
 // HUD. This scene adds one file per concern in forest/: the layout functions that place things,
 // the floor, the ground, the brook, the stands the trees grow in, the undergrowth scattered on
 // the floor, what falls from the trees in the wind, the air (light shafts, mist over the brook
-// and motes), the insects, the view, the rain, sleet or snow that falls around the camera, and
-// the sound of the wind, the brook, the rain, the birds and the crickets.
+// and motes), the insects, the view, the rain, sleet or snow that falls around the camera, the
+// sound of the wind, the brook, the rain, the birds and the crickets, and the animals.
 include ui/widgets
 include forest/library
 include forest/layout
@@ -22,6 +22,7 @@ include forest/insects
 include forest/view
 include forest/precipitation
 include forest/audio
+include forest/animals
 
 using box.view
 

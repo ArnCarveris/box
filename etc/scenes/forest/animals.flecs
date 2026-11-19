@@ -1,0 +1,2295 @@
+using flecs.script
+using flecs.script.math
+using box.app
+using box.transform
+using box.geometry
+using box.material
+using box.animation
+using box.camera
+using box.controllers
+using state
+using assets
+
+// The animals of the forest, each by its season and time of day (the sliders of state.flecs):
+// songbirds that flit between the dead branches of the snags, the rails of the footbridge and the
+// ground, buzzards and crows over the canopy (fewer in winter, none at night), a tawny owl at
+// night, a red squirrel that forages on the floor and runs up the trunks of the snags, a roe deer
+// that grazes on the far bank of the brook at dawn and dusk and leaves in strong wind or heavy
+// rain, and brown trout that hold in the current of the pool and the calm reach.
+//
+// The animals that move about are template instances whose async block steers them with a
+// seeded Rng and the fixed delta time of the app, so a capture with --delta-time is the same every
+// run. They plan where to go with the layout functions of layout.flecs, stands.flecs and
+// scatter.flecs: away from the trees, the landmarks, the logs, stumps and rocks and the mounds,
+// out of the brook bed (the trout out of the stones of the bed), and the perches and trunks they
+// use are found with the same functions that grow the snags (trees.flecs) and the footbridge
+// (brook.flecs). The birds over the canopy fly on Animators, so no script runs for them.
+state {
+  // Seeds of the animals
+  export const SEED_SONGBIRD: i32 = 7101
+  export const SEED_OWL: i32 = 7211
+  export const SEED_SQUIRREL: i32 = 7307
+  export const SEED_DEER: i32 = 7401
+  export const SEED_TROUT: i32 = 7503
+
+  // Songbirds about in the day, fewer in winter; none in the dark. The owl comes out once
+  // daylight drops below OWL_DARK
+  export const SONGBIRDS_MAX: i32 = 5
+  export const BIRD_DAY: f32 = 0.35
+  export const OWL_DARK: f32 = 0.2
+
+  // Kinds of the perching birds
+  export const BIRD_ROBIN: i32 = 0
+  export const BIRD_CHAFFINCH: i32 = 1
+  export const BIRD_TIT: i32 = 2
+  export const BIRD_OWL: i32 = 3
+
+  // Kinds of the birds over the canopy
+  export const SOARER_BUZZARD: i32 = 0
+  export const SOARER_CROW: i32 = 1
+
+  // The roe deer grazes from DEER_DAWN_BEFORE hours before sunrise to DEER_DAWN_AFTER after it,
+  // and from DEER_DUSK_BEFORE before sunset to DEER_DUSK_AFTER after it. It leaves when the
+  // wind blows harder than DEER_WIND m/s or more rain than DEER_RAIN falls
+  // (forest_rainfall, 0..1)
+  export const DEER_DAWN_BEFORE: f32 = 1
+  export const DEER_DAWN_AFTER: f32 = 2.5
+  export const DEER_DUSK_BEFORE: f32 = 3
+  export const DEER_DUSK_AFTER: f32 = 1.5
+  export const DEER_WIND: f32 = 11
+  export const DEER_RAIN: f32 = 0.55
+
+  // Where the deer grazes: on the far (south) bank of the brook, at the edge of the clearing,
+  // within DEER_GRAZE_R of the spot; it comes and goes along a lane through the forest from the
+  // spot DEER_LANE meters long, clear of the trees
+  export const DEER_GRAZE_X: f32 = -5
+  export const DEER_GRAZE_Z: f32 = -14.2
+  export const DEER_GRAZE_R: f32 = 2.6
+  export const DEER_LANE: f32 = 22
+
+  // The trout: TROUT_COUNT fish, in the pool above the cascade and the calm reach below it
+  export const TROUT_COUNT: i32 = 4
+
+  // Behaviours of the deer
+  export const DEER_AWAY: i32 = 0
+  export const DEER_ENTER: i32 = 1
+  export const DEER_GRAZE: i32 = 2
+  export const DEER_ALERT: i32 = 3
+  export const DEER_LEAVE: i32 = 4
+
+  // The pose of an animal that its template draws, written once a frame by its async block: its
+  // position and yaw (turning local +Z toward world +X), pitch and roll, and the joints of the
+  // kind: a gait phase, a speed, the wings open and their beat, the head turned and bowed, the
+  // tail, a crouch (sitting up for the squirrel)
+  struct ForestAnimalPose(
+    x: f32,
+    y: f32,
+    z: f32,
+    yaw: f32,
+    pitch: f32,
+    roll: f32,
+    gait: f32,
+    speed: f32,
+    open: f32,
+    beat: f32,
+    head: f32,
+    bow: f32,
+    tail: f32,
+    crouch: f32,
+    ear: f32
+  )
+
+  // A perch of the birds: where the feet go, and the biggest bird it holds (1 songbirds, 2 also
+  // the owl)
+  struct ForestPerch(x: f32, y: f32, z: f32, size: f32)
+
+  // The two landmark snags of stands.flecs, as ForestSnag grows them (trees.flecs)
+  export const SNAG_A_SEED: i32 = 5
+  export const SNAG_A_HEIGHT: f32 = 7.5
+  export const SNAG_A_TILT: f32 = 0.03
+  export const SNAG_A_YAW: f32 = 0.8
+  export const SNAG_B_SEED: i32 = 9
+  export const SNAG_B_HEIGHT: f32 = 2.6
+  export const SNAG_B_YAW: f32 = 2.2
+
+  // Radius of the trunk of a snag at its foot, and the scale of its trunk path across
+  fn forest_snag_r0(seed: f64) -> f64 {
+    0.26 + 0.18 * forest_hash(1, seed)
+  }
+
+  fn forest_snag_kr(seed: f64) -> f64 {
+    forest_snag_r0(seed) / TRUNK_RADIUS
+  }
+
+  // The trunk of a snag of a height at height y over its foot, in its own space: the offset of
+  // its axis across X and Z and its radius (the trunk tapers to 0.75 at the top)
+  fn forest_snag_f(height: f64, y: f64) -> f64 {
+    (y + TRUNK_SINK) / (height + TRUNK_SINK)
+  }
+
+  fn forest_snag_axis_x(seed: f64, height: f64, y: f64) -> f64 {
+    forest_trunk_x(seed - 4 * floor(seed / 4), forest_snag_f(height, y)) * forest_snag_kr(seed)
+  }
+
+  fn forest_snag_axis_z(seed: f64, height: f64, y: f64) -> f64 {
+    forest_trunk_z(seed - 4 * floor(seed / 4), forest_snag_f(height, y)) * forest_snag_kr(seed)
+  }
+
+  fn forest_snag_radius(seed: f64, height: f64, y: f64) -> f64 {
+    forest_snag_r0(seed) * (1 - 0.25 * forest_snag_f(height, y))
+  }
+
+  // Stub j of a snag (trees.flecs): its height on the trunk, scale, pitch and yaw, and the point
+  // q along it on the top of the wood, in the space of the snag
+  fn forest_stub_y(height: f64, j: f64) -> f64 {
+    height * (0.35 + 0.18 * j)
+  }
+
+  fn forest_stub_s(seed: f64, j: f64) -> f64 {
+    (0.8 + 1.4 * forest_hash(j + 40, seed)) / LIMB_LEN
+  }
+
+  fn forest_stub_p(seed: f64, j: f64) -> f64 {
+    1 + 0.5 * forest_hash(j + 41, seed)
+  }
+
+  fn forest_stub_w(seed: f64, j: f64) -> f64 {
+    j * 2.3 + seed
+  }
+
+  // Radius of the wood of stub j at q along it
+  fn forest_stub_r(seed: f64, j: f64, q: f64) -> f64 {
+    const s = forest_stub_s(seed, j)
+    const lv = forest_girth_level(forest_snag_r0(seed) * 0.3 / s)
+    forest_girth(lv) * s * (1 - (1 - LIMB_TAPER) * q)
+  }
+
+  fn forest_stub_x(seed: f64, height: f64, j: f64, q: f64) -> f64 {
+    const y = forest_stub_y(height, j)
+    forest_snag_axis_x(seed, height, y) +
+      forest_limb_at_x(LIMB_STRAIGHT, q, forest_stub_p(seed, j), forest_stub_w(seed, j), forest_stub_s(seed, j))
+  }
+
+  fn forest_stub_top(seed: f64, height: f64, j: f64, q: f64) -> f64 {
+    const y = forest_stub_y(height, j)
+    const p = forest_stub_p(seed, j)
+    y + forest_limb_at_y(LIMB_STRAIGHT, q, p, forest_stub_w(seed, j), forest_stub_s(seed, j)) +
+      forest_stub_r(seed, j, q) / max(sin(p), 0.5)
+  }
+
+  fn forest_stub_z(seed: f64, height: f64, j: f64, q: f64) -> f64 {
+    const y = forest_stub_y(height, j)
+    forest_snag_axis_z(seed, height, y) +
+      forest_limb_at_z(LIMB_STRAIGHT, q, forest_stub_p(seed, j), forest_stub_w(seed, j), forest_stub_s(seed, j))
+  }
+
+  // The top of the fallen top of a snag at q along it, in the space of the snag (trees.flecs)
+  fn forest_log_top_x(seed: f64, q: f64) -> f64 {
+    const v = seed - 4 * floor(seed / 4)
+    const lr = forest_snag_r0(seed) * 0.8
+    forest_trunk_x(v + 1 - 4 * floor((v + 1) / 4), q) * lr / TRUNK_RADIUS
+  }
+
+  fn forest_log_top_y(seed: f64, q: f64) -> f64 {
+    const v = seed - 4 * floor(seed / 4)
+    const lr = forest_snag_r0(seed) * 0.8
+    lr * 0.85 - forest_trunk_z(v + 1 - 4 * floor((v + 1) / 4), q) * lr / TRUNK_RADIUS +
+      lr * (1 - 0.25 * q)
+  }
+
+  fn forest_log_top_z(seed: f64, q: f64) -> f64 {
+    forest_snag_r0(seed) + 0.5 + q * (4 + 4 * forest_hash(60, seed))
+  }
+
+  // Yaw of the footbridge (brook.flecs), and a point on it in its space (local +Z along the path)
+  export const BRIDGE_YAW: f32 = atan2(forest_path_slope(CROSSING_Z), 1)
+  export const RAIL_TOP: f32 = 1.055
+
+  fn forest_bridge_x(lx: f64, lz: f64) -> f64 {
+    CROSSING_X + lx * cos(BRIDGE_YAW) + lz * sin(BRIDGE_YAW)
+  }
+
+  fn forest_bridge_z(lx: f64, lz: f64) -> f64 {
+    CROSSING_Z + lz * cos(BRIDGE_YAW) - lx * sin(BRIDGE_YAW)
+  }
+
+  // Perches: the dead stubs of the two snags, the fallen top of the broken one and the handrails
+  // of the footbridge, where the feet of a bird rest
+  export const FOREST_PERCHES: ForestPerch[] = [
+    {
+      SNAG_A_X + forest_rot_x(forest_stub_x(5, 7.5, 0, 0.55), forest_stub_top(5, 7.5, 0, 0.55), forest_stub_z(5, 7.5, 0, 0.55), SNAG_A_TILT, SNAG_A_YAW),
+      forest_rot_y(forest_stub_x(5, 7.5, 0, 0.55), forest_stub_top(5, 7.5, 0, 0.55), forest_stub_z(5, 7.5, 0, 0.55), SNAG_A_TILT, SNAG_A_YAW),
+      SNAG_A_Z + forest_rot_z(forest_stub_x(5, 7.5, 0, 0.55), forest_stub_top(5, 7.5, 0, 0.55), forest_stub_z(5, 7.5, 0, 0.55), SNAG_A_TILT, SNAG_A_YAW),
+      2
+    },
+    {
+      SNAG_A_X + forest_rot_x(forest_stub_x(5, 7.5, 1, 0.5), forest_stub_top(5, 7.5, 1, 0.5), forest_stub_z(5, 7.5, 1, 0.5), SNAG_A_TILT, SNAG_A_YAW),
+      forest_rot_y(forest_stub_x(5, 7.5, 1, 0.5), forest_stub_top(5, 7.5, 1, 0.5), forest_stub_z(5, 7.5, 1, 0.5), SNAG_A_TILT, SNAG_A_YAW),
+      SNAG_A_Z + forest_rot_z(forest_stub_x(5, 7.5, 1, 0.5), forest_stub_top(5, 7.5, 1, 0.5), forest_stub_z(5, 7.5, 1, 0.5), SNAG_A_TILT, SNAG_A_YAW),
+      2
+    },
+    {
+      SNAG_A_X + forest_rot_x(forest_stub_x(5, 7.5, 2, 0.5), forest_stub_top(5, 7.5, 2, 0.5), forest_stub_z(5, 7.5, 2, 0.5), SNAG_A_TILT, SNAG_A_YAW),
+      forest_rot_y(forest_stub_x(5, 7.5, 2, 0.5), forest_stub_top(5, 7.5, 2, 0.5), forest_stub_z(5, 7.5, 2, 0.5), SNAG_A_TILT, SNAG_A_YAW),
+      SNAG_A_Z + forest_rot_z(forest_stub_x(5, 7.5, 2, 0.5), forest_stub_top(5, 7.5, 2, 0.5), forest_stub_z(5, 7.5, 2, 0.5), SNAG_A_TILT, SNAG_A_YAW),
+      2
+    },
+    {
+      SNAG_A_X + forest_rot_x(forest_stub_x(5, 7.5, 1, 0.85), forest_stub_top(5, 7.5, 1, 0.85), forest_stub_z(5, 7.5, 1, 0.85), SNAG_A_TILT, SNAG_A_YAW),
+      forest_rot_y(forest_stub_x(5, 7.5, 1, 0.85), forest_stub_top(5, 7.5, 1, 0.85), forest_stub_z(5, 7.5, 1, 0.85), SNAG_A_TILT, SNAG_A_YAW),
+      SNAG_A_Z + forest_rot_z(forest_stub_x(5, 7.5, 1, 0.85), forest_stub_top(5, 7.5, 1, 0.85), forest_stub_z(5, 7.5, 1, 0.85), SNAG_A_TILT, SNAG_A_YAW),
+      1
+    },
+    {
+      SNAG_B_X + forest_rot_x(forest_stub_x(9, 2.6, 0, 0.6), forest_stub_top(9, 2.6, 0, 0.6), forest_stub_z(9, 2.6, 0, 0.6), 0, SNAG_B_YAW),
+      forest_rot_y(forest_stub_x(9, 2.6, 0, 0.6), forest_stub_top(9, 2.6, 0, 0.6), forest_stub_z(9, 2.6, 0, 0.6), 0, SNAG_B_YAW),
+      SNAG_B_Z + forest_rot_z(forest_stub_x(9, 2.6, 0, 0.6), forest_stub_top(9, 2.6, 0, 0.6), forest_stub_z(9, 2.6, 0, 0.6), 0, SNAG_B_YAW),
+      2
+    },
+    {
+      SNAG_B_X + forest_rot_x(forest_stub_x(9, 2.6, 1, 0.6), forest_stub_top(9, 2.6, 1, 0.6), forest_stub_z(9, 2.6, 1, 0.6), 0, SNAG_B_YAW),
+      forest_rot_y(forest_stub_x(9, 2.6, 1, 0.6), forest_stub_top(9, 2.6, 1, 0.6), forest_stub_z(9, 2.6, 1, 0.6), 0, SNAG_B_YAW),
+      SNAG_B_Z + forest_rot_z(forest_stub_x(9, 2.6, 1, 0.6), forest_stub_top(9, 2.6, 1, 0.6), forest_stub_z(9, 2.6, 1, 0.6), 0, SNAG_B_YAW),
+      1
+    },
+    {
+      SNAG_B_X + forest_rot_x(forest_stub_x(9, 2.6, 2, 0.6), forest_stub_top(9, 2.6, 2, 0.6), forest_stub_z(9, 2.6, 2, 0.6), 0, SNAG_B_YAW),
+      forest_rot_y(forest_stub_x(9, 2.6, 2, 0.6), forest_stub_top(9, 2.6, 2, 0.6), forest_stub_z(9, 2.6, 2, 0.6), 0, SNAG_B_YAW),
+      SNAG_B_Z + forest_rot_z(forest_stub_x(9, 2.6, 2, 0.6), forest_stub_top(9, 2.6, 2, 0.6), forest_stub_z(9, 2.6, 2, 0.6), 0, SNAG_B_YAW),
+      1
+    },
+    {
+      SNAG_B_X + forest_rot_x(forest_log_top_x(9, 0.35), forest_log_top_y(9, 0.35), forest_log_top_z(9, 0.35), 0, SNAG_B_YAW),
+      forest_log_top_y(9, 0.35),
+      SNAG_B_Z + forest_rot_z(forest_log_top_x(9, 0.35), forest_log_top_y(9, 0.35), forest_log_top_z(9, 0.35), 0, SNAG_B_YAW),
+      2
+    },
+    {
+      SNAG_B_X + forest_rot_x(forest_log_top_x(9, 0.75), forest_log_top_y(9, 0.75), forest_log_top_z(9, 0.75), 0, SNAG_B_YAW),
+      forest_log_top_y(9, 0.75),
+      SNAG_B_Z + forest_rot_z(forest_log_top_x(9, 0.75), forest_log_top_y(9, 0.75), forest_log_top_z(9, 0.75), 0, SNAG_B_YAW),
+      1
+    },
+    {forest_bridge_x(0 - BRIDGE_HALF_WIDTH, -2.2), RAIL_TOP, forest_bridge_z(0 - BRIDGE_HALF_WIDTH, -2.2), 2},
+    {forest_bridge_x(0 - BRIDGE_HALF_WIDTH, -0.4), RAIL_TOP, forest_bridge_z(0 - BRIDGE_HALF_WIDTH, -0.4), 1},
+    {forest_bridge_x(0 - BRIDGE_HALF_WIDTH, 1.6), RAIL_TOP, forest_bridge_z(0 - BRIDGE_HALF_WIDTH, 1.6), 1},
+    {forest_bridge_x(BRIDGE_HALF_WIDTH, -1.5), RAIL_TOP, forest_bridge_z(BRIDGE_HALF_WIDTH, -1.5), 1},
+    {forest_bridge_x(BRIDGE_HALF_WIDTH, 0.6), RAIL_TOP, forest_bridge_z(BRIDGE_HALF_WIDTH, 0.6), 1},
+    {forest_bridge_x(BRIDGE_HALF_WIDTH, 2.4), RAIL_TOP, forest_bridge_z(BRIDGE_HALF_WIDTH, 2.4), 2}
+  ]
+  export const PERCH_COUNT: i32 = 15
+
+  // The perch each perching bird is at or flies to (-1 on the ground), so two never share one
+  export mut perch_taken: i32[] = [-1, -1, -1, -1, -1, -1]
+
+  // Songbirds by the season and the hour: five in spring and summer, four in autumn, two in
+  // winter, none in the dark
+  fn forest_songbird_count(season: f64, hour: f64) -> i32 {
+    const n = round(forest_seasonal(season, 5, 5, 4, 2))
+    forest_daylight(season, hour) > BIRD_DAY ? n : 0
+  }
+
+  // Buzzards and crows over the canopy by day: three and three, in winter one and two
+  fn forest_buzzard_count(season: f64, hour: f64) -> i32 {
+    const n = round(forest_seasonal(season, 3, 3, 2, 1))
+    forest_daylight(season, hour) > BIRD_DAY ? n : 0
+  }
+
+  fn forest_crow_count(season: f64, hour: f64) -> i32 {
+    const n = round(forest_seasonal(season, 3, 3, 3, 2))
+    forest_daylight(season, hour) > BIRD_DAY ? n : 0
+  }
+
+  fn forest_owl_out(season: f64, hour: f64) -> bool {
+    forest_daylight(season, hour) < OWL_DARK
+  }
+
+  // The deer's hours: around sunrise and sunset
+  fn forest_deer_hours(season: f64, hour: f64) -> bool {
+    const rise = forest_sunrise(season)
+    const set = forest_sunset(season)
+    (hour > rise - DEER_DAWN_BEFORE && hour < rise + DEER_DAWN_AFTER) ||
+      (hour > set - DEER_DUSK_BEFORE && hour < set + DEER_DUSK_AFTER)
+  }
+
+  // Wind or rain that drives the deer off
+  fn forest_deer_weather(w: f64, p: f64, t: f64) -> bool {
+    w > DEER_WIND || forest_rainfall(p, t) > DEER_RAIN
+  }
+
+  // A rock of scatter.flecs (or the stone beside it) within r of (x, z): the small things of the
+  // grid cells around it
+  fn forest_rock_cell_near(gx: f64, gz: f64, x: f64, z: f64, r: f64) -> bool {
+    const i = gx * SMALL_GRID + gz
+    const rx = (gx + 0.1 + 0.8 * forest_hash(i, 341)) * SMALL_CELL - UNDER_EDGE
+    const rz = (gz + 0.1 + 0.8 * forest_hash(i, 342)) * SMALL_CELL - UNDER_EDGE
+    const rs = 0.18 + 0.4 * forest_hash(i, 353) * forest_hash(i, 354)
+    forest_near(x, z, rx, rz, rs * 2.2 + r) ? (
+      forest_small_kind(forest_hash(i, 343), forest_light(rx, rz)) == PLANT_ROCK &&
+      forest_hash(i, 344) < forest_under_density(rx, rz) && forest_floor_free(rx, rz, 0.6) &&
+      !forest_feature_near(rx, rz, 0.5)) : false
+  }
+
+  fn forest_rock_near(x: f64, z: f64, r: f64) -> bool {
+    const gx = floor((x + UNDER_EDGE) / SMALL_CELL - 0.5)
+    const gz = floor((z + UNDER_EDGE) / SMALL_CELL - 0.5)
+    forest_rock_cell_near(gx, gz, x, z, r) ? true : (forest_rock_cell_near(gx + 1, gz, x, z, r) ? true : (
+      forest_rock_cell_near(gx, gz + 1, x, z, r) ? true : forest_rock_cell_near(gx + 1, gz + 1, x, z, r)))
+  }
+
+  // A shrub of scatter.flecs within r of (x, z)
+  fn forest_shrub_cell_near(gx: f64, gz: f64, x: f64, z: f64, r: f64) -> bool {
+    forest_near(x, z, forest_feature_x(gx, gz), forest_feature_z(gx, gz), 1.3 + r) ?
+      forest_feature_kind(gx, gz) == FEATURE_SHRUB : false
+  }
+
+  fn forest_shrub_near(x: f64, z: f64, r: f64) -> bool {
+    const gx = floor((x + FEATURE_GRID * FEATURE_CELL / 2) / FEATURE_CELL - 0.5)
+    const gz = floor((z + FEATURE_GRID * FEATURE_CELL / 2) / FEATURE_CELL - 0.5)
+    forest_shrub_cell_near(gx, gz, x, z, r) ? true : (forest_shrub_cell_near(gx + 1, gz, x, z, r) ? true : (
+      forest_shrub_cell_near(gx, gz + 1, x, z, r) ? true : forest_shrub_cell_near(gx + 1, gz + 1, x, z, r)))
+  }
+
+  // A mound of the floor (ground.flecs) within r of (x, z)
+  fn forest_mound_near(x: f64, z: f64, r: f64) -> bool {
+    mut near: bool = false
+
+    for i in 0..MOUND_COUNT {
+      if !near && forest_mound_placed(i) {
+        const rr = max(forest_mound_rx(i), forest_mound_rz(i)) + r
+        near = forest_near(x, z, forest_mound_x(i), forest_mound_z(i), rr)
+      }
+    }
+
+    near
+  }
+
+  // An animal of radius r can stand at (x, z) on the flat floor: off the brook bed, clear of the
+  // trees and their root flares, the landmarks, logs, stumps, rocks, shrubs and the mounds
+  fn forest_ground_free(x: f64, z: f64, r: f64) -> bool {
+    forest_in_world(x, z, 4) && forest_brook_distance(x, z) > BROOK_BANK + r &&
+      !forest_trees_near(x, z, r + 1.6) && !forest_landmark_near(x, z, r) &&
+      !forest_feature_near(x, z, r + 0.2) && !forest_rock_near(x, z, r) &&
+      !forest_shrub_near(x, z, r) && !forest_mound_near(x, z, r)
+  }
+
+  // The straight line between two spots is free for an animal of radius r, checked every step
+  fn forest_line_free(x0: f64, z0: f64, x1: f64, z1: f64, r: f64, step: f64) -> bool {
+    const d = sqrt((x1 - x0) * (x1 - x0) + (z1 - z0) * (z1 - z0))
+    const n = max(1, ceil(d / step))
+    mut free: bool = true
+
+    for i in 0..n + 1 {
+      if free {
+        const t = i / n
+        free = forest_ground_free(x0 + (x1 - x0) * t, z0 + (z1 - z0) * t, r)
+      }
+    }
+
+    free
+  }
+
+  // A bird flies from (x0, z0) to (x1, z1) under the crowns, clear of the trunks and the young
+  // trees (crowns start well above the arcs of the birds)
+  fn forest_flight_free(x0: f64, z0: f64, x1: f64, z1: f64) -> bool {
+    const d = sqrt((x1 - x0) * (x1 - x0) + (z1 - z0) * (z1 - z0))
+    const n = max(2, ceil(d / 1.5))
+    mut free: bool = true
+
+    for i in 1..n {
+      if free {
+        const t = i / n
+        free = !forest_trees_near(x0 + (x1 - x0) * t, z0 + (z1 - z0) * t, 3)
+      }
+    }
+
+    free
+  }
+
+  // Shortest turn from angle a to b
+  fn forest_turn(a: f64, b: f64) -> f64 {
+    atan2(sin(b - a), cos(b - a))
+  }
+
+  // The trout keep clear of the mossy stones and the bigger pebbles of the bed (brook.flecs): a
+  // fish whose body runs along the brook from x0 (the head, upstream) to x1 (the tail) at d off
+  // the centerline and height y, r to either side of its axis. Every point of the body is
+  // tested, not only its middle
+  fn forest_trout_free(x0: f64, x1: f64, d: f64, y: f64, r: f64) -> bool {
+    mut free: bool = abs(d) < BROOK_BED_HALF - r
+    const xm = (x0 + x1) * 0.5
+    const hl = (x1 - x0) * 0.5
+
+    for i in 0..22 {
+      const sx = (forest_hash(i, 111) * 2 - 1) * (BROOK_DETAIL_X - 4)
+      const size = 0.5 + forest_hash(i, 113) * 0.35
+      if free && abs(sx - xm) < size + r + hl + 0.2 {
+        const sd = (forest_hash(i, 112) * 2 - 1) * 0.75
+        const dx = max(0, abs(sx - xm) - hl)
+        free = dx * dx + (sd - d) * (sd - d) > (size * 0.62 + r) * (size * 0.62 + r)
+      }
+    }
+
+    for i in 0..280 {
+      const px = (forest_hash(i, 101) * 2 - 1) * BROOK_DETAIL_X
+      if free && abs(px - xm) < 0.6 + hl {
+        const pd = (forest_hash(i, 102) * 2 - 1) * (BROOK_HALF_WIDTH - 0.05)
+        const h = forest_hash(i, 103)
+        const s = 0.05 + h * h * 0.22
+        const top = forest_brook_bed_y_at(px, pd) + s * 0.12 + s * (0.45 + forest_hash(i, 107) * 0.2)
+        if top > y - 0.05 {
+          const dx = max(0, abs(px - xm) - hl)
+          free = dx * dx + (pd - d) * (pd - d) > (s + r + 0.04) * (s + r + 0.04)
+        }
+      }
+    }
+
+    free
+  }
+
+  // The same for a trout of the given size whose middle is at x: the snout is 0.18 m upstream
+  // of it and the beating tail fin reaches 0.25 m downstream, at full size
+  fn forest_trout_body_free(x: f64, d: f64, size: f64) -> bool {
+    forest_trout_free(x - 0.19 * size, x + 0.26 * size, d,
+      forest_brook_bed_y_at(x, d) + 0.085, 0.05 * size)
+  }
+
+  // The reach a trout holds in: 0 and 1 the pool above the cascade, 2 and 3 the calm reach
+  fn forest_trout_x0(i: f64) -> f64 {
+    i < 1.5 ? POOL_X0 + 0.8 : CALM_X0 + 0.8
+  }
+
+  fn forest_trout_x1(i: f64) -> f64 {
+    i < 1.5 ? CASCADE_X - 1.2 : CALM_X1 - 0.8
+  }
+}
+
+state {
+  // The colors of the perching birds: for each kind (BIRD_*) the back, head, breast, belly,
+  // wing, tail, beak, cheek and legs, three channels each
+  export const BIRD_PARTS: i32 = 9
+  export const BIRD_COLORS: f32[] = [
+    // Robin: olive brown, the orange red face and breast, a pale belly
+    116, 94, 66, 116, 94, 66, 214, 98, 40, 226, 218, 202, 104, 84, 60, 98, 78, 56, 34, 28, 24,
+    214, 98, 40, 150, 112, 92,
+    // Chaffinch: a chestnut back, blue grey cap, pink breast, white bars on dark wings
+    128, 90, 64, 96, 114, 138, 198, 126, 100, 222, 196, 180, 54, 50, 48, 70, 70, 66, 140, 140, 150,
+    198, 126, 100, 150, 120, 104,
+    // Great tit: a green back, black cap and stripe, white cheeks, yellow breast, blue grey wings
+    112, 126, 66, 22, 22, 26, 222, 196, 62, 214, 188, 70, 90, 104, 120, 70, 80, 96, 30, 30, 32,
+    236, 236, 230, 110, 116, 130,
+    // Tawny owl: mottled warm brown, a paler facial disc and breast
+    118, 82, 50, 124, 88, 56, 168, 128, 86, 176, 140, 98, 104, 72, 46, 110, 78, 50, 196, 180, 140,
+    172, 136, 94, 160, 140, 110
+  ]
+
+  fn forest_bird_c(kind: f64, part: f64, ch: f64) -> f64 {
+    BIRD_COLORS[(kind * BIRD_PARTS + part) * 3 + ch]
+  }
+
+  // The kinds and laps of the birds over the canopy: buzzards soar in wide circles high over the
+  // trees, crows row across on bigger ones, a little lower. Centers and radii keep every lap
+  // well above the tallest crowns (about 30 m)
+  struct ForestSoarLap(x: f32, y: f32, z: f32, radius: f32, speed: f32, phase: f32)
+
+  export const BUZZARD_LAPS: ForestSoarLap[] = [
+    {-12, 42, -30, 22, 8.5, 0.1},
+    {22, 47, -14, 28, 9, 0.55},
+    {-26, 52, 8, 18, 8, 0.8}
+  ]
+
+  export const CROW_LAPS: ForestSoarLap[] = [
+    {6, 36, -10, 42, 11, 0.3},
+    {6, 37.5, -10, 42, 11, 0.335},
+    {-30, 39, -40, 34, 10.5, 0.7}
+  ]
+}
+
+assets {
+  prefab ForestFeather { PbrMaterial: {roughness: 0.82}; NoShadow }
+  prefab ForestBirdEye { Rgb: {12, 10, 10}; PbrMaterial: {roughness: 0.15}; NoShadow }
+
+  // A perching bird of a kind (BIRD_*), its feet at the origin, facing +Z. pose (written by its
+  // async block) places it and moves its joints: pitch and roll tilt the body over the feet,
+  // open spreads the flight wings and beat flaps them, head turns and bow lowers the head, tail
+  // cocks the tail. Songbirds are some 14 cm long; the owl is a stockier bird near 40 cm
+  template ForestPerchingBird {
+    prop id: i32 = 0
+    prop kind: i32 = BIRD_ROBIN
+
+    mut pose: ForestAnimalPose = {}
+
+    const owl = kind == BIRD_OWL
+    const k = owl ? 2.7 : 1
+    // The owl sits upright, its head big and round
+    const upright = owl ? -0.75 : -0.25
+    const hr = owl ? 0.034 : 0.024
+    const tit = kind == BIRD_TIT
+
+    Position: {pose.x, pose.y, pose.z}
+    Rotation: {0, pose.yaw, 0}
+    DynamicTransform
+
+    // Legs, tucked away in flight
+    for s in 0..2 {
+      const sx = s * 2 - 1
+      "leg_{s}" : ForestFeather {
+        Position: {sx * 0.011 * k, 0.013 * k, 0.004 * k}
+        Scale: {1, max(0.05, 1 - pose.open), 1}
+        Cylinder: {length: 0.026 * k, radius: 0.0028 * k, segments: 4}
+        Rgb: {forest_bird_c(kind, 8, 0), forest_bird_c(kind, 8, 1), forest_bird_c(kind, 8, 2)}
+      }
+    }
+
+    body {
+      Position: {0, 0.028 * k, 0}
+      Rotation: {upright + pose.pitch, 0, pose.roll}
+
+      back : ForestFeather {
+        Position: {0, 0.004 * k, 0.012 * k}
+        Scale: {0.033 * k, 0.036 * k, 0.056 * k}
+        Sphere: {radius: 1, segments: 12, smooth: true}
+        Rgb: {forest_bird_c(kind, 0, 0), forest_bird_c(kind, 0, 1), forest_bird_c(kind, 0, 2)}
+      }
+
+      breast : ForestFeather {
+        Position: {0, -0.006 * k, 0.026 * k}
+        Scale: {0.03 * k, 0.03 * k, 0.04 * k}
+        Sphere: {radius: 1, segments: 12, smooth: true}
+        Rgb: {forest_bird_c(kind, 2, 0), forest_bird_c(kind, 2, 1), forest_bird_c(kind, 2, 2)}
+      }
+
+      belly : ForestFeather {
+        Position: {0, -0.012 * k, 0.002 * k}
+        Scale: {0.027 * k, 0.026 * k, 0.04 * k}
+        Sphere: {radius: 1, segments: 10, smooth: true}
+        Rgb: {forest_bird_c(kind, 3, 0), forest_bird_c(kind, 3, 1), forest_bird_c(kind, 3, 2)}
+      }
+
+      // The black stripe down the breast of the great tit
+      if tit {
+        stripe : ForestFeather {
+          Position: {0, -0.012 * k, 0.03 * k}
+          Scale: {0.007, 0.024, 0.032}
+          Sphere: {radius: 1, segments: 8, smooth: true}
+          Rgb: {24, 24, 28}
+        }
+      }
+
+      // The folded wings along the sides
+      for s in 0..2 {
+        const sx = s * 2 - 1
+        "fold_{s}" : ForestFeather {
+          Position: {sx * 0.022 * k, 0.008 * k, -0.004 * k}
+          Rotation: {0.12, sx * 0.1, 0}
+          Scale: {0.013 * k, 0.024 * k, 0.05 * k}
+          Sphere: {radius: 1, segments: 10, smooth: true}
+          Rgb: {forest_bird_c(kind, 4, 0), forest_bird_c(kind, 4, 1), forest_bird_c(kind, 4, 2)}
+        }
+
+        // A white bar across the wing of the chaffinch
+        if kind == BIRD_CHAFFINCH {
+          "bar_{s}" : ForestFeather {
+            Position: {sx * 0.031, 0.012, 0.012}
+            Rotation: {0.12, sx * 0.1, 0}
+            Scale: {0.005, 0.016, 0.008}
+            Sphere: {radius: 1, segments: 6, smooth: true}
+            Rgb: {236, 232, 220}
+          }
+        }
+      }
+
+      // The tail, cocked by pose.tail
+      tail {
+        Position: {0, 0.008 * k, -0.04 * k}
+        Rotation: {(owl ? 0.5 : -0.25) - pose.tail, 0, 0}
+        feathers : ForestFeather {
+          Position: {0, 0, -0.03 * k}
+          Box: {(owl ? 0.034 : 0.024) * k, 0.005 * k, 0.06 * k}
+          Rgb: {forest_bird_c(kind, 5, 0), forest_bird_c(kind, 5, 1), forest_bird_c(kind, 5, 2)}
+        }
+      }
+
+      // The flight wings, spread by pose.open and flapped by pose.beat
+      for s in 0..2 {
+        const sx = s * 2 - 1
+        "wing_{s}" {
+          Position: {sx * 0.02 * k, 0.016 * k, 0.012 * k}
+          Rotation: {0 - upright - pose.pitch, 0, sx * pose.beat}
+          Scale: {max(0.02, pose.open), 1, max(0.02, pose.open)}
+          inner : ForestFeather {
+            Position: {sx * 0.04 * k, 0, 0}
+            Box: {0.08 * k, 0.004 * k, (owl ? 0.075 : 0.05) * k}
+            Rgb: {forest_bird_c(kind, 4, 0), forest_bird_c(kind, 4, 1), forest_bird_c(kind, 4, 2)}
+          }
+
+          outer : ForestFeather {
+            Position: {sx * 0.11 * k, 0, -0.008 * k}
+            Rotation: {0, sx * 0.25, 0}
+            Box: {0.07 * k, 0.003 * k, (owl ? 0.06 : 0.036) * k}
+            Rgb: {forest_bird_c(kind, 5, 0), forest_bird_c(kind, 5, 1), forest_bird_c(kind, 5, 2)}
+          }
+        }
+      }
+
+      // The head turns about the neck and bows to peck
+      head {
+        Position: {0, (owl ? 0.032 : 0.03) * k, (owl ? 0.016 : 0.044) * k}
+        Rotation: {0 - upright - pose.pitch + pose.bow, pose.head, 0}
+
+        skull : ForestFeather {
+          Position: {0, hr * 0.4, 0}
+          Scale: {owl ? 1.15 : 1, owl ? 0.92 : 1, owl ? 0.86 : 1.1}
+          Sphere: {radius: hr * k, segments: 12, smooth: true}
+          Rgb: {forest_bird_c(kind, 1, 0), forest_bird_c(kind, 1, 1), forest_bird_c(kind, 1, 2)}
+        }
+
+        // The face: the red face of the robin, the white cheeks of the tit, the facial disc of the
+        // owl
+        if owl || kind == BIRD_ROBIN || tit {
+          face : ForestFeather {
+            Position: {0, (owl ? 0.012 : -0.004) * k, (owl ? 0.016 : 0.012) * k}
+            Scale: {owl ? 1.1 : 0.82, owl ? 0.95 : 0.7, owl ? 0.45 : 0.7}
+            Sphere: {radius: hr * k, segments: 12, smooth: true}
+            Rgb: {forest_bird_c(kind, 7, 0), forest_bird_c(kind, 7, 1), forest_bird_c(kind, 7, 2)}
+          }
+        }
+
+        beak : ForestFeather {
+          Position: {0, (owl ? 0.004 : 0.008) * k, (owl ? 0.034 : 0.031) * k}
+          Rotation: {PI / 2 + (owl ? 0.5 : 0), 0, 0}
+          Cone: {length: (owl ? 0.012 : 0.017) * k, radius: (owl ? 0.005 : 0.0055) * k, segments: 6}
+          Rgb: {forest_bird_c(kind, 6, 0), forest_bird_c(kind, 6, 1), forest_bird_c(kind, 6, 2)}
+        }
+
+        for s in 0..2 {
+          const sx = s * 2 - 1
+          "eye_{s}" : ForestBirdEye {
+            Position: {sx * (owl ? 0.012 : 0.015) * k, (owl ? 0.017 : 0.016) * k, (owl ? 0.027 : 0.017) * k}
+            Sphere: {radius: (owl ? 0.0065 : 0.0042) * k, segments: 8, smooth: true}
+          }
+        }
+      }
+    }
+
+    // Flit between the perches and the ground: sit a while, looking about and flicking the tail,
+    // hop and peck on the ground, then fly in a bounding arc to another perch (one no other bird
+    // holds) or a spot on the floor, clear of the trunks. The owl only sits on the perches that
+    // hold it, turns its head far round, and glides with slow beats
+    async {
+      const rng: flecs.script.math.Rng = {seed: (owl ? SEED_OWL : SEED_SONGBIRD) + id * 131}
+      const big = owl ? 2 : 1
+      const flight_speed: f32 = owl ? 4.2 : 5.5
+
+      // Start on a perch of its own
+      mut perch: i32 = owl ? 2 : (id * 4 + 1) % PERCH_COUNT
+      perch_taken[id] = perch
+      mut x: f32 = FOREST_PERCHES[perch].x
+      mut y: f32 = FOREST_PERCHES[perch].y
+      mut z: f32 = FOREST_PERCHES[perch].z
+      mut yaw: f32 = rng.f(6.2832)
+      mut on_ground = false
+      mut flying = false
+      mut wait: f32 = 1 + rng.f(owl ? 9 : 4)
+      mut clock: f32 = rng.f(10)
+
+      // The flight: from (fx0, fy0, fz0) to (fx1, fy1, fz1), ft of the way, over fdur seconds,
+      // arcing hump meters above the line
+      mut fx0: f32 = x
+      mut fy0: f32 = y
+      mut fz0: f32 = z
+      mut fx1: f32 = x
+      mut fy1: f32 = y
+      mut fz1: f32 = z
+      mut ft: f32 = 0
+      mut fdur: f32 = 1
+      mut hump: f32 = 0
+      mut fyaw: f32 = yaw
+      mut to_ground = false
+      mut to_perch: i32 = perch
+
+      // The pose of the joints
+      mut open: f32 = 0
+      mut beat: f32 = 0
+      mut head: f32 = 0
+      mut head_to: f32 = 0
+      mut head_wait: f32 = 0.5
+      mut bow: f32 = 0
+      mut peck: f32 = 0
+      mut tail: f32 = 0
+      mut tail_wait: f32 = 1
+      mut pitch: f32 = 0
+
+      // A hop on the ground: from (hx0, hz0) to (hx1, hz1), ht of the way
+      mut hx0: f32 = x
+      mut hz0: f32 = z
+      mut hx1: f32 = x
+      mut hz1: f32 = z
+      mut ht: f32 = 1
+      mut hop_wait: f32 = 0.8
+      mut gx0: f32 = x
+      mut gz0: f32 = z
+
+      while true {
+        await next_frame()
+        const dt: f32 = box.app.Status[box.app.Status].delta_time
+        clock += dt
+
+        if flying {
+          ft = min(1, ft + dt / fdur)
+          const e = ft * ft * (3 - 2 * ft)
+          x = fx0 + (fx1 - fx0) * e
+          z = fz0 + (fz1 - fz0) * e
+          // A bounding flight: bursts of beats and closed wing glides that rise and dip
+          const burst = owl ? (ft < 0.25 || ft > 0.8) : forest_fract(clock * 2.4) < 0.55
+          const dip = owl ? 0 : 0.06 * sin(clock * 2.4 * 6.2832) * sin(ft * PI)
+          y = fy0 + (fy1 - fy0) * e + hump * sin(ft * PI) + dip
+          yaw += forest_turn(yaw, fyaw) * min(1, dt * 12)
+          open += ((burst || !owl ? 1 : 1) - open) * min(1, dt * 14)
+          beat = burst ? (owl ? 0.75 * sin(clock * 11) : 1.1 * sin(clock * 75)) : (owl ? 0.08 : -0.9)
+          if !owl && !burst {
+            open += (0.35 - open) * min(1, dt * 20)
+          }
+          pitch = clamp((fy1 - fy0) * (1 - ft) * 0.05 - (ft > 0.85 ? 0.5 : 0), -0.6, 0.4)
+          head += (0 - head) * min(1, dt * 8)
+          bow += (0 - bow) * min(1, dt * 8)
+
+          if ft >= 1 {
+            flying = false
+            on_ground = to_ground
+            perch = to_perch
+            wait = on_ground ? 2 + rng.f(5) : (owl ? 8 + rng.f(14) : 2 + rng.f(6))
+            gx0 = x
+            gz0 = z
+            hx0 = x
+            hz0 = z
+            hx1 = x
+            hz1 = z
+            ht = 1
+            tail = 0.5
+          }
+        } else {
+          open += (0 - open) * min(1, dt * 10)
+          beat += (0 - beat) * min(1, dt * 10)
+          pitch += (0 - pitch) * min(1, dt * 6)
+          wait -= dt
+
+          // Look about: the head turns in quick steps, the owl's far round
+          head_wait -= dt
+          if head_wait <= 0 {
+            head_wait = owl ? 1.2 + rng.f(3) : 0.25 + rng.f(0.9)
+            head_to = owl ? rng.f(4) - 2 : rng.f(2) - 1
+          }
+          head += (head_to - head) * min(1, dt * (owl ? 4 : 18))
+
+          // Flick the tail now and then
+          tail_wait -= dt
+          if tail_wait <= 0 {
+            tail_wait = 0.6 + rng.f(2.5)
+            tail = owl ? 0.1 : 0.55
+          }
+          tail += (0 - tail) * min(1, dt * 5)
+
+          if on_ground {
+            // Hop about near where it landed and peck at the floor
+            hop_wait -= dt
+            if ht < 1 {
+              ht = min(1, ht + dt / 0.16)
+              x = hx0 + (hx1 - hx0) * ht
+              z = hz0 + (hz1 - hz0) * ht
+              y = 0.05 * sin(ht * PI)
+            } else if hop_wait <= 0 {
+              hop_wait = 0.4 + rng.f(1.3)
+              if rng.f(1) < 0.45 {
+                peck = 0.35
+              } else {
+                const back = (x - gx0) * (x - gx0) + (z - gz0) * (z - gz0) > 0.36
+                const a = back ? atan2(gx0 - x, gz0 - z) : yaw + rng.f(1.6) - 0.8
+                yaw = a
+                hx0 = x
+                hz0 = z
+                hx1 = x + sin(a) * (0.08 + rng.f(0.12))
+                hz1 = z + cos(a) * (0.08 + rng.f(0.12))
+                ht = 0
+              }
+            }
+            peck = max(0, peck - dt)
+            bow += ((peck > 0 ? 1.1 : 0) - bow) * min(1, dt * 25)
+          } else {
+            bow += (0 - bow) * min(1, dt * 8)
+            // Turn round on the perch now and then
+            if hop_wait <= 0 {
+              hop_wait = 3 + rng.f(5)
+              yaw += PI * (rng.f(1) < 0.5 ? 1 : -1) * (owl ? 0.3 : 1)
+            }
+            hop_wait -= dt
+          }
+
+          // Time to go: pick a free perch or a spot on the floor that a clear flight reaches
+          if wait <= 0 {
+            wait = 0.5
+            mut tries: i32 = 0
+            while tries < 6 && !flying {
+              tries += 1
+              const pick_ground = !owl && rng.f(1) < (on_ground ? 0.3 : 0.5)
+              mut tx: f32 = x
+              mut ty: f32 = 0
+              mut tz: f32 = z
+              mut tp: i32 = -1
+              mut ok = false
+
+              if pick_ground {
+                if rng.f(1) < 0.6 {
+                  // On the footpath through the clearing, where the grass leaves the floor bare
+                  tz = -2 + rng.f(11)
+                  tx = forest_path_x(tz) + rng.f(0.8) - 0.4
+                } else {
+                  const a = rng.f(6.2832)
+                  const r = 1.5 + rng.f(5)
+                  tx = x + sin(a) * r
+                  tz = z + cos(a) * r
+                }
+                ok = forest_clearing_distance(tx, tz) < 1 && forest_ground_free(tx, tz, 0.15)
+              } else {
+                tp = floor(rng.f(PERCH_COUNT - 0.001))
+                ok = tp != perch && FOREST_PERCHES[tp].size >= big
+                for b in 0..perch_taken.count() {
+                  if b != id && perch_taken[b] == tp {
+                    ok = false
+                  }
+                }
+                tx = FOREST_PERCHES[tp].x
+                ty = FOREST_PERCHES[tp].y
+                tz = FOREST_PERCHES[tp].z
+              }
+
+              const d = sqrt((tx - x) * (tx - x) + (tz - z) * (tz - z))
+              if ok && d > 0.8 && d < 36 && forest_flight_free(x, z, tx, tz) {
+                flying = true
+                to_ground = pick_ground
+                to_perch = tp
+                perch_taken[id] = tp
+                fx0 = x
+                fy0 = y
+                fz0 = z
+                fx1 = tx
+                fy1 = ty
+                fz1 = tz
+                ft = 0
+                fdur = d / flight_speed + 0.4
+                hump = (owl ? 0.4 : 0.35) + d * 0.07
+                fyaw = atan2(tx - x, tz - z)
+                on_ground = false
+              }
+            }
+          }
+        }
+
+        pose = {
+          x: x, y: y, z: z, yaw: yaw, pitch: pitch, roll: 0, gait: 0, speed: 0, open: open,
+          beat: beat, head: head, bow: bow, tail: tail, crouch: 0, ear: 0
+        }
+      }
+    }
+  }
+
+  // Wing beats of the birds over the canopy, the right wing (+X) lifting with -Z rotation
+  // facing +Z: the buzzard soars on held wings and gives a few slow beats now and then, the crow
+  // rows steadily
+  prefab forest_buzzard_beat {
+    Clip: {duration: 9}
+    beat { Track: {component: Rotation, member: "z", curve: {kind: CurveCatmullRom, keys: [
+      {0, -0.1}, {0.3, -0.55}, {0.65, 0.3}, {1, -0.55}, {1.35, 0.3}, {1.7, -0.1}, {9, -0.1}
+    ]}} }
+  }
+
+  prefab forest_crow_beat {
+    Clip: {duration: 0.42}
+    beat { Track: {component: Rotation, member: "z", curve: {kind: CurveCatmullRom, keys: [
+      {0, -0.5}, {0.21, 0.45}, {0.42, -0.5}
+    ]}} }
+  }
+
+  // A lap of a circle: turning the parent by -a carries the child on the rim along +Z
+  prefab forest_soar_lap {
+    Clip: {duration: 1}
+    turn { Track: {component: Rotation, member: "y", curve: {keys: [{0, 0}, {1, -6.2832}]}} }
+  }
+
+  prefab ForestBuzzardBrown { Rgb: {104, 76, 52}; PbrMaterial: {roughness: 0.85}; NoShadow }
+  prefab ForestBuzzardPale { Rgb: {196, 176, 150}; PbrMaterial: {roughness: 0.85}; NoShadow }
+  prefab ForestCrowBlack { Rgb: {26, 26, 30}; PbrMaterial: {roughness: 0.55}; NoShadow }
+  prefab ForestRaptorBeak { Rgb: {60, 56, 50}; PbrMaterial: {roughness: 0.5}; NoShadow }
+
+  // A bird over the canopy facing +Z: a common buzzard (broad wings with fingered tips, pale
+  // underneath, a short fanned tail) or a carrion crow (black, narrower wings, a wedge of a
+  // tail). Its wings beat by the clip of its kind from phase
+  template ForestSoarer {
+    prop kind: i32 = SOARER_BUZZARD
+    prop phase: f32 = 0
+
+    const crow = kind == SOARER_CROW
+    const span = crow ? 0.46 : 0.6
+    const chord = crow ? 0.2 : 0.3
+
+    body {
+      if crow {
+        torso : ForestCrowBlack { Scale: {0.09, 0.08, 0.24}; Sphere: {radius: 1, segments: 10, smooth: true} }
+        head : ForestCrowBlack { Position: {0, 0.03, 0.24}; Sphere: {radius: 0.06, segments: 8, smooth: true} }
+        beak : ForestCrowBlack { Position: {0, 0.02, 0.33}; Rotation: {PI / 2, 0, 0}; Cone: {length: 0.08, radius: 0.022, segments: 6} }
+        tail : ForestCrowBlack { Position: {0, 0, -0.3}; Scale: {1, 1, 1}; Box: {0.14, 0.015, 0.18} }
+      } else {
+        torso : ForestBuzzardBrown { Scale: {0.12, 0.1, 0.28}; Sphere: {radius: 1, segments: 10, smooth: true} }
+        chest : ForestBuzzardPale { Position: {0, -0.03, 0.06}; Scale: {0.1, 0.07, 0.18}; Sphere: {radius: 1, segments: 10, smooth: true} }
+        head : ForestBuzzardBrown { Position: {0, 0.02, 0.27}; Sphere: {radius: 0.075, segments: 8, smooth: true} }
+        beak : ForestRaptorBeak { Position: {0, 0, 0.35}; Rotation: {PI / 2 + 0.4, 0, 0}; Cone: {length: 0.05, radius: 0.02, segments: 6} }
+        tail : ForestBuzzardBrown { Position: {0, 0, -0.34}; Box: {0.22, 0.015, 0.2} }
+      }
+    }
+
+    for s in 0..2 {
+      const sx = s * 2 - 1
+      "wing_{s}" {
+        Position: {sx * 0.06, 0.03, 0.03}
+        Rotation: {0, 0, 0}
+        Scale: {sx, 1, 1}
+        Animator: {clip: crow ? forest_crow_beat : forest_buzzard_beat, time: phase * (crow ? 0.42 : 9), speed: 1}
+
+        if crow {
+          inner : ForestCrowBlack { Position: {span * 0.5, 0, 0}; Box: {span, 0.02, chord} }
+          outer : ForestCrowBlack { Position: {span * 1.25, 0, -0.03}; Rotation: {0, -0.25, 0}; Box: {span * 0.6, 0.015, chord * 0.75} }
+        } else {
+          inner : ForestBuzzardBrown { Position: {span * 0.5, 0.01, 0}; Box: {span, 0.02, chord} }
+          under : ForestBuzzardPale { Position: {span * 0.5, -0.005, 0}; Box: {span * 0.9, 0.012, chord * 0.8} }
+          outer : ForestBuzzardBrown { Position: {span * 1.2, 0.02, -0.02}; Rotation: {0, 0, 0.08}; Box: {span * 0.45, 0.015, chord * 0.9} }
+          // The fingered primaries at the tip
+          for f in 0..4 {
+            "finger_{f}" : ForestRaptorBeak {
+              Position: {span * 1.52, 0.03, chord * (0.32 - f * 0.17)}
+              Rotation: {0, 0.15 - f * 0.12, 0.12}
+              Box: {span * 0.3, 0.01, 0.035}
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+// The birds: songbirds and the owl about the clearing by their season and hour (re-placed when
+// the count changes), buzzards and crows on their laps over the canopy by day
+forest {
+  animals {
+    const songbirds = forest_songbird_count(season, hour)
+    const buzzards = forest_buzzard_count(season, hour)
+    const crows = forest_crow_count(season, hour)
+
+    for i in 0..songbirds {
+      ForestPerchingBird "songbird_{i}"(id: i, kind: i % 3)
+    }
+
+    if forest_owl_out(season, hour) {
+      ForestPerchingBird owl(id: 5, kind: BIRD_OWL)
+    }
+
+    for i in 0..buzzards {
+      const lap = BUZZARD_LAPS[i]
+      "buzzard_{i}" {
+        Position: {lap.x, lap.y, lap.z}
+        Rotation: {0, 0, 0}
+        Animator: {clip: forest_soar_lap, time: lap.phase, speed: lap.speed / (6.2832 * lap.radius)}
+        bird {
+          Position: {lap.radius, 0, 0}
+          Rotation: {0, 0, 0.28}
+          ForestSoarer soarer(kind: SOARER_BUZZARD, phase: lap.phase)
+        }
+      }
+    }
+
+    for i in 0..crows {
+      const lap = CROW_LAPS[i]
+      "crow_{i}" {
+        Position: {lap.x, lap.y, lap.z}
+        Rotation: {0, 0, 0}
+        Animator: {clip: forest_soar_lap, time: lap.phase, speed: lap.speed / (6.2832 * lap.radius)}
+        bird {
+          Position: {lap.radius, 0, 0}
+          Rotation: {0, 0, 0.18}
+          ForestSoarer soarer(kind: SOARER_CROW, phase: lap.phase * 7)
+        }
+      }
+    }
+  }
+}
+
+state {
+  // The squirrel: where it can stand on the floor by the snags, the trunks it climbs and how
+  export const SQUIRREL_RUN: f32 = 2.6
+  export const SQUIRREL_CLIMB: f32 = 1.1
+
+  // Within r of a landmark boulder of ground.flecs (as forest_landmark_near)
+  fn forest_boulder_near(x: f64, z: f64, r: f64) -> bool {
+    forest_near(x, z, -13, 3, 2.5 + r) || forest_near(x, z, 16, 10, 3.5 + r) ||
+      forest_near(x, z, -20, -20, 3 + r) || forest_near(x, z, 24, -24, 2.8 + r) ||
+      forest_near(x, z, -30, 14, 3.2 + r) || forest_near(x, z, 34, 18, 2.8 + r) ||
+      forest_near(x, z, -1, -11.5, 1.5 + r) || forest_near(x, z, 10, 1, 0.9 + r)
+  }
+
+  // Within r of the trunk of a snag or of the fallen top of the broken one
+  fn forest_snag_near(x: f64, z: f64, r: f64) -> bool {
+    const ax = x - SNAG_B_X
+    const az = z - SNAG_B_Z
+    // Along the fallen top, local +Z of the snag turned by its yaw
+    const lz = ax * sin(SNAG_B_YAW) + az * cos(SNAG_B_YAW)
+    const lx = ax * cos(SNAG_B_YAW) - az * sin(SNAG_B_YAW)
+    const top = forest_log_top_z(SNAG_B_SEED, 1)
+    const on_top = lz > 0 && lz < top + 0.3 && abs(lx) < 0.45 + r
+    on_top || forest_near(x, z, SNAG_A_X, SNAG_A_Z, forest_snag_r0(SNAG_A_SEED) + 0.1 + r) ||
+      forest_near(x, z, SNAG_B_X, SNAG_B_Z, forest_snag_r0(SNAG_B_SEED) + 0.1 + r)
+  }
+
+  // The floor is clear for a small animal of radius r at (x, z): as forest_ground_free, but it
+  // may come right up to the snags
+  fn forest_floor_clear(x: f64, z: f64, r: f64) -> bool {
+    forest_in_world(x, z, 4) && forest_brook_distance(x, z) > BROOK_BANK + r &&
+      !forest_trees_near(x, z, r + 1.6) && !forest_boulder_near(x, z, r) &&
+      !forest_snag_near(x, z, r) && !forest_feature_near(x, z, r + 0.2) &&
+      !forest_rock_near(x, z, r) && !forest_shrub_near(x, z, r) && !forest_mound_near(x, z, r)
+  }
+
+  fn forest_floor_line_clear(x0: f64, z0: f64, x1: f64, z1: f64, r: f64) -> bool {
+    const d = sqrt((x1 - x0) * (x1 - x0) + (z1 - z0) * (z1 - z0))
+    const n = max(1, ceil(d / 0.5))
+    mut free: bool = true
+
+    for i in 0..n + 1 {
+      if free {
+        const t = i / n
+        free = forest_floor_clear(x0 + (x1 - x0) * t, z0 + (z1 - z0) * t, r)
+      }
+    }
+
+    free
+  }
+
+  // The angle round a snag (in its own space, 0 along local +Z) farthest from its stubs, its
+  // shelf fungus and its fallen top, where the squirrel runs up and down
+  fn forest_climb_angle(seed: f64, fallen: bool) -> f64 {
+    mut best: f64 = 0
+    mut best_gap: f64 = -1
+
+    for i in 0..24 {
+      const a = i * 6.2832 / 24
+      mut gap: f64 = 10
+      for j in 0..3 {
+        gap = min(gap, abs(forest_turn(a, forest_stub_w(seed, j))))
+      }
+      gap = min(gap, abs(forest_turn(a, forest_hash(50, seed) * 6.2832)) * 0.8)
+      if fallen {
+        gap = min(gap, abs(forest_turn(a, 0)))
+      }
+      if gap > best_gap {
+        best_gap = gap
+        best = a
+      }
+    }
+
+    best
+  }
+
+  export const CLIMB_A: f32 = forest_climb_angle(SNAG_A_SEED, false)
+  export const CLIMB_B: f32 = forest_climb_angle(SNAG_B_SEED, true)
+
+  // A point on the bark of snag a (0) or b (1) at height y, d meters out from the bark, at the
+  // climbing angle: world X, Y and Z
+  fn forest_bark_lx(t: f64, y: f64, d: f64) -> f64 {
+    const seed = t < 0.5 ? SNAG_A_SEED : SNAG_B_SEED
+    const height = t < 0.5 ? SNAG_A_HEIGHT : SNAG_B_HEIGHT
+    const a = t < 0.5 ? CLIMB_A : CLIMB_B
+    forest_snag_axis_x(seed, height, y) + sin(a) * (forest_snag_radius(seed, height, y) + d)
+  }
+
+  fn forest_bark_lz(t: f64, y: f64, d: f64) -> f64 {
+    const seed = t < 0.5 ? SNAG_A_SEED : SNAG_B_SEED
+    const height = t < 0.5 ? SNAG_A_HEIGHT : SNAG_B_HEIGHT
+    const a = t < 0.5 ? CLIMB_A : CLIMB_B
+    forest_snag_axis_z(seed, height, y) + cos(a) * (forest_snag_radius(seed, height, y) + d)
+  }
+
+  fn forest_bark_x(t: f64, y: f64, d: f64) -> f64 {
+    t < 0.5 ?
+      SNAG_A_X + forest_rot_x(forest_bark_lx(t, y, d), y, forest_bark_lz(t, y, d), SNAG_A_TILT, SNAG_A_YAW) :
+      SNAG_B_X + forest_rot_x(forest_bark_lx(t, y, d), y, forest_bark_lz(t, y, d), 0, SNAG_B_YAW)
+  }
+
+  fn forest_bark_y(t: f64, y: f64, d: f64) -> f64 {
+    t < 0.5 ? forest_rot_y(forest_bark_lx(t, y, d), y, forest_bark_lz(t, y, d), SNAG_A_TILT, SNAG_A_YAW) : y
+  }
+
+  fn forest_bark_z(t: f64, y: f64, d: f64) -> f64 {
+    t < 0.5 ?
+      SNAG_A_Z + forest_rot_z(forest_bark_lx(t, y, d), y, forest_bark_lz(t, y, d), SNAG_A_TILT, SNAG_A_YAW) :
+      SNAG_B_Z + forest_rot_z(forest_bark_lx(t, y, d), y, forest_bark_lz(t, y, d), 0, SNAG_B_YAW)
+  }
+
+  // World yaw of the outward direction from the bark of a snag at its climbing angle
+  fn forest_bark_yaw(t: f64) -> f64 {
+    t < 0.5 ? CLIMB_A + SNAG_A_YAW : CLIMB_B + SNAG_B_YAW
+  }
+
+  // Squirrel behaviours
+  export const SQ_FORAGE: i32 = 0
+  export const SQ_RUN: i32 = 1
+  export const SQ_UP: i32 = 2
+  export const SQ_CLING: i32 = 3
+  export const SQ_DOWN: i32 = 4
+}
+
+assets {
+  prefab ForestSquirrelFur { PbrMaterial: {roughness: 0.9} }
+  prefab ForestSquirrelPale { Rgb: {232, 220, 196}; PbrMaterial: {roughness: 0.9} }
+  prefab ForestSquirrelDark { Rgb: {40, 26, 18}; PbrMaterial: {roughness: 0.4} }
+
+  // A red squirrel, about 20 cm of body and as much again of bushy tail, its feet on the ground
+  // at the origin, facing +Z. pose: gait is the phase of its bounds and speed how fast it runs
+  // (0..1), crouch sits it up on its haunches, head turns its head, bow nibbles, tail flicks the
+  // tail; pitch stands it on the bark of a trunk. The coat is a bright fox red in summer, a
+  // duller grey brown with long ear tufts in winter
+  template ForestSquirrel {
+    prop id: i32 = 0
+
+    mut pose: ForestAnimalPose = {}
+
+    const fur_r = forest_seasonal(season, 176, 182, 160, 130)
+    const fur_g = forest_seasonal(season, 84, 82, 78, 86)
+    const fur_b = forest_seasonal(season, 40, 34, 40, 62)
+    const tuft = forest_seasonal(season, 0.7, 0.35, 0.8, 1.2)
+    const run = clamp(pose.speed, 0, 1)
+    const sg = sin(pose.gait)
+    const sit = clamp(pose.crouch, 0, 1)
+
+    Position: {pose.x, pose.y, pose.z}
+    Rotation: {pose.pitch, pose.yaw, 0}
+    DynamicTransform
+
+    // The haunches: big hind legs folded under the hips, which push off in a bound
+    for s in 0..2 {
+      const sx = s * 2 - 1
+      "hind_{s}" {
+        Position: {sx * 0.03, 0.045, -0.045}
+        Rotation: {sg * 0.7 * run, 0, 0}
+        thigh : ForestSquirrelFur {
+          Scale: {0.022, 0.034, 0.04}
+          Sphere: {radius: 1, segments: 10, smooth: true}
+          Rgb: {fur_r, fur_g, fur_b}
+        }
+        foot : ForestSquirrelFur {
+          Position: {0, -0.04, 0.02}
+          Scale: {0.012, 0.007, 0.032}
+          Sphere: {radius: 1, segments: 8, smooth: true}
+          Rgb: {fur_r * 0.8, fur_g * 0.8, fur_b * 0.8}
+        }
+      }
+    }
+
+    // The body pivots at the hips: it rocks with the bound and sits up on the haunches
+    body {
+      Position: {0, 0.055 + 0.025 * abs(sg) * run, -0.045}
+      Rotation: {0 - sit * 1.15 - 0.15 + 0.22 * cos(pose.gait) * run, 0, 0}
+
+      torso : ForestSquirrelFur {
+        Position: {0, 0.008, 0.06}
+        Scale: {0.04, 0.04, 0.08}
+        Sphere: {radius: 1, segments: 14, smooth: true}
+        Rgb: {fur_r, fur_g, fur_b}
+      }
+
+      belly : ForestSquirrelPale {
+        Position: {0, -0.012, 0.075}
+        Scale: {0.03, 0.028, 0.062}
+        Sphere: {radius: 1, segments: 10, smooth: true}
+      }
+
+      // Forelegs, reaching out in the bound, held to the chest when it sits up
+      for s in 0..2 {
+        const sx = s * 2 - 1
+        "fore_{s}" {
+          Position: {sx * 0.02, -0.01, 0.11}
+          Rotation: {0 - sg * 0.8 * run + sit * 1.3 + pose.bow * 0.5, 0, 0}
+          leg : ForestSquirrelFur {
+            Position: {0, -0.025, 0}
+            Capsule: {length: 0.03, radius: 0.008, segments: 6}
+            Rgb: {fur_r, fur_g, fur_b}
+          }
+          paw : ForestSquirrelFur {
+            Position: {0, -0.05, 0.006}
+            Scale: {0.009, 0.006, 0.013}
+            Sphere: {radius: 1, segments: 6, smooth: true}
+            Rgb: {fur_r * 0.75, fur_g * 0.75, fur_b * 0.75}
+          }
+        }
+      }
+
+      head {
+        Position: {0, 0.03, 0.135}
+        Rotation: {sit * 1.0 + pose.bow * 0.4 - 0.1, pose.head, 0}
+
+        skull : ForestSquirrelFur {
+          Position: {0, 0.008, 0.014}
+          Scale: {0.026, 0.026, 0.034}
+          Sphere: {radius: 1, segments: 12, smooth: true}
+          Rgb: {fur_r, fur_g, fur_b}
+        }
+
+        chin : ForestSquirrelPale {
+          Position: {0, -0.006, 0.026}
+          Scale: {0.016, 0.012, 0.022}
+          Sphere: {radius: 1, segments: 8, smooth: true}
+        }
+
+        nose : ForestSquirrelDark {
+          Position: {0, 0.006, 0.048}
+          Sphere: {radius: 0.0045, segments: 6, smooth: true}
+        }
+
+        for s in 0..2 {
+          const sx = s * 2 - 1
+          "eye_{s}" : ForestSquirrelDark {
+            Position: {sx * 0.016, 0.016, 0.03}
+            Sphere: {radius: 0.0055, segments: 8, smooth: true}
+          }
+
+          // Upright ears with tufts, long in winter
+          "ear_{s}" {
+            Position: {sx * 0.014, 0.03, 0.006}
+            Rotation: {-0.15, 0, sx * -0.25}
+            flap : ForestSquirrelFur {
+              Position: {0, 0.012, 0}
+              Scale: {0.008, 0.016, 0.004}
+              Sphere: {radius: 1, segments: 6, smooth: true}
+              Rgb: {fur_r, fur_g, fur_b}
+            }
+            tuft : ForestSquirrelFur {
+              Position: {0, 0.026 + 0.008 * tuft, 0}
+              Scale: {0.003, 0.012 * tuft, 0.003}
+              Sphere: {radius: 1, segments: 5, smooth: true}
+              Rgb: {fur_r * 0.7, fur_g * 0.6, fur_b * 0.6}
+            }
+          }
+        }
+      }
+
+      // The bushy tail: five fluffy lengths, curled up over the back at rest, streaming out
+      // behind in a run, flicking when it is alarmed
+      tail {
+        Position: {0, 0.02, -0.005}
+        Rotation: {-0.9 + 0.75 * run - pose.tail * 0.4 + sit * 0.8, 0, 0}
+        t0 : ForestSquirrelFur {
+          Position: {0, 0, -0.03}
+          Scale: {0.022, 0.024, 0.036}
+          Sphere: {radius: 1, segments: 8, smooth: true}
+          Rgb: {fur_r, fur_g, fur_b}
+        }
+        k1 {
+          Position: {0, 0, -0.055}
+          Rotation: {-0.55 + 0.45 * run - pose.tail * 0.5 + 0.12 * sg * run, 0, 0}
+          t1 : ForestSquirrelFur {
+            Position: {0, 0, -0.03}
+            Scale: {0.028, 0.03, 0.04}
+            Sphere: {radius: 1, segments: 8, smooth: true}
+            Rgb: {fur_r, fur_g, fur_b}
+          }
+          k2 {
+            Position: {0, 0, -0.055}
+            Rotation: {-0.6 + 0.5 * run - pose.tail * 0.4 + 0.15 * sg * run, 0, 0}
+            t2 : ForestSquirrelFur {
+              Position: {0, 0, -0.03}
+              Scale: {0.032, 0.032, 0.042}
+              Sphere: {radius: 1, segments: 8, smooth: true}
+              Rgb: {fur_r, fur_g, fur_b}
+            }
+            k3 {
+              Position: {0, 0, -0.055}
+              Rotation: {-0.5 + 0.45 * run + pose.tail * 0.3, 0, 0}
+              t3 : ForestSquirrelFur {
+                Position: {0, 0, -0.03}
+                Scale: {0.03, 0.03, 0.04}
+                Sphere: {radius: 1, segments: 8, smooth: true}
+                Rgb: {fur_r, fur_g, fur_b}
+              }
+              k4 {
+                Position: {0, 0, -0.05}
+                Rotation: {0.5 - 0.3 * run + pose.tail * 0.6, 0, 0}
+                t4 : ForestSquirrelFur {
+                  Position: {0, 0, -0.024}
+                  Scale: {0.022, 0.022, 0.032}
+                  Sphere: {radius: 1, segments: 8, smooth: true}
+                  Rgb: {fur_r * 0.9, fur_g * 0.85, fur_b * 0.85}
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Forage on the floor by the snags, sitting up to nibble and hopping on; dash across the floor
+    // in bounds to the foot of a snag, run up the bark at its climbing angle, cling there looking
+    // about, come down head first and dash off to forage again
+    async {
+      const rng: flecs.script.math.Rng = {seed: SEED_SQUIRREL + id * 17}
+      mut mode: i32 = SQ_FORAGE
+      // The snag it is at: 0 the tall one, 1 the broken one
+      mut snag: f32 = 0
+      mut x: f32 = forest_bark_x(0, 0, 1.2)
+      mut y: f32 = 0
+      mut z: f32 = forest_bark_z(0, 0, 1.2)
+      mut yaw: f32 = forest_bark_yaw(0)
+      mut pitch: f32 = 0
+      mut wait: f32 = 3 + rng.f(3)
+      mut gait: f32 = 0
+      mut speed: f32 = 0
+      mut crouch: f32 = 1
+      mut head: f32 = 0
+      mut head_to: f32 = 0
+      mut head_wait: f32 = 0.5
+      mut bow: f32 = 0
+      mut nibble: f32 = 0
+      mut tail: f32 = 0
+      mut tail_wait: f32 = 1
+      mut hop: f32 = 1
+      mut hop_wait: f32 = 1
+      // A run on the floor: to (tx, tz), then up the snag when climb is set
+      mut tx: f32 = x
+      mut tz: f32 = z
+      mut climb = false
+      mut burst: f32 = 0
+      // The height it climbs to on the bark
+      mut top: f32 = 2
+
+      while true {
+        await next_frame()
+        const dt: f32 = box.app.Status[box.app.Status].delta_time
+        mut moving: f32 = 0
+
+        // Look about in quick turns of the head, flick the tail
+        head_wait -= dt
+        if head_wait <= 0 {
+          head_wait = 0.3 + rng.f(1.2)
+          head_to = rng.f(1.4) - 0.7
+        }
+        head += (head_to - head) * min(1, dt * 16)
+        tail_wait -= dt
+        if tail_wait <= 0 {
+          tail_wait = 0.8 + rng.f(2.5)
+          tail = 1
+        }
+        tail = max(0, tail - dt * 3)
+
+        if mode == SQ_FORAGE {
+          wait -= dt
+          hop_wait -= dt
+          pitch += (0 - pitch) * min(1, dt * 12)
+          if hop < 1 {
+            // A short hop on along its heading
+            hop = min(1, hop + dt / 0.18)
+            x += sin(yaw) * 0.9 * dt
+            z += cos(yaw) * 0.9 * dt
+            y = 0.04 * sin(hop * PI)
+            gait += dt * 30
+            moving = 0.6
+            crouch += (0 - crouch) * min(1, dt * 20)
+          } else {
+            y = 0
+            crouch += (1 - crouch) * min(1, dt * 8)
+            nibble = max(0, nibble - dt)
+            if hop_wait <= 0 {
+              hop_wait = 1 + rng.f(2.5)
+              const a = yaw + rng.f(2.4) - 1.2
+              const nx = x + sin(a) * 0.17
+              const nz = z + cos(a) * 0.17
+              if forest_floor_clear(nx, nz, 0.12) {
+                yaw = a
+                hop = 0
+              } else {
+                nibble = 1.2
+              }
+            }
+          }
+          bow = nibble > 0 ? 0.5 + 0.5 * sin(nibble * 40) : 0
+
+          // Off again: to the foot of a snag to climb it, or to forage somewhere else
+          if wait <= 0 && hop >= 1 {
+            wait = 0.4
+            mut tries: i32 = 0
+            mut found = false
+            while tries < 6 && !found {
+              tries += 1
+              if rng.f(1) < 0.6 {
+                // Mostly the snag it is by, now and then across the clearing to the other one
+                const t: f32 = rng.f(1) < 0.75 ? snag : 1 - snag
+                const fx = forest_bark_x(t, 0, 0.25)
+                const fz = forest_bark_z(t, 0, 0.25)
+                if forest_floor_line_clear(x, z, fx, fz, 0.12) {
+                  found = true
+                  climb = true
+                  snag = t
+                  tx = fx
+                  tz = fz
+                }
+              } else {
+                const a = rng.f(6.2832)
+                const r = 2 + rng.f(5)
+                const fx = forest_bark_x(snag, 0, 0) + sin(a) * r
+                const fz = forest_bark_z(snag, 0, 0) + cos(a) * r
+                if forest_floor_clear(fx, fz, 0.15) && forest_floor_line_clear(x, z, fx, fz, 0.12) {
+                  found = true
+                  climb = false
+                  tx = fx
+                  tz = fz
+                }
+              }
+            }
+            if found {
+              mode = SQ_RUN
+              burst = 0
+            }
+          }
+        } else if mode == SQ_RUN {
+          // Dash in bursts with short stops, bounding
+          const dx = tx - x
+          const dz = tz - z
+          const d = sqrt(dx * dx + dz * dz)
+          burst += dt
+          const go = forest_fract(burst * 0.55) < 0.82 || d < 0.6
+          crouch += ((go ? 0 : 0.6) - crouch) * min(1, dt * 14)
+          if go {
+            const step = min(d, SQUIRREL_RUN * dt)
+            x += dx / max(d, 0.001) * step
+            z += dz / max(d, 0.001) * step
+            gait += dt * 26
+            moving = 1
+          }
+          yaw += forest_turn(yaw, atan2(dx, dz)) * min(1, dt * 14)
+          y = 0
+          if d < 0.02 {
+            if climb {
+              mode = SQ_UP
+              y = 0
+              top = snag < 0.5 ? 1.8 + rng.f(2.8) : 0.9 + rng.f(0.8)
+            } else {
+              mode = SQ_FORAGE
+              wait = 3 + rng.f(5)
+              hop_wait = 0.5
+            }
+          }
+        } else if mode == SQ_UP || mode == SQ_DOWN {
+          // On the bark: up head first, down head first
+          const up = mode == SQ_UP
+          const go = forest_fract(gait * 0.06) < 0.85
+          const v = SQUIRREL_CLIMB * (up ? 1 : 0.85) * (go ? 1 : 0.15)
+          y = up ? min(top, y + v * dt) : max(0, y - v * dt)
+          gait += dt * 22
+          moving = go ? 0.8 : 0.2
+          crouch += (0 - crouch) * min(1, dt * 14)
+          pitch += ((up ? -1.5708 : 1.5708) - pitch) * min(1, dt * 12)
+          // Out from the bark by a little, as the squirrel turns onto it near the foot
+          const lift = min(1, y / 0.12)
+          x = forest_bark_x(snag, y, 0.012 + 0.2 * (1 - lift))
+          z = forest_bark_z(snag, y, 0.012 + 0.2 * (1 - lift))
+          yaw += forest_turn(yaw, forest_bark_yaw(snag) + (up ? PI : 0)) * min(1, dt * 14)
+          if up && y >= top {
+            mode = SQ_CLING
+            wait = 2.5 + rng.f(4)
+          }
+          if !up && y <= 0 {
+            // Off the bark and away from the snag
+            mode = SQ_FORAGE
+            pitch = 0
+            x = forest_bark_x(snag, 0, 0.25)
+            z = forest_bark_z(snag, 0, 0.25)
+            yaw = forest_bark_yaw(snag)
+            wait = 0.2
+            hop_wait = 0.3
+          }
+        } else {
+          // Clinging to the bark, head up, looking about
+          wait -= dt
+          if wait <= 0 {
+            mode = SQ_DOWN
+          }
+        }
+
+        speed += (moving - speed) * min(1, dt * 10)
+        pose = {
+          x: x, y: forest_bark_y(snag, y, 0), z: z, yaw: yaw, pitch: pitch, roll: 0, gait: gait,
+          speed: speed, open: 0, beat: 0, head: head, bow: bow, tail: tail, crouch: crouch, ear: 0
+        }
+      }
+    }
+  }
+}
+
+// The squirrel forages by day by the snags at the west and east edges of the clearing
+forest {
+  squirrel {
+    if forest_daylight(season, hour) > BIRD_DAY {
+      ForestSquirrel red_squirrel(id: 0)
+    }
+  }
+}
+
+assets {
+  prefab ForestDeerCoat { PbrMaterial: {roughness: 0.92} }
+  prefab ForestDeerPale { PbrMaterial: {roughness: 0.92} }
+  prefab ForestDeerBlack { Rgb: {18, 16, 15}; PbrMaterial: {roughness: 0.35} }
+  prefab ForestDeerEye { Rgb: {10, 8, 8}; PbrMaterial: {roughness: 0.08} }
+  prefab ForestDeerHoof { Rgb: {38, 32, 28}; PbrMaterial: {roughness: 0.5} }
+  prefab ForestDeerAntler { PbrMaterial: {roughness: 0.75} }
+
+  // A leg of the deer from its shoulder or hip, the hoof on the ground at rest: the upper bone
+  // turned by up, the lower one (from the knee or hock) turned by low relative to it
+  template ForestDeerLeg {
+    prop hind: bool = false
+    prop up: f32 = 0
+    prop low: f32 = 0
+    prop r: f32 = 150
+    prop g: f32 = 90
+    prop b: f32 = 50
+
+    const ul = hind ? 0.27 : 0.24
+    const ll = hind ? 0.29 : 0.26
+
+    Rotation: {up, 0, 0}
+
+    upper : ForestDeerCoat {
+      Position: {0, 0 - ul * 0.5, 0}
+      Scale: {1, 1, hind ? 1.5 : 1.2}
+      Capsule: {length: ul - 0.04, radius: hind ? 0.03 : 0.026, segments: 8, smooth: true}
+      Rgb: {r, g, b}
+    }
+
+    joint {
+      Position: {0, 0 - ul, 0}
+      Rotation: {low, 0, 0}
+
+      knee : ForestDeerCoat {
+        Sphere: {radius: hind ? 0.024 : 0.021, segments: 8, smooth: true}
+        Rgb: {r, g, b}
+      }
+
+      cannon : ForestDeerCoat {
+        Position: {0, 0 - ll * 0.45, 0}
+        Capsule: {length: ll * 0.8, radius: 0.0145, segments: 8, smooth: true}
+        Rgb: {r * 0.82, g * 0.82, b * 0.84}
+      }
+
+      fetlock : ForestDeerCoat {
+        Position: {0, 0 - ll + 0.045, 0.004}
+        Sphere: {radius: 0.017, segments: 8, smooth: true}
+        Rgb: {r * 0.7, g * 0.7, b * 0.72}
+      }
+
+      // The cloven hoof, two toes
+      for s in 0..2 {
+        "hoof_{s}" : ForestDeerHoof {
+          Position: {(s * 2 - 1) * 0.008, 0 - ll + 0.018, 0.012}
+          Rotation: {0.35, 0, 0}
+          Frustum: {length: 0.04, radius_bottom: 0.011, radius_top: 0.008, segments: 6}
+        }
+      }
+    }
+  }
+
+  // A roe deer buck, about 72 cm at the shoulder, facing +Z with its hooves on the ground at the
+  // origin: a slender body on long thin legs, higher at the rump, the white (in winter) or buff
+  // (in summer) rump patch, a long neck, a short head with large ears, a black nose and a white
+  // chin, and short three tined antlers that are cast in late autumn and regrow in velvet over
+  // the winter. The coat is foxy red in summer and grey brown in winter.
+  //
+  // pose: gait is the phase of the legs, speed 0 stands, 1 walks and 2 bounds, bow lowers the
+  // neck to graze (0 head up, 1 muzzle in the grass), head turns the head, ear flicks the ears,
+  // tail lifts the white rump hairs in alarm
+  template ForestRoeDeer {
+    prop id: i32 = 0
+
+    mut pose: ForestAnimalPose = {}
+    mut shown = false
+
+    const cr = forest_seasonal(season, 112, 122, 100, 86)
+    const cg = forest_seasonal(season, 76, 68, 76, 74)
+    const cb = forest_seasonal(season, 52, 40, 58, 64)
+    const pr = forest_seasonal(season, 214, 206, 222, 236)
+    const pg = forest_seasonal(season, 196, 184, 210, 232)
+    const pb = forest_seasonal(season, 160, 140, 180, 222)
+    const antler = forest_seasonal(season, 1, 1, 0.8, 0.45)
+    const velvet = forest_seasonal(season, 0, 0, 0, 1) > 0.5
+
+    // Walk: lateral sequence, the legs a quarter of a cycle apart; bound: the hind legs push off
+    // together and the forelegs reach out together, the body pitching
+    const walk = clamp(pose.speed, 0, 1)
+    const bound = clamp(pose.speed - 1, 0, 1)
+    const g = pose.gait
+    const amp = 0.3 * walk * (1 - bound) + 0.75 * bound
+    const pitch = 0.16 * sin(g) * bound
+    const bob = 0.01 * cos(2 * g) * walk * (1 - bound) + 0.09 * abs(sin(g)) * bound
+
+    Position: {pose.x, pose.y, pose.z}
+    Rotation: {0, pose.yaw, 0}
+    DynamicTransform
+
+    if shown {
+      body {
+        Position: {0, bob, 0}
+        Rotation: {pitch, 0, 0}
+
+        // One smooth barrel from the shoulders to the haunches, the chest deeper in front and
+        // the rump a little higher behind
+        barrel : ForestDeerCoat {
+          Position: {0, 0.588, -0.02}
+          Rotation: {PI / 2 + 0.04, 0, 0}
+          Scale: {1, 1, 1.06}
+          Capsule: {length: 0.44, radius: 0.132, segments: 18, smooth: true}
+          Rgb: {cr, cg, cb}
+        }
+
+        belly : ForestDeerPale {
+          Position: {0, 0.5, 0.0}
+          Scale: {0.1, 0.06, 0.24}
+          Sphere: {radius: 1, segments: 12, smooth: true}
+          Rgb: {cr * 1.12, cg * 1.15, cb * 1.2}
+        }
+
+        chest : ForestDeerCoat {
+          Position: {0, 0.57, 0.2}
+          Scale: {0.118, 0.142, 0.15}
+          Sphere: {radius: 1, segments: 16, smooth: true}
+          Rgb: {cr, cg, cb}
+        }
+
+        rump : ForestDeerCoat {
+          Position: {0, 0.612, -0.27}
+          Scale: {0.124, 0.13, 0.15}
+          Sphere: {radius: 1, segments: 16, smooth: true}
+          Rgb: {cr, cg, cb}
+        }
+
+        // The rump patch, and the hairs of it that flare when the deer is alarmed
+        patch : ForestDeerPale {
+          Position: {0, 0.6, -0.4}
+          Scale: {0.1 + 0.02 * pose.tail, 0.115 + 0.02 * pose.tail, 0.05}
+          Sphere: {radius: 1, segments: 12, smooth: true}
+          Rgb: {pr, pg, pb}
+        }
+
+        for s in 0..2 {
+          const sx = s * 2 - 1
+          "thigh_{s}" : ForestDeerCoat {
+            Position: {sx * 0.066, 0.55, -0.25}
+            Scale: {0.07, 0.125, 0.115}
+            Sphere: {radius: 1, segments: 12, smooth: true}
+            Rgb: {cr, cg, cb}
+          }
+
+          "shoulder_{s}" : ForestDeerCoat {
+            Position: {sx * 0.07, 0.54, 0.24}
+            Scale: {0.058, 0.11, 0.08}
+            Sphere: {radius: 1, segments: 12, smooth: true}
+            Rgb: {cr * 0.97, cg * 0.97, cb * 0.97}
+          }
+        }
+
+        // Legs: left hind 0, left fore a quarter, right hind a half, right fore three quarters of
+        // the walk; in a bound the pairs go together
+        for s in 0..2 {
+          const sx = s * 2 - 1
+          const oh = s * PI * (1 - bound) + s * 0.25 * bound
+          const of = s * PI * (1 - bound) + PI / 2 * (1 - bound) + (PI + s * 0.25) * bound
+          const swh = sin(g + oh)
+          const swf = sin(g + of)
+          const lifth = max(0, cos(g + oh))
+          const liftf = max(0, cos(g + of))
+
+          ForestDeerLeg "hind_{s}"(
+            hind: true,
+            up: 0.4 - amp * swh + 0.3 * bound,
+            low: -0.75 - 0.55 * lifth * (walk + bound),
+            r: cr, g: cg, b: cb
+          ) {
+            Position: {sx * 0.072, 0.525, -0.26}
+          }
+
+          ForestDeerLeg "fore_{s}"(
+            hind: false,
+            up: -0.03 - amp * swf - 0.2 * bound,
+            low: 1.1 * liftf * (walk + bound),
+            r: cr, g: cg, b: cb
+          ) {
+            Position: {sx * 0.078, 0.5, 0.25}
+          }
+        }
+
+        // The neck rises from the shoulders and lowers the head into the grass to graze
+        neck {
+          Position: {0, 0.64, 0.32}
+          Rotation: {-0.95 + 2.1 * pose.bow - pitch, 0, 0}
+
+          base : ForestDeerCoat {
+            Position: {0, -0.01, 0.04}
+            Scale: {0.075, 0.1, 0.1}
+            Sphere: {radius: 1, segments: 12, smooth: true}
+            Rgb: {cr, cg, cb}
+          }
+
+          shaft : ForestDeerCoat {
+            Position: {0, 0, 0.15}
+            Rotation: {PI / 2, 0, 0}
+            Scale: {1, 1, 1.15}
+            Capsule: {length: 0.2, radius: 0.052, segments: 12, smooth: true}
+            Rgb: {cr, cg, cb}
+          }
+
+          // The pale throat patch
+          throat : ForestDeerPale {
+            Position: {0, -0.04, 0.24}
+            Scale: {0.035, 0.03, 0.045}
+            Sphere: {radius: 1, segments: 8, smooth: true}
+            Rgb: {pr, pg, pb}
+          }
+
+          head {
+            Position: {0, 0, 0.3}
+            Rotation: {1.3 - 0.95 * pose.bow, pose.head, 0}
+
+            skull : ForestDeerCoat {
+              Position: {0, 0.02, 0.05}
+              Scale: {0.058, 0.064, 0.09}
+              Sphere: {radius: 1, segments: 14, smooth: true}
+              Rgb: {cr, cg, cb}
+            }
+
+            // The muzzle tapers to the black nose, the face greyer, the chin and a band above the
+            // nose white
+            muzzle : ForestDeerCoat {
+              Position: {0, -0.008, 0.135}
+              Scale: {0.038, 0.042, 0.075}
+              Sphere: {radius: 1, segments: 12, smooth: true}
+              Rgb: {cr * 0.72, cg * 0.74, cb * 0.8}
+            }
+
+            nose : ForestDeerBlack {
+              Position: {0, -0.005, 0.205}
+              Scale: {0.026, 0.024, 0.016}
+              Sphere: {radius: 1, segments: 10, smooth: true}
+            }
+
+            band : ForestDeerPale {
+              Position: {0, -0.006, 0.185}
+              Scale: {0.034, 0.026, 0.012}
+              Sphere: {radius: 1, segments: 8, smooth: true}
+              Rgb: {236, 232, 224}
+            }
+
+            chin : ForestDeerPale {
+              Position: {0, -0.04, 0.15}
+              Scale: {0.026, 0.014, 0.04}
+              Sphere: {radius: 1, segments: 8, smooth: true}
+              Rgb: {236, 232, 224}
+            }
+
+            for s in 0..2 {
+              const sx = s * 2 - 1
+              "eye_{s}" : ForestDeerEye {
+                Position: {sx * 0.047, 0.035, 0.085}
+                Scale: {0.6, 1, 1.2}
+                Sphere: {radius: 0.014, segments: 8, smooth: true}
+              }
+
+              // The large ears, flicking now and then, turned forward to listen
+              "ear_{s}" {
+                Position: {sx * 0.038, 0.072, 0.02}
+                Rotation: {-0.25 - 0.3 * pose.ear * s, 0, sx * (0 - 0.6 + 0.15 * pose.ear * (1 - s))}
+                flap : ForestDeerCoat {
+                  Position: {0, 0.06, 0}
+                  Scale: {0.034, 0.068, 0.012}
+                  Sphere: {radius: 1, segments: 10, smooth: true}
+                  Rgb: {cr * 0.9, cg * 0.9, cb * 0.92}
+                }
+                inner : ForestDeerPale {
+                  Position: {0, 0.058, 0.007}
+                  Scale: {0.024, 0.052, 0.006}
+                  Sphere: {radius: 1, segments: 8, smooth: true}
+                  Rgb: {pr, pg * 0.98, pb * 0.95}
+                }
+                rim : ForestDeerBlack {
+                  Position: {0, 0.124, 0}
+                  Scale: {0.016, 0.01, 0.009}
+                  Sphere: {radius: 1, segments: 6, smooth: true}
+                }
+              }
+
+              // Short antlers, three tines each, rough at the base; in velvet in winter
+              "antler_{s}" {
+                Position: {sx * 0.024, 0.085, 0.035}
+                Rotation: {-0.25, 0, sx * -0.18}
+                Scale: {antler, antler, antler}
+                beam : ForestDeerAntler {
+                  Position: {0, 0.08, 0}
+                  Capsule: {length: 0.14, radius: 0.008, segments: 6, smooth: true}
+                  Rgb: {velvet ? 96 : 122, velvet ? 76 : 102, velvet ? 58 : 78}
+                }
+                burr : ForestDeerAntler {
+                  Position: {0, 0.008, 0}
+                  Scale: {1, 0.5, 1}
+                  Sphere: {radius: 0.014, segments: 8, smooth: true}
+                  Rgb: {velvet ? 96 : 104, velvet ? 76 : 86, velvet ? 58 : 66}
+                }
+                front : ForestDeerAntler {
+                  Position: {0, 0.1, 0.022}
+                  Rotation: {0.9, 0, 0}
+                  Capsule: {length: 0.045, radius: 0.0055, segments: 6, smooth: true}
+                  Rgb: {velvet ? 96 : 170, velvet ? 76 : 150, velvet ? 58 : 120}
+                }
+                rear : ForestDeerAntler {
+                  Position: {0, 0.15, -0.018}
+                  Rotation: {-0.8, 0, 0}
+                  Capsule: {length: 0.035, radius: 0.005, segments: 6, smooth: true}
+                  Rgb: {velvet ? 96 : 188, velvet ? 76 : 170, velvet ? 58 : 140}
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // The deer comes out of the forest along a lane clear of the trees to the edge of the clearing
+    // at dawn and dusk, grazes there, steps on and looks up now and then; it walks back into the
+    // forest when its hours are over, and when the wind or the rain gets strong it starts, looks
+    // round and bounds away. Seeded, so a fixed delta time capture is the same every run
+    async {
+      const rng: flecs.script.math.Rng = {seed: SEED_DEER + id * 7}
+
+      // The graze spot: the free spot near DEER_GRAZE at the edge of the clearing, south of the
+      // brook, nearest to it
+      mut gx: f32 = DEER_GRAZE_X
+      mut gz: f32 = DEER_GRAZE_Z
+      mut best: f32 = 1000
+      for i in 0..9 {
+        for j in 0..9 {
+          const cx = DEER_GRAZE_X + (i - 4) * 0.8
+          const cz = DEER_GRAZE_Z + (j - 4) * 0.8
+          const d = (cx - DEER_GRAZE_X) * (cx - DEER_GRAZE_X) + (cz - DEER_GRAZE_Z) * (cz - DEER_GRAZE_Z)
+          if d < best && forest_brook_side(cx, cz) < 0 && forest_ground_free(cx, cz, 0.9) {
+            best = d
+            gx = cx
+            gz = cz
+          }
+        }
+      }
+
+      // The lane: the end of the longest clear line out of the clearing from the graze spot
+      const out = atan2(gx, gz)
+      mut ex: f32 = gx + sin(out) * 6
+      mut ez: f32 = gz + cos(out) * 6
+      mut found = false
+      for k in 0..3 {
+        const len = DEER_LANE - k * 5
+        for i in 0..13 {
+          const a = out + (i % 2 == 0 ? 1 : -1) * floor((i + 1) / 2) * 0.18
+          const lx = gx + sin(a) * len
+          const lz = gz + cos(a) * len
+          if !found && forest_line_free(gx, gz, lx, lz, 0.5, 0.7) {
+            found = true
+            ex = lx
+            ez = lz
+          }
+        }
+      }
+
+      const start = forest_deer_hours(season, hour) && !forest_deer_weather(wind, precipitation, temperature)
+      mut mode: i32 = start ? DEER_GRAZE : DEER_AWAY
+      mut x: f32 = start ? gx : ex
+      mut z: f32 = start ? gz : ez
+      mut yaw: f32 = start ? out + PI + 0.7 : out + PI
+      mut on: bool = start
+      mut speed: f32 = 0
+      mut gait: f32 = 0
+      mut bow: f32 = start ? 1 : 0
+      mut head: f32 = 0
+      mut head_to: f32 = 0
+      mut ear: f32 = 0
+      mut ear_wait: f32 = 1
+      mut tail: f32 = 0
+      mut timer: f32 = 0
+      mut wait: f32 = 4 + rng.f(4)
+      // Grazing (head down) or looking up
+      mut grazing = start
+      // Where it walks to: (tx, tz), at pace (1 walk, 2 bound); via the graze spot first when
+      // it leaves from beside it
+      mut tx: f32 = x
+      mut tz: f32 = z
+      mut pace: f32 = 0
+      mut via = false
+
+      while true {
+        await next_frame()
+        const dt: f32 = box.app.Status[box.app.Status].delta_time
+        const hours = forest_deer_hours(season, hour)
+        const storm = forest_deer_weather(wind, precipitation, temperature)
+        timer += dt
+        mut move: f32 = 0
+
+        // The ears flick now and then, faster when alarmed
+        ear_wait -= dt
+        if ear_wait <= 0 {
+          ear_wait = 0.8 + rng.f(3)
+          ear = 1
+        }
+        ear = max(0, ear - dt * 5)
+
+        if mode == DEER_AWAY {
+          on = false
+          if hours && !storm {
+            wait -= dt
+            if wait <= 0 {
+              mode = DEER_ENTER
+              on = true
+              x = ex
+              z = ez
+              tx = gx
+              tz = gz
+              pace = 1
+              wait = 3 + rng.f(4)
+            }
+          } else {
+            wait = 2 + rng.f(3)
+          }
+        } else if mode == DEER_ENTER || mode == DEER_LEAVE {
+          // Walk (stopping now and then to look) or bound to the target
+          const dx = tx - x
+          const dz = tz - z
+          const d = sqrt(dx * dx + dz * dz)
+          const err = forest_turn(yaw, atan2(dx, dz))
+          wait -= dt
+          const pause = pace < 1.5 && wait < 1.8
+          if wait <= 0 {
+            wait = 4 + rng.f(5)
+          }
+          yaw += clamp(err, -1, 1) * min(1, dt * (pace > 1.5 ? 5 : 2.5))
+          bow += ((pause ? 0 : 0.15) - bow) * min(1, dt * 3)
+          if !pause && abs(err) < 0.7 {
+            const v = pace > 1.5 ? 6.5 : 0.85
+            const step = min(d, v * dt)
+            x += dx / max(d, 0.001) * step
+            z += dz / max(d, 0.001) * step
+            move = pace
+          } else if !pause {
+            move = 0.4
+          }
+          if d < 0.05 {
+            if via {
+              via = false
+              tx = ex
+              tz = ez
+            } else if mode == DEER_ENTER {
+              mode = DEER_GRAZE
+              grazing = true
+              wait = 4 + rng.f(5)
+            } else {
+              mode = DEER_AWAY
+              on = false
+              wait = 4 + rng.f(4)
+            }
+          }
+          if mode == DEER_ENTER && storm {
+            mode = DEER_ALERT
+            wait = 1.2
+          } else if mode == DEER_ENTER && !hours {
+            mode = DEER_LEAVE
+            tx = ex
+            tz = ez
+          }
+        } else if mode == DEER_GRAZE {
+          wait -= dt
+          if grazing {
+            bow += (1 - bow) * min(1, dt * 2)
+            head_to = 0
+          } else {
+            bow += (0 - bow) * min(1, dt * 2.5)
+          }
+          head += (head_to - head) * min(1, dt * 3)
+
+          // A few slow steps on to fresh grass, within reach of the graze spot
+          const dx = tx - x
+          const dz = tz - z
+          const d = sqrt(dx * dx + dz * dz)
+          if d > 0.02 {
+            const err = forest_turn(yaw, atan2(dx, dz))
+            yaw += clamp(err, -1, 1) * min(1, dt * 1.5)
+            if abs(err) < 0.5 {
+              const step = min(d, 0.32 * dt)
+              x += dx / d * step
+              z += dz / d * step
+              move = 0.45
+            } else {
+              move = 0.25
+            }
+          }
+
+          if wait <= 0 {
+            if grazing && rng.f(1) < 0.45 {
+              // Look up and round, ears turning
+              grazing = false
+              wait = 2 + rng.f(3)
+              head_to = rng.f(1.6) - 0.8
+              ear = 1
+            } else {
+              grazing = true
+              wait = 4 + rng.f(6)
+              const a = yaw + rng.f(1.6) - 0.8
+              const r = 0.3 + rng.f(0.6)
+              const nx = x + sin(a) * r
+              const nz = z + cos(a) * r
+              const home = (nx - gx) * (nx - gx) + (nz - gz) * (nz - gz) < DEER_GRAZE_R * DEER_GRAZE_R
+              if home && forest_ground_free(nx, nz, 0.75) {
+                tx = nx
+                tz = nz
+              } else {
+                tx = x + (gx - x) * 0.3
+                tz = z + (gz - z) * 0.3
+              }
+            }
+          }
+
+          if storm {
+            mode = DEER_ALERT
+            wait = 1.2
+          } else if !hours {
+            mode = DEER_LEAVE
+            pace = 1
+            via = true
+            tx = gx
+            tz = gz
+            wait = 5
+          }
+        } else {
+          // Alarmed: head up, ears up, the rump patch flared, a moment's stare, then off
+          bow += (0 - bow) * min(1, dt * 8)
+          head += (0.5 - head) * min(1, dt * 4)
+          tail = 1
+          ear = 0.6
+          wait -= dt
+          if wait <= 0 {
+            mode = DEER_LEAVE
+            pace = 2
+            via = true
+            tx = gx
+            tz = gz
+          }
+        }
+
+        if mode != DEER_ALERT {
+          tail = max(0, tail - dt * (mode == DEER_LEAVE ? 0.15 : 0.8))
+        }
+        if mode != DEER_GRAZE {
+          head += (0 - head) * min(1, dt * 3)
+        }
+        speed += (move - speed) * min(1, dt * 4)
+        gait += dt * (speed < 1.2 ? 5.2 * speed + 0.4 * min(speed, 0.3) : 7 + 3 * (speed - 1))
+
+        if on != shown {
+          shown = on
+        }
+        pose = {
+          x: x, y: 0, z: z, yaw: yaw, pitch: 0, roll: 0, gait: gait, speed: speed, open: 0,
+          beat: 0, head: head, bow: bow, tail: tail, crouch: 0, ear: ear
+        }
+      }
+    }
+  }
+
+  prefab ForestTroutBack { Rgb: {78, 74, 44}; PbrMaterial: {roughness: 0.35} }
+  prefab ForestTroutFlank { Rgb: {176, 146, 82}; PbrMaterial: {roughness: 0.3} }
+  prefab ForestTroutBelly { Rgb: {222, 210, 172}; PbrMaterial: {roughness: 0.35} }
+  prefab ForestTroutFin { Rgb: {120, 104, 66}; PbrMaterial: {roughness: 0.5} }
+  prefab ForestTroutSpot { Rgb: {36, 30, 24}; PbrMaterial: {roughness: 0.4} }
+  prefab ForestTroutRed { Rgb: {176, 52, 36}; PbrMaterial: {roughness: 0.4} }
+
+  // A brown trout some 30 cm long, facing +Z: an olive back, golden flanks with dark and red
+  // spots, a pale belly. pose.gait beats the tail, which the body follows in a wave, faster with
+  // pose.speed
+  template ForestTrout {
+    prop id: i32 = 0
+    prop size: f32 = 1
+
+    mut pose: ForestAnimalPose = {}
+
+    const wave = sin(pose.gait)
+    const sw = 0.12 + 0.25 * clamp(pose.speed, 0, 1)
+
+    Position: {pose.x, pose.y, pose.z}
+    Rotation: {pose.pitch, pose.yaw + wave * sw * 0.25, 0}
+    Scale: {size, size, size}
+    DynamicTransform
+
+    back : ForestTroutBack {
+      Position: {0, 0.012, 0.01}
+      Scale: {0.026, 0.03, 0.14}
+      Sphere: {radius: 1, segments: 12, smooth: true}
+    }
+
+    flank : ForestTroutFlank {
+      Position: {0, -0.004, 0.015}
+      Scale: {0.03, 0.034, 0.135}
+      Sphere: {radius: 1, segments: 12, smooth: true}
+    }
+
+    belly : ForestTroutBelly {
+      Position: {0, -0.018, 0.03}
+      Scale: {0.024, 0.022, 0.1}
+      Sphere: {radius: 1, segments: 10, smooth: true}
+    }
+
+    snout : ForestTroutBack {
+      Position: {0, 0.004, 0.13}
+      Scale: {0.02, 0.022, 0.035}
+      Sphere: {radius: 1, segments: 8, smooth: true}
+    }
+
+    for s in 0..2 {
+      const sx = s * 2 - 1
+      "eye_{s}" : ForestTroutSpot {
+        Position: {sx * 0.017, 0.01, 0.115}
+        Sphere: {radius: 0.0055, segments: 6, smooth: true}
+      }
+
+      "pectoral_{s}" : ForestTroutFin {
+        Position: {sx * 0.024, -0.02, 0.07}
+        Rotation: {0.3, sx * 0.5, sx * 0.6}
+        Box: {0.03, 0.002, 0.022}
+      }
+
+      for k in 0..4 {
+        "spot_{s}_{k}" : ForestTroutSpot {
+          Position: {sx * 0.024, 0.012 - (k % 2) * 0.012, 0.07 - k * 0.04}
+          Sphere: {radius: 0.0045, segments: 5}
+        }
+      }
+
+      for k in 0..2 {
+        "red_{s}_{k}" : ForestTroutRed {
+          Position: {sx * 0.027, -0.006, 0.03 - k * 0.05}
+          Sphere: {radius: 0.0042, segments: 5}
+        }
+      }
+    }
+
+    dorsal : ForestTroutFin {
+      Position: {0, 0.042, 0.02}
+      Rotation: {-0.4, 0, 0}
+      Box: {0.003, 0.03, 0.04}
+    }
+
+    // The tail beats from the narrow root behind the body
+    tail {
+      Position: {0, 0, -0.11}
+      Rotation: {0, wave * sw, 0}
+
+      root : ForestTroutFlank {
+        Position: {0, 0, -0.025}
+        Scale: {0.012, 0.018, 0.04}
+        Sphere: {radius: 1, segments: 8, smooth: true}
+      }
+
+      fin : ForestTroutFin {
+        Position: {0, 0, -0.07}
+        Rotation: {0, wave * sw * 0.6, 0}
+        Box: {0.003, 0.062, 0.045}
+      }
+    }
+
+    // Hold in the current facing upstream, the tail beating, while the lie wanders up, down and
+    // across the reach; the fish follows it, faster tail beats when it moves. Its whole body
+    // stays clear of the stones and the big pebbles of the bed: when a stone is in the way it
+    // slides along it, and when that is blocked too it edges around it to one side
+    async {
+      const lo: f32 = forest_trout_x0(id)
+      const hi: f32 = forest_trout_x1(id)
+      mut t: f32 = id * 37.3
+      mut gait: f32 = id * 1.7
+      mut cx: f32 = lo + (hi - lo) * (0.25 + 0.2 * id - 0.4 * floor(id / 2))
+      mut cd: f32 = 0
+      mut yaw: f32 = PI * -0.5
+      mut side: f32 = id % 2 == 0 ? 1 : -1
+
+      // Start in a free spot: step down the reach and across it until the body is clear
+      mut found: bool = forest_trout_body_free(cx, cd, size)
+      for k in 0..60 {
+        const tx = lo + forest_fract(0.25 + 0.2 * id + k * 0.137) * (hi - lo)
+        const td = ((k % 5) - 2) * 0.12
+        if !found && forest_trout_body_free(tx, td, size) {
+          cx = tx
+          cd = td
+          found = true
+        }
+      }
+
+      while true {
+        await next_frame()
+        const dt: f32 = box.app.Status[box.app.Status].delta_time
+        t += dt
+        // The lie wanders up and down the reach and across it; the fish darts when the lie
+        // moves fast
+        const u = t * 0.11 + id * 1.3
+        const lx = lo + (hi - lo) * (0.5 + 0.42 * sin(u) * cos(u * 0.37 + id))
+        const ld = 0.3 * sin(u * 2.3 + id * 2)
+        const nx = cx + clamp((lx - cx) * dt * 1.2, 0 - dt * 0.6, dt * 0.6)
+        const nd = cd + clamp((ld - cd) * dt * 1.5, 0 - dt * 0.3, dt * 0.3)
+        const px = cx
+        const pd = cd
+        if forest_trout_body_free(nx, nd, size) {
+          cx = nx
+          cd = nd
+        } else {
+          if forest_trout_body_free(nx, cd, size) {
+            cx = nx
+          } else {
+            const sd = cd + side * dt * 0.25
+            if forest_trout_body_free(cx, sd, size) {
+              cd = sd
+            } else {
+              side = 0 - side
+            }
+          }
+        }
+        const vx = (cx - px) / max(dt, 0.001)
+        const vd = (cd - pd) / max(dt, 0.001)
+        const v = min(1, sqrt(vx * vx + vd * vd) * 3)
+        const sl = forest_brook_slope(cx)
+        const upstream = atan2(-1, 0 - sl)
+        yaw += forest_turn(yaw, upstream) * min(1, dt * 4)
+        gait += dt * (5 + 10 * v)
+
+        pose = {
+          x: forest_brook_off_x(cx, cd), y: forest_brook_bed_y_at(cx, cd) + 0.085,
+          z: forest_brook_off_z(cx, cd), yaw: yaw, pitch: 0, roll: 0, gait: gait, speed: v,
+          open: 0, beat: 0, head: 0, bow: 0, tail: 0, crouch: 0, ear: 0
+        }
+      }
+    }
+  }
+}
+
+// The roe deer at the edge of the clearing, and the trout in the brook
+forest {
+  deer {
+    ForestRoeDeer roe_deer(id: 0)
+  }
+
+  trout {
+    for i in 0..TROUT_COUNT {
+      ForestTrout "trout_{i}"(id: i, size: 0.85 + 0.12 * (i % 3))
+    }
+  }
+}
