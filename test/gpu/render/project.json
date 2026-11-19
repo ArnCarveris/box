@@ -1594,7 +1594,10 @@
                     "spot_shadow_in_fog",
                     "point_shadow_in_fog",
                     "light_outside_clusters",
-                    "no_new_splits"
+                    "no_new_splits",
+                    "overlap_no_new_pass",
+                    "fog_distance_sky",
+                    "grid_size_4k"
                 ]
             },
             {

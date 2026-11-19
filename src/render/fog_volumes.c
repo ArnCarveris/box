@@ -2,9 +2,9 @@
  * @file render/fog_volumes.c
  * @brief Gives every lit view the FogVolumes of its scene in its frustum, for the light extract.
  *
- * The volumes are collected once per frame; a view with LightSettings.fog_volumes gets those of
- * the scene of its camera that may be in its frustum, back to front by the distance of their
- * centers from the camera, at most BOX_RENDER_FOG_VOLUMES_MAX of the nearest.
+ * The volumes are collected once per frame; a lit view gets those of its scene that may be in
+ * its frustum, back to front, at most BOX_RENDER_FOG_VOLUMES_MAX of the nearest, and its fog
+ * distance. The size and slices of the froxel grid of a view (froxel.wgsl) are computed here.
  *
  * The offset the wind moves the noise by is computed from the time of the packet in double
  * precision and wrapped to the period of the noise, so drifting fog stays smooth after hours.
@@ -280,7 +280,6 @@ static void box_fog_record(
     out->sun_inscatter = glm_max(fog->sun_inscatter, 0.0f);
     out->ambient_inscatter = glm_max(fog->ambient_inscatter, 0.0f);
     out->light_inscatter = glm_max(fog->light_inscatter, 0.0f);
-    out->steps = fog->steps < 4 ? 4 : fog->steps > 128 ? 128 : fog->steps;
     out->noise_strength = glm_clamp(fog->noise_strength, 0.0f, 1.0f);
     out->noise_scale = glm_max(fog->noise_scale, BOX_RENDER_FOG_NOISE_SCALE_MIN);
     box_render_fog_offset(fog, time, out->offset);
@@ -438,6 +437,7 @@ void box_render_fog_views(
             : NULL;
         v->fog_first = ecs_vec_count(&p->fog_volumes);
         v->fog_count = 0;
+        v->fog_distance = box_render_fog_distance(view ? view->lighting.fog_distance : 0);
         if (!fog_count || !view || !view->lighting.enabled || !view->lighting.fog_volumes ||
             !box_camera_has_depth(&v->camera_data))
         {
@@ -532,6 +532,58 @@ void box_render_fog_free(
         ecs_vec_fini_t(NULL, &fog->fog_over_next, ecs_entity_t);
         ecs_os_free(fog);
     }
+}
+
+float box_render_fog_distance(
+    float distance)
+{
+    return distance == 0 ? (float)BOX_FROXEL_DISTANCE_DEFAULT
+        : glm_max(distance, (float)BOX_FROXEL_DISTANCE_MIN);
+}
+
+void box_render_froxel_grid(
+    int32_t width,
+    int32_t height,
+    int32_t *out)
+{
+    int32_t edge = width > height ? width : height;
+    int32_t tile = (edge + BOX_FROXEL_CELLS_MAX - 1) / BOX_FROXEL_CELLS_MAX;
+    width = width > 1 ? width : 1;
+    height = height > 1 ? height : 1;
+    tile = tile > BOX_FROXEL_TILE_MIN ? tile : BOX_FROXEL_TILE_MIN;
+    out[0] = (width + tile - 1) / tile;
+    out[1] = (height + tile - 1) / tile;
+    out[2] = tile;
+}
+
+float box_render_froxel_depth(
+    float share,
+    float near_,
+    float far_,
+    bool ortho)
+{
+    float x = share;
+    if (!ortho) {
+        x = (exp2f((float)BOX_FROXEL_EXPONENT * share) - 1.0f) /
+            (exp2f((float)BOX_FROXEL_EXPONENT) - 1.0f);
+    }
+
+    return near_ + (far_ - near_) * x;
+}
+
+float box_render_froxel_share(
+    float depth,
+    float near_,
+    float far_,
+    bool ortho)
+{
+    float x = glm_clamp((depth - near_) / glm_max(far_ - near_, 1e-6f), 0.0f, 1.0f);
+    if (!ortho) {
+        x = log2f(1.0f + x * (exp2f((float)BOX_FROXEL_EXPONENT) - 1.0f)) /
+            (float)BOX_FROXEL_EXPONENT;
+    }
+
+    return x;
 }
 
 bool box_render_view_sees(

@@ -1978,15 +1978,16 @@ void box_gpu_fog_volumes_init(
 void box_gpu_fog_volumes_fini(
     box_gpu_t *gpu);
 
-/** Start the fog volume draws of a packet, which fill the buffer of the draws from its start.
+/** Start the fog volume passes of a packet, which fill the buffer of the passes from its start,
+ * and release the grids of views that drew no fog volumes for a while.
  *
  * @param gpu The backend
  */
 void box_gpu_fog_volumes_begin(
     box_gpu_t *gpu);
 
-/** Check whether a view draws fog volumes: it has records and the shader is compiled, so its
- * forward pass splits around them.
+/** Check whether a view draws fog volumes: it has records and the shader and its compute
+ * pipelines exist, so it injects its grid and its forward pass splits around the apply draw.
  *
  * @param gpu The backend
  * @param v The view
@@ -1996,8 +1997,30 @@ bool box_gpu_fog_volumes_ready(
     box_gpu_t *gpu,
     const box_render_view_t *v);
 
-/** Segment of the rays of a view a fog volume draw marches (FogDraw.segment of
- * fog_volume.wgsl) */
+/** Light the froxel grid of a view with fog volumes in a target and integrate it, in one
+ * compute pass before its forward pass (inject and integrate of fog_volume.wgsl): after its
+ * clusters and shadows, with the bind group of the view. Records nothing for a view without
+ * volumes or before the pipelines exist, and the apply draws of the view then draw nothing.
+ *
+ * @param gpu The backend
+ * @param t The target, whose render size the grid follows
+ * @param encoder The encoder of the frame
+ * @param packet The packet, which holds the records
+ * @param v The view
+ * @param group The bind group of the view
+ * @param slot Slot of the view in the view buffer
+ */
+void box_gpu_fog_volumes_inject(
+    box_gpu_t *gpu,
+    const box_gpu_target_t *t,
+    WGPUCommandEncoder encoder,
+    const box_render_packet_t *packet,
+    const box_render_view_t *v,
+    WGPUBindGroup group,
+    int32_t slot);
+
+/** Segment of the rays of a view a fog volume apply draw takes (Froxel.segment of
+ * froxel.wgsl) */
 typedef enum box_gpu_fog_segment_t {
     BOX_GPU_FOG_SEGMENT_FULL,       /**< From the camera to the opaque depth */
     BOX_GPU_FOG_SEGMENT_BEHIND,     /**< From the nearest transmissive surface of a pixel to the
@@ -2008,8 +2031,9 @@ typedef enum box_gpu_fog_segment_t {
                                      *   transmissive draw */
 } box_gpu_fog_segment_t;
 
-/** Record the fog volumes of a view, one instanced draw back to front. Replaces the pipeline
- * and the bind group at 1. A draw of the front segment does not count its volumes again.
+/** Apply the froxel grid the view injected in this packet (box_gpu_fog_volumes_inject), one
+ * fullscreen draw that looks the grid up at the depth of each pixel. Replaces the pipeline and
+ * the bind group at 1.
  *
  * @param gpu The backend
  * @param pass The render pass of the view, which reads its depth, with the bind group of the
@@ -2020,8 +2044,8 @@ typedef enum box_gpu_fog_segment_t {
  * @param v The view
  * @param depth The depth of the view, read only in the pass
  * @param glass The depth of the nearest transmissive surfaces over the opaque depth
- * (box_gpu_transmission_glass), NULL to march the full segment
- * @param segment The segment of the rays to march, FULL without glass
+ * (box_gpu_transmission_glass), NULL to apply the full segment
+ * @param segment The segment of the rays to apply, FULL without glass
  * @return Whether the volumes were drawn
  */
 bool box_gpu_fog_volumes_draw(

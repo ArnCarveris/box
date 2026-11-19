@@ -73,9 +73,9 @@ static WGPUPipelineLayout box_gpu_mesh_layout(
     });
 }
 
-/** Create the layout of the view group of the forward pass: the view uniforms, the lights and
- * clusters, the shadows, the reflections, the aerial perspective, the environment, the
- * ambient occlusion, the cookie, the opaque snapshot, the planar images and the planet lights.
+/** Create the layout of the view group of the forward pass and the fog grid compute (all but the
+ * storage textures): view uniforms, lights, clusters, shadows, reflections, aerial perspective,
+ * environment, ambient occlusion, cookie, opaque snapshot, planar images and planet lights.
  *
  * Binding BOX_GPU_WATER_WAVES_BINDING holds the wave table of the Water materials, the
  * BOX_GPU_RIPPLES_* bindings the field of WaterRipples of the scene of the view.
@@ -266,6 +266,9 @@ static WGPUBindGroupLayout box_gpu_view_layout(
     WGPUBindGroupLayoutDescriptor layout = {
         .entryCount = BOX_GPU_VIEW_BINDINGS, .entries = entries };
     box_gpu_ripples_layout(entries);
+    for (int32_t i = 0; i < BOX_GPU_VIEW_BINDINGS; i ++) {
+        entries[i].visibility |= entries[i].storageTexture.access ? 0 : WGPUShaderStage_Compute;
+    }
 
     return wgpuDeviceCreateBindGroupLayout(gpu->device, &layout);
 }
@@ -1211,7 +1214,7 @@ typedef struct box_gpu_view_pass_t {
     WGPUTexture depth_texture;      /**< Texture of the depth attachment, which the snapshot
                                      *   copies next to its color */
     int32_t front;                  /**< Index of the draw after the last transmissive draw of
-                                     *   a view with fog volumes, before which the volumes march
+                                     *   a view with fog volumes, before which the volumes apply
                                      *   the rays in front of the glass, -1 for none */
     WGPUTextureView glass;          /**< Depth of the nearest transmissive surfaces over the
                                      *   opaque depth, NULL until box_gpu_draw_glass */
@@ -1339,7 +1342,7 @@ static void box_gpu_draw_glass(
  * samples its depth. The shells haze the blended layers around the ground of a planet, such as
  * clouds, which come before them, but not the others, such as those in front of a planet.
  *
- * The fog volumes of a view with transmissive draws march only the rays behind the glass
+ * The fog volumes of a view with transmissive draws apply only the rays behind the glass
  * (box_gpu_draw_glass), which its snapshot then holds.
  *
  * @param gpu The backend
@@ -1404,11 +1407,11 @@ static bool box_gpu_draw_particles(
     return result;
 }
 
-/** End the pass of a view after its last transmissive draw, march its fog volumes from the
+/** End the pass of a view after its last transmissive draw, apply its fog volumes from the
  * camera to the nearest transmissive surface of each pixel that has one in a pass that reads the
  * depth, then continue in a new pass with the groups of the forward pass bound again.
  *
- * Together with the part behind the glass, which the snapshot holds, every ray is marched once,
+ * Together with the part behind the glass, which the snapshot holds, every ray is fogged once,
  * so the glass is fogged as an opaque surface at its depth. Blended shapes drawn in front of the
  * glass before its last transmissive draw are fogged as the glass behind them.
  *
@@ -1491,7 +1494,7 @@ static void box_gpu_draw_snapshot(
  * snapshot, taken right before the first transmissive draw and again before a later one that
  * overlaps the draws since the last one, BOX_GPU_TRANSMISSION_SNAPSHOTS at most
  * (box_gpu_transmission_plan, box_gpu_draw_snapshot). A view
- * with fog volumes and transmissive draws marches the rays behind the glass before the snapshot
+ * with fog volumes and transmissive draws applies the rays behind the glass before the snapshot
  * and those in front of it after the last transmissive draw (box_gpu_draw_fog_front)
  * @param format The format of the color target
  * @param packet The packet
@@ -1951,6 +1954,7 @@ void box_gpu_draw_views(
             box_gpu_transmission_begin(gpu, t, packet, slot, source,
                 hdr ? BOX_GPU_HDR_FORMAT : t->format);
         WGPUBindGroup group = box_gpu_light_group(gpu, t, v, slot, ao, snapshot);
+        box_gpu_fog_volumes_inject(gpu, t, encoder, packet, v, group, slot);
         if (prepasses) {
             box_gpu_draw_prepass(gpu, t, encoder, packet, v, group, slot, false);
             if (occludes) {

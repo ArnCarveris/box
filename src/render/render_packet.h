@@ -74,7 +74,8 @@
 /** Shader handle of the engine shader that builds the mip pyramid of the planar reflections */
 #define BOX_RENDER_SHADER_PLANAR (60)
 
-/** Shader handle of the engine shader that raymarches the fog volumes of a view */
+/** Shader handle of the engine shader that lights the froxel grid of the fog volumes of a view,
+ * integrates it and applies it */
 #define BOX_RENDER_SHADER_FOG_VOLUME (51)
 
 /** Shader handle of the engine shader that raymarches the atmosphere shells of the planets of a
@@ -782,7 +783,8 @@ typedef struct box_render_debug_box_t {
 /** Bit of box_render_debug_box_t.kind of the leaf of an entity */
 #define BOX_RENDER_DEBUG_BOX_LEAF (4u)
 
-/** A FogVolume a view raymarches, resolved; the layout of FogVolume in fog_volume.wgsl.
+/** A FogVolume a view draws through its froxel grid, resolved; the layout of FogVolume in
+ * fog_volume.wgsl.
  *
  * The box is centered on center and spans extent along each of its axes, the world rotation of
  * the entity; the values are clamped to their ranges.
@@ -798,14 +800,13 @@ typedef struct box_render_fog_volume_t {
     float edge_fade;        /**< FogVolume.edge_fade, at least 0 */
     float sun_inscatter;    /**< FogVolume.sun_inscatter, at least 0 */
     float ambient_inscatter; /**< FogVolume.ambient_inscatter, at least 0 */
-    int32_t steps;          /**< FogVolume.steps, 4 to 128 */
+    float light_inscatter;  /**< FogVolume.light_inscatter, at least 0 */
     float offset[3];        /**< World offset the noise moves by: FogVolume.wind times the world
                              *   time, in double precision and wrapped to [0, 10 noise_scale),
                              *   the period of the noise, see box_render_fog_offset */
     float noise_strength;   /**< FogVolume.noise_strength, 0 to 1 */
     float noise_scale;      /**< FogVolume.noise_scale, at least BOX_RENDER_FOG_NOISE_SCALE_MIN */
-    float light_inscatter;  /**< FogVolume.light_inscatter, at least 0 */
-    float pad[2];           /**< Pads the record to the 16 byte stride of its WGSL array */
+    float pad[3];           /**< Pads the record to the 16 byte stride of its WGSL array */
 } box_render_fog_volume_t;
 
 /** A PlanarReflection a view renders a mirrored image of, resolved by the extract
@@ -1070,6 +1071,8 @@ typedef struct box_render_view_t {
     int32_t fog_first;          /**< Index of the first fog volume of the view in the packet */
     int32_t fog_count;          /**< Fog volumes the view draws, back to front, filled by the
                                  *   light extract for a lit view with LightSettings.fog_volumes */
+    float fog_distance;         /**< LightSettings.fog_distance of the view, filled with its
+                                 *   fog volumes, resolved by box_render_fog_distance */
     ViewDebug debug;            /**< View.debug, copied by a capture of the camera of a view;
                                  *   all zero for the other captures (probes, reflections,
                                  *   bakes, no view), which draw no debug pass */

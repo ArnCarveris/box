@@ -270,8 +270,8 @@ static void box_planar_reflection_ctor(
 /** Construct FogVolume values.
  *
  * A white box of 5 units each way with a density of 0.1 that scatters all it extinguishes, a
- * forward phase of 0.3, faces that fade over 1 unit, full sun, ambient, point and spot light, 24
- * march steps and no noise, whose billows would be 4 units across.
+ * forward phase of 0.3, faces that fade over 1 unit, full sun, ambient, point and spot light
+ * and no noise, whose billows would be 4 units across.
  *
  * @param ptr The components
  * @param count Number of components
@@ -296,7 +296,6 @@ static void box_fog_volume_ctor(
             .sun_inscatter = 1.0f,
             .ambient_inscatter = 1.0f,
             .light_inscatter = 1.0f,
-            .steps = 24,
             .noise_strength = 0.0f,
             .noise_scale = 4.0f,
             .wind = {0.0f, 0.0f, 0.0f}

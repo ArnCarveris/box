@@ -229,8 +229,7 @@ korean_village {
       asymmetry: 0.45,
       noise_strength: 0.75,
       noise_scale: 3,
-      wind: {0.25, 0.02, 0},
-      steps: 8
+      wind: {0.25, 0.02, 0}
     }
   }
 

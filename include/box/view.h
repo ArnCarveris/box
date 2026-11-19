@@ -43,6 +43,10 @@ ECS_STRUCT(EnvironmentSettings, {
  *
  * baked, reflections and atmosphere only take effect for the features the Scene of the view
  * enables; turning them off does not compile other pipelines.
+ *
+ * The FogVolumes of a view render through a froxel grid from the near plane of its camera to
+ * fog_distance beyond it: fog farther away is not drawn, and a longer distance makes the depth
+ * slices of the grid thicker.
  */
 ECS_STRUCT(LightSettings, {
     bool enabled;           /**< Enable lighting for the view */
@@ -55,6 +59,8 @@ ECS_STRUCT(LightSettings, {
                              *   geometry and the aerial perspective of the 3D meshes, View
                              *   ctor sets true */
     bool fog_volumes;       /**< Render the FogVolumes of the scene, View ctor sets true */
+    float fog_distance;     /**< World units the FogVolumes reach from the near plane, View
+                             *   ctor sets 100; 0 is 100, else at least 1 */
     EnvironmentSettings environment; /**< Environment the view is lit with, used only when
                                       *   the view is lit */
     ecs_entity_t scene;     /**< Scene whose lights and shadows light the view, 0 for its own */

@@ -838,6 +838,13 @@ void box_gpu_stats_publish(
     s->prepass_draws += p->prepass_draws;
     s->debug_passes += p->debug_passes;
     s->fog_volumes += p->fog_volumes;
+    s->fog_dispatches += p->fog_dispatches;
+    if (p->fog_grid[0] > 0) {
+        for (i = 0; i < 3; i ++) {
+            s->fog_grid[i] = p->fog_grid[i];
+        }
+    }
+
     s->star_fields += p->star_fields;
     s->transmission_snapshots += p->transmission_snapshots;
     s->transmission_textures += p->transmission_textures;

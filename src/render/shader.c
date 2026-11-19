@@ -456,7 +456,7 @@ static void box_shader_changed(
  * it converts environment images or draws environment backgrounds and the packet carries an
  * image or a view with a background, or it simulates or draws particles
  * and the packet has a particle pool, or it blurs the opaque snapshot and a batch is
- * transmissive, or it raymarches fog volumes or assigns lights to clusters and a view of the
+ * transmissive, or it lights fog volumes or assigns lights to clusters and a view of the
  * packet draws a fog volume, which reads the clusters for its point and spot lights, or it
  * raymarches planet atmosphere shells and a view of the packet draws one, or it steps the fields
  * of WaterRipples and the packet has one, or it draws star

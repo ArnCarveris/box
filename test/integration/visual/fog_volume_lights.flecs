@@ -110,7 +110,7 @@ pole {
 
 street_fog {
   Position: {-2, 2.5, -12}
-  FogVolume: {extent: {4.8, 2.5, 16}, density: 0.18, color: {220, 224, 235}, asymmetry: 0.3, edge_fade: 0.5, steps: 64}
+  FogVolume: {extent: {4.8, 2.5, 16}, density: 0.18, color: {220, 224, 235}, asymmetry: 0.3, edge_fade: 0.5}
 }
 
 // A blue point light in a fog volume of its own across the road
@@ -122,5 +122,5 @@ glow {
 
 glow_fog {
   Position: {5, 1.5, -10}
-  FogVolume: {extent: {3, 2.5, 3}, density: 0.6, asymmetry: 0, edge_fade: 0.5, steps: 48}
+  FogVolume: {extent: {3, 2.5, 3}, density: 0.6, asymmetry: 0, edge_fade: 0.5}
 }

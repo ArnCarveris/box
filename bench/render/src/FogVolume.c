@@ -1,11 +1,12 @@
 /**
  * @file FogVolume.c
- * @brief Benchmarks for the cost of the fog volumes a view raymarches on the GPU.
+ * @brief Benchmarks for the cost of the fog volumes a view lights in its froxel grid on the GPU.
  *
  * A headless world renders 1000 boxes lit by a shadow casting sun into a 1280x720 offscreen
  * surface on the main thread and waits for the GPU after every frame, so a case measures a whole
  * frame; the volumes cover the whole image, the camera stands inside each of them. The light
- * cases add 16 point and spot lights over the boxes, 4 of them shadowed, to one volume.
+ * cases add 16 point and spot lights over the boxes, 4 of them shadowed, to one volume. The
+ * screen case renders 1920x1080 inside one volume with noise, as the light shafts of a forest.
  */
 
 #include <box.h>
@@ -21,12 +22,18 @@
  * @param volumes Fog volumes, all around the camera
  * @param lights Point and spot lights over the boxes, every other one a spot
  * @param light_inscatter FogVolume.light_inscatter of the volumes
+ * @param width Width of the surface
+ * @param height Height of the surface
+ * @param noise FogVolume.noise_strength of the volumes
  */
 static void bench_fog_volumes(
     bench_t *b,
     int32_t volumes,
     int32_t lights,
-    float light_inscatter)
+    float light_inscatter,
+    int32_t width,
+    int32_t height,
+    float noise)
 {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
@@ -74,6 +81,8 @@ static void bench_fog_volumes(
         f->extent[2] = 40;
         f->density = 0.02f;
         f->light_inscatter = light_inscatter;
+        f->noise_strength = noise;
+        f->noise_scale = 6;
         ecs_modified(world, e, FogVolume);
     }
 
@@ -92,7 +101,8 @@ static void bench_fog_volumes(
     }
 
     ecs_entity_t surface = ecs_new(world);
-    ecs_set(world, surface, Surface, {.width = 1280, .height = 720, .resolution_scale = 1});
+    ecs_set(world, surface, Surface, {.width = width, .height = height,
+        .resolution_scale = 1});
     uint32_t word = 0;
     for (i = 0; i < 3; i ++) {
         ecs_progress(world, 1.0f / 60);
@@ -114,33 +124,40 @@ void FogVolume_none(
     bench_t *b)
 {
     // lighting/fog_volume
-    bench_fog_volumes(b, 0, 0, 1);
+    bench_fog_volumes(b, 0, 0, 1, 1280, 720, 0);
 }
 
 void FogVolume_one(
     bench_t *b)
 {
     // lighting/fog_volume
-    bench_fog_volumes(b, 1, 0, 1);
+    bench_fog_volumes(b, 1, 0, 1, 1280, 720, 0);
 }
 
 void FogVolume_sixteen(
     bench_t *b)
 {
     // lighting/fog_volume
-    bench_fog_volumes(b, 16, 0, 1);
+    bench_fog_volumes(b, 16, 0, 1, 1280, 720, 0);
 }
 
 void FogVolume_lights_off(
     bench_t *b)
 {
     // lighting/fog_volume
-    bench_fog_volumes(b, 1, BENCH_FOG_LIGHTS, 0);
+    bench_fog_volumes(b, 1, BENCH_FOG_LIGHTS, 0, 1280, 720, 0);
 }
 
 void FogVolume_lights(
     bench_t *b)
 {
     // lighting/fog_volume
-    bench_fog_volumes(b, 1, BENCH_FOG_LIGHTS, 1);
+    bench_fog_volumes(b, 1, BENCH_FOG_LIGHTS, 1, 1280, 720, 0);
+}
+
+void FogVolume_screen(
+    bench_t *b)
+{
+    // lighting/fog_volume
+    bench_fog_volumes(b, 1, 0, 1, 1920, 1080, 0.45f);
 }

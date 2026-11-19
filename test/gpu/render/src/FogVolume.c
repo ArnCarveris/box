@@ -1,9 +1,14 @@
 /**
  * @file FogVolume.c
- * @brief Tests for the fog volumes a view raymarches in its forward pass: transmittance, scattered
- * light, clipping to the depth, the camera inside and behind, edges, rotation, sun shafts, the
- * phase, the order of overlapping volumes, glass, orthographic cameras, resizes, several views
- * and the captures, which do not see them; checked on PNG captures.
+ * @brief Tests for the fog volumes a view lights in its froxel grid and applies in its forward
+ * pass: transmittance, scattered light, clipping to the depth, the camera inside and behind,
+ * edges, rotation, sun shafts, the phase, the order of overlapping volumes, glass, orthographic
+ * cameras, resizes, several views, the fog distance, the size of the grid and the captures,
+ * which do not see them; checked on PNG captures.
+ *
+ * A 64 pixel capture has a grid of 8 by 8 cells: hard faces of a box land on the depth slices of
+ * the grid, so the expected transmittance of a box follows from the share of the sample points
+ * of each slice in it (fv_grid_transmittance), and shapes in the fog are a cell or more across.
  *
  * Most cases run in a lit view without a sun, from a camera at the origin looking down -Z with a
  * 60 degree field of view, over black walls that show their emission. Volumes have hard edges
@@ -139,7 +144,7 @@ static ecs_entity_t fv_wall(
     return e;
 }
 
-/** Add a white fog volume with hard edges and 64 steps.
+/** Add a white fog volume with hard edges.
  *
  * @param world The world
  * @param pos Center
@@ -163,7 +168,6 @@ static ecs_entity_t fv_volume(
     f->density = density;
     f->absorption = absorption;
     f->edge_fade = 0;
-    f->steps = 64;
     ecs_modified(world, e, FogVolume);
 
     return e;
@@ -319,6 +323,81 @@ static void fv_expect(
     }
 }
 
+/** Near plane of the cameras of the cases */
+#define FV_NEAR (0.1f)
+
+/** Transmittance the froxel grid of a view gives at a view depth through the middle of the
+ * image, for an absorbing volume with hard faces between two view depths.
+ *
+ * Each slice absorbs over its thickness times the share of its BOX_FROXEL_SAMPLES points in the
+ * volume, accumulated to their far sides and interpolated as froxel_uvw of froxel.wgsl does.
+ *
+ * @param density Extinction per unit of the volume, times the length of the ray per unit of
+ * view depth for a ray at an angle
+ * @param z0 View depth of the near face of the volume
+ * @param z1 View depth of the far face of the volume
+ * @param depth View depth of the pixel, 0 or less for a pixel without depth
+ * @param ortho Whether the camera is orthographic
+ * @param distance LightSettings.fog_distance of the view
+ * @return The transmittance
+ */
+static float fv_grid_transmittance(
+    float density,
+    float z0,
+    float z1,
+    float depth,
+    bool ortho,
+    float distance)
+{
+    const int32_t n = BOX_FROXEL_SLICES;
+    const float far_ = FV_NEAR + distance;
+    float t[BOX_FROXEL_SLICES], tau = 0, result;
+    int32_t k;
+    for (k = 0; k < n; k ++) {
+        float lo = box_render_froxel_depth((float)k / n, FV_NEAR, far_, ortho);
+        float hi = box_render_froxel_depth((float)(k + 1) / n, FV_NEAR, far_, ortho);
+        int32_t j, inside = 0;
+        for (j = 0; j < BOX_FROXEL_SAMPLES; j ++) {
+            float c = lo + (hi - lo) * ((float)j + 0.5f) / BOX_FROXEL_SAMPLES;
+            inside += c > z0 && c < z1;
+        }
+
+        tau += density * (hi - lo) * (float)inside / BOX_FROXEL_SAMPLES;
+
+        t[k] = expf(-tau);
+    }
+
+    float share = depth > 0
+        ? box_render_froxel_share(depth, FV_NEAR, far_, ortho) * (float)n
+        : (float)n;
+    if (share <= 1) {
+        result = 1 + (t[0] - 1) * share;
+    } else {
+        float i = share - 1;
+        int32_t k0 = (int32_t)floorf(i);
+        result = k0 >= n - 1 ? t[n - 1] : t[k0] + (t[k0 + 1] - t[k0]) * (i - (float)k0);
+    }
+
+    return result;
+}
+
+/** fv_grid_transmittance of a perspective view with the default fog distance.
+ *
+ * @param density Extinction per unit of the volume
+ * @param z0 View depth of the near face of the volume
+ * @param z1 View depth of the far face of the volume
+ * @param depth View depth of the pixel
+ * @return The transmittance
+ */
+static float fv_grid(
+    float density,
+    float z0,
+    float z1,
+    float depth)
+{
+    return fv_grid_transmittance(density, z0, z1, depth, false, 100);
+}
+
 /** Shadow settings of the views of the sun cases: two cascades over 60 units */
 static const ShadowSettings fv_shadows = {
     .enabled = true, .cascades = 2, .resolution = 1024, .max_distance = 60,
@@ -358,7 +437,8 @@ void FogVolume_no_volume_no_pass(void) {
 }
 
 /** A purely absorbing volume 4 units deep in front of a wall passes exp(-density * 4) of its
- * light; the view ends its pass for the volume, which draw last in one more. */
+ * light, over the slices of the grid in it; the view lights its grid in two dispatches and ends
+ * its pass for the volume, which draws last in one more. */
 void FogVolume_density_transmittance(void) {
     // fog_volume/march
     ecs_world_t *world = fv_world(0);
@@ -366,7 +446,8 @@ void FogVolume_density_transmittance(void) {
     fv_wall(world, 0, -20, 40, FV_WALL);
     fv_volume(world, (float[]){0, 0, -10}, (float[]){20, 20, 2}, 0.2f, 1);
     unsigned char *px = fv_render(world, "fog_transmittance.png");
-    int32_t want = fv_srgb(fv_lin(FV_WALL) * expf(-0.2f * 4.0f));
+    int32_t want = fv_srgb(fv_lin(FV_WALL) * fv_grid(0.2f, 8, 12, 19.9f));
+    test_assert(abs(want - fv_srgb(fv_lin(FV_WALL) * expf(-0.2f * 4.0f))) <= 12);
     fv_expect(fv_px(px, 32, 32), want, 4);
     fv_expect(fv_px(px, 40, 24), want, 6);
     stbi_image_free(px);
@@ -374,6 +455,7 @@ void FogVolume_density_transmittance(void) {
     box_render_gpu_stats_t before = fv_frames(world, 0);
     box_render_gpu_stats_t after = fv_frames(world, 2);
     test_int(after.fog_volumes - before.fog_volumes, 2);
+    test_int(after.fog_dispatches - before.fog_dispatches, 4);
     test_int(after.forward_passes - before.forward_passes, 4);
     test_int(after.errors, before.errors);
 
@@ -413,8 +495,8 @@ void FogVolume_clips_to_depth(void) {
     (void)behind;
     unsigned char *px = fv_render(world, "fog_depth.png");
     int32_t near_ = fv_px(px, 21, 32)[1], far_ = fv_px(px, 43, 32)[1];
-    test_assert(abs(near_ - fv_srgb(fv_lin(FV_WALL) * expf(-0.3f * 3.9f))) <= 6);
-    test_assert(abs(far_ - fv_srgb(fv_lin(FV_WALL) * expf(-0.3f * 8.0f))) <= 6);
+    test_assert(abs(near_ - fv_srgb(fv_lin(FV_WALL) * fv_grid(0.3f, 6, 14, 9.9f))) <= 6);
+    test_assert(abs(far_ - fv_srgb(fv_lin(FV_WALL) * fv_grid(0.3f, 6, 14, 19.9f))) <= 6);
     test_assert(near_ > far_ + 20);
     test_assert(near_ < FV_WALL - 20);
     stbi_image_free(px);
@@ -431,7 +513,7 @@ void FogVolume_camera_inside(void) {
     fv_wall(world, 0, -20, 40, FV_WALL);
     fv_volume(world, (float[]){0, 0, 0}, (float[]){10, 10, 10}, 0.1f, 1);
     unsigned char *px = fv_render(world, "fog_inside.png");
-    fv_expect(fv_px(px, 32, 32), fv_srgb(fv_lin(FV_WALL) * expf(-0.1f * 9.9f)), 5);
+    fv_expect(fv_px(px, 32, 32), fv_srgb(fv_lin(FV_WALL) * fv_grid(0.1f, -1, 10, 19.9f)), 5);
     stbi_image_free(px);
 
     ecs_fini(world);
@@ -487,7 +569,8 @@ void FogVolume_edge_fade(void) {
 }
 
 /** A long box turned a quarter about Z fogs the column above the center instead of the row to
- * its right. */
+ * its right. The box is 4 units, two cells, across, so the cell centers next to the middle of
+ * the image are inside it. */
 void FogVolume_rotated_box(void) {
     // fog_volume/edge
     int32_t k;
@@ -495,13 +578,14 @@ void FogVolume_rotated_box(void) {
         ecs_world_t *world = fv_world(0);
         fv_view(world, fv_ortho(world), true);
         fv_wall(world, 0, -10, 40, FV_WALL);
-        ecs_entity_t e = fv_volume(world, (float[]){0, 0, 0}, (float[]){6, 1, 1}, 1, 1);
+        ecs_entity_t e = fv_volume(world, (float[]){0, 0, 0}, (float[]){6, 2, 2}, 0.25f, 1);
         if (k) {
             ecs_set(world, e, Rotation, {0, 0, (float)GLM_PI_2});
         }
 
         unsigned char *px = fv_render(world, k ? "fog_rotated.png" : "fog_unrotated.png");
-        int32_t fogged = fv_srgb(fv_lin(FV_WALL) * expf(-2.0f));
+        int32_t fogged = fv_srgb(fv_lin(FV_WALL) *
+            fv_grid_transmittance(0.25f, 8, 12, 19.9f, true, 100));
         const unsigned char *right = fv_px(px, 48, 32), *above = fv_px(px, 32, 16);
         fv_expect(k ? above : right, fogged, 4);
         fv_expect(k ? right : above, FV_WALL, 1);
@@ -711,7 +795,7 @@ void FogVolume_transmissive_inside_fogged(void) {
     // fog_volume/order
     int32_t opaque = fv_panel_inside(false, "fog_panel_opaque.png");
     int32_t glass = fv_panel_inside(true, "fog_panel_glass.png");
-    int32_t want = fv_srgb(fv_lin(FV_WALL) * expf(-0.3f * 3.9f));
+    int32_t want = fv_srgb(fv_lin(FV_WALL) * fv_grid(0.3f, 6, 14, 9.9f));
     printf("opaque %d, transmissive %d, want %d\n", opaque, glass, want);
     test_assert(abs(opaque - want) <= 6);
     test_assert(abs(glass - opaque) <= 6);
@@ -791,11 +875,12 @@ void FogVolume_transmissive_inside_fogged_once(void) {
     unsigned char *px = fv_render(world, "fog_panel_once.png");
     int32_t x[2] = {32, 4}, i;
     for (i = 0; i < 2; i ++) {
-        /* The ray of the pixel crosses the 8 units of the volume at an angle */
+        /* The ray of the pixel crosses the volume at an angle, longer per unit of depth */
         float t = ((float)x[i] + 0.5f) / (FV_SIZE / 2.0f) - 1.0f;
         t *= tanf(30.0f * (float)GLM_PI / 180.0f);
-        float depth = 8.0f * sqrtf(1.0f + t * t);
-        fv_expect(fv_px(px, x[i], 32), fv_srgb(fv_lin(FV_WALL) * expf(-0.3f * depth)), 6);
+        float stretch = sqrtf(1.0f + t * t);
+        fv_expect(fv_px(px, x[i], 32),
+            fv_srgb(fv_lin(FV_WALL) * fv_grid(0.3f * stretch, 6, 14, 19.9f)), 6);
     }
     stbi_image_free(px);
 
@@ -803,7 +888,7 @@ void FogVolume_transmissive_inside_fogged_once(void) {
 }
 
 /** A view with transmissive shapes and no fog volumes keeps its passes: the snapshot splits its
- * forward pass once a frame. With a volume it also draws its glass depth only, marches the fog
+ * forward pass once a frame. With a volume it also draws its glass depth only, applies the fog
  * behind the glass before the snapshot and the fog in front of it after the glass, each in a pass
  * of its own, and counts the volume once a frame. */
 void FogVolume_transmissive_pass_count(void) {
@@ -826,12 +911,13 @@ void FogVolume_transmissive_pass_count(void) {
     after = fv_frames(world, 2);
     test_int(after.forward_passes - before.forward_passes, 12);
     test_int(after.fog_volumes - before.fog_volumes, 2);
+    test_int(after.fog_dispatches - before.fog_dispatches, 4);
     test_int(after.errors, before.errors);
 
     ecs_fini(world);
 }
 
-/** An orthographic camera marches parallel rays through the volume. */
+/** An orthographic camera has parallel rays through the volume and even slices. */
 void FogVolume_orthographic(void) {
     // fog_volume/views
     ecs_world_t *world = fv_world(0);
@@ -839,9 +925,10 @@ void FogVolume_orthographic(void) {
     fv_wall(world, 0, -10, 40, FV_WALL);
     fv_volume(world, (float[]){0, 0, 0}, (float[]){4, 4, 2}, 0.25f, 1);
     unsigned char *px = fv_render(world, "fog_ortho.png");
-    int32_t want = fv_srgb(fv_lin(FV_WALL) * expf(-1.0f));
+    int32_t want = fv_srgb(fv_lin(FV_WALL) *
+        fv_grid_transmittance(0.25f, 8, 12, 19.9f, true, 100));
     fv_expect(fv_px(px, 32, 32), want, 4);
-    fv_expect(fv_px(px, 20, 44), want, 4);
+    fv_expect(fv_px(px, 24, 40), want, 4);
     fv_expect(fv_px(px, 4, 4), FV_WALL, 1);
     stbi_image_free(px);
 
@@ -855,12 +942,14 @@ void FogVolume_resize(void) {
     fv_view(world, fv_camera(world, 0, 0), true);
     fv_wall(world, 0, -20, 40, FV_WALL);
     fv_volume(world, (float[]){0, 0, -10}, (float[]){20, 20, 2}, 0.2f, 1);
-    int32_t want = fv_srgb(fv_lin(FV_WALL) * expf(-0.8f));
+    int32_t want = fv_srgb(fv_lin(FV_WALL) * fv_grid(0.2f, 8, 12, 19.9f));
     ecs_entity_t s = fv_surface(world, FV_SIZE, FV_SIZE, "fog_resize_a.png");
     box_render_gpu_stats_t before = fv_frames(world, 3);
     unsigned char *px = fv_load(world, "fog_resize_a.png", FV_SIZE, FV_SIZE);
     fv_expect(fv_px(px, 32, 32), want, 4);
     stbi_image_free(px);
+    test_int(before.fog_grid[0], 8);
+    test_int(before.fog_grid[1], 8);
 
     ecs_set(world, s, Surface, {.width = 96, .height = 48,
         .write_to_file = "fog_resize_b.png", .resolution_scale = 1});
@@ -868,6 +957,8 @@ void FogVolume_resize(void) {
     px = fv_load(world, "fog_resize_b.png", 96, 48);
     fv_expect(&px[(24 * 96 + 48) * 4], want, 4);
     stbi_image_free(px);
+    test_int(after.fog_grid[0], 12);
+    test_int(after.fog_grid[1], 6);
     test_int(after.errors, before.errors);
 
     ecs_fini(world);
@@ -888,12 +979,13 @@ void FogVolume_two_views(void) {
     fv_volume(world, (float[]){0, 0, -10}, (float[]){8, 8, 2}, 0.1f, 1);
     fv_volume(world, (float[]){0, 0, 10}, (float[]){8, 8, 2}, 0.3f, 1);
     unsigned char *px = fv_render(world, "fog_two_views.png");
-    fv_expect(fv_px(px, 32, 32), fv_srgb(fv_lin(FV_WALL) * expf(-1.2f)), 4);
+    fv_expect(fv_px(px, 32, 32), fv_srgb(fv_lin(FV_WALL) * fv_grid(0.3f, 8, 12, 19.9f)), 4);
     stbi_image_free(px);
 
     box_render_gpu_stats_t before = fv_frames(world, 0);
     box_render_gpu_stats_t after = fv_frames(world, 1);
     test_int(after.fog_volumes - before.fog_volumes, 2);
+    test_int(after.fog_dispatches - before.fog_dispatches, 4);
     test_int(after.errors, before.errors);
 
     ecs_fini(world);
@@ -1041,7 +1133,6 @@ static ecs_entity_t fv_noise_volume(
     fv_wall(world, 0, -10, 40, FV_WALL);
     ecs_entity_t e = fv_volume(world, (float[]){0, 0, 0}, (float[]){20, 20, 1}, 0.4f, 1);
     FogVolume *f = ecs_get_mut(world, e, FogVolume);
-    f->steps = 128;
     f->noise_strength = strength;
     f->noise_scale = scale;
     glm_vec3_copy(ECS_CONST_CAST(float*, wind), f->wind);
@@ -1050,8 +1141,8 @@ static ecs_entity_t fv_noise_volume(
     return e;
 }
 
-/** Add a white volume that scatters all it extinguishes, with hard edges, an isotropic phase
- * and 128 steps.
+/** Add a white volume that scatters all it extinguishes, with hard edges and an isotropic
+ * phase.
  *
  * @param world The world
  * @param pos Center
@@ -1070,7 +1161,6 @@ static ecs_entity_t fv_lit_volume(
     ecs_entity_t e = fv_volume(world, pos, extent, density, 0);
     FogVolume *f = ecs_get_mut(world, e, FogVolume);
     f->asymmetry = 0;
-    f->steps = 128;
     f->light_inscatter = light_inscatter;
     ecs_modified(world, e, FogVolume);
 
@@ -1166,7 +1256,7 @@ void FogVolume_noise_zero_unchanged(void) {
         ecs_fini(world);
     }
 
-    int32_t want = fv_srgb(fv_lin(FV_WALL) * expf(-0.2f * 4.0f));
+    int32_t want = fv_srgb(fv_lin(FV_WALL) * fv_grid(0.2f, 8, 12, 19.9f));
     fv_expect(fv_px(px[0], 32, 32), want, 4);
     fv_expect(fv_px(px[0], 40, 24), want, 6);
     test_assert(!memcmp(px[0], px[1], FV_SIZE * FV_SIZE * 4));
@@ -1194,7 +1284,8 @@ void FogVolume_noise_varies(void) {
     test_assert(deviation[0] < 1.0);
     test_assert(deviation[1] > 6.0);
     test_assert(fabs(mean[1] - mean[0]) < 25.0);
-    test_assert(fabs(mean[0] - fv_srgb(fv_lin(FV_WALL) * expf(-0.8f))) < 4.0);
+    test_assert(fabs(mean[0] - fv_srgb(fv_lin(FV_WALL) *
+        fv_grid_transmittance(0.4f, 9, 11, 19.9f, true, 100))) < 4.0);
 }
 
 /** A larger noise_scale makes larger billows: neighbouring pixels differ less. */
@@ -1204,14 +1295,14 @@ void FogVolume_noise_scale(void) {
     int32_t k;
     for (k = 0; k < 2; k ++) {
         ecs_world_t *world = fv_world(0);
-        fv_noise_volume(world, 1, k ? 16.0f : 2.0f, (float[]){0, 0, 0});
+        fv_noise_volume(world, 1, k ? 32.0f : 4.0f, (float[]){0, 0, 0});
         unsigned char *px = fv_render(world, k ? "fog_noise_large.png" : "fog_noise_small.png");
         fv_measure(px, &mean[k], &deviation[k], &neighbours[k]);
         stbi_image_free(px);
         ecs_fini(world);
     }
 
-    printf("scale 2: neighbours %.2f deviation %.2f, scale 16: neighbours %.2f deviation %.2f\n",
+    printf("scale 4: neighbours %.2f deviation %.2f, scale 32: neighbours %.2f deviation %.2f\n",
         neighbours[0], deviation[0], neighbours[1], deviation[1]);
     test_assert(deviation[0] > 4.0);
     test_assert(deviation[1] > 4.0);
@@ -1505,10 +1596,11 @@ void FogVolume_point_light_glow(void) {
 }
 
 /** Render a slab of fog under a spot light shining down, from the side, with or without a
- * caster under the light; the light and its tile cast shadows when shadows is set.
+ * caster under the light; the light and its tile cast shadows when shadows is set, and its cone
+ * is then wider, so the fog beside the shadow of the caster is a cell of the grid away from it.
  *
  * @param shadows Whether the view and the light render shadows
- * @param caster Whether a thin bar 1.5 under the light crosses the cone
+ * @param caster Whether a bar 1 wide 1.5 under the light crosses the cone
  * @param file Name of the PNG
  * @return The pixels, RGBA, freed with stbi_image_free
  */
@@ -1524,11 +1616,11 @@ static unsigned char* fv_spot_render(
     }
 
     fv_lit_volume(world, (float[]){0, 0, -10}, (float[]){6, 5, 1}, 0.5f, 1);
-    fv_spot(world, (float[]){0, 4, -10}, 3 * GLM_PIf, 10, shadows ? 30 : 20, shadows);
+    fv_spot(world, (float[]){0, 4, -10}, 3 * GLM_PIf, 10, shadows ? 40 : 20, shadows);
     if (caster) {
         ecs_entity_t bar = ecs_new(world);
         ecs_set(world, bar, Position, {0, 2.5f, -10});
-        ecs_set(world, bar, Box, {0.5f, 0.2f, 4});
+        ecs_set(world, bar, Box, {1, 0.2f, 4});
     }
 
     unsigned char *px = fv_render(world, file);
@@ -1539,13 +1631,13 @@ static unsigned char* fv_spot_render(
 
 /** A spot light shining down through the fog shows its cone from the side: lit under the light,
  * dark beside the cone and above the light. At z -10 a world unit is about 5.5 pixels, the cone
- * is 1.5 wide each way at y 0. */
+ * is 1.5 wide each way at y 0; a cell of the grid is 8 pixels. */
 void FogVolume_spot_light_cone(void) {
     // fog_volume/lights
     unsigned char *px = fv_spot_render(false, false, "fog_spot_cone.png");
     int32_t center = fv_px(px, 32, 32)[1];
     test_assert(center > 60);
-    test_assert(fv_px(px, 32, 22)[1] > 60);
+    test_assert(fv_px(px, 32, 26)[1] > 60);
     test_assert(fv_px(px, 49, 32)[1] <= 2);
     test_assert(fv_px(px, 15, 32)[1] <= 2);
     test_assert(fv_px(px, 32, 4)[1] <= 2);
@@ -1560,7 +1652,7 @@ void FogVolume_spot_shadow_in_fog(void) {
     unsigned char *open = fv_spot_render(true, false, "fog_spot_shadow_open.png");
     unsigned char *shaded = fv_spot_render(true, true, "fog_spot_shadow.png");
     int32_t open_center = fv_px(open, 32, 32)[1], shaded_center = fv_px(shaded, 32, 32)[1];
-    int32_t open_side = fv_px(open, 40, 32)[1], shaded_side = fv_px(shaded, 40, 32)[1];
+    int32_t open_side = fv_px(open, 44, 32)[1], shaded_side = fv_px(shaded, 44, 32)[1];
     test_assert(open_center > 60);
     test_assert(shaded_center * 2 < open_center);
     test_assert(open_side > 40);
@@ -1570,7 +1662,8 @@ void FogVolume_spot_shadow_in_fog(void) {
     stbi_image_free(shaded);
 }
 
-/** Render a slab of fog around a shadowed point light, with or without a bar 1.5 under it.
+/** Render a slab of fog around a shadowed point light, with or without a bar 1 wide 1.5 under
+ * it, whose shadow covers the cells of the grid next to the middle of the image.
  *
  * @param caster Whether the bar is there
  * @param file Name of the PNG
@@ -1588,7 +1681,7 @@ static unsigned char* fv_point_shadow_render(
     if (caster) {
         ecs_entity_t bar = ecs_new(world);
         ecs_set(world, bar, Position, {0, 1.5f, -10});
-        ecs_set(world, bar, Box, {0.5f, 0.2f, 4});
+        ecs_set(world, bar, Box, {1, 0.2f, 4});
     }
 
     unsigned char *px = fv_render(world, file);
@@ -1604,7 +1697,7 @@ void FogVolume_point_shadow_in_fog(void) {
     unsigned char *open = fv_point_shadow_render(false, "fog_point_shadow_open.png");
     unsigned char *shaded = fv_point_shadow_render(true, "fog_point_shadow.png");
     int32_t open_center = fv_px(open, 32, 32)[1], shaded_center = fv_px(shaded, 32, 32)[1];
-    int32_t open_side = fv_px(open, 41, 32)[1], shaded_side = fv_px(shaded, 41, 32)[1];
+    int32_t open_side = fv_px(open, 44, 32)[1], shaded_side = fv_px(shaded, 44, 32)[1];
     test_assert(open_center > 60);
     test_assert(shaded_center * 2 < open_center);
     test_assert(open_side > 40);
@@ -1650,8 +1743,8 @@ void FogVolume_light_outside_clusters(void) {
     test_assert(lit > dark + 30);
 }
 
-/** Count the forward passes and fog volume draws of two frames of a volume with or without 16
- * point and spot lights in it.
+/** Count the forward passes and fog volumes of two frames of a volume with or without 16 point
+ * and spot lights in it.
  *
  * @param lights Whether the lights are there
  * @param out Receives the forward passes and the fog volumes
@@ -1695,4 +1788,129 @@ void FogVolume_no_new_splits(void) {
     test_int(without[1], 2);
     test_int(with[0], without[0]);
     test_int(with[1], without[1]);
+}
+
+/** Count the forward passes, draws, fog dispatches and fog volumes of two frames of a view with
+ * one volume or with a second one that overlaps it.
+ *
+ * @param second Whether the second volume is there
+ * @param out Receives the four counts
+ */
+static void fv_overlap_counts(
+    bool second,
+    int32_t out[4])
+{
+    ecs_world_t *world = fv_world(0.3f);
+    fv_view(world, fv_camera(world, 0, 0), true);
+    fv_wall(world, 0, -20, 40, FV_WALL);
+    fv_volume(world, (float[]){0, 0, -10}, (float[]){8, 8, 3}, 0.1f, 0);
+    if (second) {
+        fv_volume(world, (float[]){1, 0, -9}, (float[]){6, 6, 3}, 0.1f, 0);
+    }
+
+    unsigned char *px = fv_render(world, second ? "fog_overlap_two.png" : "fog_overlap_one.png");
+    stbi_image_free(px);
+    box_render_gpu_stats_t before = fv_frames(world, 0);
+    box_render_gpu_stats_t after = fv_frames(world, 2);
+    out[0] = after.forward_passes - before.forward_passes;
+    out[1] = after.draws - before.draws;
+    out[2] = after.fog_dispatches - before.fog_dispatches;
+    out[3] = after.fog_volumes - before.fog_volumes;
+    test_int(after.errors, before.errors);
+    ecs_fini(world);
+}
+
+/** A second volume that overlaps the first adds no pass, no draw and no dispatch: both are
+ * lit in the same grid and applied in the same draw. */
+void FogVolume_overlap_no_new_pass(void) {
+    // fog_volume/draw
+    int32_t one[4], two[4];
+    fv_overlap_counts(false, one);
+    fv_overlap_counts(true, two);
+    test_int(one[0], 4);
+    test_int(two[0], one[0]);
+    test_int(two[1], one[1]);
+    test_int(one[2], 4);
+    test_int(two[2], one[2]);
+    test_int(one[3], 2);
+    test_int(two[3], 4);
+}
+
+/** Render the gray clear color of a view, the sky, through a purely absorbing volume from 5 to
+ * 105 units in front of the camera, with a fog distance, and get the green of the center pixel.
+ *
+ * @param distance LightSettings.fog_distance of the view
+ * @param file Name of the PNG
+ * @return The green of the center pixel
+ */
+static int32_t fv_sky(
+    float distance,
+    const char *file)
+{
+    ecs_world_t *world = fv_world(0);
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = fv_camera(world, 0, 0),
+        .clear = {.enabled = true, .color = {FV_WALL, FV_WALL, FV_WALL, 255}},
+        .lighting = {.enabled = true, .fog_volumes = true, .fog_distance = distance}});
+    fv_volume(world, (float[]){0, 0, -55}, (float[]){100, 100, 50}, 0.05f, 1);
+    unsigned char *px = fv_render(world, file);
+    int32_t result = fv_px(px, 32, 32)[1];
+    stbi_image_free(px);
+    ecs_fini(world);
+
+    return result;
+}
+
+/** A pixel without depth takes the fog up to the fog distance of the view: the sky through a
+ * volume 100 units deep passes the light of the part of the volume within the distance. */
+void FogVolume_fog_distance_sky(void) {
+    // fog_volume/froxels
+    const float distances[3] = { 20, 60, 200 };
+    int32_t got[3], i;
+    for (i = 0; i < 3; i ++) {
+        char file[64];
+        snprintf(file, sizeof(file), "fog_distance_%d.png", (int32_t)distances[i]);
+        got[i] = fv_sky(distances[i], file);
+        int32_t want = fv_srgb(fv_lin(FV_WALL) *
+            fv_grid_transmittance(0.05f, 5, 105, 0, false, distances[i]));
+        printf("fog distance %.0f: got %d, want %d\n", (double)distances[i], got[i], want);
+        test_assert(abs(got[i] - want) <= 4);
+    }
+
+    // About 15, 55 and all 100 units of the volume
+    test_assert(abs(got[0] - fv_srgb(fv_lin(FV_WALL) * expf(-0.05f * 15.0f))) <= 8);
+    test_assert(got[0] > got[1] + 40);
+    test_assert(got[1] > got[2] + 20);
+    test_assert(got[2] <= 16);
+}
+
+/** The grid has a cell per 8x8 pixels of a 720p and a 1080p view, and no more cells for a 4K
+ * view, whose cells are 16 pixels. */
+void FogVolume_grid_size_4k(void) {
+    // fog_volume/froxels
+    const int32_t sizes[3][4] = {
+        { 1280, 720, 160, 90 },
+        { 1920, 1080, 240, 135 },
+        { 3840, 2160, 240, 135 }
+    };
+    ecs_world_t *world = fv_world(0);
+    fv_view(world, fv_camera(world, 0, 0), true);
+    fv_wall(world, 0, -20, 40, FV_WALL);
+    fv_volume(world, (float[]){0, 0, -10}, (float[]){20, 20, 2}, 0.2f, 1);
+    ecs_entity_t s = fv_surface(world, sizes[0][0], sizes[0][1], NULL);
+    box_render_gpu_stats_t first = fv_frames(world, 0);
+    int32_t i;
+    for (i = 0; i < 3; i ++) {
+        ecs_set(world, s, Surface, {.width = sizes[i][0], .height = sizes[i][1],
+            .resolution_scale = 1});
+        box_render_gpu_stats_t before = fv_frames(world, 2);
+        box_render_gpu_stats_t after = fv_frames(world, 1);
+        test_int(after.fog_grid[0], sizes[i][2]);
+        test_int(after.fog_grid[1], sizes[i][3]);
+        test_int(after.fog_grid[2], BOX_FROXEL_SLICES);
+        test_int(after.fog_dispatches - before.fog_dispatches, 2);
+        test_int(after.errors, first.errors);
+    }
+
+    ecs_fini(world);
 }

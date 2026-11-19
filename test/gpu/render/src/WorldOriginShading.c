@@ -422,7 +422,6 @@ static ecs_entity_t wos_fog(
     f->density = 0.5f;
     f->absorption = 1;
     f->edge_fade = 0;
-    f->steps = 64;
     f->noise_strength = 1;
     f->noise_scale = 1.7f;
     ecs_modified(world, e, FogVolume);

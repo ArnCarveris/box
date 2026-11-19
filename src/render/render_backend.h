@@ -49,7 +49,13 @@ typedef struct box_render_gpu_stats_t {
                                  *   that draws a debug item (View.debug), after its effects;
                                  *   their draw calls count among draws */
     int32_t fog_volumes;        /**< Fog volumes drawn, one per volume of a view in each frame
-                                 *   it renders; their draw calls count among draws */
+                                 *   it injects into its froxel grid; the apply draw calls of
+                                 *   the grids count among draws */
+    int32_t fog_dispatches;     /**< Compute dispatches of the froxel grids of the fog volumes,
+                                 *   inject and integrate: two per frame of a view with volumes
+                                 *   however many it has */
+    int32_t fog_grid[3];        /**< Cells across, cells down and slices of the last froxel
+                                 *   grid injected, 0 before the first */
     int32_t star_fields;        /**< Star fields drawn, one per StarField of a view in each
                                  *   frame it renders; their draw calls count among draws */
     int32_t transmission_snapshots; /**< Snapshots recorded for transmission, per frame of a

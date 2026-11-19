@@ -35,7 +35,7 @@ no per-frame cost, no view shadows). Without a `Bake` in the scene every mode is
 | Component | Fields (defaults) | Notes |
 |---|---|---|
 | `PlanarReflection` | `resolution` 0.5 (0.125..1), `clip_offset` 0.02, `distortion` 0.02 | Mirror about the plane through the entity facing local +Y. Needs `Scene.planar_reflections`. Max `BOX_PLANAR_REFLECTION_MAX` = 2 per view |
-| `FogVolume` | `extent` {5,5,5}, `density` 0.1, `color` white, `absorption` 0, `asymmetry` 0.3, `edge_fade` 1, `sun_inscatter`/`ambient_inscatter`/`light_inscatter` 1, `steps` 24 (4..128), `noise_strength` 0, `noise_scale` 4, `wind` | Raymarched box; views with `LightSettings.fog_volumes` (ctor true); max 32 per view |
+| `FogVolume` | `extent` {5,5,5}, `density` 0.1, `color` white, `absorption` 0, `asymmetry` 0.3, `edge_fade` 1, `sun_inscatter`/`ambient_inscatter`/`light_inscatter` 1, `noise_strength` 0, `noise_scale` 4, `wind` | Box lit in the froxel grid of each view with `LightSettings.fog_volumes` (ctor true), up to `LightSettings.fog_distance` (ctor 100); max 32 per view |
 | `StarField` | `count` 20000 (max 1e6), `seed` 1, `brightness` 6, `falloff` 4, `size` 1.5 px, `temperature_min` 3000, `temperature_max` 12000, `saturation` 0.6, `band` 0.4, `band_width` 8 | GPU generated stars behind all geometry; galactic plane = local XZ. Not seen by captures/IBL |
 | `Environment` | `resolution` 256 (power of two 8..1024), `filter` Ggx/Box | Environment source cubemap; adds `EnvironmentStatus` (`version`, `error`) |
 | `EnvironmentImage` | `path` (.hdr equirect) | Adds `Environment`; reloads on FileWatch change. Center column looks along -Z |
@@ -106,12 +106,18 @@ mirror { Position: {0, 1.5, -4}; Rotation: {1.5708, 0, 0}; Box: {2, 0.05, 3}
   above roughness 0.6). It does not reflect transmissive or Water shapes, fog volumes, 2D, text
   or effects; orthographic views and captures render none.
 - `FogVolume` noise is in world space: moving the box does not drag the billows.
+- `FogVolume`s render through a grid per view: a cell per ~8x8 pixels (at most 240 cells
+  across), 64 depth slices from the near plane to `fog_distance`, exponential (evenly for
+  orthographic). Detail under a cell is softened; fog beyond `fog_distance` is not drawn and
+  the sky takes the fog up to it.
 - `StarField` and `FogVolume` are invisible to probe/reflection captures and bakes.
 
 ## Cost
 
 - Point lights render 8 octahedral octants into one atlas tile; spot lights one perspective.
-- Fog: up to `BOX_FOG_VOLUME_LIGHT_STEPS` (8) cluster lookups per ray, 8 lights each; dense
-  clusters lose lights. `light_inscatter: 0` skips the lookup.
+- Fog: each grid cell is lit once for all volumes of the view, the first
+  `BOX_FOG_VOLUME_LIGHT_STEPS` (8) lights of its cluster; dense clusters lose lights.
+  `light_inscatter: 0` skips the lookup. The cost follows the grid, not the image size, screen
+  coverage or the number of overlapping volumes.
 - Bake is `bounces + 1` capture passes, spread over `budget_ms` per frame; cached in `cache`.
 - ReflectionBake spends `budget_ms` GPU time per frame; non-resident probes do not fit.

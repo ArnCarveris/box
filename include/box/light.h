@@ -25,8 +25,8 @@
 extern "C" {
 #endif
 
-/** Cluster lookups of the point and spot lights a FogVolume ray makes at most, and the lights
- * of each lookup it marches at most; FOG_LIGHT_SEGMENTS in etc/shaders/fog_volume.wgsl */
+/** Point and spot lights of its cluster a cell of the froxel grid of the FogVolumes is lit by
+ * at most; FOG_LIGHTS in etc/shaders/fog_volume.wgsl */
 #define BOX_FOG_VOLUME_LIGHT_STEPS (8)
 
 /** How a light takes part in the LightBake of its scene, as Unity's light modes.
@@ -349,22 +349,30 @@ ECS_STRUCT(PlanarReflection, {
                            *   perfect mirror */
 });
 
-/** A box of fog the lit views of its scene with LightSettings.fog_volumes raymarch, placed by the
+/** A box of fog the lit views of its scene with LightSettings.fog_volumes render, placed by the
  * position and rotation of the entity. Probe and reflection captures and bakes do not see it.
  *
- * It draws after the opaque meshes and the sky, back to front, at most 32 per view. Other blended
- * shapes and particles in or behind it are not fogged. It is lit by the ambient of the view, the
- * first directional light and the point and spot lights of the clusters of the view.
+ * The nearest 32 volumes a view sees render through a froxel grid of the view: a grid aligned
+ * with its frustum, one cell per tile of about 8x8 pixels (larger tiles above 1920 pixels, so a
+ * grid has at most 240 cells along its larger edge) by 64 depth slices from the near plane to
+ * LightSettings.fog_distance, thickening exponentially with the distance (evenly for an
+ * orthographic camera). Each cell sums the density of every volume at its center and is lit
+ * once, so the cost follows the grid, not the image size, the screen coverage or the number of
+ * overlapping volumes. The grid is applied after the opaque meshes and the sky, one lookup per
+ * pixel at its depth; fog beyond fog_distance is not drawn, and the sky takes the fog up to it.
+ * Detail smaller than a cell, such as a hard face of a box or a thin shaft, is softened over a
+ * cell. Other blended shapes and particles in or behind it are not fogged. It is lit by the
+ * ambient of the view, the first directional light through its shadow cascades and cookie, and
+ * the point and spot lights of the clusters of the view.
  *
  * A shape with Transmission in or behind it is fogged as an opaque surface at its depth: the fog
- * behind the nearest glass of a pixel is marched before the snapshot the glass shows, the fog in
+ * behind the nearest glass of a pixel is applied before the snapshot the glass shows, the fog in
  * front of it after the last transmissive draw, from a depth only pass of the transmissive shapes.
  * Blended shapes drawn in front of glass before the last glass are fogged as the glass; the fog
  * between two layers of glass is lost.
  *
- * A ray looks up its clusters at most BOX_FOG_VOLUME_LIGHT_STEPS times, each segment lit by the
- * first BOX_FOG_VOLUME_LIGHT_STEPS lights of the cluster at its middle, so dense clusters may
- * lose lights. Shadows are one depth comparison per step.
+ * A cell is lit by the first BOX_FOG_VOLUME_LIGHT_STEPS lights of its cluster, so dense clusters
+ * may lose lights. Shadows are one depth comparison per cell.
  */
 ECS_STRUCT(FogVolume, {
     vec3 extent;             /**< Half size of the box, default {5, 5, 5} */
@@ -381,9 +389,6 @@ ECS_STRUCT(FogVolume, {
     float ambient_inscatter; /**< Scale of the ambient light, default 1 */
     float light_inscatter;   /**< Scale of the point and spot lights, default 1, 0 skips their
                               *   lookup */
-    int32_t steps;           /**< March steps across a volume, default 24, clamped to 4..128;
-                              *   a ray that crosses part of the box takes its share of them,
-                              *   at least 4, or 8 with noise */
     float noise_strength;    /**< 0 constant density, 1 the density goes from 0 to twice its
                               *   value with a tileable 3D noise, clamped to 0..1, default 0 */
     float noise_scale;       /**< World size of the largest billows, default 4. The noise is in

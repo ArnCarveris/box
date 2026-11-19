@@ -13,6 +13,7 @@
 
 #include "render_packet.h"
 #include "render_backend.h"
+#include "../../etc/shaders/include/froxel.h"
 
 /** Counters of the instanced batches of a world, written by the draw extract */
 typedef struct box_render_draws_stats_t {
@@ -363,7 +364,8 @@ void box_render_fog_noise(
     uint8_t *out);
 
 /** Give every lit view with LightSettings.fog_volumes the FogVolumes of the scene of its camera
- * that may be in its frustum, back to front by the distance of their centers from the camera.
+ * that may be in its frustum, back to front by the distance of their centers from the camera,
+ * and its LightSettings.fog_distance.
  *
  * A view that sees more than BOX_RENDER_FOG_VOLUMES_MAX keeps the nearest and warns once.
  * Views without a view entity, unlit views and cameras without a depth range get none. The
@@ -379,6 +381,59 @@ void box_render_fog_views(
     box_render_fog_t *fog,
     box_render_packet_t *p,
     box_render_lights_stats_t *stats);
+
+/** Resolve LightSettings.fog_distance: 0 is BOX_FROXEL_DISTANCE_DEFAULT, else at least
+ * BOX_FROXEL_DISTANCE_MIN.
+ *
+ * @param distance LightSettings.fog_distance
+ * @return World units the froxel grid of the view reaches beyond its near plane
+ */
+float box_render_fog_distance(
+    float distance);
+
+/** Get the size of the froxel grid of the fog volumes of a view of a render size: one cell per
+ * tile of max(BOX_FROXEL_TILE_MIN, ceil(edge / BOX_FROXEL_CELLS_MAX)) pixels, edge the larger
+ * of width and height, so the grid has at most BOX_FROXEL_CELLS_MAX cells along it.
+ *
+ * @param width Render width in pixels
+ * @param height Render height in pixels
+ * @param out Receives the cells across, the cells down and the tile edge in pixels
+ */
+void box_render_froxel_grid(
+    int32_t width,
+    int32_t height,
+    int32_t *out);
+
+/** Get the view depth at a share of the depth of a froxel grid, froxel_depth of froxel.wgsl:
+ * exponential from the near plane for a perspective camera (BOX_FROXEL_EXPONENT), linear for an
+ * orthographic one.
+ *
+ * @param share Share of the depth of the grid, 0 at the near plane and 1 at its far end
+ * @param near_ View depth of the near plane
+ * @param far_ View depth of the far end of the grid, near_ plus the fog distance
+ * @param ortho Whether the camera is orthographic
+ * @return The view depth
+ */
+float box_render_froxel_depth(
+    float share,
+    float near_,
+    float far_,
+    bool ortho);
+
+/** Get the share of the depth of a froxel grid of a view depth, the inverse of
+ * box_render_froxel_depth, clamped to 0..1; froxel_share of froxel.wgsl.
+ *
+ * @param depth The view depth
+ * @param near_ View depth of the near plane
+ * @param far_ View depth of the far end of the grid
+ * @param ortho Whether the camera is orthographic
+ * @return The share
+ */
+float box_render_froxel_share(
+    float depth,
+    float near_,
+    float far_,
+    bool ortho);
 
 /** Give every view with a tree on in BvhDebug the boxes of those trees of the spatial index of
  * the scene of its camera, after the boxes of the views before it.

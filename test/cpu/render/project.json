@@ -138,7 +138,10 @@
                     "offset_wraps",
                     "offset_negative_wind",
                     "offset_zero_wind",
-                    "offset_record"
+                    "offset_record",
+                    "fog_distance",
+                    "froxel_grid_size",
+                    "froxel_slices"
                 ]
             },
             {

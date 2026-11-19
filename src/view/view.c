@@ -37,6 +37,7 @@ static void box_view_ctor(
         values[i].lighting.depth_prepass = true;
         values[i].lighting.atmosphere = true;
         values[i].lighting.fog_volumes = true;
+        values[i].lighting.fog_distance = 100.0f;
         values[i].lighting.environment.intensity = 1.0f;
         values[i].shadows = (ShadowSettings){
             .cascades = 4,
