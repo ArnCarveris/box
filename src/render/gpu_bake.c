@@ -649,6 +649,8 @@ static void box_gpu_bake_draws(
                 .mesh = m->id,
                 .vertex_offset = m->offset,
                 .vertex_size = m->vertex_size,
+                .data_offset = m->data_offset,
+                .data_size = m->data_size,
                 .index_offset = m->index_offset,
                 .index_size = m->index_size
             };
@@ -1033,6 +1035,12 @@ static WGPURenderBundle box_gpu_bake_bundle(
 
         wgpuRenderBundleEncoderSetVertexBuffer(
             e, 0, draw->buffer, draw->vertex_offset, draw->vertex_size);
+        if (draw->data_size) {
+            wgpuRenderBundleEncoderSetVertexBuffer(
+                e, 2, draw->buffer, draw->data_offset, draw->data_size);
+            box_gpu_count(gpu, BOX_GPU_STAT_DATA_BIND);
+        }
+
         wgpuRenderBundleEncoderSetVertexBuffer(e, 1, b->slots, first * sizeof(uint32_t),
             (uint64_t)draw->count * sizeof(uint32_t));
         wgpuRenderBundleEncoderSetIndexBuffer(

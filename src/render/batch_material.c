@@ -121,10 +121,12 @@ uint8_t box_draws_blend(
 
 bool box_draws_scene_cutout(
     const AlphaCutoff *cutoff,
+    const VertexReveal *reveal,
     const Shape2D *shape2d,
     uint32_t features)
 {
-    return box_draws_cutout(cutoff, shape2d) && (features & BOX_RENDER_FEATURE_ALPHA_CUTOUT);
+    return (box_draws_cutout(cutoff, shape2d) || (reveal && !shape2d)) &&
+        (features & BOX_RENDER_FEATURE_ALPHA_CUTOUT);
 }
 
 uint8_t box_draws_scene_blend(
@@ -672,6 +674,56 @@ void box_draws_texture_scroll(
     out[3] = scroll ? box_draws_scroll_axis(scroll->normal_velocity[1], time) : 0.0f;
 }
 
+/** Convert a positive float to a half float, rounded toward zero, the largest half for one
+ * above its range and 0 for one below it.
+ *
+ * @param value The value, positive and finite
+ * @return The bits of the half float
+ */
+static uint32_t box_draws_half(
+    float value)
+{
+    uint32_t bits, result = 0u;
+    ecs_os_memcpy(&bits, &value, ECS_SIZEOF(bits));
+    int32_t exponent = (int32_t)((bits >> 23) & 0xFFu) - 127 + 15;
+    uint32_t mantissa = (bits & 0x7FFFFFu) | 0x800000u;
+    if (exponent >= 31) {
+        result = 0x7BFFu;
+    } else if (exponent > 0) {
+        result = ((uint32_t)exponent << 10) | ((bits >> 13) & 0x3FFu);
+    } else if (exponent > -10) {
+        result = mantissa >> (14 - exponent);
+    }
+
+    return result;
+}
+
+/** Pack a VertexReveal into the reveal bits of the flags and the threshold of a material record,
+ * after the wind fields, which set the flags.
+ *
+ * @param out The record
+ * @param reveal The VertexReveal, NULL for none
+ */
+static void box_draws_reveal_pack(
+    box_render_material_t *out,
+    const VertexReveal *reveal)
+{
+    out->reveal_threshold = 0.0f;
+    if (!reveal || reveal->channel < 0 || reveal->channel > 7) {
+        goto done;
+    }
+
+    float softness = isfinite(reveal->softness) && reveal->softness > 0.0f
+        ? reveal->softness : 0.0f;
+    out->reveal_threshold = isfinite(reveal->threshold) ? reveal->threshold : 0.0f;
+    out->flags |= BOX_RENDER_REVEAL_PRESENT |
+        ((uint32_t)reveal->channel << BOX_RENDER_REVEAL_CHANNEL_SHIFT) |
+        (reveal->invert ? BOX_RENDER_REVEAL_INVERT : 0u) |
+        (box_draws_half(softness) << BOX_RENDER_REVEAL_SOFTNESS_SHIFT);
+done:
+    return;
+}
+
 void box_draws_material_pack(
     box_render_material_t *out,
     const box_draw_material_t *material)
@@ -721,6 +773,7 @@ void box_draws_material_pack(
     }
 
     box_render_wind_pack(out, material->sway, &material->wind);
+    box_draws_reveal_pack(out, material->shape2d ? NULL : material->reveal);
     out->transmission_factor = transmission ? transmission->transmission_factor : 0.0f;
     out->ior = transmission ? transmission->ior : BOX_MATERIAL_IOR;
     out->thickness_factor = transmission ? glm_max(transmission->thickness_factor, 0.0f) : 0.0f;

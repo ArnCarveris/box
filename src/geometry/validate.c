@@ -9,6 +9,7 @@
 
 #include "paths.h"
 #include <math.h>
+#include <stdio.h>
 
 /** Check that an entity holds a usable 2D or 3D path.
  *
@@ -529,6 +530,67 @@ done:
     return true;
 }
 
+/** Check that a per vertex member of a Mesh3 is empty or has one value per vertex.
+ *
+ * @param member The member
+ * @param vertices Number of vertices
+ * @param name Name of the member
+ * @param reason Buffer the reason is written to
+ * @param size Bytes of the buffer
+ * @return The reason, NULL when the member is valid
+ */
+static const char* box_validate_mesh3_member(
+    const ecs_vec_t *member,
+    int32_t vertices,
+    const char *name,
+    char *reason,
+    size_t size)
+{
+    const char *result = NULL;
+    int32_t count = ecs_vec_count(member);
+    if (count && count != vertices) {
+        snprintf(reason, size, "%s has %d values for %d vertices; give one per vertex or none, "
+            "it is ignored", name, count, vertices);
+        result = reason;
+    }
+
+    return result;
+}
+
+/** Validate hook for Mesh3: the colors, data0 and data1 are empty or have one value per vertex.
+ *
+ * @param world The world
+ * @param entity The entity being validated
+ * @param ptr Pointer to the component value
+ * @return Always true; problems are only logged
+ */
+static bool box_validate_mesh3_hook(
+    ecs_world_t *world,
+    ecs_entity_t entity,
+    void *ptr)
+{
+    const Mesh3 *mesh = ptr;
+    char buf[160];
+    if (!mesh) {
+        goto done;
+    }
+
+    int32_t vertices = ecs_vec_count(&mesh->vertices);
+    const char *reason = box_validate_mesh3_member(&mesh->colors, vertices, "colors",
+        buf, sizeof(buf));
+    if (!reason) {
+        reason = box_validate_mesh3_member(&mesh->data0, vertices, "data0", buf, sizeof(buf));
+    }
+
+    if (!reason) {
+        reason = box_validate_mesh3_member(&mesh->data1, vertices, "data1", buf, sizeof(buf));
+    }
+
+    box_validate_report(world, entity, "Mesh3", reason);
+done:
+    return true;
+}
+
 void box_geometry_validation_init(
     ecs_world_t *world)
 {
@@ -542,4 +604,5 @@ void box_geometry_validation_init(
     ecs_set_hooks(world, BeveledPrism, {.on_validate = box_validate_prism_hook});
     ecs_set_hooks(world, Bevel, {.on_validate = box_validate_bevel_hook});
     ecs_set_hooks(world, ShapeMesh, {.on_validate = box_validate_mesh_hook});
+    ecs_set_hooks(world, Mesh3, {.on_validate = box_validate_mesh3_hook});
 }

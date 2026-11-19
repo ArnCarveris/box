@@ -805,30 +805,6 @@ void box_gpu_draw_fini(
     }
 }
 
-/** Compute the box around the vertex positions of a mesh.
- *
- * @param m The mesh
- * @param vertices The vertices
- * @param count Number of vertices
- */
-static void box_gpu_mesh_bounds(
-    box_gpu_mesh_t *m,
-    const box_vertex_t *vertices,
-    uint32_t count)
-{
-    vec3 lo, hi;
-    uint32_t i;
-    glm_vec3_copy(ECS_CONST_CAST(float*, vertices[0].position), lo);
-    glm_vec3_copy(lo, hi);
-    for (i = 1; i < count; i ++) {
-        glm_vec3_minv(lo, ECS_CONST_CAST(float*, vertices[i].position), lo);
-        glm_vec3_maxv(hi, ECS_CONST_CAST(float*, vertices[i].position), hi);
-    }
-
-    glm_vec3_center(lo, hi, m->center);
-    glm_vec3_sub(hi, m->center, m->extent);
-}
-
 void box_gpu_mesh_apply(
     box_gpu_t *gpu,
     box_render_resource_op_t op,
@@ -866,7 +842,10 @@ void box_gpu_mesh_apply(
     const uint8_t *vertices = (const uint8_t*)(desc + 1);
     uint64_t vertex_span = (vertex_size + BOX_GPU_MESH_ALIGN - 1) &
         ~(uint64_t)(BOX_GPU_MESH_ALIGN - 1);
-    uint64_t alloc_size = vertex_span + index_size;
+    uint64_t data_size = desc->data ? (uint64_t)desc->vertex_count * 2 * sizeof(vec4) : 0;
+    uint64_t data_span = (data_size + BOX_GPU_MESH_ALIGN - 1) &
+        ~(uint64_t)(BOX_GPU_MESH_ALIGN - 1);
+    uint64_t alloc_size = vertex_span + data_span + index_size;
     if (alloc_size > limits.maxBufferSize) {
         ecs_err("surface mesh exceeds device buffer capacity");
         goto done;
@@ -882,7 +861,9 @@ void box_gpu_mesh_apply(
     m->buffer = box_gpu_mesh_pool_buffer(gpu, m->page);
     m->alloc_size = alloc_size;
     m->vertex_size = vertex_size;
-    m->index_offset = m->offset + vertex_span;
+    m->data_offset = m->offset + vertex_span;
+    m->data_size = data_size;
+    m->index_offset = m->offset + vertex_span + data_span;
     m->index_size = index_size;
     m->id = ++ gpu->mesh_ids;
     m->wireable = vertex_size <= limits.maxStorageBufferBindingSize &&
@@ -901,6 +882,11 @@ void box_gpu_mesh_apply(
     wgpuQueueWriteBuffer(gpu->queue, m->buffer, m->offset, vertices, (size_t)vertex_size);
     wgpuQueueWriteBuffer(gpu->queue, m->buffer, m->index_offset, vertices + vertex_size,
         (size_t)index_size);
+    if (data_size) {
+        wgpuQueueWriteBuffer(gpu->queue, m->buffer, m->data_offset, vertices + vertex_size +
+            index_size + (uint64_t)desc->surface_asset_count * sizeof(vec4), (size_t)data_size);
+    }
+
     box_gpu_debug_mesh_adjacency(gpu, m, (const box_vertex_t*)vertices, desc->vertex_count,
         (const uint32_t*)(vertices + vertex_size));
     ecs_map_insert_ptr(&gpu->meshes, handle, m);

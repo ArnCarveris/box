@@ -128,7 +128,7 @@ fn lit(f: VertexOut, shaded: Surface) -> vec4f {
 
 @fragment fn fs_cutout(f: VertexOut, @builtin(front_facing) front: bool) -> @location(0) vec4f {
     let s = surface(f, front);
-    if (s.alpha < vo_scalars(f).x) {
+    if (cut_out(f, s.alpha)) {
         discard;
     }
 
@@ -146,7 +146,7 @@ fn lit(f: VertexOut, shaded: Surface) -> vec4f {
     let geometric = normalize(f.normal);
     let b = blend_fragment(f);
     let albedo = blend_fragment_albedo(b);
-    if (f.color.a * albedo.a < vo_scalars(f).x) {
+    if (cut_out(f, f.color.a * albedo.a)) {
         discard;
     }
 
@@ -179,7 +179,7 @@ fn layered(f: VertexOut, front: bool, s: Surface, maps: texture_2d_array<f32>, f
     -> @location(0) vec4f
 {
     let s = surface(f, front);
-    if (s.alpha < vo_scalars(f).x) {
+    if (cut_out(f, s.alpha)) {
         discard;
     }
 
@@ -205,7 +205,7 @@ fn layered(f: VertexOut, front: bool, s: Surface, maps: texture_2d_array<f32>, f
     let geometric = normalize(f.normal);
     let b = blend_fragment(f);
     let albedo = blend_fragment_albedo(b);
-    if (f.color.a * albedo.a < vo_scalars(f).x) {
+    if (cut_out(f, f.color.a * albedo.a)) {
         discard;
     }
 

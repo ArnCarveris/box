@@ -33,7 +33,11 @@
                     "inherited_invalid_surface_child",
                     "negative_bevel_rims",
                     "infinite_bevel_rims",
-                    "profile_segments"
+                    "profile_segments",
+                    "mesh3_data_valid",
+                    "mesh3_data0_count",
+                    "mesh3_data1_count",
+                    "mesh3_colors_count"
                 ]
             },
             {
@@ -338,7 +342,14 @@
                     "prefab_instance_override",
                     "prefab_update",
                     "prefab_delete",
-                    "prefab_remove"
+                    "prefab_remove",
+                    "data",
+                    "data_one_stream",
+                    "no_data",
+                    "data_count_mismatch",
+                    "data_derived_normals",
+                    "data_cache_key",
+                    "data_prefab_instances_share"
                 ]
             },
             {
@@ -379,7 +390,9 @@
                     "star",
                     "star_cache_shared",
                     "custom_without_lod",
-                    "custom_lod"
+                    "custom_lod",
+                    "custom_data",
+                    "vertex_data_builder"
                 ]
             },
             {

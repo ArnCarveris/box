@@ -549,7 +549,9 @@ void BoxGeometryImport(
         BOX_OWNED_VEC(Mesh3, normals, vec3),
         BOX_OWNED_VEC(Mesh3, uvs, vec2),
         BOX_OWNED_VEC(Mesh3, indices, uint32_t),
-        BOX_OWNED_VEC(Mesh3, colors, rgba));
+        BOX_OWNED_VEC(Mesh3, colors, rgba),
+        BOX_OWNED_VEC(Mesh3, data0, vec4),
+        BOX_OWNED_VEC(Mesh3, data1, vec4));
     ECS_META_COMPONENT(world, Box);
     ECS_META_COMPONENT(world, Quad);
     ECS_META_COMPONENT(world, Triangle);

@@ -1384,6 +1384,9 @@ done:
 
 /** Record one indirect draw of a mesh over a run of visible slots.
  *
+ * A mesh with per vertex data binds its data stream in vertex buffer slot 2; a level of detail
+ * without data of a batch whose mesh has it does not draw, as its pipeline reads the stream.
+ *
  * @param gpu The backend
  * @param pass The render pass
  * @param b The batch
@@ -1414,7 +1417,8 @@ static bool box_gpu_cull_draw_mesh(
     box_gpu_mesh_t *m = ecs_map_get_deref(&gpu->meshes, box_gpu_mesh_t, handle);
     WGPUBindGroup instances = m
         ? box_gpu_instance_group(gpu, b->instances, handle, m, shading) : NULL;
-    bool result = m && instances && args != UINT32_MAX;
+    bool result = m && instances && args != UINT32_MAX &&
+        (m->data_size || !box_gpu_vertex_data(gpu, b));
     if (!result) {
         goto done;
     }
@@ -1435,6 +1439,11 @@ static bool box_gpu_cull_draw_mesh(
         wgpuRenderPassEncoderSetVertexBuffer(pass, 0, m->buffer, m->offset, m->vertex_size);
         c->mesh_vertices = m->buffer;
         c->mesh_vertex_offset = m->offset;
+    }
+
+    if (m->data_size) {
+        wgpuRenderPassEncoderSetVertexBuffer(pass, 2, m->buffer, m->data_offset, m->data_size);
+        box_gpu_count(gpu, BOX_GPU_STAT_DATA_BIND);
     }
 
     wgpuRenderPassEncoderSetVertexBuffer(pass, 1, ecs_vec_get_t(&c->pages,

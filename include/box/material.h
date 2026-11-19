@@ -790,6 +790,32 @@ ECS_STRUCT(TextureScroll, {
                            *   only, on top of velocity */
 });
 
+/** Hides the parts of a 3D mesh whose per vertex data channel is below a threshold, a material
+ * component inherited by instances like Rgb, default channel 0, threshold 0, softness 0, not
+ * inverted.
+ *
+ * channel picks one of the 8 floats of the per vertex data of the mesh (Mesh3.data0 channels 0
+ * to 3, data1 channels 4 to 7, box_mesh_vertex_data). Across a triangle the value of the channel
+ * is interpolated between its vertices; where it is below threshold (above with invert) the
+ * fragment is discarded. softness widens the edge into a dithered band of softness channel
+ * units above the threshold, in which ever more pixels are kept. A part whose vertices are all
+ * below the threshold is not drawn at all; a value equal to the threshold is on the edge.
+ *
+ * The shapes draw in the alpha tested path (as with an AlphaCutoff, so a scene needs
+ * Scene.alpha_cutout), in the depth prepass, the forward pass, the shadows of every light,
+ * planar reflections and captures alike. The threshold is in the material record: writing it
+ * animates every shape that shares the material without rebuilding meshes or moving shapes
+ * between batches. A mesh without per vertex data, a 2D shape and text ignore it.
+ */
+ECS_STRUCT(VertexReveal, {
+    int32_t channel;        /**< Data channel 0 to 7: data0.x to data0.w, then data1.x to
+                             *   data1.w; out of range reveals everything */
+    float threshold;        /**< Value below which the mesh is hidden */
+    float softness;         /**< Width in channel units of the dithered edge above the threshold,
+                             *   0 for a hard edge */
+    bool invert;            /**< Hide above the threshold instead, the edge below it */
+});
+
 /** Height of a constructed WindSway: world units above base at which the bend is full */
 #define BOX_MATERIAL_SWAY_HEIGHT (1.0f)
 

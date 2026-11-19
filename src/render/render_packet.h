@@ -1147,6 +1147,9 @@ typedef struct box_render_mesh_desc_t {
     uint32_t surface_asset_count; /**< Surface asset vec4s after the indices */
     uint32_t vertex_count;  /**< Vertices after the description */
     uint32_t index_count;   /**< Indices after the vertices */
+    uint32_t data;          /**< 1 when two vec4 of per vertex data per vertex (box_mesh_t.data)
+                             *   follow the surface assets, uploaded as a vertex stream of its
+                             *   own; 0 for a mesh without data, which uploads and binds none */
 } box_render_mesh_desc_t;
 
 /** Description of a BOX_RENDER_TEXTURE create, followed by its RGBA8 pixels row by row, or its
@@ -1691,9 +1694,26 @@ typedef struct box_render_material_t {
                              *   without one */
     float wind_flutter_phase; /**< WindSway.flutter_frequency times the time of the wind wrapped
                              *   to 0..1, 0 without one */
-    uint32_t wind_flags;    /**< BOX_RENDER_WIND_PRESENT with a WindSway, 0 without one */
-    float wind_pad;         /**< Pads the record to the 16 byte alignment of Material */
+    uint32_t flags;         /**< BOX_RENDER_WIND_PRESENT with a WindSway; with a VertexReveal
+                             *   whose channel is 0..7 BOX_RENDER_REVEAL_PRESENT, maybe
+                             *   BOX_RENDER_REVEAL_INVERT, the channel at
+                             *   BOX_RENDER_REVEAL_CHANNEL_SHIFT and its softness (0 when
+                             *   negative or not finite) as a half float in the high 16 bits;
+                             *   0 without either */
+    float reveal_threshold; /**< VertexReveal.threshold, 0 without one or when not finite */
 } box_render_material_t;
+
+/** Flag of a record with a VertexReveal (box_render_material_t.flags) */
+#define BOX_RENDER_REVEAL_PRESENT (1u << 1)
+
+/** Flag of a VertexReveal record that hides above the threshold (VertexReveal.invert) */
+#define BOX_RENDER_REVEAL_INVERT (1u << 2)
+
+/** Bit of the flags at which the data channel of a VertexReveal record starts, 3 bits */
+#define BOX_RENDER_REVEAL_CHANNEL_SHIFT (3)
+
+/** Bit of the flags at which the softness of a VertexReveal record starts, a half float */
+#define BOX_RENDER_REVEAL_SOFTNESS_SHIFT (16)
 
 /** Smallest WaterCaustics.scale and depth of a record */
 #define BOX_RENDER_CAUSTICS_MIN (1e-3f)

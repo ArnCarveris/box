@@ -353,3 +353,94 @@ void Validation_profile_segments(void)
     Validation_logs(world, "invalid Loft on subject: closed path needs at least three distinct points");
     ecs_fini(world);
 }
+
+/** Set a Mesh3 of one triangle on an entity with a number of colors, data0 and data1 values.
+ *
+ * @param world The world
+ * @param e The entity
+ * @param colors Number of colors
+ * @param data0 Number of data0 values
+ * @param data1 Number of data1 values
+ */
+static void Validation_mesh3_set(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    int32_t colors,
+    int32_t data0,
+    int32_t data1)
+{
+    Mesh3 m = {0};
+    ecs_vec_init_t(NULL, &m.vertices, vec3, 3);
+    ecs_vec_set_count_t(NULL, &m.vertices, vec3, 3);
+    vec3 *p = ecs_vec_first_t(&m.vertices, vec3);
+    for (int i = 0; i < 3; i ++) {
+        glm_vec3_copy((vec3){ (float)(i == 1), (float)(i == 2), 0.0f }, p[i]);
+    }
+
+    if (colors) {
+        ecs_vec_init_t(NULL, &m.colors, rgba, colors);
+        ecs_vec_set_count_t(NULL, &m.colors, rgba, colors);
+        ecs_os_memset(ecs_vec_first(&m.colors), 255, colors * ECS_SIZEOF(rgba));
+    }
+
+    if (data0) {
+        ecs_vec_init_t(NULL, &m.data0, vec4, data0);
+        ecs_vec_set_count_t(NULL, &m.data0, vec4, data0);
+        ecs_os_memset(ecs_vec_first(&m.data0), 0, data0 * ECS_SIZEOF(vec4));
+    }
+
+    if (data1) {
+        ecs_vec_init_t(NULL, &m.data1, vec4, data1);
+        ecs_vec_set_count_t(NULL, &m.data1, vec4, data1);
+        ecs_os_memset(ecs_vec_first(&m.data1), 0, data1 * ECS_SIZEOF(vec4));
+    }
+
+    ecs_set_ptr(world, e, Mesh3, &m);
+    ecs_vec_fini_t(NULL, &m.vertices, vec3);
+    ecs_vec_fini_t(NULL, &m.colors, rgba);
+    ecs_vec_fini_t(NULL, &m.data0, vec4);
+    ecs_vec_fini_t(NULL, &m.data1, vec4);
+}
+
+void Validation_mesh3_data_valid(void)
+{
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t entity = ecs_entity(world, {.name = "subject"});
+    Validation_mesh3_set(world, entity, 3, 3, 3);
+    ecs_entity_t session = ecs_shell_session_init(world, NULL);
+    char *out = box_command_run(world, session, "logs error 20", NULL);
+    test_str(out, "");
+    ecs_os_free(out);
+    ecs_fini(world);
+}
+
+void Validation_mesh3_data0_count(void)
+{
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t entity = ecs_entity(world, {.name = "subject"});
+    Validation_mesh3_set(world, entity, 0, 2, 0);
+    Validation_logs(world, "invalid Mesh3 on subject: data0 has 2 values for 3 vertices");
+    ecs_fini(world);
+}
+
+void Validation_mesh3_data1_count(void)
+{
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t entity = ecs_entity(world, {.name = "subject"});
+    Validation_mesh3_set(world, entity, 0, 3, 4);
+    Validation_logs(world, "invalid Mesh3 on subject: data1 has 4 values for 3 vertices");
+    ecs_fini(world);
+}
+
+void Validation_mesh3_colors_count(void)
+{
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t entity = ecs_entity(world, {.name = "subject"});
+    Validation_mesh3_set(world, entity, 1, 0, 0);
+    Validation_logs(world, "invalid Mesh3 on subject: colors has 1 values for 3 vertices");
+    ecs_fini(world);
+}

@@ -320,6 +320,8 @@ typedef struct box_draw_material_t {
                                  *   (box_draws_water_caustics_frame), 0 for still water */
     const WindSway *sway;       /**< Wind sway of a 3D shape, ignored by 2D shapes */
     box_render_wind_t wind;     /**< Wind of the frame the sway is packed with, read with sway */
+    const VertexReveal *reveal; /**< Hides the parts of a 3D mesh by its per vertex data, ignored
+                                 *   by 2D shapes */
     const Tint *tint;           /**< Tint of the shape itself, applied after the inherited */
     const box_draw_tint_t *inherited; /**< Composed tints of the ancestors, NULL for none */
     const Shape2D *shape2d;     /**< Resolved 2D shape, NULL for a 3D shape */
@@ -387,6 +389,8 @@ typedef struct box_draw_transition_material_t {
     float caustics_frame[2]; /**< Offset of the water frame of the caustics in cells */
     WindSway sway;          /**< WindSway, which has no transition: the record keeps it */
     bool swayed;            /**< The material has a WindSway */
+    VertexReveal reveal;    /**< VertexReveal, which has no transition: the record keeps it */
+    bool revealed;          /**< The material has a VertexReveal */
     box_render_wind_t wind; /**< Wind of the frame the sway was packed with */
     Opacity opacity;        /**< Opacity of the shape itself */
     Tint tint;              /**< Tint of the shape itself */
@@ -2217,16 +2221,19 @@ bool box_draws_cutout(
     const AlphaCutoff *cutoff,
     const Shape2D *shape2d);
 
-/** Check whether a shape is alpha tested in its scene: box_draws_cutout, for a 3D shape only
- * when its scene has BOX_RENDER_FEATURE_ALPHA_CUTOUT.
+/** Check whether a shape is alpha tested in its scene: box_draws_cutout or a 3D shape with a
+ * VertexReveal, which discards in the alpha tested path, only when its scene has
+ * BOX_RENDER_FEATURE_ALPHA_CUTOUT.
  *
  * @param cutoff The AlphaCutoff of the shape, NULL for none
+ * @param reveal The VertexReveal of the shape, NULL for none
  * @param shape2d The resolved 2D shape, NULL for a 3D shape
  * @param features BOX_RENDER_FEATURE_* features of the scene of a 3D shape
  * @return Whether its fragments are tested against the cutoff
  */
 bool box_draws_scene_cutout(
     const AlphaCutoff *cutoff,
+    const VertexReveal *reveal,
     const Shape2D *shape2d,
     uint32_t features);
 

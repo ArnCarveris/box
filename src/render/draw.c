@@ -855,7 +855,8 @@ static void box_draws_key(
     ecs_os_memset_t(key, 0, box_draw_key_t);
     key->scene = box_draws_scene(world, d, e);
     key->features = shape2d ? 0u : box_render_scene_features(world, key->scene);
-    key->cutout = box_draws_scene_cutout(ecs_get(world, e, AlphaCutoff), shape2d, key->features);
+    key->cutout = box_draws_scene_cutout(ecs_get(world, e, AlphaCutoff),
+        ecs_get(world, e, VertexReveal), shape2d, key->features);
     key->blend = box_draws_scene_blend(ecs_get(world, e, BlendMode), fading ? 0.0f : alpha,
         key->cutout, shape2d, key->features);
     key->back_face = back_face ? (uint8_t)*back_face : (uint8_t)BackFaceCull;
@@ -973,7 +974,8 @@ static void box_draws_key_blend(
 {
     bool fading = ecs_has_id(world, e, TransitionOpacity);
     bool planet_light = key->features & BOX_RENDER_FEATURE_PLANET_LIGHT;
-    key->cutout = box_draws_scene_cutout(material->cutoff, NULL, key->features);
+    key->cutout = box_draws_scene_cutout(material->cutoff, material->reveal, NULL,
+        key->features);
     key->blend = box_draws_scene_blend(ecs_get(world, e, BlendMode),
         fading ? 0.0f : box_draws_alpha(material), key->cutout, NULL, key->features);
     key->planet = 0;
@@ -1009,8 +1011,8 @@ static bool box_draws_blend_kept(
     bool result = key->transmissive;
     if (!result) {
         bool fading = ecs_has_id(world, e, TransitionOpacity);
-        bool cutout = box_draws_scene_cutout(material->cutoff, material->shape2d,
-            key->features);
+        bool cutout = box_draws_scene_cutout(material->cutoff, material->reveal,
+            material->shape2d, key->features);
         result = cutout == key->cutout && box_draws_scene_blend(ecs_get(world, e, BlendMode),
             fading ? 0.0f : box_draws_alpha(material), cutout, material->shape2d,
             key->features) == key->blend;
@@ -1124,6 +1126,7 @@ static void box_draws_update_shape(
             material = (box_draw_material_t){
                 .opacity = faded ? ecs_get(world, e, Opacity) : NULL,
                 .cutoff = faded ? ecs_get(world, e, AlphaCutoff) : NULL,
+                .reveal = faded ? ecs_get(world, e, VertexReveal) : NULL,
                 .tint = faded ? ecs_get(world, e, Tint) : NULL,
                 .inherited = s->tinted ? &s->tint : NULL, .fade = s->fade
             };
@@ -1293,6 +1296,10 @@ void box_draws_shape_material(
         .inherited = s->tinted ? &s->tint : NULL,
         .fade = s->fade
     };
+    if (!out->shape2d) {
+        out->reveal = ecs_get(world, e, VertexReveal);
+    }
+
     if (out->shape2d) {
         out->border = ecs_get(world, e, Border);
         out->border_radius = out->border && out->shape2d->kind == BOX_SHAPE2D_RECT &&

@@ -143,6 +143,8 @@ static void box_gpu_feature_constants(
  * layers module of the mesh shader (shader, box_render_mesh_layers) with the layers layouts
  * (box_gpu_layer_pipeline_layout), fs_water_layers for water; ignored by the 2D shape shader
  * and for the other transmissive pipelines
+ * @param data Whether the mesh has per vertex data: the vs_data and vs_surface_data entry points
+ * read it from a third vertex buffer (box_gpu_vertex_data); ignored by the 2D shape shader
  * @param range Whether the instances have a DrawRange (the draw_range constant of both stages
  * of the mesh shaders), which dithers their fades; ignored by the 2D shape shader
  * @return The pipeline
@@ -168,6 +170,7 @@ static WGPURenderPipeline box_gpu_forward_create(
     bool mirrored,
     bool wind,
     bool layers,
+    bool data,
     bool range)
 {
     bool shape2d = handle == BOX_RENDER_SHADER_SHAPE2D;
@@ -183,6 +186,7 @@ static WGPURenderPipeline box_gpu_forward_create(
     equal = equal && !transmissive && !shape2d;
     cutout = cutout && !shape2d && !transmissive && !equal;
     surface = surface && !shape2d;
+    data = data && !shape2d;
     const char *entry = box_shadow ? (polygon ? "fs_shadow_polygon" : "fs_shadow") :
         polygon ? "fs_polygon" : slice ? "fs_slice" : cutout ? "fs_cutout" : "fs";
     if (texture_blend) {
@@ -211,8 +215,9 @@ static WGPURenderPipeline box_gpu_forward_create(
     WGPUVertexAttribute slot_attr = {
         .format = WGPUVertexFormat_Uint32, .offset = 0, .shaderLocation = 3
     };
+    WGPUVertexAttribute data_attrs[2];
     WGPUBlendState blend_state;
-    WGPUVertexBufferLayout buffers[2] = {
+    WGPUVertexBufferLayout buffers[3] = {
         {
             .stepMode = WGPUVertexStepMode_Vertex,
             .arrayStride = sizeof(box_vertex_t),
@@ -226,6 +231,7 @@ static WGPURenderPipeline box_gpu_forward_create(
             .attributes = &slot_attr
         }
     };
+    buffers[2] = box_gpu_vertex_data_layout(data_attrs);
     box_gpu_blend_state(shape2d && blend == Opaque ? AlphaBlend : blend, &blend_state);
     WGPUColorTargetState target = {
         .format = format,
@@ -318,10 +324,14 @@ static WGPURenderPipeline box_gpu_forward_create(
             : texture_blend ? gpu->blend_mesh_layout : gpu->mesh_layout,
         .vertex = {
             .module = shader,
-            .entryPoint = { .data = surface ? "vs_surface" : "vs", .length = WGPU_STRLEN },
+            .entryPoint = {
+                .data = surface ? (data ? "vs_surface_data" : "vs_surface")
+                    : (data ? "vs_data" : "vs"),
+                .length = WGPU_STRLEN
+            },
             .constantCount = shape2d ? 1 : mesh ? (size_t)vertex_count : 0,
             .constants = shape2d ? &vertex_constant : mesh ? vertex_constants : NULL,
-            .bufferCount = 2,
+            .bufferCount = data ? 3 : 2,
             .buffers = buffers
         },
         .primitive = {
@@ -360,6 +370,8 @@ static WGPURenderPipeline box_gpu_forward_create(
  * the forward pipeline of the batch does (material_wind)
  * @param layers Whether the batch binds the layers group of TextureLayers (the layers layouts);
  * the prepass does not apply the layers, which do not change the alpha
+ * @param data Whether the alpha tested vertex stage reads the per vertex data of the mesh for
+ * its VertexReveal (vs_cutout_data, vs_cutout_surface_data); ignored without cutout
  * @param range Whether the instances have a DrawRange: both stages have the draw_range override
  * and a plain batch discards with fs_depth_range (fs_count_range)
  * @return The pipeline
@@ -374,6 +386,7 @@ static WGPURenderPipeline box_gpu_prepass_create(
     WGPUTextureFormat count,
     bool wind,
     bool layers,
+    bool data,
     bool range)
 {
     WGPUConstantEntry vertex_constants[2];
@@ -400,6 +413,11 @@ static WGPURenderPipeline box_gpu_prepass_create(
         : (counts ? "fs_count_cutout" : "fs_depth_cutout");
     const char *vertex = cutout ? (surface ? "vs_cutout_surface" : "vs_cutout")
         : (surface ? "vs_depth_surface" : "vs_depth");
+    data = data && cutout;
+    if (data) {
+        vertex = surface ? "vs_cutout_surface_data" : "vs_cutout_data";
+    }
+
     WGPUVertexAttribute vertex_attrs[3] = {
         { .format = WGPUVertexFormat_Float32x3, .offset = 0, .shaderLocation = 0 },
         { .format = WGPUVertexFormat_Float32x3, .offset = 12, .shaderLocation = 1 },
@@ -408,7 +426,8 @@ static WGPURenderPipeline box_gpu_prepass_create(
     WGPUVertexAttribute slot_attr = {
         .format = WGPUVertexFormat_Uint32, .offset = 0, .shaderLocation = 3
     };
-    WGPUVertexBufferLayout buffers[2] = {
+    WGPUVertexAttribute data_attrs[2];
+    WGPUVertexBufferLayout buffers[3] = {
         {
             .stepMode = WGPUVertexStepMode_Vertex,
             .arrayStride = sizeof(box_vertex_t),
@@ -422,6 +441,7 @@ static WGPURenderPipeline box_gpu_prepass_create(
             .attributes = &slot_attr
         }
     };
+    buffers[2] = box_gpu_vertex_data_layout(data_attrs);
     WGPUBlendState add = {
         .color = {
             .operation = WGPUBlendOperation_Add,
@@ -462,7 +482,7 @@ static WGPURenderPipeline box_gpu_prepass_create(
             .entryPoint = { .data = vertex, .length = WGPU_STRLEN },
             .constantCount = vertex_count,
             .constants = vertex_count ? vertex_constants : NULL,
-            .bufferCount = 2,
+            .bufferCount = data ? 3 : 2,
             .buffers = buffers
         },
         .primitive = {
@@ -488,8 +508,8 @@ typedef enum box_gpu_depth_mode_t {
 
 /** Pack the state a forward or depth prepass pipeline is created for into its cache key.
  *
- * @param shader Shader handle, below 2^12
- * @param format Format of the color target, below 2^21, Undefined for a depth prepass, the count
+ * @param shader Shader handle, below 2^11
+ * @param format Format of the color target, below 2^20, Undefined for a depth prepass, the count
  * format for an overdraw count
  * @param blend BlendMode, below 16
  * @param back_face BackFaceMode, of which the pipeline only tells BackFaceCull from the rest
@@ -511,6 +531,7 @@ typedef enum box_gpu_depth_mode_t {
  * override)
  * @param layers Whether the pipeline applies TextureLayers or, for a depth prepass, has their
  * layouts
+ * @param data Whether the vertex stage reads the per vertex data stream (box_gpu_vertex_data)
  * @param range Whether the pipeline dithers the DrawRange of the instances (the draw_range
  * override)
  * @return The key, distinct for every distinct pipeline
@@ -531,13 +552,15 @@ static uint64_t box_gpu_forward_key(
     bool distortion,
     bool wind,
     bool layers,
+    bool data,
     bool range)
 {
     ecs_assert((uint32_t)format < (1u << 20), ECS_INTERNAL_ERROR, NULL);
-    ecs_assert(shader < (1u << 12), ECS_INTERNAL_ERROR, NULL);
+    ecs_assert(shader < (1u << 11), ECS_INTERNAL_ERROR, NULL);
     ecs_assert(features <= BOX_RENDER_OVERRIDE_SCENE, ECS_INTERNAL_ERROR, NULL);
 
-    return ((uint64_t)shader << 52) | ((uint64_t)distortion << 51) | ((uint64_t)water << 50) |
+    return ((uint64_t)shader << 53) | ((uint64_t)data << 52) | ((uint64_t)distortion << 51) |
+        ((uint64_t)water << 50) |
         ((uint64_t)surface << 49) | ((uint64_t)mirrored << 48) | ((uint64_t)features << 33) |
         ((uint64_t)texture_blend << 32) |
         ((uint64_t)transmissive << 31) | ((uint64_t)wind << 30) | ((uint64_t)layers << 29) |
@@ -625,7 +648,7 @@ WGPURenderPipeline box_gpu_forward_pipeline_mirrored(
     WGPUShaderModule shader;
     ecs_map_val_t *cached;
     uint64_t key;
-    bool texture_blend, cutout, surface, water, distortion, wind, layers, range;
+    bool texture_blend, cutout, surface, water, distortion, wind, layers, data, range;
     if (b->blend > Max) {
         goto done;
     }
@@ -645,6 +668,7 @@ WGPURenderPipeline box_gpu_forward_pipeline_mirrored(
     distortion = b->transmissive && b->pipeline == BOX_RENDER_SHADER_MESH_EXTENDED &&
         (b->features & BOX_RENDER_FEATURE_DISTORTION);
     wind = mesh && b->wind;
+    data = mesh && box_gpu_vertex_data(gpu, b);
     range = mesh && box_render_batch_ranged(b);
 
     key = box_gpu_forward_key(b->pipeline, format, b->blend, b->back_face,
@@ -652,7 +676,7 @@ WGPURenderPipeline box_gpu_forward_pipeline_mirrored(
         shape2d ? b->slice : b->transmissive,
         shape2d ? b->polygon : texture_blend, surface,
         equal ? BOX_GPU_DEPTH_EQUAL : BOX_GPU_DEPTH_GREATER, features, mirrored, water,
-        distortion, wind, layers, range);
+        distortion, wind, layers, data, range);
     cached = ecs_map_get(&gpu->forward, key);
     if (cached && *cached) {
         result = (WGPURenderPipeline)(uintptr_t)*cached;
@@ -662,7 +686,7 @@ WGPURenderPipeline box_gpu_forward_pipeline_mirrored(
     result = box_gpu_forward_cache(gpu, key, box_gpu_forward_create(gpu, b->pipeline, shader,
         format, b->blend, b->back_face, cutout, b->transmissive, water, distortion, equal,
         b->box_shadow,
-        b->slice, texture_blend, b->polygon, surface, features, mirrored, wind, layers,
+        b->slice, texture_blend, b->polygon, surface, features, mirrored, wind, layers, data,
         range));
 done:
     return result;
@@ -686,18 +710,19 @@ WGPURenderPipeline box_gpu_prepass_pipeline(
     WGPUShaderModule shader = box_gpu_shader_get(gpu, b->pipeline);
     ecs_map_val_t *cached;
     uint64_t key;
-    bool texture_blend, layers, range;
+    bool texture_blend, layers, data, range;
     if (!shader) {
         goto done;
     }
 
     texture_blend = box_gpu_texture_blends(b);
     layers = box_gpu_layered(b);
+    data = b->cutout && box_gpu_vertex_data(gpu, b);
     range = box_render_batch_ranged(b);
     key = box_gpu_forward_key(b->pipeline, count, Opaque, b->back_face, b->cutout,
         false, texture_blend, b->surface,
         count != WGPUTextureFormat_Undefined ? BOX_GPU_DEPTH_COUNT : BOX_GPU_DEPTH_PREPASS, 0,
-        false, false, false, b->wind, layers, range);
+        false, false, false, b->wind, layers, data, range);
     cached = ecs_map_get(&gpu->forward, key);
     if (cached && *cached) {
         result = (WGPURenderPipeline)(uintptr_t)*cached;
@@ -706,7 +731,7 @@ WGPURenderPipeline box_gpu_prepass_pipeline(
 
     result = box_gpu_forward_cache(gpu, key,
         box_gpu_prepass_create(gpu, shader, b->back_face, b->cutout, texture_blend, b->surface,
-            count, b->wind, layers, range));
+            count, b->wind, layers, data, range));
 done:
     return result;
 }

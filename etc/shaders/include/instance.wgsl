@@ -36,3 +36,11 @@ fn instance_frame(t: InstanceTransform, model: mat4x4f) -> mat4x4f {
     }
     return result;
 }
+
+// Per vertex data of a mesh that has it (Mesh3.data0 and data1, box_mesh_vertex_data), a vertex
+// stream of its own that only the _data entry points read: the pipelines of the batches whose
+// mesh has data (box_gpu_vertex_data) bind it as the third vertex buffer.
+struct VertexData {
+    @location(4) data0: vec4f,
+    @location(5) data1: vec4f,
+};

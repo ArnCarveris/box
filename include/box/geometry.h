@@ -35,6 +35,8 @@ ECS_STRUCT(Mesh3, {
     ecs_vec(vec2) uvs;         /**< Texture coordinates, empty for zeros */
     ecs_vec(uint32_t) indices; /**< Three indices per triangle, empty to draw in order */
     ecs_vec(rgba) colors;      /**< Per vertex color and alpha, one per vertex or empty */
+    ecs_vec(vec4) data0;       /**< Per vertex data, channels 0 to 3, one per vertex or empty */
+    ecs_vec(vec4) data1;       /**< Per vertex data, channels 4 to 7, one per vertex or empty */
 });
 
 /** Box with size x, y, z */
@@ -701,6 +703,9 @@ typedef struct box_mesh_t {
     box_vertex_t *vertices;  /**< Vertex array */
     uint32_t *indices;       /**< Three indices per triangle */
     rgba *colors;            /**< One color per vertex, NULL when the mesh has none */
+    vec4 *data;              /**< Two vec4 of data per vertex, data0 then data1 (channels 0 to
+                              *   3 and 4 to 7), vertex_capacity pairs; NULL when the mesh has
+                              *   none, which costs the renderer nothing */
     vec4 *surface_assets;    /**< Surface vectors of a Sweep, Loft, Lathe or extrusion, NULL
                               *   for none */
     int32_t surface_asset_count; /**< Number of vectors in surface_assets */
@@ -884,6 +889,26 @@ int32_t box_mesh_vertex(
     const vec3 normal,
     float u,
     float v);
+
+/** Set the per vertex data of a vertex of a mesh (Mesh3.data0 and data1).
+ *
+ * The first call gives the mesh its data, zero for the vertices it does not set; a mesh
+ * without data (no call) uploads no data stream. Shaders read it in the vertex stage, a
+ * VertexReveal material hides the parts whose channel is below its threshold.
+ *
+ * A shape with levels of detail sets it at every level, as its levels draw with the pipelines
+ * of its level 0.
+ *
+ * @param mesh The mesh
+ * @param index The vertex, below vertex_count
+ * @param data0 Channels 0 to 3
+ * @param data1 Channels 4 to 7
+ */
+void box_mesh_vertex_data(
+    box_mesh_t *mesh,
+    int32_t index,
+    const vec4 data0,
+    const vec4 data1);
 
 /** Append a triangle, wound counter-clockwise around the normals of its vertices.
  *

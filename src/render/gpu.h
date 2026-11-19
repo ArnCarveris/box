@@ -575,6 +575,41 @@ uint32_t box_gpu_draw_kind(
     const box_render_batch_t *b,
     bool equal);
 
+/** Compute the box around the vertex positions of a mesh.
+ *
+ * @param m The mesh
+ * @param vertices The vertices
+ * @param count Number of vertices
+ */
+void box_gpu_mesh_bounds(
+    box_gpu_mesh_t *m,
+    const box_vertex_t *vertices,
+    uint32_t count);
+
+/** Check whether a batch draws with the per vertex data variants of the mesh pipelines: a
+ * batch of a mesh shader whose mesh has per vertex data (box_gpu_mesh_t.data_size).
+ *
+ * Its forward pipelines read the data stream in every vertex stage (the _data entry points),
+ * its alpha tested depth prepass and shadow pipelines too; the plain depth prepass and shadow
+ * pipelines do not read it. Its draws bind the data stream in vertex buffer slot 2.
+ *
+ * @param gpu The backend
+ * @param b The batch
+ * @return Whether its mesh has per vertex data
+ */
+bool box_gpu_vertex_data(
+    const box_gpu_t *gpu,
+    const box_render_batch_t *b);
+
+/** Vertex buffer layout of the per vertex data stream of the _data entry points of the mesh
+ * and shadow shaders: data0 at location 4 and data1 at location 5 (VertexData).
+ *
+ * @param attrs Receives the two attributes the layout points to
+ * @return The layout
+ */
+WGPUVertexBufferLayout box_gpu_vertex_data_layout(
+    WGPUVertexAttribute *attrs);
+
 /** Check whether a batch draws with the layers variants of the mesh pipelines: an opaque,
  * alpha tested or blended batch of a mesh shader with TextureLayers, not transmissive, or a
  * water batch with TextureLayers (fs_water_layers).

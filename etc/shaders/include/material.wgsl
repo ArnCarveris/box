@@ -113,9 +113,12 @@ struct Material {
     wind_flutter: f32,
     wind_reach: f32,
     wind_flutter_phase: f32,
-    // WIND_PRESENT with a WindSway, 0 without one
-    wind_flags: u32,
-    wind_pad: f32,
+    // WIND_PRESENT with a WindSway; REVEAL_PRESENT with a VertexReveal, REVEAL_INVERT, its data
+    // channel 0..7 at REVEAL_CHANNEL_SHIFT and its softness (0 for a hard edge) as a half float
+    // in the high 16 bits (unpack2x16float); 0 without either
+    flags: u32,
+    // VertexReveal threshold, 0 without one
+    reveal_threshold: f32,
 };
 
 // Smallest depth and visibility of a Water record (BOX_RENDER_WATER_MIN).
@@ -147,6 +150,46 @@ const DISTORTION_SHARP: u32 = 2u;
 // Below this weight a projection of a triplanar mapping is dropped and the others renormalized,
 // so a fragment whose normal is (nearly) along an axis samples once.
 const TRIPLANAR_MIN_WEIGHT: f32 = 0.01;
+
+// Flags of the VertexReveal of a record (BOX_RENDER_REVEAL_PRESENT, BOX_RENDER_REVEAL_INVERT)
+// and the bit its data channel starts at (BOX_RENDER_REVEAL_CHANNEL_SHIFT).
+const REVEAL_PRESENT: u32 = 2u;
+const REVEAL_INVERT: u32 = 4u;
+const REVEAL_CHANNEL_SHIFT: u32 = 3u;
+
+// Reveal edge of a vertex without a VertexReveal or without data: always drawn.
+const REVEAL_NONE: f32 = 1e4;
+
+// Smallest softness a reveal edge divides by, which makes a hard edge of a softness of 0.
+const REVEAL_HARD: f32 = 1e-5;
+
+// Reveal edge of a vertex of a VertexReveal material from its per vertex data: the distance of
+// its channel above the threshold (below it with REVEAL_INVERT) over the softness, which is
+// linear in the channel, so the interpolated edge is that of the interpolated channel. The
+// fragments with an edge below 0 are hidden, those above 1 drawn, those between dithered
+// (revealed). REVEAL_NONE for a material without one.
+fn reveal_edge(m: Material, data0: vec4f, data1: vec4f) -> f32 {
+    var result = REVEAL_NONE;
+    if ((m.flags & REVEAL_PRESENT) != 0u) {
+        let channel = (m.flags >> REVEAL_CHANNEL_SHIFT) & 7u;
+        let value = select(data0[channel & 3u], data1[channel & 3u], channel >= 4u);
+        var d = value - m.reveal_threshold;
+        if ((m.flags & REVEAL_INVERT) != 0u) {
+            d = -d;
+        }
+        result = d / max(unpack2x16float(m.flags).y, REVEAL_HARD);
+    }
+    return result;
+}
+
+// Whether a fragment with an interpolated reveal edge is drawn at a pixel: kept where the edge
+// is above an interleaved gradient noise of the pixel in 0..1, so a soft edge is dithered and a
+// hard one cut at the threshold.
+fn revealed(edge: f32, pixel: vec2f) -> bool {
+    let p = floor(pixel);
+    let dither = fract(52.9829189 * fract(0.06711056 * p.x + 0.00583715 * p.y));
+    return edge >= 0.0 && edge >= dither;
+}
 
 // Record of a material id; an id past the table reads the default material of slot 0.
 fn material_fetch(id: u32) -> Material {

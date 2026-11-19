@@ -90,6 +90,11 @@ void box_draws_transition_target(
         out->wind = material->wind;
     }
 
+    if (material->reveal) {
+        out->revealed = true;
+        out->reveal = *material->reveal;
+    }
+
     out->time = material->time;
 
     if (material->transmission) {
@@ -263,6 +268,7 @@ static void box_draws_transition_parts(
         .caustics_frame = { material->caustics_frame[0], material->caustics_frame[1] },
         .sway = material->swayed ? &material->sway : NULL,
         .wind = material->wind,
+        .reveal = material->revealed ? &material->reveal : NULL,
         .tint = box_draws_transition_part(material, BOX_RENDER_TRANSITION_TINT,
             &material->tint),
         .inherited = material->tinted ? &material->inherited : NULL,

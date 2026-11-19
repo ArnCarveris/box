@@ -915,8 +915,10 @@ static bool box_materials_slotted(
 }
 
 /** Check whether adding or removing a material component changes the batch key of the shapes
- * that have it: the alpha test, transmission, distortion, water, a PlanarReflection and the
- * material features of the extended mesh shader. A TextureMapping changes it when set too.
+ * that have it: the alpha test (AlphaCutoff, VertexReveal), transmission, distortion, water, a
+ * PlanarReflection and the material features of the extended mesh shader.
+ *
+ * A TextureMapping changes it when set too.
  *
  * @param component The component
  * @return Whether its OnAdd and OnRemove move the shapes to a new key
@@ -929,7 +931,7 @@ static bool box_materials_keyed(
         component == ecs_id(SpecularAnisotropy) || component == ecs_id(DiffuseTransmission) ||
         component == ecs_id(Fresnel) || component == ecs_id(Water) ||
         component == ecs_id(Distortion) || component == ecs_id(PlanarReflection) ||
-        component == ecs_id(WindSway);
+        component == ecs_id(WindSway) || component == ecs_id(VertexReveal);
 }
 
 /** Follow a set or removal of a material component on its owner, or on a base that propagates
@@ -984,20 +986,21 @@ void box_draws_materials_observers(
     ecs_world_t *world,
     box_render_draws_t *d)
 {
-    ecs_entity_t components[20] = {
+    ecs_entity_t components[21] = {
         ecs_id(Rgb), ecs_id(PbrMaterial), ecs_id(Emissive), ecs_id(TextureTransform),
         ecs_id(AlphaCutoff), ecs_id(Transmission), ecs_id(ClearCoat), ecs_id(SpecularAnisotropy),
         ecs_id(Sheen), ecs_id(DiffuseTransmission), ecs_id(TextureMapping), ecs_id(TextureScroll),
         ecs_id(Fresnel), ecs_id(Water), ecs_id(PlanarReflection), ecs_id(Distortion),
-        ecs_id(WaterWaves), ecs_id(WindSway), ecs_id(WaterCaustics), ecs_id(WaterFlow)
+        ecs_id(WaterWaves), ecs_id(WindSway), ecs_id(VertexReveal), ecs_id(WaterCaustics),
+        ecs_id(WaterFlow)
     };
-    const char *names[20] = {
+    const char *names[21] = {
         "DrawsOnColor", "DrawsOnPbrMaterial", "DrawsOnEmissive", "DrawsOnTextureTransform",
         "DrawsOnAlphaCutoff", "DrawsOnTransmission", "DrawsOnClearCoat",
         "DrawsOnSpecularAnisotropy", "DrawsOnSheen", "DrawsOnDiffuseTransmission",
         "DrawsOnTextureMapping", "DrawsOnTextureScroll", "DrawsOnFresnel", "DrawsOnWater",
         "DrawsOnPlanarReflection", "DrawsOnDistortion", "DrawsOnWaterWaves",
-        "DrawsOnWindSway", "DrawsOnWaterCaustics", "DrawsOnWaterFlow"
+        "DrawsOnWindSway", "DrawsOnVertexReveal", "DrawsOnWaterCaustics", "DrawsOnWaterFlow"
     };
     int32_t i;
     box_draws_observer(world, d, "MaterialsOnPrefab", (ecs_observer_desc_t){
@@ -1022,7 +1025,7 @@ void box_draws_materials_observers(
         .query.flags = EcsQueryMatchPrefab,
         .events = { EcsOnAdd, EcsOnRemove } }, BoxMaterialsOnIsA);
 
-    for (i = 0; i < 20; i ++) {
+    for (i = 0; i < 21; i ++) {
         bool keyed = box_materials_keyed(components[i]) || box_materials_slotted(components[i]);
         bool owned = components[i] == ecs_id(PlanarReflection);
         box_draws_observer(world, d, names[i], (ecs_observer_desc_t){
@@ -1061,6 +1064,7 @@ void box_draws_material_of(
         out->water = ecs_get(world, owner, Water);
         out->distortion = ecs_get(world, owner, Distortion);
         out->sway = ecs_get(world, owner, WindSway);
+        out->reveal = ecs_get(world, owner, VertexReveal);
         if (out->water) {
             out->waves = ecs_get(world, owner, WaterWaves);
             out->flow = ecs_get(world, owner, WaterFlow);

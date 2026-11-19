@@ -765,6 +765,9 @@ void box_gpu_count(
     case BOX_GPU_STAT_INSTANCE_BIND:
         gpu->pending.instance_binds ++;
         break;
+    case BOX_GPU_STAT_DATA_BIND:
+        gpu->pending.data_binds ++;
+        break;
     case BOX_GPU_STAT_CULL_DISPATCH:
         gpu->pending.cull_dispatches ++;
         break;
@@ -837,6 +840,7 @@ void box_gpu_stats_publish(
     s->transmission_textures += p->transmission_textures;
     s->forward_passes += p->forward_passes;
     s->instance_binds += p->instance_binds;
+    s->data_binds += p->data_binds;
     s->cull_dispatches += p->cull_dispatches;
     s->cull_instance_dispatches += p->cull_instance_dispatches;
     if (p->cull_page_slots > 0) {

@@ -36,7 +36,7 @@ struct WindMove {
 
 // Whether a material moves its vertices: it has a WindSway and the wind blows.
 fn wind_sways(m: Material) -> bool {
-    return (m.wind_flags & WIND_PRESENT) != 0u && m.wind_speed > 0.0;
+    return (m.flags & WIND_PRESENT) != 0u && m.wind_speed > 0.0;
 }
 
 // The move of a vertex at a world position of a shape whose origin is at origin, by the

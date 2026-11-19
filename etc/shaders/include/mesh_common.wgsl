@@ -153,7 +153,10 @@ struct VertexOut {
     @location(6) @interpolate(flat) flat2: vec4u,
     @location(7) @interpolate(flat) flat3: vec4u,
     @location(11) object: vec4f,
-    @location(14) object_normal: vec3f,
+    // xyz the normal mapping_uv projects (VertexShading.object_normal); w the reveal edge of a
+    // VertexReveal material of a mesh with per vertex data, passed on by the _data vertex
+    // stages (reveal_edge), REVEAL_NONE without one or without data.
+    @location(14) object_normal: vec4f,
     // Wrapped TextureScroll.normal_velocity offset of the material, added to the UVs of the
     // normal map only (normal_uv), 0 without material_texture_scroll
     @location(15) @interpolate(flat) normal_offset: vec2f,
@@ -535,7 +538,7 @@ fn vertex_out(p: Placed, material: Material, frame: ModelFrame, s: VertexShading
     o.flat3 = vec4u(pack2x16snorm(s.rotation.xy), pack2x16snorm(s.rotation.zw),
         bitcast<u32>(material.thickness_factor), bitcast<u32>(material.attenuation_distance));
     o.object = s.object;
-    o.object_normal = s.object_normal;
+    o.object_normal = vec4f(s.object_normal, REVEAL_NONE);
     o.uv = vec4f(s.uv, s.material);
     o.normal_offset = vec2f(0.0);
     if (material_texture_scroll) {
@@ -594,11 +597,14 @@ struct CutoutOut {
     @location(3) object: vec4f,
     @location(4) object_normal: vec3f,
     @location(5) @interpolate(flat) range: u32,
+    // Reveal edge of a VertexReveal material (reveal_edge), REVEAL_NONE without one or without
+    // per vertex data
+    @location(6) reveal: f32,
 };
 
 fn cutout_out(p: Placed, material: Material, s: VertexShading, range: u32) -> CutoutOut {
     return CutoutOut(p.pos, s.uv, s.color.a,
-        vertex_scalars(material, s.mapped), s.object, s.object_normal, range);
+        vertex_scalars(material, s.mapped), s.object, s.object_normal, range, REVEAL_NONE);
 }
 
 fn depth_out(slot: u32, p: Placed) -> DepthOut {
@@ -611,6 +617,17 @@ fn range_discard(range: u32, pos: vec4f) {
     if (draw_range && !range_keeps(range, pos.xy)) {
         discard;
     }
+}
+
+// Whether the alpha test of the cutout entry points of the forward pass discards a fragment of
+// an alpha: below the cutoff of its material or hidden by its VertexReveal.
+fn cut_out(f: VertexOut, alpha: f32) -> bool {
+    return alpha < vo_scalars(f).x || !revealed(f.object_normal.w, f.pos.xy);
+}
+
+// Whether the alpha test of the depth prepass discards a fragment of an alpha, as cut_out.
+fn cut_out_depth(f: CutoutOut, alpha: f32) -> bool {
+    return alpha < cutout_scalars(f).x || !revealed(f.reveal, f.pos.xy);
 }
 
 fn cutout_scalars(f: CutoutOut) -> vec4f {
@@ -640,7 +657,7 @@ fn vertex_range_out(o: ptr<function, VertexOut>, v: VertexIn) {
     (*o).planar |= vertex_range(v.slot) << 16u;
 }
 
-@vertex fn vs(v: VertexIn) -> VertexOut {
+fn mesh_vertex(v: VertexIn) -> VertexOut {
     let shading = shadings[slot_of(v.slot)];
     let material = material_fetch(shading_material(shading));
     let p = placed_wind(v, place_mesh(v));
@@ -657,7 +674,11 @@ fn vertex_range_out(o: ptr<function, VertexOut>, v: VertexIn) {
     return o;
 }
 
-@vertex fn vs_surface(v: VertexIn) -> VertexOut {
+@vertex fn vs(v: VertexIn) -> VertexOut {
+    return mesh_vertex(v);
+}
+
+fn mesh_vertex_surface(v: VertexIn) -> VertexOut {
     let shading = shadings[slot_of(v.slot)];
     let material = material_fetch(shading_material(shading));
     let p = placed_wind(v, place(v));
@@ -674,6 +695,26 @@ fn vertex_range_out(o: ptr<function, VertexOut>, v: VertexIn) {
     return o;
 }
 
+@vertex fn vs_surface(v: VertexIn) -> VertexOut {
+    return mesh_vertex_surface(v);
+}
+
+// The vertex stages of the meshes with per vertex data (box_gpu_vertex_data): the reveal edge
+// of the data is passed on in VertexOut.object_normal.w.
+@vertex fn vs_data(v: VertexIn, d: VertexData) -> VertexOut {
+    var o = mesh_vertex(v);
+    let material = material_fetch(shading_material(shadings[slot_of(v.slot)]));
+    o.object_normal.w = reveal_edge(material, d.data0, d.data1);
+    return o;
+}
+
+@vertex fn vs_surface_data(v: VertexIn, d: VertexData) -> VertexOut {
+    var o = mesh_vertex_surface(v);
+    let material = material_fetch(shading_material(shadings[slot_of(v.slot)]));
+    o.object_normal.w = reveal_edge(material, d.data0, d.data1);
+    return o;
+}
+
 @vertex fn vs_depth(v: VertexIn) -> DepthOut {
     return depth_out(v.slot, placed_wind(v, place_mesh(v)));
 }
@@ -682,7 +723,7 @@ fn vertex_range_out(o: ptr<function, VertexOut>, v: VertexIn) {
     return depth_out(v.slot, placed_wind(v, place(v)));
 }
 
-@vertex fn vs_cutout(v: VertexIn) -> CutoutOut {
+fn cutout_vertex(v: VertexIn) -> CutoutOut {
     let shading = shadings[slot_of(v.slot)];
     let material = material_fetch(shading_material(shading));
     let p = placed_wind(v, place_mesh(v));
@@ -692,7 +733,11 @@ fn vertex_range_out(o: ptr<function, VertexOut>, v: VertexIn) {
         vertex_range(v.slot));
 }
 
-@vertex fn vs_cutout_surface(v: VertexIn) -> CutoutOut {
+@vertex fn vs_cutout(v: VertexIn) -> CutoutOut {
+    return cutout_vertex(v);
+}
+
+fn cutout_vertex_surface(v: VertexIn) -> CutoutOut {
     let shading = shadings[slot_of(v.slot)];
     let material = material_fetch(shading_material(shading));
     let p = placed_wind(v, place(v));
@@ -700,6 +745,25 @@ fn vertex_range_out(o: ptr<function, VertexOut>, v: VertexIn) {
     return cutout_out(p, material,
         vertex_shading_surface(v, shading, material, p, frame.scale, frame.normal),
         vertex_range(v.slot));
+}
+
+@vertex fn vs_cutout_surface(v: VertexIn) -> CutoutOut {
+    return cutout_vertex_surface(v);
+}
+
+// The alpha tested depth prepass of the meshes with per vertex data, with its reveal edge.
+@vertex fn vs_cutout_data(v: VertexIn, d: VertexData) -> CutoutOut {
+    var o = cutout_vertex(v);
+    let material = material_fetch(shading_material(shadings[slot_of(v.slot)]));
+    o.reveal = reveal_edge(material, d.data0, d.data1);
+    return o;
+}
+
+@vertex fn vs_cutout_surface_data(v: VertexIn, d: VertexData) -> CutoutOut {
+    var o = cutout_vertex_surface(v);
+    let material = material_fetch(shading_material(shadings[slot_of(v.slot)]));
+    o.reveal = reveal_edge(material, d.data0, d.data1);
+    return o;
 }
 
 struct DrawKind {
@@ -775,7 +839,7 @@ fn output(color: vec3f, alpha: f32) -> vec4f {
     range_discard(f.range, f.pos);
     let albedo = mapping_alpha(albedo_map, material_sampler, f.uv, cutout_scalars(f).w, f.object,
         f.object_normal);
-    if (f.alpha * albedo < cutout_scalars(f).x) {
+    if (cut_out_depth(f, f.alpha * albedo)) {
         discard;
     }
 }
@@ -784,7 +848,7 @@ fn output(color: vec3f, alpha: f32) -> vec4f {
     range_discard(f.range, f.pos);
     let albedo = mapping_alpha(albedo_map, material_sampler, f.uv, cutout_scalars(f).w, f.object,
         f.object_normal);
-    if (f.alpha * albedo < cutout_scalars(f).x) {
+    if (cut_out_depth(f, f.alpha * albedo)) {
         discard;
     }
 

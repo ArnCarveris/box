@@ -680,6 +680,7 @@ void BoxMaterialImport(
     ECS_META_COMPONENT(world, WaterRipples);
     ECS_META_COMPONENT(world, RippleSource);
     ECS_META_COMPONENT(world, WindSway);
+    ECS_META_COMPONENT(world, VertexReveal);
     ECS_META_COMPONENT(world, BlendMode);
     ECS_META_COMPONENT(world, BackFaceMode);
     ECS_META_COMPONENT(world, PbrTextures);
@@ -731,14 +732,15 @@ void BoxMaterialImport(
     ecs_add_pair(world, ecs_id(TextureBlend), EcsOnInstantiate, EcsInherit);
     ecs_add_pair(world, ecs_id(TextureLayers), EcsOnInstantiate, EcsInherit);
 
-    ecs_entity_t materials[16] = {
+    ecs_entity_t materials[17] = {
         ecs_id(Rgb), ecs_id(PbrMaterial), ecs_id(Emissive), ecs_id(TextureTransform),
         ecs_id(AlphaCutoff), ecs_id(Transmission), ecs_id(ClearCoat), ecs_id(SpecularAnisotropy),
         ecs_id(Sheen), ecs_id(DiffuseTransmission), ecs_id(TextureMapping), ecs_id(TextureScroll),
-        ecs_id(Fresnel), ecs_id(Water), ecs_id(Distortion), ecs_id(WindSway)
+        ecs_id(Fresnel), ecs_id(Water), ecs_id(Distortion), ecs_id(WindSway),
+        ecs_id(VertexReveal)
     };
     int32_t i;
-    for (i = 0; i < 16; i ++) {
+    for (i = 0; i < 17; i ++) {
         ecs_add_pair(world, materials[i], EcsOnInstantiate, EcsInherit);
         ecs_add_pair(world, materials[i], EcsWith, ecs_id(MaterialId));
     }

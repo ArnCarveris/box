@@ -581,3 +581,234 @@ void Mesh3_prefab_remove(void) {
 
     ecs_fini(world);
 }
+
+/** Make a Mesh3 of one triangle with per vertex data streams.
+ *
+ * @param m The mesh to fill, freed with Mesh3_fini
+ * @param data0 Values of data0, 0 for none
+ * @param data1 Values of data1, 0 for none
+ * @param normals Whether the triangle has normals, else they are derived per face
+ */
+static void Mesh3_data_triangle(
+    Mesh3 *m,
+    int32_t data0,
+    int32_t data1,
+    bool normals)
+{
+    *m = (Mesh3){0};
+    ecs_vec_init_t(NULL, &m->vertices, vec3, 3);
+    ecs_vec_set_count_t(NULL, &m->vertices, vec3, 3);
+    vec3 *p = ecs_vec_first_t(&m->vertices, vec3);
+    for (int i = 0; i < 3; i ++) {
+        glm_vec3_copy((vec3){ (float)(i == 1), (float)(i == 2), 0.0f }, p[i]);
+    }
+
+    if (normals) {
+        ecs_vec_init_t(NULL, &m->normals, vec3, 3);
+        ecs_vec_set_count_t(NULL, &m->normals, vec3, 3);
+        vec3 *n = ecs_vec_first_t(&m->normals, vec3);
+        for (int i = 0; i < 3; i ++) {
+            glm_vec3_copy((vec3){ 0.0f, 0.0f, 1.0f }, n[i]);
+        }
+    }
+
+    if (data0) {
+        ecs_vec_init_t(NULL, &m->data0, vec4, data0);
+        ecs_vec_set_count_t(NULL, &m->data0, vec4, data0);
+        vec4 *d = ecs_vec_first_t(&m->data0, vec4);
+        for (int i = 0; i < data0; i ++) {
+            glm_vec4_copy((vec4){ (float)i, 10.0f + (float)i, 20.0f, 30.0f }, d[i]);
+        }
+    }
+
+    if (data1) {
+        ecs_vec_init_t(NULL, &m->data1, vec4, data1);
+        ecs_vec_set_count_t(NULL, &m->data1, vec4, data1);
+        vec4 *d = ecs_vec_first_t(&m->data1, vec4);
+        for (int i = 0; i < data1; i ++) {
+            glm_vec4_copy((vec4){ 40.0f, 50.0f, 60.0f, 70.0f + (float)i }, d[i]);
+        }
+    }
+}
+
+/** Free the vectors of a Mesh3 made by Mesh3_data_triangle.
+ *
+ * @param m The mesh
+ */
+static void Mesh3_fini(
+    Mesh3 *m)
+{
+    ecs_vec_fini_t(NULL, &m->vertices, vec3);
+    ecs_vec_fini_t(NULL, &m->normals, vec3);
+    ecs_vec_fini_t(NULL, &m->data0, vec4);
+    ecs_vec_fini_t(NULL, &m->data1, vec4);
+}
+
+/** Get the cached mesh of the Mesh3 of an entity.
+ *
+ * @param world The world
+ * @param e The entity
+ * @return The mesh
+ */
+static const box_mesh_t* Mesh3_cached(
+    ecs_world_t *world,
+    ecs_entity_t e)
+{
+    const ShapeMesh *sm = ecs_get(world, e, ShapeMesh);
+    test_assert(sm != NULL);
+    const box_mesh_t *mesh = box_mesh_cache_get(box_mesh_cache_of(world), sm->mesh);
+    test_assert(mesh != NULL);
+
+    return mesh;
+}
+
+void Mesh3_data(void) {
+    // renderer/meshes
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxGeometry);
+    Mesh3 m;
+    Mesh3_data_triangle(&m, 3, 3, true);
+    ecs_entity_t e = ecs_new(world);
+    ecs_set_ptr(world, e, Mesh3, &m);
+    Mesh3_fini(&m);
+
+    const box_mesh_t *mesh = Mesh3_cached(world, e);
+    test_int(mesh->vertex_count, 3);
+    test_assert(mesh->data != NULL);
+    for (int i = 0; i < 3; i ++) {
+        test_flt(mesh->data[i * 2][0], (float)i);
+        test_flt(mesh->data[i * 2][1], 10.0f + (float)i);
+        test_flt(mesh->data[i * 2][3], 30.0f);
+        test_flt(mesh->data[i * 2 + 1][0], 40.0f);
+        test_flt(mesh->data[i * 2 + 1][3], 70.0f + (float)i);
+    }
+
+    ecs_fini(world);
+}
+
+void Mesh3_data_one_stream(void) {
+    // renderer/meshes
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxGeometry);
+    Mesh3 m;
+    Mesh3_data_triangle(&m, 0, 3, true);
+    ecs_entity_t e = ecs_new(world);
+    ecs_set_ptr(world, e, Mesh3, &m);
+    Mesh3_fini(&m);
+
+    const box_mesh_t *mesh = Mesh3_cached(world, e);
+    test_assert(mesh->data != NULL);
+    for (int i = 0; i < 3; i ++) {
+        for (int c = 0; c < 4; c ++) {
+            test_flt(mesh->data[i * 2][c], 0.0f);
+        }
+
+        test_flt(mesh->data[i * 2 + 1][3], 70.0f + (float)i);
+    }
+
+    ecs_fini(world);
+}
+
+void Mesh3_no_data(void) {
+    // renderer/meshes
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxGeometry);
+    Mesh3 m;
+    Mesh3_data_triangle(&m, 0, 0, true);
+    ecs_entity_t e = ecs_new(world);
+    ecs_set_ptr(world, e, Mesh3, &m);
+    Mesh3_fini(&m);
+
+    test_assert(Mesh3_cached(world, e)->data == NULL);
+    ecs_fini(world);
+}
+
+void Mesh3_data_count_mismatch(void) {
+    // renderer/meshes
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxGeometry);
+    Mesh3 m;
+    Mesh3_data_triangle(&m, 2, 0, true);
+    ecs_entity_t e = ecs_new(world);
+    int32_t level = ecs_log_set_level(-4);
+    ecs_set_ptr(world, e, Mesh3, &m);
+    ecs_log_set_level(level);
+    Mesh3_fini(&m);
+
+    const box_mesh_t *mesh = Mesh3_cached(world, e);
+    test_int(mesh->vertex_count, 3);
+    test_assert(mesh->data == NULL);
+    ecs_fini(world);
+}
+
+void Mesh3_data_derived_normals(void) {
+    // renderer/meshes
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxGeometry);
+    Mesh3 m;
+    Mesh3_data_triangle(&m, 3, 3, false);
+    ecs_entity_t e = ecs_new(world);
+    ecs_set_ptr(world, e, Mesh3, &m);
+    Mesh3_fini(&m);
+
+    const box_mesh_t *mesh = Mesh3_cached(world, e);
+    test_int(mesh->vertex_count, 3);
+    test_assert(mesh->data != NULL);
+    for (int i = 0; i < 3; i ++) {
+        uint32_t v = mesh->indices[i];
+        test_flt(mesh->data[v * 2][0], (float)i);
+        test_flt(mesh->data[v * 2 + 1][3], 70.0f + (float)i);
+        test_flt(mesh->vertices[v].normal[2], 1.0f);
+    }
+
+    ecs_fini(world);
+}
+
+void Mesh3_data_cache_key(void) {
+    // renderer/meshes
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxGeometry);
+    Mesh3 plain, data, other;
+    Mesh3_data_triangle(&plain, 0, 0, true);
+    Mesh3_data_triangle(&data, 3, 0, true);
+    Mesh3_data_triangle(&other, 3, 0, true);
+    ecs_vec_first_t(&other.data0, vec4)[1][2] = 99.0f;
+    ecs_entity_t e1 = ecs_new(world);
+    ecs_entity_t e2 = ecs_new(world);
+    ecs_entity_t e3 = ecs_new(world);
+    ecs_entity_t e4 = ecs_new(world);
+    ecs_set_ptr(world, e1, Mesh3, &plain);
+    ecs_set_ptr(world, e2, Mesh3, &data);
+    ecs_set_ptr(world, e3, Mesh3, &data);
+    ecs_set_ptr(world, e4, Mesh3, &other);
+    Mesh3_fini(&plain);
+    Mesh3_fini(&data);
+    Mesh3_fini(&other);
+
+    uint32_t m1 = ecs_get(world, e1, ShapeMesh)->mesh;
+    uint32_t m2 = ecs_get(world, e2, ShapeMesh)->mesh;
+    uint32_t m3 = ecs_get(world, e3, ShapeMesh)->mesh;
+    uint32_t m4 = ecs_get(world, e4, ShapeMesh)->mesh;
+    test_assert(m1 != m2);
+    test_uint(m2, m3);
+    test_assert(m2 != m4);
+    ecs_fini(world);
+}
+
+void Mesh3_data_prefab_instances_share(void) {
+    // renderer/meshes
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxGeometry);
+    Mesh3 m;
+    Mesh3_data_triangle(&m, 3, 3, true);
+    ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
+    ecs_set_ptr(world, prefab, Mesh3, &m);
+    Mesh3_fini(&m);
+    ecs_entity_t i1 = ecs_new_w_pair(world, EcsIsA, prefab);
+    ecs_entity_t i2 = ecs_new_w_pair(world, EcsIsA, prefab);
+
+    test_uint(ecs_get(world, i1, ShapeMesh)->mesh, ecs_get(world, i2, ShapeMesh)->mesh);
+    test_assert(Mesh3_cached(world, i1)->data != NULL);
+    test_flt(Mesh3_cached(world, i1)->data[2][1], 11.0f);
+    ecs_fini(world);
+}

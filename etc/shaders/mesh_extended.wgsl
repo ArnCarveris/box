@@ -130,7 +130,7 @@ fn tangent_along(v: vec3f, n: vec3f) -> vec3f {
 fn triplanar(f: VertexOut, geometric: vec3f) -> Layers {
     let dx = dpdx(f.object);
     let dy = dpdy(f.object);
-    let n = f.object_normal;
+    let n = f.object_normal.xyz;
     let w = mapping_weights(n, vo_scalars(f).w - 1.0);
     let s = mapping_signs(n);
     let dominant = mapping_axis(n);
@@ -206,7 +206,7 @@ fn blend_sample(uv: vec2f, gx: vec2f, gy: vec2f, w: vec4f, maps: bool) -> BlendS
 fn blend_triplanar(f: VertexOut, geometric: vec3f, front: bool) -> Layers {
     let dx = dpdx(f.object);
     let dy = dpdy(f.object);
-    let n = f.object_normal;
+    let n = f.object_normal.xyz;
     let w = mapping_weights(n, vo_scalars(f).w - 1.0);
     let s = mapping_signs(n);
     let dominant = mapping_axis(n);
@@ -798,7 +798,7 @@ fn transmission(f: VertexOut, s: Surface, v: vec3f, reflected: Lit) -> vec4f {
 fn water_uv(f: VertexOut) -> vec2f {
     var uv = f.uv.xy;
     if (vo_scalars(f).w != 0.0) {
-        uv = mapping_uv(f.object, f.object_normal, f.uv.xy);
+        uv = mapping_uv(f.object, f.object_normal.xyz, f.uv.xy);
     }
     return uv;
 }
@@ -1464,7 +1464,7 @@ fn lit(f: VertexOut, shaded: Surface) -> vec4f {
 
 @fragment fn fs_cutout(f: VertexOut, @builtin(front_facing) front: bool) -> @location(0) vec4f {
     let s = surface(f, front);
-    if (s.alpha < vo_scalars(f).x) {
+    if (cut_out(f, s.alpha)) {
         discard;
     }
 
@@ -1485,14 +1485,14 @@ fn lit(f: VertexOut, shaded: Surface) -> vec4f {
     } else {
         let b = blend_fragment(f);
         let albedo = blend_fragment_albedo(b);
-        if (f.color.a * albedo.a < vo_scalars(f).x) {
+        if (cut_out(f, f.color.a * albedo.a)) {
             discard;
         }
         layers = blend_maps(geometric, b, albedo, front);
     }
 
     let s = surface_of(f, front, geometric, layers);
-    if (s.alpha < vo_scalars(f).x) {
+    if (cut_out(f, s.alpha)) {
         discard;
     }
 
@@ -1557,7 +1557,7 @@ fn layered(f: VertexOut, front: bool, s: Surface, maps: texture_2d_array<f32>, f
     -> @location(0) vec4f
 {
     let s = surface(f, front);
-    if (s.alpha < vo_scalars(f).x) {
+    if (cut_out(f, s.alpha)) {
         discard;
     }
 
@@ -1596,7 +1596,7 @@ fn layered(f: VertexOut, front: bool, s: Surface, maps: texture_2d_array<f32>, f
     } else {
         let b = blend_fragment(f);
         let albedo = blend_fragment_albedo(b);
-        if (f.color.a * albedo.a < vo_scalars(f).x) {
+        if (cut_out(f, f.color.a * albedo.a)) {
             discard;
         }
         layers = blend_maps(geometric, b, albedo, front);
@@ -1604,7 +1604,7 @@ fn layered(f: VertexOut, front: bool, s: Surface, maps: texture_2d_array<f32>, f
     }
 
     let s = surface_of(f, front, geometric, layers);
-    if (s.alpha < vo_scalars(f).x) {
+    if (cut_out(f, s.alpha)) {
         discard;
     }
 

@@ -1201,6 +1201,16 @@
                 ]
             },
             {
+                "id": "VertexReveal",
+                "testcases": [
+                    "defaults",
+                    "pack",
+                    "mesh_upload",
+                    "batches",
+                    "threshold_animates"
+                ]
+            },
+            {
                 "id": "TextureLayers",
                 "testcases": [
                     "defaults",

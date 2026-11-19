@@ -72,6 +72,9 @@ typedef struct box_render_gpu_stats_t {
     int32_t instance_binds;     /**< Instance bind groups set in the cull, depth prepass,
                                  *   forward, shadow and capture passes, only when the page or
                                  *   surface assets differ from the ones bound last in the pass */
+    int32_t data_binds;         /**< Per vertex data streams bound in the depth prepass,
+                                 *   forward, shadow and capture passes, one per draw of a mesh
+                                 *   with data (Mesh3.data0, data1); never for a mesh without */
     int32_t cull_dispatches;    /**< Compute dispatches the cull passes of views recorded:
                                  *   cull_instances, cull_ordered, cull_scan and cull_write,
                                  *   not the pyramid reductions nor the probe capture culls */

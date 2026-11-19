@@ -67,8 +67,14 @@
 /** Shadow pipelines made on first use per kind of tile (box_gpu_shadow_variant): the alpha
  * tested one with a TextureBlend and the three of the parametric surfaces, then the same six of
  * the casters with a WindSway (plain, alpha tested, with a TextureBlend, of meshes then of
- * surfaces), then those twelve of the casters with a DrawRange (draw_range) */
-#define BOX_GPU_SHADOW_VARIANTS (22)
+ * surfaces).
+ *
+ * Then those twelve of the casters with a DrawRange (draw_range).
+ *
+ * Then the alpha tested ones of the meshes with per vertex data, which read it for a
+ * VertexReveal (with and without a TextureBlend, of meshes then of surfaces, without then with
+ * a WindSway), without then with a DrawRange */
+#define BOX_GPU_SHADOW_VARIANTS (38)
 
 /** Color format of the HDR target a view with effects renders into */
 #define BOX_GPU_HDR_FORMAT (WGPUTextureFormat_RGBA16Float)
@@ -167,6 +173,10 @@ typedef struct box_gpu_mesh_t {
     uint64_t vertex_size;           /**< Bytes of the vertices */
     uint64_t index_offset;          /**< Offset of the indices in the page buffer */
     uint64_t index_size;            /**< Bytes of the indices */
+    uint64_t data_offset;           /**< Offset of the per vertex data stream in the page
+                                     *   buffer, two vec4 per vertex, after the vertices */
+    uint64_t data_size;             /**< Bytes of the per vertex data stream, 0 for a mesh
+                                     *   without data, whose draws bind no data stream */
     uint64_t id;                    /**< Id unique to this mesh, unlike its reusable handle */
     uint32_t index_count;           /**< Indices to draw */
     WGPUBindGroup wire;             /**< Vertices and indices as the storage buffers of a wire
@@ -1328,6 +1338,7 @@ typedef enum box_gpu_stat_t {
     BOX_GPU_STAT_FORWARD_PASS,      /**< A forward render pass of a view was begun */
     BOX_GPU_STAT_SCATTER,           /**< A scatter dispatch was recorded */
     BOX_GPU_STAT_INSTANCE_BIND,     /**< An instance bind group was set in a pass or bundle */
+    BOX_GPU_STAT_DATA_BIND,         /**< A per vertex data stream was bound in a pass or bundle */
     BOX_GPU_STAT_CULL_DISPATCH,     /**< A dispatch of the cull pass of a view was recorded */
     BOX_GPU_STAT_CULL_INSTANCES,    /**< A cull_instances dispatch of a view was recorded */
     BOX_GPU_STAT_SHADOW_TILE,       /**< A shadow atlas tile was rendered */

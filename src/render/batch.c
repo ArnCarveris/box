@@ -1708,8 +1708,8 @@ static void box_draws_fill_material(
             }
         }
 
-        bool cutout = box_draws_scene_cutout(material.cutoff, material.shape2d,
-            b->key.features);
+        bool cutout = box_draws_scene_cutout(material.cutoff,
+            ecs_get(it->world, it->entities[i], VertexReveal), material.shape2d, b->key.features);
         uint8_t blend = box_draws_scene_blend(box_draws_at(modes, mode_step, i), alpha, cutout,
             material.shape2d, b->key.features);
         if (!b->key.transmissive && (blend != b->key.blend || cutout != b->key.cutout)) {

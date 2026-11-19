@@ -437,6 +437,16 @@
                 ]
             },
             {
+                "id": "VertexData",
+                "testcases": [
+                    "draws_same_without",
+                    "no_data_binds_nothing",
+                    "reveal_thresholds",
+                    "reveal_channel_invert",
+                    "reveal_soft_edge"
+                ]
+            },
+            {
                 "id": "TextureScroll",
                 "testcases": [
                     "shifts_checker",

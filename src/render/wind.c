@@ -160,8 +160,8 @@ void box_render_wind_pack(
         out->wind_flutter = 0.0f;
         out->wind_reach = 0.0f;
         out->wind_flutter_phase = 0.0f;
-        out->wind_flags = 0u;
-        out->wind_pad = 0.0f;
+        out->flags = 0u;
+        out->reveal_threshold = 0.0f;
         goto done;
     }
 
@@ -182,8 +182,8 @@ void box_render_wind_pack(
     out->wind_reach = isfinite(sway->flutter_reach)
         ? glm_max(sway->flutter_reach, BOX_RENDER_WIND_MIN) : BOX_MATERIAL_SWAY_FLUTTER_REACH;
     out->wind_flutter_phase = box_wind_wrap_float(frequency * wind->time, 1.0);
-    out->wind_flags = BOX_RENDER_WIND_PRESENT;
-    out->wind_pad = 0.0f;
+    out->flags = BOX_RENDER_WIND_PRESENT;
+    out->reveal_threshold = 0.0f;
 done:
     return;
 }

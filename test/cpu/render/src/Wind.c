@@ -453,12 +453,12 @@ void Wind_pack(void) {
     box_draws_material_pack(&record, &(box_draw_material_t){ .fade = 1 });
     test_flt(record.wind_speed, 0);
     test_flt(record.wind_bend, 0);
-    test_uint(record.wind_flags, 0);
-    test_flt(record.wind_pad, 0);
+    test_uint(record.flags, 0);
+    test_flt(record.reveal_threshold, 0);
     plain = record;
     test_int(ECS_SIZEOF(box_render_material_t), 256);
     test_int(offsetof(box_render_material_t, wind_direction), 192);
-    test_int(offsetof(box_render_material_t, wind_flags), 248);
+    test_int(offsetof(box_render_material_t, flags), 248);
 
     /* A wind without a WindSway changes nothing */
     box_render_wind_t wind = {
@@ -486,7 +486,7 @@ void Wind_pack(void) {
     test_flt(record.wind_flutter, 0.1f);
     test_flt(record.wind_reach, 0.5f);
     test_flt(record.wind_flutter_phase, 0.75f);
-    test_uint(record.wind_flags, BOX_RENDER_WIND_PRESENT);
+    test_uint(record.flags, BOX_RENDER_WIND_PRESENT);
 
     /* The other fields are those of the plain record */
     box_render_material_t other = record;
@@ -636,13 +636,13 @@ void Wind_batches(void) {
 
     /* The record of the swaying shape holds the wind, that of the plain one none */
     const box_render_material_t *r = wind_record(world, tree);
-    test_uint(r->wind_flags, BOX_RENDER_WIND_PRESENT);
+    test_uint(r->flags, BOX_RENDER_WIND_PRESENT);
     test_flt(r->wind_speed, 8);
     test_flt(r->wind_bend, 0.05f);
     const MaterialId *id = ecs_get(world, plain, MaterialId);
     if (id && id->value != UINT32_MAX) {
         r = wind_record(world, plain);
-        test_uint(r->wind_flags, 0);
+        test_uint(r->flags, 0);
         test_flt(r->wind_speed, 0);
     }
 
@@ -674,7 +674,7 @@ void Wind_batches(void) {
     test_bool(td->wind, false);
     test_flt(td->wind_reach, 0);
     r = wind_record(world, tree);
-    test_uint(r->wind_flags, 0);
+    test_uint(r->flags, 0);
     test_flt(r->wind_speed, 0);
     test_assert(td->max[0] < 3.5f + 0.01f);
 

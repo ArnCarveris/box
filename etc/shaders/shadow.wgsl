@@ -65,6 +65,8 @@ struct VertexIn {
 // The UV of a vertex, or for a MappingObject, MappingWorld or MappingFrame material (mapped 1 plus
 // its blend) the offset of its projection, with the object (world, frame) position and normal
 // mapping_uv projects, as mesh.wgsl has them.
+// reveal is the reveal edge of a VertexReveal material read from the per vertex data of the
+// _data entry points (reveal_edge), REVEAL_NONE without one or without data.
 struct CasterOut {
     @builtin(position) pos: vec4f,
     @location(0) uv: vec2f,
@@ -73,6 +75,7 @@ struct CasterOut {
     @location(3) @interpolate(flat) mapped: f32,
     @location(4) object: vec4f,
     @location(5) object_normal: vec3f,
+    @location(8) reveal: f32,
     // Dither code of the DrawRange of the caster with draw_range, 0 without
     @location(7) @interpolate(flat) range: u32,
 };
@@ -87,6 +90,7 @@ struct PointOut {
     @location(3) @interpolate(flat) mapped: f32,
     @location(4) object: vec4f,
     @location(5) object_normal: vec3f,
+    @location(8) reveal: f32,
 #ifdef BOX_SHADOW_CLIP_DISTANCES
     @builtin(clip_distances) clip: array<f32, 3>,
 #else
@@ -259,6 +263,7 @@ fn cutout_attributes(v: VertexIn, o: ptr<function, CasterOut>) {
     }
     (*o).alpha = shading.alpha;
     (*o).cutoff = material.cutoff;
+    (*o).reveal = REVEAL_NONE;
 }
 
 // position and normal: the object position and normal of the vertex.
@@ -306,6 +311,7 @@ fn cutout_attributes_mesh(v: VertexIn, o: ptr<function, CasterOut>) {
     }
     (*o).alpha = shading.alpha;
     (*o).cutoff = material.cutoff;
+    (*o).reveal = REVEAL_NONE;
 }
 
 @vertex fn vs(v: VertexIn) -> ShadowOut {
@@ -317,7 +323,7 @@ fn cutout_attributes_mesh(v: VertexIn, o: ptr<function, CasterOut>) {
     return ShadowOut(caster_position(slot_of(v.slot), v.position), caster_range(v.slot));
 }
 
-@vertex fn vs_cutout(v: VertexIn) -> CasterOut {
+fn caster_cutout(v: VertexIn) -> CasterOut {
     var o: CasterOut;
     o.range = caster_range(v.slot);
     o.pos = cascade.matrix * vec4f(caster_world_mesh(slot_of(v.slot), v.position), 1.0);
@@ -325,11 +331,39 @@ fn cutout_attributes_mesh(v: VertexIn, o: ptr<function, CasterOut>) {
     return o;
 }
 
-@vertex fn vs_cutout_surface(v: VertexIn) -> CasterOut {
+fn caster_cutout_surface(v: VertexIn) -> CasterOut {
     var o: CasterOut;
     o.range = caster_range(v.slot);
     o.pos = caster_position(slot_of(v.slot), v.position);
     cutout_attributes(v, &o);
+    return o;
+}
+
+// Reveal edge of a vertex of an alpha tested caster with per vertex data (reveal_edge).
+fn caster_reveal(v: VertexIn, d: VertexData) -> f32 {
+    return reveal_edge(material_fetch(shadings[slot_of(v.slot)].material & 0xFFFFFFu), d.data0,
+        d.data1);
+}
+
+@vertex fn vs_cutout(v: VertexIn) -> CasterOut {
+    return caster_cutout(v);
+}
+
+@vertex fn vs_cutout_surface(v: VertexIn) -> CasterOut {
+    return caster_cutout_surface(v);
+}
+
+// The alpha tested casters with per vertex data (box_gpu_vertex_data), which a VertexReveal
+// hides parts of.
+@vertex fn vs_cutout_data(v: VertexIn, d: VertexData) -> CasterOut {
+    var o = caster_cutout(v);
+    o.reveal = caster_reveal(v, d);
+    return o;
+}
+
+@vertex fn vs_cutout_surface_data(v: VertexIn, d: VertexData) -> CasterOut {
+    var o = caster_cutout_surface(v);
+    o.reveal = caster_reveal(v, d);
     return o;
 }
 
@@ -344,6 +378,13 @@ fn cutout_test(uv: vec2f, alpha: f32, cutoff: f32, mapped: f32, object: vec4f,
     }
 }
 
+// Discard where a VertexReveal hides the caster, as the alpha tested mesh pipelines do.
+fn reveal_test(reveal: f32, pixel: vec2f) {
+    if (!revealed(reveal, pixel)) {
+        discard;
+    }
+}
+
 @fragment fn fs() {
 }
 
@@ -353,6 +394,7 @@ fn cutout_test(uv: vec2f, alpha: f32, cutoff: f32, mapped: f32, object: vec4f,
 }
 
 @fragment fn fs_cutout(f: CasterOut) {
+    reveal_test(f.reveal, f.pos.xy);
     caster_dither(f.range, f.pos);
     cutout_test(f.uv, f.alpha, f.cutoff, f.mapped, f.object, f.object_normal);
 }
@@ -369,6 +411,7 @@ fn cutout_test_blend(uv: vec2f, alpha: f32, cutoff: f32, mapped: f32, object: ve
 }
 
 @fragment fn fs_cutout_blend(f: CasterOut) {
+    reveal_test(f.reveal, f.pos.xy);
     caster_dither(f.range, f.pos);
     cutout_test_blend(f.uv, f.alpha, f.cutoff, f.mapped, f.object, f.object_normal);
 }
@@ -393,6 +436,7 @@ fn point_out(world: vec3f, c: CasterOut) -> PointOut {
     o.mapped = c.mapped;
     o.object = c.object;
     o.object_normal = c.object_normal;
+    o.reveal = c.reveal;
     o.range = 0u;
     o.clip = octant_clip(world);
     return o;
@@ -408,27 +452,49 @@ fn point_out(world: vec3f, c: CasterOut) -> PointOut {
     return PointShadowOut(octant_position(world), octant_clip(world));
 }
 
-@vertex fn vs_point_cutout(v: VertexIn) -> PointOut {
+fn point_cutout(v: VertexIn) -> PointOut {
     let world = caster_world_mesh(slot_of(v.slot), v.position);
     var c: CasterOut;
     cutout_attributes_mesh(v, &c);
     return point_out(world, c);
 }
 
-@vertex fn vs_point_cutout_surface(v: VertexIn) -> PointOut {
+fn point_cutout_surface(v: VertexIn) -> PointOut {
     let world = caster_world(slot_of(v.slot), v.position);
     var c: CasterOut;
     cutout_attributes(v, &c);
     return point_out(world, c);
 }
 
+@vertex fn vs_point_cutout(v: VertexIn) -> PointOut {
+    return point_cutout(v);
+}
+
+@vertex fn vs_point_cutout_surface(v: VertexIn) -> PointOut {
+    return point_cutout_surface(v);
+}
+
+@vertex fn vs_point_cutout_data(v: VertexIn, d: VertexData) -> PointOut {
+    var o = point_cutout(v);
+    o.reveal = caster_reveal(v, d);
+    return o;
+}
+
+@vertex fn vs_point_cutout_surface_data(v: VertexIn, d: VertexData) -> PointOut {
+    var o = point_cutout_surface(v);
+    o.reveal = caster_reveal(v, d);
+    return o;
+}
+
 #ifdef BOX_SHADOW_CLIP_DISTANCES
 // The clip distances already kept the fragment to its octant.
 @fragment fn fs_point_cutout(f: CasterOut) {
+    reveal_test(f.reveal, f.pos.xy);
     cutout_test(f.uv, f.alpha, f.cutoff, f.mapped, f.object, f.object_normal);
 }
 
 @fragment fn fs_point_cutout_blend(f: CasterOut) {
+    reveal_test(f.reveal, f.pos.xy);
     cutout_test_blend(f.uv, f.alpha, f.cutoff, f.mapped, f.object, f.object_normal);
 }
 #else
@@ -444,11 +510,13 @@ fn octant_discard(clip: vec3f) {
 }
 
 @fragment fn fs_point_cutout(f: PointOut) {
+    reveal_test(f.reveal, f.pos.xy);
     cutout_test(f.uv, f.alpha, f.cutoff, f.mapped, f.object, f.object_normal);
     octant_discard(f.clip);
 }
 
 @fragment fn fs_point_cutout_blend(f: PointOut) {
+    reveal_test(f.reveal, f.pos.xy);
     cutout_test_blend(f.uv, f.alpha, f.cutoff, f.mapped, f.object, f.object_normal);
     octant_discard(f.clip);
 }
