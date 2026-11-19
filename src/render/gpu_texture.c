@@ -1153,10 +1153,12 @@ static void box_gpu_blend_array_release(
  *
  * @param gpu The backend
  * @param a The array, with its map, count, quality and sources
+ * @param dirty Slices whose source changed, bit per slice
  */
 static void box_gpu_blend_array_build(
     box_gpu_t *gpu,
-    box_gpu_blend_array_t *a)
+    box_gpu_blend_array_t *a,
+    uint32_t dirty)
 {
     box_gpu_texture_t *src[BOX_GPU_ARRAY_SLICES] = {0};
     bool albedo = a->map == BOX_RENDER_BLEND_ALBEDO;
@@ -1182,35 +1184,41 @@ static void box_gpu_blend_array_build(
         height = height ? height : 1;
     }
 
-    box_gpu_blend_array_release(gpu, a);
     mips = box_gpu_mip_count(width, height);
-    WGPUTextureDescriptor desc = {
-        .usage = WGPUTextureUsage_TextureBinding | WGPUTextureUsage_RenderAttachment,
-        .dimension = WGPUTextureDimension_2D,
-        .size = { width, height, a->count },
-        .format = BOX_GPU_TEXTURE_FORMAT,
-        .mipLevelCount = mips,
-        .sampleCount = 1,
-        .viewFormatCount = albedo ? 1 : 0,
-        .viewFormats = albedo ? &srgb : NULL
-    };
-    a->texture = wgpuDeviceCreateTexture(gpu->device, &desc);
-    WGPUTextureViewDescriptor view = WGPU_TEXTURE_VIEW_DESCRIPTOR_INIT;
-    view.format = format;
-    view.dimension = WGPUTextureViewDimension_2DArray;
-    view.baseMipLevel = 0;
-    view.mipLevelCount = mips;
-    view.baseArrayLayer = 0;
-    view.arrayLayerCount = a->count;
-    view.aspect = WGPUTextureAspect_All;
-    a->view = wgpuTextureCreateView(a->texture, &view);
-    for (level = 0; level < mips; level ++) {
-        uint64_t w = width >> level, h = height >> level;
-        a->bytes += (w ? w : 1) * (h ? h : 1) * 4 * a->count;
+    if (!a->texture || wgpuTextureGetWidth(a->texture) != width ||
+        wgpuTextureGetHeight(a->texture) != height)
+    {
+        dirty = UINT32_MAX;
+        box_gpu_blend_array_release(gpu, a);
+        WGPUTextureDescriptor desc = {
+            .usage = WGPUTextureUsage_TextureBinding | WGPUTextureUsage_RenderAttachment,
+            .dimension = WGPUTextureDimension_2D,
+            .size = { width, height, a->count },
+            .format = BOX_GPU_TEXTURE_FORMAT,
+            .mipLevelCount = mips,
+            .sampleCount = 1,
+            .viewFormatCount = albedo ? 1 : 0,
+            .viewFormats = albedo ? &srgb : NULL
+        };
+        a->texture = wgpuDeviceCreateTexture(gpu->device, &desc);
+        WGPUTextureViewDescriptor view = WGPU_TEXTURE_VIEW_DESCRIPTOR_INIT;
+        view.format = format;
+        view.dimension = WGPUTextureViewDimension_2DArray;
+        view.baseMipLevel = 0;
+        view.mipLevelCount = mips;
+        view.baseArrayLayer = 0;
+        view.arrayLayerCount = a->count;
+        view.aspect = WGPUTextureAspect_All;
+        a->view = wgpuTextureCreateView(a->texture, &view);
+        for (level = 0; level < mips; level ++) {
+            uint64_t w = width >> level, h = height >> level;
+            a->bytes += (w ? w : 1) * (h ? h : 1) * 4 * a->count;
+        }
+
+        gpu->blend_bytes += a->bytes;
+        a->version ++;
     }
 
-    gpu->blend_bytes += a->bytes;
-    a->version ++;
     gpu->pending.blend_builds ++;
     WGPURenderPipeline pipeline = box_gpu_blit_pipeline(gpu, format);
     if (!pipeline) {
@@ -1224,6 +1232,10 @@ static void box_gpu_blend_array_build(
     WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(gpu->device, NULL);
     for (s = 0; s < a->count; s ++) {
         box_gpu_texture_t *tex = src[s];
+        if (!((dirty >> s) & 1u)) {
+            continue;
+        }
+
         if (!tex) {
             tex = (a->flat >> s) & 1u ? gpu->flat : gpu->white;
         }
@@ -1246,6 +1258,10 @@ static void box_gpu_blend_array_build(
 
     for (level = 1; level < mips; level ++) {
         for (s = 0; s < a->count; s ++) {
+            if (!((dirty >> s) & 1u)) {
+                continue;
+            }
+
             WGPUTextureView sv = box_gpu_blend_slice(a->texture, format, level - 1, s);
             WGPUTextureView dv = box_gpu_blend_slice(a->texture, format, level, s);
             box_gpu_texture_blit(gpu, encoder, pipeline, sv, dv);
@@ -1283,7 +1299,7 @@ box_gpu_blend_array_t* box_gpu_array_get(
 {
     uint32_t sources[BOX_GPU_ARRAY_SLICES] = {0};
     box_gpu_blend_array_t *a;
-    uint32_t s;
+    uint32_t s, dirty = 0;
     bool stale = false;
     for (s = 0; s < count; s ++) {
         sources[s] = in[s] & BOX_RENDER_TEXTURE_TARGET ? 0 : in[s];
@@ -1310,12 +1326,14 @@ box_gpu_blend_array_t* box_gpu_array_get(
         stale = true;
     }
 
-    for (s = 0; !stale && s < count; s ++) {
-        stale = box_gpu_blend_serial(gpu, sources[s]) != a->serials[s];
+    for (s = 0; s < count; s ++) {
+        if (stale || box_gpu_blend_serial(gpu, sources[s]) != a->serials[s]) {
+            dirty |= 1u << s;
+        }
     }
 
-    if (stale) {
-        box_gpu_blend_array_build(gpu, a);
+    if (dirty) {
+        box_gpu_blend_array_build(gpu, a, dirty);
     }
 
     a->used = gpu->blend_frame;
