@@ -1,10 +1,11 @@
-// The fps and load panels of box, the script module box.fps. box.fps loads it when a panel
-// first opens and loads it again when the file changes on disk.
+// The fps, load and GPU stats panels of box, the script module box.fps. box.fps loads it when a
+// panel first opens and loads it again when the file changes on disk.
 //
 // C creates the scene of the panels (fps.ui), its camera and view, and the panels in a column at
 // the top right of the surface: the fps panel (fps.ui.screen.panel), an instance of FpsWidget,
-// above the load panel (fps.ui.screen.load), an instance of LoadWidget. Everything the panels
-// show is defined here, in the colors of the theme.
+// above the load panel (fps.ui.screen.load), an instance of LoadWidget, above the GPU stats panel
+// (fps.ui.screen.gpu), an instance of GpuWidget. Everything the panels show is defined here, in
+// the colors of the theme.
 //
 // The panel is a heading over a chart of the last 120 frame times and a summary of the last
 // second. The summary reads Summary, which box.fps writes from FrameSamples. box.fps exports
@@ -323,6 +324,393 @@ template LoadWidget {
 
     chart {
       FpsChart: {}
+    }
+  }
+}
+
+// Width of a column of the GPU stats panel and of the gap between two columns
+const gpu_col_w: f32 = 220
+const gpu_gap: f32 = 16
+
+// A row of the GPU stats panel: a label on the left, its value on the right
+template GpuRow {
+  prop label: string = ""
+  prop value: string = ""
+
+  const t = box.ui.theme[Theme]
+  const row_h: f32 = ceil(t.small_font_size * 1.25)
+
+  Layout: {direction: Row, spacing: t.spacing}
+  Item: {width: {mode: Fixed, value: gpu_col_w}, height: {mode: Fixed, value: row_h}}
+
+  name {
+    Item: {width: {mode: Grow}}
+    Text: {value: label, size: t.small_font_size, line_height: row_h}
+    Rgb: t.text_muted
+  }
+
+  amount {
+    Text: {value: value, size: t.small_font_size, line_height: row_h, align: Right}
+    Rgb: t.text
+  }
+}
+
+// The title of a section of the GPU stats panel, above its rows
+template GpuTitle {
+  prop label: string = ""
+
+  const t = box.ui.theme[Theme]
+  const row_h: f32 = ceil(t.small_font_size * 1.5)
+
+  Item: {width: {mode: Fixed, value: gpu_col_w}, height: {mode: Fixed, value: row_h}}
+  Text: {value: label, size: t.small_font_size, line_height: row_h}
+  Rgb: t.text
+}
+
+// The GPU stats panel: the heading over three columns of sections. Every section reads GpuStats
+// in a scope of its own; box.fps writes it every GpuPanel.interval with the counts per frame
+// averaged over that interval. box.fps.count and box.fps.bytes format the numbers compactly.
+template GpuWidget {
+  prop title: string = "GPU stats"
+
+  const t = box.ui.theme[Theme]
+  const heading_h: f32 = ceil(t.font_size * 1.4)
+  const width: f32 = gpu_col_w * 3 + gpu_gap * 2
+
+  Layout: {
+    direction: Column,
+    padding: {t.padding, t.padding, t.padding, t.padding},
+    spacing: t.spacing / 2
+  }
+  Rect: {1, 1}
+  Rgb: t.surface
+  Border: {width: 1, radius: t.radius, color: {t.border.r, t.border.g, t.border.b, 255}}
+
+  // The title on the left, what the averages cover on the right
+  heading {
+    const g = GpuStats[GpuStats]
+
+    Layout: {direction: Row}
+    Item: {width: {mode: Fixed, value: width}, height: {mode: Fixed, value: heading_h}}
+
+    name {
+      Item: {width: {mode: Grow}}
+      Text: {value: title, size: t.font_size, line_height: heading_h}
+      Rgb: t.text
+    }
+
+    window {
+      Text: {
+        value: match g.gpu {
+          true: "per frame, {g.packets} frames rendered"
+          _: "no GPU backend"
+        },
+        size: t.small_font_size,
+        line_height: heading_h,
+        align: Right
+      }
+      Rgb: t.text_muted
+    }
+  }
+
+  columns {
+    Layout: {direction: Row, spacing: gpu_gap}
+
+    left {
+      Layout: {direction: Column}
+
+      scene {
+        const s = GpuStats[GpuStats].scene
+
+        Layout: {direction: Column}
+
+        title {
+          GpuTitle: {label: "Scene"}
+        }
+        instances {
+          GpuRow: {
+            label: "Instances",
+            value: "{box.fps.count(s.instances)}, {box.fps.count(s.dynamic)} dynamic"
+          }
+        }
+        batches {
+          GpuRow: {label: "Batches", value: box.fps.count(s.batches)}
+        }
+        visible {
+          GpuRow: {
+            label: "Visible",
+            value: "{box.fps.count(s.visible)} of {box.fps.count(s.tested)}"
+          }
+        }
+        culled {
+          GpuRow: {
+            label: "Culled",
+            value: "{box.fps.count(s.frustum_culled)} frustum, " +
+              "{box.fps.count(s.occlusion_culled)} occl."
+          }
+        }
+        triangles {
+          GpuRow: {label: "Triangles", value: box.fps.count(s.triangles)}
+        }
+        shadow_triangles {
+          GpuRow: {label: "Shadow triangles", value: box.fps.count(s.shadow_triangles)}
+        }
+        other_triangles {
+          GpuRow: {label: "Other triangles", value: box.fps.count(s.other_triangles)}
+        }
+      }
+
+      shadows {
+        const s = GpuStats[GpuStats].shadows
+
+        Layout: {direction: Column}
+
+        title {
+          GpuTitle: {label: "Shadows"}
+        }
+        draws {
+          GpuRow: {label: "Draw calls", value: box.fps.count(s.draws)}
+        }
+        tiles {
+          GpuRow: {
+            label: "Atlas tiles",
+            value: "{box.fps.count(s.tiles)}, {box.fps.count(s.tiles_kept)} kept"
+          }
+        }
+        cascades {
+          GpuRow: {
+            label: "Cascades",
+            value: "{box.fps.count(s.cascades)}, {box.fps.count(s.cascades_kept)} kept"
+          }
+        }
+      }
+
+      time {
+        const s = GpuStats[GpuStats].time
+
+        Layout: {direction: Column}
+
+        title {
+          GpuTitle: {label: "GPU time"}
+        }
+        cull {
+          GpuRow: {
+            label: "Culling",
+            value: match s.measured { true: "{s.cull_ms:.2} ms"; _: "-" }
+          }
+        }
+        texture_graphs {
+          GpuRow: {
+            label: "Texture graphs",
+            value: match s.measured { true: "{s.texture_graph_ms:.2} ms"; _: "-" }
+          }
+        }
+        atmosphere {
+          GpuRow: {
+            label: "Atmosphere",
+            value: match s.measured { true: "{s.atmosphere_ms:.2} ms"; _: "-" }
+          }
+        }
+      }
+    }
+
+    middle {
+      Layout: {direction: Column}
+
+      commands {
+        const s = GpuStats[GpuStats].commands
+
+        Layout: {direction: Column}
+
+        title {
+          GpuTitle: {label: "Commands"}
+        }
+        total {
+          GpuRow: {label: "Total", value: box.fps.count(s.total)}
+        }
+        passes {
+          GpuRow: {
+            label: "Passes",
+            value: "{box.fps.count(s.render_passes)} render, " +
+              "{box.fps.count(s.compute_passes)} compute"
+          }
+        }
+        draws {
+          GpuRow: {label: "Draw calls", value: box.fps.count(s.draws)}
+        }
+        dispatches {
+          GpuRow: {
+            label: "Dispatches",
+            value: "{box.fps.count(s.dispatches)}, {box.fps.count(s.workgroups)} groups"
+          }
+        }
+        pipelines {
+          GpuRow: {label: "Pipeline switches", value: box.fps.count(s.pipelines)}
+        }
+        bind_groups {
+          GpuRow: {label: "Bind groups", value: box.fps.count(s.bind_groups)}
+        }
+        buffer_binds {
+          GpuRow: {label: "Buffer binds", value: box.fps.count(s.buffer_binds)}
+        }
+        copies {
+          GpuRow: {
+            label: "Copies",
+            value: "{box.fps.count(s.copies)}, {box.fps.bytes(s.copy_bytes)}"
+          }
+        }
+        writes {
+          GpuRow: {
+            label: "Queue writes",
+            value: "{box.fps.count(s.writes)}, {box.fps.bytes(s.write_bytes)}"
+          }
+        }
+        submits {
+          GpuRow: {
+            label: "Submits",
+            value: "{box.fps.count(s.submits)}, {box.fps.count(s.command_buffers)} buffers"
+          }
+        }
+      }
+
+      pipelines {
+        const s = GpuStats[GpuStats].commands
+
+        Layout: {direction: Column}
+
+        title {
+          GpuTitle: {label: "Pipelines"}
+        }
+        cached {
+          GpuRow: {
+            label: "Cached",
+            value: "{box.fps.count(s.pipelines_cached)}, " +
+              "{box.fps.count(s.pipelines_building)} building"
+          }
+        }
+        created {
+          GpuRow: {label: "Created", value: box.fps.count(s.pipelines_created)}
+        }
+      }
+
+      memory {
+        const s = GpuStats[GpuStats].memory
+
+        Layout: {direction: Column}
+
+        title {
+          GpuTitle: {label: "Memory"}
+        }
+        buffers {
+          GpuRow: {
+            label: "Buffers",
+            value: "{box.fps.count(s.buffers)}, {box.fps.count(s.meshes)} meshes"
+          }
+        }
+        instances {
+          GpuRow: {label: "Instance pages", value: box.fps.bytes(s.instance_bytes)}
+        }
+        blend {
+          GpuRow: {label: "Blend layers", value: box.fps.bytes(s.blend_bytes)}
+        }
+        graphs {
+          GpuRow: {label: "Texture graphs", value: box.fps.bytes(s.graph_bytes)}
+        }
+      }
+    }
+
+    right {
+      Layout: {direction: Column}
+
+      packet {
+        const s = GpuStats[GpuStats].packet
+
+        Layout: {direction: Column}
+
+        title {
+          GpuTitle: {label: "Render packets"}
+        }
+        resources {
+          GpuRow: {label: "Resources", value: box.fps.count(s.resources)}
+        }
+        uploads {
+          GpuRow: {
+            label: "Uploads",
+            value: "{box.fps.count(s.uploads)}, {box.fps.bytes(s.bytes)}"
+          }
+        }
+        scatters {
+          GpuRow: {label: "Scatters", value: box.fps.count(s.scatters)}
+        }
+        processed {
+          GpuRow: {label: "Changed entities", value: box.fps.count(s.processed)}
+        }
+        instance_bytes {
+          GpuRow: {label: "Instance uploads", value: box.fps.bytes(s.instance_bytes)}
+        }
+      }
+
+      texture_graphs {
+        const s = GpuStats[GpuStats].texture_graphs
+
+        Layout: {direction: Column}
+
+        title {
+          GpuTitle: {label: "Texture graphs"}
+        }
+        graphs {
+          GpuRow: {
+            label: "Graphs",
+            value: "{box.fps.count(s.graphs)}, {box.fps.count(s.programs)} programs"
+          }
+        }
+        evaluations {
+          GpuRow: {label: "Evaluations", value: box.fps.count(s.evaluations)}
+        }
+        dispatches {
+          GpuRow: {
+            label: "Dispatches",
+            value: "{box.fps.count(s.dispatches)}, {box.fps.count(s.texels)} texels"
+          }
+        }
+        cache {
+          GpuRow: {
+            label: "Cache",
+            value: "{box.fps.count(s.hits)} hit, {box.fps.count(s.misses)} miss"
+          }
+        }
+        cached {
+          GpuRow: {
+            label: "Cached",
+            value: "{box.fps.count(s.cached)}, {box.fps.bytes(s.cached_bytes)}"
+          }
+        }
+      }
+
+      mesh_graphs {
+        const s = GpuStats[GpuStats].mesh_graphs
+
+        Layout: {direction: Column}
+
+        title {
+          GpuTitle: {label: "Mesh graphs"}
+        }
+        jobs {
+          GpuRow: {label: "Jobs", value: box.fps.count(s.jobs)}
+        }
+        evaluated {
+          GpuRow: {
+            label: "Nodes",
+            value: "{box.fps.count(s.evaluated)}, {box.fps.count(s.hits)} cached"
+          }
+        }
+        cached {
+          GpuRow: {
+            label: "Cached",
+            value: "{box.fps.count(s.values)}, {box.fps.bytes(s.bytes)}"
+          }
+        }
+      }
     }
   }
 }

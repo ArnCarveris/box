@@ -161,6 +161,40 @@ typedef struct box_render_gpu_stats_t {
                                  *   texture_graph_evaluations */
     int64_t texture_graph_cached_bytes; /**< Bytes of the cached values now, in use or not */
     int32_t texture_graph_cached; /**< Cached values now */
+    int32_t packets;            /**< Packets rendered */
+    int32_t pipelines_cached;   /**< Pipelines in the pipeline cache now, built or building */
+    int32_t api_render_passes;  /**< Render passes begun through the webgpu API */
+    int32_t api_compute_passes; /**< Compute passes begun through the webgpu API */
+    int32_t api_pipelines;      /**< Pipelines set in passes and bundles */
+    int32_t api_bind_groups;    /**< Bind groups set in passes and bundles */
+    int32_t api_buffer_binds;   /**< Vertex and index buffers set in passes and bundles */
+    int32_t api_draws;          /**< Draw calls of every kind, direct and indirect */
+    int64_t api_triangles;      /**< Vertices of the direct draws times their instances, over
+                                 *   3; the triangles of indirect draws are read back */
+    int32_t api_dispatches;     /**< Compute dispatches of every kind */
+    int64_t api_workgroups;     /**< Workgroups of the direct dispatches */
+    int32_t api_copies;         /**< Copies between buffers and textures in command encoders */
+    int64_t api_copy_bytes;     /**< Bytes of the copies between buffers */
+    int32_t api_writes;         /**< Buffer and texture writes on the queue */
+    int64_t api_write_bytes;    /**< Bytes of the writes on the queue */
+    int32_t api_submits;        /**< Submits on the queue */
+    int32_t api_command_buffers; /**< Command buffers submitted */
+    int32_t api_bundles;        /**< Render bundles executed */
+    int64_t view_triangles;     /**< Triangles the indirect draws of views drew after culling,
+                                 *   read back while box_render_gpu_stats_detail is on */
+    int64_t shadow_triangles;   /**< Triangles the indirect draws of shadow cascades drew after
+                                 *   culling, read back like view_triangles */
+    int32_t triangle_reads;     /**< Frames whose triangles view_triangles and
+                                 *   shadow_triangles hold */
+    int32_t packet_resources;   /**< Resource creates, updates and destroys of the packets */
+    int32_t packet_uploads;     /**< Uploads of the packets */
+    int32_t packet_scatters;    /**< Scatters of the packets */
+    int32_t packet_copies;      /**< Copies between buffers of the packets */
+    int32_t packet_composes;    /**< Composes of the packets */
+    int32_t packet_batches;     /**< Batches of the packets */
+    int32_t packet_views;       /**< Views of the packets */
+    int64_t packet_bytes;       /**< Bytes of data the resources and uploads of the packets
+                                 *   point into */
 } box_render_gpu_stats_t;
 
 /** GPU time of the probe captures the GPU backend measured since the last time it was taken */
@@ -776,6 +810,19 @@ box_render_backend_t box_render_gpu_backend(void);
 bool box_render_gpu_stats(
     ecs_world_t *world,
     box_render_gpu_stats_t *stats);
+
+/** Turn on or off the counters of the GPU backend of a world that cost GPU work: the triangles
+ * the indirect draws drew, which the read back of the cull counters then also copies.
+ *
+ * Applies from the next cull pass; off by default.
+ *
+ * @param world The world
+ * @param detail Whether the costly counters are on
+ * @return Whether the world renders with the GPU backend
+ */
+bool box_render_gpu_stats_detail(
+    ecs_world_t *world,
+    bool detail);
 
 /** Check whether the GPU backend of a world may still write the capture of a file: its packet
  * rendered and the readback of the image is still mapping.

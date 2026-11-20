@@ -19,6 +19,253 @@
 #include <wgpu.h>
 #endif
 
+#if defined(_MSC_VER)
+/** Storage of a variable of which every thread has its own */
+#define BOX_GPU_THREAD_LOCAL __declspec(thread)
+#else
+/** Storage of a variable of which every thread has its own */
+#define BOX_GPU_THREAD_LOCAL _Thread_local
+#endif
+
+/** Commands a thread recorded through the webgpu API since box_gpu_stats_publish last took
+ * them on that thread. The macros below count every call of the backend sources, which include
+ * this header, so a new call site counts without changes. */
+typedef struct box_gpu_api_t {
+    int32_t render_passes;          /**< wgpuCommandEncoderBeginRenderPass */
+    int32_t compute_passes;         /**< wgpuCommandEncoderBeginComputePass */
+    int32_t pipelines;              /**< SetPipeline of passes and bundles */
+    int32_t bind_groups;            /**< SetBindGroup of passes and bundles */
+    int32_t buffer_binds;           /**< SetVertexBuffer and SetIndexBuffer */
+    int32_t draws;                  /**< Draw calls, direct and indirect */
+    int64_t triangles;              /**< Vertices or indices of direct draws times their
+                                     *   instances, over 3 */
+    int32_t dispatches;             /**< Dispatches, direct and indirect */
+    int64_t workgroups;             /**< Workgroups of direct dispatches */
+    int32_t copies;                 /**< Copies of command encoders */
+    int64_t copy_bytes;             /**< Bytes of buffer to buffer copies */
+    int32_t writes;                 /**< wgpuQueueWriteBuffer and wgpuQueueWriteTexture */
+    int64_t write_bytes;            /**< Bytes of those writes */
+    int32_t submits;                /**< wgpuQueueSubmit */
+    int32_t command_buffers;        /**< Command buffers submitted */
+    int32_t bundles;                /**< Render bundles executed */
+} box_gpu_api_t;
+
+/** The webgpu commands this thread recorded, defined in gpu.c */
+extern BOX_GPU_THREAD_LOCAL box_gpu_api_t box_gpu_api;
+
+/** Count a direct draw of a render pass and record it.
+ *
+ * @param pass The render pass
+ * @param vertices Vertices per instance
+ * @param instances Instances
+ * @param first_vertex First vertex
+ * @param first_instance First instance
+ */
+static inline void box_gpu_api_draw(
+    WGPURenderPassEncoder pass,
+    uint32_t vertices,
+    uint32_t instances,
+    uint32_t first_vertex,
+    uint32_t first_instance)
+{
+    box_gpu_api.draws ++;
+    box_gpu_api.triangles += (int64_t)vertices * instances / 3;
+    wgpuRenderPassEncoderDraw(pass, vertices, instances, first_vertex, first_instance);
+}
+
+/** Count a direct draw of a render bundle and record it.
+ *
+ * @param bundle The render bundle encoder
+ * @param vertices Vertices per instance
+ * @param instances Instances
+ * @param first_vertex First vertex
+ * @param first_instance First instance
+ */
+static inline void box_gpu_api_bundle_draw(
+    WGPURenderBundleEncoder bundle,
+    uint32_t vertices,
+    uint32_t instances,
+    uint32_t first_vertex,
+    uint32_t first_instance)
+{
+    box_gpu_api.draws ++;
+    box_gpu_api.triangles += (int64_t)vertices * instances / 3;
+    wgpuRenderBundleEncoderDraw(bundle, vertices, instances, first_vertex, first_instance);
+}
+
+/** Count a direct indexed draw of a render pass and record it.
+ *
+ * @param pass The render pass
+ * @param indices Indices per instance
+ * @param instances Instances
+ * @param first_index First index
+ * @param base_vertex Added to every index
+ * @param first_instance First instance
+ */
+static inline void box_gpu_api_draw_indexed(
+    WGPURenderPassEncoder pass,
+    uint32_t indices,
+    uint32_t instances,
+    uint32_t first_index,
+    int32_t base_vertex,
+    uint32_t first_instance)
+{
+    box_gpu_api.draws ++;
+    box_gpu_api.triangles += (int64_t)indices * instances / 3;
+    wgpuRenderPassEncoderDrawIndexed(pass, indices, instances, first_index, base_vertex,
+        first_instance);
+}
+
+/** Count a direct dispatch and record it.
+ *
+ * @param pass The compute pass
+ * @param x Workgroups across
+ * @param y Workgroups down
+ * @param z Workgroups deep
+ */
+static inline void box_gpu_api_dispatch(
+    WGPUComputePassEncoder pass,
+    uint32_t x,
+    uint32_t y,
+    uint32_t z)
+{
+    box_gpu_api.dispatches ++;
+    box_gpu_api.workgroups += (int64_t)x * y * z;
+    wgpuComputePassEncoderDispatchWorkgroups(pass, x, y, z);
+}
+
+/** Count a submit and make it.
+ *
+ * @param queue The queue
+ * @param count Command buffers
+ * @param buffers The command buffers
+ */
+static inline void box_gpu_api_submit(
+    WGPUQueue queue,
+    size_t count,
+    WGPUCommandBuffer const *buffers)
+{
+    box_gpu_api.submits ++;
+    box_gpu_api.command_buffers += (int32_t)count;
+    wgpuQueueSubmit(queue, count, buffers);
+}
+
+/** Count a buffer write and make it.
+ *
+ * @param queue The queue
+ * @param buffer The buffer
+ * @param offset Byte offset in the buffer
+ * @param data The bytes
+ * @param size Bytes to write
+ */
+static inline void box_gpu_api_write_buffer(
+    WGPUQueue queue,
+    WGPUBuffer buffer,
+    uint64_t offset,
+    void const *data,
+    size_t size)
+{
+    box_gpu_api.writes ++;
+    box_gpu_api.write_bytes += (int64_t)size;
+    wgpuQueueWriteBuffer(queue, buffer, offset, data, size);
+}
+
+/** Count a texture write and make it.
+ *
+ * @param queue The queue
+ * @param dst The texture region written
+ * @param data The bytes
+ * @param size Bytes of data
+ * @param layout Layout of the bytes
+ * @param extent Texels written
+ */
+static inline void box_gpu_api_write_texture(
+    WGPUQueue queue,
+    WGPUTexelCopyTextureInfo const *dst,
+    void const *data,
+    size_t size,
+    WGPUTexelCopyBufferLayout const *layout,
+    WGPUExtent3D const *extent)
+{
+    box_gpu_api.writes ++;
+    box_gpu_api.write_bytes += (int64_t)size;
+    wgpuQueueWriteTexture(queue, dst, data, size, layout, extent);
+}
+
+/** Count a copy between buffers and record it.
+ *
+ * @param encoder The command encoder
+ * @param src The source buffer
+ * @param src_offset Byte offset in the source
+ * @param dst The destination buffer
+ * @param dst_offset Byte offset in the destination
+ * @param size Bytes to copy
+ */
+static inline void box_gpu_api_copy_buffer(
+    WGPUCommandEncoder encoder,
+    WGPUBuffer src,
+    uint64_t src_offset,
+    WGPUBuffer dst,
+    uint64_t dst_offset,
+    uint64_t size)
+{
+    box_gpu_api.copies ++;
+    box_gpu_api.copy_bytes += (int64_t)size;
+    wgpuCommandEncoderCopyBufferToBuffer(encoder, src, src_offset, dst, dst_offset, size);
+}
+
+/** Count a pass, a bind, a draw or a copy whose arguments are not counted, then call the API */
+#define BOX_GPU_API_COUNT(field, call) (box_gpu_api.field ++, call)
+
+#define wgpuCommandEncoderBeginRenderPass(...) \
+    BOX_GPU_API_COUNT(render_passes, wgpuCommandEncoderBeginRenderPass(__VA_ARGS__))
+#define wgpuCommandEncoderBeginComputePass(...) \
+    BOX_GPU_API_COUNT(compute_passes, wgpuCommandEncoderBeginComputePass(__VA_ARGS__))
+#define wgpuRenderPassEncoderSetPipeline(...) \
+    BOX_GPU_API_COUNT(pipelines, wgpuRenderPassEncoderSetPipeline(__VA_ARGS__))
+#define wgpuRenderBundleEncoderSetPipeline(...) \
+    BOX_GPU_API_COUNT(pipelines, wgpuRenderBundleEncoderSetPipeline(__VA_ARGS__))
+#define wgpuComputePassEncoderSetPipeline(...) \
+    BOX_GPU_API_COUNT(pipelines, wgpuComputePassEncoderSetPipeline(__VA_ARGS__))
+#define wgpuRenderPassEncoderSetBindGroup(...) \
+    BOX_GPU_API_COUNT(bind_groups, wgpuRenderPassEncoderSetBindGroup(__VA_ARGS__))
+#define wgpuRenderBundleEncoderSetBindGroup(...) \
+    BOX_GPU_API_COUNT(bind_groups, wgpuRenderBundleEncoderSetBindGroup(__VA_ARGS__))
+#define wgpuComputePassEncoderSetBindGroup(...) \
+    BOX_GPU_API_COUNT(bind_groups, wgpuComputePassEncoderSetBindGroup(__VA_ARGS__))
+#define wgpuRenderPassEncoderSetVertexBuffer(...) \
+    BOX_GPU_API_COUNT(buffer_binds, wgpuRenderPassEncoderSetVertexBuffer(__VA_ARGS__))
+#define wgpuRenderPassEncoderSetIndexBuffer(...) \
+    BOX_GPU_API_COUNT(buffer_binds, wgpuRenderPassEncoderSetIndexBuffer(__VA_ARGS__))
+#define wgpuRenderBundleEncoderSetVertexBuffer(...) \
+    BOX_GPU_API_COUNT(buffer_binds, wgpuRenderBundleEncoderSetVertexBuffer(__VA_ARGS__))
+#define wgpuRenderBundleEncoderSetIndexBuffer(...) \
+    BOX_GPU_API_COUNT(buffer_binds, wgpuRenderBundleEncoderSetIndexBuffer(__VA_ARGS__))
+#define wgpuRenderPassEncoderDraw box_gpu_api_draw
+#define wgpuRenderBundleEncoderDraw box_gpu_api_bundle_draw
+#define wgpuRenderPassEncoderDrawIndexed box_gpu_api_draw_indexed
+#define wgpuRenderPassEncoderDrawIndirect(...) \
+    BOX_GPU_API_COUNT(draws, wgpuRenderPassEncoderDrawIndirect(__VA_ARGS__))
+#define wgpuRenderPassEncoderDrawIndexedIndirect(...) \
+    BOX_GPU_API_COUNT(draws, wgpuRenderPassEncoderDrawIndexedIndirect(__VA_ARGS__))
+#define wgpuRenderBundleEncoderDrawIndexedIndirect(...) \
+    BOX_GPU_API_COUNT(draws, wgpuRenderBundleEncoderDrawIndexedIndirect(__VA_ARGS__))
+#define wgpuComputePassEncoderDispatchWorkgroups box_gpu_api_dispatch
+#define wgpuComputePassEncoderDispatchWorkgroupsIndirect(...) \
+    BOX_GPU_API_COUNT(dispatches, wgpuComputePassEncoderDispatchWorkgroupsIndirect(__VA_ARGS__))
+#define wgpuRenderPassEncoderExecuteBundles(...) \
+    BOX_GPU_API_COUNT(bundles, wgpuRenderPassEncoderExecuteBundles(__VA_ARGS__))
+#define wgpuQueueSubmit box_gpu_api_submit
+#define wgpuQueueWriteBuffer box_gpu_api_write_buffer
+#define wgpuQueueWriteTexture box_gpu_api_write_texture
+#define wgpuCommandEncoderCopyBufferToBuffer box_gpu_api_copy_buffer
+#define wgpuCommandEncoderCopyBufferToTexture(...) \
+    BOX_GPU_API_COUNT(copies, wgpuCommandEncoderCopyBufferToTexture(__VA_ARGS__))
+#define wgpuCommandEncoderCopyTextureToBuffer(...) \
+    BOX_GPU_API_COUNT(copies, wgpuCommandEncoderCopyTextureToBuffer(__VA_ARGS__))
+#define wgpuCommandEncoderCopyTextureToTexture(...) \
+    BOX_GPU_API_COUNT(copies, wgpuCommandEncoderCopyTextureToTexture(__VA_ARGS__))
+
 /** Color format of offscreen targets */
 #define BOX_GPU_OFFSCREEN_FORMAT (WGPUTextureFormat_RGBA8UnormSrgb)
 
@@ -738,6 +985,10 @@ typedef struct box_gpu_cull_readback_t {
     ecs_vec_t records;              /**< box_gpu_cull_record_t of the views */
     uint64_t stamp_offset;          /**< Byte offset of the timestamps after the counters */
     uint32_t stamps;                /**< Timestamp pairs of its cull passes, 0 for none */
+    ecs_vec_t view_args;            /**< uint32_t, draw arguments the views drew with */
+    ecs_vec_t shadow_args;          /**< uint32_t, draw arguments the cascades drew with */
+    uint64_t args_offset;           /**< Byte offset of the draw arguments after the timestamps */
+    uint32_t args_words;            /**< Words of draw arguments copied, 0 for none */
 } box_gpu_cull_readback_t;
 
 /** The cluster buffer of a view in a target and the read back of the entries its pass allocated */
@@ -829,6 +1080,9 @@ typedef struct box_gpu_cull_t {
     uint32_t next_hiz;              /**< Id of the next pyramid */
     int64_t stamp;                  /**< Cull passes begun, ages histories and pyramids */
     box_gpu_cull_readback_t readbacks[BOX_GPU_CULL_READBACKS]; /**< Counter copies */
+    bool detail;                    /**< Copies also read back the draw arguments of the views
+                                     *   and cascades, gpu->stats_detail at the begin */
+    int64_t triangle_frame;         /**< Frame of the last read back whose triangles counted */
     ecs_vec_t status;               /**< box_render_cull_status_t, under the lock of the gpu */
     int64_t frame;                  /**< Frame of the packet of the target being rendered */
     ecs_vec_t views;                /**< box_gpu_cull_view_t of the target */
@@ -1321,6 +1575,8 @@ typedef struct box_gpu_t {
                                      *   under the lock */
     bool shadow_core_request;       /**< Point light tiles discard instead of clipping from the
                                      *   next packet, under the lock */
+    bool stats_detail;              /**< The read back of the cull counters also copies the
+                                     *   draw arguments to count triangles, under the lock */
     uint64_t buffer_writes;         /**< Writes to buffers, the version of the last one */
     box_render_gpu_stats_t stats;   /**< Counters read by the main thread */
     box_render_gpu_stats_t pending; /**< Counter changes not yet published, render thread only */

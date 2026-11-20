@@ -83,6 +83,14 @@ WGPUComputePipeline box_gpu_compute_pipeline(
 int32_t box_gpu_pipelines_building(
     const box_gpu_t *gpu);
 
+/** Get the pipelines in the cache: built, building or failed, until a sweep drops them.
+ *
+ * @param gpu The backend
+ * @return The pipelines
+ */
+int32_t box_gpu_pipelines_cached(
+    const box_gpu_t *gpu);
+
 /** Replace a group of render pipelines once every pipeline that replaces them was created, so
  * the group keeps its previous pipelines until then and when one of them failed.
  *

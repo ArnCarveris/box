@@ -657,6 +657,19 @@
                 ]
             },
             {
+                "id": "GpuPanel",
+                "testcases": [
+                    "closed_by_default",
+                    "command_toggles",
+                    "below_load_panel",
+                    "stats_without_gpu",
+                    "interval",
+                    "rows_show_stats",
+                    "format_count",
+                    "format_bytes"
+                ]
+            },
+            {
                 "id": "StartupOverlay",
                 "testcases": [
                     "closed_by_default",

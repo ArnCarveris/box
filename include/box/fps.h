@@ -180,6 +180,19 @@ extern "C" {
  * TaskPublish */
 #define BOX_LOAD_END_PHASE "box.fps.LoadEnd"
 
+/** Path of the GPU stats panel, below the load panel in the column at the top right of the
+ * surface, the instance of BOX_GPU_TEMPLATE */
+#define BOX_GPU_PANEL "fps.ui.screen.gpu"
+
+/** Path of the heading of the GPU stats panel, a Text above its columns */
+#define BOX_GPU_HEADING BOX_GPU_PANEL ".heading"
+
+/** Path of the template of the script that the GPU stats panel instantiates */
+#define BOX_GPU_TEMPLATE "box.fps.GpuWidget"
+
+/** Seconds GpuStats averages over by default (GpuPanel.interval) */
+#define BOX_GPU_INTERVAL (0.5f)
+
 /** The fps panel singleton: whether it is shown.
  *
  * A change applies in the next frame. The panel shows FrameSamples (box/app.h), takes neither
@@ -249,6 +262,143 @@ ECS_STRUCT(LoadSummary, {
     LoadStat gpu;       /**< The renderer waiting on the GPU */
     LoadStat audio;     /**< The audio thread */
     LoadStat jobs;      /**< The busiest job worker */
+});
+
+/** The GPU stats panel singleton: whether it is shown and how often its stats update.
+ *
+ * A change applies in the next frame. While it is open box.fps writes GpuStats and the GPU
+ * backend reads back the triangles its indirect draws drew (box_render_gpu_stats_detail).
+ */
+ECS_STRUCT(GpuPanel, {
+    bool open;          /**< Shown, the gpu_stats command flips it */
+    float interval;     /**< Seconds between two updates of GpuStats, which averages over
+                         *   them; 0 or less updates every frame. BOX_GPU_INTERVAL by default */
+});
+
+/** What the scene asks the renderer to draw, and what the views drew of it */
+ECS_STRUCT(GpuSceneStats, {
+    int32_t batches;            /**< Instanced batches, impostor batches included */
+    int32_t instances;          /**< Instances in batches, static and dynamic */
+    int32_t dynamic;            /**< Dynamic instances among them */
+    int32_t impostors;          /**< Instances drawn as impostor cards */
+    int32_t materials;          /**< Slots of the material table */
+    int32_t views;              /**< Views with a CullStatus, the sums below are over them */
+    int32_t tested;             /**< Instances the views tested */
+    int32_t visible;            /**< Instances the views drew */
+    int32_t frustum_culled;     /**< Instances outside the frustums */
+    int32_t occlusion_culled;   /**< Instances hidden behind closer geometry */
+    int32_t range_culled;       /**< Instances outside their DrawRange */
+    double triangles;           /**< Triangles the views drew per frame after culling */
+    double shadow_triangles;    /**< Triangles the shadow cascades drew per frame */
+    double other_triangles;     /**< Triangles of the direct draws per frame: effects,
+                                 *   particles, sky, fullscreen passes */
+});
+
+/** Commands the renderer recorded per frame through the webgpu API */
+ECS_STRUCT(GpuCommandStats, {
+    double total;               /**< Every command below, bytes excluded */
+    double render_passes;       /**< Render passes */
+    double compute_passes;      /**< Compute passes */
+    double draws;               /**< Draw calls, direct and indirect */
+    double dispatches;          /**< Compute dispatches */
+    double workgroups;          /**< Workgroups of the direct dispatches */
+    double pipelines;           /**< Pipeline switches: pipelines set in passes */
+    double bind_groups;         /**< Bind groups set */
+    double buffer_binds;        /**< Vertex and index buffers set */
+    double copies;              /**< Copies between buffers and textures */
+    double copy_bytes;          /**< Bytes copied between buffers */
+    double writes;              /**< Buffer and texture writes on the queue */
+    double write_bytes;         /**< Bytes of those writes */
+    double submits;             /**< Queue submits */
+    double command_buffers;     /**< Command buffers submitted */
+    int32_t pipelines_cached;   /**< Pipelines in the pipeline cache */
+    int32_t pipelines_created;  /**< Pipelines created since the device was created */
+    int32_t pipelines_building; /**< Pipelines whose creation is in progress */
+});
+
+/** What the main thread sent the renderer per frame in its render packets */
+ECS_STRUCT(GpuPacketStats, {
+    double resources;           /**< Resource creates, updates and destroys */
+    double uploads;             /**< Uploads */
+    double scatters;            /**< Scatters of changed instance slots */
+    double copies;              /**< Copies between buffers */
+    double bytes;               /**< Bytes of data the resources and uploads point into */
+    double processed;           /**< Changed entities the draw extract processed */
+    double instance_bytes;      /**< Bytes the draw extract uploaded into instance, clip and
+                                 *   material buffers */
+});
+
+/** Shadow work per frame */
+ECS_STRUCT(GpuShadowStats, {
+    double draws;               /**< Draw calls of the cascades and atlas tiles */
+    double tiles;               /**< Atlas tiles rendered */
+    double tiles_kept;          /**< Atlas tiles kept from an earlier frame */
+    double cascades;            /**< Cascades rendered */
+    double cascades_kept;       /**< Cascades kept from an earlier frame */
+});
+
+/** Texture graph work per frame and the state of their cache */
+ECS_STRUCT(GpuTextureGraphStats, {
+    int32_t graphs;             /**< Texture graphs alive */
+    int32_t programs;           /**< Generated stage programs alive */
+    double evaluations;         /**< Evaluations, animated updates included */
+    double dispatches;          /**< Stage dispatches */
+    double texels;              /**< Texels the dispatches computed */
+    double hits;                /**< Stages the cache had */
+    double misses;              /**< Stages dispatched into a new cache entry */
+    double evictions;           /**< Cached values evicted */
+    int32_t cached;             /**< Cached values */
+    int64_t cached_bytes;       /**< Bytes of the cached values */
+    int64_t pool_bytes;         /**< Bytes of the pooled intermediates and key images */
+});
+
+/** Mesh graph work per frame and the state of their value cache */
+ECS_STRUCT(GpuMeshGraphStats, {
+    double jobs;                /**< Jobs submitted */
+    double evaluated;           /**< Node values computed */
+    double hits;                /**< Node values found in the cache */
+    double evicted;             /**< Values evicted from the cache */
+    int32_t values;             /**< Values in the cache */
+    int64_t bytes;              /**< Bytes of those values */
+});
+
+/** Resources of the GPU backend and the memory the renderer counts */
+ECS_STRUCT(GpuMemoryStats, {
+    int32_t buffers;            /**< Buffers alive */
+    int32_t meshes;             /**< Meshes alive */
+    int32_t targets;            /**< Targets alive */
+    int32_t shaders;            /**< Shader modules alive */
+    int64_t instance_bytes;     /**< Bytes of the instance pages */
+    int64_t blend_bytes;        /**< Bytes of the texture arrays of the TextureBlend layers */
+    int64_t graph_bytes;        /**< Bytes of the texture graph values, pool and key images */
+});
+
+/** GPU time per frame, from timestamp queries; 0 without them */
+ECS_STRUCT(GpuTimeStats, {
+    bool measured;              /**< The device has timestamp queries */
+    double cull_ms;             /**< Cull passes of the views */
+    double texture_graph_ms;    /**< Texture graph evaluations */
+    double atmosphere_ms;       /**< Atmosphere passes */
+});
+
+/** Renderer statistics, written by box.fps while GpuPanel is open, every GpuPanel.interval.
+ *
+ * Counts per frame are averages over the interval: the work of the renderer over the packets
+ * it rendered, the work of the main thread over its frames. Other values are the latest.
+ */
+ECS_STRUCT(GpuStats, {
+    bool gpu;                   /**< The world renders with the GPU backend; without it every
+                                 *   value the renderer counts is 0 */
+    int32_t frames;             /**< Main thread frames the averages cover */
+    int32_t packets;            /**< Packets the renderer rendered in them */
+    GpuSceneStats scene;        /**< Instances, culling and triangles */
+    GpuCommandStats commands;   /**< webgpu commands */
+    GpuPacketStats packet;      /**< Render packets */
+    GpuShadowStats shadows;     /**< Shadow work */
+    GpuTextureGraphStats texture_graphs; /**< Texture graphs */
+    GpuMeshGraphStats mesh_graphs; /**< Mesh graphs */
+    GpuMemoryStats memory;      /**< Resources and memory */
+    GpuTimeStats time;          /**< GPU time */
 });
 
 /** Compute the summary of the last second of frame samples.

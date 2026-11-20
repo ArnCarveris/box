@@ -1,10 +1,10 @@
 /**
  * @file command/cmd_frames.c
- * @brief The fps, load and frames commands: the fps and load panels, the frame rate cap and the
- * timing of the recent frames.
+ * @brief The fps, load, gpu_stats and frames commands: the fps, load and GPU stats panels, the
+ * frame rate cap and the timing of the recent frames.
  *
  * fps toggles FpsPanel.open, box.fps opens and closes the panel from that change, and fps <rate>
- * sets App.fps. load toggles LoadPanel.open the same way.
+ * sets App.fps. load and gpu_stats toggle LoadPanel.open and GpuPanel.open the same way.
  *
  * frames prints FrameTiming and RenderStatus in a few lines: the rate, the cap, vsync, the delta
  * against the wall time, the presents and the late and dropped frames.
@@ -19,6 +19,9 @@
 
 /** Path of the LoadPanel singleton, looked up for the same reason */
 #define BOX_CMD_LOAD_COMPONENT "box.fps.LoadPanel"
+
+/** Path of the GpuPanel singleton, looked up for the same reason */
+#define BOX_CMD_GPU_COMPONENT "box.fps.GpuPanel"
 
 /** Append the line of a range of frame times.
  *
@@ -239,6 +242,42 @@ done:
     return;
 }
 
+/** The gpu_stats command: toggle GpuPanel.open and return the new state.
+ *
+ * @param ctx The call context
+ * @param argc Number of arguments
+ * @param argv No arguments
+ * @param result Receives "true" when the panel is now open, else "false"
+ */
+static void box_cmd_gpu_stats(
+    const ecs_function_ctx_t *ctx,
+    int32_t argc,
+    const ecs_value_t *argv,
+    ecs_value_t *result)
+{
+    ecs_world_t *world = ctx->world;
+    ecs_entity_t comp = ecs_lookup(world, BOX_CMD_GPU_COMPONENT);
+    GpuPanel *panel;
+    (void)argc;
+    (void)argv;
+    if (!comp || comp != ecs_id(GpuPanel)) {
+        ecs_err("box.fps is not imported");
+        goto done;
+    }
+
+    panel = ecs_singleton_get_mut(world, GpuPanel);
+    if (!panel) {
+        ecs_err("the world has no box.fps.GpuPanel");
+        goto done;
+    }
+
+    panel->open = !panel->open;
+    ecs_singleton_modified(world, GpuPanel);
+    *(char**)result->ptr = ecs_os_strdup(panel->open ? "true" : "false");
+done:
+    return;
+}
+
 void box_cmd_frames_init(
     ecs_world_t *world)
 {
@@ -260,6 +299,15 @@ void box_cmd_frames_init(
             .name = "load",
             .return_type = ecs_id(ecs_string_t),
             .callback = box_cmd_load
+        });
+
+    box_command_register(world,
+        "Show or hide the GPU stats panel: instances, triangles, draw calls, pipeline and bind "
+        "group switches, commands, texture and mesh graph work, memory and GPU time per frame",
+        (ecs_function_desc_t){
+            .name = "gpu_stats",
+            .return_type = ecs_id(ecs_string_t),
+            .callback = box_cmd_gpu_stats
         });
 
     box_command_register(world,
