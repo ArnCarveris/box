@@ -203,19 +203,18 @@ static void hier_wind(
 }
 
 /** Append an axis aligned box of 24 vertices facing out to a mesh, every vertex with the same
- * data.
+ * data, all four data vectors given.
  *
  * @param m The mesh
  * @param lo Minimum corner
  * @param hi Maximum corner
- * @param sway data0, data2 and data3 of the box (box_wind_sway_vertex), data1 is zero; NULL
- * for a mesh without data
+ * @param data data0 to data3 of the box; NULL for a mesh without data
  */
-static void hier_box(
+static void hier_box_data(
     Mesh3 *m,
     const float lo[3],
     const float hi[3],
-    const vec4 *sway)
+    const vec4 *data)
 {
     static const float corners[4][2] = { { 0, 0 }, { 1, 0 }, { 1, 1 }, { 0, 1 } };
     static const uint32_t quad[6] = { 0, 1, 2, 0, 2, 3 };
@@ -234,13 +233,14 @@ static void hier_box(
                 p[w] = corners[k][1] ? hi[w] : lo[w];
                 glm_vec3_zero(n);
                 n[axis] = side ? 1.0f : -1.0f;
-                if (sway) {
-                    glm_vec4_copy(ECS_CONST_CAST(float*, sway[0]),
+                if (data) {
+                    glm_vec4_copy(ECS_CONST_CAST(float*, data[0]),
                         *ecs_vec_append_t(NULL, &m->data0, vec4));
-                    glm_vec4_zero(*ecs_vec_append_t(NULL, &m->data1, vec4));
-                    glm_vec4_copy(ECS_CONST_CAST(float*, sway[1]),
+                    glm_vec4_copy(ECS_CONST_CAST(float*, data[1]),
+                        *ecs_vec_append_t(NULL, &m->data1, vec4));
+                    glm_vec4_copy(ECS_CONST_CAST(float*, data[2]),
                         *ecs_vec_append_t(NULL, &m->data2, vec4));
-                    glm_vec4_copy(ECS_CONST_CAST(float*, sway[2]),
+                    glm_vec4_copy(ECS_CONST_CAST(float*, data[3]),
                         *ecs_vec_append_t(NULL, &m->data3, vec4));
                 }
             }
@@ -250,6 +250,30 @@ static void hier_box(
             }
         }
     }
+}
+
+/** Append a box like hier_box_data, with data1 zero.
+ *
+ * @param m The mesh
+ * @param lo Minimum corner
+ * @param hi Maximum corner
+ * @param sway data0, data2 and data3 of the box (box_wind_sway_vertex), data1 is zero; NULL
+ * for a mesh without data
+ */
+static void hier_box(
+    Mesh3 *m,
+    const float lo[3],
+    const float hi[3],
+    const vec4 *sway)
+{
+    vec4 data[4] = {{0}};
+    if (sway) {
+        glm_vec4_copy(ECS_CONST_CAST(float*, sway[0]), data[0]);
+        glm_vec4_copy(ECS_CONST_CAST(float*, sway[1]), data[2]);
+        glm_vec4_copy(ECS_CONST_CAST(float*, sway[2]), data[3]);
+    }
+
+    hier_box_data(m, lo, hi, sway ? (const vec4*)data : NULL);
 }
 
 /** Free the vectors of a Mesh3.
@@ -904,14 +928,19 @@ static void hier_mark_box(
     const vec3 at,
     bool scramble)
 {
-    vec4 d0 = { data[0][v], data[1][v], data[2][v], data[3][v] };
-    vec4 d1 = { data[4][v], data[5][v], data[6][v], data[7][v] };
-    if (scramble) {
-        glm_vec4_copy((vec4){ -3.7f, 5.2f, 0.4f, 40000.0f + (float)v }, d1);
+    vec4 d[4];
+    int32_t k;
+    for (k = 0; k < 16; k ++) {
+        d[k / 4][k % 4] = data[k] ? data[k][v] : 0.0f;
     }
 
-    hier_box(m, (float[3]){ at[0] - HIER_MARK, at[1] - HIER_MARK, at[2] - HIER_MARK },
-        (float[3]){ at[0] + HIER_MARK, at[1] + HIER_MARK, at[2] + HIER_MARK }, d0, d1);
+    if (scramble) {
+        glm_vec4_copy((vec4){ -3.7f, 5.2f, 0.4f, 40000.0f + (float)v }, d[1]);
+    }
+
+    hier_box_data(m, (float[3]){ at[0] - HIER_MARK, at[1] - HIER_MARK, at[2] - HIER_MARK },
+        (float[3]){ at[0] + HIER_MARK, at[1] + HIER_MARK, at[2] + HIER_MARK },
+        (const vec4*)d);
 }
 
 /** Add a red Mesh3 at the origin of marker boxes at a vertex of every leaf card of the
@@ -947,14 +976,14 @@ static ecs_entity_t hier_cards(
     test_assert(value != NULL);
     const box_mg_mesh_t *cm = &value->mesh;
     const float *card = box_mg_attr_find(cm->attrs, cm->attr_count, "card");
-    float *data[8];
+    float *data[16];
     int32_t i, v;
     test_assert(card != NULL);
-    for (i = 0; i < 8; i ++) {
+    for (i = 0; i < 16; i ++) {
         char name[BOX_MESH_ATTR_NAME];
         ecs_os_snprintf(name, ECS_SIZEOF(name), "%s%d", BOX_MESH_DATA_ATTR, i);
         data[i] = box_mg_attr_find(cm->attrs, cm->attr_count, name);
-        test_assert(data[i] != NULL);
+        test_assert(i >= 8 || data[i] != NULL);
     }
 
     Mesh3 m = {0};
@@ -1005,11 +1034,7 @@ static ecs_entity_t hier_cards(
     ecs_set(world, e, Position, {0, 0, 0});
     ecs_set(world, e, Rgb, {200, 60, 40});
     ecs_set_ptr(world, e, Mesh3, &m);
-    ecs_vec_fini_t(NULL, &m.vertices, vec3);
-    ecs_vec_fini_t(NULL, &m.normals, vec3);
-    ecs_vec_fini_t(NULL, &m.indices, uint32_t);
-    ecs_vec_fini_t(NULL, &m.data0, vec4);
-    ecs_vec_fini_t(NULL, &m.data1, vec4);
+    hier_mesh_fini(&m);
 
     return e;
 }
