@@ -165,6 +165,12 @@
  * spectra of WaterSpectrum */
 #define BOX_RENDER_SHADER_WATER_SPECTRUM (17)
 
+/** Shader handle of the engine compute shader that places the grass blades of a view */
+#define BOX_RENDER_SHADER_GRASS_PLACE (18)
+
+/** Shader handle of the engine shader that draws the grass blades */
+#define BOX_RENDER_SHADER_GRASS (19)
+
 /** Shader handle of the engine compute shader that steps the fields of WaterRipples */
 #define BOX_RENDER_SHADER_WATER_RIPPLES (15)
 
@@ -1192,6 +1198,10 @@ typedef struct box_render_target_desc_t {
     bool texture;           /**< Materials sample the image, so it renders before other targets */
 } box_render_target_desc_t;
 
+/** vec4 of per vertex data per vertex of the data stream of a mesh with data: data0 to data3
+ * (box_mesh_t.data then data_upper, zero without it) */
+#define BOX_RENDER_DATA_VECS (4)
+
 /** Description of a BOX_RENDER_MESH create, followed by its vertices and its indices.
  *
  * The vertices are box_vertex_t, the indices uint32_t with three per counter-clockwise
@@ -1201,9 +1211,10 @@ typedef struct box_render_mesh_desc_t {
     uint32_t surface_asset_count; /**< Surface asset vec4s after the indices */
     uint32_t vertex_count;  /**< Vertices after the description */
     uint32_t index_count;   /**< Indices after the vertices */
-    uint32_t data;          /**< 1 when two vec4 of per vertex data per vertex (box_mesh_t.data)
-                             *   follow the surface assets, uploaded as a vertex stream of its
-                             *   own; 0 for a mesh without data, which uploads and binds none */
+    uint32_t data;          /**< 1 when BOX_RENDER_DATA_VECS vec4 of per vertex data per vertex
+                             *   (box_mesh_t.data and data_upper) follow the surface assets,
+                             *   uploaded as a vertex stream of its own; 0 for a mesh without
+                             *   data, which uploads and binds none */
 } box_render_mesh_desc_t;
 
 /** Description of a BOX_RENDER_TEXTURE create, followed by its RGBA8 pixels row by row, or its
@@ -1773,10 +1784,11 @@ typedef struct box_render_material_t {
     float wind_flutter;     /**< WindSway.flutter, 0 without one, when negative or not finite */
     float wind_reach;       /**< WindSway.flutter_reach, at least BOX_RENDER_WIND_MIN, 0
                              *   without one */
-    float wind_flutter_phase; /**< WindSway.flutter_frequency times the time of the wind wrapped
+    float wind_flutter_phase; /**< WindSway.flutter_frequency times the wind clock wrapped
                              *   to 0..1, 0 without one */
     uint32_t flags;         /**< BOX_RENDER_WIND_PRESENT with a WindSway, and
-                             *   BOX_RENDER_WIND_PIVOTS with WindSway.pivots; with a VertexReveal
+                             *   BOX_RENDER_WIND_PIVOTS with WindSway.pivots (and
+                             *   BOX_RENDER_WIND_FOLIAGE with WindSway.foliage); with a VertexReveal
                              *   whose channel is 0..7 BOX_RENDER_REVEAL_PRESENT, maybe
                              *   BOX_RENDER_REVEAL_INVERT, the channel at
                              *   BOX_RENDER_REVEAL_CHANNEL_SHIFT and its softness (0 when
@@ -1786,7 +1798,7 @@ typedef struct box_render_material_t {
     float reveal_threshold; /**< VertexReveal.threshold, 0 without one or when not finite */
     float wind_branch;      /**< WindSway.branch of a record with BOX_RENDER_WIND_PIVOTS, 0
                              *   without pivots or when not finite */
-    float wind_branch_phase; /**< WindSway.branch_frequency times the time of the wind wrapped
+    float wind_branch_phase; /**< WindSway.branch_frequency times the wind clock wrapped
                              *   to 0..1 with BOX_RENDER_WIND_PIVOTS, 0 without */
     float occlusion_strength; /**< VertexOcclusion.strength clamped to 0..1 of a record with
                              *   BOX_RENDER_OCCLUSION_PRESENT, 0 without one */
@@ -1829,6 +1841,10 @@ typedef struct box_render_material_t {
 /** Flag of a WindSway record with pivots (WindSway.pivots): a mesh with per vertex data sways
  * about the pivots in its data */
 #define BOX_RENDER_WIND_PIVOTS (1u << 6)
+
+/** Flag of a WindSway record with pivots and foliage (WindSway.foliage): the pivots read only
+ * data0, a vertex turns about its pivot with a stiffness of 0 and without its parent */
+#define BOX_RENDER_WIND_FOLIAGE (1u << 11)
 
 /** Smallest Distortion.scale of a record */
 #define BOX_RENDER_DISTORTION_MIN (1e-3f)
@@ -2209,6 +2225,57 @@ typedef struct box_render_terrain_index_t {
     uint32_t data;          /**< Offset of the records in the packet data */
     uint32_t count;         /**< uint32_t of the records */
 } box_render_terrain_index_t;
+/** Levels of detail a sampled terrain indexes at most (BOX_TERRAIN_LEVELS) */
+#define BOX_RENDER_TERRAIN_LEVELS (16)
+
+/** Foci of a sampled terrain at most (BOX_TERRAIN_FOCI) */
+#define BOX_RENDER_TERRAIN_FOCI (8)
+
+/** A Terrain with TerrainSampled, whose tiles that draw the compute and vertex stages read by
+ * world position (terrain_sample.wgsl).
+ *
+ * The grid holds a window of cells by cells per level, the finest first, rows from -z, a cell per
+ * tile of the level from the tile first; each cell the slot of the tile of its node that draws
+ * plus one, 0 where none does. The backend binds the cells, the surface assets and the mask atlas
+ * of the grid mesh of the tiles, filled by the terrain_heights of the same packet. */
+typedef struct box_render_terrain_sample_t {
+    ecs_entity_t terrain;   /**< The terrain entity, the key of its bindings in the backend */
+    uint32_t mesh;          /**< Handle of the grid mesh of the tiles, 0 before one draws */
+    uint32_t grid;          /**< Data offset of the cells, levels * cells * cells uint32_t */
+    int32_t levels;         /**< Levels of detail, 0 when nothing is indexed yet */
+    int32_t cells;          /**< Cells along an edge of the window of a level */
+    int32_t resolution;     /**< Vertices along an edge of a tile */
+    int32_t focus_count;    /**< Foci in foci */
+    bool masks;             /**< The tiles have masks in the mask atlas of the mesh */
+    double origin[3];       /**< Absolute position of the frame of the terrain */
+    double tile_size;       /**< Edge of a tile of level 0 in meters */
+    double extent;          /**< Half size of a bounded terrain, 0 unbounded */
+    double foci[BOX_RENDER_TERRAIN_FOCI][2]; /**< Foci the tiles morph around in the frame of
+                             *   the terrain, x and z */
+    int32_t first[BOX_RENDER_TERRAIN_LEVELS][2]; /**< Column and row of the tile of the first
+                             *   cell of each level */
+    float morph[BOX_RENDER_TERRAIN_LEVELS][2]; /**< Distances of the nearest focus from the
+                             *   center of a tile of each level where its morph starts and ends */
+} box_render_terrain_sample_t;
+
+/** A Grass whose blades the GPU backend places around the camera of each lit view of its scene
+ * and draws (gpu_grass.c), with its defaults resolved (box_grass_resolve) and its colors
+ * linear. Positions and heights are in the local frame of the packet. */
+typedef struct box_render_grass_t {
+    ecs_entity_t grass;     /**< The Grass entity, the key of its buffers in the backend */
+    ecs_entity_t terrain;   /**< Terrain with TerrainSampled it grows on, 0 for the plane */
+    ecs_entity_t scene;     /**< Scene of the Grass entity, 0 for the default scene */
+    float plane;            /**< Local y of the plane of a Grass without a terrain */
+    float ground[2];        /**< Lowest and highest local y of the ground the blades stand on */
+    int32_t mask;           /**< Mask channel that weighs the density, -1 for none */
+    float density;          /**< Blades per square meter */
+    float height[2];        /**< Shortest and tallest blade */
+    float width[2];         /**< Narrowest and widest blade */
+    float base[3];          /**< Linear color at the base */
+    float tip[3];           /**< Linear color at the tip */
+    float lod[3];           /**< Distances where levels 0 and 1 end and the blades end */
+    uint32_t seed;          /**< Seed of the hash of the cells */
+} box_render_grass_t;
 
 /** Description of a BOX_RENDER_SHADER create or update, followed by its code and its label.
  *
@@ -2626,6 +2693,10 @@ typedef struct box_render_packet_t {
     ecs_vec_t terrain_bakes; /**< box_render_terrain_bake_t, the terrain tiles that draw with
                              *   a bake atlas */
     ecs_vec_t terrain_indices; /**< box_render_terrain_index_t of their terrains */
+    ecs_vec_t terrain_samples; /**< box_render_terrain_sample_t, the terrains with
+                             *   TerrainSampled, bound after their heights were copied */
+    ecs_vec_t grasses;      /**< box_render_grass_t, the Grass entities, whose blades the lit
+                             *   views of their scene place and draw */
     ecs_vec_t debug_boxes;  /**< box_render_debug_box_t, the boxes of the spatial index trees
                              *   of the views */
     ecs_vec_t debug_poses;  /**< mat4, the matrices that place the boxes of the views */

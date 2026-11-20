@@ -359,12 +359,16 @@ void VertexReveal_mesh_upload(void) {
     test_uint(desc->vertex_count, 6);
     uint32_t offset = (uint32_t)sizeof(box_render_mesh_desc_t) + 6 * sizeof(box_vertex_t) +
         desc->index_count * sizeof(uint32_t) + desc->surface_asset_count * sizeof(vec4);
-    test_uint(size, offset + 6 * 2 * sizeof(vec4));
+    test_uint(size, offset + 6 * BOX_RENDER_DATA_VECS * sizeof(vec4));
     const vec4 *values = (const vec4*)((const uint8_t*)desc + offset);
     int32_t i;
     for (i = 0; i < 6; i ++) {
-        test_flt(values[i * 2][0], (float)(i / 3));
-        test_flt(values[i * 2 + 1][3], (float)i);
+        const vec4 *v = &values[i * BOX_RENDER_DATA_VECS];
+        test_flt(v[0][0], (float)(i / 3));
+        test_flt(v[1][3], (float)i);
+        /* The mesh has no data2 and data3, so they are zero */
+        test_flt(v[2][0], 0);
+        test_flt(v[3][3], 0);
     }
 
     ecs_fini(world);

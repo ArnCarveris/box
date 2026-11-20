@@ -610,9 +610,9 @@ bool box_gpu_vertex_data(
     const box_render_batch_t *b);
 
 /** Vertex buffer layout of the per vertex data stream of the _data entry points of the mesh
- * and shadow shaders: data0 at location 4 and data1 at location 5 (VertexData).
+ * and shadow shaders: data0 to data3 at locations 4 to 7 (VertexData).
  *
- * @param attrs Receives the two attributes the layout points to
+ * @param attrs Receives the BOX_RENDER_DATA_VECS attributes the layout points to
  * @return The layout
  */
 WGPUVertexBufferLayout box_gpu_vertex_data_layout(
@@ -1202,7 +1202,15 @@ void box_gpu_profile_frame(
 void box_gpu_terrain_bake_free(
     box_gpu_mesh_t *m);
 
-/** Release the layouts, buffers and placeholder of the terrain bakes.
+/** Create the bind group layout of the sampled terrains (terrain_sample.wgsl).
+ *
+ * @param gpu The backend
+ */
+void box_gpu_terrain_init(
+    box_gpu_t *gpu);
+
+/** Release the bindings of the sampled terrains and their layout, and the layouts, buffers and
+ * placeholder of the terrain bakes.
  *
  * @param gpu The backend
  */
@@ -1223,6 +1231,115 @@ WGPUTextureView box_gpu_terrain_bake_view(
     const box_render_texture_blend_t *blend,
     uint32_t *layout,
     uint32_t *version);
+/** Write the bindings of the terrains with TerrainSampled of a packet
+ * (box_render_terrain_sample_t), after box_gpu_terrain_heights copied their heights: the params
+ * and the cells when they changed, a cell whose slot holds no heights yet as no tile, and the bind
+ * group again when the surface assets or the mask atlas of the grid mesh were made again. The
+ * bindings of the terrains the packet does not sample are released.
+ *
+ * @param gpu The backend
+ * @param packet The packet
+ */
+void box_gpu_terrain_samples(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet);
+
+/** Get the bind group of a sampled terrain, for the passes whose compute or vertex stages read it
+ * with terrain_sample.wgsl at the group of terrain_sample_layout.
+ *
+ * @param gpu The backend
+ * @param terrain The terrain entity
+ * @return The group, valid until the next packet, NULL when the last packet did not sample it
+ */
+WGPUBindGroup box_gpu_terrain_sample_group(
+    box_gpu_t *gpu,
+    ecs_entity_t terrain);
+
+/** Create the layouts of the grass passes: the place pass reads a sampled terrain and writes
+ * the blades of a Grass, the draw reads the blades in the vertex stage.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_grass_init(
+    box_gpu_t *gpu);
+
+/** Release the grass passes, their pipelines and the buffers of every Grass.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_grass_fini(
+    box_gpu_t *gpu);
+
+/** Start the grass work of a packet: publish the blade counts and times read back, make the
+ * buffers of its Grass entities and release those of the Grass entities it no longer has, and
+ * zero the counts of the packet.
+ *
+ * @param gpu The backend
+ * @param packet The packet
+ */
+void box_gpu_grass_begin(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet);
+
+/** End the grass work of a packet: copy its blade counts and the timestamps of its passes into
+ * a readback, mapped a packet later.
+ *
+ * @param gpu The backend
+ * @param packet The packet
+ */
+void box_gpu_grass_end(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet);
+
+/** Check whether a view draws grass: it is lit, has a depth, is not an impostor frame nor
+ * WireframeOnly and a Grass of its scene has its buffers and pipelines.
+ *
+ * @param gpu The backend
+ * @param packet The packet
+ * @param v The view
+ * @return Whether box_gpu_grass_record places blades for it
+ */
+bool box_gpu_grass_drawn(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet,
+    const box_render_view_t *v);
+
+/** Record the compute pass that places the blades of the Grass entities of the scene of a view
+ * around its camera: per Grass a reset, a place dispatch over the patches of its grid and a
+ * finish that clamps the indirect arguments of its levels and adds the counts of the packet.
+ *
+ * @param gpu The backend
+ * @param encoder The encoder of the frame
+ * @param packet The packet
+ * @param v The view
+ * @param slot Slot of the view in the view buffer, whose uniforms are in view_data
+ */
+void box_gpu_grass_record(
+    box_gpu_t *gpu,
+    WGPUCommandEncoder encoder,
+    const box_render_packet_t *packet,
+    const box_render_view_t *v,
+    int32_t slot);
+
+/** Record the draws of the blades a view placed (box_gpu_grass_record) into one of its passes,
+ * one indirect draw per Grass and level of detail. Replaces the pipeline and the bind group at 1.
+ *
+ * @param gpu The backend
+ * @param pass The pass, with the bind group of the view at 0
+ * @param packet The packet
+ * @param v The view
+ * @param format Format of the color target, Undefined for the depth prepass
+ * @param equal Whether the pass loads the depth of a prepass that drew the blades, so it tests
+ * against it without writing it
+ * @return Whether a blade draw was recorded
+ */
+bool box_gpu_grass_draw(
+    box_gpu_t *gpu,
+    WGPURenderPassEncoder pass,
+    const box_render_packet_t *packet,
+    const box_render_view_t *v,
+    WGPUTextureFormat format,
+    bool equal);
 
 /** Write the uploads of a packet into their buffers.
  *
@@ -2437,13 +2554,14 @@ bool box_gpu_debug_enabled(
 
 /** Upload the edge adjacency of a mesh that can be wired (box_gpu_mesh_t.wireable) for its
  * wire draws (debug_wire.wgsl): for each index, the vertex of the neighbor triangle across the
- * edge opposite that corner which is not on the edge, or BOX_GPU_WIRE_NONE on a border.
+ * edge opposite that corner which is not on the edge, or BOX_GPU_WIRE_NONE on a border. It
+ * follows a copy of the indices in one buffer, so the wire draws read both from one binding.
  *
  * Edges are matched by the positions of their vertices, welded within a tiny distance, so the
  * vertices a face or a uv seam duplicates still join, in linear time.
  *
- * The backend keeps no CPU copy of a mesh, so it is built at the upload; it has one uint32_t
- * per index, the size of the indices.
+ * The backend keeps no CPU copy of a mesh, so it is built at the upload; the buffer has two
+ * uint32_t per index, twice the size of the indices.
  *
  * @param gpu The backend
  * @param m The mesh, with its index count

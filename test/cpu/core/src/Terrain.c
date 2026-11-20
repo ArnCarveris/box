@@ -662,3 +662,98 @@ void Terrain_masks_change_remakes_tiles(void) {
 
     ecs_fini(world);
 }
+
+void Terrain_sample_window_covers_drawn(void) {
+    ecs_entity_t terrain, focus;
+    ecs_world_t *world = tt_world(&terrain, &focus, 1000);
+    ecs_progress(world, 0);
+    tt_ready(world, terrain);
+    ecs_progress(world, 0);
+    box_terrain_window_t w;
+    test_bool(box_terrain_window(world, terrain, &w), true);
+    test_int(w.levels, 4);
+    test_int(w.resolution, 17);
+    test_int(w.focus_count, 1);
+    test_flt(w.tile_size, TT_TILE);
+    test_flt(w.extent, 0);
+    test_assert(w.cells > 0 && w.cells <= BOX_TERRAIN_WINDOW_CELLS);
+    test_int(w.cells % 2, 0);
+
+    // The windows center on the focus at the origin
+    int32_t count, i, level;
+    for (level = 0; level < w.levels; level ++) {
+        test_int(w.first[level][0], -w.cells / 2);
+        test_int(w.first[level][1], -w.cells / 2);
+        test_assert(w.morph[level][0] < w.morph[level][1]);
+        test_flt(w.morph[level][1], TT_RANGE * (double)(1 << level));
+    }
+
+    // Every tile that draws has a cell in the window of its level, with the morph of its tile
+    box_terrain_tile_t *const *tiles = box_terrain_tiles(world, terrain, &count);
+    test_assert(count > 0);
+    for (i = 0; i < count; i ++) {
+        const box_terrain_tile_t *t = tiles[i];
+        if (!t->drawn) {
+            continue;
+        }
+
+        int32_t x = t->ix - w.first[t->level][0], z = t->iz - w.first[t->level][1];
+        test_assert(x >= 0 && x < w.cells);
+        test_assert(z >= 0 && z < w.cells);
+        const TerrainTile *tile = ecs_get(world, t->entity, TerrainTile);
+        test_assert(tile != NULL);
+        test_flt(tile->morph[0], w.morph[t->level][0]);
+        test_flt(tile->morph[1], w.morph[t->level][1]);
+    }
+
+    ecs_fini(world);
+}
+
+void Terrain_sample_window_follows_focus(void) {
+    ecs_entity_t terrain, focus;
+    ecs_world_t *world = tt_world(&terrain, &focus, 1000);
+    ecs_progress(world, 0);
+    box_terrain_window_t before, after;
+    test_bool(box_terrain_window(world, terrain, &before), true);
+    ecs_set(world, focus, Position, {200, 10, -100});
+    ecs_progress(world, 0);
+    test_bool(box_terrain_window(world, terrain, &after), true);
+    test_int(after.cells, before.cells);
+    test_flt(after.foci[0][0], 200);
+    test_flt(after.foci[0][1], -100);
+    int32_t level;
+    for (level = 0; level < after.levels; level ++) {
+        double size = TT_TILE * (double)(1 << level);
+        test_int(after.first[level][0], (int32_t)floor(200 / size) - after.cells / 2);
+        test_int(after.first[level][1], (int32_t)floor(-100 / size) - after.cells / 2);
+    }
+
+    ecs_fini(world);
+}
+
+void Terrain_sample_window_without_terrain(void) {
+    ecs_entity_t terrain, focus;
+    ecs_world_t *world = tt_world(&terrain, &focus, 1000);
+    ecs_progress(world, 0);
+    box_terrain_window_t w;
+    test_bool(box_terrain_window(world, focus, &w), false);
+    test_int(w.levels, 0);
+    ecs_remove(world, terrain, Terrain);
+    ecs_progress(world, 0);
+    test_bool(box_terrain_window(world, terrain, &w), false);
+    ecs_fini(world);
+}
+
+void Terrain_sampled_tag(void) {
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    test_assert(TerrainSampled != 0);
+    test_assert(ecs_lookup(world, "box.terrain.TerrainSampled") == TerrainSampled);
+    test_int(ecs_script_run(world, "sampled",
+        "using box.terrain\n"
+        "hills { TerrainSampled }\n", NULL), 0);
+    ecs_entity_t hills = ecs_lookup(world, "hills");
+    test_assert(hills != 0);
+    test_bool(ecs_has_id(world, hills, TerrainSampled), true);
+    ecs_fini(world);
+}

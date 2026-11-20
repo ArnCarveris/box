@@ -184,6 +184,7 @@ void WorldOriginShading_wind_frame(void) {
     s->offset_x = 12.5;
     s->offset_z = 3;
     s->sway = 0.25;
+    s->clock = 1234.5;
     ecs_modified(world, ecs_id(Wind), WindStatus);
 
     box_render_wind_t at_zero, far;
@@ -198,6 +199,10 @@ void WorldOriginShading_wind_frame(void) {
     box_render_wind_frame(world, &far);
     test_flt(far.offset[0], (float)box_render_origin_wrap(12.5 - 1000, 160));
     test_flt(far.offset[1], (float)box_render_origin_wrap(3 + 300, 160));
+
+    /* The clock of the flutter and the branches does not move with the origin */
+    test_assert(at_zero.clock == 1234.5);
+    test_assert(far.clock == at_zero.clock);
     test_assert(far.offset[0] >= 0 && far.offset[0] < 160);
     test_assert(far.origin_y == 50);
 

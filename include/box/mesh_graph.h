@@ -28,7 +28,7 @@ extern "C" {
 #define BOX_MESH_NODE_PARAMS (32)
 
 /** Most float attributes of a value */
-#define BOX_MESH_ATTRS (16)
+#define BOX_MESH_ATTRS (32)
 
 /** Bytes of the name of an attribute, the terminating zero included */
 #define BOX_MESH_ATTR_NAME (24)
@@ -38,12 +38,12 @@ extern "C" {
 #define BOX_MESH_NODE_RANDOM (1u << 0)
 
 /** Prefix of the Mesh attributes that are the per vertex data of the shape: the attributes
- * data.0 to data.7 are channels 0 to 7 (Mesh3.data0 then data1, box_mesh_vertex_data); a mesh
- * without them has no data */
+ * data.0 to data.15 are channels 0 to 15 (Mesh3.data0 to data3, box_mesh_vertex_data and
+ * box_mesh_vertex_data_upper); a mesh without them has no data */
 #define BOX_MESH_DATA_ATTR "data."
 
-/** Data channels 0 to 2 of the bark of branching curves, as Tube writes them for
- * WindSwayHierarchy: the pivot of the branch, its root on the axis of its parent */
+/** Data channels 0 to 2 of the bark of branching curves, as Tube writes them for a WindSway
+ * with pivots: the pivot of the branch, its root on the axis of its parent */
 #define BOX_MESH_DATA_PIVOT (0)
 
 /** Data channel of the bark of branching curves: the level of the branch, 0 for a stem */
@@ -54,7 +54,8 @@ extern "C" {
 #define BOX_MESH_DATA_PHASE (4)
 
 /** Data channel of the bark of branching curves: the stiffness of the branch, the radius at
- * its base over the radius at the base of the stem it grows from, 1 for a stem */
+ * its base over the radius at the base of the stem it grows from, 1 for a stem; a WindSway
+ * reads it, with those of the ancestors, from the channels 8 to 15 */
 #define BOX_MESH_DATA_STIFFNESS (5)
 
 /** Data channel of the bark of branching curves: the distance in meters from the root of the
@@ -67,7 +68,8 @@ extern "C" {
 /** Data channel of foliage (Cards): the level of the twig a card grows on in its integer part,
  * plus 0.5 times the flutter weight of the vertex, 0..1 from the stem of the card to its tip,
  * as WindSway packs data0.w; the same channel as BOX_MESH_DATA_LEVEL of the bark, whose flutter
- * weight is 0. Its pivot is the pivot of the twig, in BOX_MESH_DATA_PIVOT */
+ * weight is 0. Its pivot is the pivot of the twig, in BOX_MESH_DATA_PIVOT; a WindSway with
+ * pivots and foliage reads only these channels */
 #define BOX_MESH_DATA_FLUTTER (3)
 
 /** Data channel of foliage: the seed of the card in 0..1, the same for every vertex of a card
@@ -281,7 +283,10 @@ ECS_STRUCT(MeshMerge, {
  *
  * A curve with a parent gets a collar: it flares and its normals blend into the surface of the
  * parent where it leaves it, and its rings inside the parent stay inside. Curves with a level
- * attribute (Stem, Branches) write the bark data channels, BOX_MESH_DATA_PIVOT and after.
+ * attribute (Stem, Branches) write the bark data channels, BOX_MESH_DATA_PIVOT and after, and
+ * in the channels 8 to 15 the pivots of the ancestors of their branch and the stiffnesses of the
+ * branch and its ancestors, as box_wind_sway_vertex packs data2 and data3, so a WindSway with
+ * pivots turns a branch of every level with all of its ancestors.
  */
 ECS_STRUCT(MeshTube, {
     ecs_entity_t curves;  /**< Curves input node */
@@ -611,7 +616,8 @@ ECS_ENUM(MeshNeedleStyle, {
  *
  * Each point has the attributes t (the fraction of the length of its curve), curve, level,
  * pivot_x, pivot_y and pivot_z (the root of its twig, the pivot of the twig for the wind),
- * root_distance (from the root of the plant), seed and hue (0..1, random per leaf) and index.
+ * root_distance (from the root of the plant), seed and hue (0..1, random per leaf), index and
+ * data.8 to data.15 (the WindSway data of the ancestors of its twig, as Tube writes it).
  * Defaults are set when the component is added.
  *
  * With keep below 1 only the leaves whose seed is under keep stay, and every other leaf merges
@@ -688,8 +694,10 @@ ECS_STRUCT(MeshNeedles, {
  * attributes of the points (the point without them), BOX_MESH_DATA_FLUTTER from their level
  * and the flutter weight (flutter times the height of the vertex along +Y from the stem over
  * the length of the card), BOX_MESH_DATA_SEED and BOX_MESH_DATA_HUE from their seed and hue (from
- * the index without them), BOX_MESH_DATA_GROWTH from their root_distance and
- * BOX_MESH_DATA_OCCLUSION 1. Defaults are set when the component is added.
+ * the index without them), BOX_MESH_DATA_GROWTH from their root_distance,
+ * BOX_MESH_DATA_OCCLUSION 1 and the channels 8 to 15 from the attributes data.8 to data.15 of
+ * the points, when they have them, so a card sways with its twig and all of its ancestors.
+ * Defaults are set when the component is added.
  */
 ECS_STRUCT(MeshCards, {
     ecs_entity_t points;   /**< Points input node */
@@ -701,9 +709,13 @@ ECS_STRUCT(MeshCards, {
     int32_t segments;      /**< Rows of quads along the card, 0 for 2, at most 16 */
     bool double_sided;     /**< Give the cards a back, true when added; a mesh input is kept
                             *   as it is */
+    bool shared_back;      /**< The back of a double sided card reuses the vertices of its
+                            *   front, its triangles wound the other way */
     float flutter;         /**< Flutter weight at the tip of the card, 0..1, 1 when added */
     float lod_segments;    /**< Factor of the segments per level of detail, at least 1 kept; 0
                             *   for 0.5, negative keeps them */
+    int32_t lod_flat;      /**< Level of detail from which the cards are flat quads of one row
+                            *   with a shared back, 0 for none */
 });
 
 /** Node of a MeshGraph that bends the normals of foliage toward the normals of the envelope of

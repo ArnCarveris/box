@@ -51,6 +51,8 @@ trees {
     prop stiffness: f32 = 0.5
     prop flutter: f32 = 0.07
     prop lods: i32 = 4
+    prop leaf_lod_skip: i32 = 0
+    prop leaf_lod_flat: i32 = 0
 
     Tree tree(
       seed: seed, height: 24 * age, radius: 0.42 * tree_age_radius(age), taper: 0.85, bend: 0.02,
@@ -68,7 +70,8 @@ trees {
       leaf_material: leaf_material, leaf_size: tree_age_leaf(0.9, age), leaf_count: 4,
       leaf_start: 0.2, leaf_angle: 0.6, leaf_orientation: FaceUp, leaf_tilt: 0.35,
       crown_shape: Ellipsoid, crown_normals: 0.7, occlusion: 0.75, stiffness: stiffness,
-      flutter: flutter, lods: lods
+      flutter: flutter, lods: lods,
+      leaf_lod_skip: leaf_lod_skip, leaf_lod_flat: leaf_lod_flat
     ) { Position: {0, 0, 0} }
   }
 
@@ -82,6 +85,8 @@ trees {
     prop stiffness: f32 = 0.65
     prop flutter: f32 = 0.07
     prop lods: i32 = 4
+    prop leaf_lod_skip: i32 = 0
+    prop leaf_lod_flat: i32 = 0
 
     Tree tree(
       seed: seed, height: 21 * age, radius: 0.6 * tree_age_radius(age), taper: 0.88, bend: 0.06,
@@ -99,7 +104,8 @@ trees {
       leaf_material: leaf_material, leaf_size: tree_age_leaf(0.8, age), leaf_count: 4,
       leaf_start: 0.25, leaf_angle: 0.7, leaf_orientation: FaceOut, leaf_tilt: 0.5,
       crown_shape: Ellipsoid, crown_normals: 0.65, occlusion: 0.75, stiffness: stiffness,
-      flutter: flutter, lods: lods
+      flutter: flutter, lods: lods,
+      leaf_lod_skip: leaf_lod_skip, leaf_lod_flat: leaf_lod_flat
     ) { Position: {0, 0, 0} }
   }
 
@@ -113,6 +119,8 @@ trees {
     prop stiffness: f32 = 0.3
     prop flutter: f32 = 0.1
     prop lods: i32 = 4
+    prop leaf_lod_skip: i32 = 0
+    prop leaf_lod_flat: i32 = 0
 
     Tree tree(
       seed: seed, height: 19 * age, radius: 0.2 * tree_age_radius(age), taper: 0.88, bend: 0.03,
@@ -130,7 +138,8 @@ trees {
       leaf_material: leaf_material, leaf_size: tree_age_leaf(0.6, age), leaf_count: 5,
       leaf_start: 0.1, leaf_angle: 0.4, leaf_orientation: Along, leaf_tilt: 0.3,
       crown_shape: Ellipsoid, crown_normals: 0.6, occlusion: 0.6, stiffness: stiffness,
-      flutter: flutter, lods: lods
+      flutter: flutter, lods: lods,
+      leaf_lod_skip: leaf_lod_skip, leaf_lod_flat: leaf_lod_flat
     ) { Position: {0, 0, 0} }
   }
 
@@ -144,6 +153,8 @@ trees {
     prop stiffness: f32 = 0.7
     prop flutter: f32 = 0.03
     prop lods: i32 = 4
+    prop leaf_lod_skip: i32 = 0
+    prop leaf_lod_flat: i32 = 0
 
     Tree tree(
       seed: seed, height: 28 * age, radius: 0.36 * tree_age_radius(age), taper: 0.95, bend: 0.01,
@@ -160,7 +171,8 @@ trees {
       leaf_material: leaf_material, leaf_levels: 2, leaf_start: 0.05, needle_style: Spruce,
       needle_cards: 3, needle_width: 0.7, needle_droop: 0.25, crown_shape: Density,
       crown_normals: 0.6, occlusion: 0.75, stiffness: stiffness,
-      flutter: flutter, lods: lods
+      flutter: flutter, lods: lods,
+      leaf_lod_skip: leaf_lod_skip, leaf_lod_flat: leaf_lod_flat
     ) { Position: {0, 0, 0} }
   }
 
@@ -174,6 +186,8 @@ trees {
     prop stiffness: f32 = 0.75
     prop flutter: f32 = 0.03
     prop lods: i32 = 4
+    prop leaf_lod_skip: i32 = 0
+    prop leaf_lod_flat: i32 = 0
 
     Tree tree(
       seed: seed, height: 30 * age, radius: 0.4 * tree_age_radius(age), taper: 0.95, bend: 0.01,
@@ -190,7 +204,8 @@ trees {
       leaf_levels: 2, leaf_start: 0.05, needle_style: Fir, needle_cards: 4, needle_width: 0.9,
       needle_droop: 0.05, crown_shape: Density, crown_normals: 0.6, occlusion: 0.75,
       stiffness: stiffness,
-      flutter: flutter, lods: lods
+      flutter: flutter, lods: lods,
+      leaf_lod_skip: leaf_lod_skip, leaf_lod_flat: leaf_lod_flat
     ) { Position: {0, 0, 0} }
   }
 
@@ -204,6 +219,8 @@ trees {
     prop stiffness: f32 = 0.6
     prop flutter: f32 = 0.03
     prop lods: i32 = 4
+    prop leaf_lod_skip: i32 = 0
+    prop leaf_lod_flat: i32 = 0
 
     Tree tree(
       seed: seed, height: 24 * age, radius: 0.32 * tree_age_radius(age), taper: 0.88, bend: 0.04,
@@ -222,7 +239,8 @@ trees {
       leaf_per_node: 3, leaf_start: 0.4, leaf_angle: 0.55, leaf_orientation: Along,
       leaf_tilt: 0.4, card: Cross, crown_shape: Ellipsoid, crown_normals: 0.6, occlusion: 0.65,
       stiffness: stiffness,
-      flutter: flutter, lods: lods
+      flutter: flutter, lods: lods,
+      leaf_lod_skip: leaf_lod_skip, leaf_lod_flat: leaf_lod_flat
     ) { Position: {0, 0, 0} }
   }
 
@@ -236,6 +254,8 @@ trees {
     prop stiffness: f32 = 0.25
     prop flutter: f32 = 0.12
     prop lods: i32 = 4
+    prop leaf_lod_skip: i32 = 0
+    prop leaf_lod_flat: i32 = 0
 
     Tree tree(
       seed: seed, height: 13 * age, radius: 0.45 * tree_age_radius(age), taper: 0.8, bend: 0.06,
@@ -252,7 +272,8 @@ trees {
       crown: None, leaf_material: leaf_material, leaf_size: tree_age_leaf(0.7, age),
       leaf_count: 6, leaf_start: 0.05, leaf_angle: 0.25, leaf_orientation: Along, leaf_tilt: 0.2,
       crown_shape: Density, crown_normals: 0.5, occlusion: 0.6, stiffness: stiffness,
-      flutter: flutter, lods: lods
+      flutter: flutter, lods: lods,
+      leaf_lod_skip: leaf_lod_skip, leaf_lod_flat: leaf_lod_flat
     ) { Position: {0, 0, 0} }
   }
 
@@ -272,6 +293,8 @@ trees {
     prop stiffness: f32 = 1
     prop flutter: f32 = 0.01
     prop lods: i32 = 4
+    prop leaf_lod_skip: i32 = 0
+    prop leaf_lod_flat: i32 = 0
 
     Tree tree(
       seed: seed, height: height > 0 ? height : 11 * age, radius: 0.36 * tree_age_radius(age),
@@ -287,7 +310,8 @@ trees {
       crown: None, leaf_material: leaf_material, leaf_size: tree_age_leaf(1.1, age), leaf_count: 2,
       leaf_start: 0.5, leaf_angle: 0.4, leaf_orientation: Along, leaf_tilt: 0.2, card: Quad,
       crown_shape: Density, crown_normals: 0.3, occlusion: 0.4, stiffness: stiffness,
-      flutter: flutter, lods: lods
+      flutter: flutter, lods: lods,
+      leaf_lod_skip: leaf_lod_skip, leaf_lod_flat: leaf_lod_flat
     ) { Position: {0, 0, 0} }
   }
 }

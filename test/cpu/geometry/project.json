@@ -345,6 +345,7 @@
                     "prefab_remove",
                     "data",
                     "data_one_stream",
+                    "data_upper",
                     "no_data",
                     "data_count_mismatch",
                     "data_derived_normals",

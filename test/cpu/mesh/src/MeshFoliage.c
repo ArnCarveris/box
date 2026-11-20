@@ -343,9 +343,9 @@ void MeshFoliage_leaves_attrs(void) {
     for (i = 0; i < p->count; i ++) {
         int32_t ci = (int32_t)curve[i];
         const float *at = c->positions[c->offsets[ci]];
-        test_near(px[i], at[0], 1e-5f);
-        test_near(py[i], at[1], 1e-5f);
-        test_near(pz[i], at[2], 1e-5f);
+        test_flt(px[i], sway_snap(at[0]));
+        test_flt(py[i], sway_snap(at[1]));
+        test_flt(pz[i], sway_snap(at[2]));
         test_assert(seed[i] >= 0.0f && seed[i] < 1.0f);
         test_assert(hue[i] >= 0.0f && hue[i] < 1.0f);
         test_flt(index[i], (float)(i % 40));
@@ -475,6 +475,36 @@ void MeshFoliage_cards_shapes(void) {
     ecs_fini(world);
 }
 
+void MeshFoliage_cards_shared_back(void) {
+    ecs_world_t *world = test_world();
+    ecs_entity_t stem = foliage_stem(world, "stem", (vec3){0, 1, 0});
+    ecs_entity_t leaves = foliage_node(world, "leaves", ecs_id(MeshLeaves), &(MeshLeaves){
+        .curves = stem, .count = 3, .end = 1, .angle = 0.8f, .size = 0.5f });
+    ecs_entity_t cards = foliage_node(world, "cards", ecs_id(MeshCards), &(MeshCards){
+        .points = leaves, .shape = MeshCardQuad, .segments = 1, .double_sided = true,
+        .shared_back = true, .flutter = 1 });
+    box_mg_value_t *v = test_eval(world, cards);
+    test_int(v->mesh.vertex_count, 3 * 4);
+    test_int(v->mesh.index_count, 3 * 12);
+    int32_t k, i;
+    for (k = 0; k < 3; k ++) {
+        const uint32_t *idx = &v->mesh.indices[k * 12];
+        for (i = 0; i < 12; i ++) {
+            test_assert(idx[i] >= (uint32_t)(k * 4));
+            test_assert(idx[i] < (uint32_t)(k * 4 + 4));
+        }
+
+        for (i = 0; i < 6; i += 3) {
+            test_int(idx[6 + i], idx[i]);
+            test_int(idx[6 + i + 1], idx[i + 2]);
+            test_int(idx[6 + i + 2], idx[i + 1]);
+        }
+    }
+
+    box_mg_value_release(v);
+    ecs_fini(world);
+}
+
 /** Every vertex of a card holds the pivot and level of its twig, the flutter weight from its
  * stem to its tip, the seed and hue of its card, its growth and an open occlusion */
 void MeshFoliage_cards_data(void) {
@@ -577,6 +607,63 @@ static ecs_entity_t foliage_crown(
     return foliage_node(world, "cards", ecs_id(MeshCards), &(MeshCards){
         .points = leaves, .shape = MeshCardBent, .bend = 0.15f, .double_sided = true,
         .flutter = 1 });
+}
+
+/** The cards of Leaves sway with their twig: every vertex holds in its channels 8 to 15 the
+ * pivots of the ancestors of the twig and the stiffnesses of the twig and its ancestors, the same
+ * values as the bark of the twig that Tube writes */
+void MeshFoliage_cards_sway(void) {
+    ecs_world_t *world = test_world();
+    ecs_entity_t limbs = foliage_tree(world, 3);
+    ecs_entity_t twigs = foliage_node(world, "twigs", ecs_id(MeshBranches), &(MeshBranches){
+        .curves = limbs, .count = 2, .start = 0.3f, .end = 1.0f,
+        .distribution = MeshBranchAlternate, .down_angle = 0.6f, .length = 0.5f,
+        .taper = 0.5f, .segments = 4 });
+    ecs_entity_t leaves = foliage_node(world, "leaves", ecs_id(MeshLeaves), &(MeshLeaves){
+        .curves = twigs, .count = 3, .end = 1, .angle = 0.8f, .size = 0.2f, .seed = 4 });
+    ecs_entity_t cards = foliage_node(world, "cards", ecs_id(MeshCards), &(MeshCards){
+        .points = leaves, .shape = MeshCardQuad, .flutter = 1 });
+    ecs_entity_t tube = foliage_node(world, "bark", ecs_id(MeshTube), &(MeshTube){
+        .curves = twigs, .sides = 4 });
+    box_mg_value_t *pts = test_eval(world, leaves);
+    box_mg_value_t *v = test_eval(world, cards);
+    box_mg_value_t *bark = test_eval(world, tube);
+    const box_mg_points_t *p = &pts->points;
+    const box_mg_mesh_t *m = &v->mesh, *b = &bark->mesh;
+    const float *d[16], *bd[16];
+    int32_t i, k, j;
+    for (k = 0; k < 16; k ++) {
+        d[k] = foliage_data(m, k);
+        bd[k] = foliage_data(b, k);
+    }
+
+    for (k = 0; k < 8; k ++) {
+        char name[BOX_MESH_ATTR_NAME];
+        ecs_os_snprintf(name, ECS_SIZEOF(name), "%s%d", BOX_MESH_DATA_ATTR, 8 + k);
+        points_attr(p, name);
+    }
+
+    test_assert(m->vertex_count > 0);
+    for (i = 0; i < m->vertex_count; i ++) {
+        test_flt(floorf(d[BOX_MESH_DATA_FLUTTER][i]), 2);
+        int32_t found = -1;
+        for (j = 0; j < b->vertex_count && found < 0; j ++) {
+            if (bd[0][j] == d[0][i] && bd[1][j] == d[1][i] && bd[2][j] == d[2][i]) {
+                found = j;
+            }
+        }
+
+        test_assert(found >= 0);
+        test_flt(bd[BOX_MESH_DATA_LEVEL][found], 2);
+        for (k = 8; k < 16; k ++) {
+            test_flt(d[k][i], bd[k][found]);
+        }
+    }
+
+    box_mg_value_release(bark);
+    box_mg_value_release(v);
+    box_mg_value_release(pts);
+    ecs_fini(world);
 }
 
 /** CrownNormals with a strength of 1 turns every normal to the outward normal of the

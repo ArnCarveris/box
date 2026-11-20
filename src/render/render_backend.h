@@ -80,7 +80,7 @@ typedef struct box_render_gpu_stats_t {
                                  *   surface assets differ from the ones bound last in the pass */
     int32_t data_binds;         /**< Per vertex data streams bound in the depth prepass,
                                  *   forward, shadow and capture passes, one per draw of a mesh
-                                 *   with data (Mesh3.data0, data1); never for a mesh without */
+                                 *   with data (Mesh3.data0 to data3); never for a mesh without */
     int32_t cull_dispatches;    /**< Compute dispatches the cull passes of views recorded:
                                  *   cull_instances, cull_ordered, cull_scan and cull_write,
                                  *   not the pyramid reductions nor the probe capture culls */
@@ -105,6 +105,17 @@ typedef struct box_render_gpu_stats_t {
                                  *   queries */
     int32_t atmosphere_passes[BOX_RENDER_ATMOS_PASSES]; /**< Passes whose GPU time
                                  *   atmosphere_ns holds */
+    int32_t grass_passes;       /**< Compute passes that placed the grass blades of a view,
+                                 *   one per frame of a lit view whose scene has a Grass */
+    int64_t grass_ns;           /**< GPU time of the grass compute passes read back, 0 without
+                                 *   timestamp queries */
+    int32_t grass_timed;        /**< Grass compute passes whose GPU time grass_ns holds */
+    int64_t grass_generated[BOX_GRASS_LODS]; /**< Blades the grass passes placed in the patches
+                                 *   the views saw, per level of detail, read back */
+    int64_t grass_drawn[BOX_GRASS_LODS]; /**< Blades of those the views drew per level of
+                                 *   detail, read back */
+    int32_t grass_reads;        /**< Packets whose blades grass_generated and grass_drawn
+                                 *   hold */
     int32_t shadow_tiles;       /**< Shadow atlas tiles rendered */
     int32_t shadow_reused;      /**< Shadow atlas tiles kept from an earlier frame instead of
                                  *   rendered */
@@ -991,6 +1002,57 @@ bool box_render_gpu_read_buffer(
 uint64_t box_render_gpu_buffer_size(
     ecs_world_t *world,
     uint32_t handle);
+
+/** A grass blade the GPU backend placed, read back for tests */
+typedef struct box_render_grass_blade_t {
+    float position[3];          /**< Local world position of its base in the packet that
+                                 *   placed it */
+    float yaw;                  /**< Angle of its facing around the vertical in radians */
+    float height;               /**< Height in meters, shrunk where it fades out */
+    float width;                /**< Width at its base in meters, widened with distance */
+    int32_t level;              /**< Level of detail it is drawn with */
+} box_render_grass_blade_t;
+
+/** Read back the blades of a Grass as the last view that placed them left them, waiting for the
+ * copy, for tests. Only call this when the main thread renders, after box_render_sync.
+ *
+ * @param world The world
+ * @param grass The Grass entity
+ * @param out Receives box_render_grass_blade_t, the blades of level 0 first
+ * @return Whether the backend placed blades of the Grass and they were read
+ */
+bool box_render_gpu_grass_blades(
+    ecs_world_t *world,
+    ecs_entity_t grass,
+    ecs_vec_t *out);
+
+/** Run a compute shader that reads a terrain with TerrainSampled (terrain_sample.wgsl) and copy
+ * what it wrote into memory, waiting for the copy, for tests.
+ *
+ * The shader file is preprocessed as the engine shaders are; its entry point main gets the
+ * bindings of the terrain of the last packet at group 0, its input as a read only storage buffer
+ * at group 1 binding 0 and its output as a read write storage buffer at group 1 binding 1. Only
+ * call this when the main thread renders, after box_render_sync, as box_render_gpu_read_buffer.
+ *
+ * @param world The world
+ * @param terrain The terrain entity, with TerrainSampled
+ * @param path The WGSL file
+ * @param in The input, NULL when in_size is 0
+ * @param in_size Bytes of the input, a multiple of 4, 0 for an empty buffer
+ * @param out Receives the output
+ * @param out_size Bytes of the output, a multiple of 4
+ * @param groups Workgroups dispatched along x
+ * @return Whether the last packet sampled the terrain and the output was copied
+ */
+bool box_render_gpu_terrain_compute(
+    ecs_world_t *world,
+    ecs_entity_t terrain,
+    const char *path,
+    const void *in,
+    uint32_t in_size,
+    void *out,
+    uint32_t out_size,
+    uint32_t groups);
 
 /** Read back what the cull pass of a view kept in the last target the GPU backend rendered.
  *

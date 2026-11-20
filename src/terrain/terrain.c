@@ -13,6 +13,7 @@
 #include <math.h>
 
 ECS_COMPONENT_DECLARE(TileTerrainGrid);
+ECS_TAG_DECLARE(TerrainSampled);
 
 /** Check whether a character of the grid is whitespace.
  *
@@ -269,6 +270,7 @@ void BoxTerrainImport(
     ECS_META_COMPONENT(world, Terrain);
     ECS_META_COMPONENT(world, TerrainStatus);
     ecs_add_pair(world, ecs_id(TerrainStatus), EcsOnInstantiate, EcsDontInherit);
+    ECS_TAG_DEFINE(world, TerrainSampled);
     box_terrain_tiles_import(world);
     ECS_META_COMPONENT(world, TerrainQueryStatus);
     ecs_add_pair(world, ecs_id(TerrainQueryStatus), EcsOnInstantiate, EcsDontInherit);

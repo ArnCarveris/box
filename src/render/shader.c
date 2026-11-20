@@ -455,7 +455,8 @@ static void box_shader_changed(
  * may process environments, or it builds atmosphere LUTs and the packet has an atmosphere, or
  * it converts environment images or draws environment backgrounds and the packet carries an
  * image or a view with a background, or it simulates or draws particles
- * and the packet has a particle pool, or it blurs the opaque snapshot and a batch is
+ * and the packet has a particle pool, or it places or draws grass blades and the packet has a
+ * Grass, or it blurs the opaque snapshot and a batch is
  * transmissive, or it lights fog volumes or assigns lights to clusters and a view of the
  * packet draws a fog volume, which reads the clusters for its point and spot lights, or it
  * raymarches planet atmosphere shells and a view of the packet draws one, or it steps the fields
@@ -521,6 +522,10 @@ static bool box_shader_used(
     }
 
     if (box_render_particles_use(p, handle)) {
+        result = true;
+    }
+
+    if (box_render_grass_use(p, handle)) {
         result = true;
     }
 
@@ -1024,6 +1029,10 @@ void BoxShaderImport(
         BOX_RENDER_SHADER_PARTICLE_SIM, true);
     box_shader_builtin(world, state, builtin, "particle_draw",
         "etc/shaders/particle_draw.wgsl", BOX_RENDER_SHADER_PARTICLE_DRAW, true);
+    box_shader_builtin(world, state, builtin, "grass_place", "etc/shaders/grass_place.wgsl",
+        BOX_RENDER_SHADER_GRASS_PLACE, true);
+    box_shader_builtin(world, state, builtin, "grass", "etc/shaders/grass.wgsl",
+        BOX_RENDER_SHADER_GRASS, true);
     box_shader_builtin(world, state, builtin, "transmission", "etc/shaders/transmission.wgsl",
         BOX_RENDER_SHADER_TRANSMISSION, true);
     box_shader_builtin(world, state, builtin, "planar", "etc/shaders/planar.wgsl",

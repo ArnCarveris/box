@@ -17,11 +17,17 @@
 //
 // A material with WIND_PIVOTS whose mesh has per vertex data (the _data entry points set it with
 // wind_vertex_data) first turns every vertex of a branch rigidly about the pivot of the branch
-// (data0.xyz in object space), by an angle read at the pivot, and a branch of level 2 or more
-// then with its parent about the pivot of the parent (data1.xyz), so it stays attached to it.
-// The level and the flutter weight of the vertex are packed in data0.w, the stiffness of the
-// branch and of its parent in data1.w (WindSway and box_wind_sway_vertex in material.h). It then
-// bends the vertex by its rest position as above; the flutter is weighted by the flutter weight.
+// (data0.xyz in object space), by an angle read at the pivot, then with each of its ancestors
+// about the pivot of that ancestor, from its parent out to the branch of level 1, so a branch of
+// any level stays attached to its parent. The level and the flutter weight of the vertex are
+// packed in data0.w; the pivot of the parent is data2.xyz, those of the grandparent and the great
+// grandparent offsets from it packed in data3, and the stiffnesses of the branch and its
+// ancestors in data2.w (WindSway and box_wind_sway_vertex in material.h). Every pivot snaps down
+// to the grid of WIND_GRID, so the pivots a branch turns about are the same values in its own
+// vertices and in those of its descendants. It then bends the vertex by its rest position as
+// above; the flutter is weighted by the flutter weight.
+// A material with WIND_FOLIAGE turns a vertex only about the pivot of its twig (data0.xyz) with a
+// stiffness of 0, without its ancestors, like the twig, so a leaf stays on it.
 #pragma once
 
 #include "wind_gust.wgsl"
@@ -42,8 +48,18 @@ const WIND_TAU: f32 = 6.283185307179586;
 // Flag of a record with pivots (BOX_RENDER_WIND_PIVOTS).
 const WIND_PIVOTS: u32 = 64u;
 
+// Flag of a record with pivots that reads only data0, the foliage of a MeshGraph whose data1
+// holds the seed, hue, growth and occlusion of its cards (BOX_RENDER_WIND_FOLIAGE).
+const WIND_FOLIAGE: u32 = 2048u;
+
 // Deepest branch level a record with pivots tells apart (BOX_MATERIAL_SWAY_LEVELS).
 const WIND_LEVELS: f32 = 4.0;
+
+// Cells per object space unit of the grid the pivots snap to (BOX_MATERIAL_SWAY_GRID).
+const WIND_GRID: f32 = 256.0;
+
+// Bias of the packed offsets of the ancestor pivots in grid cells (BOX_MATERIAL_SWAY_BIAS).
+const WIND_OFFSET_BIAS: f32 = 32768.0;
 
 // Lean of a branch around which it swings, and the relative amplitude of its swing about the
 // wind axis (BOX_RENDER_WIND_BRANCH_CROSS).
@@ -54,13 +70,16 @@ const WIND_BRANCH_CROSS: f32 = 0.3;
 // without it a WIND_PIVOTS material sways as without pivots.
 var<private> wind_data: bool = false;
 var<private> wind_data0: vec4f = vec4f(0.0);
-var<private> wind_data1: vec4f = vec4f(0.0);
+var<private> wind_data2: vec4f = vec4f(0.0);
+var<private> wind_data3: vec4f = vec4f(0.0);
 
-// Make the per vertex data of the vertex being placed available to wind_move.
-fn wind_vertex_data(data0: vec4f, data1: vec4f) {
+// Make the per vertex data of the vertex being placed available to wind_move: data0, data2 and
+// data3 of the mesh (data1 is free for other uses).
+fn wind_vertex_data(data0: vec4f, data2: vec4f, data3: vec4f) {
     wind_data = true;
     wind_data0 = data0;
-    wind_data1 = data1;
+    wind_data2 = data2;
+    wind_data3 = data3;
 }
 
 // Axis the phase of the flutter of a vertex runs along (BOX_RENDER_WIND_FLUTTER_AXIS); its
@@ -95,8 +114,8 @@ fn wind_pivots(m: Material) -> bool {
     return wind_data && (m.flags & WIND_PIVOTS) != 0u;
 }
 
-// Phase of a branch, 0..1, hashed from the bits of its object space pivot, so the vertices of a
-// branch and of its children (whose data1.xyz is the same pivot) agree.
+// Phase of a branch, 0..1, hashed from the bits of its snapped object space pivot, so the
+// vertices of a branch and of its descendants (which decode the same pivot) agree.
 fn wind_branch_phase(pivot: vec3f) -> f32 {
     var h = dot(bitcast<vec3u>(pivot), vec3u(0x8da6b343u, 0xd8163841u, 0xcb1ab31fu));
     h = (h ^ (h >> 16u)) * 0x7feb352du;
@@ -134,12 +153,31 @@ fn wind_turn(pivot: vec3f, level: f32, stiffness: f32, phase0: f32, m: Material)
     return result;
 }
 
-// The stiffness of the branch of the vertex being placed (x) and of its parent (y), packed in
-// data1.w (box_wind_sway_vertex).
-fn wind_stiffness() -> vec2f {
-    let q = max(round(wind_data1.w), 0.0);
-    let parent = floor(q / 256.0);
-    return clamp(vec2f(q - 256.0 * parent, parent) / 255.0, vec2f(0.0), vec2f(1.0));
+// The stiffnesses of the branch of the vertex being placed (x), its parent (y), grandparent (z)
+// and great grandparent (w), 6 bits each in data2.w (box_wind_sway_vertex).
+fn wind_stiffness() -> vec4f {
+    let q = u32(clamp(round(wind_data2.w), 0.0, 16777215.0));
+    let s = vec4u(q, q >> 6u, q >> 12u, q >> 18u) & vec4u(63u);
+    return vec4f(s) / 63.0;
+}
+
+// The pivots of the branch of the vertex being placed and of its ancestors in object space,
+// snapped down to the grid in cells: the branch (0), its parent (1, data2.xyz), grandparent and
+// great grandparent (2 and 3, offsets from the parent of 16 bits each, packed 24 bits to a
+// channel of data3 by box_wind_sway_vertex).
+fn wind_pivot_cells() -> array<vec3f, 4> {
+    var result: array<vec3f, 4>;
+    result[0] = floor(wind_data0.xyz * WIND_GRID);
+    result[1] = floor(wind_data2.xyz * WIND_GRID);
+    let w = vec4u(clamp(round(wind_data3), vec4f(0.0), vec4f(16777215.0)));
+    let c0 = w.x | (w.y << 24u);
+    let c1 = (w.y >> 8u) | (w.z << 16u);
+    let c2 = (w.z >> 16u) | (w.w << 8u);
+    result[2] = result[1] + vec3f(f32(c0 & 0xFFFFu), f32(c0 >> 16u), f32(c1 & 0xFFFFu)) -
+        WIND_OFFSET_BIAS;
+    result[3] = result[1] + vec3f(f32(c1 >> 16u), f32(c2 & 0xFFFFu), f32(c2 >> 16u)) -
+        WIND_OFFSET_BIAS;
+    return result;
 }
 
 // Whether a material moves its vertices: it has a WindSway and the wind blows.
@@ -178,17 +216,22 @@ fn wind_move(world: vec3f, model: mat4x4f, m: Material, absolute: WorldOrigin) -
     let packed = max(wind_data0.w, 0.0);
     let weight = clamp(2.0 * fract(packed), 0.0, 1.0);
     if (pivots) {
-        // A branch turns about its pivot, then with its parent about the pivot of the parent
+        // A branch turns about its pivot, then with each ancestor about the pivot of the
+        // ancestor, its parent first
         let level = min(floor(packed), WIND_LEVELS);
-        let stiffness = wind_stiffness();
-        let pivot = (model * vec4f(wind_data0.xyz, 1.0)).xyz;
-        o.turn = wind_turn(pivot, level, stiffness.x, wind_branch_phase(wind_data0.xyz), m);
-        var moved = pivot + wind_rotate(world - pivot, o.turn);
-        if (level >= 2.0) {
-            let parent = (model * vec4f(wind_data1.xyz, 1.0)).xyz;
-            let turn = wind_turn(parent, level - 1.0, stiffness.y,
-                wind_branch_phase(wind_data1.xyz), m);
-            moved = parent + wind_rotate(moved - parent, turn);
+        let foliage = (m.flags & WIND_FOLIAGE) != 0u;
+        let stiffness = select(wind_stiffness(), vec4f(0.0), foliage);
+        var cells = wind_pivot_cells();
+        var moved = world;
+        for (var k = 0; k < 4; k++) {
+            let at = level - f32(k);
+            if (at < 1.0 || (foliage && k > 0)) {
+                break;
+            }
+            let rest = cells[k] / WIND_GRID;
+            let pivot = (model * vec4f(rest, 1.0)).xyz;
+            let turn = wind_turn(pivot, at, stiffness[k], wind_branch_phase(rest), m);
+            moved = pivot + wind_rotate(moved - pivot, turn);
             o.turn = wind_compose(turn, o.turn);
         }
         o.offset += moved - world;

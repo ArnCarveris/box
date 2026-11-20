@@ -661,44 +661,115 @@ static void box_wind_sway_ctor(
     }
 }
 
-/** Quantize a stiffness to 0..255, 0 when not finite.
+/** Quantize a stiffness to 0..63, 0 when not finite.
  *
  * @param stiffness The stiffness, 0..1
  * @return The quantized stiffness
  */
-static float box_wind_sway_stiffness(
+static uint32_t box_wind_sway_stiffness(
     float stiffness)
 {
-    return isfinite(stiffness) ? roundf(glm_clamp(stiffness, 0.0f, 1.0f) * 255.0f) : 0.0f;
+    return isfinite(stiffness)
+        ? (uint32_t)roundf(glm_clamp(stiffness, 0.0f, 1.0f) * 63.0f) : 0u;
+}
+
+/** Grid cell of an object space coordinate of a pivot, as wind.wgsl snaps it: floor of the
+ * coordinate times BOX_MATERIAL_SWAY_GRID, exact in single precision.
+ *
+ * @param value The coordinate
+ * @return The cell, 0 when not finite
+ */
+static float box_wind_sway_cell(
+    float value)
+{
+    return isfinite(value) ? floorf(value * BOX_MATERIAL_SWAY_GRID) : 0.0f;
 }
 
 void box_wind_sway_vertex(
     vec4 data0,
-    vec4 data1,
+    vec4 data2,
+    vec4 data3,
     const vec3 pivot,
     int32_t level,
-    float stiffness,
     float weight,
-    const vec3 parent,
-    float parent_stiffness)
+    const vec3 *ancestors,
+    const float *stiffness)
 {
     float w = isfinite(weight) ? glm_clamp(weight, 0.0f, 1.0f) : 0.0f;
+    uint32_t offsets[6] = {0}, packed = 0, c[3];
+    int32_t i, k;
     if (level < 0) {
         level = 0;
     } else if (level > BOX_MATERIAL_SWAY_LEVELS) {
         level = BOX_MATERIAL_SWAY_LEVELS;
     }
 
-    glm_vec3_copy(ECS_CONST_CAST(float*, pivot), data0);
-    data0[3] = (float)level + 0.5f * w;
-    if (parent) {
-        glm_vec3_copy(ECS_CONST_CAST(float*, parent), data1);
-    } else {
-        glm_vec3_zero(data1);
+    glm_vec3_zero(data2);
+    for (k = 0; k < 3; k ++) {
+        data0[k] = box_wind_sway_cell(pivot[k]) / BOX_MATERIAL_SWAY_GRID;
+        if (ancestors && level >= 2) {
+            data2[k] = box_wind_sway_cell(ancestors[0][k]) / BOX_MATERIAL_SWAY_GRID;
+        }
     }
 
-    data1[3] = box_wind_sway_stiffness(stiffness) +
-        256.0f * box_wind_sway_stiffness(parent_stiffness);
+    data0[3] = (float)level + 0.5f * w;
+
+    for (i = 0; stiffness && i < level; i ++) {
+        packed |= box_wind_sway_stiffness(stiffness[i]) << (6 * i);
+    }
+
+    data2[3] = (float)packed;
+
+    for (i = 0; i < 2; i ++) {
+        for (k = 0; k < 3; k ++) {
+            float offset = 0.0f;
+            if (ancestors && level >= 3 + i) {
+                offset = box_wind_sway_cell(ancestors[1 + i][k]) -
+                    box_wind_sway_cell(ancestors[0][k]);
+            }
+
+            offset = glm_clamp(offset + (float)BOX_MATERIAL_SWAY_BIAS, 0.0f, 65535.0f);
+            offsets[i * 3 + k] = (uint32_t)offset;
+        }
+    }
+
+    c[0] = offsets[0] | (offsets[1] << 16);
+    c[1] = offsets[2] | (offsets[3] << 16);
+    c[2] = offsets[4] | (offsets[5] << 16);
+    data3[0] = (float)(c[0] & 0xFFFFFFu);
+    data3[1] = (float)((c[0] >> 24) | ((c[1] & 0xFFFFu) << 8));
+    data3[2] = (float)((c[1] >> 16) | ((c[2] & 0xFFu) << 16));
+    data3[3] = (float)(c[2] >> 8);
+}
+
+void box_wind_sway_ancestors(
+    const vec4 data2,
+    const vec4 data3,
+    vec3 ancestors[3])
+{
+    uint32_t w[4], c[3], offsets[6];
+    int32_t i, k;
+    for (i = 0; i < 4; i ++) {
+        float v = isfinite(data3[i]) ? roundf(glm_clamp(data3[i], 0.0f, 16777215.0f)) : 0.0f;
+        w[i] = (uint32_t)v;
+    }
+
+    c[0] = w[0] | (w[1] << 24);
+    c[1] = (w[1] >> 8) | (w[2] << 16);
+    c[2] = (w[2] >> 16) | (w[3] << 8);
+    for (i = 0; i < 3; i ++) {
+        offsets[i * 2] = c[i] & 0xFFFFu;
+        offsets[i * 2 + 1] = c[i] >> 16;
+    }
+
+    for (k = 0; k < 3; k ++) {
+        float parent = box_wind_sway_cell(data2[k]);
+        ancestors[0][k] = parent / BOX_MATERIAL_SWAY_GRID;
+        for (i = 0; i < 2; i ++) {
+            ancestors[1 + i][k] = (parent + (float)offsets[i * 3 + k] -
+                (float)BOX_MATERIAL_SWAY_BIAS) / BOX_MATERIAL_SWAY_GRID;
+        }
+    }
 }
 
 /** Construct TextureMapping values that keep the UVs of the mesh, with a size of 1 and no

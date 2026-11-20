@@ -792,9 +792,11 @@ void MeshBranch_bark_data(void) {
             along = m->uvs[base + j * ring][1];
             for (k = 0; k < ring; k ++) {
                 int32_t vx = base + j * ring + k;
-                test_near(mesh_data(m, BOX_MESH_DATA_PIVOT)[vx], cv->positions[first][0], 0);
-                test_near(mesh_data(m, BOX_MESH_DATA_PIVOT + 1)[vx], cv->positions[first][1], 0);
-                test_near(mesh_data(m, BOX_MESH_DATA_PIVOT + 2)[vx], cv->positions[first][2], 0);
+                /* The pivot snapped to the grid, as its descendants unpack it */
+                for (int32_t a = 0; a < 3; a ++) {
+                    test_flt(mesh_data(m, BOX_MESH_DATA_PIVOT + a)[vx],
+                        sway_snap(cv->positions[first][a]));
+                }
                 test_near(mesh_data(m, BOX_MESH_DATA_LEVEL)[vx], i ? 1.0f : 0.0f, 0);
                 test_near(mesh_data(m, BOX_MESH_DATA_PHASE)[vx], phase[first], 0);
                 test_near(mesh_data(m, BOX_MESH_DATA_STIFFNESS)[vx],
@@ -864,10 +866,201 @@ void MeshBranch_shape_data(void) {
 
     const float *p = c->curves.positions[c->curves.offsets[2]];
     int32_t last = m->vertex_count - 1;
-    test_near(mesh_data(m, BOX_MESH_DATA_PIVOT)[last], p[0] + 1, 1e-5f);
-    test_near(mesh_data(m, BOX_MESH_DATA_PIVOT + 1)[last], p[1] + 2, 1e-5f);
-    test_near(mesh_data(m, BOX_MESH_DATA_PIVOT + 2)[last], p[2] + 3, 1e-5f);
+    test_flt(mesh_data(m, BOX_MESH_DATA_PIVOT)[last], sway_snap(p[0]) + 1);
+    test_flt(mesh_data(m, BOX_MESH_DATA_PIVOT + 1)[last], sway_snap(p[1]) + 2);
+    test_flt(mesh_data(m, BOX_MESH_DATA_PIVOT + 2)[last], sway_snap(p[2]) + 3);
 
+    box_mg_value_release(v);
+    box_mg_value_release(c);
+    ecs_fini(world);
+}
+
+/** Tube writes in the channels 8 to 15 the pivots of the ancestors of the branch of every
+ * vertex and the stiffnesses of the branch and its ancestors, as box_wind_sway_vertex packs
+ * them, so a WindSway with pivots turns a branch of level 3 and 4 with every ancestor; a
+ * MeshGraph shape gives them to its mesh as its upper data */
+void MeshBranch_sway_chain(void) {
+    ecs_world_t *world = test_world();
+    ecs_entity_t trunk = trunk_node(world, 4, 0.2f, 0.5f);
+    ecs_entity_t limbs = branches_node(world, "limbs", trunk, MeshBranchAlternate, 2, 0.5f);
+    ecs_entity_t twigs = branches_node(world, "twigs", limbs, MeshBranchAlternate, 2, 0.5f);
+    ecs_entity_t shoots = branches_node(world, "shoots", twigs, MeshBranchAlternate, 2, 0.5f);
+    ecs_entity_t sprigs = branches_node(world, "sprigs", shoots, MeshBranchAlternate, 2, 0.5f);
+    ecs_entity_t tube = branch_node(world, "bark", ecs_id(MeshTube), &(MeshTube){
+        .curves = sprigs, .sides = 4 });
+    box_mg_value_t *v = test_eval(world, tube), *c = test_eval(world, sprigs);
+    const box_mg_mesh_t *m = &v->mesh;
+    const box_mg_curves_t *cv = &c->curves;
+    const float *level = curve_attr(cv, "level");
+    const float *d[16];
+    int32_t i, j, k, counts[5] = {0};
+    test_int(cv->curve_count, 1 + 2 + 4 + 8 + 16);
+    for (k = 0; k < 16; k ++) {
+        d[k] = mesh_data(m, k);
+    }
+
+    for (i = 0; i < m->vertex_count; i ++) {
+        int32_t curve = -1;
+        for (k = 0; k < cv->curve_count && curve < 0; k ++) {
+            const float *p = cv->positions[cv->offsets[k]];
+            if (sway_snap(p[0]) == d[0][i] && sway_snap(p[1]) == d[1][i] &&
+                sway_snap(p[2]) == d[2][i])
+            {
+                curve = k;
+            }
+        }
+
+        test_assert(curve >= 0);
+        int32_t lv = (int32_t)level[cv->offsets[curve]];
+        test_assert(lv >= 0 && lv <= 4);
+        test_flt(d[BOX_MESH_DATA_LEVEL][i], (float)lv);
+        counts[lv] ++;
+
+        vec4 d2 = { d[8][i], d[9][i], d[10][i], d[11][i] };
+        vec4 d3 = { d[12][i], d[13][i], d[14][i], d[15][i] };
+        vec3 ancestors[3];
+        box_wind_sway_ancestors(d2, d3, ancestors);
+        uint32_t packed = (uint32_t)d2[3];
+        int32_t at = curve;
+        for (j = 0; j < lv; j ++) {
+            float expected = cv->radii[cv->offsets[at]] / 0.2f;
+            float stiffness = (float)((packed >> (6 * j)) & 63u) / 63.0f;
+            test_assert(fabsf(stiffness - expected) <= 0.5f / 63.0f + 1e-5f);
+            at = cv->parents[at];
+            test_assert(at >= 0);
+            test_int((int32_t)level[cv->offsets[at]], lv - j - 1);
+            if (j == 0 && lv >= 2) {
+                /* The parent pivot, the same value as the pivot of the parent */
+                for (k = 0; k < 3; k ++) {
+                    test_flt(d2[k], sway_snap(cv->positions[cv->offsets[at]][k]));
+                }
+            }
+
+            if (j < 3 && lv - j >= 2) {
+                for (k = 0; k < 3; k ++) {
+                    test_flt(ancestors[j][k], sway_snap(cv->positions[cv->offsets[at]][k]));
+                }
+            }
+        }
+
+        test_assert(packed >> (6 * lv) == 0);
+    }
+
+    for (k = 0; k <= 4; k ++) {
+        test_assert(counts[k] > 0);
+    }
+
+    /* The shape gives the channels 8 to 15 to its mesh as the upper data */
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, MeshGraph, { .output = tube });
+    test_int(test_wait(world, e)->state, MeshGraphReady);
+    const box_mesh_t *mesh = test_shape_mesh(world, e);
+    test_assert(mesh != NULL);
+    test_assert(mesh->data != NULL);
+    test_assert(mesh->data_upper != NULL);
+    test_int(mesh->vertex_count, m->vertex_count);
+    for (i = 0; i < m->vertex_count; i ++) {
+        for (k = 0; k < 8; k ++) {
+            test_flt(mesh->data[i * 2 + k / 4][k % 4], d[k][i]);
+            test_flt(mesh->data_upper[i * 2 + k / 4][k % 4], d[8 + k][i]);
+        }
+    }
+
+    box_mg_value_release(v);
+    box_mg_value_release(c);
+    ecs_fini(world);
+}
+
+/** MeshTransform with a rotation, a scale and an off grid position moves the pivots of the
+ * WindSway data so that a branch of level 3 and 4 still unpacks the same grid cells for its
+ * grandparent and great grandparent as the vertices of those branches hold for themselves, so
+ * the deep branches turn with exactly the turns of their ancestors */
+void MeshBranch_sway_chain_transformed(void) {
+    ecs_world_t *world = test_world();
+    ecs_entity_t trunk = trunk_node(world, 4, 0.2f, 0.5f);
+    ecs_entity_t limbs = branches_node(world, "limbs", trunk, MeshBranchAlternate, 2, 0.5f);
+    ecs_entity_t twigs = branches_node(world, "twigs", limbs, MeshBranchAlternate, 2, 0.5f);
+    ecs_entity_t shoots = branches_node(world, "shoots", twigs, MeshBranchAlternate, 2, 0.5f);
+    ecs_entity_t sprigs = branches_node(world, "sprigs", shoots, MeshBranchAlternate, 2, 0.5f);
+    ecs_entity_t tube = branch_node(world, "bark", ecs_id(MeshTube), &(MeshTube){
+        .curves = sprigs, .sides = 4 });
+    ecs_entity_t moved = branch_node(world, "moved", ecs_id(MeshTransform), &(MeshTransform){
+        .input = tube, .position = {0.3013f, -1.0007f, 2.1234f}, .rotation = {0.7f, 0.3f, -0.2f},
+        .scale = {2.03f, 1.7f, 2.03f} });
+    ecs_entity_t twice = branch_node(world, "twice", ecs_id(MeshTransform), &(MeshTransform){
+        .input = moved, .position = {-0.0011f, 0.0042f, 0.5003f}, .rotation = {-0.4f, 0, 0.1f},
+        .scale = {0.77f, 0.77f, 0.77f} });
+    box_mg_value_t *v = test_eval(world, tube), *c = test_eval(world, sprigs);
+    box_mg_value_t *outs[2] = { test_eval(world, moved), test_eval(world, twice) };
+    const box_mg_mesh_t *m = &v->mesh;
+    const box_mg_curves_t *cv = &c->curves;
+    const float *level = curve_attr(cv, "level");
+    int32_t *curve_of = ecs_os_malloc_n(int32_t, m->vertex_count);
+    int32_t *first = ecs_os_malloc_n(int32_t, cv->curve_count);
+    int32_t i, j, k, o, deep = 0;
+    for (k = 0; k < cv->curve_count; k ++) {
+        first[k] = -1;
+    }
+
+    /* The branch of every vertex, from its pivot before the transform */
+    for (i = 0; i < m->vertex_count; i ++) {
+        const float *d0 = mesh_data(m, 0), *d1 = mesh_data(m, 1), *d2 = mesh_data(m, 2);
+        curve_of[i] = -1;
+        for (k = 0; k < cv->curve_count && curve_of[i] < 0; k ++) {
+            const float *p = cv->positions[cv->offsets[k]];
+            if (sway_snap(p[0]) == d0[i] && sway_snap(p[1]) == d1[i] &&
+                sway_snap(p[2]) == d2[i])
+            {
+                curve_of[i] = k;
+            }
+        }
+
+        test_assert(curve_of[i] >= 0);
+        if (first[curve_of[i]] < 0) {
+            first[curve_of[i]] = i;
+        }
+    }
+
+    for (o = 0; o < 2; o ++) {
+        const box_mg_mesh_t *t = &outs[o]->mesh;
+        const float *d[16];
+        test_int(t->vertex_count, m->vertex_count);
+        for (k = 0; k < 16; k ++) {
+            d[k] = mesh_data(t, k);
+        }
+
+        for (i = 0; i < t->vertex_count; i ++) {
+            int32_t curve = curve_of[i], at = curve;
+            int32_t lv = (int32_t)level[cv->offsets[curve]];
+            vec4 d2 = { d[8][i], d[9][i], d[10][i], d[11][i] };
+            vec4 d3 = { d[12][i], d[13][i], d[14][i], d[15][i] };
+            vec3 ancestors[3];
+            box_wind_sway_ancestors(d2, d3, ancestors);
+            for (k = 0; k < 3; k ++) {
+                /* Every vertex of a branch holds the same pivot, on the grid */
+                test_flt(d[k][i], d[k][first[curve]]);
+                test_flt(d[k][i], sway_snap(d[k][i]));
+            }
+
+            /* Each ancestor unpacks to the grid cell of the pivot of its own vertices */
+            for (j = 0; j < 3 && lv - j >= 2; j ++) {
+                at = cv->parents[at];
+                test_assert(at >= 0 && first[at] >= 0);
+                for (k = 0; k < 3; k ++) {
+                    test_flt(floorf(ancestors[j][k] * BOX_MATERIAL_SWAY_GRID),
+                        floorf(d[k][first[at]] * BOX_MATERIAL_SWAY_GRID));
+                }
+            }
+
+            deep += lv >= 3;
+        }
+    }
+
+    test_assert(deep > 0);
+    ecs_os_free(first);
+    ecs_os_free(curve_of);
+    box_mg_value_release(outs[1]);
+    box_mg_value_release(outs[0]);
     box_mg_value_release(v);
     box_mg_value_release(c);
     ecs_fini(world);

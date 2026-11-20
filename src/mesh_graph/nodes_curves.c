@@ -427,6 +427,36 @@ static int32_t box_mg_curve_root(
     return result;
 }
 
+void box_mg_curve_sway(
+    const box_mg_curves_t *c,
+    const float *level,
+    int32_t curve,
+    vec4 data0,
+    vec4 data2,
+    vec4 data3)
+{
+    vec3 ancestors[3], last;
+    float stiffness[BOX_MATERIAL_SWAY_LEVELS] = {0};
+    int32_t root = box_mg_curve_root(c, curve), first = c->offsets[curve];
+    int32_t lv = level ? (int32_t)floorf(level[first] + 0.5f) : 0, at = curve, k;
+    float root_radius = c->radii[c->offsets[root]];
+    glm_vec3_copy(c->positions[first], last);
+    stiffness[0] = root_radius > 0.0f ? c->radii[first] / root_radius : 1.0f;
+    for (k = 0; k < 3; k ++) {
+        at = at >= 0 ? box_mg_tube_parent(c, at) : -1;
+        if (at >= 0) {
+            glm_vec3_copy(c->positions[c->offsets[at]], last);
+            stiffness[k + 1] = root_radius > 0.0f
+                ? c->radii[c->offsets[at]] / root_radius : 1.0f;
+        }
+
+        glm_vec3_copy(last, ancestors[k]);
+    }
+
+    box_wind_sway_vertex(data0, data2, data3, c->positions[first], lv, 0.0f,
+        (const vec3*)ancestors, stiffness);
+}
+
 /** Write the bark data channels of the vertices of the tube of a curve.
  *
  * @param tb The tube
@@ -451,7 +481,8 @@ static void box_mg_tube_data(
     int32_t ring = tb->pr->count, root = box_mg_curve_root(c, curve);
     float root_radius = c->radii[c->offsets[root]], total = distances[count - 1];
     float phase = 0.0f;
-    float *data[8];
+    float *data[16];
+    vec4 sway[3];
     if (tb->phase) {
         phase = tb->phase[first];
     } else {
@@ -460,22 +491,29 @@ static void box_mg_tube_data(
         phase = box_mg_rand_float(&rand);
     }
 
-    for (k = 0; k < 8; k ++) {
+    for (k = 0; k < 16; k ++) {
         char name[BOX_MESH_ATTR_NAME];
         ecs_os_snprintf(name, ECS_SIZEOF(name), "%s%d", BOX_MESH_DATA_ATTR, k);
         data[k] = box_mg_attr_find(m->attrs, m->attr_count, name);
     }
 
+    box_mg_curve_sway(c, tb->level, curve, sway[0], sway[1], sway[2]);
     for (k = base; k < m->vertex_count; k ++) {
-        int32_t v = k - base, j = v / ring;
+        int32_t v = k - base, j = v / ring, ch;
         j = v < count * ring ? j : (v < (count + 1) * ring ? 0 : count - 1);
-        data[BOX_MESH_DATA_PIVOT][k] = c->positions[first][0];
-        data[BOX_MESH_DATA_PIVOT + 1][k] = c->positions[first][1];
-        data[BOX_MESH_DATA_PIVOT + 2][k] = c->positions[first][2];
+        data[BOX_MESH_DATA_PIVOT][k] = sway[0][0];
+        data[BOX_MESH_DATA_PIVOT + 1][k] = sway[0][1];
+        data[BOX_MESH_DATA_PIVOT + 2][k] = sway[0][2];
         data[BOX_MESH_DATA_LEVEL][k] = tb->level[first];
         data[BOX_MESH_DATA_PHASE][k] = phase;
         data[BOX_MESH_DATA_STIFFNESS][k] = root_radius > 0.0f
             ? c->radii[first] / root_radius : 1.0f;
+        for (ch = 0; ch < 8; ch ++) {
+            if (data[BOX_MG_SWAY_CHANNEL + ch]) {
+                data[BOX_MG_SWAY_CHANNEL + ch][k] = sway[1 + ch / 4][ch % 4];
+            }
+        }
+
         const box_mg_sample_t *sj = &samples[j];
         float growth = distances[j];
         if (tb->growth) {
@@ -708,7 +746,7 @@ static int box_mesh_tube_eval(
     }
 
     const float *dropped = box_mg_attr_find(c->attrs, c->attr_count, "dropped");
-    for (i = 0; tb.level && i < 8; i ++) {
+    for (i = 0; tb.level && i < 16; i ++) {
         char name[BOX_MESH_ATTR_NAME];
         ecs_os_snprintf(name, ECS_SIZEOF(name), "%s%d", BOX_MESH_DATA_ATTR, i);
         box_mg_attr_add(out->mesh.attrs, &out->mesh.attr_count, name, 0);

@@ -195,6 +195,26 @@ static double box_terrain_range(
     return ldexp(s->lod_distance, level);
 }
 
+/** Get the distance of a focus from the center of a tile of a level where its morph into the
+ * grid of the next coarser level starts; it ends at the range of the level.
+ *
+ * A tile of level L meets finer tiles no farther from a focus than the range of level L - 1 plus
+ * the diagonal of a tile of level L, so its morph starts beyond that, and ends at its range,
+ * where it meets coarser tiles. Ranges of at least 3 tile sizes leave room for the morph.
+ *
+ * @param s The settings
+ * @param level The level
+ * @return Meters
+ */
+static double box_terrain_morph(
+    const box_terrain_settings_t *s,
+    int32_t level)
+{
+    double size = box_terrain_size(s, level), range = box_terrain_range(s, level);
+
+    return fmin(0.5 * range + 1.42 * size, BOX_TERRAIN_MORPH * range);
+}
+
 /** Get the key of a node of the quadtree.
  *
  * @param level The level
@@ -621,11 +641,7 @@ static bool box_terrain_texture_ready(
     return !texture || (status && status->state == TextureReady && status->revision > 0);
 }
 
-/** Write the TerrainTile of a tile: its node, slot, focus and morph.
- *
- * A tile of level L meets finer tiles no farther from a focus than the range of level L - 1 plus
- * the diagonal of a tile of level L, so its morph starts beyond that, and ends at its range,
- * where it meets coarser tiles. Ranges of at least 3 tile sizes leave room for the morph.
+/** Write the TerrainTile of a tile: its node, slot, focus and morph (box_terrain_morph).
  *
  * The vertex stage measures the distance along the ground, so the morph distances are those
  * along the ground at which the focus with its clearance is that far. The bounds of the tile are
@@ -646,7 +662,7 @@ static void box_terrain_tile_write(
 {
     double size = box_terrain_size(s, t->level), range = box_terrain_range(s, t->level);
     double cx = ((double)t->ix + 0.5) * size, cz = ((double)t->iz + 0.5) * size;
-    double morph = fmin(0.5 * range + 1.42 * size, BOX_TERRAIN_MORPH * range);
+    double morph = box_terrain_morph(s, t->level);
     double fx = cx, fz = cz, fc = 0.0, best = DBL_MAX;
     int32_t i;
     for (i = 0; i < tiles->focus_count; i ++) {
@@ -1451,6 +1467,49 @@ box_terrain_tile_t* const* box_terrain_tiles(
     *count = tiles ? ecs_vec_count(&tiles->list) : 0;
 
     return tiles && *count ? ecs_vec_first(&tiles->list) : NULL;
+}
+
+bool box_terrain_window(
+    const ecs_world_t *world,
+    ecs_entity_t terrain,
+    box_terrain_window_t *out)
+{
+    const TerrainModule *m = ecs_singleton_get(world, TerrainModule);
+    box_terrain_tiles_t *tiles = m && m->ctx
+        ? ecs_map_get_deref(&m->ctx->terrains, box_terrain_tiles_t, terrain) : NULL;
+    bool result = false;
+    int32_t level, i, reach;
+    ecs_os_memset_t(out, 0, box_terrain_window_t);
+    if (!tiles || !tiles->made || !tiles->settings.height || !tiles->focus_count) {
+        goto done;
+    }
+
+    const box_terrain_settings_t *s = &tiles->settings;
+    reach = (int32_t)ceil(s->lod_distance / s->tile_size) + 2 + BOX_TERRAIN_WINDOW_MARGIN;
+    out->levels = s->levels;
+    out->cells = 2 * reach;
+    out->cells = out->cells > BOX_TERRAIN_WINDOW_CELLS ? BOX_TERRAIN_WINDOW_CELLS : out->cells;
+    out->resolution = s->resolution;
+    out->focus_count = tiles->focus_count;
+    out->tile_size = s->tile_size;
+    out->extent = s->extent;
+    for (i = 0; i < tiles->focus_count; i ++) {
+        out->foci[i][0] = tiles->foci[i][0];
+        out->foci[i][1] = tiles->foci[i][1];
+    }
+
+    for (level = 0; level < s->levels; level ++) {
+        double size = box_terrain_size(s, level), range = box_terrain_range(s, level);
+        double morph = box_terrain_morph(s, level), fc = tiles->foci[0][2];
+        out->first[level][0] = (int32_t)floor(tiles->foci[0][0] / size) - out->cells / 2;
+        out->first[level][1] = (int32_t)floor(tiles->foci[0][1] / size) - out->cells / 2;
+        out->morph[level][0] = (float)sqrt(fmax(morph * morph - fc * fc, 0.0));
+        out->morph[level][1] = (float)sqrt(fmax(range * range - fc * fc, 0.0));
+    }
+
+    result = true;
+done:
+    return result;
 }
 
 void box_terrain_tile_surface(

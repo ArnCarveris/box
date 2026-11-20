@@ -64,7 +64,30 @@ static void box_mg_flip(
     }
 }
 
-/** Move, turn and scale the pivots of the bark data channels of a mesh, which are positions.
+/** Move, turn and scale a pivot.
+ *
+ * @param p The pivot, moved in place
+ * @param r The rotation
+ * @param s The scale
+ * @param position The offset
+ */
+static void box_mg_transform_pivot(
+    vec3 p,
+    mat3 r,
+    const vec3 s,
+    const vec3 position)
+{
+    vec3 v = { p[0] * s[0], p[1] * s[1], p[2] * s[2] };
+    glm_mat3_mulv(r, v, p);
+    glm_vec3_add(p, (float*)position, p);
+}
+
+/** Move, turn and scale the pivots of the data channels of a mesh, which are positions: the
+ * pivot of the branch and those of its ancestors in the WindSway data of the channels
+ * BOX_MG_SWAY_CHANNEL and after.
+ *
+ * Those pivots are on the grid of BOX_MATERIAL_SWAY_GRID, so a branch and its descendants hold
+ * the same floats for it; each is transformed and snapped again, so they stay the same.
  *
  * @param m The mesh
  * @param r The rotation
@@ -77,20 +100,54 @@ static void box_mg_transform_pivots(
     const vec3 s,
     const vec3 position)
 {
-    float *pivot[3];
+    float *data[16];
+    bool sway = true;
     int32_t i, k;
-    for (k = 0; k < 3; k ++) {
+    for (k = 0; k < 16; k ++) {
         char name[BOX_MESH_ATTR_NAME];
-        ecs_os_snprintf(name, ECS_SIZEOF(name), "%s%d", BOX_MESH_DATA_ATTR,
-            BOX_MESH_DATA_PIVOT + k);
-        pivot[k] = box_mg_attr_find(m->attrs, m->attr_count, name);
+        ecs_os_snprintf(name, ECS_SIZEOF(name), "%s%d", BOX_MESH_DATA_ATTR, k);
+        data[k] = box_mg_attr_find(m->attrs, m->attr_count, name);
+        sway = sway && (k < BOX_MG_SWAY_CHANNEL || data[k]);
     }
 
+    float **pivot = &data[BOX_MESH_DATA_PIVOT];
     for (i = 0; pivot[0] && pivot[1] && pivot[2] && i < m->vertex_count; i ++) {
-        vec3 v = { pivot[0][i] * s[0], pivot[1][i] * s[1], pivot[2][i] * s[2] }, w;
-        glm_mat3_mulv(r, v, w);
+        vec3 v = { pivot[0][i], pivot[1][i], pivot[2][i] };
+        box_mg_transform_pivot(v, r, s, position);
         for (k = 0; k < 3; k ++) {
-            pivot[k][i] = w[k] + position[k];
+            pivot[k][i] = v[k];
+        }
+    }
+
+    for (i = 0; sway && i < m->vertex_count; i ++) {
+        vec4 d0, d2, d3, packed2, packed3;
+        vec3 ancestors[3], own = {0};
+        for (k = 0; k < 4; k ++) {
+            d2[k] = data[BOX_MG_SWAY_CHANNEL + k][i];
+            d3[k] = data[BOX_MG_SWAY_CHANNEL + 4 + k][i];
+        }
+
+        for (k = 0; k < 3 && pivot[k]; k ++) {
+            own[k] = pivot[k][i];
+        }
+
+        box_wind_sway_ancestors(d2, d3, ancestors);
+        for (k = 0; k < 3; k ++) {
+            box_mg_transform_pivot(ancestors[k], r, s, position);
+        }
+
+        box_wind_sway_vertex(d0, packed2, packed3, own, BOX_MATERIAL_SWAY_LEVELS,
+            0.0f, (const vec3*)ancestors, NULL);
+        for (k = 0; k < 3; k ++) {
+            if (pivot[k]) {
+                pivot[k][i] = d0[k];
+            }
+
+            data[BOX_MG_SWAY_CHANNEL + k][i] = packed2[k];
+        }
+
+        for (k = 0; k < 4; k ++) {
+            data[BOX_MG_SWAY_CHANNEL + 4 + k][i] = packed3[k];
         }
     }
 }

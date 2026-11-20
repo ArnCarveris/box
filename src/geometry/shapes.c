@@ -1681,6 +1681,8 @@ static void box_key_mesh3(
     hash = box_hash_vec(hash, &v->colors, ECS_SIZEOF(rgba));
     hash = box_hash_vec(hash, &v->data0, ECS_SIZEOF(vec4));
     hash = box_hash_vec(hash, &v->data1, ECS_SIZEOF(vec4));
+    hash = box_hash_vec(hash, &v->data2, ECS_SIZEOF(vec4));
+    hash = box_hash_vec(hash, &v->data3, ECS_SIZEOF(vec4));
     key->i[0] = (int32_t)(uint32_t)hash;
     key->i[1] = (int32_t)(uint32_t)(hash >> 32);
     key->i[2] = ecs_vec_count(&v->vertices);

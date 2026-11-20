@@ -987,6 +987,13 @@ ECS_STRUCT(VertexOcclusion, {
 /** Deepest branch level a WindSway with pivots tells apart; deeper levels sway as this one */
 #define BOX_MATERIAL_SWAY_LEVELS (4)
 
+/** Cells per object space unit of the grid the pivots of a WindSway with pivots snap down to */
+#define BOX_MATERIAL_SWAY_GRID (256.0f)
+
+/** Bias of the offsets of the ancestor pivots of a WindSway with pivots in grid cells: an
+ * ancestor lies at most this many cells, 128 units, from the parent along each axis */
+#define BOX_MATERIAL_SWAY_BIAS (32768)
+
 /** Bending and fluttering of the vertices of a 3D mesh in the Wind (trees, bushes, grass), a
  * material component inherited by instances like Rgb, default bend 0, height 1, base 0, flutter
  * 0, flutter_frequency 2, flutter_reach 0.3, no pivots, branch 0 and branch_frequency 0.5.
@@ -1008,9 +1015,9 @@ ECS_STRUCT(VertexOcclusion, {
  * grow by the largest displacement so swaying shapes do not pop, and the shadow tiles and
  * cascades with swaying casters render again every frame while the wind blows.
  *
- * With pivots, a mesh with per vertex data (box_mesh_vertex_data) sways like a hierarchy of
- * shapes, so one merged tree mesh moves like a trunk with separate branches and leaves. The data
- * of each vertex holds (box_wind_sway_vertex packs it):
+ * With pivots, a mesh with per vertex data (box_mesh_vertex_data, box_mesh_vertex_data_upper)
+ * sways like a hierarchy of shapes, so one merged tree mesh moves like a trunk with separate
+ * branches and leaves. The data of each vertex holds (box_wind_sway_vertex packs it):
  *
  * - data0.xyz: the pivot of the branch the vertex belongs to, in object space (where the branch
  *   joins its parent)
@@ -1018,22 +1025,33 @@ ECS_STRUCT(VertexOcclusion, {
  *   for the branches on the trunk, 2 for the branches on those, up to BOX_MATERIAL_SWAY_LEVELS;
  *   plus 0.5 times the flutter weight of the vertex, 0..1, the share of the flutter it moves by:
  *   0 at the stem of a leaf, 1 at its tip
- * - data1.xyz: the pivot of the parent branch, in object space, the same value as the data0.xyz
+ * - data1: unused, free for a VertexReveal or VertexOcclusion
+ * - data2.xyz: the pivot of the parent branch, in object space, the same value as the data0.xyz
  *   of the vertices of the parent; unused below level 2
- * - data1.w: round(255 stiffness) + 256 round(255 parent stiffness), the stiffness of the branch
- *   and of its parent, each 0..1: a branch with a stiffness of 1 does not swing about its pivot
+ * - data2.w: the stiffnesses of the branch, its parent, grandparent and great grandparent, each
+ *   0..1 as round(63 stiffness) in 6 bits, the branch in the lowest: a branch with a stiffness
+ *   of 1 does not swing about its pivot
+ * - data3: the pivots of the grandparent (level 3 and up) and of the great grandparent (level 4)
+ *   as offsets from the pivot of the parent in cells of 1 / BOX_MATERIAL_SWAY_GRID units, each
+ *   plus BOX_MATERIAL_SWAY_BIAS in 16 bits, the six of them in this order packed 24 bits to a
+ *   channel as whole numbers
+ *
+ * Every pivot snaps down to the grid of BOX_MATERIAL_SWAY_GRID cells per unit, the same in the
+ * vertices of the branch and in those of its descendants.
  *
  * Every vertex of a branch of level 1 or more turns rigidly about its pivot: about the horizontal
  * axis across the wind by branch radians times (1 - stiffness) at full wind, leaning with the
  * wind and swinging at level times branch_frequency, plus a smaller swing about the wind axis.
  * The phase of the swing is hashed from the pivot, so neighbouring branches swing apart. The
  * strength of the wind is read at the pivot, so a branch never stretches. A branch of level 2 or
- * more then turns with its parent (of one level less) about the pivot of the parent, so it stays
- * attached to the tip of its parent; a branch of level 3 or more does not carry the turn of its
- * grandparent, so leaves best take the pivot and level of the twig they grow on with a flutter
- * weight. The main bend then moves the vertex by its rest position as without pivots, and the
- * flutter is weighted by the flutter weight instead of the distance from the origin. Normals turn
- * with the branch. A mesh without data sways as without pivots.
+ * more then turns with each of its ancestors about the pivot of the ancestor, its parent first,
+ * out to the branch of level 1, so a branch of every level stays attached to its parent; a leaf
+ * takes the pivot and level of a branch one level deeper than the twig it grows on, or those of
+ * the twig with a flutter weight. The main bend then moves the vertex by its rest position as
+ * without pivots, and the flutter is weighted by the flutter weight instead of the distance from
+ * the origin. Normals turn with the branch. A mesh without data sways as without pivots.
+ * With foliage the ancestors are not read: every vertex turns about the pivot in data0 with a
+ * stiffness of 0 and without its parent.
  *
  * Its record is packed every frame, like that of a TextureScroll. Needs Scene.wind: a scene
  * without it draws the shape as if it had no WindSway, with the shaders it has without it. Only
@@ -1047,7 +1065,7 @@ ECS_STRUCT(WindSway, {
     float base;             /**< World Y at which the displacement is 0, the ground */
     float flutter;          /**< World units of the fast local flutter at full wind, 0 for
                              *   none */
-    float flutter_frequency; /**< Hz of the flutter */
+    float flutter_frequency; /**< Hz of the flutter at full wind, slower in a light wind */
     float flutter_reach;    /**< World distance from the origin of the shape over which the
                              *   flutter rises from 0 to full; at least 0.001; unused with pivots
                              *   on a mesh with data, whose flutter is weighted by data0.w */
@@ -1055,30 +1073,52 @@ ECS_STRUCT(WindSway, {
                              *   every vertex from the per vertex data of the mesh */
     float branch;           /**< Radians a branch with pivots and a stiffness of 0 turns about
                              *   its pivot at full wind, 0 for rigid branches */
-    float branch_frequency; /**< Hz of the swing of the branches of level 1; level n swings n
-                             *   times as fast */
+    float branch_frequency; /**< Hz of the swing of the branches of level 1 at full wind,
+                             *   slower in a light wind; level n swings n times as fast */
+    bool foliage;           /**< With pivots, read only data0 of the per vertex data, the pivot
+                             *   of the twig, its level and the flutter weight, as the foliage
+                             *   of a MeshGraph (Cards) holds it: data1, the seed, hue, growth
+                             *   and occlusion of the cards, is not read as a parent pivot or
+                             *   stiffness; every vertex turns with a stiffness of 0 about the
+                             *   pivot of its twig only, like the twig, so the stems stay on it */
 });
 
-/** Pack the per vertex data a WindSway with pivots reads for a vertex of a branch.
+/** Pack the per vertex data a WindSway with pivots reads for a vertex of a branch. The pivots
+ * are stored snapped down to the grid of BOX_MATERIAL_SWAY_GRID, so box_wind_sway_ancestors
+ * unpacks the pivot of an ancestor as the same floats the ancestor's own data0 holds.
  *
- * @param data0 Receives the pivot and the level and flutter weight
- * @param data1 Receives the parent pivot and the stiffnesses
+ * @param data0 Receives the snapped pivot and the level and flutter weight
+ * @param data2 Receives the snapped parent pivot and the stiffnesses
+ * @param data3 Receives the grandparent and great grandparent pivots
  * @param pivot Object space pivot of the branch of the vertex
  * @param level Level of the branch, 0 for the trunk, clamped to 0..BOX_MATERIAL_SWAY_LEVELS
- * @param stiffness Stiffness of the branch, 0..1
  * @param weight Flutter weight of the vertex, 0..1
- * @param parent Object space pivot of the parent branch, NULL below level 2
- * @param parent_stiffness Stiffness of the parent branch, 0..1
+ * @param ancestors Object space pivots of the parent, grandparent and great grandparent, the
+ *   first level - 1 of them (at most 3) read; NULL below level 2
+ * @param stiffness Stiffnesses of the branch, its parent, grandparent and great grandparent,
+ *   0..1, the first level of them (at most 4) read; NULL for 0
  */
 void box_wind_sway_vertex(
     vec4 data0,
-    vec4 data1,
+    vec4 data2,
+    vec4 data3,
     const vec3 pivot,
     int32_t level,
-    float stiffness,
     float weight,
-    const vec3 parent,
-    float parent_stiffness);
+    const vec3 *ancestors,
+    const float *stiffness);
+
+/** Unpack the pivots of the ancestors of a vertex from the data box_wind_sway_vertex packs, as
+ * a WindSway with pivots does: snapped to the grid of BOX_MATERIAL_SWAY_GRID.
+ *
+ * @param data2 The parent pivot and the stiffnesses
+ * @param data3 The grandparent and great grandparent pivots
+ * @param ancestors Receives the pivots of the parent, grandparent and great grandparent
+ */
+void box_wind_sway_ancestors(
+    const vec4 data2,
+    const vec4 data3,
+    vec3 ancestors[3]);
 
 /** Where the texture coordinates of a material come from */
 ECS_ENUM(TextureMappingMode, {

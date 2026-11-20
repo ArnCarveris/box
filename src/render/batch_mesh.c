@@ -30,7 +30,7 @@ bool box_draws_mesh_send(
         (uint64_t)mesh->vertex_count * sizeof(box_vertex_t) +
         (uint64_t)mesh->index_count * sizeof(uint32_t) +
         (uint64_t)mesh->surface_asset_count * sizeof(vec4) +
-        (mesh->data ? (uint64_t)mesh->vertex_count * 2 * sizeof(vec4) : 0);
+        (mesh->data ? (uint64_t)mesh->vertex_count * BOX_RENDER_DATA_VECS * sizeof(vec4) : 0);
     if (total_size + (uint64_t)ecs_vec_count(&p->data) + BOX_RENDER_DATA_ALIGN > INT32_MAX) {
         ecs_err("surface render packet capacity exceeded");
         result = false;
@@ -41,7 +41,7 @@ bool box_draws_mesh_send(
     uint32_t index_size = (uint32_t)mesh->index_count * (uint32_t)sizeof(uint32_t);
     uint32_t asset_size = (uint32_t)mesh->surface_asset_count * (uint32_t)sizeof(vec4);
     uint32_t data_size = mesh->data
-        ? (uint32_t)mesh->vertex_count * 2 * (uint32_t)sizeof(vec4) : 0;
+        ? (uint32_t)mesh->vertex_count * BOX_RENDER_DATA_VECS * (uint32_t)sizeof(vec4) : 0;
     box_render_mesh_desc_t *desc = box_render_packet_resource(p, BOX_RENDER_MESH,
         BOX_RENDER_CREATE, handle,
         (uint32_t)sizeof(box_render_mesh_desc_t) + vertex_size + index_size + asset_size +
@@ -59,8 +59,20 @@ bool box_draws_mesh_send(
     }
 
     if (data_size) {
-        ecs_os_memcpy(data + vertex_size + index_size + asset_size, mesh->data,
-            (ecs_size_t)data_size);
+        vec4 *out = (vec4*)(void*)(data + vertex_size + index_size + asset_size);
+        int32_t i;
+        for (i = 0; i < mesh->vertex_count; i ++) {
+            vec4 *v = &out[i * BOX_RENDER_DATA_VECS];
+            glm_vec4_copy(mesh->data[i * 2], v[0]);
+            glm_vec4_copy(mesh->data[i * 2 + 1], v[1]);
+            if (mesh->data_upper) {
+                glm_vec4_copy(mesh->data_upper[i * 2], v[2]);
+                glm_vec4_copy(mesh->data_upper[i * 2 + 1], v[3]);
+            } else {
+                glm_vec4_zero(v[2]);
+                glm_vec4_zero(v[3]);
+            }
+        }
     }
 
     box_mesh_cache_hold(cache, handle);

@@ -496,3 +496,30 @@ void MeshLod_displace_points(void) {
     box_mg_value_release(p2);
     ecs_fini(world);
 }
+
+void MeshLod_cards_flat(void) {
+    ecs_world_t *world = test_world();
+    ecs_entity_t stem = lod_stem(world, "stem", 8);
+    ecs_entity_t leaves = lod_node(world, "leaves", ecs_id(MeshLeaves), &(MeshLeaves){
+        .curves = stem, .count = 3, .end = 1, .angle = 0.8f, .size = 0.5f, .lod_keep = -1 });
+    ecs_entity_t cards = lod_node(world, "cards", ecs_id(MeshCards), &(MeshCards){
+        .points = leaves, .shape = MeshCardBent, .bend = 0.15f, .segments = 2,
+        .double_sided = true, .flutter = 1, .lod_flat = 2 });
+    int32_t vertices[4] = { 3 * 18, 3 * 12, 3 * 4, 3 * 4 };
+    int32_t indices[4] = { 3 * 48, 3 * 24, 3 * 12, 3 * 12 };
+    int32_t l;
+    for (l = 0; l < 4; l ++) {
+        box_mg_value_t *v = box_mesh_graph_evaluate_level(world, cards, l, NULL);
+        test_assert(v != NULL);
+        test_int(v->mesh.vertex_count, vertices[l]);
+        test_int(v->mesh.index_count, indices[l]);
+        if (l >= 2) {
+            test_near(glm_vec3_dot(v->mesh.normals[0], v->mesh.normals[1]), 1, 1e-4f);
+            test_near(glm_vec3_dot(v->mesh.normals[0], v->mesh.normals[3]), 1, 1e-4f);
+        }
+
+        box_mg_value_release(v);
+    }
+
+    ecs_fini(world);
+}

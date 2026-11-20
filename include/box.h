@@ -44,6 +44,7 @@
 #include "box/startup.h"
 #include "box/atmosphere.h"
 #include "box/particle.h"
+#include "box/grass.h"
 #include "box/transition.h"
 #include "box/world.h"
 

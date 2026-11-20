@@ -502,7 +502,12 @@
                     "branches_turn_about_pivots",
                     "stiff_branches_still",
                     "without_data_unchanged",
-                    "shadow_follows_branch"
+                    "shadow_follows_branch",
+                    "deep_levels_attached",
+                    "deep_levels_shadow",
+                    "deep_levels_wireframe",
+                    "card_stems_pinned_tips_flutter",
+                    "card_stems_turn_with_twig"
                 ]
             },
             {
@@ -2108,6 +2113,30 @@
                     "ray_hits",
                     "walk_slope_stop_at_cliff",
                     "chunk_waits_for_terrain"
+                ]
+            },
+            {
+                "id": "Grass",
+                "testcases": [
+                    "plane_places_blades",
+                    "thins_with_distance",
+                    "stays_put_as_camera_moves",
+                    "stays_put_across_origin_shift",
+                    "follows_terrain_height",
+                    "mask_weighs_density",
+                    "stats_show_counts_and_time",
+                    "renders_lit_blades"
+                ]
+            },
+            {
+                "id": "TerrainSample",
+                "testcases": [
+                    "matches_queries",
+                    "tile_edges",
+                    "after_origin_shift",
+                    "coarse_levels_further_out",
+                    "beyond_windows_not_found",
+                    "untagged_has_no_bindings"
                 ]
             },
             {

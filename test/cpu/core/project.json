@@ -15,6 +15,7 @@
             "../../../src/render",
             "../../../src/texture",
             "../../../src/terrain",
+            "../../../src/grass",
             "../../../src/geometry"
         ]
     },
@@ -348,7 +349,24 @@
                     "masks_graph_windows",
                     "masks_wait_ready",
                     "masks_blend_surface",
-                    "masks_change_remakes_tiles"
+                    "masks_change_remakes_tiles",
+                    "sample_window_covers_drawn",
+                    "sample_window_follows_focus",
+                    "sample_window_without_terrain",
+                    "sampled_tag"
+                ]
+            },
+            {
+                "id": "Grass",
+                "testcases": [
+                    "registered",
+                    "defaults",
+                    "script",
+                    "resolve",
+                    "terrain_sampled",
+                    "extract_plane",
+                    "extract_terrain",
+                    "extract_scene"
                 ]
             },
             {

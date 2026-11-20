@@ -37,6 +37,9 @@ ECS_STRUCT(Mesh3, {
     ecs_vec(rgba) colors;      /**< Per vertex color and alpha, one per vertex or empty */
     ecs_vec(vec4) data0;       /**< Per vertex data, channels 0 to 3, one per vertex or empty */
     ecs_vec(vec4) data1;       /**< Per vertex data, channels 4 to 7, one per vertex or empty */
+    ecs_vec(vec4) data2;       /**< Per vertex data, channels 8 to 11, one per vertex or empty */
+    ecs_vec(vec4) data3;       /**< Per vertex data, channels 12 to 15, one per vertex or
+                                *   empty */
 });
 
 /** Box with size x, y, z */
@@ -706,6 +709,9 @@ typedef struct box_mesh_t {
     vec4 *data;              /**< Two vec4 of data per vertex, data0 then data1 (channels 0 to
                               *   3 and 4 to 7), vertex_capacity pairs; NULL when the mesh has
                               *   none, which costs the renderer nothing */
+    vec4 *data_upper;        /**< Two vec4 of data per vertex, data2 then data3 (channels 8
+                              *   to 11 and 12 to 15), vertex_capacity pairs; NULL for zeros;
+                              *   only with data */
     vec4 *surface_assets;    /**< Surface vectors of a Sweep, Loft, Lathe or extrusion, NULL
                               *   for none */
     int32_t surface_asset_count; /**< Number of vectors in surface_assets */
@@ -909,6 +915,23 @@ void box_mesh_vertex_data(
     int32_t index,
     const vec4 data0,
     const vec4 data1);
+
+/** Set the upper per vertex data of a vertex of a mesh (Mesh3.data2 and data3), which a
+ * WindSway with pivots reads for the ancestors of the branch of the vertex.
+ *
+ * Gives the mesh data, as box_mesh_vertex_data does, when it has none. The renderer uploads
+ * the four vec4 of every vertex of a mesh with data, zero where the mesh has no upper data.
+ *
+ * @param mesh The mesh
+ * @param index The vertex, below vertex_count
+ * @param data2 Channels 8 to 11
+ * @param data3 Channels 12 to 15
+ */
+void box_mesh_vertex_data_upper(
+    box_mesh_t *mesh,
+    int32_t index,
+    const vec4 data2,
+    const vec4 data3);
 
 /** Append a triangle, wound counter-clockwise around the normals of its vertices.
  *

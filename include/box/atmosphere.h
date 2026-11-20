@@ -277,7 +277,8 @@ ECS_STRUCT(TimeOfDayStatus, {
 /** Gust scale of a constructed Wind: world size of a gust patch */
 #define BOX_WIND_GUST_SCALE (20.0f)
 
-/** Speed in world units per second at which the flutter of a WindSway reaches its full amount */
+/** Speed in world units per second at which the flutter of a WindSway reaches its full amount,
+ * and its flutter and branches move at their full rates */
 #define BOX_WIND_FULL_SPEED (10.0f)
 
 /** Gust patches over which the gust field repeats along each axis: the gust offset of a
@@ -313,14 +314,17 @@ ECS_STRUCT(Wind, {
  * Every frame the offset moves along the direction by the speed times the frame delta, wrapped
  * to BOX_WIND_GUST_PERIOD times the gust scale; the sway phase advances by its frequency, which
  * grows with the speed, times the delta, wrapped to 0..1; time counts the seconds the wind was
- * advanced, the clock of the flutter. Setting the Wind keeps the status, so the motion goes on
- * smoothly from where it was.
+ * advanced; clock advances by the delta times a rate that grows with the speed, from a sixth
+ * in a calm to 1 at BOX_WIND_FULL_SPEED (a third at 2 m/s), the clock of the flutter and the
+ * branches of a WindSway, whose frequencies are their rates at full wind. Setting the Wind
+ * keeps the status, so the motion goes on smoothly from where it was.
  */
 ECS_STRUCT(WindStatus, {
     double offset_x;        /**< World units along X the gust field moved, wrapped */
     double offset_z;        /**< World units along Z the gust field moved, wrapped */
     double sway;            /**< Phase of the sway, 0..1 */
     double time;            /**< Seconds the wind was advanced */
+    double clock;           /**< Seconds of the flutter and branches, slower in a light wind */
 });
 
 /** Register the box.atmosphere module.

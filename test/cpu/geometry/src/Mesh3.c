@@ -642,6 +642,8 @@ static void Mesh3_fini(
     ecs_vec_fini_t(NULL, &m->normals, vec3);
     ecs_vec_fini_t(NULL, &m->data0, vec4);
     ecs_vec_fini_t(NULL, &m->data1, vec4);
+    ecs_vec_fini_t(NULL, &m->data2, vec4);
+    ecs_vec_fini_t(NULL, &m->data3, vec4);
 }
 
 /** Get the cached mesh of the Mesh3 of an entity.
@@ -682,6 +684,53 @@ void Mesh3_data(void) {
         test_flt(mesh->data[i * 2 + 1][0], 40.0f);
         test_flt(mesh->data[i * 2 + 1][3], 70.0f + (float)i);
     }
+
+    ecs_fini(world);
+}
+
+/** The data2 and data3 of a Mesh3 are the upper data of its mesh; a mesh with only upper data
+ * has zero data0 and data1 */
+void Mesh3_data_upper(void) {
+    // renderer/meshes
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxGeometry);
+    Mesh3 m;
+    Mesh3_data_triangle(&m, 3, 0, true);
+    ecs_vec_init_t(NULL, &m.data2, vec4, 3);
+    ecs_vec_set_count_t(NULL, &m.data2, vec4, 3);
+    ecs_vec_init_t(NULL, &m.data3, vec4, 3);
+    ecs_vec_set_count_t(NULL, &m.data3, vec4, 3);
+    for (int i = 0; i < 3; i ++) {
+        glm_vec4_copy((vec4){ 80.0f + (float)i, 90.0f, 100.0f, 110.0f },
+            ecs_vec_get_t(&m.data2, vec4, i)[0]);
+        glm_vec4_copy((vec4){ 120.0f, 130.0f, 140.0f, 150.0f + (float)i },
+            ecs_vec_get_t(&m.data3, vec4, i)[0]);
+    }
+
+    ecs_entity_t e = ecs_new(world);
+    ecs_set_ptr(world, e, Mesh3, &m);
+    Mesh3_fini(&m);
+
+    const box_mesh_t *mesh = Mesh3_cached(world, e);
+    test_int(mesh->vertex_count, 3);
+    test_assert(mesh->data != NULL);
+    test_assert(mesh->data_upper != NULL);
+    for (int i = 0; i < 3; i ++) {
+        test_flt(mesh->data[i * 2][0], (float)i);
+        test_flt(mesh->data[i * 2 + 1][3], 0.0f);
+        test_flt(mesh->data_upper[i * 2][0], 80.0f + (float)i);
+        test_flt(mesh->data_upper[i * 2][3], 110.0f);
+        test_flt(mesh->data_upper[i * 2 + 1][0], 120.0f);
+        test_flt(mesh->data_upper[i * 2 + 1][3], 150.0f + (float)i);
+    }
+
+    /* Without data2 and data3 the mesh has no upper data */
+    Mesh3_data_triangle(&m, 3, 3, true);
+    ecs_set_ptr(world, e, Mesh3, &m);
+    Mesh3_fini(&m);
+    mesh = Mesh3_cached(world, e);
+    test_assert(mesh->data != NULL);
+    test_assert(mesh->data_upper == NULL);
 
     ecs_fini(world);
 }

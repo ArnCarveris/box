@@ -764,7 +764,7 @@ static WGPURenderPipeline box_gpu_shadow_create(
     WGPUVertexAttribute slot_attr = {
         .format = WGPUVertexFormat_Uint32, .offset = 0, .shaderLocation = 3
     };
-    WGPUVertexAttribute data_attrs[2];
+    WGPUVertexAttribute data_attrs[BOX_RENDER_DATA_VECS];
     WGPUVertexBufferLayout buffers[3] = {
         {
             .stepMode = WGPUVertexStepMode_Vertex,

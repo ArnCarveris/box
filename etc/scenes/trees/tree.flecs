@@ -135,6 +135,8 @@ trees {
 
     // Levels of detail of both shapes, 1 to 4
     prop lods: i32 = 4
+    prop leaf_lod_skip: i32 = 0
+    prop leaf_lod_flat: i32 = 0
 
     const rng: flecs.script.math.Rng = {seed: seed}
     const yaw = rng.f(6.28)
@@ -147,6 +149,8 @@ trees {
     const g4 = g3 && tree_grows(b4.count, b4.density)
     const top = g4 ? 4 : (g3 ? 3 : (g2 ? 2 : (g1 ? 1 : 0)))
     const leaf_level = max(top - leaf_levels + 1, 0)
+    const leaf_keep = leaf_lod_skip > 0 ? pow(0.5, leaf_lod_skip) : 0
+    const card_rows = leaf_lod_skip > 0 ? 1 : 0
 
     // The members of the levels left at 0
     const e1 = b1.end > b1.start ? b1.end : 1
@@ -269,7 +273,7 @@ trees {
         curves: pruned, placement: leaf_placement, level: leaf_level, count: leaf_count,
         density: leaf_density, per_node: leaf_per_node, start: leaf_start, angle: leaf_angle,
         orientation: leaf_orientation, tilt: leaf_tilt, bank: leaf_bank, size: leaf_size,
-        size_tip: 0.8, size_level: 1.2, size_variation: 0.25, seed: s + 9
+        size_tip: 0.8, size_level: 1.2, size_variation: 0.25, seed: s + 9, keep: leaf_keep
       }
     }
 
@@ -277,11 +281,17 @@ trees {
       nodes.Needles: {
         curves: pruned, placement: leaf_placement, level: leaf_level, style: needle_style,
         cards: needle_cards, start: leaf_start, width: needle_width, bank: 0.6,
-        droop: needle_droop, tilt: 0.2, seed: s + 9
+        droop: needle_droop, tilt: 0.2, seed: s + 9, keep: leaf_keep
       }
     }
 
-    cards { nodes.Cards: {points: needles ? needle_points : leaf_points, shape: card, width: 1, bend: card_bend, double_sided: true, flutter: 1} }
+    cards {
+      nodes.Cards: {
+        points: needles ? needle_points : leaf_points, shape: card, width: 1, bend: card_bend,
+        segments: card_rows, double_sided: true, flutter: 1, lod_flat: leaf_lod_flat
+      }
+    }
+
     normals { nodes.CrownNormals: {mesh: cards, shape: crown_shape, strength: crown_normals} }
     occluded { nodes.CrownOcclusion: {mesh: normals, shape: crown_shape, strength: occlusion} }
 
@@ -312,7 +322,7 @@ trees {
       Graph: {output: occluded, levels: lods}
       WindSway: {
         bend: sway, height: height, base: ground, flutter: flutter, flutter_frequency: 3.2,
-        pivots: true, branch: sway_branch
+        pivots: true, branch: sway_branch, foliage: true
       }
       if thin > 0 {
         VertexReveal: {channel: TREE_CHANNEL_SEED, threshold: thin, softness: 0}

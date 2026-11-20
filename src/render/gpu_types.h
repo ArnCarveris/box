@@ -444,9 +444,11 @@ typedef struct box_gpu_mesh_t {
     uint32_t index_count;           /**< Indices to draw */
     WGPUBindGroup wire;             /**< Vertices and indices as the storage buffers of a wire
                                      *   draw (debug_wire.wgsl), NULL until the first one */
-    WGPUBuffer adjacency;           /**< Edge adjacency of the wire draws, one uint32_t per
-                                     *   index (box_gpu_debug_adjacency), NULL when the mesh is
-                                     *   not wireable */
+    WGPUBindGroup wire_data;        /**< wire with the per vertex data, of the wire draws of
+                                     *   vs_wind_data, NULL until the first one or without data */
+    WGPUBuffer adjacency;           /**< Indices then edge adjacency of the wire draws, one
+                                     *   uint32_t each per index (box_gpu_debug_adjacency),
+                                     *   NULL when the mesh is not wireable */
     bool wireable;                  /**< The vertices and the adjacency fit in a storage buffer
                                      *   binding, so the mesh can be wired */
     bool wire_reported;             /**< The error of a mesh that is not wireable was logged */
@@ -1399,6 +1401,49 @@ typedef struct box_gpu_reflect_t {
     uint32_t mips;                  /**< Mip levels */
 } box_gpu_reflect_t;
 
+/** A level of the uniforms of a sampled terrain (TerrainSampleLevel of terrain_sample.wgsl),
+ * 32 bytes */
+typedef struct box_gpu_terrain_sample_level_t {
+    int32_t whole[2];               /**< Absolute x and z of the corner of the window of the
+                                     *   level, whole meters */
+    float rest[2];                  /**< The rest of the corner below a meter */
+    float size;                     /**< Edge of a tile of the level in meters */
+    float morph[2];                 /**< Distances of the focus from the center of a tile where
+                                     *   its morph starts and ends */
+    uint32_t first;                 /**< Index of the first cell of the level in the grid */
+} box_gpu_terrain_sample_level_t;
+
+/** The uniforms of a sampled terrain (TerrainSampleParams of terrain_sample.wgsl), 640 bytes */
+typedef struct box_gpu_terrain_sample_params_t {
+    uint32_t counts[4];             /**< Levels, cells along an edge of a window, vertices along
+                                     *   an edge of a tile, foci */
+    uint32_t layout[4];             /**< Floats of a row of the heights of a slot, floats of a
+                                     *   slot, texels along an edge of the masks of a tile (0
+                                     *   without masks), cells across the mask atlas */
+    int32_t origin_whole[4];        /**< Absolute x and z of the frame of the terrain, whole
+                                     *   meters, then 1 when the terrain is bounded */
+    float origin[4];                /**< The rest of x and z, the extent of a bounded terrain and
+                                     *   the local y of the frame of the terrain */
+    float foci[4][4];               /**< Two foci per vec4, x and z relative to the corner of the
+                                     *   window of level 0 */
+    box_gpu_terrain_sample_level_t levels[BOX_RENDER_TERRAIN_LEVELS]; /**< The levels */
+} box_gpu_terrain_sample_params_t;
+
+/** The bindings of a terrain with TerrainSampled (box_gpu_terrain_samples) */
+typedef struct box_gpu_terrain_sample_t {
+    WGPUBuffer params;              /**< Uniform buffer of the params */
+    WGPUBuffer grid;                /**< Storage buffer of the cells */
+    uint64_t grid_size;             /**< Bytes of grid */
+    box_gpu_terrain_sample_params_t written; /**< The params params holds */
+    uint32_t *cells;                /**< The cells grid holds */
+    int32_t cell_count;             /**< Cells in cells */
+    WGPUBindGroup group;            /**< The bind group of terrain_sample_layout */
+    WGPUBuffer group_heights;       /**< Surface assets the group binds */
+    WGPUTextureView group_masks;    /**< Mask atlas view the group binds */
+    WGPUBuffer group_grid;          /**< Grid the group binds */
+    int64_t frame;                  /**< Frame of the last packet that sampled the terrain */
+} box_gpu_terrain_sample_t;
+
 /** The webgpu backend: device, shared objects and targets */
 typedef struct box_gpu_t {
     WGPUInstance instance;          /**< The instance */
@@ -1649,6 +1694,7 @@ typedef struct box_gpu_t {
     struct box_gpu_env_image_t *environment_image; /**< Conversion of environment images,
                                                     *   created by the first image */
     box_gpu_particles_t *particles; /**< Particle passes */
+    struct box_gpu_grass_t *grass;  /**< Grass passes and the blades of the Grass entities */
     box_gpu_ripples_t *ripples;     /**< Fields of WaterRipples */
     box_gpu_spectra_t *spectra;     /**< Spectra of WaterSpectrum */
     struct box_gpu_impostor_t *impostor; /**< Impostor frame copies, created by the first */
@@ -1683,6 +1729,10 @@ typedef struct box_gpu_t {
     uint64_t texture_graph_key_bytes; /**< Bytes of the key images of interpolated graphs */
     uint64_t texture_graph_cached_bytes; /**< Bytes of the cached texture graph values */
     int32_t texture_graph_cached;   /**< Cached texture graph values */
+    WGPUBindGroupLayout terrain_sample_layout; /**< Bind group layout of a sampled terrain
+                                     *   (terrain_sample.wgsl), compute, vertex and fragment */
+    ecs_map_t terrain_samples;      /**< Terrain entity to its box_gpu_terrain_sample_t, the
+                                     *   terrains the last packet sampled */
     bool lost;                      /**< The device was lost, the ring recreates it */
     bool lose;                      /**< box_render_gpu_lose_device asked to destroy it */
 } box_gpu_t;

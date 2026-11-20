@@ -592,7 +592,6 @@ void box_gpu_draw_fini(
     box_gpu_planets_fini(gpu);
     box_gpu_debug_fini(gpu);
     box_gpu_planar_fini(gpu);
-    box_gpu_terrain_fini(gpu);
     if (gpu->view_buffer) {
         wgpuBufferRelease(gpu->view_buffer);
         gpu->view_buffer = NULL;
@@ -661,7 +660,8 @@ void box_gpu_mesh_apply(
     const uint8_t *vertices = (const uint8_t*)(desc + 1);
     uint64_t vertex_span = (vertex_size + BOX_GPU_MESH_ALIGN - 1) &
         ~(uint64_t)(BOX_GPU_MESH_ALIGN - 1);
-    uint64_t data_size = desc->data ? (uint64_t)desc->vertex_count * 2 * sizeof(vec4) : 0;
+    uint64_t data_size = desc->data
+        ? (uint64_t)desc->vertex_count * BOX_RENDER_DATA_VECS * sizeof(vec4) : 0;
     uint64_t data_span = (data_size + BOX_GPU_MESH_ALIGN - 1) &
         ~(uint64_t)(BOX_GPU_MESH_ALIGN - 1);
     uint64_t alloc_size = vertex_span + data_span + index_size;
@@ -686,7 +686,8 @@ void box_gpu_mesh_apply(
     m->index_size = index_size;
     m->id = ++ gpu->mesh_ids;
     m->wireable = vertex_size <= limits.maxStorageBufferBindingSize &&
-        index_size <= limits.maxStorageBufferBindingSize;
+        index_size * 2 <= limits.maxStorageBufferBindingSize &&
+        data_size <= limits.maxStorageBufferBindingSize;
     m->surface_asset_size = desc->surface_asset_count ?
         (uint64_t)desc->surface_asset_count * sizeof(vec4) : sizeof(vec4);
     m->assets = desc->surface_asset_count != 0;
@@ -1549,6 +1550,10 @@ static void box_gpu_draw_pass(
 
     wgpuRenderPassEncoderSetBindGroup(vp.pass, 0, group, 1, &offset);
     wgpuRenderPassEncoderSetBindGroup(vp.pass, 3, box_gpu_volume_group(gpu, v), 0, NULL);
+    if (phase != 2) {
+        box_gpu_grass_draw(gpu, vp.pass, packet, v, format, phase == 3);
+    }
+
     box_gpu_draw_batches(gpu, t, &vp, format, packet, v, group, slot, phase);
     wgpuRenderPassEncoderEnd(vp.pass);
     wgpuRenderPassEncoderRelease(vp.pass);
@@ -1658,7 +1663,8 @@ static void box_gpu_draw_prepass_draws(
     }
 }
 
-/** Record a depth prepass of a view: its opaque and alpha tested mesh draws, depth only.
+/** Record a depth prepass of a view: its opaque and alpha tested mesh draws, depth only, and
+ * in the early prepass its grass blades.
  *
  * @param gpu The backend
  * @param t The target
@@ -1691,6 +1697,10 @@ static void box_gpu_draw_prepass(
     WGPURenderPassEncoder pass = box_gpu_profile_render_pass(gpu, encoder, &desc, "prepass");
     box_gpu_draw_prepass_draws(gpu, pass, packet, v, group, slot, late,
         WGPUTextureFormat_Undefined, BOX_GPU_STAT_PREPASS_DRAW);
+    if (!late) {
+        box_gpu_grass_draw(gpu, pass, packet, v, WGPUTextureFormat_Undefined, false);
+    }
+
     wgpuRenderPassEncoderEnd(pass);
     wgpuRenderPassEncoderRelease(pass);
     box_gpu_count(gpu, BOX_GPU_STAT_PREPASS);
@@ -1769,6 +1779,7 @@ void box_gpu_draw_views(
         box_gpu_atmosphere_view(gpu, t, encoder, packet, v);
         box_gpu_light_cluster(gpu, t, encoder, v, slot);
         box_gpu_cull_record(gpu, encoder, slot);
+        box_gpu_grass_record(gpu, encoder, packet, v, slot);
         box_gpu_shadow_render(gpu, encoder, packet, i, slot);
         box_gpu_planar_render(gpu, t, encoder, packet, v, slot);
         bool prepasses = box_gpu_draw_prepasses(gpu, packet, v, slot);

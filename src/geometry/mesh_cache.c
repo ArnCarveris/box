@@ -489,8 +489,10 @@ static void box_resolved_mesh_generate(
     mesh->indices = ecs_os_memdup_n(source->indices, uint32_t, source->index_count);
     mesh->surface_assets = ecs_os_calloc_n(vec4, regions);
     mesh->data = source->data ? ecs_os_memdup_n(source->data, vec4, count * 2) : NULL;
+    mesh->data_upper = source->data_upper
+        ? ecs_os_memdup_n(source->data_upper, vec4, count * 2) : NULL;
     if (!mesh->vertices || !mesh->indices || !mesh->surface_assets ||
-        (source->data && !mesh->data))
+        (source->data && !mesh->data) || (source->data_upper && !mesh->data_upper))
     {
         box_mesh_fini(mesh);
         goto done;
