@@ -427,6 +427,52 @@ float box_mg_noise(
 void box_mg_curves_frames(
     box_mg_curves_t *curves);
 
+/** Compute the tangents and rotation minimizing normals of a range of curves.
+ *
+ * @param curves The curves
+ * @param from First curve
+ * @param to Curve after the last
+ */
+void box_mg_curves_frames_range(
+    box_mg_curves_t *curves,
+    int32_t from,
+    int32_t to);
+
+/** A point sampled on a curve */
+typedef struct box_mg_sample_t {
+    vec3 position;               /**< Position */
+    vec3 tangent;                /**< Unit tangent */
+    vec3 normal;                 /**< Unit normal, perpendicular to the tangent */
+    float radius;                /**< Radius */
+    int32_t point;               /**< First point of the segment of the sample */
+    float fraction;              /**< Fraction along the segment */
+} box_mg_sample_t;
+
+/** Sample a curve at a distance from its start.
+ *
+ * @param c The curves
+ * @param first First point of the curve
+ * @param count Points of the curve
+ * @param lengths Length up to each point
+ * @param distance The distance
+ * @param out Receives the sample
+ */
+void box_mg_curve_sample(
+    const box_mg_curves_t *c,
+    int32_t first,
+    int32_t count,
+    const float *lengths,
+    float distance,
+    box_mg_sample_t *out);
+
+/** Set the tip attribute of curves: 1 on the last point of every curve without children, 0
+ * on the other points; added when there is room.
+ *
+ * @param curves The curves
+ */
+void box_mg_curves_tips(
+    box_mg_curves_t *curves);
+
 /** Compute the length of a curve up to each of its points.
  *
  * @param curves The curves
@@ -466,6 +512,13 @@ void box_mesh_nodes_mesh_register(
  * @param world The world
  */
 void box_mesh_nodes_curves_register(
+    ecs_world_t *world);
+
+/** Register the node kinds of branching curves: Stem, Branches and Prune.
+ *
+ * @param world The world
+ */
+void box_mesh_nodes_branch_register(
     ecs_world_t *world);
 
 /** Register the MeshGraph shape and its observers.

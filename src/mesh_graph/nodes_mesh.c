@@ -64,6 +64,37 @@ static void box_mg_flip(
     }
 }
 
+/** Move, turn and scale the pivots of the bark data channels of a mesh, which are positions.
+ *
+ * @param m The mesh
+ * @param r The rotation
+ * @param s The scale
+ * @param position The offset
+ */
+static void box_mg_transform_pivots(
+    box_mg_mesh_t *m,
+    mat3 r,
+    const vec3 s,
+    const vec3 position)
+{
+    float *pivot[3];
+    int32_t i, k;
+    for (k = 0; k < 3; k ++) {
+        char name[BOX_MESH_ATTR_NAME];
+        ecs_os_snprintf(name, ECS_SIZEOF(name), "%s%d", BOX_MESH_DATA_ATTR,
+            BOX_MESH_DATA_PIVOT + k);
+        pivot[k] = box_mg_attr_find(m->attrs, m->attr_count, name);
+    }
+
+    for (i = 0; pivot[0] && pivot[1] && pivot[2] && i < m->vertex_count; i ++) {
+        vec3 v = { pivot[0][i] * s[0], pivot[1][i] * s[1], pivot[2][i] * s[2] }, w;
+        glm_mat3_mulv(r, v, w);
+        for (k = 0; k < 3; k ++) {
+            pivot[k][i] = w[k] + position[k];
+        }
+    }
+}
+
 /** Move, turn and scale a value.
  *
  * @param node The MeshTransform
@@ -103,6 +134,8 @@ static int box_mesh_transform_eval(
     if (s[0] * s[1] * s[2] < 0.0f) {
         box_mg_flip(m, 0);
     }
+
+    box_mg_transform_pivots(m, r, s, t->position);
 
     float mean = (fabsf(s[0]) + fabsf(s[1]) + fabsf(s[2])) / 3.0f;
     for (i = 0; i < c->point_count; i ++) {

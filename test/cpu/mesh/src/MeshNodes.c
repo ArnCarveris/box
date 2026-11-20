@@ -100,22 +100,6 @@ static void point_up(
     glm_quat_rotatev(p->rotations[i], (vec3){0, 1, 0}, out);
 }
 
-/** Check that two vec3 are within a tolerance.
- *
- * @param a The value
- * @param b The expected value
- * @param eps The tolerance
- */
-static void near3(
-    const vec3 a,
-    const vec3 b,
-    float eps)
-{
-    test_near(a[0], b[0], eps);
-    test_near(a[1], b[1], eps);
-    test_near(a[2], b[2], eps);
-}
-
 void MeshNodes_shape_box(void) {
     ecs_world_t *world = test_world();
     box_mg_value_t *v = test_eval(world, box_node(world, 2, 1, 1));

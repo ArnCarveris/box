@@ -537,11 +537,12 @@ static void box_mg_plan_eval_node(
     box_mg_node_t *n)
 {
     box_mg_node_t *nodes = ecs_vec_first_t(&plan->nodes, box_mg_node_t);
-    const int32_t *links = ecs_vec_get_t(&plan->links, int32_t, n->link);
     int32_t i, count = 0;
     for (i = 0; i < BOX_MESH_NODE_INPUTS; i ++) {
         count += n->counts[i];
     }
+
+    const int32_t *links = count ? ecs_vec_get_t(&plan->links, int32_t, n->link) : NULL;
 
     const box_mg_value_t **inputs = ecs_os_calloc_n(const box_mg_value_t*, count + 1);
     for (i = 0; i < count && !n->error; i ++) {

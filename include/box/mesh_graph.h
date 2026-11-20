@@ -25,10 +25,10 @@ extern "C" {
 #define BOX_MESH_NODE_INPUTS (4)
 
 /** Most parameters of a node kind */
-#define BOX_MESH_NODE_PARAMS (16)
+#define BOX_MESH_NODE_PARAMS (32)
 
 /** Most float attributes of a value */
-#define BOX_MESH_ATTRS (8)
+#define BOX_MESH_ATTRS (16)
 
 /** Bytes of the name of an attribute, the terminating zero included */
 #define BOX_MESH_ATTR_NAME (24)
@@ -36,6 +36,33 @@ extern "C" {
 /** Flag of a node kind whose value is random: it has an int32_t parameter named seed, and its
  * value is the same for the same seed on every run and platform */
 #define BOX_MESH_NODE_RANDOM (1u << 0)
+
+/** Prefix of the Mesh attributes that are the per vertex data of the shape: the attributes
+ * data.0 to data.7 are channels 0 to 7 (Mesh3.data0 then data1, box_mesh_vertex_data); a mesh
+ * without them has no data */
+#define BOX_MESH_DATA_ATTR "data."
+
+/** Data channels 0 to 2 of the bark of branching curves, as Tube writes them for
+ * WindSwayHierarchy: the pivot of the branch, its root on the axis of its parent */
+#define BOX_MESH_DATA_PIVOT (0)
+
+/** Data channel of the bark of branching curves: the level of the branch, 0 for a stem */
+#define BOX_MESH_DATA_LEVEL (3)
+
+/** Data channel of the bark of branching curves: the phase of the branch in 0..1, from its
+ * seed, so branches sway out of step */
+#define BOX_MESH_DATA_PHASE (4)
+
+/** Data channel of the bark of branching curves: the stiffness of the branch, the radius at
+ * its base over the radius at the base of the stem it grows from, 1 for a stem */
+#define BOX_MESH_DATA_STIFFNESS (5)
+
+/** Data channel of the bark of branching curves: the distance in meters from the root of the
+ * stem along the branches, which a VertexReveal grows the plant along */
+#define BOX_MESH_DATA_GROWTH (6)
+
+/** Data channel of the bark of branching curves: the fraction of the length of the branch */
+#define BOX_MESH_DATA_ALONG (7)
 
 /** A capture got its value */
 #define BOX_MESH_CAPTURE_OK (0)
@@ -149,7 +176,7 @@ ECS_STRUCT(MeshNodeKind, {
     int32_t input_count;    /**< Inputs in inputs */
     MeshNodePort inputs[4]; /**< The BOX_MESH_NODE_INPUTS inputs, in order */
     int32_t param_count;    /**< Parameters in params */
-    MeshNodeParam params[16]; /**< The BOX_MESH_NODE_PARAMS parameters, in order */
+    MeshNodeParam params[32]; /**< The BOX_MESH_NODE_PARAMS parameters, in order */
     bool source;            /**< The node reads entities of the world on the main thread */
     bool random;            /**< The node has a seed, see BOX_MESH_NODE_RANDOM */
 });
@@ -200,6 +227,10 @@ ECS_STRUCT(MeshMerge, {
  * Each point of a curve gets a ring of the profile in its frame, scaled by its radius times
  * radius. u runs around the profile from 0 to 1, v along the curve: its length times v_scale,
  * continuous from point to point.
+ *
+ * A curve with a parent gets a collar: it flares and its normals blend into the surface of the
+ * parent where it leaves it, and its rings inside the parent stay inside. Curves with a level
+ * attribute (Stem, Branches) write the bark data channels, BOX_MESH_DATA_PIVOT and after.
  */
 ECS_STRUCT(MeshTube, {
     ecs_entity_t curves;  /**< Curves input node */
@@ -209,6 +240,127 @@ ECS_STRUCT(MeshTube, {
     float radius;         /**< Factor of the radius of the curves, 0 for 1 */
     float v_scale;        /**< v per unit of length along the curve, 0 for 1 */
     bool caps;            /**< Close both ends of every curve with a fan */
+    float collar;         /**< Length above the surface of the parent over which the collar of
+                           *   a child blends, in base radii of the child; 0 for 2, negative
+                           *   for no collar */
+    float flare;          /**< Radius the collar adds where it meets the parent, a fraction of
+                           *   the radius of the child; 0 for 0.5, negative for none */
+    bool square_uv;       /**< u repeats a whole number of times around each curve, about its
+                           *   circumference at the base times v_scale, so bark texels are
+                           *   square */
+    int32_t flutes;       /**< Buttress flutes around the base of the curves without a parent,
+                           *   0 for none */
+    float flute_depth;    /**< Radius a flute adds at its crest, a fraction of the radius */
+    float flute_height;   /**< Length from the base over which the flutes fade out, 0 for three
+                           *   base radii */
+});
+
+/** How Branches spreads the children of a parent around it */
+ECS_ENUM(MeshBranchDistribution, {
+    MeshBranchAlternate = 0, /**< One child per node, each half a turn from the last */
+    MeshBranchOpposite = 1,  /**< Two opposite children per node, each pair a quarter turn
+                              *   from the last */
+    MeshBranchWhorled = 2,   /**< whorl children per node evenly around, each whorl half a
+                              *   step from the last */
+    MeshBranchSpiral = 3     /**< One child per node, each the phyllotaxis angle from the
+                              *   last */
+});
+
+/** Shape of the envelope of Prune */
+ECS_ENUM(MeshEnvelopeShape, {
+    MeshEnvelopeNone = 0,      /**< No envelope, only the radius prunes */
+    MeshEnvelopeEllipsoid = 1, /**< Ellipsoid around center with the half extents of size */
+    MeshEnvelopeCone = 2,      /**< Cone from its base at center, radius size x and z, up to
+                                *   its apex size y above */
+    MeshEnvelopeCylinder = 3   /**< Cylinder from its base at center, radius size x and z,
+                                *   size y high */
+});
+
+/** Node of a MeshGraph whose Curves are stems: a curve that grows from a point or from each
+ * point of a Points, bending by noise and gravitropism as it goes.
+ *
+ * A stem has the attributes level 0, parent_t 0, tip (1 on its last point), root_distance
+ * (from its root in meters) and phase (0..1 from the seed), which Branches, Tube, Prune and
+ * PointsOnCurves read. Defaults are set when the component is added.
+ */
+ECS_STRUCT(MeshStem, {
+    ecs_entity_t points;    /**< Points node, a stem grows from each along its +Y turned to
+                             *   direction and scaled by its y scale; 0 for one stem */
+    vec3 position;          /**< Root of the stem without points */
+    vec3 direction;         /**< Start direction, 0 for +Y */
+    float length;           /**< Length, 5 when added, 0 for 1 */
+    float length_variation; /**< Random change of the length, a fraction of it */
+    int32_t segments;       /**< Segments of a stem, 12 when added, 0 for 8, at most 256 */
+    float radius;           /**< Radius at the root, 0.2 when added, 0 for 0.1 */
+    float taper;            /**< Fraction of the radius the tip loses, 0.8 when added */
+    float noise;            /**< Bend of the noise, radians per meter */
+    float noise_frequency;  /**< Noise cells per meter, 0 for 1 */
+    float gravitropism;     /**< Bend toward +Y in radians per meter, negative bends down */
+    float twist;            /**< Turn of the frame around the stem, radians per meter */
+    int32_t seed;           /**< Seed of the variation, noise and phase */
+});
+
+/** Node of a MeshGraph that sprouts child curves along the curves of the highest level of a
+ * Curves, which it outputs with the children, so a chain of Branches grows level by level.
+ *
+ * A child starts on the axis of its parent, so a Tube sinks it into the parent; its radius
+ * is the parent radius there split by the pipe model among the children of its node and the
+ * parent. Children get level, parent_t, tip, root_distance and phase like a Stem.
+ */
+ECS_STRUCT(MeshBranches, {
+    ecs_entity_t curves;     /**< Curves input node: parents and their ancestors */
+    int32_t count;           /**< Children per parent in whole nodes, 4 when added */
+    float density;           /**< Children per meter of the range instead of count, 0 for
+                              *   count */
+    float start;             /**< Start of the range, a fraction of the parent length */
+    float end;               /**< End of the range, 1 when added, 0 for 1 */
+    MeshBranchDistribution distribution; /**< How the children turn around the parent */
+    int32_t whorl;           /**< Children per node of a Whorled distribution, 0 for 3 */
+    float phyllotaxis;       /**< Turn between children of a Spiral in radians, 0 for the
+                              *   golden angle */
+    float down_angle;        /**< Angle between a child and its parent at the start of the
+                              *   range in radians, 0.8 when added */
+    float down_angle_change; /**< Change of the down angle from the start to the end of the
+                              *   range */
+    float roll;              /**< Turn added to every child around its parent, radians */
+    float length;            /**< Length of a child as a fraction of the length of its
+                              *   parent, 0.5 when added, 0 for 0.5 */
+    float length_curve[5];   /**< Factor of the length at 0, 1/4, 1/2, 3/4 and 1 of the range,
+                              *   linear between them; all 0 for 1 */
+    float radius_exponent;   /**< Exponent of the pipe model, 0 for 2: the area is kept */
+    float taper;             /**< Fraction of its radius the tip of a child loses, 0.8 when
+                              *   added */
+    int32_t segments;        /**< Segments of a child, 0 for 6, at most 256 */
+    float gravity;           /**< Bend toward -Y, radians per meter */
+    float phototropism;      /**< Bend toward light, radians per meter */
+    vec3 light;              /**< Direction toward the light, 0 for +Y */
+    float noise;             /**< Bend of the noise, radians per meter */
+    float angle_variation;   /**< Random change of the down angle, radians */
+    float roll_variation;    /**< Random change of the roll, radians */
+    float length_variation;  /**< Random change of the length, a fraction of it */
+    float radius_variation;  /**< Random change of the radius, a fraction of it */
+    int32_t seed;            /**< Seed of the variations, the noise and the phases */
+});
+
+/** Node of a MeshGraph that removes or shortens the curves of a Curves outside an envelope
+ * and the curves thinner than a radius, each with its children.
+ *
+ * The envelope is the profile when it has one: its x is the radius around the vertical axis
+ * through center at the height y above center, as a Lathe turns a Path2D.
+ */
+ECS_STRUCT(MeshPrune, {
+    ecs_entity_t curves;     /**< Curves input node */
+    ecs_entity_t profile;    /**< Curves node whose first curve is the envelope, 0 for shape */
+    MeshEnvelopeShape shape; /**< Envelope without a profile */
+    vec3 center;             /**< Center of the ellipsoid, center of the base of the cone or
+                              *   cylinder, origin of the profile */
+    vec3 size;               /**< Half extents of the ellipsoid, radii and height of the cone
+                              *   or cylinder; a 0 is 1 */
+    float min_radius;        /**< Curves whose base radius is below it are removed */
+    int32_t level;           /**< Curves of a lower level are kept, 1 when added */
+    bool shorten;            /**< Cut a curve where it leaves the envelope instead of removing
+                              *   it; it tapers to the radius of its old tip, its children
+                              *   beyond the cut are removed and the others thinned to fit */
 });
 
 /** Node of a MeshGraph that places Points along every curve of a Curves.

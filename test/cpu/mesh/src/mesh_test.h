@@ -208,6 +208,22 @@ static void test_near(
     test_assert(fabsf(value - expect) <= eps);
 }
 
+/** Check that two vec3 are within a tolerance.
+ *
+ * @param a The value
+ * @param b The expected value
+ * @param eps The tolerance
+ */
+static void near3(
+    const vec3 a,
+    const vec3 b,
+    float eps)
+{
+    test_near(a[0], b[0], eps);
+    test_near(a[1], b[1], eps);
+    test_near(a[2], b[2], eps);
+}
+
 /** Check that the last failure of a graph mentions a text.
  *
  * @param world The world

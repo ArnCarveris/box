@@ -438,7 +438,7 @@ void MeshGraph_node_kinds(void) {
     test_assert(tube->inputs[1].optional);
     test_assert(!tube->source);
     test_assert(!tube->random);
-    test_int(tube->param_count, 4);
+    test_int(tube->param_count, 10);
     test_str(tube->params[0].name, "sides");
 
     const MeshNodeKind *merge = ecs_get(world, ecs_id(MeshMerge), MeshNodeKind);
@@ -454,6 +454,10 @@ void MeshGraph_node_kinds(void) {
     test_assert(ecs_lookup(world, "box.mesh.Graph") == ecs_id(MeshGraph));
     test_assert(ecs_lookup(world, "box.mesh.nodes.Tube") == ecs_id(MeshTube));
     test_assert(ecs_lookup(world, "box.mesh.nodes.Mesh3") == ecs_id(MeshMesh3));
+    test_assert(ecs_lookup(world, "box.mesh.nodes.Branches") == ecs_id(MeshBranches));
+    test_assert(ecs_get(world, ecs_id(MeshBranches), MeshNodeKind)->random);
+    test_int(ecs_get(world, ecs_id(MeshBranches), MeshNodeKind)->param_count, 24);
+    test_int(ecs_get(world, ecs_id(MeshPrune), MeshNodeKind)->input_count, 2);
 
     ecs_fini(world);
 }

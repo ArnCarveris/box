@@ -641,7 +641,8 @@
             {
                 "id": "MeshGraph",
                 "testcases": [
-                    "tube_with_spheres"
+                    "tube_with_spheres",
+                    "branching_tree"
                 ]
             },
             {

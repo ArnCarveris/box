@@ -380,6 +380,36 @@ static void box_mesh_graph_key(
     }
 }
 
+/** Give a generated mesh the per vertex data of the data.0 to data.7 attributes of a Mesh
+ * value, when it has one of them.
+ *
+ * @param m The Mesh value
+ * @param mesh The generated mesh, with its vertices
+ */
+static void box_mesh_graph_data(
+    const box_mg_mesh_t *m,
+    box_mesh_t *mesh)
+{
+    const float *channels[8];
+    bool any = false;
+    int32_t i, k;
+    for (k = 0; k < 8; k ++) {
+        char name[BOX_MESH_ATTR_NAME];
+        ecs_os_snprintf(name, ECS_SIZEOF(name), "%s%d", BOX_MESH_DATA_ATTR, k);
+        channels[k] = box_mg_attr_find(m->attrs, m->attr_count, name);
+        any = any || channels[k];
+    }
+
+    for (i = 0; any && i < m->vertex_count; i ++) {
+        vec4 d[2];
+        for (k = 0; k < 8; k ++) {
+            d[k / 4][k % 4] = channels[k] ? channels[k][i] : 0.0f;
+        }
+
+        box_mesh_vertex_data(mesh, i, d[0], d[1]);
+    }
+}
+
 /** Generate the mesh of a MeshGraph from the value delivered for its output.
  *
  * @param world The world
@@ -418,6 +448,7 @@ static void box_mesh_graph_generate(
     }
 
     ecs_os_memcpy_n(mesh->indices, m->indices, uint32_t, m->index_count);
+    box_mesh_graph_data(m, mesh);
 done:
     return;
 }
@@ -564,6 +595,10 @@ static void box_mesh_register(
     BOX_MESH_COMPONENT(world, MeshValueType, "ValueType");
     ecs_set_name_prefix(world, "MeshGraph");
     BOX_MESH_COMPONENT(world, MeshGraphState, "State");
+    ecs_set_name_prefix(world, "MeshBranch");
+    BOX_MESH_COMPONENT(world, MeshBranchDistribution, "BranchDistribution");
+    ecs_set_name_prefix(world, "MeshEnvelope");
+    BOX_MESH_COMPONENT(world, MeshEnvelopeShape, "EnvelopeShape");
     ecs_set_name_prefix(world, NULL);
     BOX_MESH_COMPONENT(world, MeshGraph, "Graph");
     BOX_MESH_COMPONENT(world, MeshGraphStatus, "Status");
@@ -585,6 +620,9 @@ static void box_mesh_register(
     ECS_META_COMPONENT(world, MeshInstanceOnPoints);
     ECS_META_COMPONENT(world, MeshDisplace);
     ECS_META_COMPONENT(world, MeshNormals);
+    ECS_META_COMPONENT(world, MeshStem);
+    ECS_META_COMPONENT(world, MeshBranches);
+    ECS_META_COMPONENT(world, MeshPrune);
     ECS_META_COMPONENT(world, MeshCut);
     ECS_META_COMPONENT(world, MeshStrata);
     ECS_META_COMPONENT(world, MeshJitter);
@@ -615,7 +653,23 @@ static void box_mesh_register(
         BOX_OWNED_STR(MeshNodeKind, params[12].name),
         BOX_OWNED_STR(MeshNodeKind, params[13].name),
         BOX_OWNED_STR(MeshNodeKind, params[14].name),
-        BOX_OWNED_STR(MeshNodeKind, params[15].name));
+        BOX_OWNED_STR(MeshNodeKind, params[15].name),
+        BOX_OWNED_STR(MeshNodeKind, params[16].name),
+        BOX_OWNED_STR(MeshNodeKind, params[17].name),
+        BOX_OWNED_STR(MeshNodeKind, params[18].name),
+        BOX_OWNED_STR(MeshNodeKind, params[19].name),
+        BOX_OWNED_STR(MeshNodeKind, params[20].name),
+        BOX_OWNED_STR(MeshNodeKind, params[21].name),
+        BOX_OWNED_STR(MeshNodeKind, params[22].name),
+        BOX_OWNED_STR(MeshNodeKind, params[23].name),
+        BOX_OWNED_STR(MeshNodeKind, params[24].name),
+        BOX_OWNED_STR(MeshNodeKind, params[25].name),
+        BOX_OWNED_STR(MeshNodeKind, params[26].name),
+        BOX_OWNED_STR(MeshNodeKind, params[27].name),
+        BOX_OWNED_STR(MeshNodeKind, params[28].name),
+        BOX_OWNED_STR(MeshNodeKind, params[29].name),
+        BOX_OWNED_STR(MeshNodeKind, params[30].name),
+        BOX_OWNED_STR(MeshNodeKind, params[31].name));
 }
 
 void box_mesh_graph_shape_init(
@@ -688,6 +742,7 @@ void BoxMeshImport(
     box_mesh_nodes_source_register(world);
     box_mesh_nodes_mesh_register(world);
     box_mesh_nodes_curves_register(world);
+    box_mesh_nodes_branch_register(world);
 
     ecs_system(world, {
         .entity = ecs_entity(world, { .name = "Build" }),

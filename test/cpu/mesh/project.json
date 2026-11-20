@@ -79,6 +79,39 @@
                     "deterministic_across_worlds",
                     "sincos"
                 ]
+            },
+            {
+                "id": "MeshBranch",
+                "testcases": [
+                    "stem",
+                    "stem_on_points",
+                    "stem_gravitropism",
+                    "stem_twist",
+                    "alternate",
+                    "opposite",
+                    "whorled",
+                    "spiral",
+                    "density",
+                    "down_angle_change",
+                    "length_curve",
+                    "pipe_model",
+                    "levels",
+                    "bends",
+                    "deterministic",
+                    "prune_remove",
+                    "prune_shorten",
+                    "prune_shapes",
+                    "prune_radius",
+                    "collar_inside",
+                    "collar_flare",
+                    "bark_uvs",
+                    "flutes",
+                    "bark_data",
+                    "no_data_without_level",
+                    "shape_data",
+                    "points_attrs",
+                    "script_tree"
+                ]
             }
         ]
     }

@@ -616,8 +616,16 @@ static void box_mg_curve_tangents(
 void box_mg_curves_frames(
     box_mg_curves_t *curves)
 {
+    box_mg_curves_frames_range(curves, 0, curves->curve_count);
+}
+
+void box_mg_curves_frames_range(
+    box_mg_curves_t *curves,
+    int32_t from,
+    int32_t to)
+{
     int32_t c, i;
-    for (c = 0; c < curves->curve_count; c ++) {
+    for (c = from; c < to; c ++) {
         int32_t first = curves->offsets[c], count = curves->offsets[c + 1] - first;
         if (count <= 0) {
             continue;
@@ -676,4 +684,27 @@ float box_mg_curve_lengths(
     }
 
     return length;
+}
+
+void box_mg_curves_tips(
+    box_mg_curves_t *curves)
+{
+    float *tip = box_mg_attr_add(curves->attrs, &curves->attr_count, "tip", curves->point_count);
+    int32_t c;
+    bool *parent = ecs_os_calloc_n(bool, curves->curve_count + 1);
+    for (c = 0; c < curves->curve_count; c ++) {
+        int32_t p = curves->parents[c];
+        if (p >= 0 && p < curves->curve_count) {
+            parent[p] = true;
+        }
+    }
+
+    for (c = 0; tip && c < curves->curve_count; c ++) {
+        int32_t first = curves->offsets[c], last = curves->offsets[c + 1] - 1, i;
+        for (i = first; i <= last; i ++) {
+            tip[i] = i == last && !parent[c] ? 1.0f : 0.0f;
+        }
+    }
+
+    ecs_os_free(parent);
 }
