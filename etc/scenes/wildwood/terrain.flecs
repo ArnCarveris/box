@@ -21,12 +21,15 @@ using assets
 //   flattened (no bumps)
 // - trails: the edges between the cells of another TexCells (CellsEdge), sunk a little into the
 //   ground
-// Both TexCells read warped coordinates, so the clearings are not round and the trails wind.
+// - landmark sites: near the points of a third TexCells, on flat ground, the hollow of a pond or
+//   a knoll in a small glade, for the landmarks of landmarks.flecs
+// The first two TexCells read warped coordinates, so the clearings are not round and the trails
+// wind.
 //
 // Masks, four weights that add up to 1 and paint the TextureBlend of materials.flecs:
-// red the forest floor, green the grass of the clearings and the alpine meadows (where later
-// scatter keeps the trees out), blue the dirt of the trails and the scree, alpha the rock of the
-// steep slopes and walls.
+// red the forest floor, green the grass of the clearings, the glades and the alpine meadows
+// (where later scatter keeps the trees out), blue the dirt of the trails, the scree and the beds
+// of the ponds, alpha the rock of the steep slopes and walls.
 wildwood {
   land {
     // Rolling forest floor
@@ -63,13 +66,6 @@ wildwood {
     }
 
     clearing { nodes.Multiply: {a: clear_in, b: clear_kept} }
-
-    wooded { nodes.Subtract: {a_value: {1, 1, 1, 1}, b: clearing} }
-
-    // Bumps of the forest floor, smoothed out in the clearings
-    bumps { nodes.Noise: {frequency: 0.018, octaves: 3, seed: 22} }
-    bumps_c { nodes.Remap: {input: bumps, from_min: 0, from_max: 1, to_min: -4, to_max: 4} }
-    bumps_h { nodes.Multiply: {a: bumps_c, b: wooded} }
 
     // Escarpments: a band noise steps up where it crosses 0.5; the wall stands where the second
     // noise is high and leans into a slope where it is low
@@ -127,12 +123,73 @@ wildwood {
     trail_h { nodes.Multiply: {a: track, b_value: {-0.35, -0.35, -0.35, -0.35}} }
 
     h1 { nodes.Add: {a: roll_h, b: terraces_h} }
-    h2 { nodes.Add: {a: h1, b: bumps_h} }
-    h3 { nodes.Add: {a: h2, b: wall_h} }
+    h3 { nodes.Add: {a: h1, b: wall_h} }
     h3c { nodes.Add: {a: h3, b: crags_h} }
     h4 { nodes.Add: {a: h3c, b: peaks_h} }
     h5 { nodes.Add: {a: h4, b: foothills_h} }
-    height { nodes.Add: {a: h5, b: trail_h} }
+
+    // Landmark sites: near the point of some cells of a third TexCells, away from the rock
+    // walls, a pond in a hollow or a knoll, each in a small glade. The points keep to the middle
+    // of their cells (jitter), so a site never reaches the edge of its cell. The slope is
+    // blurred so that it changes little across a site, which keeps it whole.
+    site_cells { nodes.Cells: {distance: CellsNearest, size: 230, jitter: 0.5, seed: 71} }
+    site_d { nodes.Split: {input: site_cells, channel: ChannelR} }
+    site_r { nodes.Split: {input: site_cells, channel: ChannelB} }
+    site_slope { nodes.Slope: {height: h5} }
+    site_slope_b { nodes.Blur: {input: site_slope, radius: 24} }
+    site_flat {
+      nodes.Smoothstep: {input: site_slope_b, edge0_value: {0.3, 0, 0, 0}, edge1_value: {0.2, 0, 0, 0}}
+    }
+
+    pond_r {
+      nodes.Smoothstep: {input: site_r, edge0_value: {0.145, 0, 0, 0}, edge1_value: {0.135, 0, 0, 0}}
+    }
+
+    site_r_in {
+      nodes.Smoothstep: {input: site_r, edge0_value: {0.405, 0, 0, 0}, edge1_value: {0.395, 0, 0, 0}}
+    }
+
+    site_any { nodes.Multiply: {a: site_r_in, b: site_flat} }
+    pond_sel { nodes.Multiply: {a: pond_r, b: site_flat} }
+    knoll_sel { nodes.Subtract: {a: site_any, b: pond_sel} }
+
+    // The hollow of the pond, with a flat bed, and the knoll
+    hollow {
+      nodes.Smoothstep: {input: site_d, edge0_value: {0.1, 0, 0, 0}, edge1_value: {0.02, 0, 0, 0}}
+    }
+
+    hollow_s { nodes.Multiply: {a: hollow, b: pond_sel} }
+    hollow_h { nodes.Multiply: {a: hollow_s, b_value: {-2.8, -2.8, -2.8, -2.8}} }
+    knoll {
+      nodes.Smoothstep: {input: site_d, edge0_value: {0.17, 0, 0, 0}, edge1_value: {0, 0, 0, 0}}
+    }
+
+    knoll_s { nodes.Multiply: {a: knoll, b: knoll_sel} }
+    knoll_h { nodes.Multiply: {a: knoll_s, b_value: {4.5, 4.5, 4.5, 4.5}} }
+    site_h { nodes.Add: {a: hollow_h, b: knoll_h} }
+
+    // The glade of the site, and the mud of the bed of the pond
+    glade_in {
+      nodes.Smoothstep: {input: site_d, edge0_value: {0.16, 0, 0, 0}, edge1_value: {0.09, 0, 0, 0}}
+    }
+
+    glade { nodes.Multiply: {a: glade_in, b: site_any} }
+    bed_in {
+      nodes.Smoothstep: {input: site_d, edge0_value: {0.075, 0, 0, 0}, edge1_value: {0.055, 0, 0, 0}}
+    }
+
+    bed { nodes.Multiply: {a: bed_in, b: pond_sel} }
+    opening { nodes.Max: {a: clearing, b: glade} }
+    wooded { nodes.Subtract: {a_value: {1, 1, 1, 1}, b: opening} }
+
+    // Bumps of the forest floor, smoothed out in the clearings and the glades
+    bumps { nodes.Noise: {frequency: 0.018, octaves: 3, seed: 22} }
+    bumps_c { nodes.Remap: {input: bumps, from_min: 0, from_max: 1, to_min: -4, to_max: 4} }
+    bumps_h { nodes.Multiply: {a: bumps_c, b: wooded} }
+
+    h6 { nodes.Add: {a: h5, b: bumps_h} }
+    h7 { nodes.Add: {a: h6, b: site_h} }
+    height { nodes.Add: {a: h7, b: trail_h} }
 
     // Rock on the steep slopes and walls
     slope { nodes.Slope: {height: height} }
@@ -166,18 +223,24 @@ wildwood {
     trail_w { nodes.Multiply: {a: track, b: rest_a} }
     rest_b { nodes.Subtract: {a: rest_a, b: trail_w} }
 
-    // Grass in the clearings and above the tree line
+    // Mud on the bed of the ponds
+    bed_w { nodes.Multiply: {a: bed, b: rest_b} }
+    rest_c { nodes.Subtract: {a: rest_b, b: bed_w} }
+
+    // Grass in the clearings, the glades and above the tree line
     alpine {
       nodes.Smoothstep: {input: height, edge0_value: {210, 0, 0, 0}, edge1_value: {300, 0, 0, 0}}
     }
 
-    meadow { nodes.Max: {a: clearing, b: alpine} }
-    grass_w { nodes.Multiply: {a: meadow, b: rest_b} }
-    floor_w { nodes.Subtract: {a: rest_b, b: grass_w} }
+    meadow_a { nodes.Max: {a: clearing, b: alpine} }
+    meadow { nodes.Max: {a: meadow_a, b: glade} }
+    grass_w { nodes.Multiply: {a: meadow, b: rest_c} }
+    floor_w { nodes.Subtract: {a: rest_c, b: grass_w} }
 
     scree_dirt { nodes.Multiply: {a: scree_w, b_value: {0.4, 0.4, 0.4, 0.4}} }
     scree_rock { nodes.Multiply: {a: scree_w, b_value: {0.6, 0.6, 0.6, 0.6}} }
-    dirt_w { nodes.Add: {a: trail_w, b: scree_dirt} }
+    dirt_a { nodes.Add: {a: trail_w, b: scree_dirt} }
+    dirt_w { nodes.Add: {a: dirt_a, b: bed_w} }
     rock_w { nodes.Add: {a: rock, b: scree_rock} }
     masks { nodes.Combine: {r: floor_w, g: grass_w, b: dirt_w, a: rock_w} }
 
