@@ -1,0 +1,667 @@
+using flecs.script
+using flecs.script.math
+using box.material
+using box.mesh
+using box.input
+using trees
+
+// The state of the editor: the props of the edited tree, which every control of the panel
+// writes, and the settings of the view around it.
+tree_editor {
+  export const PANEL_W: f32 = 372
+  export const ROW_W: f32 = 318
+
+  export const PRESETS = ["Beech", "Oak", "Birch", "Spruce", "Fir", "Pine", "Willow", "Snag"]
+  export const BARKS = ["Beech", "Oak", "Birch", "Spruce", "Fir", "Pine", "Willow", "Dead"]
+  export const LEAVES = [
+    "Beech leaf", "Oak leaf", "Birch leaf", "Willow leaf", "Spruce needle", "Fir needle",
+    "Pine needle", "Dead twig"
+  ]
+  export const DISTRIBUTIONS = ["Alternate", "Opposite", "Whorled", "Spiral"]
+  export const ENVELOPES = ["None", "Ellipsoid", "Cone", "Cylinder"]
+  export const PLACEMENTS = ["Twigs", "Tips", "Levels"]
+  export const ORIENTATIONS = ["Along", "Face up", "Face out"]
+  export const CARDS = ["Quad", "Bent", "Cross"]
+  export const CROWN_SHAPES = ["Ellipsoid", "Density"]
+  export const NEEDLE_STYLES = ["Fir", "Spruce"]
+  export const LOD_MODES = ["Auto", "LOD 0", "LOD 1", "LOD 2", "LOD 3"]
+
+  // The distances of the levels of detail while the view picks them
+  export const LOD_AUTO: f32 = 30
+
+  // The props of the edited tree: those of the preset it was loaded from, then every edit
+  export mut props: Tree = {}
+
+  // The props the tree grows from: the props, copied when they changed and the tree is not
+  // growing, so that a drag regrows it as fast as the graph evaluates and no faster
+  export mut grown: Tree = {}
+  export mut edits: i32 = 0
+
+  // The preset the props were loaded from, its age (the fraction of the mature height) and
+  // the seed it was loaded with
+  export mut preset: i32 = 0
+  export mut age: f32 = 1
+  export mut source_seed: i32 = 1
+
+  // Season: 0 spring, 1 summer, 2 autumn, 3 winter
+  export mut season: f32 = 1
+  export mut wind: f32 = 3
+  export mut hour: f32 = 15
+
+  // 0 lets the view pick the level of detail, 1 to 4 show level 0 to 3
+  export mut lod: i32 = 0
+
+  export mut show_bark = true
+  export mut show_foliage = true
+  export mut show_skeleton = false
+  export mut turntable = false
+  export mut spin: f32 = 0
+
+  // The orbit of the camera around the trunk: yaw and pitch in radians, meters to the target,
+  // the height of the target
+  export mut yaw: f32 = 0.5
+  export mut pitch: f32 = 0.12
+  export mut dist: f32 = 40
+  export mut target_y: f32 = 12
+
+  export mut panel_shown = true
+
+  // The script of the edited tree, which Print writes to the console and the clipboard
+  export mut snippet: string = ""
+  export mut printed: i32 = 0
+
+  // The outcome of the last evaluations of the bark and the foliage, and the frame rate
+  export mut bark_status: Status = {}
+  export mut foliage_status: Status = {}
+  export mut fps: f32 = 0
+
+  actions {
+    fit {
+      Action: {description: "Fit the view to the tree"}
+      Binding: {key: F}
+    }
+
+    randomize {
+      Action: {description: "Grow the tree from another seed"}
+      Binding: {key: R}
+    }
+
+    print {
+      Action: {description: "Print the tree as script to the console and copy it"}
+      Binding: {key: P}
+    }
+
+    reset {
+      Action: {description: "Reload the preset at its age and the seed"}
+    }
+
+    toggle_panel {
+      Action: {description: "Hide or show the panel"}
+      Binding: {key: H}
+    }
+  }
+
+  // Meters from the camera to the trunk that fit a tree of a height in the view, and the
+  // height the camera looks at
+  fn fit_dist(height: f32, width: f32) -> f32 {
+    max(height * 1.9, height * width * 4) + 4
+  }
+
+  fn fit_target(height: f32) -> f32 {
+    height * 0.5
+  }
+
+  // The LOD settings of the view: picked by distance, or every level up to the forced one at
+  // distance 0 and the others out of reach
+  fn lod_distance(mode: i32, level: i32) -> f32 {
+    match mode {
+      0: LOD_AUTO * (pow(2.2, level) - 1) / 1.2
+      _: level < mode ? 0 : 1000000
+    }
+  }
+
+  // The level the view shows: the forced one, or the one the distance of the camera to the
+  // bounding sphere of the tree picks
+  fn lod_shown(mode: i32, d: f32, height: f32) -> i32 {
+    const near = max(d - height * 0.6, 0)
+    match mode {
+      0: near >= lod_distance(0, 3) ? 3 : near >= lod_distance(0, 2) ? 2 :
+        near >= lod_distance(0, 1) ? 1 : 0
+      _: mode - 1
+    }
+  }
+
+  // Season
+  fn season_name(s: f32) -> string {
+    s < 0.5 ? "Spring" : s < 1.5 ? "Summer" : s < 2.5 ? "Autumn" : "Winter"
+  }
+
+  fn mix_rgb(a: Rgb, b: Rgb, t: f32) -> Rgb {
+    const k = clamp(t, 0, 1)
+    {a.r + (b.r - a.r) * k, a.g + (b.g - a.g) * k, a.b + (b.b - a.b) * k}
+  }
+
+  // The leaves over the year from base, the color of the summer: fresh in spring, yellow to
+  // orange and brown in autumn, brown in winter; needles darken a little in winter
+  fn season_rgb(base: Rgb, s: f32, needles: bool) -> Rgb {
+    const spring: Rgb = {168, 206, 86}
+    const gold: Rgb = {214, 150, 46}
+    const rust: Rgb = {176, 82, 34}
+    const brown: Rgb = {112, 74, 44}
+    const dull: Rgb = {58, 72, 58}
+
+    match needles {
+      true: s < 1 ? mix_rgb(base, spring, (1 - s) * 0.3) :
+        s < 2 ? base : mix_rgb(base, dull, (s - 2) * 0.35)
+      _: s < 1 ? mix_rgb(base, spring, (1 - s) * 0.55) :
+        s < 1.5 ? base :
+        s < 2 ? mix_rgb(base, gold, (s - 1.5) * 2) :
+        s < 2.5 ? mix_rgb(gold, rust, (s - 2) * 2) : mix_rgb(rust, brown, (s - 2.5) * 2)
+    }
+  }
+
+  // The fraction of the leaves the season takes away: a crown filling out in spring, the
+  // leaves falling through autumn; needles stay
+  fn season_thin(s: f32, needles: bool) -> f32 {
+    match needles {
+      true: 0
+      _: s < 1 ? (1 - s) * 0.45 : s < 2 ? 0 : clamp(pow(s - 2, 1.6), 0, 1)
+    }
+  }
+
+  // The props the tree grows with: those of the panel, thinned by the season
+  fn seasoned(p: Tree, s: f32) -> Tree {
+    mut r = p
+    r.thin = max(p.thin, season_thin(s, p.needles))
+    r
+  }
+
+  // The bend of the wind sway of a tree, as the Tree computes it
+  fn tree_sway(p: Tree) -> f32 {
+    p.height * 0.0028 * (1.4 - p.stiffness)
+  }
+
+  // Materials by index, the order of BARKS and LEAVES
+  fn bark_of(i: i32) -> entity {
+    match i {
+      1: TreeBarkOak
+      2: TreeBarkBirch
+      3: TreeBarkSpruce
+      4: TreeBarkFir
+      5: TreeBarkPine
+      6: TreeBarkWillow
+      7: TreeBarkDead
+      _: TreeBarkBeech
+    }
+  }
+
+  fn bark_index(e: entity) -> i32 {
+    match e.name() {
+      "TreeBarkOak": 1
+      "TreeBarkBirch": 2
+      "TreeBarkSpruce": 3
+      "TreeBarkFir": 4
+      "TreeBarkPine": 5
+      "TreeBarkWillow": 6
+      "TreeBarkDead": 7
+      _: 0
+    }
+  }
+
+  fn leaf_of(i: i32) -> entity {
+    match i {
+      1: TreeLeafOak
+      2: TreeLeafBirch
+      3: TreeLeafWillow
+      4: TreeNeedleSpruce
+      5: TreeNeedleFir
+      6: TreeNeedlePine
+      7: TreeTwigDead
+      _: TreeLeafBeech
+    }
+  }
+
+  fn leaf_index(e: entity) -> i32 {
+    match e.name() {
+      "TreeLeafOak": 1
+      "TreeLeafBirch": 2
+      "TreeLeafWillow": 3
+      "TreeNeedleSpruce": 4
+      "TreeNeedleFir": 5
+      "TreeNeedlePine": 6
+      "TreeTwigDead": 7
+      _: 0
+    }
+  }
+
+  // Enums by index, the order of the option lists
+  fn distribution_index(d: BranchDistribution) -> i32 {
+    match "{d}" {
+      "Opposite": 1
+      "Whorled": 2
+      "Spiral": 3
+      _: 0
+    }
+  }
+
+  fn envelope_index(e: EnvelopeShape) -> i32 {
+    match "{e}" {
+      "Ellipsoid": 1
+      "Cone": 2
+      "Cylinder": 3
+      _: 0
+    }
+  }
+
+  fn placement_index(p: LeafPlacement) -> i32 {
+    match "{p}" {
+      "Tips": 1
+      "Levels": 2
+      _: 0
+    }
+  }
+
+  fn orientation_index(o: LeafOrientation) -> i32 {
+    match "{o}" {
+      "FaceUp": 1
+      "FaceOut": 2
+      _: 0
+    }
+  }
+
+  fn card_index(c: CardShape) -> i32 {
+    match "{c}" {
+      "Bent": 1
+      "Cross": 2
+      _: 0
+    }
+  }
+
+  fn crown_shape_index(c: CrownShape) -> i32 {
+    match "{c}" {
+      "Density": 1
+      _: 0
+    }
+  }
+
+  fn needle_style_index(n: NeedleStyle) -> i32 {
+    match "{n}" {
+      "Spruce": 1
+      _: 0
+    }
+  }
+
+  // The level of branches a panel group edits, by its name
+  fn branch_level(group: string) -> i32 {
+    match group {
+      "b1": 1
+      "b2": 2
+      "b3": 3
+      "b4": 4
+      _: 0
+    }
+  }
+
+  // Writes the number a slider or stepper named after a prop of the tree set
+  fn set_number(n: string, v: f32) {
+    if n == "seed" {
+      props.seed = v
+    } else if n == "height" {
+      props.height = v
+    } else if n == "radius" {
+      props.radius = v
+    } else if n == "taper" {
+      props.taper = v
+    } else if n == "bend" {
+      props.bend = v
+    } else if n == "lean" {
+      props.lean = v
+    } else if n == "twist" {
+      props.twist = v
+    } else if n == "flutes" {
+      props.flutes = v
+    } else if n == "flare" {
+      props.flare = v
+    } else if n == "flare_height" {
+      props.flare_height = v
+    } else if n == "crown_base" {
+      props.crown_base = v
+    } else if n == "crown_top" {
+      props.crown_top = v
+    } else if n == "crown_width" {
+      props.crown_width = v
+    } else if n == "bark_drop" {
+      props.bark_drop = v
+    } else if n == "leaf_size" {
+      props.leaf_size = v
+    } else if n == "leaf_density" {
+      props.leaf_density = v
+    } else if n == "leaf_count" {
+      props.leaf_count = v
+    } else if n == "leaf_per_node" {
+      props.leaf_per_node = v
+    } else if n == "leaf_start" {
+      props.leaf_start = v
+    } else if n == "leaf_levels" {
+      props.leaf_levels = v
+    } else if n == "leaf_angle" {
+      props.leaf_angle = v
+    } else if n == "leaf_tilt" {
+      props.leaf_tilt = v
+    } else if n == "leaf_bank" {
+      props.leaf_bank = v
+    } else if n == "card_bend" {
+      props.card_bend = v
+    } else if n == "needle_cards" {
+      props.needle_cards = v
+    } else if n == "needle_width" {
+      props.needle_width = v
+    } else if n == "needle_droop" {
+      props.needle_droop = v
+    } else if n == "crown_normals" {
+      props.crown_normals = v
+    } else if n == "occlusion" {
+      props.occlusion = v
+    } else if n == "thin" {
+      props.thin = v
+    } else if n == "growth" {
+      props.growth = v
+    } else if n == "stiffness" {
+      props.stiffness = v
+    } else if n == "flutter" {
+      props.flutter = v
+    } else if n == "sway_branch" {
+      props.sway_branch = v
+    } else if n == "ground" {
+      props.ground = v
+    } else if n == "lods" {
+      props.lods = v
+    } else if n == "age" {
+      age = v
+    } else if n == "season" {
+      season = v
+    } else if n == "wind" {
+      wind = v
+    } else if n == "hour" {
+      hour = v
+    }
+  }
+
+  // Writes the number a slider of a level of branches set
+  fn set_branch_number(level: i32, n: string, v: f32) {
+    if level == 1 {
+      if n == "count" {
+        props.b1.count = v
+      } else if n == "density" {
+        props.b1.density = v
+      } else if n == "start" {
+        props.b1.start = v
+      } else if n == "end" {
+        props.b1.end = v
+      } else if n == "whorl" {
+        props.b1.whorl = v
+      } else if n == "phyllotaxis" {
+        props.b1.phyllotaxis = v
+      } else if n == "down" {
+        props.b1.down = v
+      } else if n == "down_end" {
+        props.b1.down_end = v
+      } else if n == "length" {
+        props.b1.length = v
+      } else if n == "length_end" {
+        props.b1.length_end = v
+      } else if n == "gravity" {
+        props.b1.gravity = v
+      } else if n == "light" {
+        props.b1.light = v
+      } else if n == "noise" {
+        props.b1.noise = v
+      } else if n == "exponent" {
+        props.b1.exponent = v
+      }
+    } else if level == 2 {
+      if n == "count" {
+        props.b2.count = v
+      } else if n == "density" {
+        props.b2.density = v
+      } else if n == "start" {
+        props.b2.start = v
+      } else if n == "end" {
+        props.b2.end = v
+      } else if n == "whorl" {
+        props.b2.whorl = v
+      } else if n == "phyllotaxis" {
+        props.b2.phyllotaxis = v
+      } else if n == "down" {
+        props.b2.down = v
+      } else if n == "down_end" {
+        props.b2.down_end = v
+      } else if n == "length" {
+        props.b2.length = v
+      } else if n == "length_end" {
+        props.b2.length_end = v
+      } else if n == "gravity" {
+        props.b2.gravity = v
+      } else if n == "light" {
+        props.b2.light = v
+      } else if n == "noise" {
+        props.b2.noise = v
+      } else if n == "exponent" {
+        props.b2.exponent = v
+      }
+    } else if level == 3 {
+      if n == "count" {
+        props.b3.count = v
+      } else if n == "density" {
+        props.b3.density = v
+      } else if n == "start" {
+        props.b3.start = v
+      } else if n == "end" {
+        props.b3.end = v
+      } else if n == "whorl" {
+        props.b3.whorl = v
+      } else if n == "phyllotaxis" {
+        props.b3.phyllotaxis = v
+      } else if n == "down" {
+        props.b3.down = v
+      } else if n == "down_end" {
+        props.b3.down_end = v
+      } else if n == "length" {
+        props.b3.length = v
+      } else if n == "length_end" {
+        props.b3.length_end = v
+      } else if n == "gravity" {
+        props.b3.gravity = v
+      } else if n == "light" {
+        props.b3.light = v
+      } else if n == "noise" {
+        props.b3.noise = v
+      } else if n == "exponent" {
+        props.b3.exponent = v
+      }
+    } else if level == 4 {
+      if n == "count" {
+        props.b4.count = v
+      } else if n == "density" {
+        props.b4.density = v
+      } else if n == "start" {
+        props.b4.start = v
+      } else if n == "end" {
+        props.b4.end = v
+      } else if n == "whorl" {
+        props.b4.whorl = v
+      } else if n == "phyllotaxis" {
+        props.b4.phyllotaxis = v
+      } else if n == "down" {
+        props.b4.down = v
+      } else if n == "down_end" {
+        props.b4.down_end = v
+      } else if n == "length" {
+        props.b4.length = v
+      } else if n == "length_end" {
+        props.b4.length_end = v
+      } else if n == "gravity" {
+        props.b4.gravity = v
+      } else if n == "light" {
+        props.b4.light = v
+      } else if n == "noise" {
+        props.b4.noise = v
+      } else if n == "exponent" {
+        props.b4.exponent = v
+      }
+    }
+  }
+
+  // Writes the distribution of a level of branches
+  fn set_distribution(level: i32, i: i32) {
+    if level == 1 {
+      if i == 0 {
+        props.b1.distribution = Alternate
+      } else if i == 1 {
+        props.b1.distribution = Opposite
+      } else if i == 2 {
+        props.b1.distribution = Whorled
+      } else {
+        props.b1.distribution = Spiral
+      }
+    } else if level == 2 {
+      if i == 0 {
+        props.b2.distribution = Alternate
+      } else if i == 1 {
+        props.b2.distribution = Opposite
+      } else if i == 2 {
+        props.b2.distribution = Whorled
+      } else {
+        props.b2.distribution = Spiral
+      }
+    } else if level == 3 {
+      if i == 0 {
+        props.b3.distribution = Alternate
+      } else if i == 1 {
+        props.b3.distribution = Opposite
+      } else if i == 2 {
+        props.b3.distribution = Whorled
+      } else {
+        props.b3.distribution = Spiral
+      }
+    } else if level == 4 {
+      if i == 0 {
+        props.b4.distribution = Alternate
+      } else if i == 1 {
+        props.b4.distribution = Opposite
+      } else if i == 2 {
+        props.b4.distribution = Whorled
+      } else {
+        props.b4.distribution = Spiral
+      }
+    }
+  }
+
+  // Writes the option a dropdown named after a prop of the tree picked
+  fn set_choice(n: string, i: i32) {
+    if n == "bark_material" {
+      props.bark_material = bark_of(i)
+    } else if n == "leaf_material" {
+      props.leaf_material = leaf_of(i)
+    } else if n == "crown" {
+      if i == 0 {
+        props.crown = None
+      } else if i == 1 {
+        props.crown = Ellipsoid
+      } else if i == 2 {
+        props.crown = Cone
+      } else {
+        props.crown = Cylinder
+      }
+    } else if n == "leaf_placement" {
+      if i == 0 {
+        props.leaf_placement = Twigs
+      } else if i == 1 {
+        props.leaf_placement = Tips
+      } else {
+        props.leaf_placement = Levels
+      }
+    } else if n == "leaf_orientation" {
+      if i == 0 {
+        props.leaf_orientation = Along
+      } else if i == 1 {
+        props.leaf_orientation = FaceUp
+      } else {
+        props.leaf_orientation = FaceOut
+      }
+    } else if n == "card" {
+      if i == 0 {
+        props.card = Quad
+      } else if i == 1 {
+        props.card = Bent
+      } else {
+        props.card = Cross
+      }
+    } else if n == "crown_shape" {
+      if i == 0 {
+        props.crown_shape = Ellipsoid
+      } else {
+        props.crown_shape = Density
+      }
+    } else if n == "needle_style" {
+      if i == 0 {
+        props.needle_style = Fir
+      } else {
+        props.needle_style = Spruce
+      }
+    } else if n == "lod" {
+      lod = i
+    }
+  }
+
+  // Writes the flag a switch named after a prop of the tree or a setting of the view set
+  fn set_flag(n: string, v: bool) {
+    if n == "prune" {
+      props.prune = v
+    } else if n == "needles" {
+      props.needles = v
+    } else if n == "show_bark" {
+      show_bark = v
+    } else if n == "show_foliage" {
+      show_foliage = v
+    } else if n == "show_skeleton" {
+      show_skeleton = v
+    } else if n == "turntable" {
+      turntable = v
+    }
+  }
+
+  // The script of a level of branches and of a tree: a Tree instance with every prop, which
+  // grows the same tree in another scene that includes trees/generator
+  fn branch_snippet(b: TreeBranches) -> string {
+    "\{count: {b.count}, density: {b.density:.3}, start: {b.start:.3}, end: {b.end:.3}, " +
+    "distribution: {b.distribution}, whorl: {b.whorl}, phyllotaxis: {b.phyllotaxis:.3}, " +
+    "down: {b.down:.3}, down_end: {b.down_end:.3}, length: {b.length:.3}, " +
+    "length_end: {b.length_end:.3}, gravity: {b.gravity:.3}, light: {b.light:.3}, " +
+    "noise: {b.noise:.3}, exponent: {b.exponent:.3}}"
+  }
+
+  fn tree_snippet(p: Tree) -> string {
+    "trees.Tree tree(seed: {p.seed}, height: {p.height:.3}, radius: {p.radius:.3}, " +
+    "taper: {p.taper:.3}, bend: {p.bend:.3}, lean: {p.lean:.3}, twist: {p.twist:.3}, " +
+    "flutes: {p.flutes}, flare: {p.flare:.3}, flare_height: {p.flare_height:.3}, " +
+    "bark_material: {p.bark_material}, " +
+    "b1: " + branch_snippet(p.b1) + ", b2: " + branch_snippet(p.b2) + ", " +
+    "b3: " + branch_snippet(p.b3) + ", b4: " + branch_snippet(p.b4) + ", " +
+    "crown: {p.crown}, crown_base: {p.crown_base:.3}, crown_top: {p.crown_top:.3}, " +
+    "crown_width: {p.crown_width:.3}, prune: {p.prune}, bark_drop: {p.bark_drop:.3}, " +
+    "needles: {p.needles}, leaf_material: {p.leaf_material}, leaf_size: {p.leaf_size:.3}, " +
+    "leaf_density: {p.leaf_density:.3}, leaf_placement: {p.leaf_placement}, " +
+    "leaf_count: {p.leaf_count}, leaf_per_node: {p.leaf_per_node}, " +
+    "leaf_start: {p.leaf_start:.3}, leaf_levels: {p.leaf_levels}, " +
+    "leaf_angle: {p.leaf_angle:.3}, leaf_orientation: {p.leaf_orientation}, " +
+    "leaf_tilt: {p.leaf_tilt:.3}, leaf_bank: {p.leaf_bank:.3}, card: {p.card}, " +
+    "card_bend: {p.card_bend:.3}, needle_style: {p.needle_style}, " +
+    "needle_cards: {p.needle_cards}, needle_width: {p.needle_width:.3}, " +
+    "needle_droop: {p.needle_droop:.3}, crown_shape: {p.crown_shape}, " +
+    "crown_normals: {p.crown_normals:.3}, occlusion: {p.occlusion:.3}, thin: {p.thin:.3}, " +
+    "growth: {p.growth:.3}, stiffness: {p.stiffness:.3}, flutter: {p.flutter:.3}, " +
+    "sway_branch: {p.sway_branch:.3}, ground: {p.ground:.3}, lods: {p.lods}) " +
+    "\{ box.transform.Position: \{0, 0, 0} }"
+  }
+}

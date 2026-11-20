@@ -1,0 +1,32 @@
+// The tree editor: one Tree on a grassy turntable under the sky, an orbit camera around it and a
+// panel with a control for every prop of the tree, grouped by part. A preset loads a species at
+// an age and a seed, every edit regrows the tree while the last mesh stays until the new one is
+// ready, the stats show the vertices and triangles of each level of detail and the time the
+// graph took, and Print writes the tree as a Tree instance to the console and the clipboard.
+//
+// Drag in the view to orbit, the wheel zooms. F fits the view, R grows another seed, P prints
+// the tree, H hides the panel and the grave key opens the console.
+include trees/generator
+include ui/widgets
+include tree_editor/state
+include tree_editor/stage
+include tree_editor/panel
+include tree_editor/logic
+
+using flecs.script
+using flecs.script.math
+using box.material
+using box.view
+using box.light
+using box.atmosphere
+using tree_editor
+
+$ {
+  box.app.FpsTarget: {60}
+  Scene: {
+    reflections: true, environment: true, aerial_perspective: true, alpha_cutout: true,
+    triplanar: true, diffuse_transmission: true, wind: true
+  }
+  AmbientLight: {sky: {120, 140, 170}, ground: {60, 64, 44}, intensity: 0.2}
+  Wind: {direction: {1, 0.3}, speed: wind, gust: 0.5, gust_scale: 30}
+}

@@ -1,0 +1,395 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.camera
+using box.view
+using box.geometry
+using box.material
+using box.layout
+using box.text
+using box.input
+using box.picking
+using box.surface
+using box.ui
+using box.widgets
+using box.mesh
+using trees
+using tree_editor
+
+tree_editor {
+  export const GROUP_W: f32 = ROW_W + 16
+  export const SCROLL_H: f32 = 852
+
+  // A dropdown with its caption on the left. The panel writes the prop the row is named after.
+  template ChoiceRow {
+    prop label: string = ""
+    prop options = ["Option"]
+    prop value: i32 = 0
+
+    const t = box.ui.theme[Theme]
+
+    Layout: {direction: Row, v: Middle}
+    Item: {width: {mode: Fixed, value: ROW_W}}
+
+    caption {
+      Text: {value: label, size: t.font_size}
+      Rgb: t.text
+    }
+
+    gap {
+      Item: {width: {mode: Grow}}
+    }
+
+    Dropdown choice(options: options, value: value, width: 176)
+  }
+
+  // A caption above the controls that follow it in a group
+  template Caption {
+    prop text: string = ""
+
+    const t = box.ui.theme[Theme]
+
+    Text: {value: text, size: t.small_font_size, font: box.text.DefaultFontBold}
+    Rgb: t.text_muted
+  }
+
+  // The group of a level of branches, named b1 to b4: the panel writes the member of that level
+  // each slider is named after
+  template BranchGroup : Collapsible {
+    prop b: TreeBranches = {}
+    prop max_count: f32 = 40
+    prop max_density: f32 = 10
+
+    Caption c_amount(text: "AMOUNT AND PLACE")
+    Slider count(label: "Count per parent", min: 0, max: max_count, step: 1, value: b.count, width: ROW_W)
+    Slider density(label: "Density per meter (over count)", min: 0, max: max_density, step: 0.1, value: b.density, decimals: 1, width: ROW_W)
+    Slider start(label: "Start along parent", min: 0, max: 1, step: 0.01, value: b.start, decimals: 2, width: ROW_W)
+    Slider end(label: "End along parent (0 tip)", min: 0, max: 1, step: 0.01, value: b.end, decimals: 2, width: ROW_W)
+    ChoiceRow distribution(label: "Distribution", options: DISTRIBUTIONS, value: distribution_index(b.distribution))
+    Slider whorl(label: "Per whorl (0 for 3)", min: 0, max: 8, step: 1, value: b.whorl, width: ROW_W)
+    Slider phyllotaxis(label: "Phyllotaxis (0 golden)", min: 0, max: 3.14, step: 0.01, value: b.phyllotaxis, decimals: 2, unit: " rad", width: ROW_W)
+    Caption c_shape(text: "SHAPE")
+    Slider down(label: "Angle at start", min: 0, max: 2.5, step: 0.01, value: b.down, decimals: 2, unit: " rad", width: ROW_W)
+    Slider down_end(label: "Angle at end (0 same)", min: 0, max: 2.5, step: 0.01, value: b.down_end, decimals: 2, unit: " rad", width: ROW_W)
+    Slider length(label: "Length at start", min: 0, max: 1.5, step: 0.01, value: b.length, decimals: 2, width: ROW_W)
+    Slider length_end(label: "Length at end (0 same)", min: 0, max: 1.5, step: 0.01, value: b.length_end, decimals: 2, width: ROW_W)
+    Slider gravity(label: "Gravity", min: 0, max: 1.5, step: 0.005, value: b.gravity, decimals: 3, width: ROW_W)
+    Slider light(label: "Toward light", min: 0, max: 0.4, step: 0.005, value: b.light, decimals: 3, width: ROW_W)
+    Slider noise(label: "Noise", min: 0, max: 1, step: 0.01, value: b.noise, decimals: 2, width: ROW_W)
+    Slider exponent(label: "Pipe exponent (0 for 2)", min: 0, max: 3.5, step: 0.05, value: b.exponent, decimals: 2, width: ROW_W)
+  }
+
+  // One level of detail in the stats: the vertices and triangles of the bark and the foliage
+  template StatRow {
+    prop level: i32 = 0
+    prop shown: bool = false
+    prop bark_v: i32 = 0
+    prop bark_t: i32 = 0
+    prop leaf_v: i32 = 0
+    prop leaf_t: i32 = 0
+
+    Layout: {direction: Row}
+
+    name {
+      Item: {width: {mode: Fixed, value: 58}}
+      Text: {value: shown ? "> LOD {level}" : "  LOD {level}", size: 13}
+      Rgb: shown ? {236, 214, 140} : {200, 206, 214}
+    }
+
+    bark {
+      Item: {width: {mode: Fixed, value: 128}}
+      Text: {value: "{bark_v} / {bark_t}", size: 13}
+      Rgb: shown ? {236, 214, 140} : {200, 206, 214}
+    }
+
+    foliage {
+      Item: {width: {mode: Fixed, value: 128}}
+      Text: {value: "{leaf_v} / {leaf_t}", size: 13}
+      Rgb: shown ? {236, 214, 140} : {200, 206, 214}
+    }
+  }
+}
+
+box {
+  ui {
+    theme {
+      Theme = {font_size: 13, small_font_size: 11, padding: 8, spacing: 7, control_height: 26}
+    }
+  }
+}
+
+hud {
+  Scene: {blend_modes: true}
+
+  camera {
+    Position: {0, 0, 100}
+    Camera: {ortho: true, ortho_scale: 1}
+  }
+
+  screen {
+    Fill: {surface: window}
+    Layout: {}
+    FocusScope
+
+    // The whole window under the panel and the stats: dragging it orbits the camera
+    pad {
+      Fill: {surface: window}
+      Interactive
+    }
+
+    // The stats of the tree: its status, the size of each level of detail and the time the
+    // graph took, the level the view shows marked
+    stats {
+      const shown = lod_shown(lod, dist, props.height)
+      const loading = bark_status.state == Loading || foliage_status.state == Loading
+      const failed = bark_status.state == Failed || foliage_status.state == Failed
+      const ms = max(bark_status.time, foliage_status.time) * 1000
+
+      InputBlocker
+      Layout: {direction: Column, spacing: 3, padding: {10, 10, 12, 12}}
+      Item: {h: Left, v: Top, x: 12, y: -12}
+      Rect: {1, 1}
+      Rgb: {24, 28, 33}
+      Opacity: {0.86}
+      Border: {width: 1, radius: 8, color: {70, 76, 87, 255}}
+
+      title {
+        Text: {value: "{PRESETS[preset]} age {age:.2}, seed {props.seed}", size: 15, font: box.text.DefaultFontBold}
+        Rgb: {236, 238, 242}
+      }
+
+      state {
+        Text: {
+          value: loading ? "Growing..." : failed ? "Failed: {bark_status.error}{foliage_status.error}" :
+            ms > 0 ? "Generated in {ms:.0} ms" : "Generated from the cache",
+          size: 13
+        }
+        Rgb: loading ? {236, 214, 140} : failed ? {230, 120, 100} : {150, 210, 160}
+      }
+
+      head {
+        Layout: {direction: Row}
+
+        name {
+          Item: {width: {mode: Fixed, value: 58}}
+          Text: {value: "", size: 12}
+        }
+
+        bark {
+          Item: {width: {mode: Fixed, value: 128}}
+          Text: {value: "Bark verts / tris", size: 12}
+          Rgb: {150, 158, 170}
+        }
+
+        foliage {
+          Item: {width: {mode: Fixed, value: 128}}
+          Text: {value: "Foliage verts / tris", size: 12}
+          Rgb: {150, 158, 170}
+        }
+      }
+
+      StatRow lod0(
+        level: 0, shown: shown == 0, bark_v: bark_status.level_vertices[0],
+        bark_t: bark_status.level_triangles[0], leaf_v: foliage_status.level_vertices[0],
+        leaf_t: foliage_status.level_triangles[0]
+      )
+      StatRow lod1(
+        level: 1, shown: shown == 1, bark_v: bark_status.level_vertices[1],
+        bark_t: bark_status.level_triangles[1], leaf_v: foliage_status.level_vertices[1],
+        leaf_t: foliage_status.level_triangles[1]
+      )
+      StatRow lod2(
+        level: 2, shown: shown == 2, bark_v: bark_status.level_vertices[2],
+        bark_t: bark_status.level_triangles[2], leaf_v: foliage_status.level_vertices[2],
+        leaf_t: foliage_status.level_triangles[2]
+      )
+      StatRow lod3(
+        level: 3, shown: shown == 3, bark_v: bark_status.level_vertices[3],
+        bark_t: bark_status.level_triangles[3], leaf_v: foliage_status.level_vertices[3],
+        leaf_t: foliage_status.level_triangles[3]
+      )
+
+      view_line {
+        Text: {
+          value: (lod == 0 ? "Auto" : "Forced") + " LOD {shown}   {fps:.0} fps   {season_name(season)}",
+          size: 13
+        }
+        Rgb: {200, 206, 214}
+      }
+    }
+
+    hint {
+      Item: {h: Left, v: Bottom, x: 14, y: 12}
+      Text: {
+        value: "Drag to orbit, wheel to zoom   F fit   R random seed   P print   H panel   ` console",
+        size: 13
+      }
+      Rgb: {240, 242, 236}
+    }
+
+    // The panel, off screen while hidden so its controls keep their state
+    panel {
+      InputBlocker
+      Layout: {direction: Column, spacing: 8, padding: {12, 12, 12, 12}}
+      Item: {
+        h: Right, v: Top, x: panel_shown ? -12 : 2000, y: -12,
+        width: {mode: Fixed, value: PANEL_W}
+      }
+      Rect: {1, 1}
+      Rgb: {30, 33, 39}
+      Border: {width: 1, radius: 10, color: {70, 76, 87, 255}}
+      BoxShadow: {offset_y: -6, blur: 24, spread: 2, color: {0, 0, 0, 150}}
+
+      masthead {
+        Layout: {direction: Row, v: Bottom}
+        Item: {width: {mode: Grow}}
+
+        title {
+          Text: {value: "Tree Editor", size: 20, font: box.text.DefaultFontBold}
+          Rgb: {236, 238, 242}
+        }
+
+        gap {
+          Item: {width: {mode: Grow}}
+        }
+
+        species {
+          Text: {value: "{PRESETS[preset]} #{props.seed}", size: 13}
+          Rgb: {98, 168, 122}
+        }
+      }
+
+      ScrollView groups(width: PANEL_W - 24, height: SCROLL_H, focusable: false, frame: false) {
+        Collapsible species(title: "Species", value: true, width: GROUP_W) {
+          ChoiceRow preset(label: "Preset", options: PRESETS, value: tree_editor.preset)
+          Slider age(label: "Age (reloads the preset)", min: 0.1, max: 1, step: 0.05, value: tree_editor.age, decimals: 2, width: ROW_W)
+
+          seed_row {
+            Layout: {direction: Row, v: Middle, spacing: 8}
+            Item: {width: {mode: Fixed, value: ROW_W}}
+
+            caption {
+              Text: {value: "Seed", size: 13}
+              Rgb: {214, 218, 224}
+            }
+
+            gap {
+              Item: {width: {mode: Grow}}
+            }
+
+            Stepper seed(min: 1, max: 99999, step: 1, value: props.seed, width: 132)
+            Button random(label: "Random", variant: "secondary", action: actions.randomize, width: 78)
+          }
+
+          buttons {
+            Layout: {direction: Row, spacing: 8}
+
+            Button reset(label: "Reload preset", variant: "secondary", action: actions.reset, width: 155)
+            Button fit(label: "Fit view", variant: "secondary", action: actions.fit, width: 155)
+          }
+        }
+
+        Collapsible trunk(title: "Trunk", width: GROUP_W) {
+          Slider height(label: "Height", min: 2, max: 45, step: 0.1, value: props.height, decimals: 1, unit: " m", width: ROW_W)
+          Slider radius(label: "Radius at the foot", min: 0.03, max: 1.5, step: 0.01, value: props.radius, decimals: 2, unit: " m", width: ROW_W)
+          Slider taper(label: "Taper", min: 0, max: 1, step: 0.01, value: props.taper, decimals: 2, width: ROW_W)
+          Slider bend(label: "Bend", min: 0, max: 0.2, step: 0.002, value: props.bend, decimals: 3, unit: " rad/m", width: ROW_W)
+          Slider lean(label: "Lean", min: 0, max: 0.5, step: 0.01, value: props.lean, decimals: 2, unit: " rad", width: ROW_W)
+          Slider twist(label: "Bark twist", min: 0, max: 1, step: 0.01, value: props.twist, decimals: 2, unit: " rad/m", width: ROW_W)
+          Slider flutes(label: "Buttress flutes", min: 0, max: 12, step: 1, value: props.flutes, width: ROW_W)
+          Slider flare(label: "Flute flare", min: 0, max: 1, step: 0.01, value: props.flare, decimals: 2, width: ROW_W)
+          Slider flare_height(label: "Flute height (0 auto)", min: 0, max: 6, step: 0.1, value: props.flare_height, decimals: 1, unit: " m", width: ROW_W)
+        }
+
+        BranchGroup b1(title: "Branches 1 (limbs)", width: GROUP_W, b: props.b1, max_count: 220, max_density: 20)
+        BranchGroup b2(title: "Branches 2", width: GROUP_W, b: props.b2, max_count: 40, max_density: 20)
+        BranchGroup b3(title: "Branches 3", width: GROUP_W, b: props.b3, max_count: 30, max_density: 20)
+        BranchGroup b4(title: "Branches 4 (twigs)", width: GROUP_W, b: props.b4, max_count: 30, max_density: 20)
+
+        Collapsible crown_group(title: "Crown", width: GROUP_W) {
+          ChoiceRow crown(label: "Envelope", options: ENVELOPES, value: envelope_index(props.crown))
+          Slider crown_base(label: "Base of the height", min: 0, max: 1, step: 0.01, value: props.crown_base, decimals: 2, width: ROW_W)
+          Slider crown_top(label: "Top of the height", min: 0.5, max: 1.5, step: 0.01, value: props.crown_top, decimals: 2, width: ROW_W)
+          Slider crown_width(label: "Radius of the height", min: 0.05, max: 1, step: 0.01, value: props.crown_width, decimals: 2, width: ROW_W)
+          Switch prune(label: "Shorten branches (off removes)", value: props.prune)
+          Slider bark_drop(label: "No bark under radius", min: 0, max: 0.5, step: 0.005, value: props.bark_drop, decimals: 3, width: ROW_W)
+        }
+
+        Collapsible foliage_group(title: "Foliage", width: GROUP_W) {
+          Switch needles(label: "Needles instead of leaves", value: props.needles)
+          Caption c_place(text: "PLACEMENT")
+          ChoiceRow leaf_placement(label: "Placement", options: PLACEMENTS, value: placement_index(props.leaf_placement))
+          Slider leaf_levels(label: "Highest levels", min: 1, max: 4, step: 1, value: props.leaf_levels, width: ROW_W)
+          Slider leaf_count(label: "Per twig", min: 0, max: 16, step: 1, value: props.leaf_count, width: ROW_W)
+          Slider leaf_density(label: "Nodes per meter (over count)", min: 0, max: 20, step: 0.1, value: props.leaf_density, decimals: 1, width: ROW_W)
+          Slider leaf_per_node(label: "Per node", min: 1, max: 6, step: 1, value: props.leaf_per_node, width: ROW_W)
+          Slider leaf_start(label: "Start along twig", min: 0, max: 1, step: 0.01, value: props.leaf_start, decimals: 2, width: ROW_W)
+          Caption c_leaf(text: "LEAVES")
+          Slider leaf_size(label: "Size", min: 0.1, max: 2, step: 0.01, value: props.leaf_size, decimals: 2, unit: " m", width: ROW_W)
+          Slider leaf_angle(label: "Angle off twig", min: 0, max: 1.57, step: 0.01, value: props.leaf_angle, decimals: 2, unit: " rad", width: ROW_W)
+          ChoiceRow leaf_orientation(label: "Facing", options: ORIENTATIONS, value: orientation_index(props.leaf_orientation))
+          Slider leaf_tilt(label: "Tilt", min: 0, max: 1.57, step: 0.01, value: props.leaf_tilt, decimals: 2, unit: " rad", width: ROW_W)
+          Slider leaf_bank(label: "Bank", min: 0, max: 1.57, step: 0.01, value: props.leaf_bank, decimals: 2, unit: " rad", width: ROW_W)
+          ChoiceRow card(label: "Card", options: CARDS, value: card_index(props.card))
+          Slider card_bend(label: "Card bend", min: 0, max: 0.6, step: 0.01, value: props.card_bend, decimals: 2, width: ROW_W)
+          Caption c_needles(text: "NEEDLES")
+          ChoiceRow needle_style(label: "Needle style", options: NEEDLE_STYLES, value: needle_style_index(props.needle_style))
+          Slider needle_cards(label: "Cards per shoot", min: 1, max: 6, step: 1, value: props.needle_cards, width: ROW_W)
+          Slider needle_width(label: "Width of length", min: 0.1, max: 1.5, step: 0.01, value: props.needle_width, decimals: 2, width: ROW_W)
+          Slider needle_droop(label: "Droop", min: 0, max: 1, step: 0.01, value: props.needle_droop, decimals: 2, width: ROW_W)
+          Caption c_shade(text: "SHADING")
+          ChoiceRow crown_shape(label: "Crown shape", options: CROWN_SHAPES, value: crown_shape_index(props.crown_shape))
+          Slider crown_normals(label: "Normals to crown", min: 0, max: 1, step: 0.01, value: props.crown_normals, decimals: 2, width: ROW_W)
+          Slider occlusion(label: "Occlusion", min: 0, max: 1, step: 0.01, value: props.occlusion, decimals: 2, width: ROW_W)
+        }
+
+        Collapsible bark_group(title: "Bark and leaf materials", width: GROUP_W) {
+          ChoiceRow bark_material(label: "Bark", options: BARKS, value: bark_index(props.bark_material))
+          ChoiceRow leaf_material(label: "Leaves", options: LEAVES, value: leaf_index(props.leaf_material))
+          Slider growth(label: "Bark grown (0 all)", min: 0, max: 45, step: 0.1, value: props.growth, decimals: 1, unit: " m", width: ROW_W)
+        }
+
+        Collapsible season_group(title: "Season and wind", value: true, width: GROUP_W) {
+          Slider season(label: "Season: {season_name(tree_editor.season)}", min: 0, max: 3, step: 0.01, value: tree_editor.season, decimals: 2, width: ROW_W)
+          Slider thin(label: "Thin leaves", min: 0, max: 1, step: 0.01, value: props.thin, decimals: 2, width: ROW_W)
+          Slider hour(label: "Time of day", min: 5, max: 21, step: 0.05, value: tree_editor.hour, decimals: 1, unit: " h", width: ROW_W)
+          Slider wind(label: "Wind", min: 0, max: 15, step: 0.1, value: tree_editor.wind, decimals: 1, unit: " m/s", width: ROW_W)
+          Slider stiffness(label: "Stiffness", min: 0, max: 1, step: 0.01, value: props.stiffness, decimals: 2, width: ROW_W)
+          Slider flutter(label: "Leaf flutter", min: 0, max: 0.3, step: 0.005, value: props.flutter, decimals: 3, unit: " m", width: ROW_W)
+          Slider sway_branch(label: "Branch swing", min: 0, max: 0.3, step: 0.005, value: props.sway_branch, decimals: 3, unit: " rad", width: ROW_W)
+          Slider ground(label: "Ground height", min: -2, max: 2, step: 0.05, value: props.ground, decimals: 2, unit: " m", width: ROW_W)
+        }
+
+        Collapsible view_group(title: "View", value: true, width: GROUP_W) {
+          ChoiceRow lod(label: "Level of detail", options: LOD_MODES, value: tree_editor.lod)
+          Slider lods(label: "Levels built", min: 1, max: 4, step: 1, value: props.lods, width: ROW_W)
+
+          switches {
+            Layout: {direction: Row, spacing: 14}
+
+            Switch show_bark(label: "Bark", value: tree_editor.show_bark)
+            Switch show_foliage(label: "Foliage", value: tree_editor.show_foliage)
+            Switch show_skeleton(label: "Skeleton", value: tree_editor.show_skeleton)
+          }
+
+          Switch turntable(label: "Turntable", value: tree_editor.turntable)
+        }
+
+        Collapsible snippet_group(title: "Script", value: true, width: GROUP_W) {
+          Button print(label: "Print as script (P)", action: actions.print, width: ROW_W)
+          TextInput snippet_text(value: snippet, read_only: true, placeholder: "Print writes the Tree here", width: ROW_W)
+          Label note(
+            text: printed > 0 ? "Printed to the console (` key) and copied to the clipboard" :
+              "Prints a Tree instance with every prop to paste into a scene",
+            variant: "caption", width: ROW_W
+          )
+        }
+      }
+    }
+  }
+
+  view {
+    // Over the view of the tree, which is created after it
+    View: {camera: hud.camera, order: 1, lighting: {enabled: false}, culling: {enabled: false}}
+  }
+}
