@@ -2,7 +2,7 @@ using flecs.script
 using flecs.script.math
 using box.input
 
-// The constants of the wildwood and the state its parts share: where the walk starts, the
+// The constants of the infinite forest and the state its parts share: where the walk starts, the
 // streaming radii around the focus (the player, walking or flying), the sizes and heights of
 // the terrain features and the snow line of the peaks.
 state {

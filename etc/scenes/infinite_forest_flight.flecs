@@ -1,9 +1,9 @@
-// The long flight over the wildwood: the course of wildwood_walk.flecs flown at 40 m/s, 70 m
+// The long flight over the infinite forest: the course of infinite_forest_walk.flecs flown at 40 m/s, 70 m
 // over the highest ground ahead, by 1/60 s of the world per frame, 15000 frames, with the frames
-// capped at 120 FPS. A perf run measures its frames and writes them to wildwood_flight.json; the
+// capped at 120 FPS. A perf run measures its frames and writes them to infinite_forest_flight.json; the
 // course panel shows a row of the streaming every 500 m and what the frames over 16.7 ms did.
-include wildwood
-include wildwood/course
+include infinite_forest
+include infinite_forest/course
 
 using box.perf
 
@@ -22,7 +22,7 @@ $ {
       period: 0,
       camera: player,
       fly: true,
-      report: "wildwood_flight.json"
+      report: "infinite_forest_flight.json"
     }
   }
 }

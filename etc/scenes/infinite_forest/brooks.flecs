@@ -14,7 +14,7 @@ using assets
 
 // The water of the brooks that terrain.flecs carves along the edges of cells of BROOK_SIZE
 // meters, placed by a ChunkGrid of BROOK_CELL cells around the focus. A cell reads the distance
-// to the middle of the brook, the bed and the height of the land from the wildwood.brooks
+// to the middle of the brook, the bed and the height of the land from the infinite_forest.brooks
 // terrain at absolute positions, so its water is where it was each time it loads and meets the
 // water of the cells beside it.
 //
@@ -34,7 +34,7 @@ using assets
 // boulders above them.
 //
 // The field of ripples and foam (WaterRipples) follows the player at the height of the terrace
-// of the brook nearest to it. With state.brook_start (wildwood_brooks.flecs) the player starts
+// of the brook nearest to it. With state.brook_start (infinite_forest_brooks.flecs) the player starts
 // on the bank of the brook nearest to the start, looking downstream.
 state {
   // Cells of BROOK_CELL meters within BROOK_RANGE of the focus, the stones, the plants and the
@@ -91,15 +91,15 @@ state {
 
   // Meters from the middle of the brook, the bed under it and the height of the land
   fn wild_brook_d(x: f64, z: f64) -> f64 {
-    box.terrain.mask(wildwood.brooks, x, z, 0)
+    box.terrain.mask(infinite_forest.brooks, x, z, 0)
   }
 
   fn wild_brook_bed(x: f64, z: f64) -> f64 {
-    box.terrain.mask(wildwood.brooks, x, z, 1)
+    box.terrain.mask(infinite_forest.brooks, x, z, 1)
   }
 
   fn wild_brook_land(x: f64, z: f64) -> f64 {
-    box.terrain.height(wildwood.brooks, x, z) + BROOK_DATA_DROP
+    box.terrain.height(infinite_forest.brooks, x, z) + BROOK_DATA_DROP
   }
 
   // The terrace of a bed, and the height of the water over a terrace
@@ -501,7 +501,7 @@ assets {
   }
 }
 
-wildwood {
+infinite_forest {
   // The water of the brooks around the focus, on the heights of their terrain
   brook_cells {
     ChunkGrid: {
@@ -511,7 +511,7 @@ wildwood {
       hysteresis: 8,
       budget: BROOK_BUDGET,
       budget_ms: BROOK_BUDGET_MS,
-      ground: wildwood.brooks
+      ground: infinite_forest.brooks
     }
   }
 
@@ -544,7 +544,7 @@ async {
     const x = p.x + o.x
     const z = p.z + o.z
 
-    if box.terrain.known(wildwood.brooks, x, z) {
+    if box.terrain.known(infinite_forest.brooks, x, z) {
       const near = wild_brook_d(x, z) < BROOK_RIPPLES_NEAR
       state.brook_ripple_x = p.x
       state.brook_ripple_z = p.z
@@ -566,10 +566,10 @@ async {
     const sx = state.start_x + o.x
     const sz = state.start_z + o.z
     const r = BROOK_START_REACH
-    while !box.terrain.known(wildwood.brooks, sx - r, sz - r) ||
-      !box.terrain.known(wildwood.brooks, sx + r, sz - r) ||
-      !box.terrain.known(wildwood.brooks, sx - r, sz + r) ||
-      !box.terrain.known(wildwood.brooks, sx + r, sz + r)
+    while !box.terrain.known(infinite_forest.brooks, sx - r, sz - r) ||
+      !box.terrain.known(infinite_forest.brooks, sx + r, sz - r) ||
+      !box.terrain.known(infinite_forest.brooks, sx - r, sz + r) ||
+      !box.terrain.known(infinite_forest.brooks, sx + r, sz + r)
     {
       await next_frame()
     }
@@ -595,11 +595,11 @@ async {
     const cx = state.brook_best_x
     const cz = state.brook_best_z
     state.scripted = true
-    while !box.terrain.resident(wildwood.brooks, cx - 24, cz - 24) ||
-      !box.terrain.resident(wildwood.brooks, cx + 24, cz - 24) ||
-      !box.terrain.resident(wildwood.brooks, cx - 24, cz + 24) ||
-      !box.terrain.resident(wildwood.brooks, cx + 24, cz + 24) ||
-      !box.terrain.resident(wildwood.land, cx, cz)
+    while !box.terrain.resident(infinite_forest.brooks, cx - 24, cz - 24) ||
+      !box.terrain.resident(infinite_forest.brooks, cx + 24, cz - 24) ||
+      !box.terrain.resident(infinite_forest.brooks, cx - 24, cz + 24) ||
+      !box.terrain.resident(infinite_forest.brooks, cx + 24, cz + 24) ||
+      !box.terrain.resident(infinite_forest.land, cx, cz)
     {
       const oc = WorldOrigin[WorldOrigin]
       state.start_x = cx - oc.x
@@ -637,7 +637,7 @@ async {
     const ob = WorldOrigin[WorldOrigin]
     state.start_x = bx - ob.x
     state.start_z = bz - ob.z
-    state.start_y = box.terrain.height(wildwood.land, bx, bz) + EYE + 0.05 - ob.y
+    state.start_y = box.terrain.height(infinite_forest.land, bx, bz) + EYE + 0.05 - ob.y
     state.start_yaw = atan2(0 - lx, 0 - lz)
     state.start_pitch = -0.2
     state.scripted = false

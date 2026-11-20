@@ -1,4 +1,4 @@
-// Wildwood: an endless forest to walk through: terrain without end, rolling forest floor with flat
+// Infinite forest: an endless forest to walk through: terrain without end, rolling forest floor with flat
 // shelves, clearings, a network of trails, brooks stepping down the valleys, tall rock walls with
 // scree at their feet and mountain ranges with snow on their peaks in the distance, grown over with
 // stands of beech, oak, birch, spruce and fir, young trees and snags, and an undergrowth of grass,
@@ -7,7 +7,7 @@
 // the season, the weather, the wind and the time of day.
 //
 // The forest library (forest/library) brings the state the sliders write, the materials, the
-// weather, the sky and the HUD. This scene adds one file per concern in wildwood/: its constants
+// weather, the sky and the HUD. This scene adds one file per concern in infinite_forest/: its constants
 // and the fly toggle, the terrain materials, the terrain, the player, the tree library, the stands
 // that stream its trees over the terrain, the undergrowth that streams the plants of the forest
 // library close around the player, the water, stones and reeds of the brooks, the rare landmarks
@@ -16,16 +16,16 @@
 include ui/widgets
 include trees/generator
 include forest/library
-include wildwood/state
-include wildwood/materials
-include wildwood/terrain
-include wildwood/player
-include wildwood/trees
-include wildwood/stands
-include wildwood/undergrowth
-include wildwood/brooks
-include wildwood/landmarks
-include wildwood/view
+include infinite_forest/state
+include infinite_forest/materials
+include infinite_forest/terrain
+include infinite_forest/player
+include infinite_forest/trees
+include infinite_forest/stands
+include infinite_forest/undergrowth
+include infinite_forest/brooks
+include infinite_forest/landmarks
+include infinite_forest/view
 
 using box.view
 

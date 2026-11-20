@@ -7,7 +7,7 @@ using box.render
 using state
 using assets
 
-// The ground of the wildwood: an endless Terrain whose heights and masks are texture graphs over
+// The ground of the infinite forest: an endless Terrain whose heights and masks are texture graphs over
 // the absolute world (DomainWorld), so it never repeats and stays the same across shifts of the
 // WorldOrigin.
 //
@@ -38,11 +38,11 @@ using assets
 // of the ponds and the banks of the brooks, alpha the rock of the steep slopes and walls and the
 // stones of the beds of the brooks.
 //
-// The brooks of brooks.flecs read wildwood.brooks, a second Terrain of the same graph that only
+// The brooks of brooks.flecs read infinite_forest.brooks, a second Terrain of the same graph that only
 // serves queries and draws no tiles: its height is that of the land BROOK_DATA_DROP meters
 // lower, and its masks are the brook values the land has no channel left for: red the meters to
 // the middle of the nearest brook, green the height of the bed there.
-wildwood {
+infinite_forest {
   land {
     // Rolling forest floor
     roll { nodes.Noise: {frequency: 0.0032, octaves: 4, seed: 21} }
@@ -373,17 +373,17 @@ wildwood {
     }
 
     texture.Blend: {
-      layers: [wildwood_floor, wildwood_grass, wildwood_dirt, wildwood_rock],
-      heights: [litter_height, wildwood_grass_height, path_height, rock_height],
+      layers: [infinite_forest_floor, infinite_forest_grass, infinite_forest_dirt, infinite_forest_rock],
+      heights: [litter_height, infinite_forest_grass_height, path_height, rock_height],
       contrast: 6
     }
 
     texture.Mapping: {mode: MappingWorld, size: GROUND_MAP_SIZE, blend: 0.4}
-    texture.Layers: {layers: [wildwood_moss, wildwood_peak_snow, layer_wet, layer_snow]}
+    texture.Layers: {layers: [infinite_forest_moss, infinite_forest_peak_snow, layer_wet, layer_snow]}
     Rgb: {212, 206, 196}
     PbrMaterial: {roughness: 0.95}
 
-    // What wildwood.brooks reads: the land BROOK_DATA_DROP meters lower, the meters to the
+    // What infinite_forest.brooks reads: the land BROOK_DATA_DROP meters lower, the meters to the
     // middle of the nearest brook and the height of its bed
     brook_data_h { nodes.Subtract: {a: height, b_value: {BROOK_DATA_DROP, 0, 0, 0}} }
 
@@ -394,8 +394,8 @@ wildwood {
   // BROOK_QUERY_RADIUS of the focus, and where the cells of brooks.flecs ask for them
   brooks {
     Terrain: {
-      height: wildwood.land.brook_data_h,
-      masks: wildwood.land.brook_data,
+      height: infinite_forest.land.brook_data_h,
+      masks: infinite_forest.land.brook_data,
       tile_size: 1024,
       resolution: 5,
       levels: 1,

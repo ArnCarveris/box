@@ -8,7 +8,7 @@ using trees
 using state
 using assets
 
-// The tree library of the wildwood: a handful of seeded variants per species, grown once each by
+// The tree library of the infinite forest: a handful of seeded variants per species, grown once each by
 // the presets of the tree generator (trees/presets.flecs) in the bark and leaf materials of the
 // forest library, as prefabs that stands.flecs scatters over the terrain.
 //

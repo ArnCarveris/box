@@ -11,7 +11,7 @@ using trees
 using state
 using assets
 
-// The landmarks of the wildwood: rare things a walk comes across, placed by a ChunkGrid of
+// The landmarks of the infinite forest: rare things a walk comes across, placed by a ChunkGrid of
 // LANDMARK_CELL cells within LANDMARK_RANGE of the focus. A cell decides from seeded hashes of
 // absolute positions and from the heights and masks of the terrain (box.terrain), so a landmark
 // is where it was each time its cell loads, and every piece stands on the terrain under it.
@@ -65,11 +65,11 @@ state {
 
   // Height and masks of the terrain (red forest floor, green grass, blue dirt, alpha rock)
   fn wild_mark_h(x: f64, z: f64) -> f64 {
-    box.terrain.height(wildwood.land, x, z)
+    box.terrain.height(infinite_forest.land, x, z)
   }
 
   fn wild_mark_m(x: f64, z: f64, channel: i32) -> f64 {
-    box.terrain.mask(wildwood.land, x, z, channel)
+    box.terrain.mask(infinite_forest.land, x, z, channel)
   }
 
   // Seeded hash of two indices, 0..1
@@ -239,12 +239,12 @@ state {
   // Whether the terrain is known LANDMARK_REACH around the cell at x0 z0, and the brooks under
   // the cell
   fn wild_mark_ready(x0: f64, z0: f64, size: f64) -> bool {
-    box.terrain.known(wildwood.land, x0 - LANDMARK_REACH, z0 - LANDMARK_REACH) &&
-      box.terrain.known(wildwood.land, x0 + size + LANDMARK_REACH, z0 - LANDMARK_REACH) &&
-      box.terrain.known(wildwood.land, x0 - LANDMARK_REACH, z0 + size + LANDMARK_REACH) &&
-      box.terrain.known(wildwood.land, x0 + size + LANDMARK_REACH, z0 + size + LANDMARK_REACH) &&
-      box.terrain.known(wildwood.brooks, x0, z0) &&
-      box.terrain.known(wildwood.brooks, x0 + size, z0 + size)
+    box.terrain.known(infinite_forest.land, x0 - LANDMARK_REACH, z0 - LANDMARK_REACH) &&
+      box.terrain.known(infinite_forest.land, x0 + size + LANDMARK_REACH, z0 - LANDMARK_REACH) &&
+      box.terrain.known(infinite_forest.land, x0 - LANDMARK_REACH, z0 + size + LANDMARK_REACH) &&
+      box.terrain.known(infinite_forest.land, x0 + size + LANDMARK_REACH, z0 + size + LANDMARK_REACH) &&
+      box.terrain.known(infinite_forest.brooks, x0, z0) &&
+      box.terrain.known(infinite_forest.brooks, x0 + size, z0 + size)
   }
 
   // Whether x z is clear of the brooks: their stony beds are not scree and their channels not
@@ -312,7 +312,7 @@ state {
     const trail = dirt > 0.7 && wild_mark_m(x, z, 1) < 0.15 && rock < 0.1 &&
       roll < LANDMARK_TRUNKS
     const scree = dirt > 0.1 && rock > 0.2 && rock < 0.8 && wild_mark_m(x, z, 0) < 0.3 &&
-      box.terrain.slope(wildwood.land, x, z) < 0.6 && roll < LANDMARK_BOULDERS
+      box.terrain.slope(infinite_forest.land, x, z) < 0.6 && roll < LANDMARK_BOULDERS
     trail ? (wild_mark_arms(x, z, 8) == 2 && wild_mark_ring_sum(x, z, 10, 1) < 3 ? 2 : 0) :
       scree ? 1 : 0
   }
@@ -321,7 +321,7 @@ state {
   // grass around it, and a little hash that breaks ties
   fn wild_mark_giant_key(x: f64, z: f64) -> f64 {
     const ok = wild_mark_m(x, z, 1) > 0.95 &&
-      box.terrain.slope(wildwood.land, x, z) < 0.15 && wild_mark_h(x, z) < WILD_BROAD_HEIGHT + 30
+      box.terrain.slope(infinite_forest.land, x, z) < 0.15 && wild_mark_h(x, z) < WILD_BROAD_HEIGHT + 30
     ok ? wild_mark_ring_sum(x, z, 18, 1) + wild_mark_ring_sum(x, z, 36, 1) +
       0.001 * wild_mark_hash(floor(x / LANDMARK_STEP), floor(z / LANDMARK_STEP), 3) : -1
   }
@@ -1162,7 +1162,7 @@ assets {
   }
 }
 
-wildwood {
+infinite_forest {
   // The landmarks around the focus
   landmarks {
     ChunkGrid: {
@@ -1172,7 +1172,7 @@ wildwood {
       hysteresis: 16,
       budget: LANDMARK_BUDGET,
       budget_ms: LANDMARK_BUDGET_MS,
-      ground: wildwood.land
+      ground: infinite_forest.land
     }
   }
 }

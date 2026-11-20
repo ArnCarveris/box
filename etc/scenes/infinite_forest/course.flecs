@@ -12,7 +12,7 @@ using box.geometry
 using box.material
 using state
 
-// The course of the long walk and the long flight (wildwood_walk.flecs, wildwood_flight.flecs):
+// The course of the long walk and the long flight (infinite_forest_walk.flecs, infinite_forest_flight.flecs):
 // a script moves the player COURSE_LENGTH meters from the start on the trail, in legs that each
 // turn from the one before. Walking it keeps to the trails it comes upon, weighing the dirt
 // ahead against the heading of its leg, and stays off rock walls; it stands at eye height on the
@@ -39,7 +39,7 @@ state {
   export const COURSE_MARK: f32 = 500
   export mut course_seek: f32 = 0
 
-  // Whether the course is flown instead of walked, set by wildwood_flight.flecs
+  // Whether the course is flown instead of walked, set by infinite_forest_flight.flecs
   export mut course_flight: bool = false
 
   // World seconds a frame moves the player by
@@ -124,32 +124,32 @@ state {
 
   // How good a place is to walk: the dirt of the trails, no rock and no steep ground
   fn course_ground(x: f64, z: f64) -> f64 {
-    wildwood_mask(x, z, MASK_DIRT) - 1.5 * wildwood_mask(x, z, MASK_ROCK) -
-      4 * max(0, box.terrain.slope(wildwood.land, x, z) - COURSE_STEEP)
+    infinite_forest_mask(x, z, MASK_DIRT) - 1.5 * infinite_forest_mask(x, z, MASK_ROCK) -
+      4 * max(0, box.terrain.slope(infinite_forest.land, x, z) - COURSE_STEEP)
   }
 
   // Cells of the stands, the undergrowth and the landmarks loaded now, or created this frame
   fn course_cells() -> f64 {
-    wildwood.stands[ChunkGridStatus].cells + wildwood.undergrowth[ChunkGridStatus].cells +
-      wildwood.landmarks[ChunkGridStatus].cells
+    infinite_forest.stands[ChunkGridStatus].cells + infinite_forest.undergrowth[ChunkGridStatus].cells +
+      infinite_forest.landmarks[ChunkGridStatus].cells
   }
 
   fn course_created() -> f64 {
-    wildwood.stands[ChunkGridStatus].created + wildwood.undergrowth[ChunkGridStatus].created +
-      wildwood.landmarks[ChunkGridStatus].created
+    infinite_forest.stands[ChunkGridStatus].created + infinite_forest.undergrowth[ChunkGridStatus].created +
+      infinite_forest.landmarks[ChunkGridStatus].created
   }
 
   // Cells of the grids that changed level or were deleted this frame, and the milliseconds the
   // grids took
   fn course_changed() -> f64 {
-    wildwood.stands[ChunkGridStatus].changed + wildwood.undergrowth[ChunkGridStatus].changed +
-      wildwood.landmarks[ChunkGridStatus].changed + wildwood.stands[ChunkGridStatus].deleted +
-      wildwood.undergrowth[ChunkGridStatus].deleted + wildwood.landmarks[ChunkGridStatus].deleted
+    infinite_forest.stands[ChunkGridStatus].changed + infinite_forest.undergrowth[ChunkGridStatus].changed +
+      infinite_forest.landmarks[ChunkGridStatus].changed + infinite_forest.stands[ChunkGridStatus].deleted +
+      infinite_forest.undergrowth[ChunkGridStatus].deleted + infinite_forest.landmarks[ChunkGridStatus].deleted
   }
 
   fn course_grid_ms() -> f64 {
-    wildwood.stands[ChunkGridStatus].time_ms + wildwood.undergrowth[ChunkGridStatus].time_ms +
-      wildwood.landmarks[ChunkGridStatus].time_ms
+    infinite_forest.stands[ChunkGridStatus].time_ms + infinite_forest.undergrowth[ChunkGridStatus].time_ms +
+      infinite_forest.landmarks[ChunkGridStatus].time_ms
   }
 
   // Texture graphs alive on the backend, 0 before the backend counted them
@@ -202,7 +202,7 @@ async {
   state.scripted = true
   if state.course_seek > 0 {
     state.course_now = "Waiting for the ground at {state.course_seek:.0} m"
-    while !box.terrain.resident(wildwood.land, state.course_x, state.course_z) {
+    while !box.terrain.resident(infinite_forest.land, state.course_x, state.course_z) {
       const o = WorldOrigin[WorldOrigin]
       state.start_x = state.course_x - o.x
       state.start_y = GROUND_MAX - o.y
@@ -212,7 +212,7 @@ async {
     }
   }
 
-  const h0 = box.terrain.height(wildwood.land, state.course_x, state.course_z)
+  const h0 = box.terrain.height(infinite_forest.land, state.course_x, state.course_z)
   state.course_y = h0 + (state.course_flight ? COURSE_FLY_CLEARANCE : EYE)
   state.course_started = true
 
@@ -231,8 +231,8 @@ async {
 
   // What the frame before did, and the slow frames counted by it
   mut last_shifts: i32 = WorldOriginStatus[WorldOriginStatus].shifts
-  mut last_made: i32 = wildwood.land[TerrainStatus].created
-  mut last_dropped: i32 = wildwood.land[TerrainStatus].dropped
+  mut last_made: i32 = infinite_forest.land[TerrainStatus].created
+  mut last_dropped: i32 = infinite_forest.land[TerrainStatus].dropped
   mut last_graphs: i32 = course_graphs()
   mut slow_shift: i32 = 0
   mut slow_cells: i32 = 0
@@ -246,9 +246,9 @@ async {
     if state.course_distance >= next_mark {
       const km = next_mark / 1000
       const shifts = WorldOriginStatus[WorldOriginStatus].shifts
-      const land = wildwood.land[TerrainStatus]
+      const land = infinite_forest.land[TerrainStatus]
       const tiles_mb = course_mb(land.gpu_bytes)
-      const query_mb = course_mb(wildwood.land[TerrainQueryStatus].cpu_bytes)
+      const query_mb = course_mb(infinite_forest.land[TerrainQueryStatus].cpu_bytes)
       const cells = course_cells()
       const rate = mark_seconds > 0 ? loads / mark_seconds : 0
       const graphs = course_graphs()
@@ -287,7 +287,7 @@ async {
     const dt = COURSE_FRAME
     const frame_ms = box.app.FrameTiming[box.app.FrameTiming].interval_ms
     const shifts_now = WorldOriginStatus[WorldOriginStatus].shifts
-    const land_now = wildwood.land[TerrainStatus]
+    const land_now = infinite_forest.land[TerrainStatus]
     const graphs_now = course_graphs()
     const made = course_created()
     const changed = course_changed()
@@ -388,13 +388,13 @@ async {
 
     // The height: walking, eye height over the ground, eased over a meter or so of the walk;
     // flying, over the highest ground ahead, climbing sooner than it sinks
-    const ground = box.terrain.height(wildwood.land, nx, nz)
+    const ground = box.terrain.height(infinite_forest.land, nx, nz)
     mut pitch: f64 = COURSE_WALK_PITCH
     if state.course_flight {
       mut top: f64 = ground
       for k in 1..7 {
         const d = k * COURSE_FLY_AHEAD / 6
-        top = max(top, box.terrain.height(wildwood.land, nx - sin(new_yaw) * d,
+        top = max(top, box.terrain.height(infinite_forest.land, nx - sin(new_yaw) * d,
           nz - cos(new_yaw) * d))
       }
 

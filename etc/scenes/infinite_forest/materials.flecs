@@ -5,7 +5,7 @@ using box.texture
 using state
 using assets
 
-// The materials of the wildwood terrain. Its TextureBlend has four layers, weighed by the masks
+// The materials of the infinite forest terrain. Its TextureBlend has four layers, weighed by the masks
 // of terrain.flecs: the forest floor (the leaf litter of the forest library), the grass of the
 // clearings and the alpine meadows, the dirt of the trails and the rock of the walls, mapped
 // triplanar so steep faces do not stretch. Scree is rock half buried in dirt, which the height
@@ -15,7 +15,7 @@ using assets
 assets {
   // Grass: tufts of blades in greens from shade to sun, drier straw in patches and soil showing
   // between the tufts
-  template WildwoodGrassMap {
+  template InfiniteForestGrassMap {
     prop map: i32 = 0
     prop res: i32 = GROUND_RES
 
@@ -57,44 +57,44 @@ assets {
     }
   }
 
-  WildwoodGrassMap wildwood_grass_albedo(map: MAP_ALBEDO)
-  WildwoodGrassMap wildwood_grass_normal(map: MAP_NORMAL)
-  WildwoodGrassMap wildwood_grass_height(map: MAP_HEIGHT)
-  WildwoodGrassMap wildwood_grass_orm(map: MAP_ORM)
+  InfiniteForestGrassMap infinite_forest_grass_albedo(map: MAP_ALBEDO)
+  InfiniteForestGrassMap infinite_forest_grass_normal(map: MAP_NORMAL)
+  InfiniteForestGrassMap infinite_forest_grass_height(map: MAP_HEIGHT)
+  InfiniteForestGrassMap infinite_forest_grass_orm(map: MAP_ORM)
 
   // The layers of the blend, tiling every GROUND_MAP_SIZE / scale meters
-  wildwood_floor {
+  infinite_forest_floor {
     PbrTextures: {albedo: litter_albedo, normal: litter_normal, orm: litter_orm}
     texture.Transform: {scale_x: 24, scale_y: 24}
   }
 
-  wildwood_grass {
-    PbrTextures: {albedo: wildwood_grass_albedo, normal: wildwood_grass_normal, orm: wildwood_grass_orm}
+  infinite_forest_grass {
+    PbrTextures: {albedo: infinite_forest_grass_albedo, normal: infinite_forest_grass_normal, orm: infinite_forest_grass_orm}
     texture.Transform: {scale_x: 40, scale_y: 40}
   }
 
-  wildwood_dirt {
+  infinite_forest_dirt {
     PbrTextures: {albedo: path_albedo, normal: path_normal, orm: path_orm}
     texture.Transform: {scale_x: 56, scale_y: 56}
   }
 
-  wildwood_rock {
+  infinite_forest_rock {
     PbrTextures: {albedo: rock_albedo, normal: rock_normal, orm: rock_orm}
     texture.Transform: {scale_x: 16, scale_y: 16}
   }
 
   // Moss in patches on what faces up: the rock tops, the flats and the forest floor
-  wildwood_moss_patches {
+  infinite_forest_moss_patches {
     n { nodes.Noise: {frequency: 6, octaves: 4, seed: 81} }
     Graph: {output: n, width: 512, format: GraphSingle}
   }
 
-  wildwood_moss {
+  infinite_forest_moss {
     texture.Layer: {
       amount: forest_seasonal(season, 0.42, 0.36, 0.4, 0.3),
       direction: {0, 1, 0},
       facing: 0.78,
-      mask: wildwood_moss_patches,
+      mask: infinite_forest_moss_patches,
       cavity: -0.2,
       contrast: 5,
       albedo: LayerMix,
@@ -109,7 +109,7 @@ assets {
 
   // Snow on the peaks above SNOW_LINE on what faces up, drifting in patches: on the summits in
   // summer, down to the snow line in winter, and wherever the weather lets snow lie
-  wildwood_peak_snow {
+  infinite_forest_peak_snow {
     texture.Layer: {
       amount: max(forest_seasonal(season, 0.62, 0.38, 0.55, 1), forest_snow_amount(snow)),
       direction: {0, 1, 0},

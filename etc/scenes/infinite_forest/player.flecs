@@ -34,16 +34,16 @@ state {
   export const MASK_GRASS: i32 = 1
   export const MASK_DIRT: i32 = 2
 
-  fn wildwood_mask(x: f64, z: f64, channel: i32) -> f64 {
-    box.terrain.mask(wildwood.land, x, z, channel)
+  fn infinite_forest_mask(x: f64, z: f64, channel: i32) -> f64 {
+    box.terrain.mask(infinite_forest.land, x, z, channel)
   }
 
   // How much a place is on a trail in a clearing: on the dirt, with grass on either side, and
   // near the center of the search
-  fn wildwood_start_score(x: f64, z: f64) -> f64 {
-    const dirt = wildwood_mask(x, z, MASK_DIRT)
-    const grass = wildwood_mask(x + 7, z, MASK_GRASS) + wildwood_mask(x - 7, z, MASK_GRASS) +
-      wildwood_mask(x, z + 7, MASK_GRASS) + wildwood_mask(x, z - 7, MASK_GRASS)
+  fn infinite_forest_start_score(x: f64, z: f64) -> f64 {
+    const dirt = infinite_forest_mask(x, z, MASK_DIRT)
+    const grass = infinite_forest_mask(x + 7, z, MASK_GRASS) + infinite_forest_mask(x - 7, z, MASK_GRASS) +
+      infinite_forest_mask(x, z + 7, MASK_GRASS) + infinite_forest_mask(x, z - 7, MASK_GRASS)
     const d = sqrt((x - START_X) * (x - START_X) + (z - START_Z) * (z - START_Z))
     dirt > 0.6 ? dirt * grass * (1 - 0.5 * d / START_SEARCH) : 0
   }
@@ -88,11 +88,11 @@ player {
 // the trail and stand on the ground
 async {
   const r = START_SEARCH
-  while !box.terrain.resident(wildwood.land, START_X, START_Z) ||
-    !box.terrain.known(wildwood.land, START_X - r, START_Z - r) ||
-    !box.terrain.known(wildwood.land, START_X + r, START_Z - r) ||
-    !box.terrain.known(wildwood.land, START_X - r, START_Z + r) ||
-    !box.terrain.known(wildwood.land, START_X + r, START_Z + r)
+  while !box.terrain.resident(infinite_forest.land, START_X, START_Z) ||
+    !box.terrain.known(infinite_forest.land, START_X - r, START_Z - r) ||
+    !box.terrain.known(infinite_forest.land, START_X + r, START_Z - r) ||
+    !box.terrain.known(infinite_forest.land, START_X - r, START_Z + r) ||
+    !box.terrain.known(infinite_forest.land, START_X + r, START_Z + r)
   {
     await next_frame()
   }
@@ -102,7 +102,7 @@ async {
     for j in 0..n {
       const x = START_X - r + i * START_STEP
       const z = START_Z - r + j * START_STEP
-      const score = wildwood_start_score(x, z)
+      const score = infinite_forest_start_score(x, z)
       if score > state.search_score {
         state.search_score = score
         state.search_x = x
@@ -116,8 +116,8 @@ async {
     const a = k * PI / 12
     const ax = state.search_x + 12 * cos(a)
     const az = state.search_z + 12 * sin(a)
-    const along = wildwood_mask(ax, az, MASK_DIRT) +
-      0.3 * wildwood_mask(state.search_x + 30 * cos(a), state.search_z + 30 * sin(a), MASK_GRASS)
+    const along = infinite_forest_mask(ax, az, MASK_DIRT) +
+      0.3 * infinite_forest_mask(state.search_x + 30 * cos(a), state.search_z + 30 * sin(a), MASK_GRASS)
     if along > state.search_along {
       state.search_along = along
       state.search_angle = a
@@ -127,6 +127,6 @@ async {
   state.start_x = state.search_x
   state.start_z = state.search_z
   state.start_yaw = atan2(0 - cos(state.search_angle), 0 - sin(state.search_angle))
-  state.start_y = box.terrain.height(wildwood.land, state.search_x, state.search_z) + EYE + 0.05
+  state.start_y = box.terrain.height(infinite_forest.land, state.search_x, state.search_z) + EYE + 0.05
   state.started = true
 }

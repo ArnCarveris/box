@@ -1,0 +1,7 @@
+// The infinite forest with the player on the bank of the brook nearest to the start, looking
+// downstream (infinite_forest/brooks.flecs)
+include infinite_forest
+
+async {
+  state.brook_start = true
+}
