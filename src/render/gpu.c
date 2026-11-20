@@ -569,8 +569,8 @@ static void box_gpu_render(
     }
 
     box_gpu_texture_graphs_evaluate(gpu, packet);
-    box_gpu_texture_mips(gpu, packet);
     box_gpu_terrain_heights(gpu, packet);
+    box_gpu_texture_mips(gpu, packet);
     box_gpu_copy(gpu, packet);
     box_gpu_upload(gpu, packet);
     box_gpu_scatter(gpu, packet);

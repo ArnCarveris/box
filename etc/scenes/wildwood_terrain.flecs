@@ -1,0 +1,39 @@
+// Wildwood terrain: the ground of wildwood.flecs on its own, without trees, undergrowth, the
+// water of the brooks, the landmarks or the trails. Walk with WASD, F switches to flying.
+include ui/widgets
+include trees/generator
+include forest/library
+include wildwood/state
+include wildwood/materials
+include wildwood/terrain
+include wildwood/player
+include wildwood/view
+
+using box.view
+using box.texture
+
+$ {
+  box.app.FpsTarget: {60}
+  Scene: {
+    reflections: true,
+    environment: true,
+    aerial_perspective: true,
+    cookies: true,
+    alpha_cutout: true,
+    blend_modes: true,
+    texture_blend: true,
+    water: true,
+    texture_layers: true,
+    triplanar: true,
+    diffuse_transmission: true,
+    wind: true
+  }
+}
+
+// No trails: they neither sink into the ground nor paint it with dirt
+wildwood {
+  land {
+    trail_h { nodes.Multiply: {a: wildwood.land.track, b_value: {0, 0, 0, 0}} }
+    trail_w { nodes.Multiply: {a: wildwood.land.track, b_value: {0, 0, 0, 0}} }
+  }
+}

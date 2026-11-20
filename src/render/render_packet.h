@@ -2159,8 +2159,9 @@ typedef struct box_render_copy_t {
  *
  * The backend copies the R32Float image of the texture into the slot when the image changed since
  * it last copied it there, after the texture graphs evaluated and before the views render. A
- * slot holds the rows of the image, each aligned to 256 bytes (box_terrain_row_bytes); the
- * assets grow to hold the highest slot, which copies every slot again.
+ * slot holds the rows of the image, each aligned to 256 bytes (box_terrain_row_bytes), and
+ * after them the rows of the rough heights as long; the assets grow to hold the highest slot,
+ * which copies every slot again.
  *
  * The RGBA8 masks of slot s go to the cell s of the atlas, s % columns across and s / columns
  * down, a cell twice as wide as the masks image: the masks at its left, the coarse masks in the
@@ -2170,6 +2171,8 @@ typedef struct box_render_terrain_height_t {
     uint32_t mesh;          /**< Handle of the grid mesh of the tile */
     uint32_t slot;          /**< Slot of the tile */
     uint32_t texture;       /**< Handle of the texture with the heights of the tile */
+    uint32_t rough;         /**< Handle of the texture with the heights of the next coarser
+                             *   level at every second texel */
     uint32_t masks;         /**< Handle of the texture with the masks of the tile, 0 for none */
     uint32_t coarse;        /**< Handle of the texture with the masks of the next coarser level
                              *   at every second texel, 0 for none */

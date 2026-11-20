@@ -23,10 +23,10 @@ state {
   // coarsest tiles reach TERRAIN_DETAIL * 2^(TERRAIN_LEVELS - 1); the CPU heights the player
   // walks on are at TERRAIN_QUERY_SPACING within TERRAIN_QUERY_RADIUS. The reflection probe
   // recaptures above the focus every PROBE_FOLLOW meters
-  export const TERRAIN_TILE: f32 = 32
-  export const TERRAIN_RESOLUTION: i32 = 65
-  export const TERRAIN_LEVELS: i32 = 8
-  export const TERRAIN_DETAIL: f32 = 160
+  export const TERRAIN_TILE: f32 = 16
+  export const TERRAIN_RESOLUTION: i32 = 33
+  export const TERRAIN_LEVELS: i32 = 9
+  export const TERRAIN_DETAIL: f32 = 80
   export const TERRAIN_BUDGET: i32 = 24
   export const TERRAIN_QUERY_SPACING: f32 = 0.5
   export const TERRAIN_QUERY_RADIUS: f32 = 128
@@ -40,9 +40,9 @@ state {
   // The brooks (terrain.flecs, brooks.flecs) run along the edges of cells of about BROOK_SIZE
   // meters. Their beds step down in terraces of BROOK_STEP meters with the water BROOK_DEPTH
   // over each, so the water of a terrace hides under the bed of the one above it. The heights of
-  // the land and the values of the brooks that the cells read come from a second terrain, drawn
-  // BROOK_DATA_DROP meters under the land, whose CPU heights reach BROOK_QUERY_RADIUS around the
-  // focus
+  // the land and the values of the brooks that the cells read come from a second terrain that
+  // draws no tiles, BROOK_DATA_DROP meters under the land, whose CPU heights reach
+  // BROOK_QUERY_RADIUS around the focus
   export const BROOK_SIZE: f32 = 420
   export const BROOK_STEP: f32 = 0.3
   export const BROOK_DEPTH: f32 = 0.2

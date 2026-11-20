@@ -2734,6 +2734,21 @@ void box_draws_send_ordered(
     box_render_packet_t *p,
     box_render_draws_t *d);
 
+/** List the instances of the draw of a batch of Terrain tiles nearest to the camera of the first
+ * view of its scene first, so the near tiles hide the far ones in the depth test; the draw of
+ * any other batch keeps the order of its slots.
+ *
+ * @param p The packet
+ * @param d The state
+ * @param b The batch
+ * @param out The draw of the batch
+ */
+void box_draws_send_nearest(
+    box_render_packet_t *p,
+    box_render_draws_t *d,
+    const box_draw_batch_t *b,
+    box_render_batch_t *out);
+
 /** Compute the local bounds of the slots of a batch with parametric surfaces: the union of the
  * bounds of each surface, and of the mesh for a slot without one. A plain mesh batch keeps no
  * surfaces, so it is not bounded and draws with the bounds of its mesh.

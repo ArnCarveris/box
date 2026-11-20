@@ -452,8 +452,9 @@ typedef struct box_gpu_mesh_t {
     bool wire_reported;             /**< The error of a mesh that is not wireable was logged */
     float center[3];                /**< Center of the box around the vertex positions */
     float extent[3];                /**< Half size of the box around the vertex positions */
-    uint32_t *terrain_serials;      /**< Grid mesh of terrain tiles: serial of the image copied
-                                     *   into each slot of its surface assets, 0 for none */
+    uint32_t *terrain_serials;      /**< Grid mesh of terrain tiles: serials of the heights and
+                                     *   of the rough heights copied into each slot of its
+                                     *   surface assets, two per slot, 0 for none */
     int32_t terrain_slots;          /**< Slots its surface assets hold */
     uint64_t terrain_slot_size;     /**< Bytes of a slot */
     WGPUTexture terrain_masks;      /**< Grid mesh of terrain tiles with masks: the mask atlas,

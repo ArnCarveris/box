@@ -280,6 +280,17 @@ fn decide(job: Job, slot: u32, m: mat4x4f, b: Bounds, f: u32, ranged: bool) -> v
     return vec2<bool>(draw, !framed);
 }
 
+// Page slot of an instance of a job: its slots in order from first, or a job that lists them
+// (list) the slot at its entry in the lists.
+fn job_slot(job: Job, index: u32) -> u32 {
+    var result = job.first + index;
+    if (job.list != 0u) {
+        result = slot_lists[job.first + index];
+    }
+
+    return result;
+}
+
 @compute @workgroup_size(64)
 fn cull_instances(
     @builtin(local_invocation_index) local: u32,
@@ -310,7 +321,7 @@ fn cull_instances(
 
     workgroupBarrier();
     if (index < job.count) {
-        let slot = job.first + index;
+        let slot = job_slot(job, index);
         let m = instance_model(transforms[slot]);
         let b = bounds(job, m);
         var drawn = 0u;
@@ -502,7 +513,7 @@ fn cull_write(
     let scan = scan_words[at + 1u];
     let bit = local % 32u;
     let frustums = countOneBits(job.mask);
-    let slot = job.first + index;
+    let slot = job_slot(job, index);
     let packed = ranged_slot(slot, range_at(job, instance_model(transforms[slot])));
     for (var k = 0u; k < frustums; k++) {
         let words = scan + (k * job_groups + part) * SCAN_WORDS;

@@ -41,6 +41,13 @@ ECS_COMPONENT_DECLARE(TerrainTile);
  * deviations, so a standard deviation of half a cell */
 #define BOX_TERRAIN_MASK_BLUR (1.5)
 
+/** Depth of the skirts of a tile in cells of its level */
+#define BOX_TERRAIN_SKIRT (0.1)
+
+/** Heights sampled along each axis of the square around a focus whose heights give its
+ * clearance above or below the terrain */
+#define BOX_TERRAIN_CLEARANCE_SAMPLES (17)
+
 /** The values of a Terrain with its defaults and limits applied */
 typedef struct box_terrain_settings_t {
     ecs_entity_t height;    /**< Height node */
@@ -73,8 +80,9 @@ typedef struct box_terrain_tiles_t {
                              *   above 0, children of the container, 0 until made */
     box_terrain_settings_t settings; /**< Settings the tiles were made with */
     bool made;              /**< settings holds the settings of the tiles */
-    double foci[BOX_TERRAIN_FOCI][2]; /**< Foci the tiles morph around, x and z in the frame
-                             *   of the terrain */
+    double foci[BOX_TERRAIN_FOCI][3]; /**< Foci the tiles are selected for and morph around, x
+                             *   and z in the frame of the terrain and the clearance of the
+                             *   focus above or below the terrain around it */
     int32_t focus_count;    /**< Foci in foci */
     double placed[3];       /**< Position of the terrain the tiles were placed for */
     bool positioned;        /**< placed holds a position */
@@ -214,13 +222,13 @@ static int32_t box_terrain_half(
     return v >= 0 ? v / 2 : -((-v + 1) / 2);
 }
 
-/** Get the distance from a focus to the rectangle of a node, 0 inside it.
+/** Get the distance from a focus to the rectangle of a node, its clearance inside it.
  *
  * @param s The settings
  * @param level The level
  * @param ix The column
  * @param iz The row
- * @param focus The focus, x and z in the frame of the terrain
+ * @param focus The focus, x and z in the frame of the terrain and its clearance
  * @return Meters
  */
 static double box_terrain_node_distance(
@@ -228,14 +236,14 @@ static double box_terrain_node_distance(
     int32_t level,
     int32_t ix,
     int32_t iz,
-    const double focus[2])
+    const double focus[3])
 {
     double size = box_terrain_size(s, level);
     double x0 = (double)ix * size, z0 = (double)iz * size;
     double dx = fmax(fmax(x0 - focus[0], focus[0] - (x0 + size)), 0.0);
     double dz = fmax(fmax(z0 - focus[1], focus[1] - (z0 + size)), 0.0);
 
-    return sqrt(dx * dx + dz * dz);
+    return sqrt(dx * dx + dz * dz + focus[2] * focus[2]);
 }
 
 /** Get the distance from the nearest focus to the rectangle of a node.
@@ -253,7 +261,7 @@ static double box_terrain_nearest(
     int32_t level,
     int32_t ix,
     int32_t iz,
-    const double foci[][2],
+    const double foci[][3],
     int32_t count)
 {
     double result = DBL_MAX;
@@ -299,7 +307,7 @@ static bool box_terrain_inside(
 static void box_terrain_select_node(
     box_terrain_ctx_t *ctx,
     const box_terrain_settings_t *s,
-    const double foci[][2],
+    const double foci[][3],
     int32_t count,
     int32_t level,
     int32_t ix,
@@ -356,7 +364,7 @@ static int box_terrain_node_compare(
 static void box_terrain_select(
     box_terrain_ctx_t *ctx,
     const box_terrain_settings_t *s,
-    const double foci[][2],
+    const double foci[][3],
     int32_t count)
 {
     int32_t top = s->levels - 1, i, ix, iz;
@@ -619,6 +627,10 @@ static bool box_terrain_texture_ready(
  * the diagonal of a tile of level L, so its morph starts beyond that, and ends at its range,
  * where it meets coarser tiles. Ranges of at least 3 tile sizes leave room for the morph.
  *
+ * The vertex stage measures the distance along the ground, so the morph distances are those
+ * along the ground at which the focus with its clearance is that far. The bounds of the tile are
+ * the heights it has once measured, else those of the terrain.
+ *
  * @param world The world
  * @param tiles The tiles of the terrain
  * @param s The settings
@@ -635,23 +647,28 @@ static void box_terrain_tile_write(
     double size = box_terrain_size(s, t->level), range = box_terrain_range(s, t->level);
     double cx = ((double)t->ix + 0.5) * size, cz = ((double)t->iz + 0.5) * size;
     double morph = fmin(0.5 * range + 1.42 * size, BOX_TERRAIN_MORPH * range);
-    double fx = cx, fz = cz, best = DBL_MAX;
+    double fx = cx, fz = cz, fc = 0.0, best = DBL_MAX;
     int32_t i;
     for (i = 0; i < tiles->focus_count; i ++) {
         double dx = tiles->foci[i][0] - cx, dz = tiles->foci[i][1] - cz;
-        if (dx * dx + dz * dz < best) {
-            best = dx * dx + dz * dz;
+        double d = dx * dx + dz * dz + tiles->foci[i][2] * tiles->foci[i][2];
+        if (d < best) {
+            best = d;
             fx = tiles->foci[i][0];
             fz = tiles->foci[i][1];
+            fc = tiles->foci[i][2];
         }
     }
 
+    morph = sqrt(fmax(morph * morph - fc * fc, 0.0));
+    range = sqrt(fmax(range * range - fc * fc, 0.0));
     float cell = (float)(size / (double)(s->resolution - 1));
     TerrainTile v = {
         .terrain = e,
         .texture = t->texture,
         .masks = t->masks,
         .coarse = t->coarse,
+        .rough = t->rough,
         .level = t->level,
         .ix = t->ix,
         .iz = t->iz,
@@ -660,9 +677,9 @@ static void box_terrain_tile_write(
         .size = (float)size,
         .focus = { (float)(fx - cx), (float)(fz - cz) },
         .morph = { (float)morph, (float)range },
-        .skirt = 2.0f * cell + 1.0f,
-        .min_height = s->min_height,
-        .max_height = s->max_height,
+        .skirt = (float)BOX_TERRAIN_SKIRT * cell,
+        .min_height = t->measured ? t->low : s->min_height,
+        .max_height = t->measured ? t->high : s->max_height,
         .bounded = s->extent > 0.0,
         .masked = t->masks && t->coarse && ecs_has(world, e, TextureBlend),
         .clip = { (float)(-s->extent - cx), (float)(-s->extent - cz),
@@ -733,10 +750,21 @@ static box_terrain_tile_t* box_terrain_tile_new(
         },
         .format = GraphFloat
     });
+    ecs_set(world, t->texture, TextureReadback, { .keep = false });
+    const TextureGraph *heights = ecs_get(world, t->texture, TextureGraph);
+    TextureGraphWindow window = heights->window;
+    int32_t coarse = box_terrain_coarse_texels(s->resolution);
+    t->rough = ecs_new_w_pair(world, EcsChildOf, t->entity);
+    ecs_set(world, t->rough, TextureGraph, {
+        .output = s->height,
+        .width = coarse,
+        .height = coarse,
+        .domain = DomainWorld,
+        .window = window,
+        .format = GraphFloat
+    });
+    ecs_set(world, t->rough, TextureReadback, { .keep = false });
     if (s->masks) {
-        const TextureGraph *heights = ecs_get(world, t->texture, TextureGraph);
-        TextureGraphWindow window = heights->window;
-        int32_t coarse = box_terrain_coarse_texels(s->resolution);
         t->masks = ecs_new_w_pair(world, EcsChildOf, t->entity);
         ecs_set(world, t->masks, TextureGraph, {
             .output = box_terrain_filter(world, tiles, node->level),
@@ -906,7 +934,8 @@ int32_t box_terrain_foci(
     const ecs_world_t *world,
     ecs_entity_t e,
     const double local[3],
-    double out[BOX_TERRAIN_FOCI][2])
+    double out[BOX_TERRAIN_FOCI][2],
+    double *heights)
 {
     box_world_focus_t foci[BOX_TERRAIN_FOCI];
     ecs_entity_t scene = box_world_scene_of(world, e);
@@ -916,6 +945,10 @@ int32_t box_terrain_foci(
         if (foci[i].scene == scene) {
             out[result][0] = (double)foci[i].position[0] - local[0];
             out[result][1] = (double)foci[i].position[2] - local[2];
+            if (heights) {
+                heights[result] = (double)foci[i].position[1] - local[1];
+            }
+
             result ++;
         }
     }
@@ -923,22 +956,75 @@ int32_t box_terrain_foci(
     for (i = 0; i < count && !result; i ++) {
         out[i][0] = (double)foci[i].position[0] - local[0];
         out[i][1] = (double)foci[i].position[2] - local[2];
+        if (heights) {
+            heights[i] = (double)foci[i].position[1] - local[1];
+        }
     }
 
     return result ? result : count;
 }
 
-/** Check whether the foci moved far enough from those the tiles morph around that the tiles
- * take the new ones, and take them.
+/** Get the clearance of a focus: how far it is above the highest or below the lowest of the
+ * heights of the terrain within the reach of its coarse query tiles, sampled on a grid fixed in
+ * the frame of the terrain, 0 where none of them is known or it is between them.
+ *
+ * @param world The world
+ * @param e The terrain
+ * @param value The terrain value
+ * @param x X of the focus in the frame of the terrain
+ * @param z Z of the focus in the frame of the terrain
+ * @param y Y of the focus in the frame of the terrain
+ * @return Meters
+ */
+static double box_terrain_clearance(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    const Terrain *value,
+    double x,
+    double z,
+    double y)
+{
+    double radius = isfinite(value->query_radius) && value->query_radius > 0.0f
+        ? value->query_radius : 64.0;
+    double reach = radius * BOX_TERRAIN_QUERY_SCALE;
+    double step = 2.0 * reach / (double)(BOX_TERRAIN_CLEARANCE_SAMPLES - 1);
+    double lo = DBL_MAX, hi = -DBL_MAX, result = 0.0;
+    int32_t x0 = (int32_t)ceil((x - reach) / step), z0 = (int32_t)ceil((z - reach) / step);
+    int32_t i, j;
+    float h;
+    if (box_terrain_height(world, e, x, z, &h)) {
+        lo = hi = h;
+    }
+
+    for (j = 0; j < BOX_TERRAIN_CLEARANCE_SAMPLES; j ++) {
+        for (i = 0; i < BOX_TERRAIN_CLEARANCE_SAMPLES; i ++) {
+            if (box_terrain_height(world, e, (double)(x0 + i) * step,
+                (double)(z0 + j) * step, &h))
+            {
+                lo = fmin(lo, h);
+                hi = fmax(hi, h);
+            }
+        }
+    }
+
+    if (lo <= hi) {
+        result = fmax(fmax(y - hi, lo - y), 0.0);
+    }
+
+    return result;
+}
+
+/** Check whether the foci moved far enough from those the tiles are selected for and morph
+ * around that the tiles take the new ones, and take them.
  *
  * @param tiles The tiles
- * @param foci The foci
+ * @param foci The foci with their clearance
  * @param count Number of foci
  * @return Whether the tiles morph around new foci
  */
 static bool box_terrain_refocus(
     box_terrain_tiles_t *tiles,
-    const double foci[][2],
+    const double foci[][3],
     int32_t count)
 {
     double step = tiles->settings.tile_size * BOX_TERRAIN_FOCUS_STEP;
@@ -946,18 +1032,86 @@ static bool box_terrain_refocus(
     int32_t i;
     for (i = 0; i < count && !result; i ++) {
         result = fabs(foci[i][0] - tiles->foci[i][0]) > step ||
-            fabs(foci[i][1] - tiles->foci[i][1]) > step;
+            fabs(foci[i][1] - tiles->foci[i][1]) > step ||
+            fabs(foci[i][2] - tiles->foci[i][2]) > step;
     }
 
     if (result) {
-        for (i = 0; i < count; i ++) {
-            tiles->foci[i][0] = foci[i][0];
-            tiles->foci[i][1] = foci[i][1];
-        }
-
+        ecs_os_memcpy_n(tiles->foci, foci, double, 3 * count);
         tiles->focus_count = count;
     }
 
+    return result;
+}
+
+/** Measure the bounds of a tile from the copies of its heights and rough heights once both
+ * arrived, and stop reading them back; read them back again when an image changes after.
+ *
+ * @param world The world
+ * @param t The tile
+ * @return Whether the bounds of the tile changed
+ */
+static bool box_terrain_measure(
+    ecs_world_t *world,
+    box_terrain_tile_t *t)
+{
+    box_texture_copy_t copies[2];
+    ecs_entity_t textures[2] = { t->texture, t->rough };
+    float lo = FLT_MAX, hi = -FLT_MAX;
+    bool result = false;
+    int32_t k, i;
+    if (t->measured) {
+        for (k = 0; k < 2; k ++) {
+            const TextureStatus *status = ecs_get(world, textures[k], TextureStatus);
+            result |= status && status->revision > t->revisions[k];
+        }
+
+        for (k = 0; result && k < 2; k ++) {
+            ecs_set(world, textures[k], TextureReadback, { .keep = false });
+        }
+
+        t->measured = !result;
+        goto done;
+    }
+
+    if (!box_texture_readback(world, t->texture, &copies[0]) ||
+        !box_texture_readback(world, t->rough, &copies[1]))
+    {
+        goto done;
+    }
+
+    for (k = 0; k < 2; k ++) {
+        const float *texels = copies[k].data;
+        int32_t n = copies[k].width * copies[k].height;
+        if (copies[k].format != ReadbackR32Float || !texels) {
+            goto done;
+        }
+
+        for (i = 0; i < n; i ++) {
+            if (isfinite(texels[i])) {
+                lo = texels[i] < lo ? texels[i] : lo;
+                hi = texels[i] > hi ? texels[i] : hi;
+            }
+        }
+    }
+
+    for (k = 0; k < 2; k ++) {
+        const TextureStatus *status = ecs_get(world, textures[k], TextureStatus);
+        if (status && status->revision > copies[k].revision) {
+            goto done;
+        }
+    }
+
+    for (k = 0; k < 2; k ++) {
+        t->revisions[k] = copies[k].revision;
+        ecs_remove(world, textures[k], TextureReadback);
+    }
+
+    t->measured = lo <= hi;
+    t->low = lo;
+    t->high = hi;
+    result = t->measured;
+done:
     return result;
 }
 
@@ -977,8 +1131,8 @@ static void box_terrain_status(
     TerrainStatus status = {0};
     int32_t i, texels = tiles->settings.resolution + 2 * BOX_TERRAIN_BORDER;
     int32_t coarse = box_terrain_coarse_texels(tiles->settings.resolution);
-    int64_t bytes = (int64_t)texels * texels * 4 +
-        (int64_t)box_terrain_row_bytes(tiles->settings.resolution) * texels;
+    int64_t bytes = ((int64_t)texels * texels + (int64_t)coarse * coarse) * 4 +
+        (int64_t)box_terrain_row_bytes(tiles->settings.resolution) * (texels + coarse);
     if (tiles->settings.masks) {
         bytes += 2 * ((int64_t)texels * texels * 4 + (int64_t)coarse * coarse * 4);
     }
@@ -1056,7 +1210,8 @@ static void box_terrain_update(
 {
     box_terrain_settings_t s;
     box_terrain_tiles_t *tiles = box_terrain_tiles_of(world, ctx, e);
-    double local[3], foci[BOX_TERRAIN_FOCI][2];
+    double local[3], foci[BOX_TERRAIN_FOCI][2], heights[BOX_TERRAIN_FOCI];
+    double around[BOX_TERRAIN_FOCI][3];
     int32_t i, count, made = 0, drops = 0, missing = 0, budget;
     box_terrain_settings(value, &s);
     budget = s.budget;
@@ -1071,14 +1226,21 @@ static void box_terrain_update(
 
     tiles->settings = s;
     tiles->made = true;
-    if (!s.height) {
+    if (!s.height || value->query_only) {
         box_terrain_drop_all(world, ctx, tiles);
         goto status;
     }
 
     box_terrain_local(world, e, local);
-    count = box_terrain_foci(world, e, local, foci);
-    bool refocus = count && box_terrain_refocus(tiles, foci, count);
+    count = box_terrain_foci(world, e, local, foci, heights);
+    for (i = 0; i < count; i ++) {
+        around[i][0] = foci[i][0];
+        around[i][1] = foci[i][1];
+        around[i][2] = box_terrain_clearance(world, e, value, foci[i][0], foci[i][1],
+            heights[i]);
+    }
+
+    bool refocus = count && box_terrain_refocus(tiles, around, count);
     bool moved = !tiles->positioned || local[0] != tiles->placed[0] ||
         local[1] != tiles->placed[1] || local[2] != tiles->placed[2];
     uint64_t materials = box_terrain_materials_hash(world, ctx, e);
@@ -1094,7 +1256,7 @@ static void box_terrain_update(
 
     int32_t first = ecs_vec_count(&tiles->list);
     if (count) {
-        box_terrain_select(ctx, &s, foci, count);
+        box_terrain_select(ctx, &s, tiles->foci, tiles->focus_count);
         for (i = 0; i < ecs_vec_count(&ctx->nodes); i ++) {
             const box_terrain_node_t *node = ecs_vec_get_t(&ctx->nodes, box_terrain_node_t, i);
             box_terrain_tile_t *t = box_terrain_find(tiles, node->level, node->ix, node->iz);
@@ -1121,6 +1283,7 @@ static void box_terrain_update(
         box_terrain_tile_t *t = list[i];
         if (!t->ready && i < first) {
             t->ready = box_terrain_texture_ready(world, t->texture) &&
+                box_terrain_texture_ready(world, t->rough) &&
                 box_terrain_texture_ready(world, t->masks) &&
                 box_terrain_texture_ready(world, t->coarse);
         }
@@ -1136,7 +1299,8 @@ static void box_terrain_update(
             continue;
         }
 
-        if (fresh || refocus || restyle) {
+        bool measured = !fresh && box_terrain_measure(world, t);
+        if (fresh || refocus || restyle || measured) {
             box_terrain_tile_write(world, tiles, &s, e, t);
         }
 

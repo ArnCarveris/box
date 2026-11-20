@@ -1313,6 +1313,7 @@ static void box_draws_send_batch(
     box_draws_batch_blend(p, d, b, out);
     box_draws_batch_page(d, b, out);
     out->instance_count = count;
+    box_draws_send_nearest(p, d, b, out);
 done:
     return;
 }

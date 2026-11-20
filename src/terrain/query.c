@@ -1299,7 +1299,7 @@ static void box_terrain_query_update(
     }
 
     box_terrain_local(world, e, local);
-    count = box_terrain_foci(world, e, local, foci);
+    count = box_terrain_foci(world, e, local, foci, NULL);
     box_terrain_query_select(world, ctx, q, foci, count);
     for (i = 0; i < ecs_vec_count(&q->list); i ++) {
         (*ecs_vec_get_t(&q->list, box_terrain_query_tile_t*, i))->wanted = false;

@@ -1,7 +1,7 @@
 /**
  * @file render/gpu_terrain.c
  * @brief The heights of the terrain tiles in the surface assets of their grid meshes: the WebGPU
- * backend copies the R32Float image of each tile into its slot, which the vertex stages read,
+ * backend copies the R32Float images of each tile into its slot, which the vertex stages read,
  * and the masks of a tile with masks into its cell of the mask atlas of the mesh, which the
  * fragment stages of a terrain TextureBlend read.
  */
@@ -236,10 +236,62 @@ static bool box_gpu_terrain_grow(
     });
     m->assets = true;
     ecs_os_free(m->terrain_serials);
-    m->terrain_serials = ecs_os_calloc_n(uint32_t, (int32_t)slots);
+    m->terrain_serials = ecs_os_calloc_n(uint32_t, (int32_t)slots * 2);
     m->terrain_slots = (int32_t)slots;
 done:
     return result;
+}
+
+/** Copy an R32Float image of a terrain tile into the surface assets of its grid mesh when it
+ * changed since the last copy.
+ *
+ * @param gpu The backend
+ * @param m The mesh
+ * @param tex The image
+ * @param handle Handle of the texture of the image
+ * @param offset Byte offset of the image in the assets
+ * @param row Bytes of a row in the assets
+ * @param copied Serial of the image last copied there
+ * @param encoder The encoder, made on first use
+ */
+static void box_gpu_terrain_copy(
+    box_gpu_t *gpu,
+    box_gpu_mesh_t *m,
+    box_gpu_texture_t *tex,
+    uint32_t handle,
+    uint64_t offset,
+    uint32_t row,
+    uint32_t *copied,
+    WGPUCommandEncoder *encoder)
+{
+    uint32_t serial = box_gpu_texture_serial(gpu, handle);
+    uint32_t width = wgpuTextureGetWidth(tex->texture);
+    uint32_t height = wgpuTextureGetHeight(tex->texture);
+    if (!serial || *copied == serial) {
+        goto done;
+    }
+
+    if (!*encoder) {
+        *encoder = wgpuDeviceCreateCommandEncoder(gpu->device, NULL);
+    }
+
+    wgpuCommandEncoderCopyTextureToBuffer(*encoder,
+        &(WGPUTexelCopyTextureInfo){
+            .texture = tex->texture,
+            .aspect = WGPUTextureAspect_All
+        },
+        &(WGPUTexelCopyBufferInfo){
+            .layout = {
+                .offset = offset,
+                .bytesPerRow = row,
+                .rowsPerImage = height
+            },
+            .buffer = m->surface_assets
+        },
+        &(WGPUExtent3D){ width, height, 1 });
+    *copied = serial;
+done:
+    return;
 }
 
 void box_gpu_terrain_heights(
@@ -255,14 +307,24 @@ void box_gpu_terrain_heights(
             box_gpu_mesh_t *m = ecs_map_get_deref(&gpu->meshes, box_gpu_mesh_t, h->mesh);
             box_gpu_texture_t *tex = ecs_map_get_deref(&gpu->textures, box_gpu_texture_t,
                 h->texture);
-            if (!m || !tex || wgpuTextureGetFormat(tex->texture) != WGPUTextureFormat_R32Float) {
+            box_gpu_texture_t *rough = ecs_map_get_deref(&gpu->textures, box_gpu_texture_t,
+                h->rough);
+            if (!m || !tex || !rough ||
+                wgpuTextureGetFormat(tex->texture) != WGPUTextureFormat_R32Float ||
+                wgpuTextureGetFormat(rough->texture) != WGPUTextureFormat_R32Float)
+            {
                 continue;
             }
 
             uint32_t width = wgpuTextureGetWidth(tex->texture);
             uint32_t height = wgpuTextureGetHeight(tex->texture);
+            uint32_t rows = wgpuTextureGetHeight(rough->texture);
             uint32_t row = (width * 4u + 255u) & ~255u;
-            uint64_t slot_size = (uint64_t)row * height;
+            uint64_t slot_size = (uint64_t)row * (height + rows);
+            if (wgpuTextureGetWidth(rough->texture) > width) {
+                continue;
+            }
+
             if (pass == 0) {
                 box_gpu_terrain_grow(gpu, m, h->slot, slot_size);
                 box_gpu_terrain_masks(gpu, m, h, true, &encoder);
@@ -270,33 +332,15 @@ void box_gpu_terrain_heights(
             }
 
             box_gpu_terrain_masks(gpu, m, h, false, &encoder);
-
-            uint32_t serial = box_gpu_texture_serial(gpu, h->texture);
-            if (m->terrain_slot_size != slot_size || (int64_t)h->slot >= m->terrain_slots ||
-                !serial || m->terrain_serials[h->slot] == serial)
-            {
+            if (m->terrain_slot_size != slot_size || (int64_t)h->slot >= m->terrain_slots) {
                 continue;
             }
 
-            if (!encoder) {
-                encoder = wgpuDeviceCreateCommandEncoder(gpu->device, NULL);
-            }
-
-            wgpuCommandEncoderCopyTextureToBuffer(encoder,
-                &(WGPUTexelCopyTextureInfo){
-                    .texture = tex->texture,
-                    .aspect = WGPUTextureAspect_All
-                },
-                &(WGPUTexelCopyBufferInfo){
-                    .layout = {
-                        .offset = (uint64_t)h->slot * slot_size,
-                        .bytesPerRow = row,
-                        .rowsPerImage = height
-                    },
-                    .buffer = m->surface_assets
-                },
-                &(WGPUExtent3D){ width, height, 1 });
-            m->terrain_serials[h->slot] = serial;
+            uint64_t offset = (uint64_t)h->slot * slot_size;
+            box_gpu_terrain_copy(gpu, m, tex, h->texture, offset, row,
+                &m->terrain_serials[h->slot * 2u], &encoder);
+            box_gpu_terrain_copy(gpu, m, rough, h->rough, offset + (uint64_t)row * height, row,
+                &m->terrain_serials[h->slot * 2u + 1u], &encoder);
         }
     }
 

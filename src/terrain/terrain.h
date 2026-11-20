@@ -51,6 +51,8 @@ typedef struct TerrainTile {
     ecs_entity_t coarse;    /**< Child entity with the TextureGraph of the masks of the next
                              *   coarser level at every second texel of the window, 0 without
                              *   Terrain.masks */
+    ecs_entity_t rough;     /**< Child entity with the TextureGraph of the heights at every
+                             *   second texel of the window, as the next coarser level has them */
     int32_t level;          /**< Level of detail, 0 the finest */
     int32_t ix;             /**< Column of the tile in the grid of its level */
     int32_t iz;             /**< Row of the tile in the grid of its level */
@@ -80,11 +82,17 @@ typedef struct box_terrain_tile_t {
     ecs_entity_t masks;     /**< Child entity with the TextureGraph of the masks, 0 for none */
     ecs_entity_t coarse;    /**< Child entity with the TextureGraph of the masks of the next
                              *   coarser level, 0 for none */
+    ecs_entity_t rough;     /**< Child entity with the TextureGraph of the heights of the next
+                             *   coarser level */
     int32_t level;          /**< Level of detail */
     int32_t ix;             /**< Column in the grid of its level */
     int32_t iz;             /**< Row in the grid of its level */
     int32_t slot;           /**< Slot of its heights */
     double distance;        /**< Distance to the nearest focus when it was last wanted */
+    float low;              /**< Lowest of its heights and rough heights once measured */
+    float high;             /**< Highest of its heights and rough heights once measured */
+    int32_t revisions[2];   /**< Revisions of the heights and rough heights measured */
+    bool measured;          /**< low and high hold the heights read back */
     bool ready;             /**< Its heights and masks are computed */
     bool wanted;            /**< The focus needs it this frame */
     bool drawn;             /**< It draws this frame */
@@ -137,7 +145,8 @@ ecs_entity_t box_terrain_mask_node(
 /** Fill the surface of a tile of a Terrain.
  *
  * p[1] is the slot, the floats per row of the heights in the surface assets, the texels per row
- * and the resolution; p[2] the focus relative to the center of the tile and the morph distances;
+ * and the resolution; a slot holds the rows of the heights and after them the rows of the rough
+ * heights; p[2] the focus relative to the center of the tile and the morph distances;
  * p[3].x 1 when the tile has masks; p[4] the size, the skirt depth, the level and 1 when bounded;
  * p[5] the clip rectangle.
  *
@@ -154,7 +163,7 @@ void box_terrain_tile_surface(
 
 /** Bytes of a row of the heights of a tile of a resolution in the surface assets of its grid
  * mesh: the texels of a row of its height image, 4 bytes each, aligned to 256 bytes as a copy
- * from a texture into a buffer requires.
+ * from a texture into a buffer requires. The rows of the rough heights are as long.
  *
  * @param resolution Vertices along an edge of the tile
  * @return Bytes of a row
@@ -184,13 +193,15 @@ void box_terrain_local(
  * @param e The terrain
  * @param local The local position of the terrain
  * @param out Receives x and z of each focus
+ * @param heights Receives y of each focus, may be NULL
  * @return Number of foci
  */
 int32_t box_terrain_foci(
     const ecs_world_t *world,
     ecs_entity_t e,
     const double local[3],
-    double out[BOX_TERRAIN_FOCI][2]);
+    double out[BOX_TERRAIN_FOCI][2],
+    double *heights);
 
 /** Cells along the edge of a query tile of a Terrain */
 #define BOX_TERRAIN_QUERY_CELLS (64)

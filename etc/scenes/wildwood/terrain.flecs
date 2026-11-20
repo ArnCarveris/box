@@ -39,9 +39,9 @@ using assets
 // stones of the beds of the brooks.
 //
 // The brooks of brooks.flecs read wildwood.brooks, a second Terrain of the same graph that only
-// serves queries: its height is that of the land BROOK_DATA_DROP meters lower, under it where
-// its few coarse tiles draw, and its masks are the brook values the land has no channel left
-// for: red the meters to the middle of the nearest brook, green the height of the bed there.
+// serves queries and draws no tiles: its height is that of the land BROOK_DATA_DROP meters
+// lower, and its masks are the brook values the land has no channel left for: red the meters to
+// the middle of the nearest brook, green the height of the bed there.
 wildwood {
   land {
     // Rolling forest floor
@@ -391,8 +391,7 @@ wildwood {
   }
 
   // The query terrain of the brooks: its CPU heights and masks at the spacing of the land within
-  // BROOK_QUERY_RADIUS of the focus, and where the cells of brooks.flecs ask for them. It draws
-  // a few coarse tiles far under the land, which nothing sees
+  // BROOK_QUERY_RADIUS of the focus, and where the cells of brooks.flecs ask for them
   brooks {
     Terrain: {
       height: wildwood.land.brook_data_h,
@@ -405,10 +404,8 @@ wildwood {
       max_height: GROUND_MAX - BROOK_DATA_DROP,
       budget: TERRAIN_BUDGET,
       query_spacing: TERRAIN_QUERY_SPACING,
-      query_radius: BROOK_QUERY_RADIUS
+      query_radius: BROOK_QUERY_RADIUS,
+      query_only: true
     }
-
-    Rgb: {60, 56, 50}
-    NoShadow
   }
 }

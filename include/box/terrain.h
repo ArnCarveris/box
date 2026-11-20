@@ -90,15 +90,17 @@ ECS_STRUCT(TileTerrain, {
  * overhang: cliffs are steep slopes, best textured triplanar.
  *
  * The tiles form a quadtree: a tile of level L has an edge of tile_size * 2^L meters, and splits
- * into the four tiles of level L - 1 while a focus is closer than lod_distance * 2^(L - 1).
+ * into the four tiles of level L - 1 while a focus is closer than lod_distance * 2^(L - 1),
+ * counting the height of the focus above or below the terrain around it.
  * Tiles are made nearest first, at most budget per frame, and a coarse tile draws until the
  * finer tiles that replace it have their heights, so the terrain has no holes. Unbounded, the
  * coarsest level reaches lod_distance * 2^(levels - 1) from each focus.
  *
  * The tiles share one grid mesh per resolution and draw in one batch; the vertex stage displaces
  * it by the heights of the tile and takes the normals from them. Near the end of the range of
- * its level a tile morphs into the grid of the next coarser level, so the levels meet without
- * cracks or pops, and skirts below the edges hide what rounding leaves. The material
+ * its level a tile morphs into the grid and the heights of the next coarser level, so the
+ * levels meet without cracks or pops, and shallow skirts below the edges hide what rounding
+ * leaves. The material
  * components of the terrain entity (Rgb, PbrMaterial, PbrTextures, TextureMapping, TextureLayers,
  * ...) apply to its tiles; TextureMapping MappingWorld with a triplanar blend suits steep slopes.
  *
@@ -150,6 +152,7 @@ ECS_STRUCT(Terrain, {
     float query_radius;     /**< Radius around a focus in meters within which the heights are
                              *   on the CPU at query_spacing, 0 for 64; coarser heights reach
                              *   BOX_TERRAIN_QUERY_SCALE times as far */
+    bool query_only;        /**< Keep only the query tiles and draw no tiles */
 });
 
 /** Tiles of a Terrain, written by the engine on the terrain entity, read only for
