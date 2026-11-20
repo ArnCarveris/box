@@ -167,7 +167,8 @@ struct VertexOut {
     @location(12) @interpolate(flat) fresnel: vec4f,
     // Fresnel color of the material in linear light as unorm16: r | g << 16, b. Of a Water
     // pipeline (water), which ignores Fresnel, x is the set of the WaterWaves of the material in
-    // the wave table in its low byte, 0 for none (vo_water_waves), and its Water.scatter_color
+    // the wave table in its low 7 bits, 0 for none (vo_water_waves), 1 in bit 7 with a
+    // WaterSpectrum (vo_water_spectrum), and its Water.scatter_color
     // display encoded above it (vo_water); y the strength and depth of its WaterCaustics
     // (pack2x16float), 0 for none (vo_water_caustics).
     @location(13) @interpolate(flat) fresnel_color: vec2u,
@@ -284,7 +285,13 @@ fn vo_water_flow(f: VertexOut) -> WaterFlowOut {
 // Set of the WaterWaves of the material of a fragment of a Water pipeline in the wave table, 0
 // for none.
 fn vo_water_waves(f: VertexOut) -> u32 {
-    return f.fresnel_color.x & 0xFFu;
+    return f.fresnel_color.x & WATER_WAVES_MASK;
+}
+
+// Whether the material of a fragment of a Water pipeline has a WaterSpectrum, whose slopes it
+// takes from the spectrum of the view (BOX_RENDER_WATER_FLOW_SPECTRUM).
+fn vo_water_spectrum(f: VertexOut) -> bool {
+    return (f.fresnel_color.x & 0x80u) != 0u;
 }
 
 // The WaterCaustics of the material of a fragment of a Water pipeline: the offset of its water
@@ -609,8 +616,9 @@ fn vertex_out(p: Placed, material: Material, frame: ModelFrame, s: VertexShading
         o.flat1.x = pack2x16float(vec2f(material.cutoff,
             min(max(water_scatter(material), 0.0), 6e4)));
         // The Fresnel words of a Water material hold its WaterCaustics, the waves its scatter
-        // color
+        // color, and bit 7 of the set of its waves whether it has a WaterSpectrum
         o.fresnel_color = vec2u(((material.water_flags >> WATER_WAVES_SHIFT) & WATER_WAVES_MASK) |
+            select(0u, 0x80u, (material.distortion_flags & WATER_FLOW_SPECTRUM) != 0u) |
             ((water_scatter_color(material) & 0xFFFFFFu) << 8u),
             pack2x16float(vec2f(min(material.fresnel_strength, 1e4),
                 min(material.fresnel_bias, 6e4))));

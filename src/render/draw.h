@@ -318,6 +318,8 @@ typedef struct box_draw_material_t {
                                  *   normal map and foam texture move with, NULL without Water */
     uint32_t water_waves;       /**< Set of the waves in the wave table, 0 for none */
     const WaterCaustics *caustics; /**< Caustics of the Water, NULL without Water */
+    const WaterSpectrum *spectrum; /**< Spectrum waves of the Water, whose slopes its fragments
+                                 *   take from the view, NULL without Water */
     float caustics_frame[2];    /**< Offset of the water frame of the caustics in cells, wrapped
                                  *   (box_draws_water_caustics_frame), 0 for still water */
     const WindSway *sway;       /**< Wind sway of a 3D shape, ignored by 2D shapes */

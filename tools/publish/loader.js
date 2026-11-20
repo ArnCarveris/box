@@ -97,7 +97,10 @@
       var features = adapter.features.has('timestamp-query') ? ['timestamp-query'] : [];
       return adapter.requestDevice({
         requiredFeatures: features,
-        requiredLimits: { maxTextureArrayLayers: adapter.limits.maxTextureArrayLayers }
+        requiredLimits: {
+          maxTextureArrayLayers: adapter.limits.maxTextureArrayLayers,
+          maxSampledTexturesPerShaderStage: adapter.limits.maxSampledTexturesPerShaderStage
+        }
       });
     });
 

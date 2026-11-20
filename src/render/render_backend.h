@@ -339,6 +339,52 @@ bool box_render_gpu_read_ripple_flow(
     float *out,
     int32_t count);
 
+/** Copy a cascade of the spectrum of the WaterSpectrum owned by an entity into memory, waiting
+ * for the copy, as the backend last evolved it: four floats per texel of its largest mip, the
+ * slope along X and Z, the height and the square of the slope of texel x, z at
+ * out[(z * resolution + x) * 4]. Texel x, z covers the world XZ
+ * (x, z) * size / resolution - offset of the tile of the cascade. Only call this when the main
+ * thread renders, after box_render_sync, as box_render_gpu_read_buffer.
+ *
+ * @param world The world
+ * @param water The entity that owns the WaterSpectrum
+ * @param cascade The cascade
+ * @param resolution Receives the texels per side, NULL for none
+ * @param out Receives four times resolution squared floats, NULL to only get the resolution
+ * @param count Floats out holds
+ * @return Whether the spectrum and the cascade exist and, with out, it was copied
+ */
+bool box_render_gpu_read_spectrum(
+    ecs_world_t *world,
+    ecs_entity_t water,
+    int32_t cascade,
+    int32_t *resolution,
+    float *out,
+    int32_t count);
+
+/** Run the inverse FFT of the spectrum shader on a square grid of complex values and copy the
+ * result into memory, waiting for it, for tests: two complex values per texel, in[(z *
+ * resolution + x) * 4] the first (real, imaginary) and in[... + 2] the second; out receives,
+ * per texel at out[(z * resolution + x) * 4], the real and imaginary parts of the transform of
+ * the first, the real part of the transform of the second and the sum of the squares of the
+ * first two, sum over (u, v) of in(u, v) e^(2 pi i (u x + v z) / resolution), without
+ * normalization, rounded to half floats as the slopes of a spectrum are. Needs the spectrum
+ * shader, which the backend creates once a packet has a WaterSpectrum. Only call this when the
+ * main thread renders, after box_render_sync.
+ *
+ * @param world The world
+ * @param resolution Texels per side, a power of two from
+ * BOX_MATERIAL_SPECTRUM_RESOLUTION_MIN to BOX_MATERIAL_SPECTRUM_RESOLUTION_MAX
+ * @param in Four times resolution squared floats
+ * @param out Receives four times resolution squared floats
+ * @return Whether the shader was ready and the result copied
+ */
+bool box_render_gpu_spectrum_fft(
+    ecs_world_t *world,
+    int32_t resolution,
+    const float *in,
+    float *out);
+
 /** Copy the L2 SH irradiance of a reflection probe cubemap slot into memory, waiting for the
  * copy.
  *

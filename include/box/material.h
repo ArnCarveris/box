@@ -513,6 +513,88 @@ ECS_STRUCT(WaterWaves, {
                          *   alone; negative or not finite is 0 */
 });
 
+/** Wind speed of a constructed WaterSpectrum, meters per second at 10 meters above the water */
+#define BOX_MATERIAL_SPECTRUM_WIND_SPEED (4.0f)
+
+/** World units of the tile of the largest cascade of a constructed WaterSpectrum */
+#define BOX_MATERIAL_SPECTRUM_SIZE (32.0f)
+
+/** Cascades of a constructed WaterSpectrum */
+#define BOX_MATERIAL_SPECTRUM_CASCADES (2)
+
+/** Most cascades of a WaterSpectrum */
+#define BOX_MATERIAL_SPECTRUM_CASCADES_MAX (3)
+
+/** Texels per side of a cascade of a constructed WaterSpectrum */
+#define BOX_MATERIAL_SPECTRUM_RESOLUTION (128)
+
+/** Fewest texels per side of a cascade of a WaterSpectrum */
+#define BOX_MATERIAL_SPECTRUM_RESOLUTION_MIN (64)
+
+/** Most texels per side of a cascade of a WaterSpectrum */
+#define BOX_MATERIAL_SPECTRUM_RESOLUTION_MAX (256)
+
+/** Directionality of a constructed WaterSpectrum: most waves follow the wind */
+#define BOX_MATERIAL_SPECTRUM_DIRECTIONALITY (0.8f)
+
+/** Amplitude of a constructed WaterSpectrum: the spectrum of the wind as is */
+#define BOX_MATERIAL_SPECTRUM_AMPLITUDE (1.0f)
+
+/** Detail of a constructed WaterSpectrum: the normal map at a quarter of its weight */
+#define BOX_MATERIAL_SPECTRUM_DETAIL (0.25f)
+
+/** Wind driven waves of a Water from an ocean spectrum: hundreds of waves of different lengths
+ * that each travel at their own speed (deep water dispersion), so the surface keeps changing
+ * shape instead of sliding as one sheet. Default a light breeze on sheltered water: a wind of 4
+ * m/s along +X, a tile of 32 world units, 2 cascades of 128 texels, a directionality of 0.8, an
+ * amplitude of 1, a seed of 0 and a detail of 0.25. Inherited by instances like Water; a field a
+ * scene does not set keeps its default. World units are taken as meters.
+ *
+ * The spectrum is a JONSWAP spectrum of a fully developed sea for the wind speed, spread around
+ * the wind direction by directionality (cos^2 spreading toward the wind, the rest the same in
+ * every direction), with the waves shorter than a centimeter damped. When its parameters change
+ * the backend draws the initial amplitudes h0(k) of every wave of a square grid of wave numbers
+ * from the seed; every frame it evolves them to the time with the deep water dispersion and
+ * inverse FFTs the slopes and the height into a tiling texture per cascade, and builds its mips.
+ * The tile of each next cascade is a fifth of the previous one, which takes over the waves from
+ * 4 cycles per its tile on, so the cascades do not double up; the last one holds the waves
+ * down to three of its texels long. The angular frequencies are multiples of 2 pi /
+ * BOX_RENDER_SPECTRUM_PERIOD and the time is wrapped to that period in double precision, so the
+ * waves never lose precision and repeat seamlessly.
+ *
+ * The waves change the shading normal only, the surface stays flat. Water fragments of a shape
+ * with a WaterSpectrum add the slopes of all cascades, sampled at their world XZ in the frame the
+ * WaterFlow of the Water entity of the spectrum moves (integrated in double precision), to those
+ * of its WaterWaves, and blend the normal map over them weighted by detail (whiteout blend). The
+ * slope variance that the mips of the cascades filter away widens the roughness like the faded
+ * WaterWaves do (see Water), so distant water keeps glittering without aliasing. The height of
+ * the spectrum adds to that of the WaterWaves for the scatter of the Water.
+ *
+ * A view binds the spectrum of the first WaterSpectrum of its scene: the shapes that inherit the
+ * one component share it, a scene with WaterSpectrum components of more than one entity logs an
+ * error once and shades all its WaterSpectrum shapes with the first. Needs Water and
+ * Scene.water: without them the component does nothing. A disabled entity costs nothing. Its
+ * fields have no transition.
+ */
+ECS_STRUCT(WaterSpectrum, {
+    float wind_speed;       /**< Wind speed at 10 m above the water, m/s; 0 or less (or not
+                             *   finite) for no waves */
+    vec2 wind_direction;    /**< Direction the wind blows toward in world XZ, normalized by the
+                             *   engine; zero (or not finite) is +X */
+    float size;             /**< World units of the tile of the largest cascade; 0 or less (or
+                             *   not finite) is the default */
+    int32_t cascades;       /**< Cascades, clamped to 1..BOX_MATERIAL_SPECTRUM_CASCADES_MAX */
+    int32_t resolution;     /**< Texels per side of a cascade, rounded to the nearest power of
+                             *   two from BOX_MATERIAL_SPECTRUM_RESOLUTION_MIN to
+                             *   BOX_MATERIAL_SPECTRUM_RESOLUTION_MAX */
+    float directionality;   /**< 0..1, how much the waves follow the wind: 0 the same in every
+                             *   direction, 1 none against the wind; clamped */
+    float amplitude;        /**< Scale of the heights of the whole spectrum, 0 for flat water */
+    uint32_t seed;          /**< Seed of the random amplitudes and phases of the waves */
+    float detail;           /**< Weight of the normal map relative to the spectrum, 0 for the
+                             *   spectrum alone; negative or not finite is 0 */
+});
+
 /** Velocity a Water surface moves with (a river, the water around a paddling boat), default
  * still, inherited by instances like Water. The WaterWaves of the shape travel in the frame
  * that moves with it: their phases integrate the velocity over the time.

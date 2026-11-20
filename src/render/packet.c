@@ -33,6 +33,7 @@ void box_render_packet_init(
     ecs_vec_init_t(NULL, &p->water_ripples, box_render_water_ripples_t, 0);
     ecs_vec_init_t(NULL, &p->ripple_sources, box_render_ripple_source_t, 0);
     ecs_vec_init_t(NULL, &p->ripple_flows, box_render_ripple_flow_t, 0);
+    ecs_vec_init_t(NULL, &p->water_spectra, box_render_water_spectrum_t, 0);
     ecs_vec_init_t(NULL, &p->impostor_blits, box_render_impostor_blit_t, 0);
     ecs_vec_init_t(NULL, &p->impostor_reads, box_render_impostor_read_t, 0);
     ecs_vec_init_t(NULL, &p->terrain_heights, box_render_terrain_height_t, 0);
@@ -68,6 +69,7 @@ void box_render_packet_fini(
     ecs_vec_fini_t(NULL, &p->water_ripples, box_render_water_ripples_t);
     ecs_vec_fini_t(NULL, &p->ripple_sources, box_render_ripple_source_t);
     ecs_vec_fini_t(NULL, &p->ripple_flows, box_render_ripple_flow_t);
+    ecs_vec_fini_t(NULL, &p->water_spectra, box_render_water_spectrum_t);
     ecs_vec_fini_t(NULL, &p->impostor_blits, box_render_impostor_blit_t);
     ecs_vec_fini_t(NULL, &p->impostor_reads, box_render_impostor_read_t);
     ecs_vec_fini_t(NULL, &p->terrain_heights, box_render_terrain_height_t);
@@ -115,6 +117,7 @@ void box_render_packet_reset(
     ecs_vec_clear(&p->water_ripples);
     ecs_vec_clear(&p->ripple_sources);
     ecs_vec_clear(&p->ripple_flows);
+    ecs_vec_clear(&p->water_spectra);
     ecs_vec_clear(&p->impostor_blits);
     ecs_vec_clear(&p->impostor_reads);
     ecs_vec_clear(&p->terrain_heights);
@@ -207,6 +210,8 @@ void box_render_packet_copy(
         ECS_SIZEOF(box_render_ripple_source_t));
     box_render_vec_copy(&dst->ripple_flows, &src->ripple_flows,
         ECS_SIZEOF(box_render_ripple_flow_t));
+    box_render_vec_copy(&dst->water_spectra, &src->water_spectra,
+        ECS_SIZEOF(box_render_water_spectrum_t));
     box_render_vec_copy(&dst->impostor_blits, &src->impostor_blits,
         ECS_SIZEOF(box_render_impostor_blit_t));
     box_render_vec_copy(&dst->impostor_reads, &src->impostor_reads,

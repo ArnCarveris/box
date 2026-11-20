@@ -255,7 +255,9 @@ done:
 
 #else
 
-/** Request the device from the adapter and get its queue.
+/** Request the device from the adapter and get its queue, with the texture array layers and
+ * the sampled textures per shader stage the adapter offers: the forward pass of a TextureBlend
+ * Water samples more textures in its fragment stage than the 16 of the default limits.
  *
  * @param gpu The backend
  */
@@ -279,11 +281,18 @@ static void box_gpu_device_init(
     desc.requiredFeatureCount = feature_count;
     desc.requiredFeatures = feature_count ? features : NULL;
 
-    if (wgpuAdapterGetLimits(gpu->adapter, &adapter) == WGPUStatus_Success &&
-        adapter.maxTextureArrayLayers != WGPU_LIMIT_U32_UNDEFINED)
-    {
-        limits.maxTextureArrayLayers = adapter.maxTextureArrayLayers;
-        desc.requiredLimits = &limits;
+    if (wgpuAdapterGetLimits(gpu->adapter, &adapter) == WGPUStatus_Success) {
+        if (adapter.maxTextureArrayLayers != WGPU_LIMIT_U32_UNDEFINED) {
+            limits.maxTextureArrayLayers = adapter.maxTextureArrayLayers;
+            desc.requiredLimits = &limits;
+        }
+
+        if (adapter.maxSampledTexturesPerShaderStage != WGPU_LIMIT_U32_UNDEFINED &&
+            adapter.maxSampledTexturesPerShaderStage > BOX_GPU_SAMPLED_TEXTURES)
+        {
+            limits.maxSampledTexturesPerShaderStage = adapter.maxSampledTexturesPerShaderStage;
+            desc.requiredLimits = &limits;
+        }
     }
 
     desc.uncapturedErrorCallbackInfo.callback = box_gpu_on_error;
@@ -549,6 +558,7 @@ static void box_gpu_render(
     box_gpu_environment_process(gpu, packet);
     box_gpu_particles_simulate(gpu, packet);
     box_gpu_ripples_simulate(gpu, packet);
+    box_gpu_spectra_evolve(gpu, packet);
     box_gpu_fog_volumes_begin(gpu);
     box_gpu_star_fields_begin(gpu);
     box_gpu_planets_begin(gpu);

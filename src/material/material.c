@@ -296,6 +296,36 @@ static void box_water_caustics_ctor(
     }
 }
 
+/** Construct WaterSpectrum values: a wind of 4 m/s along +X, a tile of 32 world units, 2
+ * cascades of 128 texels, a directionality of 0.8, an amplitude of 1, a seed of 0 and a detail of
+ * 0.25.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_water_spectrum_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    WaterSpectrum *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (WaterSpectrum){
+            .wind_speed = BOX_MATERIAL_SPECTRUM_WIND_SPEED,
+            .wind_direction = {1.0f, 0.0f},
+            .size = BOX_MATERIAL_SPECTRUM_SIZE,
+            .cascades = BOX_MATERIAL_SPECTRUM_CASCADES,
+            .resolution = BOX_MATERIAL_SPECTRUM_RESOLUTION,
+            .directionality = BOX_MATERIAL_SPECTRUM_DIRECTIONALITY,
+            .amplitude = BOX_MATERIAL_SPECTRUM_AMPLITUDE,
+            .seed = 0,
+            .detail = BOX_MATERIAL_SPECTRUM_DETAIL };
+    }
+}
+
 /** Construct WaterRipples values: a field of 32 world units and 256 cells on the Water entity, a
  * wave speed of 2, a damping of 0.5, a strength of 1, a foam decay of 0.4, a foam spread of 0.02
  * and no crest foam.
@@ -724,6 +754,7 @@ void BoxMaterialImport(
     ECS_META_COMPONENT(world, WaterWaves);
     ECS_META_COMPONENT(world, WaterFlow);
     ECS_META_COMPONENT(world, WaterCaustics);
+    ECS_META_COMPONENT(world, WaterSpectrum);
     ECS_META_COMPONENT(world, WaterRipples);
     ECS_META_COMPONENT(world, RippleSource);
     ECS_META_COMPONENT(world, WindSway);
@@ -770,6 +801,8 @@ void BoxMaterialImport(
     ecs_add_pair(world, ecs_id(WaterFlow), EcsWith, ecs_id(MaterialId));
     ecs_set_hooks(world, WaterCaustics, { .ctor = box_water_caustics_ctor });
     ecs_add_pair(world, ecs_id(WaterCaustics), EcsOnInstantiate, EcsInherit);
+    ecs_set_hooks(world, WaterSpectrum, { .ctor = box_water_spectrum_ctor });
+    ecs_add_pair(world, ecs_id(WaterSpectrum), EcsOnInstantiate, EcsInherit);
     ecs_set_hooks(world, WaterRipples, { .ctor = box_water_ripples_ctor });
     ecs_set_hooks(world, RippleSource, { .ctor = box_ripple_source_ctor });
     ecs_set_hooks(world, WindSway, { .ctor = box_wind_sway_ctor });

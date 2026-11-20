@@ -1031,21 +1031,22 @@ void box_draws_materials_observers(
     ecs_world_t *world,
     box_render_draws_t *d)
 {
-    ecs_entity_t components[21] = {
+    ecs_entity_t components[22] = {
         ecs_id(Rgb), ecs_id(PbrMaterial), ecs_id(Emissive), ecs_id(TextureTransform),
         ecs_id(AlphaCutoff), ecs_id(Transmission), ecs_id(ClearCoat), ecs_id(SpecularAnisotropy),
         ecs_id(Sheen), ecs_id(DiffuseTransmission), ecs_id(TextureMapping), ecs_id(TextureScroll),
         ecs_id(Fresnel), ecs_id(Water), ecs_id(PlanarReflection), ecs_id(Distortion),
         ecs_id(WaterWaves), ecs_id(WindSway), ecs_id(VertexReveal), ecs_id(WaterCaustics),
-        ecs_id(WaterFlow)
+        ecs_id(WaterFlow), ecs_id(WaterSpectrum)
     };
-    const char *names[21] = {
+    const char *names[22] = {
         "DrawsOnColor", "DrawsOnPbrMaterial", "DrawsOnEmissive", "DrawsOnTextureTransform",
         "DrawsOnAlphaCutoff", "DrawsOnTransmission", "DrawsOnClearCoat",
         "DrawsOnSpecularAnisotropy", "DrawsOnSheen", "DrawsOnDiffuseTransmission",
         "DrawsOnTextureMapping", "DrawsOnTextureScroll", "DrawsOnFresnel", "DrawsOnWater",
         "DrawsOnPlanarReflection", "DrawsOnDistortion", "DrawsOnWaterWaves",
-        "DrawsOnWindSway", "DrawsOnVertexReveal", "DrawsOnWaterCaustics", "DrawsOnWaterFlow"
+        "DrawsOnWindSway", "DrawsOnVertexReveal", "DrawsOnWaterCaustics", "DrawsOnWaterFlow",
+        "DrawsOnWaterSpectrum"
     };
     int32_t i;
     box_draws_observer(world, d, "MaterialsOnPrefab", (ecs_observer_desc_t){
@@ -1070,8 +1071,9 @@ void box_draws_materials_observers(
         .query.flags = EcsQueryMatchPrefab,
         .events = { EcsOnAdd, EcsOnRemove } }, BoxMaterialsOnIsA);
 
-    for (i = 0; i < 21; i ++) {
-        bool keyed = box_materials_keyed(components[i]) || box_materials_slotted(components[i]);
+    for (i = 0; i < 22; i ++) {
+        bool keyed = box_materials_keyed(components[i]) || box_materials_slotted(components[i]) ||
+            components[i] == ecs_id(WaterSpectrum);
         bool owned = components[i] == ecs_id(PlanarReflection);
         box_draws_observer(world, d, names[i], (ecs_observer_desc_t){
             .query.terms = {{
@@ -1115,6 +1117,7 @@ void box_draws_material_of(
             out->waves = ecs_get(world, owner, WaterWaves);
             out->flow = ecs_get(world, owner, WaterFlow);
             out->caustics = ecs_get(world, owner, WaterCaustics);
+            out->spectrum = ecs_get(world, owner, WaterSpectrum);
         }
     }
 
@@ -1130,6 +1133,7 @@ void box_draws_material_of(
         out->waves = out->water ? out->waves : NULL;
         out->flow = out->water ? out->flow : NULL;
         out->caustics = out->water ? out->caustics : NULL;
+        out->spectrum = out->water ? out->spectrum : NULL;
         out->distortion = features & BOX_RENDER_FEATURE_DISTORTION && !out->water
             ? out->distortion : NULL;
     }

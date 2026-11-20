@@ -51,7 +51,11 @@
 #define BOX_GPU_DEPTH_FORMAT (WGPUTextureFormat_Depth32Float)
 
 /** Bytes between the uniforms of two views, a multiple of the dynamic offset alignment */
-#define BOX_GPU_VIEW_STRIDE (1024)
+#define BOX_GPU_VIEW_STRIDE (1280)
+
+/** Sampled textures per shader stage of the WebGPU default limits, which the device raises to
+ * what the adapter offers */
+#define BOX_GPU_SAMPLED_TEXTURES (16u)
 
 /** Bytes between the matrices of two cascades, the dynamic offset alignment of webgpu */
 #define BOX_GPU_CASCADE_STRIDE (256)
@@ -120,6 +124,9 @@ typedef struct box_gpu_particles_t box_gpu_particles_t;
 
 /** Pipelines, textures and frame buffers of the fields of WaterRipples */
 typedef struct box_gpu_ripples_t box_gpu_ripples_t;
+
+/** Pipelines, buffers and texture arrays of the spectra of WaterSpectrum */
+typedef struct box_gpu_spectra_t box_gpu_spectra_t;
 
 /** Pipelines and the buffer of the draws of the fog volumes */
 typedef struct box_gpu_fog_volumes_t box_gpu_fog_volumes_t;
@@ -923,6 +930,11 @@ typedef struct box_gpu_view_uniforms_t {
     vec4 ripple_b;                  /**< World Y of its Water, tolerance, border cells, cell */
     uint32_t ripple_c[4];           /**< Resolution, texel of the window corner X and Z, 1 for a
                                      *   field and 0 without one */
+    vec4 spectrum_a;                /**< Spectrum of WaterSpectrum of the scene
+                                     *   (gpu_spectrum.c): world XZ offset of its tiles,
+                                     *   detail, height scale */
+    vec4 spectrum_b;                /**< 1 / world units of the tile of each cascade, unused */
+    uint32_t spectrum_c[4];         /**< Cascades, 0 without a spectrum, three unused */
     int32_t origin[4];              /**< Absolute position of the local origin (WorldOrigin)
                                      *   as box_gpu_origin_split packs it */
 } box_gpu_view_uniforms_t;
@@ -1006,8 +1018,15 @@ typedef struct box_gpu_atlas_read_t {
  * to the frame of the field (zw); the 1x1 zero texture without one. */
 #define BOX_GPU_RIPPLES_FLOW_BINDING (27)
 
+/** Binding of the view group of the slopes of the spectrum of WaterSpectrum of the scene of the
+ * view, an rgba16float 2D array with mips sampled through the cookie sampler (binding 18),
+ * water_spectrum of mesh_extended.wgsl: a layer per cascade of the slope along X and Z, the
+ * height and the square of the slope; a 1x1 zero array without one. Its record is in the View
+ * uniform (spectrum_a, spectrum_b, spectrum_c). */
+#define BOX_GPU_SPECTRUM_BINDING (28)
+
 /** Bindings of the view group, the highest binding plus one */
-#define BOX_GPU_VIEW_BINDINGS (28)
+#define BOX_GPU_VIEW_BINDINGS (29)
 
 /** Binding of the transmittance and sky irradiance LUT array of the planet lights in the view
  * group */
@@ -1299,6 +1318,7 @@ typedef struct box_gpu_t {
                                                     *   created by the first image */
     box_gpu_particles_t *particles; /**< Particle passes */
     box_gpu_ripples_t *ripples;     /**< Fields of WaterRipples */
+    box_gpu_spectra_t *spectra;     /**< Spectra of WaterSpectrum */
     struct box_gpu_impostor_t *impostor; /**< Impostor frame copies, created by the first */
     box_gpu_fog_volumes_t *fog_volumes; /**< Fog volume draws */
     box_gpu_star_fields_t *star_fields; /**< Star field draws */

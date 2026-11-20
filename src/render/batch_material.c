@@ -884,6 +884,9 @@ void box_draws_material_pack(
 
     if (material->water) {
         box_draws_water_flow_pack(out, material->flow, material->time);
+        if (material->spectrum) {
+            out->water_flow_flags |= BOX_RENDER_WATER_FLOW_SPECTRUM;
+        }
     } else {
         box_draws_distortion_pack(out, material->distortion, transmission, material->time);
     }

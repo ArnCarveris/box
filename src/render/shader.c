@@ -459,7 +459,8 @@ static void box_shader_changed(
  * transmissive, or it lights fog volumes or assigns lights to clusters and a view of the
  * packet draws a fog volume, which reads the clusters for its point and spot lights, or it
  * raymarches planet atmosphere shells and a view of the packet draws one, or it steps the fields
- * of WaterRipples and the packet has one, or it draws star
+ * of WaterRipples and the packet has one, or it evolves the spectra of WaterSpectrum and the
+ * packet has one, or it draws star
  * fields and a view of the packet draws one, or it
  * draws the debug grid and a view of the packet has it enabled, or it draws the wireframe and
  * a view of the packet has one, or it draws the probe debug views and a view of the packet has
@@ -528,6 +529,10 @@ static bool box_shader_used(
     }
 
     if (handle == BOX_RENDER_SHADER_WATER_RIPPLES && ecs_vec_count(&p->water_ripples)) {
+        result = true;
+    }
+
+    if (handle == BOX_RENDER_SHADER_WATER_SPECTRUM && ecs_vec_count(&p->water_spectra)) {
         result = true;
     }
 
@@ -1025,6 +1030,8 @@ void BoxShaderImport(
         BOX_RENDER_SHADER_PLANAR, true);
     box_shader_builtin(world, state, builtin, "water_ripples",
         "etc/shaders/water_ripples.wgsl", BOX_RENDER_SHADER_WATER_RIPPLES, true);
+    box_shader_builtin(world, state, builtin, "water_spectrum",
+        "etc/shaders/water_spectrum.wgsl", BOX_RENDER_SHADER_WATER_SPECTRUM, true);
     box_shader_builtin(world, state, builtin, "impostor", "etc/shaders/impostor.wgsl",
         BOX_RENDER_SHADER_IMPOSTOR, true);
     box_shader_builtin(world, state, builtin, "fog_volume", "etc/shaders/fog_volume.wgsl",

@@ -1190,6 +1190,29 @@
                 ]
             },
             {
+                "id": "WaterSpectrum",
+                "testcases": [
+                    "defaults",
+                    "reflection",
+                    "inherited",
+                    "resolution_rounded",
+                    "cascades_clamped",
+                    "params_validated",
+                    "omega_quantized",
+                    "density",
+                    "variance_grows_with_wind",
+                    "time_wraps",
+                    "record",
+                    "regenerates_on_change",
+                    "frame_follows_flow",
+                    "no_spectrum",
+                    "one_spectrum_per_scene",
+                    "instances_share",
+                    "removed",
+                    "material_flag"
+                ]
+            },
+            {
                 "id": "Wind",
                 "testcases": [
                     "defaults",

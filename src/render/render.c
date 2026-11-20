@@ -489,6 +489,7 @@ void BoxRenderImport(
     box_render_lights_init(world);
     box_render_planar_init(world);
     box_render_water_ripples_init(world);
+    box_render_water_spectrum_init(world);
     box_render_terrain_init(world);
     box_render_bake_init(world);
     box_render_reflect_init(world);

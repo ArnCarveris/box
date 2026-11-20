@@ -65,6 +65,13 @@ const WATER_WAVE_SETS: u32 = 128u;
 // (xy) and its velocity relative to the frame of the field (zw); a 1x1 zero texture without one.
 @group(0) @binding(27) var water_ripple_flow: texture_storage_2d<rgba32float, read>;
 
+// The spectrum of WaterSpectrum of the scene of the view (spectrum_a, spectrum_b and
+// spectrum_c of View), a tiling layer per cascade with mips: the slope of the heights along world
+// X and Z (xy), the height in world units (z) and the square of the slope (w), so a mip that
+// averages texels keeps the slope variance it filtered away as w - dot(xy, xy). Sampled through
+// the repeating cookie sampler; a 1x1 zero array without one.
+@group(0) @binding(28) var water_spectrum: texture_2d_array<f32>;
+
 // Snapshot of the view for transmission (gpu_transmission.c): its image right before a
 // transmissive draw, with a blur pyramid, mip k + 1 downsampled from mip k. At most 4 snapshots
 // are taken a frame; later glass samples the last one. A view without transmissive draws, and
@@ -1084,6 +1091,13 @@ fn water_layers(f: VertexOut, geometric: vec3f, m: Material) -> WaterLayers {
 // water_waves_variance gives the slope variance the fading takes away.
 fn water_waves_normal(index: u32, xz: vec2f, dx: vec2f, dy: vec2f, mapped: vec3f) -> vec3f {
     let s = water_wave_sets[min(index, WATER_WAVE_SETS - 1u)];
+    return water_slope_normal(water_waves_slope(index, xz, dx, dy), mapped, s.detail);
+}
+
+// The slope of the travelling waves of a set of the wave table at the world XZ of a fragment
+// (xy, faded like water_waves_normal) and the lift of their Gerstner steepness (z).
+fn water_waves_slope(index: u32, xz: vec2f, dx: vec2f, dy: vec2f) -> vec3f {
+    let s = water_wave_sets[min(index, WATER_WAVE_SETS - 1u)];
     let count = f32(max(s.count, 1u));
     var slope = vec2f(0.0);
     var lift = 0.0;
@@ -1098,10 +1112,46 @@ fn water_waves_normal(index: u32, xz: vec2f, dx: vec2f, dy: vec2f, mapped: vec3f
         slope += w.a.xy * (w.b.x * fade * cos(theta));
         lift += w.b.y * fade * sin(theta) / count;
     }
-    let waves = normalize(vec3f(-slope.x, max(1.0 - lift, 1e-3), -slope.y));
-    let detail = normalize(vec3f(mapped.x * s.detail, max(mapped.y, 1e-3),
-        mapped.z * s.detail));
-    return normalize(vec3f(waves.x + detail.x, waves.y * detail.y, waves.z + detail.z));
+    return vec3f(slope, lift);
+}
+
+// The normal of waves of a slope along world X and Z (slope.xy) and a Gerstner lift (slope.z)
+// with the normal map normal blended over it (whiteout), its tilt scaled by detail.
+fn water_slope_normal(slope: vec3f, mapped: vec3f, detail: f32) -> vec3f {
+    let waves = normalize(vec3f(-slope.x, max(1.0 - slope.z, 1e-3), -slope.y));
+    let tilt = normalize(vec3f(mapped.x * detail, max(mapped.y, 1e-3), mapped.z * detail));
+    return normalize(vec3f(waves.x + tilt.x, waves.y * tilt.y, waves.z + tilt.z));
+}
+
+// The spectrum of WaterSpectrum at the world XZ of a fragment: the sum of the slopes of its
+// cascades (slope), of their heights over twice the standard deviation of the height of the
+// spectrum (height, about -1..1) and of the slope variance their mips filtered away
+// (variance), each cascade sampled at the level of detail of the world XZ derivatives dx and dy
+// of the fragment over its tile. The variance fades in as the footprint grows from one texel to
+// two: where a texel covers pixels, the bilinear blend of the squared slopes exceeds the square
+// of the blended slopes between texel centers, which would roughen the water in a grid.
+struct WaterSpectrumSample {
+    slope: vec2f,
+    height: f32,
+    variance: f32,
+};
+
+fn water_spectrum_sample(xz: vec2f, dx: vec2f, dy: vec2f) -> WaterSpectrumSample {
+    var o: WaterSpectrumSample;
+    let p = xz + view.spectrum_a.xy;
+    let cascades = min(view.spectrum_c.x, 3u);
+    let texels = f32(textureDimensions(water_spectrum).x);
+    let footprint = max(length(dx), length(dy)) * texels;
+    for (var c = 0u; c < cascades; c++) {
+        let inv = view.spectrum_b[c];
+        let t = textureSampleGrad(water_spectrum, cookie_sampler, p * inv, c, dx * inv,
+            dy * inv);
+        o.slope += t.xy;
+        o.height += t.z;
+        o.variance += max(t.w - dot(t.xy, t.xy), 0.0) * saturate(footprint * inv - 1.0);
+    }
+    o.height *= view.spectrum_a.w;
+    return o;
 }
 
 // Height of the travelling waves of a set of the wave table at the world XZ of a fragment over
@@ -1140,7 +1190,14 @@ fn water_wave_fade(w: WaterWave, dx: vec2f, dy: vec2f) -> f32 {
 // resolved, adds nothing for the waves.
 fn water_waves_variance(index: u32, dx: vec2f, dy: vec2f, mapped: f32) -> f32 {
     let s = water_wave_sets[min(index, WATER_WAVE_SETS - 1u)];
-    var variance = mapped * s.detail * s.detail;
+    return mapped * s.detail * s.detail + water_waves_faded(index, dx, dy);
+}
+
+// Slope variance the fading of the travelling waves of a set of the wave table took away, the
+// part of water_waves_variance without the normal map.
+fn water_waves_faded(index: u32, dx: vec2f, dy: vec2f) -> f32 {
+    let s = water_wave_sets[min(index, WATER_WAVE_SETS - 1u)];
+    var variance = 0.0;
     for (var i = 0u; i < 4u; i++) {
         let w = s.waves[i];
         if (w.a.z <= 0.0 || w.b.x <= 0.0) {
@@ -1652,7 +1709,22 @@ fn lit(f: VertexOut, shaded: Surface) -> vec4f {
         var variance = w.variance;
         let waves = vo_water_waves(f);
         var height = 0.0;
-        if (waves != 0u) {
+        if (vo_water_spectrum(f) && view.spectrum_c.x != 0u) {
+            // The slopes of the spectrum add to those of the waves, the normal map blends over
+            // both by the detail of the spectrum
+            let detail = view.spectrum_a.z;
+            let spectrum = water_spectrum_sample(f.world.xz, dx, dy);
+            var slope = vec3f(spectrum.slope, 0.0);
+            variance = variance * detail * detail + spectrum.variance;
+            height = spectrum.height;
+            if (waves != 0u) {
+                slope += water_waves_slope(waves, f.world.xz, dx, dy);
+                variance += water_waves_faded(waves, dx, dy);
+                height += water_waves_height(waves, f.world.xz, dx, dy);
+            }
+            layers.normal = water_slope_normal(slope, layers.normal, detail);
+            height = clamp(height, -1.0, 1.0);
+        } else if (waves != 0u) {
             variance = water_waves_variance(waves, dx, dy, variance);
             layers.normal = water_waves_normal(waves, f.world.xz, dx, dy, layers.normal);
             height = water_waves_height(waves, f.world.xz, dx, dy);

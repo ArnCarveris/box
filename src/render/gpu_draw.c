@@ -75,10 +75,7 @@ static WGPUPipelineLayout box_gpu_mesh_layout(
 
 /** Create the layout of the view group of the forward pass and the fog grid compute (all but the
  * storage textures): view uniforms, lights, clusters, shadows, reflections, aerial perspective,
- * environment, ambient occlusion, cookie, opaque snapshot, planar images and planet lights.
- *
- * Binding BOX_GPU_WATER_WAVES_BINDING holds the wave table of the Water materials, the
- * BOX_GPU_RIPPLES_* bindings the field of WaterRipples of the scene of the view.
+ * environment, ambient occlusion, cookie, opaque snapshot, planar images, planet lights, water.
  *
  * @param gpu The backend
  * @return The layout
@@ -265,7 +262,7 @@ static WGPUBindGroupLayout box_gpu_view_layout(
     };
     WGPUBindGroupLayoutDescriptor layout = {
         .entryCount = BOX_GPU_VIEW_BINDINGS, .entries = entries };
-    box_gpu_ripples_layout(entries);
+    box_gpu_water_fields_layout(entries);
     for (int32_t i = 0; i < BOX_GPU_VIEW_BINDINGS; i ++) {
         entries[i].visibility |= entries[i].storageTexture.access ? 0 : WGPUShaderStage_Compute;
     }
@@ -303,7 +300,7 @@ void box_gpu_draw_init(
     box_gpu_transmission_init(gpu);
     box_gpu_atmosphere_init(gpu);
     box_gpu_particles_init(gpu);
-    box_gpu_ripples_init(gpu);
+    box_gpu_water_fields_init(gpu);
     box_gpu_fog_volumes_init(gpu);
     box_gpu_star_fields_init(gpu);
     box_gpu_planets_init(gpu);
@@ -781,7 +778,7 @@ void box_gpu_draw_fini(
     box_gpu_transmission_fini(gpu);
     box_gpu_atmosphere_fini(gpu);
     box_gpu_particles_fini(gpu);
-    box_gpu_ripples_fini(gpu);
+    box_gpu_water_fields_fini(gpu);
     box_gpu_fog_volumes_fini(gpu);
     box_gpu_star_fields_fini(gpu);
     box_gpu_planets_fini(gpu);
@@ -1122,7 +1119,7 @@ static int32_t box_gpu_view_write(
         box_gpu_atmosphere_uniforms(gpu, v, u);
         box_gpu_environment_uniforms(gpu, v, u);
         box_gpu_cookie_uniforms(gpu, v, u);
-        box_gpu_ripples_uniforms(gpu, v, u);
+        box_gpu_water_fields_uniforms(gpu, v, u);
         box_gpu_origin_split(packet->origin, u->origin);
         box_gpu_cull_add(gpu, t, packet, i, result, proj, u);
         result ++;

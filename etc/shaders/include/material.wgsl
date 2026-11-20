@@ -166,6 +166,10 @@ const WATER_FOAM_TEXTURE: u32 = 1u;
 // flow (BOX_RENDER_WATER_FLOW_TEXTURES).
 const WATER_FLOW_TEXTURES: u32 = 1u;
 
+// Flag of the flow words of a Water record whose material has a WaterSpectrum
+// (BOX_RENDER_WATER_FLOW_SPECTRUM).
+const WATER_FLOW_SPECTRUM: u32 = 4u;
+
 // Seconds of a cycle of the two phase flow mapping (BOX_RENDER_WATER_FLOW_PERIOD).
 const WATER_FLOW_PERIOD: f32 = 1.0;
 

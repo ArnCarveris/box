@@ -449,6 +449,17 @@
                 ]
             },
             {
+                "id": "WaterSpectrum",
+                "testcases": [
+                    "fft_single_frequency",
+                    "slopes_mean_zero",
+                    "variance_grows_with_wind",
+                    "changes_over_time",
+                    "flat_without_wind",
+                    "ignored_without_water"
+                ]
+            },
+            {
                 "id": "Distortion",
                 "testcases": [
                     "moves_stripes",

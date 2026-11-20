@@ -1724,6 +1724,96 @@ void box_gpu_particles_simulate(
     box_gpu_t *gpu,
     const box_render_packet_t *packet);
 
+/** Create the layouts and placeholder of the spectra of WaterSpectrum.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_spectra_init(
+    box_gpu_t *gpu);
+
+/** Release the spectra of WaterSpectrum, their pipelines and placeholder.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_spectra_fini(
+    box_gpu_t *gpu);
+
+/** Evolve the spectra of WaterSpectrum of a packet to its time and inverse FFT them into their
+ * texture arrays with mips, after its scatters and before its targets; a spectrum whose
+ * parameters changed generates its initial spectrum first.
+ *
+ * @param gpu The backend
+ * @param packet The packet
+ */
+void box_gpu_spectra_evolve(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet);
+
+/** Fill the view layout entry of the slopes of the spectrum of WaterSpectrum.
+ *
+ * @param entries The entries of the view layout, of which BOX_GPU_SPECTRUM_BINDING is filled
+ */
+void box_gpu_spectra_layout(
+    WGPUBindGroupLayoutEntry *entries);
+
+/** Fill the view group entry of the slopes of the spectrum of WaterSpectrum of the scene of a
+ * view, the placeholder without one.
+ *
+ * @param gpu The backend
+ * @param v The view, NULL for none
+ * @param entries The entries of the view group, of which BOX_GPU_SPECTRUM_BINDING is filled
+ */
+void box_gpu_spectra_bindings(
+    box_gpu_t *gpu,
+    const box_render_view_t *v,
+    WGPUBindGroupEntry *entries);
+
+/** Write the record of the spectrum of WaterSpectrum of the scene of a view into its uniforms,
+ * a zero record without one.
+ *
+ * @param gpu The backend
+ * @param v The view
+ * @param u The uniforms
+ */
+void box_gpu_spectra_uniforms(
+    const box_gpu_t *gpu,
+    const box_render_view_t *v,
+    box_gpu_view_uniforms_t *u);
+
+/** Create the layouts and placeholders of the fields of WaterRipples and the spectra of
+ * WaterSpectrum.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_water_fields_init(
+    box_gpu_t *gpu);
+
+/** Release the fields of WaterRipples and the spectra of WaterSpectrum.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_water_fields_fini(
+    box_gpu_t *gpu);
+
+/** Fill the view layout entries of the field of WaterRipples and the spectrum of WaterSpectrum.
+ *
+ * @param entries The entries of the view layout
+ */
+void box_gpu_water_fields_layout(
+    WGPUBindGroupLayoutEntry *entries);
+
+/** Write the records of the field of WaterRipples and the spectrum of WaterSpectrum of the
+ * scene of a view into its uniforms.
+ *
+ * @param gpu The backend
+ * @param v The view
+ * @param u The uniforms
+ */
+void box_gpu_water_fields_uniforms(
+    const box_gpu_t *gpu,
+    const box_render_view_t *v,
+    box_gpu_view_uniforms_t *u);
+
 /** Create the layouts and placeholders of the fields of WaterRipples.
  *
  * @param gpu The backend

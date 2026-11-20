@@ -161,6 +161,10 @@
  * the colors of the covered texels into the empty ones */
 #define BOX_RENDER_SHADER_IMPOSTOR (16)
 
+/** Shader handle of the engine compute shader that generates, evolves and inverse FFTs the
+ * spectra of WaterSpectrum */
+#define BOX_RENDER_SHADER_WATER_SPECTRUM (17)
+
 /** Shader handle of the engine compute shader that steps the fields of WaterRipples */
 #define BOX_RENDER_SHADER_WATER_RIPPLES (15)
 
@@ -1834,6 +1838,11 @@ typedef struct box_render_material_t {
  * texture move with the flow (two phase flow mapping) */
 #define BOX_RENDER_WATER_FLOW_TEXTURES (1u << 0)
 
+/** Flag of the water_flow_flags of a Water record: the shape has or inherits a WaterSpectrum, so
+ * its fragments take the slopes of the spectrum the view binds. Above the Distortion flags, which
+ * share the word with records without Water. */
+#define BOX_RENDER_WATER_FLOW_SPECTRUM (1u << 2)
+
 /** Seconds of a cycle of the two phase flow mapping of WaterFlow.textures: each of the two
  * samples moves with the flow for this long, then resets while its weight is 0 */
 #define BOX_RENDER_WATER_FLOW_PERIOD (1.0)
@@ -1988,6 +1997,64 @@ typedef struct box_render_water_ripples_t {
     bool flowing;           /**< One of its rectangles flows relative to the frame, so the
                              *   steps advect the heights and the foam */
 } box_render_water_ripples_t;
+
+/** Cascades of a spectrum of WaterSpectrum at most, BOX_MATERIAL_SPECTRUM_CASCADES_MAX */
+#define BOX_RENDER_SPECTRUM_CASCADES (3)
+
+/** Seconds after which the waves of a WaterSpectrum repeat: their angular frequencies are
+ * multiples of 2 pi over it, and the time is wrapped to it in double precision */
+#define BOX_RENDER_SPECTRUM_PERIOD (256.0)
+
+/** Ratio of the tile of a cascade of a WaterSpectrum to the tile of the next */
+#define BOX_RENDER_SPECTRUM_RATIO (5.0f)
+
+/** Cycles per its tile from which a cascade of a WaterSpectrum takes over the waves from the
+ * previous one: the cut between cascade c - 1 and c is at the wave number 2 pi CUT / size of c */
+#define BOX_RENDER_SPECTRUM_CUT (4.0f)
+
+/** Wavelength in world units below which the waves of a WaterSpectrum are damped by
+ * exp(-(k SHORTEST)^2) */
+#define BOX_RENDER_SPECTRUM_SHORTEST (0.01f)
+
+/** Share of the Nyquist wave number (pi resolution / size) of the last cascade of a WaterSpectrum
+ * at which its waves end: shorter waves, down to two texels per wave and to the corners of the
+ * grid, would show as a plaid of texels where the texture is magnified */
+#define BOX_RENDER_SPECTRUM_NYQUIST (2.0f / 3.0f)
+
+/** Wave number above all waves, the upper cut of the spectrum box_render_gpu_spectrum_fft
+ * transforms */
+#define BOX_RENDER_SPECTRUM_K_MAX (1e30f)
+
+/** A spectrum of WaterSpectrum of a frame, evolved and inverse FFT'd by the backend before the
+ * views draw, in a texture array of a layer per cascade. A view binds the one of its scene. */
+typedef struct box_render_water_spectrum_t {
+    ecs_entity_t water;     /**< Entity that owns the WaterSpectrum (the prefab of the shapes
+                             *   that inherit it), the key of the spectrum */
+    ecs_entity_t scene;     /**< Scene root of the shapes, 0 for the default scene */
+    uint32_t resolution;    /**< Texels per side of a cascade, a power of two */
+    uint32_t cascades;      /**< Cascades, 1..BOX_RENDER_SPECTRUM_CASCADES */
+    uint32_t revision;      /**< Changes whenever the parameters of the initial spectrum do, so
+                             *   the backend generates it again */
+    uint32_t seed;          /**< WaterSpectrum.seed */
+    float sizes[BOX_RENDER_SPECTRUM_CASCADES]; /**< World units of the tile of each cascade, 0
+                             *   for the ones it lacks */
+    float cuts[BOX_RENDER_SPECTRUM_CASCADES + 1]; /**< Wave numbers between the cascades:
+                             *   cascade c holds cuts[c] <= |k| < cuts[c + 1], cuts[0] is 0 and
+                             *   cuts[cascades] BOX_RENDER_SPECTRUM_NYQUIST times the Nyquist
+                             *   wave number of the last cascade */
+    float wind[2];          /**< Normalized direction the wind blows toward, world XZ */
+    float wind_speed;       /**< Wind speed, 0 for no waves */
+    float directionality;   /**< WaterSpectrum.directionality clamped to 0..1 */
+    float amplitude;        /**< WaterSpectrum.amplitude, 0 when negative or not finite */
+    float detail;           /**< WaterSpectrum.detail, 0 when negative or not finite */
+    float time;             /**< Render time wrapped to 0..BOX_RENDER_SPECTRUM_PERIOD */
+    float offset[2];        /**< World XZ the fragments add to their local world XZ to sample
+                             *   the tiles: the absolute position of the local origin minus the
+                             *   water frame, wrapped to 0..sizes[0] */
+    float height_scale;     /**< One over twice the standard deviation of the height of the
+                             *   spectrum, which brings its heights to about -1..1; 0 for flat
+                             *   water */
+} box_render_water_spectrum_t;
 
 /** Bits of box_render_mesh_shading_t.material that hold the slot of the material table, the
  * planet light slot is above them */
@@ -2495,6 +2562,8 @@ typedef struct box_render_packet_t {
                              *   stepped before the targets */
     ecs_vec_t ripple_sources; /**< box_render_ripple_source_t of those fields */
     ecs_vec_t ripple_flows; /**< box_render_ripple_flow_t of those fields */
+    ecs_vec_t water_spectra; /**< box_render_water_spectrum_t, the spectra of WaterSpectrum,
+                             *   evolved before the targets */
     ecs_vec_t impostor_blits; /**< box_render_impostor_blit_t, the impostor frames copied into
                              *   their atlases after the targets rendered */
     ecs_vec_t impostor_reads; /**< box_render_impostor_read_t, impostor atlases written to PNG

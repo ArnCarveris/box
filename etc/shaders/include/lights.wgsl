@@ -86,6 +86,15 @@ struct View {
     ripple_a: vec4f,
     ripple_b: vec4f,
     ripple_c: vec4u,
+    // The spectrum of WaterSpectrum of the scene of the view (gpu_spectrum.c), see
+    // mesh_extended.wgsl: the world XZ offset fragments add to their world XZ to sample its tiles
+    // (spectrum_a.xy), the weight of the normal map over it (spectrum_a.z), the scale that brings
+    // its heights to about -1..1 (spectrum_a.w), one over the world units of the tile of each
+    // cascade (spectrum_b.xyz) and the cascades (spectrum_c.x), 0 for a view without one, whose
+    // fragments never sample it
+    spectrum_a: vec4f,
+    spectrum_b: vec4f,
+    spectrum_c: vec4u,
     // The absolute position of the local origin (WorldOrigin) as box_gpu_origin_split packs it:
     // its whole world units (xyz) and the rest of a unit of each (w), see world_origin.wgsl
     origin: vec4i,

@@ -1167,7 +1167,9 @@ const flecs = {
               return adapter.requestDevice({
                 requiredFeatures: features,
                 requiredLimits: {
-                  maxTextureArrayLayers: adapter.limits.maxTextureArrayLayers
+                  maxTextureArrayLayers: adapter.limits.maxTextureArrayLayers,
+                  maxSampledTexturesPerShaderStage:
+                    adapter.limits.maxSampledTexturesPerShaderStage
                 }
               });
             }).then(function(device) {

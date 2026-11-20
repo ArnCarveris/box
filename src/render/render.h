@@ -967,6 +967,115 @@ bool box_render_ripples_velocity(
     ecs_entity_t source,
     float *out);
 
+/** Register the system that appends the spectra of WaterSpectrum on the main thread: the
+ * parameters of the spectrum of each scene, the time wrapped to its period and its water frame,
+ * appended to the packet for the backend (gpu_spectrum.c), after the views.
+ *
+ * @param world The world
+ */
+void box_render_water_spectrum_init(
+    ecs_world_t *world);
+
+/** Get the texels per side of a cascade of a WaterSpectrum: the nearest power of two (a tie
+ * rounds up) in BOX_MATERIAL_SPECTRUM_RESOLUTION_MIN..BOX_MATERIAL_SPECTRUM_RESOLUTION_MAX.
+ *
+ * @param resolution WaterSpectrum.resolution
+ * @return The texels per side
+ */
+int32_t box_render_spectrum_resolution(
+    int32_t resolution);
+
+/** Get the cascades of a WaterSpectrum, clamped to 1..BOX_RENDER_SPECTRUM_CASCADES.
+ *
+ * @param cascades WaterSpectrum.cascades
+ * @return The cascades
+ */
+int32_t box_render_spectrum_cascades(
+    int32_t cascades);
+
+/** Wrap a render time to 0..BOX_RENDER_SPECTRUM_PERIOD in double precision, the time the
+ * spectrum of a WaterSpectrum evolves to: as its angular frequencies are multiples of 2 pi over
+ * the period, the waves are the same at a time and at the time plus the period.
+ *
+ * @param time Total render time in seconds
+ * @return The wrapped time, 0 when not finite
+ */
+double box_render_spectrum_time(
+    double time);
+
+/** Fill the parameters of the initial spectrum of a record from a WaterSpectrum: the validated
+ * resolution, cascades, tiles, cuts, wind, directionality, amplitude, seed and detail. The
+ * entities, revision, time, offset and height scale are left alone.
+ *
+ * @param spectrum The component
+ * @param out The record
+ */
+void box_render_spectrum_params(
+    const WaterSpectrum *spectrum,
+    box_render_water_spectrum_t *out);
+
+/** Check whether two records have the same initial spectrum, so the backend keeps it.
+ *
+ * @param a The first record
+ * @param b The second record
+ * @return Whether their resolution, cascades, tiles, cuts, wind, directionality, amplitude and
+ * seed are the same
+ */
+bool box_render_spectrum_same(
+    const box_render_water_spectrum_t *a,
+    const box_render_water_spectrum_t *b);
+
+/** Get the angular frequency of a wave of a WaterSpectrum: the deep water dispersion
+ * sqrt(g k) rounded down to a multiple of 2 pi / BOX_RENDER_SPECTRUM_PERIOD, as evolved
+ * computes it in water_spectrum.wgsl.
+ *
+ * @param k Wave number, radians per world unit
+ * @return Radians per second
+ */
+double box_render_spectrum_omega(
+    double k);
+
+/** Get the directional wave spectrum of a record at a wave vector, the variance of the height
+ * per unit area of wave vectors (JONSWAP of a fully developed sea for the wind speed, spread by
+ * the directionality, damped below BOX_RENDER_SPECTRUM_SHORTEST, times the square of the
+ * amplitude), the C twin of spectrum_density of water_spectrum.wgsl.
+ *
+ * @param s The record
+ * @param kx Wave vector X, radians per world unit
+ * @param kz Wave vector Z, radians per world unit
+ * @return The density, 0 for the zero wave vector or no wind
+ */
+double box_render_spectrum_density(
+    const box_render_water_spectrum_t *s,
+    double kx,
+    double kz);
+
+/** Get the expected variance of the height, or of the slope along X plus that along Z, of a
+ * cascade of a record: the sum of the density over the wave vectors of its grid between its
+ * cuts, times the area of a cell of the grid (times k^2 for the slopes).
+ *
+ * @param s The record
+ * @param cascade The cascade
+ * @param slope Whether to get the slope variance instead of the height variance
+ * @return The variance, 0 for a cascade the record lacks
+ */
+double box_render_spectrum_variance(
+    const box_render_water_spectrum_t *s,
+    int32_t cascade,
+    bool slope);
+
+/** Get the revision of the spectrum of a WaterSpectrum the last extract appended, for tests.
+ *
+ * @param world The world
+ * @param water The entity that owns the WaterSpectrum
+ * @param out Receives the revision
+ * @return Whether the extract knows the spectrum
+ */
+bool box_render_spectrum_revision(
+    const ecs_world_t *world,
+    ecs_entity_t water,
+    uint32_t *out);
+
 /** Get the instance of the shape of an entity in the instance pages.
  *
  * @param world The world

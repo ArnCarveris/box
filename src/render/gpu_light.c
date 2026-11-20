@@ -857,6 +857,7 @@ WGPUBindGroup box_gpu_light_group_with(
     box_gpu_environment_bindings(gpu, t ? v : NULL, &entries[12]);
     box_gpu_planet_lights_bindings(gpu, &entries[BOX_GPU_PLANET_LIGHTS_BINDING]);
     box_gpu_ripples_bindings(gpu, v, entries);
+    box_gpu_spectra_bindings(gpu, v, entries);
     WGPUBindGroupDescriptor desc = {
         .layout = gpu->view_layout,
         .entryCount = BOX_GPU_VIEW_BINDINGS,
