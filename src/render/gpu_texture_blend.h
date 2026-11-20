@@ -21,11 +21,16 @@
 #define BOX_GPU_BLEND_UNIFORMS (9)
 #define BOX_GPU_BLEND_HEIGHTS (10)
 
+/** Binding of the bake atlas of the grid mesh of a terrain blend (terrain_bake of
+ * mesh_blend.wgsl), a one texel placeholder for the other blends */
+#define BOX_GPU_BLEND_BAKE (18)
+
 /** Entries of the blend group that box_gpu_texture_init makes blend_layout of.
  *
- * The fragment stage of fs_blend samples 15 of the 16 textures WebGPU guarantees: 9 of the view
- * group (gpu_draw.c), the emissive layer, the 4 arrays and the mask. */
-#define BOX_GPU_BLEND_ENTRIES (9)
+ * The fragment stage of fs_blend samples 16 textures: 9 of the view group (gpu_draw.c), the
+ * emissive layer, the 4 arrays, the mask and the bake atlas, which the device allows as it
+ * requests the sampled textures the adapter offers. */
+#define BOX_GPU_BLEND_ENTRIES (10)
 
 /** BlendUniforms flag: the mask is loaded, else layer 0 shows alone */
 #define BOX_GPU_BLEND_MASKED (1u)
@@ -53,6 +58,9 @@ typedef struct box_gpu_blend_uniforms_t {
     float contrast;     /**< TextureBlend.contrast, 0 samples no heights */
     uint32_t terrain;   /**< BOX_GPU_BLEND_TERRAIN: texels along an edge of the masks of a tile
                          *   | cells across the mask atlas << 16, else 0 */
+    uint32_t bake;      /**< BOX_GPU_BLEND_TERRAIN: texels along an edge of the bake of a tile
+                         *   | cells across the bake atlas << 16, 0 without a bake atlas */
+    uint32_t pad[3];    /**< Zero */
 } box_gpu_blend_uniforms_t;
 
 /** Queue the textures a new bind group binds in a color layer whose levels average stored values.

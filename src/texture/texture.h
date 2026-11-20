@@ -197,6 +197,8 @@ typedef struct box_textures_t {
     ecs_map_t readbacks;        /**< Entity to box_texture_readback_t*, the CPU copies of the
                                  *   textures with a TextureReadback */
     uint32_t readback_ticket;   /**< Number of the next readback of a copy */
+    ecs_map_t reach;            /**< Entity to the number of graphs whose last build reached it,
+                                 *   so a change of an entity no graph reached touches none */
 } box_textures_t;
 
 /** Singleton that holds the registry of a world */
@@ -538,9 +540,11 @@ void box_texture_graphs_fini(
 
 /** Free the compiled graph and the reached entities of a registry entry.
  *
+ * @param t The registry
  * @param tex The entry
  */
 void box_texture_graph_clear(
+    box_textures_t *t,
     box_texture_t *tex);
 
 /** Mark every graph dirty that reached an entity in its last build, such as a node or a

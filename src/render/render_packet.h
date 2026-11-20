@@ -2178,6 +2178,38 @@ typedef struct box_render_terrain_height_t {
                              *   at every second texel, 0 for none */
 } box_render_terrain_height_t;
 
+/** A tile of a Terrain whose material the backend bakes into the bake atlas of its grid mesh:
+ * the albedo, normal, roughness, metallic and occlusion of its TextureBlend and TextureLayers,
+ * with the light of the sun that the heights of the terrain let through and their ambient
+ * occlusion, in a cell of the tile and a cell of half its texels for the next coarser level.
+ *
+ * The backend bakes a tile when its heights or masks, its material or the sun changed since it
+ * baked it, after the heights are copied and before the views render, by drawing the tile with
+ * the bake entry points of the forward pipeline of its batch.
+ */
+typedef struct box_render_terrain_bake_t {
+    uint32_t mesh;          /**< Handle of the grid mesh of the tile */
+    uint32_t slot;          /**< Slot of the tile: its heights, masks and bake cell */
+    int32_t batch;          /**< Index of the batch record of the tile in the packet */
+    uint32_t instance;      /**< Slot of the tile in the instance page of the batch */
+    int32_t index;          /**< Index of the terrain index of its terrain in terrain_indices */
+    int32_t level;          /**< Level of detail of the tile */
+    int32_t ix;             /**< Column of the tile in the grid of its level */
+    int32_t iz;             /**< Row of the tile in the grid of its level */
+} box_render_terrain_bake_t;
+
+/** The tiles of a Terrain that draw, which a bake reads the heights of beyond its own tile.
+ *
+ * The records are uint32_t in the packet data: the levels, the edge of a tile of level 0 in
+ * meters (f32 bits) and two zero words; then per level the column and row of its first cell
+ * (i32), its columns | rows << 16 and the word offset of its cells from the first record; then
+ * the cells, the slot of the tile plus one, 0 where no tile of the level draws. */
+typedef struct box_render_terrain_index_t {
+    ecs_entity_t terrain;   /**< The terrain entity */
+    uint32_t data;          /**< Offset of the records in the packet data */
+    uint32_t count;         /**< uint32_t of the records */
+} box_render_terrain_index_t;
+
 /** Description of a BOX_RENDER_SHADER create or update, followed by its code and its label.
  *
  * The preprocessed WGSL code and the label each end with a terminator that their size counts.
@@ -2591,6 +2623,9 @@ typedef struct box_render_packet_t {
                              *   files after the blits */
     ecs_vec_t terrain_heights; /**< box_render_terrain_height_t, the heights of the terrain
                              *   tiles that draw, copied after the texture graphs evaluated */
+    ecs_vec_t terrain_bakes; /**< box_render_terrain_bake_t, the terrain tiles that draw with
+                             *   a bake atlas */
+    ecs_vec_t terrain_indices; /**< box_render_terrain_index_t of their terrains */
     ecs_vec_t debug_boxes;  /**< box_render_debug_box_t, the boxes of the spatial index trees
                              *   of the views */
     ecs_vec_t debug_poses;  /**< mat4, the matrices that place the boxes of the views */

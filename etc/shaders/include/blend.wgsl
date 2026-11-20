@@ -10,13 +10,18 @@
 // The TextureTransform of each layer (scale in xy, offset in zw), the slices of the arrays, the
 // BLEND_MASKED, BLEND_SINGLE, BLEND_HEIGHT, BLEND_TILES and BLEND_TERRAIN flags, the contrast of
 // the height based transitions, 0 for the linear blend, and of a BLEND_TERRAIN blend with a mask
-// atlas the texels along an edge of the masks of a tile | the cells across the atlas << 16.
+// atlas the texels along an edge of the masks of a tile | the cells across the atlas << 16, and
+// the same of its bake atlas, 0 without one.
 struct BlendUniforms {
     transforms: array<vec4f, 4>,
     count: u32,
     flags: u32,
     contrast: f32,
     terrain: u32,
+    bake: u32,
+    pad0: u32,
+    pad1: u32,
+    pad2: u32,
 };
 
 // The mask is loaded; without it layer 0 shows alone.

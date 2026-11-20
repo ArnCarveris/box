@@ -470,7 +470,36 @@ typedef struct box_gpu_mesh_t {
     WGPUTextureFormat terrain_mask_format; /**< Format of the atlas, that of the masks */
     uint32_t terrain_mask_version;  /**< Texture serial taken when the atlas is made again, so
                                      *   the blend groups that bound it bind the new one */
+    WGPUTexture terrain_bake;       /**< Grid mesh of terrain tiles with masks: the bake atlas,
+                                     *   BOX_GPU_TERRAIN_BAKE_LAYERS layers, a cell per slot
+                                     *   (box_render_terrain_bake_t), NULL until a tile bakes */
+    WGPUTextureView terrain_bake_view; /**< Array view of the bake atlas */
+    struct box_gpu_terrain_bake_key_t *terrain_bake_keys; /**< What each cell was baked from,
+                                     *   one per slot */
+    uint32_t terrain_bake_texels;   /**< Texels along an edge of the bake of a tile, the height
+                                     *   of a cell; the coarse bake right of it has half as many
+                                     *   intervals */
+    uint32_t terrain_bake_columns;  /**< Cells across the bake atlas */
+    uint32_t terrain_bake_rows;     /**< Cells down the bake atlas */
+    uint32_t terrain_bake_version;  /**< Texture serial taken when the bake atlas is made again,
+                                     *   so the blend groups that bound it bind the new one */
 } box_gpu_mesh_t;
+
+/** Layers of the bake atlas of a terrain grid mesh: the albedo with the occlusion, the normal
+ * with the roughness and metallic, and the sun and the ambient occlusion of the heights */
+#define BOX_GPU_TERRAIN_BAKE_LAYERS (3)
+
+/** Format of the layers of the bake atlas of a terrain grid mesh */
+#define BOX_GPU_TERRAIN_BAKE_FORMAT (WGPUTextureFormat_RGBA8Unorm)
+
+/** What a cell of the bake atlas of a terrain grid mesh was baked from */
+typedef struct box_gpu_terrain_bake_key_t {
+    uint32_t serials[4];            /**< Serials of the heights, the rough heights, the masks
+                                     *   and the coarse masks copied into the slot */
+    uint64_t material;              /**< Hash of the material group and the layer values */
+    uint32_t sun;                   /**< Quantized direction of the sun, 0 for none */
+    uint32_t baked;                 /**< 1 once the cell holds a bake */
+} box_gpu_terrain_bake_key_t;
 
 /** Frames the CPU may submit before it waits for the GPU to finish the oldest */
 #define BOX_GPU_FRAMES_IN_FLIGHT (2)
@@ -556,6 +585,7 @@ typedef struct box_gpu_blend_group_t {
     uint32_t versions[BOX_RENDER_BLEND_SOURCES]; /**< Versions of the arrays it binds */
     uint32_t mask_serial;           /**< Serial of the image of the mask it binds */
     uint32_t emissive_serial;       /**< Serial of the image of the emissive layer it binds */
+    uint32_t bake_serial;           /**< Version of the bake atlas of a terrain blend it binds */
     WGPUBuffer uniforms;            /**< BlendUniforms of mesh.wgsl */
     WGPUBindGroup group;            /**< The bind group, NULL until made */
     int64_t used;                   /**< Frame of the last packet that drew with it */
@@ -1407,6 +1437,27 @@ typedef struct box_gpu_t {
     WGPUPipelineLayout layer_mesh_layout; /**< mesh_layout with layer_layout */
     WGPUPipelineLayout blend_layer_mesh_layout; /**< mesh_layout with blend_layer_layout */
     WGPUBuffer layer_none;          /**< Zero TextureLayer of the slots without a layer */
+    WGPUBindGroupLayout terrain_bake_layout; /**< Group 3 of the terrain bake pipelines: the
+                                     *   terrain indices and the parameters of a bake, made on
+                                     *   first use */
+    WGPUPipelineLayout terrain_bake_layouts[2]; /**< Pipeline layouts of the terrain bakes of
+                                     *   the blend and the blend layers variants */
+    WGPUBuffer terrain_bake_params; /**< Parameters of the bakes of a packet, one per draw at
+                                     *   a dynamic offset */
+    uint64_t terrain_bake_params_size; /**< Bytes of terrain_bake_params */
+    WGPUBuffer terrain_bake_index;  /**< Terrain indices of the bakes of a packet */
+    uint64_t terrain_bake_index_size; /**< Bytes of terrain_bake_index */
+    WGPUBuffer terrain_bake_slots;  /**< Instance slots of the bakes of a packet */
+    uint64_t terrain_bake_slots_size; /**< Bytes of terrain_bake_slots */
+    WGPUTexture terrain_bake_scratch; /**< Image the bakes of a packet render into before
+                                     *   they are copied into the bake atlases, which the
+                                     *   material groups of the bakes sample */
+    WGPUTextureView terrain_bake_scratch_layers[3]; /**< View of each layer of the scratch */
+    uint32_t terrain_bake_scratch_texels; /**< Texels of the bakes of a cell of the scratch */
+    uint32_t terrain_bake_scratch_columns; /**< Cells across the scratch */
+    WGPUTexture terrain_bake_empty; /**< One texel array the terrain blends without a bake
+                                     *   atlas bind */
+    WGPUTextureView terrain_bake_empty_view; /**< Array view of terrain_bake_empty */
     box_gpu_layer_buffer_t *layer_buffers; /**< Buffers of the layer entities */
     box_gpu_layer_group_t *layer_groups; /**< Bind groups of the TextureLayers batches */
     uint64_t blend_bytes;           /**< Bytes of the blend arrays */

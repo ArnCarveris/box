@@ -118,39 +118,50 @@ fn layer_tap(maps: texture_2d_array<f32>, slice: u32, uv: vec2f, gx: vec2f, gy: 
 }
 
 // The maps of a layer at one set of UVs and gradients, weighted by w; the normal map is turned
-// into the world by tangent and bitangent around n.
-fn layer_taps(maps: texture_2d_array<f32>, first: u32, flags: u32, uv: vec2f, gx: vec2f,
-    gy: vec2f, tangent: vec3f, bitangent: vec3f, n: vec3f, w: f32, o: ptr<function, LayerSample>)
+// into the world by tangent and bitangent around n. Only the maps of want (LAYER_HAS_* bits)
+// are read, the others keep their sums.
+fn layer_taps(maps: texture_2d_array<f32>, first: u32, flags: u32, want: u32, uv: vec2f,
+    gx: vec2f, gy: vec2f, tangent: vec3f, bitangent: vec3f, n: vec3f, w: f32,
+    o: ptr<function, LayerSample>)
 {
-    if ((flags & LAYER_HAS_ALBEDO) != 0u) {
-        (*o).albedo += w * material_linear(layer_tap(maps, first, uv, gx, gy).rgb);
-    } else {
-        (*o).albedo += vec3f(w);
+    if ((want & LAYER_HAS_ALBEDO) != 0u) {
+        if ((flags & LAYER_HAS_ALBEDO) != 0u) {
+            (*o).albedo += w * material_linear(layer_tap(maps, first, uv, gx, gy).rgb);
+        } else {
+            (*o).albedo += vec3f(w);
+        }
     }
-    if ((flags & LAYER_HAS_ORM) != 0u) {
-        (*o).orm += w * layer_tap(maps, first + 1u, uv, gx, gy).rgb;
-    } else {
-        (*o).orm += vec3f(w);
+    if ((want & LAYER_HAS_ORM) != 0u) {
+        if ((flags & LAYER_HAS_ORM) != 0u) {
+            (*o).orm += w * layer_tap(maps, first + 1u, uv, gx, gy).rgb;
+        } else {
+            (*o).orm += vec3f(w);
+        }
     }
-    if ((flags & LAYER_HAS_NORMAL) != 0u) {
-        let m = layer_tap(maps, first + 2u, uv, gx, gy).xyz * 2.0 - 1.0;
-        (*o).normal += w * (tangent * m.x + bitangent * m.y + n * m.z);
-    } else {
-        (*o).normal += w * n;
+    if ((want & LAYER_HAS_NORMAL) != 0u) {
+        if ((flags & LAYER_HAS_NORMAL) != 0u) {
+            let m = layer_tap(maps, first + 2u, uv, gx, gy).xyz * 2.0 - 1.0;
+            (*o).normal += w * (tangent * m.x + bitangent * m.y + n * m.z);
+        } else {
+            (*o).normal += w * n;
+        }
     }
-    if ((flags & LAYER_HAS_MASK) != 0u) {
-        (*o).mask += w * layer_tap(maps, first + 3u, uv, gx, gy).r;
-    } else {
-        (*o).mask += w;
+    if ((want & LAYER_HAS_MASK) != 0u) {
+        if ((flags & LAYER_HAS_MASK) != 0u) {
+            (*o).mask += w * layer_tap(maps, first + 3u, uv, gx, gy).r;
+        } else {
+            (*o).mask += w;
+        }
     }
 }
 
 // Sample the maps of a layer with its mapping: the UVs of the mesh with LAYER_UV, else the world
 // position projected on the plane of the dominant axis of the geometric normal (the faces of a
 // Box), the three projections blended above a blend of 0. dx and dy are the screen derivatives
-// of the world position, uv and the gradients those of the mesh UVs.
+// of the world position, uv and the gradients those of the mesh UVs. want selects the maps read
+// (LAYER_HAS_* bits).
 fn layer_sample(maps: texture_2d_array<f32>, first: u32, l: TextureLayer, f: VertexOut,
-    s: LayerSurface, dx: vec3f, dy: vec3f, ux: vec2f, uy: vec2f) -> LayerSample {
+    s: LayerSurface, dx: vec3f, dy: vec3f, ux: vec2f, uy: vec2f, want: u32) -> LayerSample {
     var o: LayerSample;
     o.albedo = vec3f(0.0);
     o.orm = vec3f(0.0);
@@ -163,8 +174,8 @@ fn layer_sample(maps: texture_2d_array<f32>, first: u32, l: TextureLayer, f: Ver
         let frame = cotangent_frame_grad(n, dx, dy, ux * t.xy, uy * t.xy);
         let tangent = select(frame.tangent, layer_along(vec3f(1.0, 0.0, 0.0), n), frame.degenerate);
         let bitangent = select(frame.bitangent, cross(n, tangent), frame.degenerate);
-        layer_taps(maps, first, flags, f.uv.xy * t.xy + t.zw, ux * t.xy, uy * t.xy, tangent,
-            bitangent, n, 1.0, &o);
+        layer_taps(maps, first, flags, want, f.uv.xy * t.xy + t.zw, ux * t.xy, uy * t.xy,
+            tangent, bitangent, n, 1.0, &o);
     } else {
         let size = max(l.material.z, 1e-6);
         let p = f.world / size;
@@ -187,8 +198,8 @@ fn layer_sample(maps: texture_2d_array<f32>, first: u32, l: TextureLayer, f: Ver
             }
             let tangent = layer_along(mapping_tangent(k, sg), n);
             let bitangent = layer_along(mapping_bitangent(k), n);
-            layer_taps(maps, first, flags, planes[k] + t.zw, gx[k] * t.xy, gy[k] * t.xy,
-                tangent, bitangent, n, w[k], &o);
+            layer_taps(maps, first, flags, want, planes[k] + t.zw, gx[k] * t.xy,
+                gy[k] * t.xy, tangent, bitangent, n, w[k], &o);
         }
     }
     o.albedo *= l.color.rgb;
@@ -275,11 +286,18 @@ fn apply_layers(maps: texture_2d_array<f32>, first: u32, f: VertexOut, surface: 
         if (l.color.a <= 0.0) {
             continue;
         }
-        let m = layer_sample(maps, first + k * LAYER_MAPS, l, f, s, dx, dy, ux, uy);
-        let covered = layer_coverage(l, s, m.mask, layer_altitude(l, f.world.y));
+        let altitude = layer_altitude(l, f.world.y);
+        if (layer_coverage(l, s, 1.0, altitude) <= 0.0) {
+            continue;
+        }
+        let slice = first + k * LAYER_MAPS;
+        let masked = layer_sample(maps, slice, l, f, s, dx, dy, ux, uy, LAYER_HAS_MASK);
+        let covered = layer_coverage(l, s, masked.mask, altitude);
         if (covered <= 0.0) {
             continue;
         }
+        let m = layer_sample(maps, slice, l, f, s, dx, dy, ux, uy,
+            LAYER_HAS_ALBEDO | LAYER_HAS_ORM | LAYER_HAS_NORMAL);
         let porous = (1.0 - s.metallic) * s.roughness;
         let soaked = covered * mix(1.0, porous, l.coverage.w);
         s.albedo = max(layer_blend3(l.modes.x, s.albedo, m.albedo, soaked), vec3f(0.0));

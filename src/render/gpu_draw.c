@@ -134,6 +134,7 @@ static void box_gpu_mesh_free(
         wgpuTextureRelease(m->terrain_masks);
     }
 
+    box_gpu_terrain_bake_free(m);
     if (m->buffer) {
         box_gpu_mesh_pool_free(gpu, m->page, m->offset, m->alloc_size);
     }
@@ -591,6 +592,7 @@ void box_gpu_draw_fini(
     box_gpu_planets_fini(gpu);
     box_gpu_debug_fini(gpu);
     box_gpu_planar_fini(gpu);
+    box_gpu_terrain_fini(gpu);
     if (gpu->view_buffer) {
         wgpuBufferRelease(gpu->view_buffer);
         gpu->view_buffer = NULL;
@@ -1778,6 +1780,7 @@ void box_gpu_draw_views(
             box_gpu_transmission_begin(gpu, t, packet, slot, source,
                 hdr ? BOX_GPU_HDR_FORMAT : t->format);
         WGPUBindGroup group = box_gpu_light_group(gpu, t, v, slot, ao, snapshot);
+        box_gpu_terrain_bake(gpu, encoder, packet, v, group, slot);
         box_gpu_fog_volumes_inject(gpu, t, encoder, packet, v, group, slot);
         if (prepasses) {
             box_gpu_draw_prepass(gpu, t, encoder, packet, v, group, slot, false);

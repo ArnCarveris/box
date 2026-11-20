@@ -13,6 +13,14 @@
 @group(1) @binding(9) var<uniform> blending: BlendUniforms;
 @group(1) @binding(10) var blend_heights: texture_2d_array<f32>;
 
+// The bake atlas of the grid mesh of a terrain blend (gpu_terrain.c), blending.bake describing
+// it: layer 0 the square root of the albedo and the occlusion (0 for a cell not baked), layer 1
+// x and z of the normal as n * 0.5 + 0.5, the roughness and the metallic, layer 2 the light of
+// the sun the heights let through and their ambient occlusion. The cell of slot s is s %
+// columns across and s / columns down, the bake of the tile at its left and the bake of the next
+// coarser level, half the intervals, right of it. A one texel array for the other blends.
+@group(1) @binding(18) var terrain_bake: texture_2d_array<f32>;
+
 // Depth prepass of a lit view (box_gpu_draw_prepass_draws). fs_depth_cutout_blend discards what
 // fs_blend_cutout discards; the forward pass after the prepass does not alpha test, its Equal
 // depth test rejects those.
@@ -166,6 +174,99 @@ fn terrain_mask(f: VertexOut) -> vec4f {
     let d = length(uv - vec2f(0.5) - focus);
     let k = clamp((d - morph.x) / max(morph.y - morph.x, 1e-4), 0.0, 1.0);
     return mix(fine, coarse, k);
+}
+
+// Bake texels per pixel below which a terrain fragment shades its material in full, and above
+// which it takes its bake alone; it fades between them.
+const TERRAIN_BAKE_NEAR: f32 = 0.7;
+const TERRAIN_BAKE_FAR: f32 = 1.4;
+
+// Up component of the normal below which a terrain fragment takes none of the light of its bake,
+// which the bake spreads top down over a steep face, and above which it takes all of it.
+const TERRAIN_BAKE_STEEP: f32 = 0.35;
+const TERRAIN_BAKE_FLAT: f32 = 0.6;
+
+// The material of a terrain fragment from its bake (terrain_bake_material).
+struct TerrainBaked {
+    albedo: vec3f,
+    occlusion: f32,
+    normal: vec3f,
+    roughness: f32,
+    metallic: f32,
+};
+
+// Where a fragment of a terrain tile reads its bake: the uv of its texel in the cell of its tile,
+// in the cell of the next coarser level, and the fade between them as terrain_mask fades the
+// masks.
+struct TerrainBakeAt {
+    fine: vec2f,
+    coarse: vec2f,
+    morph: f32,
+};
+
+fn terrain_bake_at(f: VertexOut) -> TerrainBakeAt {
+    let uv = clamp(f.uv.xy, vec2f(0.0), vec2f(1.0));
+    let texels = f32(blending.bake & 0xFFFFu);
+    let columns = max(blending.bake >> 16u, 1u);
+    let coarse = floor((texels + 1.0) * 0.5);
+    let slot = f.flat4.x;
+    let origin = vec2f(f32(slot % columns) * (texels + coarse), f32(slot / columns) * texels);
+    let dims = vec2f(textureDimensions(terrain_bake));
+    let focus = unpack2x16float(f.flat4.y);
+    let morph = unpack2x16float(f.flat4.z);
+    let d = length(uv - vec2f(0.5) - focus);
+    return TerrainBakeAt((origin + vec2f(0.5) + uv * (texels - 1.0)) / dims,
+        (origin + vec2f(texels + 0.5, 0.5) + uv * (coarse - 1.0)) / dims,
+        clamp((d - morph.x) / max(morph.y - morph.x, 1e-4), 0.0, 1.0));
+}
+
+// A layer of the bake of a terrain fragment.
+fn terrain_bake_layer(at: TerrainBakeAt, layer: u32) -> vec4f {
+    var v = textureSampleLevel(terrain_bake, material_sampler, at.fine, layer, 0.0);
+    if (at.morph > 0.0) {
+        let c = textureSampleLevel(terrain_bake, material_sampler, at.coarse, layer, 0.0);
+        v = select(mix(v, c, at.morph), vec4f(0.0), layer == 2u && c.a == 0.0);
+    }
+    return v;
+}
+
+// Whether a fragment belongs to a terrain blend with a bake atlas.
+fn terrain_baking() -> bool {
+    return (blending.flags & (BLEND_TERRAIN | BLEND_MASKED)) == (BLEND_TERRAIN | BLEND_MASKED) &&
+        blending.bake != 0u;
+}
+
+// How far the bake of a fragment of a terrain tile stands in for its material, by the texels of
+// the bake a pixel covers: from the coarse derivatives of its grid uv, so a quad takes one side,
+// and their determinant, so a steep face whose pixels cover few texels shades in full. 0 without
+// a bake atlas.
+@diagnostic(off, derivative_uniformity)
+fn terrain_bake_far(f: VertexOut) -> f32 {
+    let texels = f32(blending.bake & 0xFFFFu);
+    let jx = dpdxCoarse(f.uv.xy);
+    let jy = dpdyCoarse(f.uv.xy);
+    let reach = sqrt(abs(jx.x * jy.y - jx.y * jy.x)) * max(texels - 1.0, 1.0);
+    return select(0.0, smoothstep(TERRAIN_BAKE_NEAR, TERRAIN_BAKE_FAR, reach), terrain_baking());
+}
+
+// The light of the bake of a fragment of a terrain tile: x the light of the sun its heights let
+// through, y their ambient occlusion and w 1 where the bake exists; (1, 1, 0, 0) without one.
+fn terrain_bake_light(f: VertexOut) -> vec4f {
+    if (!terrain_baking()) {
+        return vec4f(1.0, 1.0, 0.0, 0.0);
+    }
+    let c = terrain_bake_layer(terrain_bake_at(f), 2u);
+    return select(vec4f(c.r, c.g, 0.0, 1.0), vec4f(1.0, 1.0, 0.0, 0.0), c.a == 0.0);
+}
+
+// The material of the bake of a fragment of a terrain tile with one (terrain_bake_light).
+fn terrain_bake_material(f: VertexOut) -> TerrainBaked {
+    let at = terrain_bake_at(f);
+    let a = terrain_bake_layer(at, 0u);
+    let b = terrain_bake_layer(at, 1u);
+    let nxz = b.rg * 2.0 - 1.0;
+    return TerrainBaked(a.rgb * a.rgb, a.a,
+        normalize(vec3f(nxz.x, sqrt(max(1.0 - dot(nxz, nxz), 0.0)), nxz.y)), b.b, b.a);
 }
 
 // The mapping offset of a fragment: its uv.xy, or for a terrain tile with masks (BLEND_TERRAIN),

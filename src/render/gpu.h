@@ -648,6 +648,21 @@ WGPUBindGroup box_gpu_forward_group(
     const box_render_packet_t *packet,
     const box_render_batch_t *b);
 
+/** Get a hash of what the material group of a TextureBlend batch shades with: its blend, the
+ * versions of its arrays, its emissive layer and sampler, and with TextureLayers its layers, the
+ * version of their array and their values. Unlike the group it does not change when an atlas
+ * of a terrain blend is made again.
+ *
+ * @param gpu The backend
+ * @param packet The packet of the batch
+ * @param b The batch
+ * @return The hash
+ */
+uint64_t box_gpu_forward_content(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet,
+    const box_render_batch_t *b);
+
 /** Get the pipeline layout of the layers variants of the mesh pipelines, made on first use.
  *
  * @param gpu The backend
@@ -946,6 +961,21 @@ WGPURenderPipeline box_gpu_forward_pipeline(
     const box_render_batch_t *b,
     bool equal);
 
+/** Get the pipeline that bakes the tiles of a terrain batch into the bake atlas of their grid
+ * mesh, created on first use in the forward cache: vs_terrain_bake and fs_terrain_bake of the
+ * module of the forward pipeline of the batch, into the BOX_GPU_TERRAIN_BAKE_LAYERS layers.
+ *
+ * @param gpu The backend
+ * @param b The batch, a TextureBlend batch of the extended mesh shader with surfaces
+ * @param layout The pipeline layout: the layout of the forward pipeline of the batch with the
+ * bake group in place of the volume group
+ * @return The pipeline, NULL for another batch or while it is created
+ */
+WGPURenderPipeline box_gpu_terrain_bake_pipeline(
+    box_gpu_t *gpu,
+    const box_render_batch_t *b,
+    WGPUPipelineLayout layout);
+
 /** Create the layouts the forward pass shares.
  *
  * Group 0 binds 12 sampled textures to the fragment stage, with the spectrum of the water
@@ -1099,6 +1129,54 @@ void box_gpu_copy(
 void box_gpu_terrain_heights(
     box_gpu_t *gpu,
     const box_render_packet_t *packet);
+
+/** Bake the material of the terrain tiles of a packet that changed into the bake atlases of
+ * their grid meshes (box_render_terrain_bake_t), once per packet, with the view group of the
+ * first view that draws their scene.
+ *
+ * @param gpu The backend
+ * @param encoder The encoder of the frame
+ * @param packet The packet
+ * @param v The view
+ * @param group The bind group of the view
+ * @param slot Slot of the view in the view buffer
+ */
+void box_gpu_terrain_bake(
+    box_gpu_t *gpu,
+    WGPUCommandEncoder encoder,
+    const box_render_packet_t *packet,
+    const box_render_view_t *v,
+    WGPUBindGroup group,
+    int32_t slot);
+
+/** Release the bake atlas of a terrain grid mesh.
+ *
+ * @param m The mesh
+ */
+void box_gpu_terrain_bake_free(
+    box_gpu_mesh_t *m);
+
+/** Release the layouts, buffers and placeholder of the terrain bakes.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_terrain_fini(
+    box_gpu_t *gpu);
+
+/** Get the bake atlas a terrain blend binds and its layout in the BlendUniforms: the view of
+ * the bake atlas of the grid mesh of the blend, else an empty one.
+ *
+ * @param gpu The backend
+ * @param blend The blend record
+ * @param layout Receives texels of a bake | cells across << 16, 0 without an atlas
+ * @param version Receives the version of the atlas, 0 without one
+ * @return The view
+ */
+WGPUTextureView box_gpu_terrain_bake_view(
+    box_gpu_t *gpu,
+    const box_render_texture_blend_t *blend,
+    uint32_t *layout,
+    uint32_t *version);
 
 /** Write the uploads of a packet into their buffers.
  *

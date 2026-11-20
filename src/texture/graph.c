@@ -122,9 +122,30 @@ static void box_texture_graph_free(
     }
 }
 
-void box_texture_graph_clear(
+/** Forget the entities the last build of a graph reached in the counts of the registry.
+ *
+ * @param t The registry
+ * @param tex The entry of the graph
+ */
+static void box_texture_reach_drop(
+    box_textures_t *t,
     box_texture_t *tex)
 {
+    const ecs_entity_t *reached = ecs_vec_first_t(&tex->reached, ecs_entity_t);
+    int32_t i, count = ecs_vec_count(&tex->reached);
+    for (i = 0; i < count; i ++) {
+        ecs_map_val_t *n = ecs_map_get(&t->reach, reached[i]);
+        if (n && !-- *n) {
+            ecs_map_remove(&t->reach, reached[i]);
+        }
+    }
+}
+
+void box_texture_graph_clear(
+    box_textures_t *t,
+    box_texture_t *tex)
+{
+    box_texture_reach_drop(t, tex);
     box_texture_graph_free(tex->graph);
     tex->graph = NULL;
     ecs_vec_fini_t(NULL, &tex->reached, ecs_entity_t);
@@ -150,6 +171,7 @@ void box_texture_graphs_fini(
     ecs_vec_fini_t(NULL, &t->graph_queued, ecs_entity_t);
     ecs_vec_fini_t(NULL, &t->graph_released, uint32_t);
     ecs_vec_fini_t(NULL, &t->reload, ecs_entity_t);
+    ecs_map_fini(&t->reach);
 }
 
 void box_texture_graph_request(
@@ -168,6 +190,10 @@ void box_texture_graphs_touch(
     ecs_entity_t e)
 {
     int32_t i;
+    if (e && !ecs_map_get(&t->reach, e)) {
+        goto done;
+    }
+
     ecs_map_iter_t it = ecs_map_iter(&t->textures);
     while (ecs_map_next(&it)) {
         box_texture_t *tex = ecs_map_ptr(&it);
@@ -185,6 +211,9 @@ void box_texture_graphs_touch(
             }
         }
     }
+
+done:
+    return;
 }
 
 /** Build again the graphs that reached a node whose node component was set or removed, also
@@ -501,6 +530,7 @@ static void box_texture_graph_reach(
 
     if (!found) {
         *ecs_vec_append_t(NULL, b->reached, ecs_entity_t) = e;
+        (*ecs_map_ensure(&b->t->reach, e)) ++;
     }
 }
 
@@ -1343,6 +1373,7 @@ static void box_texture_graph_build(
     ecs_vec_init_t(NULL, &b.nodes, box_texture_graph_node_t, 0);
     ecs_vec_init_t(NULL, &b.params, uint8_t, 0);
     ecs_vec_init_t(NULL, &b.textures, box_texture_graph_texture_t, 0);
+    box_texture_reach_drop(t, tex);
     ecs_vec_clear(&tex->reached);
     if (!graph->output) {
         box_texture_graph_error(&b, "no output node");
@@ -1446,6 +1477,7 @@ void box_texture_graphs_init(
     ecs_vec_init_t(NULL, &t->graph_queued, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &t->graph_released, uint32_t, 0);
     ecs_vec_init_t(NULL, &t->reload, ecs_entity_t, 0);
+    ecs_map_init(&t->reach, NULL);
     box_texture_nodes_register(world);
     ecs_system(world, {
         .entity = ecs_entity(world, {

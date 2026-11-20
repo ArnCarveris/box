@@ -37,6 +37,8 @@ void box_render_packet_init(
     ecs_vec_init_t(NULL, &p->impostor_blits, box_render_impostor_blit_t, 0);
     ecs_vec_init_t(NULL, &p->impostor_reads, box_render_impostor_read_t, 0);
     ecs_vec_init_t(NULL, &p->terrain_heights, box_render_terrain_height_t, 0);
+    ecs_vec_init_t(NULL, &p->terrain_bakes, box_render_terrain_bake_t, 0);
+    ecs_vec_init_t(NULL, &p->terrain_indices, box_render_terrain_index_t, 0);
     ecs_vec_init_t(NULL, &p->debug_boxes, box_render_debug_box_t, 0);
     ecs_vec_init_t(NULL, &p->debug_poses, mat4, 0);
     ecs_vec_init_t(NULL, &p->transitions, box_render_transition_record_t, 0);
@@ -73,6 +75,8 @@ void box_render_packet_fini(
     ecs_vec_fini_t(NULL, &p->impostor_blits, box_render_impostor_blit_t);
     ecs_vec_fini_t(NULL, &p->impostor_reads, box_render_impostor_read_t);
     ecs_vec_fini_t(NULL, &p->terrain_heights, box_render_terrain_height_t);
+    ecs_vec_fini_t(NULL, &p->terrain_bakes, box_render_terrain_bake_t);
+    ecs_vec_fini_t(NULL, &p->terrain_indices, box_render_terrain_index_t);
     ecs_vec_fini_t(NULL, &p->debug_boxes, box_render_debug_box_t);
     ecs_vec_fini_t(NULL, &p->debug_poses, mat4);
     ecs_vec_fini_t(NULL, &p->transitions, box_render_transition_record_t);
@@ -121,6 +125,8 @@ void box_render_packet_reset(
     ecs_vec_clear(&p->impostor_blits);
     ecs_vec_clear(&p->impostor_reads);
     ecs_vec_clear(&p->terrain_heights);
+    ecs_vec_clear(&p->terrain_bakes);
+    ecs_vec_clear(&p->terrain_indices);
     ecs_vec_clear(&p->debug_boxes);
     ecs_vec_clear(&p->debug_poses);
     ecs_vec_clear(&p->transitions);
@@ -218,6 +224,10 @@ void box_render_packet_copy(
         ECS_SIZEOF(box_render_impostor_read_t));
     box_render_vec_copy(&dst->terrain_heights, &src->terrain_heights,
         ECS_SIZEOF(box_render_terrain_height_t));
+    box_render_vec_copy(&dst->terrain_bakes, &src->terrain_bakes,
+        ECS_SIZEOF(box_render_terrain_bake_t));
+    box_render_vec_copy(&dst->terrain_indices, &src->terrain_indices,
+        ECS_SIZEOF(box_render_terrain_index_t));
     box_render_vec_copy(&dst->debug_boxes, &src->debug_boxes,
         ECS_SIZEOF(box_render_debug_box_t));
     box_render_vec_copy(&dst->debug_poses, &src->debug_poses, ECS_SIZEOF(mat4));

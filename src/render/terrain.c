@@ -45,6 +45,147 @@ static void BoxRenderExtractTerrain(
     }
 }
 
+/** Get the index of the tiles of a terrain in a packet, appended on first use: the tiles that
+ * draw by level (box_render_terrain_index_t).
+ *
+ * @param p The packet
+ * @param world The world
+ * @param terrain The terrain entity
+ * @return Index of the terrain index in terrain_indices, -1 without tiles
+ */
+static int32_t box_render_terrain_index(
+    box_render_packet_t *p,
+    const ecs_world_t *world,
+    ecs_entity_t terrain)
+{
+    const box_render_terrain_index_t *indices = ecs_vec_first(&p->terrain_indices);
+    int32_t i, count = ecs_vec_count(&p->terrain_indices), tiles = 0, levels = 0, result = -1;
+    int32_t lo[BOX_TERRAIN_LEVELS][2], hi[BOX_TERRAIN_LEVELS][2];
+    uint32_t words, offset = 0, cells = 0;
+    for (i = 0; i < count; i ++) {
+        if (indices[i].terrain == terrain) {
+            result = i;
+            goto done;
+        }
+    }
+
+    box_terrain_tile_t* const* list = box_terrain_tiles(world, terrain, &tiles);
+    const Terrain *t = ecs_get(world, terrain, Terrain);
+    if (!list || !t) {
+        goto done;
+    }
+
+    for (i = 0; i < tiles; i ++) {
+        const box_terrain_tile_t *tile = list[i];
+        int32_t l = tile->level;
+        if (!tile->drawn || l < 0 || l >= BOX_TERRAIN_LEVELS) {
+            continue;
+        }
+
+        if (l >= levels) {
+            int32_t k;
+            for (k = levels; k <= l; k ++) {
+                lo[k][0] = lo[k][1] = INT32_MAX;
+                hi[k][0] = hi[k][1] = INT32_MIN;
+            }
+
+            levels = l + 1;
+        }
+
+        lo[l][0] = tile->ix < lo[l][0] ? tile->ix : lo[l][0];
+        lo[l][1] = tile->iz < lo[l][1] ? tile->iz : lo[l][1];
+        hi[l][0] = tile->ix > hi[l][0] ? tile->ix : hi[l][0];
+        hi[l][1] = tile->iz > hi[l][1] ? tile->iz : hi[l][1];
+    }
+
+    if (!levels) {
+        goto done;
+    }
+
+    for (i = 0; i < levels; i ++) {
+        if (lo[i][0] > hi[i][0]) {
+            lo[i][0] = lo[i][1] = 0;
+            hi[i][0] = hi[i][1] = -1;
+        }
+
+        cells += (uint32_t)((hi[i][0] - lo[i][0] + 1) * (hi[i][1] - lo[i][1] + 1));
+    }
+
+    words = 4u + 4u * (uint32_t)levels + cells;
+    uint32_t *r = box_render_packet_reserve(p, words * (uint32_t)sizeof(uint32_t), &offset);
+    float size = isfinite(t->tile_size) && t->tile_size > 0.0f ? t->tile_size : 32.0f;
+    ecs_os_memset(r, 0, (ecs_size_t)(words * sizeof(uint32_t)));
+    r[0] = (uint32_t)levels;
+    ecs_os_memcpy(&r[1], &size, ECS_SIZEOF(float));
+    uint32_t at = 4u + 4u * (uint32_t)levels;
+    for (i = 0; i < levels; i ++) {
+        int32_t nx = hi[i][0] - lo[i][0] + 1, nz = hi[i][1] - lo[i][1] + 1;
+        r[4 + 4 * i] = (uint32_t)lo[i][0];
+        r[5 + 4 * i] = (uint32_t)lo[i][1];
+        r[6 + 4 * i] = (uint32_t)nx | ((uint32_t)nz << 16);
+        r[7 + 4 * i] = at;
+        at += (uint32_t)(nx * nz);
+    }
+
+    for (i = 0; i < tiles; i ++) {
+        const box_terrain_tile_t *tile = list[i];
+        int32_t l = tile->level;
+        if (!tile->drawn || l < 0 || l >= levels) {
+            continue;
+        }
+
+        int32_t nx = hi[l][0] - lo[l][0] + 1;
+        uint32_t cell = r[7 + 4 * l] +
+            (uint32_t)((tile->iz - lo[l][1]) * nx + (tile->ix - lo[l][0]));
+        r[cell] = (uint32_t)tile->slot + 1u;
+    }
+
+    result = count;
+    *ecs_vec_append_t(NULL, &p->terrain_indices, box_render_terrain_index_t) =
+        (box_render_terrain_index_t){ .terrain = terrain, .data = offset, .count = words };
+done:
+    return result;
+}
+
+/** Append a bake of every tile of a terrain batch that draws with masks, with the index of the
+ * tiles of its terrain.
+ *
+ * @param p The packet
+ * @param d The draw state
+ * @param b The batch of the tiles
+ */
+static void box_render_terrain_bakes(
+    box_render_packet_t *p,
+    box_render_draws_t *d,
+    const box_draw_batch_t *b)
+{
+    const ecs_entity_t *entities = ecs_vec_first(&b->entities);
+    int32_t count = ecs_vec_count(&b->entities), i;
+    for (i = 0; i < count; i ++) {
+        const TerrainTile *tile = ecs_get(d->world, entities[i], TerrainTile);
+        if (!tile || !tile->masked) {
+            continue;
+        }
+
+        int32_t index = box_render_terrain_index(p, d->world, tile->terrain);
+        if (index < 0) {
+            continue;
+        }
+
+        *ecs_vec_append_t(NULL, &p->terrain_bakes, box_render_terrain_bake_t) =
+            (box_render_terrain_bake_t){
+                .mesh = b->key.mesh,
+                .slot = (uint32_t)tile->slot,
+                .batch = b->record,
+                .instance = b->first + (uint32_t)i,
+                .index = index,
+                .level = tile->level,
+                .ix = tile->ix,
+                .iz = tile->iz
+            };
+    }
+}
+
 /** Order instances by their distance to the camera, nearest first, then by slot.
  *
  * @param a The first instance
@@ -75,9 +216,17 @@ void box_draws_send_nearest(
     const ecs_entity_t *entities = ecs_vec_first(&b->entities);
     int32_t count = ecs_vec_count(&b->transforms), i;
     uint32_t offset = 0;
-    if (count < 2 || !b->key.surface || b->key.mover || !ecs_id(TerrainTile) ||
+    if (!count || !b->key.surface || b->key.mover || !ecs_id(TerrainTile) ||
         !ecs_is_alive(d->world, entities[0]) || !ecs_has(d->world, entities[0], TerrainTile))
     {
+        goto done;
+    }
+
+    if (out->texture_blend) {
+        box_render_terrain_bakes(p, d, b);
+    }
+
+    if (count < 2) {
         goto done;
     }
 

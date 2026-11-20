@@ -20,27 +20,49 @@ struct TerrainVertex {
     normal: vec3f,
 };
 
-// Height of a texel of the heights of the tile of surface_data, clamped to the image. Its slot
-// holds the rows of the heights and after them the rows of the rough heights, the heights of the
-// next coarser level at every second texel.
-fn terrain_texel(x: i32, z: i32) -> f32 {
+// Morph factor a bake forces on the vertices of its tile (vs_terrain_bake), below 0 for the
+// morph of the distance to the focus.
+var<private> terrain_forced_morph: f32 = -1.0;
+
+// Grid steps a bake moves the vertices on the edges of its tile outward, so the texels on the
+// edges of its cell are inside the triangles (vs_terrain_bake).
+var<private> terrain_pad: f32 = 0.0;
+
+// Grid position of the vertex terrain_vertex placed last, in vertex steps from the first vertex.
+var<private> terrain_grid: vec2f = vec2f(0.0);
+
+// Height of a texel of the heights of the tile of a slot of the surface assets, clamped to the
+// image. The slot holds the rows of the heights and after them the rows of the rough heights, the
+// heights of the next coarser level at every second texel; every slot of the mesh has the rows
+// and texels of the tile of surface_data.
+fn terrain_slot_texel(slot: u32, x: i32, z: i32) -> f32 {
     let w = i32(surface_data.p[1].z);
     let row = u32(surface_data.p[1].y);
     let cx = u32(clamp(x, 0, w - 1));
     let cz = u32(clamp(z, 0, w - 1));
-    let i = u32(surface_data.p[1].x) * row * u32(w + (w + 1) / 2) + cz * row + cx;
+    let i = slot * row * u32(w + (w + 1) / 2) + cz * row + cx;
     return surface_assets[i >> 2u][i & 3u];
 }
 
-// Height of a texel of the rough heights of the tile of surface_data, clamped to the image.
-fn terrain_rough_texel(x: i32, z: i32) -> f32 {
+// Height of a texel of the rough heights of the tile of a slot, clamped to the image.
+fn terrain_slot_rough_texel(slot: u32, x: i32, z: i32) -> f32 {
     let w = i32(surface_data.p[1].z);
     let r = (w + 1) / 2;
     let row = u32(surface_data.p[1].y);
     let cx = u32(clamp(x, 0, r - 1));
     let cz = u32(clamp(z, 0, r - 1));
-    let i = u32(surface_data.p[1].x) * row * u32(w + r) + (u32(w) + cz) * row + cx;
+    let i = slot * row * u32(w + r) + (u32(w) + cz) * row + cx;
     return surface_assets[i >> 2u][i & 3u];
+}
+
+// Height of a texel of the heights of the tile of surface_data, clamped to the image.
+fn terrain_texel(x: i32, z: i32) -> f32 {
+    return terrain_slot_texel(u32(surface_data.p[1].x), x, z);
+}
+
+// Height of a texel of the rough heights of the tile of surface_data, clamped to the image.
+fn terrain_rough_texel(x: i32, z: i32) -> f32 {
+    return terrain_slot_rough_texel(u32(surface_data.p[1].x), x, z);
 }
 
 // Height at a position on the grid of the tile in vertex steps from its first vertex, bilinear
@@ -88,13 +110,19 @@ fn terrain_vertex(position: vec3f) -> TerrainVertex {
     let offset = (g / n - vec2f(0.5)) * size;
     let d = length(offset - surface_data.p[2].xy);
     let span = max(surface_data.p[2].w - surface_data.p[2].z, 1e-4);
-    let k = clamp((d - surface_data.p[2].z) / span, 0.0, 1.0);
+    var k = clamp((d - surface_data.p[2].z) / span, 0.0, 1.0);
+    if (terrain_forced_morph >= 0.0) {
+        k = terrain_forced_morph;
+    }
     var m = g - fract(g * 0.5) * 2.0 * k;
     if (surface_data.p[4].w != 0.0) {
         let lo = (surface_data.p[5].xy / size + vec2f(0.5)) * n;
         let hi = (surface_data.p[5].zw / size + vec2f(0.5)) * n;
         m = clamp(m, lo, hi);
     }
+    m += select(vec2f(0.0), vec2f(-terrain_pad), g <= vec2f(0.0)) +
+        select(vec2f(0.0), vec2f(terrain_pad), g >= vec2f(n));
+    terrain_grid = m;
 
     let h = terrain_morphed(m, k);
     let reach = 1.0 + k;

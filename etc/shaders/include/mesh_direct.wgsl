@@ -2,8 +2,9 @@
 // (shadow_terminator) both share, and the loop over the lights of a fragment, with the shadows
 // of the spot and point lights (scene_punctual_shadows) and the cookie of the first directional
 // light (scene_cookies). The includer includes mesh_common.wgsl first and declares the Surface of
-// its fragments, with at least the albedo, the metallic, the occlusion, the shading normal and
-// the geometric normal, and light_lobes, the light its surface reflects of one light, whose
+// its fragments, with at least the albedo, the metallic, the occlusion, the shading normal, the
+// geometric normal and shade, the share of the first directional light the heights of a terrain
+// hold back (0 for none), and light_lobes, the light its surface reflects of one light, whose
 // lobes of the shading normal fade by shadow_terminator.
 #pragma once
 
@@ -128,7 +129,7 @@ fn lights_direct(s: Surface, v: vec3f, world: vec3f, cluster: u32, sides: u32,
                     radiance *= planet_light_factor(planet, l);
                 }
                 if (i == 0u) {
-                    visible = shadow_factor(at, n);
+                    visible = shadow_factor(at, n) * (1.0 - s.shade);
                     if (scene_cookies) {
                         visible *= light_cookie(at, l, n);
                     }

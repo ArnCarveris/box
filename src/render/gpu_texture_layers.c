@@ -123,6 +123,8 @@ static void box_gpu_layer_layouts(
 
     blend[n ++] = box_gpu_layer_texture_entry(BOX_GPU_BLEND_HEIGHTS,
         WGPUTextureViewDimension_2DArray);
+    blend[n ++] = box_gpu_layer_texture_entry(BOX_GPU_BLEND_BAKE,
+        WGPUTextureViewDimension_2DArray);
     blend[n ++] = kind;
     for (i = 0; i < BOX_RENDER_LAYERS; i ++) {
         blend[n ++] = plain[BOX_RENDER_TEXTURE_SLOTS + 4 + i];
@@ -286,6 +288,12 @@ static void box_gpu_layer_group_bind(
         entries[n ++] = (WGPUBindGroupEntry){
             .binding = BOX_GPU_BLEND_HEIGHTS,
             .textureView = g->array->view
+        };
+        uint32_t bake_layout, bake_serial;
+        entries[n ++] = (WGPUBindGroupEntry){
+            .binding = BOX_GPU_BLEND_BAKE,
+            .textureView = box_gpu_terrain_bake_view(gpu, &bg->blend, &bake_layout,
+                &bake_serial)
         };
     } else {
         box_gpu_material_mips(gpu, g->key.textures);
@@ -481,6 +489,60 @@ WGPUBindGroup box_gpu_forward_group(
     }
 
     result = box_gpu_layer_group(gpu, packet, b);
+done:
+    return result;
+}
+
+/** Hash bytes (FNV-1a) into a hash.
+ *
+ * @param hash The hash so far
+ * @param data The bytes
+ * @param size Number of bytes
+ * @return The hash
+ */
+static uint64_t box_gpu_content_hash(
+    uint64_t hash,
+    const void *data,
+    size_t size)
+{
+    const uint8_t *bytes = data;
+    size_t i;
+    for (i = 0; i < size; i ++) {
+        hash = (hash ^ bytes[i]) * 0x100000001B3ull;
+    }
+
+    return hash;
+}
+
+uint64_t box_gpu_forward_content(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet,
+    const box_render_batch_t *b)
+{
+    uint64_t result = 0xCBF29CE484222325ull;
+    WGPUBindGroup group = box_gpu_forward_group(gpu, packet, b);
+    const box_gpu_layer_group_t *g;
+    if (box_gpu_texture_blends(b)) {
+        const box_gpu_blend_group_t *bg = box_gpu_blend_group_get(gpu, packet, b);
+        result = box_gpu_content_hash(result, &bg->blend, sizeof(bg->blend));
+        result = box_gpu_content_hash(result, bg->versions, sizeof(bg->versions));
+        result = box_gpu_content_hash(result, &bg->emissive_serial, sizeof(uint32_t));
+        result = box_gpu_content_hash(result, &bg->wrap, sizeof(uint32_t));
+        result = box_gpu_content_hash(result, &bg->anisotropy, sizeof(uint32_t));
+    }
+
+    if (!box_gpu_layered(b)) {
+        goto done;
+    }
+
+    for (g = gpu->layer_groups; g && g->group != group; g = g->next) { }
+    if (g) {
+        const box_render_texture_layers_t *l = box_render_packet_data(packet, b->layers);
+        result = box_gpu_content_hash(result, &g->key, sizeof(g->key));
+        result = box_gpu_content_hash(result, &g->version, sizeof(g->version));
+        result = box_gpu_content_hash(result, l->values, sizeof(l->values));
+    }
+
 done:
     return result;
 }

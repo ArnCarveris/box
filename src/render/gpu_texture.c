@@ -273,6 +273,14 @@ void box_gpu_texture_init(
         }
     };
     blend[BOX_GPU_BLEND_ENTRIES - 1] = kind;
+    blend[BOX_GPU_BLEND_ENTRIES - 2] = (WGPUBindGroupLayoutEntry){
+        .binding = BOX_GPU_BLEND_BAKE,
+        .visibility = WGPUShaderStage_Fragment,
+        .texture = {
+            .sampleType = WGPUTextureSampleType_Float,
+            .viewDimension = WGPUTextureViewDimension_2DArray
+        }
+    };
     for (i = 0; i < BOX_RENDER_BLEND_SOURCES; i ++) {
         blend[4 + i] = (WGPUBindGroupLayoutEntry){
             .binding = i == BOX_RENDER_BLEND_HEIGHT
@@ -1477,6 +1485,7 @@ static void box_gpu_blend_group_bind(
     u.contrast = g->blend.contrast;
     u.terrain = terrain
         ? terrain->terrain_mask_texels | (terrain->terrain_mask_columns << 16) : 0;
+    WGPUTextureView bake = box_gpu_terrain_bake_view(gpu, &g->blend, &u.bake, &g->bake_serial);
     for (m = 0; g->arrays[BOX_RENDER_BLEND_HEIGHT] && m < (int32_t)u.count; m ++) {
         uint32_t serial = g->arrays[BOX_RENDER_BLEND_HEIGHT]->serials[m];
         if (serial && serial != UINT32_MAX) {
@@ -1517,6 +1526,10 @@ static void box_gpu_blend_group_bind(
         .binding = BOX_GPU_DRAW_KIND_BINDING,
         .buffer = gpu->draw_kinds,
         .size = 4 * sizeof(uint32_t)
+    };
+    entries[BOX_GPU_BLEND_ENTRIES - 2] = (WGPUBindGroupEntry){
+        .binding = BOX_GPU_BLEND_BAKE,
+        .textureView = bake
     };
     for (m = 0; m < BOX_RENDER_BLEND_MAPS; m ++) {
         entries[4 + m] = (WGPUBindGroupEntry){
@@ -1599,8 +1612,11 @@ box_gpu_blend_group_t* box_gpu_blend_group_get(
         heights |= r->layers[m][BOX_RENDER_BLEND_HEIGHT] != 0;
     }
 
+    uint32_t bake_layout, bake_serial;
+    box_gpu_terrain_bake_view(gpu, r, &bake_layout, &bake_serial);
     stale = !g->group || g->mask_serial != box_gpu_blend_mask_serial(gpu, r) ||
-        g->emissive_serial != box_gpu_blend_serial(gpu, emissive);
+        g->emissive_serial != box_gpu_blend_serial(gpu, emissive) ||
+        g->bake_serial != bake_serial;
     for (m = 0; m < BOX_RENDER_BLEND_SOURCES; m ++) {
         box_gpu_blend_array_t *a = m < BOX_RENDER_BLEND_MAPS || heights
             ? box_gpu_blend_array(gpu, r, (uint32_t)m) : NULL;

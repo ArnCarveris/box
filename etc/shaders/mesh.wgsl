@@ -24,6 +24,7 @@ struct Surface {
     emissive: vec3f,
     normal: vec3f,
     geometric: vec3f,
+    shade: f32,
 };
 
 fn surface(f: VertexOut, front: bool) -> Surface {

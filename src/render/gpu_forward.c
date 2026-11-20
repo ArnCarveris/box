@@ -723,6 +723,122 @@ done:
     return result;
 }
 
+/** Blend value of the forward key of a terrain bake pipeline, which no BlendMode has */
+#define BOX_GPU_TERRAIN_BAKE_BLEND (14u)
+
+WGPURenderPipeline box_gpu_terrain_bake_pipeline(
+    box_gpu_t *gpu,
+    const box_render_batch_t *b,
+    WGPUPipelineLayout layout)
+{
+    WGPURenderPipeline result = NULL;
+    uint32_t features = box_render_mesh_overrides(b->pipeline, b->features, false, false);
+    bool layers = box_gpu_layered(b);
+    WGPUShaderModule shader;
+    ecs_map_val_t *cached;
+    uint64_t key;
+    int32_t i;
+    if (b->pipeline != BOX_RENDER_SHADER_MESH_EXTENDED || !box_gpu_texture_blends(b) ||
+        !b->surface || !layout)
+    {
+        goto done;
+    }
+
+    shader = box_gpu_shader_get(gpu, layers ? box_render_mesh_layers(b->pipeline) : b->pipeline);
+    if (!shader) {
+        goto done;
+    }
+
+    key = box_gpu_forward_key(b->pipeline, BOX_GPU_TERRAIN_BAKE_FORMAT,
+        BOX_GPU_TERRAIN_BAKE_BLEND, BackFacePlain, false, false, true, true,
+        BOX_GPU_DEPTH_PREPASS, features & BOX_RENDER_OVERRIDE_SCENE, false, false, false,
+        false, layers, false, false, false);
+    cached = ecs_map_get(&gpu->forward, key);
+    if (cached && *cached) {
+        result = (WGPURenderPipeline)(uintptr_t)*cached;
+        goto done;
+    }
+
+    WGPUVertexAttribute vertex_attrs[3] = {
+        { .format = WGPUVertexFormat_Float32x3, .offset = 0, .shaderLocation = 0 },
+        { .format = WGPUVertexFormat_Float32x3, .offset = 12, .shaderLocation = 1 },
+        { .format = WGPUVertexFormat_Float32x2, .offset = 24, .shaderLocation = 2 }
+    };
+    WGPUVertexAttribute slot_attr = {
+        .format = WGPUVertexFormat_Uint32, .offset = 0, .shaderLocation = 3
+    };
+    WGPUVertexBufferLayout buffers[2] = {
+        {
+            .stepMode = WGPUVertexStepMode_Vertex,
+            .arrayStride = sizeof(box_vertex_t),
+            .attributeCount = 3,
+            .attributes = vertex_attrs
+        },
+        {
+            .stepMode = WGPUVertexStepMode_Instance,
+            .arrayStride = sizeof(uint32_t),
+            .attributeCount = 1,
+            .attributes = &slot_attr
+        }
+    };
+    const char *vertex_keys[6] = {
+        "material_texture_scroll", "scene_planet_light", "water", "material_fresnel",
+        "scene_planar", "material_distortion"
+    };
+    uint32_t vertex_bits[6] = {
+        BOX_RENDER_OVERRIDE_TEXTURE_SCROLL, BOX_RENDER_OVERRIDE_PLANET_LIGHT, 0,
+        BOX_RENDER_OVERRIDE_FRESNEL, BOX_RENDER_OVERRIDE_PLANAR, 0
+    };
+    WGPUConstantEntry vertex_constants[6];
+    for (i = 0; i < 6; i ++) {
+        vertex_constants[i] = (WGPUConstantEntry){
+            .key = { .data = vertex_keys[i], .length = WGPU_STRLEN },
+            .value = vertex_bits[i] && (features & vertex_bits[i]) ? 1.0 : 0.0
+        };
+    }
+
+    WGPUConstantEntry constants[BOX_RENDER_MESH_OVERRIDES];
+    box_gpu_feature_constants(features & BOX_RENDER_OVERRIDE_SCENE, constants);
+    WGPUColorTargetState targets[BOX_GPU_TERRAIN_BAKE_LAYERS];
+    for (i = 0; i < BOX_GPU_TERRAIN_BAKE_LAYERS; i ++) {
+        targets[i] = (WGPUColorTargetState){
+            .format = BOX_GPU_TERRAIN_BAKE_FORMAT,
+            .writeMask = WGPUColorWriteMask_All
+        };
+    }
+
+    WGPUFragmentState fragment = {
+        .module = shader,
+        .entryPoint = { .data = "fs_terrain_bake", .length = WGPU_STRLEN },
+        .constantCount = BOX_RENDER_MESH_OVERRIDES,
+        .constants = constants,
+        .targetCount = BOX_GPU_TERRAIN_BAKE_LAYERS,
+        .targets = targets
+    };
+    WGPURenderPipelineDescriptor desc = {
+        .layout = layout,
+        .vertex = {
+            .module = shader,
+            .entryPoint = { .data = "vs_terrain_bake", .length = WGPU_STRLEN },
+            .constantCount = 6,
+            .constants = vertex_constants,
+            .bufferCount = 2,
+            .buffers = buffers
+        },
+        .primitive = {
+            .topology = WGPUPrimitiveTopology_TriangleList,
+            .frontFace = WGPUFrontFace_CCW,
+            .cullMode = WGPUCullMode_None
+        },
+        .multisample = { .count = 1, .mask = 0xFFFFFFFF },
+        .fragment = &fragment
+    };
+
+    result = box_gpu_forward_cache(gpu, key, box_gpu_render_pipeline(gpu, &desc));
+done:
+    return result;
+}
+
 /** Get the depth prepass pipeline of a batch the prepass draws, created on first use in the
  * forward cache from the mesh shader of the batch, so a recompiled or released mesh shader
  * empties it too.

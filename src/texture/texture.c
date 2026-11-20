@@ -62,7 +62,7 @@ static void box_textures_free(
         box_texture_t *tex = ecs_map_ptr(&it);
         ecs_os_free(tex->pixels);
         ecs_os_free(tex->source_name);
-        box_texture_graph_clear(tex);
+        box_texture_graph_clear(t, tex);
         ecs_os_free(tex);
     }
 
@@ -789,7 +789,7 @@ static void box_texture_forget(
         box_texture_graphs_touch(t, e);
         ecs_os_free(tex->pixels);
         ecs_os_free(tex->source_name);
-        box_texture_graph_clear(tex);
+        box_texture_graph_clear(t, tex);
         ecs_os_free(tex);
     }
 
@@ -1247,7 +1247,7 @@ static void BoxTextureGraphOnRemove(
                 *ecs_vec_append_t(NULL, &t->graph_released, uint32_t) = tex->handle;
             }
 
-            box_texture_graph_clear(tex);
+            box_texture_graph_clear(t, tex);
             *ecs_vec_append_t(NULL, &t->reload, ecs_entity_t) = e;
             continue;
         }

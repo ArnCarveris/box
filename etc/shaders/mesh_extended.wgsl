@@ -7,6 +7,7 @@
 #include "include/mesh_direct.wgsl"
 #include "include/mesh_surface.wgsl"
 #include "include/mesh_blend.wgsl"
+#include "include/terrain_bake.wgsl"
 #ifdef BOX_TEXTURE_LAYERS
 #include "include/mesh_layers.wgsl"
 #endif
@@ -121,6 +122,7 @@ struct Surface {
     back_color: vec3f,
     back_factor: f32,
     thickness: f32,
+    shade: f32,
 };
 
 // Direction of v perpendicular to the normal n, of unit length; zero along n.
@@ -288,6 +290,54 @@ fn surface_blend(f: VertexOut, front: bool) -> Surface {
         layers = blend_layers(f, geometric, front);
     }
     return surface_of(f, front, geometric, layers);
+}
+
+// The layers of a terrain fragment that takes its bake alone (terrain_bake_material): its baked
+// shading normal, the other maps neutral, so surface_of gives the constants of its material.
+fn terrain_baked_layers(b: TerrainBaked) -> Layers {
+    var layers: Layers;
+    layers.albedo = vec4f(1.0);
+    layers.emissive = vec3f(1.0);
+    layers.orm = vec3f(1.0);
+    layers.normal = b.normal;
+    layers.frame = Frame(vec3f(1.0, 0.0, 0.0), vec3f(0.0, 0.0, 1.0), true);
+    return layers;
+}
+
+// The surface of the neutral layers of a terrain fragment that takes its bake alone, with the
+// baked albedo, roughness, metallic and occlusion.
+fn terrain_baked_apply(near: Surface, b: TerrainBaked) -> Surface {
+    var s = near;
+    s.albedo = b.albedo;
+    s.roughness = clamp(b.roughness, MIN_ROUGHNESS, 1.0);
+    s.metallic = b.metallic;
+    s.occlusion = b.occlusion;
+    return s;
+}
+
+// The surface of a terrain fragment shaded in full, faded toward the surface of its bake by how
+// far the bake stands in for it (terrain_bake_far), and lit by the sun and the ambient occlusion
+// its heights let through, less so on steep faces (TERRAIN_BAKE_STEEP). The bake is read after
+// the material, so nothing of it stays live while the material is shaded.
+fn terrain_baked_mix(near: Surface, f: VertexOut, front: bool, geometric: vec3f, far: f32)
+    -> Surface {
+    var s = near;
+    let light = terrain_bake_light(f);
+    if (light.w == 0.0) {
+        return s;
+    }
+    if (far > 0.0 && front) {
+        let baked = terrain_bake_material(f);
+        s.albedo = mix(s.albedo, baked.albedo, far);
+        s.roughness = mix(s.roughness, clamp(baked.roughness, MIN_ROUGHNESS, 1.0), far);
+        s.metallic = mix(s.metallic, baked.metallic, far);
+        s.occlusion = mix(s.occlusion, baked.occlusion, far);
+        s.normal = normalize(mix(s.normal, baked.normal, far));
+    }
+    let flat = smoothstep(TERRAIN_BAKE_STEEP, TERRAIN_BAKE_FLAT, geometric.y);
+    s.occlusion *= mix(1.0, light.y, flat);
+    s.shade = (1.0 - light.x) * flat;
+    return s;
 }
 
 fn surface_of(f: VertexOut, front: bool, geometric: vec3f, layers: Layers) -> Surface {
@@ -1752,8 +1802,28 @@ fn lit(f: VertexOut, shaded: Surface) -> vec4f {
     return lit(f, s);
 }
 
+// A terrain tile with a bake atlas shades from its bake alone where a bake texel is no smaller
+// than a pixel, in full and faded into the bake below that, and lit by the sun and the ambient
+// occlusion of its heights either way (terrain_baked_mix); one surface_of and one lit serve all.
 @fragment fn fs_blend(f: VertexOut, @builtin(front_facing) front: bool) -> @location(0) vec4f {
-    return lit(f, surface_blend(f, front));
+    let geometric = normalize(f.normal);
+    let far = terrain_bake_far(f);
+    let alone = far >= 1.0 && terrain_bake_light(f).w != 0.0;
+    var layers: Layers;
+    var baked: TerrainBaked;
+    if (alone) {
+        baked = terrain_bake_material(f);
+        layers = terrain_baked_layers(baked);
+    } else if (material_triplanar && vo_scalars(f).w > 1.0) {
+        layers = blend_triplanar(f, geometric, front);
+    } else {
+        layers = blend_layers(f, geometric, front);
+    }
+    var s = surface_of(f, front, geometric, layers);
+    if (alone && front) {
+        s = terrain_baked_apply(s, baked);
+    }
+    return lit(f, terrain_baked_mix(s, f, front, geometric, select(far, 0.0, alone)));
 }
 
 @fragment fn fs_blend_cutout(f: VertexOut, @builtin(front_facing) front: bool)
@@ -1852,10 +1922,8 @@ fn layered(f: VertexOut, front: bool, s: Surface, maps: texture_2d_array<f32>, f
     return lit(f, layered(f, front, s, layer_maps, 0u, 0.0));
 }
 
-@fragment fn fs_blend_layers(f: VertexOut, @builtin(front_facing) front: bool)
-    -> @location(0) vec4f
-{
-    let geometric = normalize(f.normal);
+// The surface of a fragment of a TextureBlend with TextureLayers.
+fn surface_blend_layers(f: VertexOut, front: bool, geometric: vec3f) -> Surface {
     var layers: Layers;
     var low = 0.0;
     if (material_triplanar && vo_scalars(f).w > 1.0) {
@@ -1870,7 +1938,41 @@ fn layered(f: VertexOut, front: bool, s: Surface, maps: texture_2d_array<f32>, f
         low = blend_low(b);
     }
     let s = surface_of(f, front, geometric, layers);
-    return lit(f, layered(f, front, s, blend_heights, blending.count, low));
+    return layered(f, front, s, blend_heights, blending.count, low);
+}
+
+@fragment fn fs_blend_layers(f: VertexOut, @builtin(front_facing) front: bool)
+    -> @location(0) vec4f
+{
+    let geometric = normalize(f.normal);
+    let far = terrain_bake_far(f);
+    let alone = far >= 1.0 && terrain_bake_light(f).w != 0.0;
+    var layers: Layers;
+    var baked: TerrainBaked;
+    var low = 0.0;
+    if (alone) {
+        baked = terrain_bake_material(f);
+        layers = terrain_baked_layers(baked);
+    } else if (material_triplanar && vo_scalars(f).w > 1.0) {
+        layers = blend_triplanar(f, geometric, front);
+    } else {
+        let b = blend_fragment(f);
+        var albedo = vec4f(0.0);
+        if (front || kind.alpha_cutout != 0u) {
+            albedo = blend_fragment_albedo(b);
+        }
+        layers = blend_maps(geometric, b, albedo, front);
+        low = blend_low(b);
+    }
+    var s = surface_of(f, front, geometric, layers);
+    if (alone) {
+        if (front) {
+            s = terrain_baked_apply(s, baked);
+        }
+    } else {
+        s = layered(f, front, s, blend_heights, blending.count, low);
+    }
+    return lit(f, terrain_baked_mix(s, f, front, geometric, select(far, 0.0, alone)));
 }
 
 @fragment fn fs_blend_cutout_layers(f: VertexOut, @builtin(front_facing) front: bool)
@@ -1899,3 +2001,62 @@ fn layered(f: VertexOut, front: bool, s: Surface, maps: texture_2d_array<f32>, f
     return lit(f, layered(f, front, s, blend_heights, blending.count, low));
 }
 #endif
+
+// What a bake writes into the layers of the bake atlas of a terrain grid mesh (terrain_bake of
+// mesh_blend.wgsl).
+struct TerrainBakeOut {
+    @location(0) albedo: vec4f,
+    @location(1) normal: vec4f,
+    @location(2) light: vec4f,
+};
+
+// The vertex stage of a bake: the tile placed as vs_surface places it, at the morph of its cell,
+// drawn top down into the cell with the texels at the ends of a row on its edges, the vertices on
+// its edges moved out by half a texel so those texels are covered.
+@vertex fn vs_terrain_bake(v: VertexIn) -> VertexOut {
+    let bake = terrain_bake_params;
+    terrain_forced_morph = bake.cell.w;
+    terrain_pad = bake.tile.w;
+    var o = mesh_vertex_surface(v);
+    let texels = bake.cell.z;
+    let px = vec2f(0.5) + terrain_grid / (surface_data.p[1].w - 1.0) * (texels - 1.0);
+    o.pos = vec4f(px.x / texels * 2.0 - 1.0, 1.0 - px.y / texels * 2.0, 0.5, 1.0);
+    o.flat4.y = pack2x16float(vec2f(0.0));
+    o.flat4.z = pack2x16float(select(vec2f(60000.0, 65000.0), vec2f(-2.0, -1.0),
+        bake.cell.w > 0.5));
+    return o;
+}
+
+// The fragment stage of a bake: the material of the texel as fs_blend_layers shades it, on the
+// normal of the Catmull-Rom heights of the tile, with the light of the sun and the ambient
+// occlusion the heights of the terrain let through.
+@fragment fn fs_terrain_bake(f: VertexOut) -> TerrainBakeOut {
+    let bake = terrain_bake_params;
+    let texels = bake.cell.z;
+    let rough = bake.cell.w > 0.5;
+    let uv = clamp((f.pos.xy - bake.cell.xy - vec2f(0.5)) / (texels - 1.0), vec2f(0.0),
+        vec2f(1.0));
+    let g = uv * terrain_bake_steps();
+    let geometric = terrain_smooth_normal(g, rough);
+#ifdef BOX_TEXTURE_LAYERS
+    let s = surface_blend_layers(f, true, geometric);
+#else
+    var layers: Layers;
+    if (material_triplanar && vo_scalars(f).w > 1.0) {
+        layers = blend_triplanar(f, geometric, true);
+    } else {
+        let b = blend_fragment(f);
+        layers = blend_maps(geometric, b, blend_fragment_albedo(b), true);
+    }
+    let s = surface_of(f, true, geometric, layers);
+#endif
+    let h = terrain_smooth(g, rough);
+    let p = bake.tile.xy + uv * bake.tile.z;
+    let texel = terrain_bake_meters() / (texels - 1.0);
+    var o: TerrainBakeOut;
+    o.albedo = vec4f(sqrt(clamp(s.albedo, vec3f(0.0), vec3f(1.0))),
+        clamp(s.occlusion, 2.0 / 255.0, 1.0));
+    o.normal = vec4f(s.normal.x * 0.5 + 0.5, s.normal.z * 0.5 + 0.5, s.roughness, s.metallic);
+    o.light = vec4f(terrain_bake_sun(p, h, texel), terrain_bake_ao(p, h, texel), 0.0, 1.0);
+    return o;
+}
