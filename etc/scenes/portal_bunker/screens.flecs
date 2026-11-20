@@ -166,3 +166,84 @@ freighter {
     }
   }
 }
+
+// CCTV (portal/cctv_screen.flecs): the six security cameras of the original, eyes at the housings of
+// props 17 to 22 looking at their targets and panning 0.35 rad either way at 0.3 rad/s from a phase of
+// their x, and the CCTV screen on the console of the control room (prop_23), like the doors screen.
+// The feed renders the selected camera while the screen is seen within 12 m. The texture is declared
+// first so that the screen can name it before the feed adds to it.
+bunker {
+  cctv_state { PortalCctvState: {selected: 0} }
+
+  cctv_feed {
+    texture {}
+  }
+
+  cameras {
+    PortalSecurityCamera cam01(
+      label: "CAM-01", title: "ENTRANCE HALL", place: "HALL / NE CORNER",
+      yaw: 2.3562, pitch: -0.4189, phase: 5.4
+    ) {
+      Position: {5.4, 4.4, 0.6}
+    }
+    PortalSecurityCamera cam02(
+      label: "CAM-02", title: "L-CORRIDOR", place: "CORRIDOR / SOUTH END",
+      yaw: 2.9979, pitch: -0.2054, phase: 1.1
+    ) {
+      Position: {1.1, 2.6, 10.4}
+    }
+    PortalSecurityCamera cam03(
+      label: "CAM-03", title: "CONTROL ROOM", place: "CONTROL / SE CORNER",
+      yaw: 2.3962, pitch: -0.2331, phase: -2
+    ) {
+      Position: {-2, 3.1, 13.5}
+    }
+    PortalSecurityCamera cam04(
+      label: "CAM-04", title: "ATRIUM", place: "ATRIUM / NE CORNER",
+      yaw: 0.6304, pitch: -0.5950, phase: 13.4
+    ) {
+      Position: {13.4, 7.2, 33.4}
+    }
+    PortalSecurityCamera cam05(
+      label: "CAM-05", title: "GENERATOR ROOM", place: "LEVEL -1 / EAST WALL",
+      yaw: 2.1375, pitch: -0.3662, phase: -2.5
+    ) {
+      Position: {-2.5, -1, 6.5}
+    }
+    PortalSecurityCamera cam06(
+      label: "CAM-06", title: "HARBOUR", place: "HALL ROOF / SOUTH EDGE",
+      yaw: -1.8046, pitch: -0.0916, phase: 5.5
+    ) {
+      Position: {5.5, 6.2, -0.6}
+    }
+  }
+
+  props {
+    prop_23 {
+      PortalCctvScreen screen(
+        width: 1.92,
+        height: 0.72,
+        cameras: [
+          bunker.cameras.cam01, bunker.cameras.cam02, bunker.cameras.cam03,
+          bunker.cameras.cam04, bunker.cameras.cam05, bunker.cameras.cam06
+        ],
+        state: bunker.cctv_state,
+        picture: bunker.cctv_feed.texture)
+      {
+        Position: {0, 1.35, 0.208}
+        Rotation: {0, 3.14159265, 0}
+      }
+    }
+  }
+
+  cctv_feed {
+    PortalCctvFeed: {
+      cameras: [
+        bunker.cameras.cam01, bunker.cameras.cam02, bunker.cameras.cam03,
+        bunker.cameras.cam04, bunker.cameras.cam05, bunker.cameras.cam06
+      ],
+      state: bunker.cctv_state,
+      seen: bunker.props.prop_23.screen
+    }
+  }
+}

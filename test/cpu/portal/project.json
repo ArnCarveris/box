@@ -15,6 +15,18 @@
     "test": {
         "testsuites": [
             {
+                "id": "PortalCctv",
+                "testcases": [
+                    "lists_cameras",
+                    "camera_pans",
+                    "click_selects_camera",
+                    "feed_renders_while_seen",
+                    "feed_keeps_interval",
+                    "offline_feed_renders_nothing",
+                    "closed_door_hides_screen"
+                ]
+            },
+            {
                 "id": "Portal",
                 "testcases": [
                     "area_at",

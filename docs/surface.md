@@ -30,6 +30,14 @@ window {
 }
 ```
 
+`SurfaceSchedule` (script `box.surface.Schedule`, on a surface with a `texture`): `interval` (s between renders, 0 every frame),
+`seen` (entity: render only while a perspective view no texture surface renders has the sphere of `radius`
+about its world position in its frustum, within `range` of its eye and, with portal culling, in an
+area its camera saw), `paused` (render nothing). Between renders the texture keeps its last image
+and the surface's views cost the GPU nothing; it renders once at the start regardless.
+`SurfaceScheduleStatus` (script `box.surface.ScheduleStatus`, read only): `seen`, `renders`. A camera feed on a screen:
+`Schedule: {interval: 0.066, seen: screen, radius: 1, range: 12}`.
+
 Render to texture (a UI screen on a 3D object):
 
 ```flecs

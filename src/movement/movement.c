@@ -1,7 +1,7 @@
 /**
  * @file movement/movement.c
- * @brief Integrates Velocity and AngularVelocity into Position and Rotation, and moves
- * PathFollow entities along their Path3D.
+ * @brief Integrates Velocity and AngularVelocity into Position and Rotation, moves
+ * PathFollow entities along their Path3D and pans Pan entities (pan.c).
  */
 
 #define BOX_MOVEMENT_IMPL
@@ -9,6 +9,7 @@
 #include <float.h>
 #include <math.h>
 #include "../geometry/paths.h"
+#include "pan.h"
 
 /* Samples of a curved segment in the arc length table, a line needs one */
 #define BOX_PATH_FOLLOW_STEPS 64
@@ -449,6 +450,7 @@ void BoxMovementImport(
     ECS_META_COMPONENT(world, AngularVelocity);
     ECS_META_COMPONENT(world, PathFollowMode);
     ECS_META_COMPONENT(world, PathFollow);
+    ECS_META_COMPONENT(world, Pan);
 
     ecs_add_pair(world, ecs_id(Velocity), EcsWith, DynamicTransform);
     ecs_add_pair(world, ecs_id(AngularVelocity), EcsWith, DynamicTransform);
@@ -456,6 +458,10 @@ void BoxMovementImport(
     ecs_add_pair(world, ecs_id(AngularVelocity), EcsWith, ecs_id(Rotation));
     ecs_add_pair(world, ecs_id(PathFollow), EcsWith, DynamicTransform);
     ecs_add_pair(world, ecs_id(PathFollow), EcsWith, ecs_id(Position));
+    ecs_add_pair(world, ecs_id(Pan), EcsWith, DynamicTransform);
+    ecs_add_pair(world, ecs_id(Pan), EcsWith, ecs_id(Rotation));
+
+    box_movement_pan_import(world);
 
     ecs_system(world, {
         .entity = ecs_entity(world, { .name = "IntegrateVelocity" }),

@@ -62,6 +62,21 @@ ECS_STRUCT(PathFollow, {
     bool orient;         /**< Set Rotation so the entity faces along the path tangent */
 });
 
+/** Pans the local Rotation about Y back and forth on a sine, as a security camera sweeps.
+ *
+ * Every frame Rotation.y = center + amplitude * sin(time * speed + phase), where time is the
+ * total world time in seconds; Rotation.x and Rotation.z stay as they are, so a pitched
+ * camera keeps its pitch while it pans (Rotation turns about Y, then about X).
+ *
+ * Implies Rotation and DynamicTransform.
+ */
+ECS_STRUCT(Pan, {
+    float center;        /**< Yaw in radians at the middle of the sweep */
+    float amplitude;     /**< Radians the yaw swings to either side, 0 holds it at center */
+    float speed;         /**< Angular frequency of the sine in radians per second */
+    float phase;         /**< Radians added to the angle of the sine, so sweeps run out of step */
+});
+
 /** Register the box.movement module.
  *
  * @param world The world

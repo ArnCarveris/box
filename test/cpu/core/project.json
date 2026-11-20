@@ -198,6 +198,9 @@
             {
                 "id": "Movement",
                 "testcases": [
+                    "pan_follows_sine",
+                    "pan_stays_in_range",
+                    "pan_implies_rotation",
                     "linear",
                     "angular",
                     "zero_velocity",

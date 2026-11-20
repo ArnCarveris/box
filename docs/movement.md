@@ -11,6 +11,7 @@ Module `box.movement` (`BoxMovementImport`, imports `box.transform` and `box.geo
 | `Velocity` | `x, y, z` (units/s) | `Position += Velocity * dt` |
 | `AngularVelocity` | `x, y, z` (rad/s) | `Rotation += AngularVelocity * dt` (Euler angles, per axis) |
 | `PathFollow` | `path` (entity with `Path3D`), `speed` (units/s, may be < 0), `distance`, `mode`, `orient` | `distance += speed * dt` by arc length, `Position` = path point at `distance` |
+| `Pan` | `center`, `amplitude` (rad), `speed` (rad/s), `phase` (rad) | `Rotation.y = center + amplitude * sin(world time * speed + phase)`, x and z kept (a panning security camera) |
 
 `PathFollowMode`: `PathFollowOnce` (clamp at both ends), `PathFollowLoop` (wrap the distance),
 `PathFollowPingPong` (reflect at the ends and flip the sign of `speed`).
@@ -49,6 +50,7 @@ patrol { PathFollow: {path: route, speed: 5, mode: PathFollowLoop, orient: true}
 | `box.movement.IntegrateVelocity` | `EcsOnUpdate` | `Position` (inout), `Velocity` (in) |
 | `box.movement.IntegrateAngularVelocity` | `EcsOnUpdate` | `Rotation` (inout), `AngularVelocity` (in) |
 | `box.movement.FollowPath` | `EcsOnUpdate` | `Position` (out), `PathFollow` (inout), `?Rotation` (out) |
+| `box.movement.PanYaw` | `EcsOnUpdate` | `Rotation` (inout), `Pan` (in) |
 | `box.movement.PathFollowInvalidate` | observer `OnSet`/`OnRemove` | `Path3D` (self, also on prefabs) |
 
 Runs before the transform systems in `EcsPreStore`, so world transforms are current the same frame.

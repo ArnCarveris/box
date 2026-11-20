@@ -1,0 +1,241 @@
+// PortalCctvScreen for the box.portal tests, a copy of etc/scenes/portal/cctv_screen.flecs.
+//
+// CCTV: security cameras, the feed that renders the selected one into a texture, and the screen that
+// lists the cameras and shows the feed (the original's securityCamera and cctv screen).
+//
+// A PortalSecurityCamera is a camera with no geometry (its housing is a prop) that pans to either side
+// of its yaw (Pan). A PortalCctvFeed renders the camera that its state selects into its texture
+// through its own view, which culls by the portals its camera sees like the view of the window. Its
+// Schedule (SurfaceSchedule) renders the feed only while its screen is seen, a few times a second,
+// and never for an offline camera. A PortalCctvScreen shows the cameras as buttons and the picture of the feed; a
+// click on a camera selects it.
+//
+//   cctv_state { PortalCctvState: {selected: 0} }
+//   cameras { cam01 : PortalSecurityCamera { Position: {5.4, 4.4, 0.6}; ... } }
+//   cctv_feed { PortalCctvFeed: {cameras: [cameras.cam01], state: cctv_state, seen: console.cctv} }
+//   console {
+//     PortalCctvScreen cctv(cameras: [cameras.cam01], state: cctv_state, picture: cctv_feed.texture) {...}
+//   }
+
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.camera
+using box.view
+using box.effects
+using box.surface
+using box.movement
+using box.layout
+using box.geometry
+using box.material
+using box.text
+using box.picking
+using box.spatial
+using box.widgets
+
+// What the screen shows of a camera: its label in the list, its title and place on the picture, and
+// whether it is offline (no picture)
+struct PortalCameraInfo(label: string, title: string, place: string, offline: bool)
+
+// The camera a feed and its screens show, an index into their cameras
+struct PortalCctvState(selected: i32)
+
+// A security camera: it looks along yaw and pitch (radians) and pans sweep radians to either side at
+// speed radians per second, from phase; 1.2 radians of vertical field of view, 0.05 to 60 m.
+template PortalSecurityCamera {
+  prop label: string = "CAM"
+  prop title: string = ""
+  prop place: string = ""
+  prop offline: bool = false
+  prop yaw: f32 = 0
+  prop pitch: f32 = 0
+  prop sweep: f32 = 0.35
+  prop speed: f32 = 0.3
+  prop phase: f32 = 0
+
+  Rotation: {pitch, yaw, 0}
+  Pan: {center: yaw, amplitude: sweep, speed: speed, phase: phase}
+  Camera: {fov: 68.75, near_: 0.05, far_: 60}
+  PortalCameraInfo: {label: label, title: title, place: place, offline: offline}
+}
+
+// The picture of the selected camera of state, rendered into texture (the child the screen shows) at
+// width by height pixels, every interval seconds while seen (the screen) is in view within range
+// metres. An offline camera renders nothing.
+template PortalCctvFeed {
+  prop cameras: entity[] = []
+  prop state: entity = 0
+  prop seen: entity = 0
+  prop width: i32 = 512
+  prop height: i32 = 384
+  prop interval: f32 = 0.066
+  prop range: f32 = 12
+
+  const count: i32 = cameras.count()
+  const index: i32 = count > 0 ? clamp(state[PortalCctvState].selected, 0, count - 1) : 0
+  const camera: entity = count > 0 ? cameras[index] : 0
+  const offline: bool = camera == 0 || camera[PortalCameraInfo].offline
+
+  texture {}
+
+  views {
+    view {
+      tonemap { Tonemap: {} }
+      View: {
+        camera: camera,
+        clear: {enabled: true, color: {191, 219, 255, 255}},
+        effects: [{effect: tonemap}]
+      }
+    }
+  }
+
+  Surface: {width: width, height: height, texture: texture, view_root: views}
+  Schedule: {interval: interval, seen: seen, radius: 1.2, range: range, paused: offline}
+}
+
+// A camera in the list of a screen: a button with its label, lit while selected; a click selects it
+template PortalCctvRow {
+  prop state: entity = 0
+  prop camera: entity = 0
+  prop index: i32 = 0
+  prop selected: bool = false
+
+  const offline: bool = camera != 0 && camera[PortalCameraInfo].offline
+  const label: string = camera != 0 ? camera[PortalCameraInfo].label : ""
+
+  Layout: {direction: Row}
+  Item: {width: {mode: Grow}}
+
+  Button pick(
+    label: offline ? "{label}  OFFLINE" : label,
+    variant: selected ? "primary" : "secondary",
+    width: 156)
+
+  async {
+    while true {
+      await on.change(this)
+      if state != 0 {
+        state[PortalCctvState].selected = index
+      }
+    }
+  }
+}
+
+// The CCTV screen: the cameras on the left, the picture of the selected one on the right with its
+// label, title and place, or NO SIGNAL for an offline camera. picture is the texture of the
+// PortalCctvFeed of the same cameras and state.
+template PortalCctvScreen : PortalScreen {
+  prop title: string = "SECURITY // CCTV"
+  prop cameras: entity[] = []
+  prop state: entity = 0
+  prop picture: entity = 0
+
+  const count: i32 = cameras.count()
+  const index: i32 = count > 0 ? clamp(state[PortalCctvState].selected, 0, count - 1) : 0
+  const camera: entity = count > 0 ? cameras[index] : 0
+  const offline: bool = camera == 0 || camera[PortalCameraInfo].offline
+  const online: i32 = cameras.filter((c) -> { !c[PortalCameraInfo].offline }).count()
+  const caption: string = camera != 0 ? camera[PortalCameraInfo].label : ""
+  const named: string = camera != 0 ? camera[PortalCameraInfo].title : ""
+  const place: string = camera != 0 ? camera[PortalCameraInfo].place : ""
+
+  // The picture fits 4:3 in the body under the header
+  const ph: f32 = 290
+  const pw: f32 = 386
+
+  Border: {width: 2, color: {110, 220, 255, 115}}
+
+  PortalScreenHeader header(
+    title: title,
+    status: "{online}/{count} ONLINE",
+    alert: false)
+
+  body {
+    Layout: {direction: Row, spacing: 12, padding: {10, 10, 12, 12}}
+    Item: {width: {mode: Grow}, height: {mode: Grow}}
+
+    list {
+      Layout: {direction: Column, spacing: 4}
+      Item: {width: {mode: Fixed, value: 170}}
+
+      heading {
+        Text: {value: "CAMERAS", size: 11}
+        Rgb: {90, 130, 145}
+      }
+
+      for i in 0..count {
+        "cam_{i}" {
+          PortalCctvRow: {state: state, camera: cameras[i], index: i, selected: i == index}
+        }
+      }
+    }
+
+    feed {
+      Layout: {direction: Column, spacing: 4, h: Center}
+      Item: {width: {mode: Grow}, height: {mode: Grow}}
+
+      heading {
+        Text: {value: "FEED", size: 11}
+        Rgb: {90, 130, 145}
+      }
+
+      frame {
+        Layout: {}
+        Item: {width: {mode: Fixed, value: pw}, height: {mode: Fixed, value: ph}}
+        Rect: {1, 1}
+        Rgb: {3, 16, 22}
+
+        if !offline {
+          image {
+            Item: {h: Left, v: Top, width: {mode: Fixed, value: pw}, height: {mode: Fixed, value: ph}}
+            Rect: {1, 1}
+            Image: {texture: picture, u0: 0, v0: 0, u1: 1, v1: 1}
+            Rgb: {200, 255, 215}
+            Ignore
+          }
+
+          label {
+            Item: {h: Left, v: Top, x: 8, y: -6}
+            Text: {value: "{caption}  {named}", size: 12}
+            Rgb: {255, 255, 255}
+            Ignore
+          }
+
+          where {
+            Item: {h: Left, v: Bottom, x: 26, y: 6}
+            Text: {value: "REC  {place}", size: 11}
+            Rgb: {255, 70, 55}
+            Ignore
+          }
+
+          dot {
+            Item: {
+              h: Left, v: Bottom, x: 10, y: 9,
+              width: {mode: Fixed, value: 8}, height: {mode: Fixed, value: 8}
+            }
+            Rect: {1, 1}
+            Border: {radius: 4}
+            Rgb: {255, 70, 55}
+            Ignore
+          }
+        }
+
+        if offline {
+          signal {
+            Item: {h: Center, v: Middle}
+            Text: {value: "NO SIGNAL", size: 18}
+            Rgb: {255, 70, 55}
+            Ignore
+          }
+
+          which {
+            Item: {h: Left, v: Top, x: 8, y: -6}
+            Text: {value: "{caption}  {named}", size: 12}
+            Rgb: {90, 130, 145}
+            Ignore
+          }
+        }
+      }
+    }
+  }
+}

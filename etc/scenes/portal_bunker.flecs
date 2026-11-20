@@ -21,6 +21,7 @@ include portal/harbour_screen
 include portal/engine_screen
 include portal/navigation_screen
 include portal/helm_screen
+include portal/cctv_screen
 include portal_bunker/textures
 include portal_bunker/materials
 include portal_bunker/models

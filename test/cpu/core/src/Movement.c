@@ -5,6 +5,7 @@
 
 #include <box.h>
 #include <bake_test.h>
+#include <math.h>
 #include <string.h>
 
 void Movement_linear(void) {
@@ -811,6 +812,71 @@ void Movement_path_follow_invalid_path(void) {
         test_flt(p->z, 3);
         test_flt(ecs_get(world, followers[i], PathFollow)->distance, 0);
     }
+
+    ecs_fini(world);
+}
+
+void Movement_pan_follows_sine(void) {
+    // engine_core/movement
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Rotation, {0.2f, 0, 0.1f});
+    ecs_set(world, e, Pan, {.center = 1, .amplitude = 0.5f, .speed = 2, .phase = 0.3f});
+
+    for (int i = 0; i < 7; i ++) {
+        ecs_progress(world, 0.25f);
+
+        double time = ecs_get_world_info(world)->world_time_total;
+        float expect = 1.0f + 0.5f * (float)sin(time * 2.0 + 0.3);
+        const Rotation *r = ecs_get(world, e, Rotation);
+
+        test_assert(fabsf(r->y - expect) < 1e-4f);
+        test_flt(r->x, 0.2f);
+        test_flt(r->z, 0.1f);
+    }
+
+    ecs_fini(world);
+}
+
+void Movement_pan_stays_in_range(void) {
+    // engine_core/movement
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Pan, {.center = -1, .amplitude = 0.35f, .speed = 0.3f, .phase = 5.4f});
+    float low = 100, high = -100;
+
+    for (int i = 0; i < 300; i ++) {
+        ecs_progress(world, 0.1f);
+
+        float y = ecs_get(world, e, Rotation)->y;
+        low = y < low ? y : low;
+        high = y > high ? y : high;
+    }
+
+    test_assert(low >= -1.35f - 1e-4f);
+    test_assert(high <= -0.65f + 1e-4f);
+    test_assert(low < -1.3f);
+    test_assert(high > -0.7f);
+
+    ecs_fini(world);
+}
+
+void Movement_pan_implies_rotation(void) {
+    // engine_core/movement
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Pan, {.center = 0.5f, .amplitude = 0});
+    test_assert(ecs_has(world, e, Rotation));
+    test_assert(ecs_has(world, e, DynamicTransform));
+
+    ecs_progress(world, 0.5f);
+    test_flt(ecs_get(world, e, Rotation)->y, 0.5f);
 
     ecs_fini(world);
 }

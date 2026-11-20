@@ -68,6 +68,29 @@ ECS_STRUCT(Surface, {
     char *write_to_file;             /**< PNG every frame is written to, NULL for none */
 });
 
+/** When a surface with a texture renders, on its entity: at most once per interval, and only
+ * while a view of the window sees the entity named by seen.
+ *
+ * Between renders the texture keeps its last image and the views of the surface cost the GPU
+ * nothing. A surface renders once at the start whatever the schedule, so its texture has a size.
+ *
+ * Seen: the sphere of radius about the world position of seen is in the frustum of a
+ * perspective view no texture surface renders, within range of its eye, in an area it saw.
+ */
+ECS_STRUCT(SurfaceSchedule, {
+    float interval;         /**< Seconds between renders, 0 renders every frame it is due */
+    ecs_entity_t seen;      /**< Entity whose sight wakes the surface, 0 for always awake */
+    float radius;           /**< Radius in world units of the sphere about seen, 0 a point */
+    float range;            /**< Farthest distance of the eye from seen, 0 for any distance */
+    bool paused;            /**< Render nothing and keep the last image */
+});
+
+/** What a SurfaceSchedule did, written by the engine when it changes, read only. */
+ECS_STRUCT(SurfaceScheduleStatus, {
+    bool seen;              /**< A view saw the seen entity in the last frame */
+    int32_t renders;        /**< Frames the surface rendered since the schedule was set */
+});
+
 /** Size and kind of a surface, written by the engine and read only for applications.
  *
  * A relative Surface.write_to_file is a file in AppStatus.tmp_dir, or in the working

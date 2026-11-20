@@ -8,6 +8,7 @@
 
 #define BOX_SURFACE_IMPL
 #include "surface.h"
+#include "schedule.h"
 #include "../render/render.h"
 #include "../posix.h"
 #include <math.h>
@@ -43,6 +44,7 @@ typedef struct SurfaceImpl {
     char *capture;                  /**< Path the frames are written to */
     ecs_vec_t captures;             /**< char*, files of one frame each that are written next,
                                      *   in place of the write_to_file path */
+    float schedule_wait;            /**< Seconds before a SurfaceSchedule is due again */
 } SurfaceImpl;
 
 ECS_COMPONENT_DECLARE(SurfaceImpl);
@@ -413,13 +415,15 @@ static void box_surface_clear(
  * @param s The surface
  * @param impl The engine side of the surface
  * @param state The module state
+ * @param delta_time Seconds since the last frame, for a SurfaceSchedule
  */
 static void box_surface_frame(
     ecs_world_t *world,
     ecs_entity_t e,
     const Surface *s,
     SurfaceImpl *impl,
-    box_surface_state_t *state)
+    box_surface_state_t *state,
+    float delta_time)
 {
     box_render_packet_t *p = box_render_packet(world);
     box_render_resource_op_t op = BOX_RENDER_UPDATE;
@@ -458,6 +462,13 @@ static void box_surface_frame(
     if (s->vsync && !box_surface_offscreen(world, s)) {
         p->vsync = true;
         p->refresh = p->refresh > 0 ? p->refresh : desc.refresh;
+    }
+
+    if (s->texture && !ecs_vec_count(&impl->captures) &&
+        !box_surface_schedule_due(world, e, p, delta_time, &impl->schedule_wait))
+    {
+        box_render_texture_target(world, s->texture, impl->handle);
+        goto done;
     }
 
     box_surface_clear(world, s, p, clear);
@@ -546,7 +557,8 @@ static void BoxSurfaceExtract(
         SurfaceImpl *impl = ecs_field(it, SurfaceImpl, 1);
         int32_t i;
         for (i = 0; i < it->count; i ++) {
-            box_surface_frame(it->stage, it->entities[i], &s[i], &impl[i], state);
+            box_surface_frame(
+                it->stage, it->entities[i], &s[i], &impl[i], state, it->delta_time);
         }
     }
 }
@@ -861,6 +873,8 @@ void BoxSurfaceImport(
     ecs_set_hooks(world, Surface, { .ctor = box_surface_ctor });
     ecs_set_name_prefix(world, "Surface");
     ECS_META_COMPONENT(world, SurfaceStatus);
+    ECS_META_COMPONENT(world, SurfaceSchedule);
+    ECS_META_COMPONENT(world, SurfaceScheduleStatus);
     ECS_COMPONENT_DEFINE(world, SurfaceImpl);
     ecs_set_name_prefix(world, NULL);
 
