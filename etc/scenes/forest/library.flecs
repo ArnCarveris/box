@@ -5,8 +5,8 @@
 // undergrowth (grass, ferns, flowers, shrubs, logs, stumps, rocks, mushrooms and litter), the
 // boulders, the sky and the sun, and the window and the HUD with its sliders.
 //
-// A scene includes ui/widgets (the HUD uses it) and trees/textures (the leaf card and bark
-// textures), then this, then places the things and sets up its camera and view, such as
+// A scene includes ui/widgets (the HUD uses it) and trees/generator (the tree presets with
+// their leaf card and bark textures), then this, then places the things and sets up its camera and view, such as
 // forest.flecs.
 include state
 include helpers

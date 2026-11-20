@@ -9,7 +9,7 @@
 // and motes), the insects, the view, the rain, sleet or snow that falls around the camera, the
 // sound of the wind, the brook, the rain, the birds and the crickets, and the animals.
 include ui/widgets
-include trees/textures
+include trees/generator
 include forest/library
 include forest/layout
 include forest/floor

@@ -3,27 +3,25 @@ using flecs.script.math
 using box.transform
 using box.geometry
 using box.material
+using box.mesh
+using trees
 using state
 using assets
 
 // The trees of the forest: beech, oak, birch, spruce and fir templates and dead snags, each with
 // a seed prop that varies its shape. stands.flecs places them.
 //
-// A tree is built in its own space, the root entity at its foot, Y up: a trunk swept along one
-// of a few shared trunk paths, limbs and twigs swept along shared limb paths in a few girths (so
-// the trees of a species share their meshes and draw instanced), and leaf cards (leaves.flecs)
-// in lobes at the tips of the limbs and twigs. Trunk, limbs and leaves of one tree are children
-// of its root, so they share its placement and lean and can sway together. Every leaf card
-// carries a ForestLeafCluster with a seeded value. Nothing picks, collides with or queries the
-// trees, so they stay out of the spatial index (spatial.Ignore on the root), which keeps the
-// tens of thousands of shapes they are made of out of its work.
+// A tree is a preset of the tree generator (trees/presets.flecs), two MeshGraph shapes, its
+// bark and its foliage, in the barks of bark.flecs and the leaf prefabs of leaves.flecs, which
+// recolor the canopies by the season and thin them by a VertexReveal. Trees of a species share
+// a few seeds and grow at a few ages, scaled to their height and slenderness, so they share
+// their meshes and draw instanced. The Tree sets the WindSway of both shapes, a hierarchy from
+// the pivots of the graph, as stiff as the sway of the species in wind.flecs. Nothing picks,
+// collides with or queries the trees, so they stay out of the spatial index (spatial.Ignore on
+// the root).
 state {
   // A tree, on its root entity
   struct ForestTree(species: i32, height: f32, seed: i32, detail: i32)
-
-  // A leaf card: its seeded value, 0..1, by which the season task can thin a canopy (hiding the
-  // cards below a threshold), and the species of its tree
-  struct ForestLeafCluster(seed: f32, species: i32)
 
   export const SPECIES_BEECH: i32 = 0
   export const SPECIES_OAK: i32 = 1
@@ -32,34 +30,68 @@ state {
   export const SPECIES_FIR: i32 = 4
   export const SPECIES_SNAG: i32 = 5
 
-  // Full trees in the forest, cheap ones in the backdrop: fewer limbs and bigger cards that
-  // cast no shadow, fewer segments and a dark core in the crown
+  // Full trees in the forest, cheap ones in the backdrop that cast no shadow
   export const DETAIL_FULL: i32 = 0
   export const DETAIL_CHEAP: i32 = 1
 
-  // Trunk paths run TRUNK_LEN path units up with a profile of radius TRUNK_RADIUS, limb paths
-  // LIMB_LEN; trunks start TRUNK_SINK below the ground
+  // Trunk paths of the logs (undergrowth.flecs) run TRUNK_LEN path units up with a profile of
+  // radius TRUNK_RADIUS; trunks start TRUNK_SINK below the ground
   export const TRUNK_LEN: f32 = 20
   export const TRUNK_RADIUS: f32 = 0.5
   export const TRUNK_SINK: f32 = 0.3
-  export const LIMB_LEN: f32 = 4
 
-  // Limb girths: the radius at the foot of a limb path of level l is GIRTH_MIN * GIRTH_STEP^l
-  // path units, tapering to LIMB_TAPER of that at its tip
-  export const GIRTH_LEVELS: i32 = 7
-  export const GIRTH_MIN: f32 = 0.04
-  export const GIRTH_STEP: f32 = 1.5
-  export const LIMB_TAPER: f32 = 0.3
+  // The seeds a species grows from, and the ages: a tree grows at the age of a mature tree
+  // times FOREST_AGE_STEP to a power, the closest to its height
+  export const FOREST_SEEDS: i32 = 4
+  export const FOREST_AGE_STEP: f32 = 0.75
 
-  // The share of the leaf cards of a broadleaf crown that cast a shadow
-  export const CARD_CASTING: f32 = 0.22
+  // Mature height of the preset of a species (trees/presets.flecs)
+  fn forest_preset_height(species: f64) -> f64 {
+    species < 0.5 ? 24 : (species < 1.5 ? 21 : (species < 2.5 ? 19 : (species < 3.5 ? 28 : 30)))
+  }
 
-  // Limb paths: straight, curving up, drooping, winding (once the limb is turned out from the
-  // trunk; the curves bend toward local -Z, +Z and along X)
-  export const LIMB_STRAIGHT: i32 = 0
-  export const LIMB_RISE: i32 = 1
-  export const LIMB_DROOP: i32 = 2
-  export const LIMB_WIND: i32 = 3
+  // The age a tree of a species and height grows at
+  fn forest_tree_age(species: f64, height: f64) -> f64 {
+    const n = clamp(round(log(max(height, 0.5) / forest_preset_height(species)) / log(FOREST_AGE_STEP)), 0, 10)
+    pow(FOREST_AGE_STEP, n)
+  }
+
+  // The stiffness of a Tree of a height whose top bends as much as the sway of its kind, bend
+  // at sway_height (wind.flecs), bends a vertex at that height (Tree: the top of a Tree bends
+  // height * 0.0028 * (1.4 - stiffness))
+  fn forest_tree_stiffness(height: f64, bend: f64, sway_height: f64) -> f64 {
+    clamp(1.4 - bend * height / (sway_height * sway_height * 0.0028), 0, 1.4)
+  }
+
+  // A snag (ForestSnag): the radius of its trunk at its foot, the age of the TreeSnag with that
+  // radius, and its radius at height y over its foot. It stands straight, so its axis is its Y
+  export const SNAG_TAPER: f32 = 0.55
+
+  fn forest_snag_r0(seed: f64) -> f64 {
+    0.26 + 0.18 * forest_hash(1, seed)
+  }
+
+  fn forest_snag_age(seed: f64) -> f64 {
+    pow(forest_snag_r0(seed) / 0.36, 1 / 1.3)
+  }
+
+  fn forest_snag_radius(seed: f64, height: f64, y: f64) -> f64 {
+    forest_snag_r0(seed) * (1 - SNAG_TAPER * clamp(y / height, 0, 1))
+  }
+
+  // The fallen top of a snag: a log along local +Z on the ground beside it, its radius, the
+  // start of its axis and its length
+  fn forest_fallen_radius(seed: f64) -> f64 {
+    forest_snag_r0(seed) * 0.8
+  }
+
+  fn forest_fallen_start(seed: f64) -> f64 {
+    forest_snag_r0(seed) + 0.5
+  }
+
+  fn forest_fallen_length(seed: f64) -> f64 {
+    4 + 4 * forest_hash(60, seed)
+  }
 
   // Offset of trunk path variant v at f (0 foot, 1 top) across X and Z, in path units
   fn forest_trunk_x(v: f64, f: f64) -> f64 {
@@ -74,24 +106,6 @@ state {
       v < 2.5 ? 0 - 0.1 * sin(f * PI) : 0.25 * sin(f * 1.5 * PI) * f))
   }
 
-  // Offset of limb path kind at f across X and Z, in path units
-  fn forest_limb_x(kind: f64, f: f64) -> f64 {
-    kind > 2.5 ? 0.25 * sin(f * 2 * PI) : 0
-  }
-
-  fn forest_limb_z(kind: f64, f: f64) -> f64 {
-    kind < 0.5 ? 0 : (kind < 1.5 ? 0 - 0.95 * f * f : (kind < 2.5 ? 0.95 * f * f : 0 - 0.4 * f * f))
-  }
-
-  // Girth of a level, and the level closest to a girth
-  fn forest_girth(level: f64) -> f64 {
-    GIRTH_MIN * pow(GIRTH_STEP, level)
-  }
-
-  fn forest_girth_level(r: f64) -> f64 {
-    clamp(round(log(max(r, 0.001) / GIRTH_MIN) / log(GIRTH_STEP)), 0, GIRTH_LEVELS - 1)
-  }
-
   // (x, y, z) turned as Rotation {p, w, 0} turns it (Ry * Rx): pitch p about X, then yaw w
   // about Y
   fn forest_rot_x(x: f64, y: f64, z: f64, p: f64, w: f64) -> f64 {
@@ -104,19 +118,6 @@ state {
 
   fn forest_rot_z(x: f64, y: f64, z: f64, p: f64, w: f64) -> f64 {
     (y * sin(p) + z * cos(p)) * cos(w) - x * sin(w)
-  }
-
-  // The point f along a limb of kind, turned by (p, w) and scaled by s, from its foot
-  fn forest_limb_at_x(kind: f64, f: f64, p: f64, w: f64, s: f64) -> f64 {
-    s * forest_rot_x(forest_limb_x(kind, f), LIMB_LEN * f, forest_limb_z(kind, f), p, w)
-  }
-
-  fn forest_limb_at_y(kind: f64, f: f64, p: f64, w: f64, s: f64) -> f64 {
-    s * forest_rot_y(forest_limb_x(kind, f), LIMB_LEN * f, forest_limb_z(kind, f), p, w)
-  }
-
-  fn forest_limb_at_z(kind: f64, f: f64, p: f64, w: f64, s: f64) -> f64 {
-    s * forest_rot_z(forest_limb_x(kind, f), LIMB_LEN * f, forest_limb_z(kind, f), p, w)
   }
 
   // The Rotation (Ry * Rx * Rz) of a card that points along the unit vector (tx, ty, tz) (its
@@ -171,28 +172,10 @@ assets {
     }
   }
 
-  // The limb paths, through forest_limb_x/z at thirds
-  template ForestLimbPath {
-    prop kind: i32 = 0
-
-    Path3D: {
-      start: {0, 0, 0},
-      segments: [
-        {kind: CatmullRom, end: {forest_limb_x(kind, 0.333), LIMB_LEN * 0.333, forest_limb_z(kind, 0.333)}},
-        {kind: CatmullRom, end: {forest_limb_x(kind, 0.667), LIMB_LEN * 0.667, forest_limb_z(kind, 0.667)}},
-        {kind: CatmullRom, end: {forest_limb_x(kind, 1), LIMB_LEN, forest_limb_z(kind, 1)}}
-      ]
-    }
-  }
-
   ForestTrunkPath forest_trunk_path_0(variant: 0)
   ForestTrunkPath forest_trunk_path_1(variant: 1)
   ForestTrunkPath forest_trunk_path_2(variant: 2)
   ForestTrunkPath forest_trunk_path_3(variant: 3)
-  ForestLimbPath forest_limb_path_0(kind: LIMB_STRAIGHT)
-  ForestLimbPath forest_limb_path_1(kind: LIMB_RISE)
-  ForestLimbPath forest_limb_path_2(kind: LIMB_DROOP)
-  ForestLimbPath forest_limb_path_3(kind: LIMB_WIND)
 
   // A trunk: a Sweep along trunk path variant, TRUNK_RADIUS path units at its foot, tapering to
   // taper of that at its top, in the bark of the species. Scale it by the length of the trunk
@@ -231,652 +214,135 @@ assets {
     }
   }
 
-  // A limb or twig: a Sweep along limb path kind, LIMB_LEN path units long, of girth level, in
-  // the bark of the species. Scale it by its length over LIMB_LEN
-  template ForestLimb {
-    prop species: i32 = 0
-    prop kind: i32 = 0
-    prop level: i32 = 0
-    prop detail: i32 = 0
-
-    const r = forest_girth(level)
-    const seg: i32 = detail == DETAIL_FULL ? 2 : 1
-    const rings: i32 = detail == DETAIL_FULL ? 8 : 4
-
-    if kind == LIMB_STRAIGHT {
-      Sweep: {path: forest_limb_path_0, profile: ForestRoundProfile, scale: {r, r}, taper: LIMB_TAPER, segments: seg, rings: rings}
-    } else if kind == LIMB_RISE {
-      Sweep: {path: forest_limb_path_1, profile: ForestRoundProfile, scale: {r, r}, taper: LIMB_TAPER, segments: seg, rings: rings}
-    } else if kind == LIMB_DROOP {
-      Sweep: {path: forest_limb_path_2, profile: ForestRoundProfile, scale: {r, r}, taper: LIMB_TAPER, segments: seg, rings: rings}
-    } else {
-      Sweep: {path: forest_limb_path_3, profile: ForestRoundProfile, scale: {r, r}, taper: LIMB_TAPER, segments: seg, rings: rings}
-    }
-
-    if species == SPECIES_BEECH {
-      (IsA, ForestLimbBeech)
-    } else if species == SPECIES_OAK {
-      (IsA, ForestLimbOak)
-    } else if species == SPECIES_BIRCH {
-      (IsA, ForestLimbBirch)
-    } else if species == SPECIES_SPRUCE {
-      (IsA, ForestLimbSpruce)
-    } else if species == SPECIES_FIR {
-      (IsA, ForestLimbFir)
-    } else {
-      (IsA, ForestLimbDead)
-    }
-  }
-
-  // A leaf card of a species (variant 0 or 1, the two clusters of a broadleaf), with its seeded
-  // value. Only some cards of a crown cast a shadow: the overlap of all of them in the shadow
-  // cascades would cost more than the denser shadow shows
-  template ForestLeafCard {
-    prop species: i32 = 0
-    prop variant: i32 = 0
-    prop seed: f32 = 0
-    prop shadow: bool = true
-
-    if !shadow {
-      NoShadow
-    }
-
-    if species == SPECIES_BEECH {
-      if variant == 0 {
-        (IsA, ForestLeafBeech)
-      } else {
-        (IsA, ForestLeafBeechB)
-      }
-    } else if species == SPECIES_OAK {
-      if variant == 0 {
-        (IsA, ForestLeafOak)
-      } else {
-        (IsA, ForestLeafOakB)
-      }
-    } else if species == SPECIES_BIRCH {
-      if variant == 0 {
-        (IsA, ForestLeafBirch)
-      } else {
-        (IsA, ForestLeafBirchB)
-      }
-    } else if species == SPECIES_SPRUCE {
-      (IsA, ForestNeedleSpruce)
-    } else {
-      (IsA, ForestNeedleFir)
-    }
-
-    ForestLeafCluster: {seed: seed, species: species}
-  }
-
-  // A lobe of count leaf cards (in threes from one stem, see ForestCardTripleMesh), card meters
-  // long, around the tip of a twig at (x, y, z) of the tree, their stems within spread of it. (ox, oy, oz) points from the middle of the crown to
-  // the lobe: the cards point out along it, up by lift, and banked and turned by a seeded jitter;
-  // hanging cards (birch, hang 1) point down and out instead. A share of the cards casts a
-  // shadow, none without shadow. The lobe has no pose of its own: its cards are placed in the
-  // space of the tree, which keeps the hierarchy the transforms and the renderer walk shallow
-  template ForestLeafLobe {
-    prop species: i32 = 0
-    prop seed: f32 = 0
-    prop x: f32 = 0
-    prop y: f32 = 0
-    prop z: f32 = 0
-    prop count: i32 = 5
-    prop spread: f32 = 0.4
-    prop card: f32 = 1
-    prop ox: f32 = 0
-    prop oy: f32 = 1
-    prop oz: f32 = 0
-    prop lift: f32 = 0.3
-    prop hang: f32 = 0
-    prop shadow: bool = true
-    prop casting: f32 = CARD_CASTING
-
-    const ol = sqrt(ox * ox + oy * oy + oz * oz) + 0.001
-    const ux = ox / ol
-
-    const uy = oy / ol
-    const uz = oz / ol
-
-    const clusters: i32 = floor((count + 2) / 3)
-    for c in 0..clusters {
-      const q = c * 11
-      const h1 = forest_hash(q + 1, seed)
-      const h2 = forest_hash(q + 2, seed)
-      const h3 = forest_hash(q + 3, seed)
-      const px = (h1 * 2 - 1) * spread
-      const py = (h2 * 2 - 1) * spread * 0.5
-      const pz = (h3 * 2 - 1) * spread
-      const jx = ux * (1 - hang * 0.6) + (h1 * 2 - 1) * 0.5 + (forest_hash(q + 4, seed) - 0.5) * 1.1
-      const jy = uy * 0.6 * (1 - hang) + lift - hang * 1.7 + (forest_hash(q + 5, seed) - 0.5) * 0.9
-      const jz = uz * (1 - hang * 0.6) + (h3 * 2 - 1) * 0.5 + (forest_hash(q + 6, seed) - 0.5) * 1.1
-      const jl = sqrt(jx * jx + jy * jy + jz * jz) + 0.001
-      const tx = jx / jl
-      const ty = jy / jl
-      const tz = jz / jl
-      const b = (forest_hash(q + 7, seed) - 0.5) * 1.8
-      const size = card * (0.8 + 0.4 * forest_hash(q + 8, seed))
-      const v: i32 = forest_hash(q + 9, seed) < 0.5 ? 0 : 1
-      const casts = shadow && forest_hash(q + 11, seed) < casting
-
-      ForestLeafCard(species: species, variant: v, seed: forest_hash(q + 10, seed), shadow: casts) {
-        Position: {x + px, y + py, z + pz}
-        Rotation: {forest_card_pitch(ty, b), forest_card_yaw(tx, ty, tz, b), forest_card_roll(ty, b)}
-        Scale: {size * (1 - 0.25 * hang), size, size}
-      }
-    }
-  }
-
-  // A broadleaf tree height meters tall: a trunk to top of the height, root flares, limbs from
-  // bole of the height up, each with subs twigs, and lobes of cards at the tips of the limbs and
-  // twigs, along the limbs and twigs, shell lobes over the crown between them and on the top of
-  // the trunk. Girth is the radius at the foot over the
-  // height, slender thins it (young trees). The species templates derive from it and set the
-  // props
-  template ForestBroadleaf {
+  // A living tree of a species, height meters tall, its trunk slender times as thick as usual:
+  // the preset of the species from seed % FOREST_SEEDS at the closest age, scaled to height
+  // (and across by slender), in the forest bark and the leaves of the species, every other seed
+  // of a broadleaf in the leaves that turn later. The species templates derive from it
+  template ForestGrown {
     prop species: i32 = 0
     prop seed: i32 = 1
     prop height: f32 = 22
     prop detail: i32 = 0
     prop slender: f32 = 1
-    prop girth: f32 = 0.016
-    prop bole: f32 = 0.4
-    prop top: f32 = 0.8
-    prop taper: f32 = 0.4
-    prop limbs: i32 = 7
-    prop reach: f32 = 0.3
-    prop pitch_low: f32 = 1
-    prop pitch_high: f32 = 0.5
-    prop kind: i32 = 1
-    prop twig_kind: i32 = 1
-    prop twig_pitch: f32 = 0.7
-    prop subs: i32 = 3
-    prop cards: i32 = 6
-    prop shell: i32 = 12
-    prop card: f32 = 0.075
-    prop lift: f32 = 0.3
-    prop hang: f32 = 0
 
     ForestTree: {species: species, height: height, seed: seed, detail: detail}
     box.spatial.Ignore
-
-    const full = detail == DETAIL_FULL
-    const small = height < 6
-    const tv: i32 = seed % 4
-    const th = height * top + TRUNK_SINK
-    const k = th / TRUNK_LEN
-    const foot = girth * height * slender
-    const kr = foot / TRUNK_RADIUS
-    const n: i32 = full ? (small ? 3 : (height < 12 ? limbs - 2 : limbs)) : max(4, limbs - 2)
-    const ns: i32 = full ? (small ? 1 : (height < 12 ? subs - 1 : subs)) : 0
-    const nc: i32 = full ? (small ? 3 : cards) : cards
-    const cs = clamp(height * card, 0.55, 2.2) * (full ? 1 : 1.5)
-    // The middle of the crown, which the cards turn away from
-    const ccx = forest_trunk_x(tv, 0.85) * kr
-    const ccz = forest_trunk_z(tv, 0.85) * kr
-    const ccy = height * (bole + (top - bole) * 0.5)
-    const topx = forest_trunk_x(tv, 1) * kr
-    const topz = forest_trunk_z(tv, 1) * kr
-
-    ForestTrunk trunk(species: species, variant: tv, detail: detail, taper: taper) {
-      Position: {0, 0 - TRUNK_SINK, 0}
-      Scale: {kr, k, kr}
+    if detail != DETAIL_FULL {
+      NoShadow
     }
 
-    // Root flares: short thick limbs from the foot of the trunk out into the ground
-    if full && !small {
-      for j in 0..5 {
-        const w = j * 1.2566 + seed + forest_hash(j, seed + 0.5) * 0.6
-        const rs = foot * (1.6 + 0.8 * forest_hash(j + 7, seed)) / LIMB_LEN
-        const lv: i32 = forest_girth_level(foot * 0.7 / rs)
-        ForestLimb(species: species, kind: LIMB_STRAIGHT, level: lv, detail: detail) {
-          Position: {0, foot * 0.8, 0}
-          Rotation: {2.4, w, 0}
-          Scale: {rs, rs, rs}
-        }
+    const v: i32 = seed % FOREST_SEEDS
+    const ts: i32 = v * 7 + 1
+    const late = v % 2 == 1
+    const age = forest_tree_age(species, height)
+    const hr = forest_preset_height(species) * age
+    const k = (height + TRUNK_SINK) / hr
+    const kx = k * (0.75 + 0.25 * slender)
+    const broad_stiff = forest_tree_stiffness(hr, SWAY_BROADLEAF_BEND, SWAY_BROADLEAF_HEIGHT)
+    const conifer_stiff = forest_tree_stiffness(hr, SWAY_CONIFER_BEND, SWAY_CONIFER_HEIGHT)
+
+    if species == SPECIES_BEECH {
+      TreeBeech tree(seed: ts, age: age, bark_material: ForestTreeBarkBeech, leaf_material: late ? ForestLeafBeechB : ForestLeafBeech, stiffness: broad_stiff, flutter: SWAY_LEAF_FLUTTER) {
+        Position: {0, 0 - TRUNK_SINK, 0}
+        Scale: {kx, k, kx}
       }
-    }
-
-    for i in 0..n {
-      const fi = (i + 0.0) / max(n - 1, 1)
-      const h1 = forest_hash(i * 11 + 1, seed)
-      const h2 = forest_hash(i * 11 + 2, seed)
-      const h3 = forest_hash(i * 11 + 3, seed)
-      const h4 = forest_hash(i * 11 + 4, seed)
-      const ya = height * (bole + (top - 0.04 - bole) * fi) + (h4 - 0.5) * height * 0.04
-      const fa = (ya + TRUNK_SINK) / th
-      const ax = forest_trunk_x(tv, fa) * kr
-      const az = forest_trunk_z(tv, fa) * kr
-      const ll = height * reach * (1 - 0.45 * fi) * (0.85 + 0.3 * h1)
-      const s = ll / LIMB_LEN
-      const p = pitch_low + (pitch_high - pitch_low) * fi + (h2 - 0.5) * 0.3
-      const w = i * 2.39996 + seed * 0.77 + (h3 - 0.5) * 0.5
-      const lk: i32 = h4 < 0.3 ? LIMB_WIND : kind
-      // The limb is a little over half as thick as the trunk where it grows
-      const rl = foot * (1 - (1 - taper) * fa) * (0.6 - 0.15 * fi)
-      const lv: i32 = forest_girth_level(rl / s)
-      const rg = forest_girth(lv)
-      const tx = ax + forest_limb_at_x(lk, 1, p, w, s)
-      const ty = ya + forest_limb_at_y(lk, 1, p, w, s)
-      const tz = az + forest_limb_at_z(lk, 1, p, w, s)
-
-      ForestLimb "limb_{i}"(species: species, kind: lk, level: lv, detail: detail) {
-        Position: {ax, ya, az}
-        Rotation: {p, w, 0}
-        Scale: {s, s, s}
-
-        for j in 0..ns {
-          const fj = 0.35 + 0.45 * j / max(ns - 1, 1)
-          const p2 = twig_pitch + (forest_hash(i * 11 + j + 5, seed) - 0.5) * 0.4
-          const w2 = j * 2.4 + 1.2 + (forest_hash(i * 11 + j + 7, seed) - 0.5) * 1.2
-          const s2 = 0.62 - 0.25 * fj
-          const lv2: i32 = forest_girth_level(rg * (1 - (1 - LIMB_TAPER) * fj) * 0.65 / s2)
-          ForestLimb(species: species, kind: twig_kind, level: lv2, detail: detail) {
-            Position: {forest_limb_x(lk, fj), LIMB_LEN * fj, forest_limb_z(lk, fj)}
-            Rotation: {p2, w2, 0}
-            Scale: {s2, s2, s2}
-          }
-        }
+    } else if species == SPECIES_OAK {
+      TreeOak tree(seed: ts, age: age, bark_material: ForestTreeBarkOak, leaf_material: late ? ForestLeafOakB : ForestLeafOak, stiffness: broad_stiff, flutter: SWAY_LEAF_FLUTTER) {
+        Position: {0, 0 - TRUNK_SINK, 0}
+        Scale: {kx, k, kx}
       }
-
-      // Leaves at the tip of the limb
-      ForestLeafLobe(species: species, seed: seed * 97 + i * 13, count: nc, spread: cs * 0.45, card: cs, ox: tx - ccx, oy: ty - ccy, oz: tz - ccz, lift: lift, hang: hang, shadow: full, x: tx, y: ty, z: tz)
-
-      // Leaves along its twigs and at their tips, found as the twigs are placed in the limb
-      for j in 0..ns {
-        const fj = 0.35 + 0.45 * j / max(ns - 1, 1)
-        const p2 = twig_pitch + (forest_hash(i * 11 + j + 5, seed) - 0.5) * 0.4
-        const w2 = j * 2.4 + 1.2 + (forest_hash(i * 11 + j + 7, seed) - 0.5) * 1.2
-        const s2 = 0.62 - 0.25 * fj
-        for m in 0..2 {
-          const fm = 0.55 + 0.45 * m
-          const qx = forest_limb_x(lk, fj) + forest_limb_at_x(twig_kind, fm, p2, w2, s2)
-          const qy = LIMB_LEN * fj + forest_limb_at_y(twig_kind, fm, p2, w2, s2)
-          const qz = forest_limb_z(lk, fj) + forest_limb_at_z(twig_kind, fm, p2, w2, s2)
-          const bx = ax + s * forest_rot_x(qx, qy, qz, p, w)
-          const by = ya + s * forest_rot_y(qx, qy, qz, p, w)
-          const bz = az + s * forest_rot_z(qx, qy, qz, p, w)
-          ForestLeafLobe(species: species, seed: seed * 97 + i * 13 + j * 3 + m + 5, count: max(nc - 2 + m, 3), spread: cs * 0.32, card: cs * (0.8 + 0.1 * m), ox: bx - ccx, oy: by - ccy, oz: bz - ccz, lift: lift, hang: hang, shadow: full, x: bx, y: by, z: bz)
-        }
+    } else if species == SPECIES_BIRCH {
+      TreeBirch tree(seed: ts, age: age, bark_material: ForestTreeBarkBirch, leaf_material: late ? ForestLeafBirchB : ForestLeafBirch, stiffness: forest_tree_stiffness(hr, SWAY_BIRCH_BEND, SWAY_BIRCH_HEIGHT), flutter: SWAY_LEAF_FLUTTER) {
+        Position: {0, 0 - TRUNK_SINK, 0}
+        Scale: {kx, k, kx}
       }
-
-      // Cards along the outer half of the limb, to fill the crown
-      if full && !small {
-        const mx = ax + forest_limb_at_x(lk, 0.6, p, w, s)
-        const my = ya + forest_limb_at_y(lk, 0.6, p, w, s)
-        const mz = az + forest_limb_at_z(lk, 0.6, p, w, s)
-        ForestLeafLobe(species: species, seed: seed * 97 + i * 13 + 31, count: 3, spread: cs * 0.3, card: cs * 0.85, ox: mx - ccx, oy: my - ccy, oz: mz - ccz, lift: lift, hang: hang, x: mx, y: my, z: mz)
+    } else if species == SPECIES_SPRUCE {
+      TreeSpruce tree(seed: ts, age: age, bark_material: ForestTreeBarkSpruce, leaf_material: ForestNeedleSpruce, stiffness: conifer_stiff, flutter: SWAY_NEEDLE_FLUTTER) {
+        Position: {0, 0 - TRUNK_SINK, 0}
+        Scale: {kx, k, kx}
       }
-    }
-
-    // Lobes over the shell of the crown, between the limbs, so the crown reads as a dome of
-    // foliage: a golden spiral over an ellipsoid around its middle
-    const nsh: i32 = full ? (small ? 2 : shell) : max(shell / 2, 3)
-    const shr = height * reach * 0.8
-    const shv = height * (top - bole) * 0.55
-    for m in 0..nsh {
-      const hm = forest_hash(m + 70, seed)
-      const cy = 0.85 - 1.5 * (m + 0.5) / nsh
-      const sr = sqrt(max(1 - cy * cy, 0))
-      const a = m * 2.39996 + seed * 0.37
-      const rad = 0.75 + 0.2 * hm
-      const sx = ccx + sin(a) * sr * shr * rad
-      const sy = ccy + height * 0.05 + cy * shv * rad
-      const sz = ccz + cos(a) * sr * shr * rad
-      ForestLeafLobe(species: species, seed: seed * 97 + m * 7 + 400, count: nc - 1, spread: cs * 0.45, card: cs * 0.9, ox: sx - ccx, oy: sy - ccy, oz: sz - ccz, lift: lift, hang: hang, shadow: full, x: sx, y: sy, z: sz)
-    }
-
-    // The top of the crown
-    ForestLeafLobe crown_top(species: species, seed: seed * 97 + 3, count: nc + 3, spread: cs * 0.5, card: cs, ox: 0, oy: 1, oz: 0, lift: lift, hang: hang * 0.6, shadow: full, x: topx, y: height * top, z: topz)
-
-    // A cheap crown is filled with a dark core between its few big cards
-    if !full {
-      const cr = height * reach * 0.62
-      core : ForestBroadleafCore {
-        Position: {ccx, ccy + height * 0.04, ccz}
-        Scale: {cr, height * (top - bole) * 0.55, cr}
-        IcoSphere: {radius: 1, segments: 1, smooth: true}
-      }
-    }
-  }
-
-  // A conifer height meters tall: a straight trunk tapering to the top, dead twigs below the
-  // crown, whorls of branches tier meters apart from base of the height up, each branch with a
-  // frond of needle cards along it, frond times as wide as usual (and hanging curtains on a
-  // spruce), a leader on the top and a dark core, core_width of the crown wide, that fills the
-  // crown between the fronds. The species templates derive from it and set the props
-  template ForestConifer {
-    prop species: i32 = 3
-    prop seed: i32 = 1
-    prop height: f32 = 24
-    prop detail: i32 = 0
-    prop slender: f32 = 1
-    prop girth: f32 = 0.016
-    prop base: f32 = 0.18
-    prop width: f32 = 0.2
-    prop tier: f32 = 1.5
-    prop branches: i32 = 5
-    prop pitch_low: f32 = 1.95
-    prop pitch_high: f32 = 1.3
-    prop kind: i32 = 2
-    prop hanging: bool = true
-    prop frond: f32 = 1
-    prop core_width: f32 = 0.3
-
-    ForestTree: {species: species, height: height, seed: seed, detail: detail}
-    box.spatial.Ignore
-
-    const full = detail == DETAIL_FULL
-    const th = height + TRUNK_SINK
-    const k = th / TRUNK_LEN
-    const foot = girth * height * slender
-    const kr = foot / TRUNK_RADIUS
-    const nt: i32 = clamp(round(height * (0.95 - base) / (full ? tier : tier * 2.4)), 3, 24)
-    const nb: i32 = full ? branches : 4
-    const cr = height * width
-    const ch = height * (0.92 - base)
-
-    ForestTrunk trunk(species: species, variant: 0, detail: detail, taper: 0.04) {
-      Position: {0, 0 - TRUNK_SINK, 0}
-      Scale: {kr, k, kr}
-    }
-
-    // Dead twigs on the bare trunk below the crown
-    if full && height > 6 {
-      for j in 0..4 {
-        const y = height * base * (0.3 + 0.18 * j)
-        const sl = (0.5 + forest_hash(j, seed + 0.3) * 0.9) / LIMB_LEN
-        ForestLimb(species: SPECIES_SNAG, kind: LIMB_STRAIGHT, level: 1, detail: detail) {
-          Position: {forest_trunk_x(0, (y + TRUNK_SINK) / th) * kr, y, 0}
-          Rotation: {1.85, j * 2.4 + seed, 0}
-          Scale: {sl, sl, sl}
-        }
-      }
-    }
-
-    // The core fills the crown between the fronds as seen from a distance; a young conifer is
-    // seen from close by and its fronds fill it well enough
-    if !full || height > 10 {
-      const crw = cr * (full ? core_width : 0.45)
-      core : ForestConiferCore {
-        Position: {0, height * base + ch * 0.45, 0}
-        Scale: {crw, ch * 0.45, crw}
-        Sphere: {radius: 1, segments: full ? 10 : 6, smooth: true}
-      }
-    }
-
-    // The branches and fronds, in the space of the tree (the crown has no pose of its own)
-    crown {
-      if !full {
-        NoShadow
-      }
-
-      for t in 0..nt {
-        const ft = (t + 0.0) / max(nt - 1, 1)
-        const y = height * (base + (0.93 - base) * ft) + (forest_hash(t, seed + 0.7) - 0.5) * tier * 0.4
-        const ax = forest_trunk_x(0, (y + TRUNK_SINK) / th) * kr
-        // The crown narrows to the top, a little rounded below
-        const rr = cr * (0.1 + 0.9 * pow(1 - ft, 0.85))
-        const rt = foot * (1 - 0.96 * (y + TRUNK_SINK) / th)
-
-        for b in 0..nb {
-          const q = t * 13 + b
-          const hb = forest_hash(q, seed)
-          const w = b * 6.2832 / nb + t * 0.9 + seed + (hb - 0.5) * 0.8
-          const ll = rr * (0.85 + 0.3 * forest_hash(q + 3, seed))
-          const s = ll / LIMB_LEN
-          const p = pitch_low + (pitch_high - pitch_low) * ft + (forest_hash(q + 5, seed) - 0.5) * 0.2
-          // The frond follows the branch from near the trunk to its tip, banked by a seeded
-          // jitter, and turned over on every other branch so its outer card leans the other way
-          const fx = ax + forest_limb_at_x(kind, 0.06, p, w, s)
-          const fy = y + forest_limb_at_y(kind, 0.06, p, w, s)
-          const fz = forest_limb_at_z(kind, 0.06, p, w, s)
-          const ex = ax + forest_limb_at_x(kind, 1, p, w, s)
-          const ey = y + forest_limb_at_y(kind, 1, p, w, s)
-          const ez = forest_limb_at_z(kind, 1, p, w, s)
-          const d1 = sqrt((ex - fx) * (ex - fx) + (ey - fy) * (ey - fy) + (ez - fz) * (ez - fz)) + 0.001
-          const b1 = (hb - 0.5) * 0.5 + (b % 2 == 0 ? 0 : PI)
-
-          // Branches only where the fronds leave them in view, below the upper crown
-          if full && ft < 0.45 {
-            const lv: i32 = forest_girth_level(rt * 0.3 / s)
-            ForestLimb(species: species, kind: kind, level: lv, detail: detail) {
-              Position: {ax, y, 0}
-              Rotation: {p, w, 0}
-              Scale: {s, s, s}
-            }
-          }
-
-          ForestLeafCard(species: species, variant: 0, seed: forest_hash(q + 7, seed), shadow: full && (b + t) % 3 == 0) {
-            Position: {fx, fy + 0.03, fz}
-            Rotation: {forest_card_pitch((ey - fy) / d1, b1), forest_card_yaw((ex - fx) / d1, (ey - fy) / d1, (ez - fz) / d1, b1), forest_card_roll((ey - fy) / d1, b1)}
-            Scale: {d1 * 0.75 * frond * (full ? 1 : 1.35), d1 * 1.04, d1 * 0.4}
-          }
-
-          // Hanging curtains under the lower branches of a spruce
-          if hanging && full && ft < 0.7 && (b + t) % 3 == 0 {
-            const hx = ax + forest_limb_at_x(kind, 0.6, p, w, s)
-            const hy = y + forest_limb_at_y(kind, 0.6, p, w, s)
-            const hz = forest_limb_at_z(kind, 0.6, p, w, s)
-            const ux = (ex - fx) / d1 * 0.25
-            const uz = (ez - fz) / d1 * 0.25
-            const ul = sqrt(ux * ux + 1 + uz * uz)
-            ForestLeafCard(species: species, variant: 0, seed: forest_hash(q + 10, seed), shadow: false) {
-              Position: {hx, hy, hz}
-              Rotation: {forest_card_pitch(-1 / ul, 1.2), forest_card_yaw(ux / ul, -1 / ul, uz / ul, 1.2), forest_card_roll(-1 / ul, 1.2)}
-              Scale: {ll * 0.3, ll * 0.42, ll * 0.2}
-            }
-          }
-        }
-      }
-
-      // The leader: two crossed upright fronds that sheathe the tip of the trunk, so no bare
-      // spike stands over the crown against the sky
-      const lead = max(0.6, height * 0.08)
-      for j in 0..2 {
-        ForestLeafCard(species: species, variant: 0, seed: forest_hash(90 + j, seed)) {
-          Position: {forest_trunk_x(0, 0.96) * kr, height - lead * 0.85, 0}
-          Rotation: {0, seed + j * 1.5708, 0}
-          Scale: {lead * 0.5, lead, lead * 0.5}
-        }
+    } else {
+      TreeFir tree(seed: ts, age: age, bark_material: ForestTreeBarkFir, leaf_material: ForestNeedleFir, stiffness: conifer_stiff, flutter: SWAY_NEEDLE_FLUTTER) {
+        Position: {0, 0 - TRUNK_SINK, 0}
+        Scale: {kx, k, kx}
       }
     }
   }
 
   // Beech: a tall, straight, smooth grey bole, ascending limbs and a dome of flat layered sprays
-  template ForestBeech : ForestBroadleaf {
+  template ForestBeech : ForestGrown {
     prop species: i32 = SPECIES_BEECH
     prop height: f32 = 24
-    prop girth: f32 = 0.02
-    prop bole: f32 = 0.34
-    prop top: f32 = 0.84
-    prop taper: f32 = 0.38
-    prop limbs: i32 = 9
-    prop reach: f32 = 0.3
-    prop pitch_low: f32 = 1.15
-    prop pitch_high: f32 = 0.5
-    prop kind: i32 = LIMB_RISE
-    prop twig_kind: i32 = LIMB_RISE
-    prop twig_pitch: f32 = 0.85
-    prop subs: i32 = 3
-    prop cards: i32 = 7
-    prop shell: i32 = 16
-    prop card: f32 = 0.09
-    prop lift: f32 = 0.2
   }
 
   // Oak: a stout, furrowed trunk that splits low into wide, crooked limbs under a broad crown
-  template ForestOak : ForestBroadleaf {
+  template ForestOak : ForestGrown {
     prop species: i32 = SPECIES_OAK
     prop height: f32 = 21
-    prop girth: f32 = 0.028
-    prop bole: f32 = 0.28
-    prop top: f32 = 0.74
-    prop taper: f32 = 0.36
-    prop limbs: i32 = 7
-    prop reach: f32 = 0.44
-    prop pitch_low: f32 = 1.45
-    prop pitch_high: f32 = 0.8
-    prop kind: i32 = LIMB_WIND
-    prop twig_kind: i32 = LIMB_WIND
-    prop twig_pitch: f32 = 0.9
-    prop subs: i32 = 3
-    prop cards: i32 = 7
-    prop shell: i32 = 16
-    prop card: f32 = 0.095
-    prop lift: f32 = 0.3
   }
 
   // Birch: a slender white trunk, steep thin limbs and hanging twigs of small leaves
-  template ForestBirch : ForestBroadleaf {
+  template ForestBirch : ForestGrown {
     prop species: i32 = SPECIES_BIRCH
     prop height: f32 = 16
-    prop girth: f32 = 0.014
-    prop bole: f32 = 0.4
-    prop top: f32 = 0.92
-    prop taper: f32 = 0.3
-    prop limbs: i32 = 9
-    prop reach: f32 = 0.22
-    prop pitch_low: f32 = 0.85
-    prop pitch_high: f32 = 0.4
-    prop kind: i32 = LIMB_RISE
-    prop twig_kind: i32 = LIMB_DROOP
-    prop twig_pitch: f32 = 1.4
-    prop subs: i32 = 2
-    prop cards: i32 = 6
-    prop shell: i32 = 16
-    prop card: f32 = 0.1
-    prop lift: f32 = 0
-    prop hang: f32 = 1
   }
 
   // Spruce: a narrow cone from low down, drooping branches with upturned tips and hanging
   // curtains of twigs
-  template ForestSpruce : ForestConifer {
+  template ForestSpruce : ForestGrown {
     prop species: i32 = SPECIES_SPRUCE
     prop height: f32 = 25
-    prop girth: f32 = 0.016
-    prop base: f32 = 0.14
-    prop width: f32 = 0.2
-    prop tier: f32 = 1.1
-    prop branches: i32 = 6
-    prop pitch_low: f32 = 1.95
-    prop pitch_high: f32 = 1.35
-    prop kind: i32 = LIMB_DROOP
-    prop hanging: bool = true
   }
 
   // Fir: a higher, more columnar crown of flat, level branch tiers with darker, glossy needles
-  template ForestFir : ForestConifer {
+  template ForestFir : ForestGrown {
     prop species: i32 = SPECIES_FIR
     prop height: f32 = 23
-    prop girth: f32 = 0.016
-    prop base: f32 = 0.22
-    prop width: f32 = 0.19
-    prop tier: f32 = 1.1
-    prop branches: i32 = 6
-    prop pitch_low: f32 = 1.68
-    prop pitch_high: f32 = 1.4
-    prop kind: i32 = LIMB_STRAIGHT
-    prop hanging: bool = false
-    prop frond: f32 = 1.1
-    prop core_width: f32 = 0.18
   }
 
-  // A dead snag height meters tall: a bare trunk broken off in splinters, a few stubs of limbs
-  // and bracket fungus on one side. Fallen, its upper part lies beside it on the ground, local
-  // +Z, with more fungus
+  // A dead snag height meters tall: a TreeSnag standing straight, its trunk forest_snag_r0
+  // thick at the foot, broken off with a closed top, without sway. Fallen, its upper part lies
+  // beside it on the ground along local +Z, merged into its bark
   template ForestSnag {
     prop seed: i32 = 1
     prop height: f32 = 6
     prop fallen: bool = false
     prop detail: i32 = 0
 
-    const full = detail == DETAIL_FULL
-    const r0 = 0.26 + 0.18 * forest_hash(1, seed)
-    const th = height + TRUNK_SINK
-    const k = th / TRUNK_LEN
-    const kr = r0 / TRUNK_RADIUS
-    const tv: i32 = seed % 4
-    const rt = r0 * 0.75
-    const topx = forest_trunk_x(tv, 1) * kr
-    const topz = forest_trunk_z(tv, 1) * kr
-
     ForestTree: {species: SPECIES_SNAG, height: height, seed: seed, detail: detail}
     box.spatial.Ignore
-
-    ForestTrunk trunk(species: SPECIES_SNAG, variant: tv, detail: detail, taper: 0.75) {
-      Position: {0, 0 - TRUNK_SINK, 0}
-      Scale: {kr, k, kr}
+    if detail != DETAIL_FULL {
+      NoShadow
     }
 
-    // Splinters around the broken top
-    for j in 0..5 {
-      const a = j * 1.2566 + forest_hash(j + 10, seed) * 0.6
-      const sl = rt * (1.2 + 2.5 * forest_hash(j + 20, seed))
-      {
-        (IsA, ForestLimbDead)
-        Position: {topx + sin(a) * rt * 0.55, height + sl * 0.4, topz + cos(a) * rt * 0.55}
-        Rotation: {0.15 + 0.2 * forest_hash(j + 30, seed), a, 0}
-        Cone: {segments: 5, length: sl, radius: rt * 0.45}
-      }
-    }
+    const rt = forest_snag_radius(seed, height, height)
+    const lr = forest_fallen_radius(seed)
 
-    // Stubs of dead limbs
-    for j in 0..3 {
-      const y = height * (0.35 + 0.18 * j)
-      const f = (y + TRUNK_SINK) / th
-      const sl = (0.8 + 1.4 * forest_hash(j + 40, seed)) / LIMB_LEN
-      const lv: i32 = forest_girth_level(r0 * 0.3 / sl)
-      ForestLimb(species: SPECIES_SNAG, kind: LIMB_STRAIGHT, level: lv, detail: detail) {
-        Position: {forest_trunk_x(tv, f) * kr, y, forest_trunk_z(tv, f) * kr}
-        Rotation: {1 + 0.5 * forest_hash(j + 41, seed), j * 2.3 + seed, 0}
-        Scale: {sl, sl, sl}
-      }
-    }
+    // The broken top, closed
+    top_curve { nodes.Stem: {position: {0, height - 0.04, 0}, length: 0.05, segments: 1, radius: rt, taper: 0.15} }
+    top_mesh { nodes.Tube: {curves: top_curve, sides: 10, caps: true} }
 
-    // Shelf fungus up one side, half sunk into the wood
-    if full {
-      const side = forest_hash(50, seed) * 6.2832
-      for j in 0..7 {
-        const y = height * (0.12 + 0.55 * forest_hash(j + 51, seed))
-        const f = (y + TRUNK_SINK) / th
-        const rr = r0 * (1 - 0.25 * f)
-        const a = side + (forest_hash(j + 52, seed) - 0.5) * 1.6
-        const fs = 0.1 + 0.12 * forest_hash(j + 53, seed)
-        {
-          (IsA, ForestFungus)
-          Position: {forest_trunk_x(tv, f) * kr + sin(a) * rr, y, forest_trunk_z(tv, f) * kr + cos(a) * rr}
-          Rotation: {0.08, a, 0}
-          Scale: {fs * 1.4, fs * 0.32, fs}
-          Sphere: {radius: 1, segments: 12, smooth: true}
+    log_curve {
+      if fallen {
+        nodes.Stem: {
+          position: {0, lr, forest_fallen_start(seed)}, direction: {0, 0, 1},
+          length: forest_fallen_length(seed), segments: 8, radius: lr, taper: 0.25
         }
       }
     }
-
-    if fallen {
-      const fl = 4 + 4 * forest_hash(60, seed)
-      const lr = r0 * 0.8
-      const z0 = r0 + 0.5
-      ForestTrunk fallen_top(species: SPECIES_SNAG, variant: (tv + 1) % 4, detail: detail, taper: 0.75) {
-        Position: {0, lr * 0.85, z0}
-        Rotation: {PI / 2, 0, 0}
-        Scale: {lr / TRUNK_RADIUS, fl / TRUNK_LEN, lr / TRUNK_RADIUS}
+    log_mesh {
+      if fallen {
+        nodes.Tube: {curves: log_curve, sides: 10, caps: true}
       }
-
-      if full {
-        for j in 0..6 {
-          const d = z0 + fl * (0.15 + 0.7 * forest_hash(j + 61, seed))
-          const sd = j % 2 == 0 ? 1 : -1
-          const fs = 0.09 + 0.1 * forest_hash(j + 62, seed)
-          {
-            (IsA, ForestFungus)
-            Position: {sd * lr * 0.95, lr * (0.9 + 0.5 * forest_hash(j + 63, seed)), d}
-            Rotation: {0.05, sd * PI / 2, 0}
-            Scale: {fs * 1.4, fs * 0.32, fs}
-            Sphere: {radius: 1, segments: 12, smooth: true}
-          }
-        }
+    }
+    extra {
+      if fallen {
+        nodes.Merge: {inputs: [top_mesh, log_mesh]}
       }
+    }
+
+    TreeSnag tree(seed: seed, age: forest_snag_age(seed), height: height, bend: 0, lean: 0, bark_extra: fallen ? extra : top_mesh, bark_material: ForestTreeBarkDead, leaf_material: ForestTwigDead, stiffness: 1.4) {
+      Position: {0, 0, 0}
     }
   }
 }

@@ -60,6 +60,8 @@ trees {
     prop flare: f32 = 0.3          // Radius a flute adds at its crest, a fraction of the radius
     prop flare_height: f32 = 0     // Meters up the trunk the flutes fade over, 0 for 3 radii
     prop bark_material: entity = TreeBarkBeech
+    // A Mesh node of the scene merged into the bark, such as the fallen top of a snag, 0 for none
+    prop bark_extra: entity = 0
 
     // Branch levels 1 to 4 (TreeBranches): level n grows along the curves of level n - 1 (1
     // along the trunk), when its count or density is above 0 and the level before it grows
@@ -283,10 +285,21 @@ trees {
     normals { nodes.CrownNormals: {mesh: cards, shape: crown_shape, strength: crown_normals} }
     occluded { nodes.CrownOcclusion: {mesh: normals, shape: crown_shape, strength: occlusion} }
 
+    // The bark with the mesh of the scene merged in
+    bark_all {
+      if bark_extra != 0 {
+        nodes.Merge: {inputs: [bark_mesh, bark_extra]}
+      }
+    }
+
     bark {
       (IsA, $bark_material)
       Position: {0, 0, 0}
-      Graph: {output: bark_mesh, levels: lods}
+      if bark_extra == 0 {
+        Graph: {output: bark_mesh, levels: lods}
+      } else {
+        Graph: {output: bark_all, levels: lods}
+      }
       WindSway: {bend: sway, height: height, base: ground, pivots: true, branch: sway_branch}
       if growth > 0 {
         VertexReveal: {channel: TREE_CHANNEL_GROWTH, threshold: growth, softness: 0.05, invert: true}

@@ -10,10 +10,11 @@ using assets
 using trees
 
 // The bark materials of the trees and the wood of the snags, from the bark texture graphs of the
-// tree library (trees/bark): albedo, normal, height (for the moss blend) and ORM. Trunks are Sweeps with a MappingObject, so the bark follows the trunk in
-// lengths along and around it and does not stretch. A trunk material blends its bark with the
-// moss of the floor by forest_bark_moss_mask: moss over the foot of the trunk and in patches
-// higher up. Branches show the bark alone.
+// tree library (trees/bark): albedo, normal, height (for the moss blend) and ORM, with a
+// MappingObject, so the bark keeps its size on a scaled tree. A trunk material, on the bark of a
+// tree (trees.flecs) or a log, blends its bark with the moss of the floor by
+// forest_bark_moss_mask: moss over the foot of the trunk and in patches higher up. Dead branches
+// show the bark alone.
 state {
   // Path units of a trunk the moss mask spans: the mask runs from the foot of the trunk (v 0)
   // up, so its moss stays at the foot of every trunk shorter than this
@@ -187,52 +188,40 @@ assets {
     texture.Layers: {layers: [layer_wet, layer_snow]}
   }
 
-  // Branches: the bark alone, a tile every BARK_LIMB_TILE path units
-  prefab ForestLimbBeech {
-    Rgb: {255, 255, 255}
-    PbrMaterial: {roughness: 1}
-    WindSway: {bend: SWAY_BROADLEAF_BEND, height: SWAY_BROADLEAF_HEIGHT, base: 0}
-    PbrTextures: {albedo: bark_beech_albedo, normal: bark_beech_normal, orm: bark_beech_orm}
-    texture.Mapping: {mode: MappingObject, size: BARK_LIMB_TILE}
-    texture.Layers: {layers: [layer_wet, layer_snow]}
+  // The barks on the trees (trees.flecs), whose meshes project the mapping on the planes of the
+  // object rather than follow a path: V turned to run up from the foot, so the moss stays there,
+  // and the projections blended so the trunks show no seams
+  prefab ForestTreeBarkBeech : ForestBarkBeech {
+    texture.Mapping: {mode: MappingObject, size: BARK_MASK_SIZE, blend: 0.4}
+    texture.Transform: {scale_x: 1, scale_y: -1}
   }
 
-  prefab ForestLimbOak {
-    Rgb: {255, 255, 255}
-    PbrMaterial: {roughness: 1}
-    WindSway: {bend: SWAY_BROADLEAF_BEND, height: SWAY_BROADLEAF_HEIGHT, base: 0}
-    PbrTextures: {albedo: bark_oak_albedo, normal: bark_oak_normal, orm: bark_oak_orm}
-    texture.Mapping: {mode: MappingObject, size: BARK_LIMB_TILE}
-    texture.Layers: {layers: [layer_wet, layer_snow]}
+  prefab ForestTreeBarkOak : ForestBarkOak {
+    texture.Mapping: {mode: MappingObject, size: BARK_MASK_SIZE, blend: 0.4}
+    texture.Transform: {scale_x: 1, scale_y: -1}
   }
 
-  prefab ForestLimbBirch {
-    Rgb: {255, 255, 255}
-    PbrMaterial: {roughness: 1}
-    WindSway: {bend: SWAY_BIRCH_BEND, height: SWAY_BIRCH_HEIGHT, base: 0}
-    PbrTextures: {albedo: bark_birch_albedo, normal: bark_birch_normal, orm: bark_birch_orm}
-    texture.Mapping: {mode: MappingObject, size: BARK_LIMB_TILE}
-    texture.Layers: {layers: [layer_wet, layer_snow]}
+  prefab ForestTreeBarkBirch : ForestBarkBirch {
+    texture.Mapping: {mode: MappingObject, size: BARK_MASK_SIZE, blend: 0.4}
+    texture.Transform: {scale_x: 1, scale_y: -1}
   }
 
-  prefab ForestLimbSpruce {
-    Rgb: {120, 102, 92}
-    PbrMaterial: {roughness: 1}
-    WindSway: {bend: SWAY_CONIFER_BEND, height: SWAY_CONIFER_HEIGHT, base: 0}
-    PbrTextures: {albedo: bark_spruce_albedo, normal: bark_spruce_normal, orm: bark_spruce_orm}
-    texture.Mapping: {mode: MappingObject, size: BARK_LIMB_TILE}
-    texture.Layers: {layers: [layer_wet, layer_snow]}
+  prefab ForestTreeBarkSpruce : ForestBarkSpruce {
+    texture.Mapping: {mode: MappingObject, size: BARK_MASK_SIZE, blend: 0.4}
+    texture.Transform: {scale_x: 1, scale_y: -1}
   }
 
-  prefab ForestLimbFir {
-    Rgb: {170, 172, 178}
-    PbrMaterial: {roughness: 1}
-    WindSway: {bend: SWAY_CONIFER_BEND, height: SWAY_CONIFER_HEIGHT, base: 0}
-    PbrTextures: {albedo: bark_beech_albedo, normal: bark_beech_normal, orm: bark_beech_orm}
-    texture.Mapping: {mode: MappingObject, size: BARK_LIMB_TILE}
-    texture.Layers: {layers: [layer_wet, layer_snow]}
+  prefab ForestTreeBarkFir : ForestBarkFir {
+    texture.Mapping: {mode: MappingObject, size: BARK_MASK_SIZE, blend: 0.4}
+    texture.Transform: {scale_x: 1, scale_y: -1}
   }
 
+  prefab ForestTreeBarkDead : ForestBarkDead {
+    texture.Mapping: {mode: MappingObject, size: BARK_MASK_SIZE, blend: 0.4}
+    texture.Transform: {scale_x: 1, scale_y: -1}
+  }
+
+  // Dead branches and twigs: the bark alone, a tile every BARK_LIMB_TILE path units
   prefab ForestLimbDead {
     Rgb: {255, 255, 255}
     PbrMaterial: {roughness: 1}
@@ -241,34 +230,11 @@ assets {
     texture.Layers: {layers: [layer_wet, layer_snow]}
   }
 
-  // Bracket fungus on the snags and logs
+  // Bracket fungus on the logs
   prefab ForestFungus {
     Rgb: {255, 255, 255}
     PbrMaterial: {roughness: 0.75}
     PbrTextures: {albedo: forest_fungus_albedo}
     texture.Layers: {layers: [layer_wet, layer_snow]}
-  }
-
-  // The dense, dark inside of a conifer crown, and of a cheap broadleaf crown, between the cards
-  prefab ForestConiferCore {
-    Rgb: {40, 62, 40}
-    PbrMaterial: {roughness: 0.95}
-    WindSway: {bend: SWAY_CONIFER_BEND, height: SWAY_CONIFER_HEIGHT, base: 0}
-    PbrTextures: {albedo: canopy_albedo, normal: canopy_normal}
-    texture.Mapping: {mode: MappingWorld, size: 6, blend: 0.5}
-    texture.Layers: {layers: [layer_wet_foliage, layer_snow_foliage]}
-  }
-
-  // The core of a broadleaf crown follows its leaves: it turns with them and thins away in
-  // autumn and is gone in winter
-  prefab ForestBroadleafCore {
-    Rgb: {forest_foliage(season, 34, 27, 66, 50), forest_foliage(season, 50, 43, 38, 36), forest_foliage(season, 14, 13, 12, 22)}
-    PbrMaterial: {roughness: 0.95}
-    WindSway: {bend: SWAY_BROADLEAF_BEND, height: SWAY_BROADLEAF_HEIGHT, base: 0}
-    AlphaCutoff: {forest_seasonal(season, 0.55, 0.01, 0.4, LEAF_BARE)}
-    PbrTextures: {albedo: canopy_leaf_albedo, normal: canopy_normal}
-    texture.Mapping: {mode: MappingWorld, size: 8, blend: 0.5}
-    texture.Layers: {layers: [layer_wet_foliage, layer_snow_foliage]}
-    NoBake
   }
 }

@@ -112,93 +112,18 @@ state {
   export const SNAG_B_HEIGHT: f32 = 2.6
   export const SNAG_B_YAW: f32 = 2.2
 
-  // Radius of the trunk of a snag at its foot, and the scale of its trunk path across
-  fn forest_snag_r0(seed: f64) -> f64 {
-    0.26 + 0.18 * forest_hash(1, seed)
-  }
-
-  fn forest_snag_kr(seed: f64) -> f64 {
-    forest_snag_r0(seed) / TRUNK_RADIUS
-  }
-
-  // The trunk of a snag of a height at height y over its foot, in its own space: the offset of
-  // its axis across X and Z and its radius (the trunk tapers to 0.75 at the top)
-  fn forest_snag_f(height: f64, y: f64) -> f64 {
-    (y + TRUNK_SINK) / (height + TRUNK_SINK)
-  }
-
-  fn forest_snag_axis_x(seed: f64, height: f64, y: f64) -> f64 {
-    forest_trunk_x(seed - 4 * floor(seed / 4), forest_snag_f(height, y)) * forest_snag_kr(seed)
-  }
-
-  fn forest_snag_axis_z(seed: f64, height: f64, y: f64) -> f64 {
-    forest_trunk_z(seed - 4 * floor(seed / 4), forest_snag_f(height, y)) * forest_snag_kr(seed)
-  }
-
-  fn forest_snag_radius(seed: f64, height: f64, y: f64) -> f64 {
-    forest_snag_r0(seed) * (1 - 0.25 * forest_snag_f(height, y))
-  }
-
-  // Stub j of a snag (trees.flecs): its height on the trunk, scale, pitch and yaw, and the point
-  // q along it on the top of the wood, in the space of the snag
-  fn forest_stub_y(height: f64, j: f64) -> f64 {
-    height * (0.35 + 0.18 * j)
-  }
-
-  fn forest_stub_s(seed: f64, j: f64) -> f64 {
-    (0.8 + 1.4 * forest_hash(j + 40, seed)) / LIMB_LEN
-  }
-
-  fn forest_stub_p(seed: f64, j: f64) -> f64 {
-    1 + 0.5 * forest_hash(j + 41, seed)
-  }
-
-  fn forest_stub_w(seed: f64, j: f64) -> f64 {
-    j * 2.3 + seed
-  }
-
-  // Radius of the wood of stub j at q along it
-  fn forest_stub_r(seed: f64, j: f64, q: f64) -> f64 {
-    const s = forest_stub_s(seed, j)
-    const lv = forest_girth_level(forest_snag_r0(seed) * 0.3 / s)
-    forest_girth(lv) * s * (1 - (1 - LIMB_TAPER) * q)
-  }
-
-  fn forest_stub_x(seed: f64, height: f64, j: f64, q: f64) -> f64 {
-    const y = forest_stub_y(height, j)
-    forest_snag_axis_x(seed, height, y) +
-      forest_limb_at_x(LIMB_STRAIGHT, q, forest_stub_p(seed, j), forest_stub_w(seed, j), forest_stub_s(seed, j))
-  }
-
-  fn forest_stub_top(seed: f64, height: f64, j: f64, q: f64) -> f64 {
-    const y = forest_stub_y(height, j)
-    const p = forest_stub_p(seed, j)
-    y + forest_limb_at_y(LIMB_STRAIGHT, q, p, forest_stub_w(seed, j), forest_stub_s(seed, j)) +
-      forest_stub_r(seed, j, q) / max(sin(p), 0.5)
-  }
-
-  fn forest_stub_z(seed: f64, height: f64, j: f64, q: f64) -> f64 {
-    const y = forest_stub_y(height, j)
-    forest_snag_axis_z(seed, height, y) +
-      forest_limb_at_z(LIMB_STRAIGHT, q, forest_stub_p(seed, j), forest_stub_w(seed, j), forest_stub_s(seed, j))
+  // The top of a snag (trees.flecs), on its closed top, in the space of the snag
+  fn forest_snag_top(seed: f64, height: f64) -> f64 {
+    height + 0.02
   }
 
   // The top of the fallen top of a snag at q along it, in the space of the snag (trees.flecs)
-  fn forest_log_top_x(seed: f64, q: f64) -> f64 {
-    const v = seed - 4 * floor(seed / 4)
-    const lr = forest_snag_r0(seed) * 0.8
-    forest_trunk_x(v + 1 - 4 * floor((v + 1) / 4), q) * lr / TRUNK_RADIUS
-  }
-
   fn forest_log_top_y(seed: f64, q: f64) -> f64 {
-    const v = seed - 4 * floor(seed / 4)
-    const lr = forest_snag_r0(seed) * 0.8
-    lr * 0.85 - forest_trunk_z(v + 1 - 4 * floor((v + 1) / 4), q) * lr / TRUNK_RADIUS +
-      lr * (1 - 0.25 * q)
+    forest_fallen_radius(seed) * (2 - 0.25 * q)
   }
 
   fn forest_log_top_z(seed: f64, q: f64) -> f64 {
-    forest_snag_r0(seed) + 0.5 + q * (4 + 4 * forest_hash(60, seed))
+    forest_fallen_start(seed) + q * forest_fallen_length(seed)
   }
 
   // Yaw of the footbridge (brook.flecs), and a point on it in its space (local +Z along the path)
@@ -213,61 +138,26 @@ state {
     CROSSING_Z + lz * cos(BRIDGE_YAW) - lx * sin(BRIDGE_YAW)
   }
 
-  // Perches: the dead stubs of the two snags, the fallen top of the broken one and the handrails
-  // of the footbridge, where the feet of a bird rest
+  // Perches: the tops of the two snags, the fallen top of the broken one and the handrails of
+  // the footbridge, where the feet of a bird rest
   export const FOREST_PERCHES: ForestPerch[] = [
     {
-      SNAG_A_X + forest_rot_x(forest_stub_x(5, 7.5, 0, 0.55), forest_stub_top(5, 7.5, 0, 0.55), forest_stub_z(5, 7.5, 0, 0.55), SNAG_A_TILT, SNAG_A_YAW),
-      forest_rot_y(forest_stub_x(5, 7.5, 0, 0.55), forest_stub_top(5, 7.5, 0, 0.55), forest_stub_z(5, 7.5, 0, 0.55), SNAG_A_TILT, SNAG_A_YAW),
-      SNAG_A_Z + forest_rot_z(forest_stub_x(5, 7.5, 0, 0.55), forest_stub_top(5, 7.5, 0, 0.55), forest_stub_z(5, 7.5, 0, 0.55), SNAG_A_TILT, SNAG_A_YAW),
+      SNAG_A_X + forest_rot_x(0, forest_snag_top(SNAG_A_SEED, SNAG_A_HEIGHT), 0, SNAG_A_TILT, SNAG_A_YAW),
+      forest_rot_y(0, forest_snag_top(SNAG_A_SEED, SNAG_A_HEIGHT), 0, SNAG_A_TILT, SNAG_A_YAW),
+      SNAG_A_Z + forest_rot_z(0, forest_snag_top(SNAG_A_SEED, SNAG_A_HEIGHT), 0, SNAG_A_TILT, SNAG_A_YAW),
+      2
+    },
+    {SNAG_B_X, forest_snag_top(SNAG_B_SEED, SNAG_B_HEIGHT), SNAG_B_Z, 2},
+    {
+      SNAG_B_X + forest_log_top_z(SNAG_B_SEED, 0.35) * sin(SNAG_B_YAW),
+      forest_log_top_y(SNAG_B_SEED, 0.35),
+      SNAG_B_Z + forest_log_top_z(SNAG_B_SEED, 0.35) * cos(SNAG_B_YAW),
       2
     },
     {
-      SNAG_A_X + forest_rot_x(forest_stub_x(5, 7.5, 1, 0.5), forest_stub_top(5, 7.5, 1, 0.5), forest_stub_z(5, 7.5, 1, 0.5), SNAG_A_TILT, SNAG_A_YAW),
-      forest_rot_y(forest_stub_x(5, 7.5, 1, 0.5), forest_stub_top(5, 7.5, 1, 0.5), forest_stub_z(5, 7.5, 1, 0.5), SNAG_A_TILT, SNAG_A_YAW),
-      SNAG_A_Z + forest_rot_z(forest_stub_x(5, 7.5, 1, 0.5), forest_stub_top(5, 7.5, 1, 0.5), forest_stub_z(5, 7.5, 1, 0.5), SNAG_A_TILT, SNAG_A_YAW),
-      2
-    },
-    {
-      SNAG_A_X + forest_rot_x(forest_stub_x(5, 7.5, 2, 0.5), forest_stub_top(5, 7.5, 2, 0.5), forest_stub_z(5, 7.5, 2, 0.5), SNAG_A_TILT, SNAG_A_YAW),
-      forest_rot_y(forest_stub_x(5, 7.5, 2, 0.5), forest_stub_top(5, 7.5, 2, 0.5), forest_stub_z(5, 7.5, 2, 0.5), SNAG_A_TILT, SNAG_A_YAW),
-      SNAG_A_Z + forest_rot_z(forest_stub_x(5, 7.5, 2, 0.5), forest_stub_top(5, 7.5, 2, 0.5), forest_stub_z(5, 7.5, 2, 0.5), SNAG_A_TILT, SNAG_A_YAW),
-      2
-    },
-    {
-      SNAG_A_X + forest_rot_x(forest_stub_x(5, 7.5, 1, 0.85), forest_stub_top(5, 7.5, 1, 0.85), forest_stub_z(5, 7.5, 1, 0.85), SNAG_A_TILT, SNAG_A_YAW),
-      forest_rot_y(forest_stub_x(5, 7.5, 1, 0.85), forest_stub_top(5, 7.5, 1, 0.85), forest_stub_z(5, 7.5, 1, 0.85), SNAG_A_TILT, SNAG_A_YAW),
-      SNAG_A_Z + forest_rot_z(forest_stub_x(5, 7.5, 1, 0.85), forest_stub_top(5, 7.5, 1, 0.85), forest_stub_z(5, 7.5, 1, 0.85), SNAG_A_TILT, SNAG_A_YAW),
-      1
-    },
-    {
-      SNAG_B_X + forest_rot_x(forest_stub_x(9, 2.6, 0, 0.6), forest_stub_top(9, 2.6, 0, 0.6), forest_stub_z(9, 2.6, 0, 0.6), 0, SNAG_B_YAW),
-      forest_rot_y(forest_stub_x(9, 2.6, 0, 0.6), forest_stub_top(9, 2.6, 0, 0.6), forest_stub_z(9, 2.6, 0, 0.6), 0, SNAG_B_YAW),
-      SNAG_B_Z + forest_rot_z(forest_stub_x(9, 2.6, 0, 0.6), forest_stub_top(9, 2.6, 0, 0.6), forest_stub_z(9, 2.6, 0, 0.6), 0, SNAG_B_YAW),
-      2
-    },
-    {
-      SNAG_B_X + forest_rot_x(forest_stub_x(9, 2.6, 1, 0.6), forest_stub_top(9, 2.6, 1, 0.6), forest_stub_z(9, 2.6, 1, 0.6), 0, SNAG_B_YAW),
-      forest_rot_y(forest_stub_x(9, 2.6, 1, 0.6), forest_stub_top(9, 2.6, 1, 0.6), forest_stub_z(9, 2.6, 1, 0.6), 0, SNAG_B_YAW),
-      SNAG_B_Z + forest_rot_z(forest_stub_x(9, 2.6, 1, 0.6), forest_stub_top(9, 2.6, 1, 0.6), forest_stub_z(9, 2.6, 1, 0.6), 0, SNAG_B_YAW),
-      1
-    },
-    {
-      SNAG_B_X + forest_rot_x(forest_stub_x(9, 2.6, 2, 0.6), forest_stub_top(9, 2.6, 2, 0.6), forest_stub_z(9, 2.6, 2, 0.6), 0, SNAG_B_YAW),
-      forest_rot_y(forest_stub_x(9, 2.6, 2, 0.6), forest_stub_top(9, 2.6, 2, 0.6), forest_stub_z(9, 2.6, 2, 0.6), 0, SNAG_B_YAW),
-      SNAG_B_Z + forest_rot_z(forest_stub_x(9, 2.6, 2, 0.6), forest_stub_top(9, 2.6, 2, 0.6), forest_stub_z(9, 2.6, 2, 0.6), 0, SNAG_B_YAW),
-      1
-    },
-    {
-      SNAG_B_X + forest_rot_x(forest_log_top_x(9, 0.35), forest_log_top_y(9, 0.35), forest_log_top_z(9, 0.35), 0, SNAG_B_YAW),
-      forest_log_top_y(9, 0.35),
-      SNAG_B_Z + forest_rot_z(forest_log_top_x(9, 0.35), forest_log_top_y(9, 0.35), forest_log_top_z(9, 0.35), 0, SNAG_B_YAW),
-      2
-    },
-    {
-      SNAG_B_X + forest_rot_x(forest_log_top_x(9, 0.75), forest_log_top_y(9, 0.75), forest_log_top_z(9, 0.75), 0, SNAG_B_YAW),
-      forest_log_top_y(9, 0.75),
-      SNAG_B_Z + forest_rot_z(forest_log_top_x(9, 0.75), forest_log_top_y(9, 0.75), forest_log_top_z(9, 0.75), 0, SNAG_B_YAW),
+      SNAG_B_X + forest_log_top_z(SNAG_B_SEED, 0.75) * sin(SNAG_B_YAW),
+      forest_log_top_y(SNAG_B_SEED, 0.75),
+      SNAG_B_Z + forest_log_top_z(SNAG_B_SEED, 0.75) * cos(SNAG_B_YAW),
       1
     },
     {forest_bridge_x(0 - BRIDGE_HALF_WIDTH, -2.2), RAIL_TOP, forest_bridge_z(0 - BRIDGE_HALF_WIDTH, -2.2), 2},
@@ -277,7 +167,7 @@ state {
     {forest_bridge_x(BRIDGE_HALF_WIDTH, 0.6), RAIL_TOP, forest_bridge_z(BRIDGE_HALF_WIDTH, 0.6), 1},
     {forest_bridge_x(BRIDGE_HALF_WIDTH, 2.4), RAIL_TOP, forest_bridge_z(BRIDGE_HALF_WIDTH, 2.4), 2}
   ]
-  export const PERCH_COUNT: i32 = 15
+  export const PERCH_COUNT: i32 = 10
 
   // The perch each perching bird is at or flies to (-1 on the ground), so two never share one
   export mut perch_taken: i32[] = [-1, -1, -1, -1, -1, -1]
@@ -1072,29 +962,10 @@ state {
     free
   }
 
-  // The angle round a snag (in its own space, 0 along local +Z) farthest from its stubs, its
-  // shelf fungus and its fallen top, where the squirrel runs up and down
+  // The angle round a snag (in its own space, 0 along local +Z) where the squirrel runs up and
+  // down: a seeded side, away from the fallen top
   fn forest_climb_angle(seed: f64, fallen: bool) -> f64 {
-    mut best: f64 = 0
-    mut best_gap: f64 = -1
-
-    for i in 0..24 {
-      const a = i * 6.2832 / 24
-      mut gap: f64 = 10
-      for j in 0..3 {
-        gap = min(gap, abs(forest_turn(a, forest_stub_w(seed, j))))
-      }
-      gap = min(gap, abs(forest_turn(a, forest_hash(50, seed) * 6.2832)) * 0.8)
-      if fallen {
-        gap = min(gap, abs(forest_turn(a, 0)))
-      }
-      if gap > best_gap {
-        best_gap = gap
-        best = a
-      }
-    }
-
-    best
+    fallen ? PI + (forest_hash(50, seed) - 0.5) * 2 : forest_hash(50, seed) * 6.2832
   }
 
   export const CLIMB_A: f32 = forest_climb_angle(SNAG_A_SEED, false)
@@ -1106,14 +977,14 @@ state {
     const seed = t < 0.5 ? SNAG_A_SEED : SNAG_B_SEED
     const height = t < 0.5 ? SNAG_A_HEIGHT : SNAG_B_HEIGHT
     const a = t < 0.5 ? CLIMB_A : CLIMB_B
-    forest_snag_axis_x(seed, height, y) + sin(a) * (forest_snag_radius(seed, height, y) + d)
+    sin(a) * (forest_snag_radius(seed, height, y) + d)
   }
 
   fn forest_bark_lz(t: f64, y: f64, d: f64) -> f64 {
     const seed = t < 0.5 ? SNAG_A_SEED : SNAG_B_SEED
     const height = t < 0.5 ? SNAG_A_HEIGHT : SNAG_B_HEIGHT
     const a = t < 0.5 ? CLIMB_A : CLIMB_B
-    forest_snag_axis_z(seed, height, y) + cos(a) * (forest_snag_radius(seed, height, y) + d)
+    cos(a) * (forest_snag_radius(seed, height, y) + d)
   }
 
   fn forest_bark_x(t: f64, y: f64, d: f64) -> f64 {
