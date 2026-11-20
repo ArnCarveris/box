@@ -125,6 +125,10 @@ fn lit(f: VertexOut, shaded: Surface) -> vec4f {
         color = aerial_perspective(color, s.alpha, f.pos, f.world);
     }
 
+    if (view.fog_grid.w > 0.0) {
+        color = fog_blended(color, s.alpha, f.pos, f.world);
+    }
+
     return output(color, s.alpha);
 }
 

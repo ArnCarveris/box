@@ -16,6 +16,7 @@
 #include "ambient.wgsl"
 #include "probes.wgsl"
 #include "aerial.wgsl"
+#include "fog_blend.wgsl"
 #include "planet_light.wgsl"
 #include "draw_range.wgsl"
 
@@ -882,6 +883,28 @@ fn aerial_perspective(color: vec3f, alpha: f32, pos: vec4f, world: vec3f) -> vec
         }
         default: {
             return color * ap.a;
+        }
+    }
+}
+
+// Color of a blended fragment seen through the fog volumes between it and the camera, shaped
+// for the blend equation as aerial_perspective. Opaque fragments are left as they are, the fog
+// apply draw fogs them.
+fn fog_blended(color: vec3f, alpha: f32, pos: vec4f, world: vec3f) -> vec3f {
+    if (kind.blend_mode == 0u || kind.blend_mode == 4u || kind.blend_mode == 7u) {
+        return color;
+    }
+
+    let fog = fog_froxels(pos, world);
+    switch kind.blend_mode {
+        case 1u: {
+            return color * fog.a + fog.rgb;
+        }
+        case 2u: {
+            return color * fog.a + fog.rgb * alpha;
+        }
+        default: {
+            return color * fog.a;
         }
     }
 }

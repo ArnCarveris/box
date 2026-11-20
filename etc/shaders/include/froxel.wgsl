@@ -10,7 +10,7 @@
 // The includer declares the Froxel uniform as froxel.
 #pragma once
 
-#include "froxel.h"
+#include "froxel_share.wgsl"
 
 struct Froxel {
     // Clip space of the target to world, as View.inv_view_proj
@@ -64,18 +64,6 @@ fn froxel_ray(uv: vec2f) -> FroxelRay {
     r.dir = (b - a) / select(db - da, 1e-6, abs(db - da) < 1e-6);
     r.origin = a - r.dir * da;
     return r;
-}
-
-// Share of the depth of a grid from view depth near_ to far_, 0 at the near plane and 1 at its
-// far end, of a view depth, clamped to 0..1.
-fn froxel_share_of(depth: f32, near_: f32, far_: f32, ortho: bool) -> f32 {
-    let x = saturate((depth - near_) / max(far_ - near_, 1e-6));
-    if (ortho) {
-        return x;
-    }
-
-    let k = exp2(BOX_FROXEL_EXPONENT) - 1.0;
-    return log2(1.0 + x * k) / BOX_FROXEL_EXPONENT;
 }
 
 // Share of the depth of the grid, 0 at the near plane and 1 at its far end, of a view depth,

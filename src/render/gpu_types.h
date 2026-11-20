@@ -943,6 +943,11 @@ typedef struct box_gpu_view_uniforms_t {
                                      *   view_proj without a valid history (temporal.c) */
     uint32_t temporal[4];           /**< Frames since the last reset of the history, 1 when it
                                      *   is valid, two unused */
+    vec4 fog_grid;                  /**< Froxel grid of the fog volumes (gpu_fog_volume.c): the
+                                     *   share of the grid the render size covers across and
+                                     *   down, slices, 1 when the view has fog volumes */
+    vec4 fog_range;                 /**< View depth of the near plane and of the far end of
+                                     *   the grid, 1 for orthographic, unused */
 } box_gpu_view_uniforms_t;
 
 _Static_assert(sizeof(box_gpu_view_uniforms_t) <= BOX_GPU_VIEW_STRIDE,
@@ -1031,8 +1036,14 @@ typedef struct box_gpu_atlas_read_t {
  * uniform (spectrum_a, spectrum_b, spectrum_c). */
 #define BOX_GPU_SPECTRUM_BINDING (28)
 
+/** Binding of the view group of the integrated froxel grid of the fog volumes of the view
+ * (gpu_fog_volume.c), a 3D texture sampled through the aerial perspective sampler (binding 10),
+ * fog_grid of fog_blend.wgsl, which blended draws fog themselves with; a texel of no light and
+ * full transmittance without one. Its slicing is in the View uniform (fog_grid, fog_range). */
+#define BOX_GPU_FOG_GRID_BINDING (29)
+
 /** Bindings of the view group, the highest binding plus one */
-#define BOX_GPU_VIEW_BINDINGS (29)
+#define BOX_GPU_VIEW_BINDINGS (30)
 
 /** Binding of the transmittance and sky irradiance LUT array of the planet lights in the view
  * group */
@@ -1183,6 +1194,10 @@ typedef struct box_gpu_t {
     WGPUBuffer no_probes;           /**< Reflection probe buffer of a cluster pass without probes */
     WGPUBuffer no_clips;            /**< Clip buffer of the views while no element clips */
     ecs_vec_t view_data;            /**< Bytes of the view uniforms of a target */
+    ecs_vec_t view_unfogged;        /**< int32_t per view slot, the slot of a copy of its
+                                     *   uniforms whose blended draws are not fogged, which the
+                                     *   draws before the fog in front of its glass bind, -1 for
+                                     *   a view without fog volumes */
     WGPUBindGroupLayout shadow_layout; /**< Bind group layout of the shadow pass */
     WGPUPipelineLayout shadow_pipeline_layout; /**< Pipeline layout of the shadow pass: the
                                      *   cascade, the instance and the material group */

@@ -256,8 +256,8 @@ done:
 #else
 
 /** Request the device from the adapter and get its queue, with the texture array layers and
- * the sampled textures per shader stage the adapter offers: the forward pass of a TextureBlend
- * Water samples more textures in its fragment stage than the 16 of the default limits.
+ * the sampled textures per shader stage the adapter offers: the forward pass samples more
+ * textures in its fragment stage than the 16 of the default limits (box_gpu_draw_init).
  *
  * @param gpu The backend
  */

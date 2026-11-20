@@ -73,203 +73,6 @@ static WGPUPipelineLayout box_gpu_mesh_layout(
     });
 }
 
-/** Create the layout of the view group of the forward pass and the fog grid compute (all but the
- * storage textures): view uniforms, lights, clusters, shadows, reflections, aerial perspective,
- * environment, ambient occlusion, cookie, opaque snapshot, planar images, planet lights, water.
- *
- * @param gpu The backend
- * @return The layout
- */
-static WGPUBindGroupLayout box_gpu_view_layout(
-    box_gpu_t *gpu)
-{
-    WGPUBindGroupLayoutEntry entries[BOX_GPU_VIEW_BINDINGS] = {
-        {
-            .binding = 0,
-            .visibility = WGPUShaderStage_Vertex | WGPUShaderStage_Fragment,
-            .buffer = {
-                .type = WGPUBufferBindingType_Uniform,
-                .hasDynamicOffset = true,
-                .minBindingSize = sizeof(box_gpu_view_uniforms_t)
-            }
-        },
-        {
-            .binding = 1,
-            .visibility = WGPUShaderStage_Fragment,
-            .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
-        },
-        {
-            .binding = 2,
-            .visibility = WGPUShaderStage_Fragment,
-            .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
-        },
-        {
-            .binding = 3,
-            .visibility = WGPUShaderStage_Fragment,
-            .texture = {
-                .sampleType = WGPUTextureSampleType_Depth,
-                .viewDimension = WGPUTextureViewDimension_2DArray
-            }
-        },
-        {
-            .binding = 4,
-            .visibility = WGPUShaderStage_Fragment,
-            .sampler = { .type = WGPUSamplerBindingType_Comparison }
-        },
-        {
-            .binding = 5,
-            .visibility = WGPUShaderStage_Vertex | WGPUShaderStage_Fragment,
-            .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
-        },
-        {
-            .binding = 6,
-            .visibility = WGPUShaderStage_Fragment,
-            .texture = {
-                .sampleType = WGPUTextureSampleType_Float,
-                .viewDimension = WGPUTextureViewDimension_CubeArray
-            }
-        },
-        {
-            .binding = 7,
-            .visibility = WGPUShaderStage_Fragment,
-            .sampler = { .type = WGPUSamplerBindingType_Filtering }
-        },
-        {
-            .binding = 8,
-            .visibility = WGPUShaderStage_Fragment,
-            .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
-        },
-        {
-            .binding = 9,
-            .visibility = WGPUShaderStage_Fragment,
-            .texture = {
-                .sampleType = WGPUTextureSampleType_Float,
-                .viewDimension = WGPUTextureViewDimension_3D
-            }
-        },
-        {
-            .binding = 10,
-            .visibility = WGPUShaderStage_Fragment,
-            .sampler = { .type = WGPUSamplerBindingType_Filtering }
-        },
-        {
-            .binding = 11,
-            .visibility = WGPUShaderStage_Vertex | WGPUShaderStage_Fragment,
-            .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
-        },
-        {
-            .binding = 12,
-            .visibility = WGPUShaderStage_Fragment,
-            .texture = {
-                .sampleType = WGPUTextureSampleType_Float,
-                .viewDimension = WGPUTextureViewDimension_Cube
-            }
-        },
-        {
-            .binding = 13,
-            .visibility = WGPUShaderStage_Fragment,
-            .buffer = {
-                .type = WGPUBufferBindingType_Uniform,
-                .minBindingSize = BOX_GPU_PROBE_SIZE
-            }
-        },
-        {
-            .binding = 14,
-            .visibility = WGPUShaderStage_Fragment,
-            .texture = {
-                .sampleType = WGPUTextureSampleType_UnfilterableFloat,
-                .viewDimension = WGPUTextureViewDimension_2D
-            }
-        },
-        {
-            .binding = 15,
-            .visibility = WGPUShaderStage_Fragment,
-            .texture = {
-                .sampleType = WGPUTextureSampleType_Depth,
-                .viewDimension = WGPUTextureViewDimension_2D
-            }
-        },
-        {
-            .binding = 16,
-            .visibility = WGPUShaderStage_Fragment,
-            .buffer = {
-                .type = WGPUBufferBindingType_Uniform,
-                .minBindingSize = BOX_GPU_ATLAS_TILES_SIZE
-            }
-        },
-        {
-            .binding = 17,
-            .visibility = WGPUShaderStage_Fragment,
-            .texture = {
-                .sampleType = WGPUTextureSampleType_Float,
-                .viewDimension = WGPUTextureViewDimension_2D
-            }
-        },
-        {
-            .binding = 18,
-            .visibility = WGPUShaderStage_Fragment,
-            .sampler = { .type = WGPUSamplerBindingType_Filtering }
-        },
-        {
-            .binding = 19,
-            .visibility = WGPUShaderStage_Fragment,
-            .texture = {
-                .sampleType = WGPUTextureSampleType_Float,
-                .viewDimension = WGPUTextureViewDimension_2D
-            }
-        },
-        {
-            .binding = 20,
-            .visibility = WGPUShaderStage_Fragment,
-            .texture = {
-                .sampleType = WGPUTextureSampleType_Depth,
-                .viewDimension = WGPUTextureViewDimension_2D
-            }
-        },
-        {
-            .binding = 21,
-            .visibility = WGPUShaderStage_Fragment,
-            .texture = {
-                .sampleType = WGPUTextureSampleType_Float,
-                .viewDimension = WGPUTextureViewDimension_2DArray
-            }
-        },
-        {
-            .binding = BOX_GPU_PLANET_LIGHTS_BINDING,
-            .visibility = WGPUShaderStage_Fragment,
-            .buffer = {
-                .type = WGPUBufferBindingType_Uniform,
-                .minBindingSize = BOX_GPU_PLANET_LIGHTS_SIZE
-            }
-        },
-        {
-            .binding = BOX_GPU_PLANET_LUTS_BINDING,
-            .visibility = WGPUShaderStage_Fragment,
-            .storageTexture = {
-                .access = WGPUStorageTextureAccess_ReadOnly,
-                .format = WGPUTextureFormat_RGBA16Float,
-                .viewDimension = WGPUTextureViewDimension_2DArray
-            }
-        },
-        {
-            .binding = BOX_GPU_WATER_WAVES_BINDING,
-            .visibility = WGPUShaderStage_Fragment,
-            .buffer = {
-                .type = WGPUBufferBindingType_Uniform,
-                .minBindingSize = BOX_RENDER_WATER_WAVE_SETS * sizeof(box_render_water_waves_t)
-            }
-        }
-    };
-    WGPUBindGroupLayoutDescriptor layout = {
-        .entryCount = BOX_GPU_VIEW_BINDINGS, .entries = entries };
-    box_gpu_water_fields_layout(entries);
-    for (int32_t i = 0; i < BOX_GPU_VIEW_BINDINGS; i ++) {
-        entries[i].visibility |= entries[i].storageTexture.access ? 0 : WGPUShaderStage_Compute;
-    }
-
-    return wgpuDeviceCreateBindGroupLayout(gpu->device, &layout);
-}
-
 void box_gpu_draw_init(
     box_gpu_t *gpu)
 {
@@ -277,7 +80,7 @@ void box_gpu_draw_init(
     box_gpu_volume_init(gpu);
     box_gpu_reflect_init(gpu);
     box_gpu_environment_init(gpu);
-    gpu->view_layout = box_gpu_view_layout(gpu);
+    gpu->view_layout = box_gpu_light_layout(gpu);
     gpu->mesh_layout = box_gpu_mesh_layout(gpu, gpu->material_layout);
     gpu->blend_mesh_layout = box_gpu_mesh_layout(gpu, gpu->blend_layout);
     gpu->prepass_empty_layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
@@ -292,6 +95,7 @@ void box_gpu_draw_init(
     ecs_map_init(&gpu->forward, NULL);
     ecs_map_init(&gpu->forward_previous, NULL);
     ecs_vec_init_t(NULL, &gpu->view_data, uint8_t, 0);
+    ecs_vec_init_t(NULL, &gpu->view_unfogged, int32_t, 0);
     box_gpu_copy_init(gpu);
     box_gpu_light_init(gpu);
     box_gpu_shadow_init(gpu);
@@ -764,6 +568,7 @@ void box_gpu_draw_fini(
     ecs_map_fini(&gpu->buffers);
     box_gpu_copy_fini(gpu);
     ecs_vec_fini_t(NULL, &gpu->view_data, uint8_t);
+    ecs_vec_fini_t(NULL, &gpu->view_unfogged, int32_t);
     box_gpu_forward_reset(gpu, false);
     ecs_map_fini(&gpu->forward);
     ecs_map_fini(&gpu->forward_previous);
@@ -1073,7 +878,8 @@ static bool box_gpu_target_has_view(
 }
 
 /** Write the uniforms of the views a target renders into the view buffer, then those of their
- * planar reflections after them (box_gpu_planar_add).
+ * planar reflections after them (box_gpu_planar_add), then the copies of the views with fog
+ * volumes whose blended draws are not fogged (box_gpu_fog_volumes_unfogged_write).
  *
  * @param gpu The backend
  * @param t The target
@@ -1087,7 +893,8 @@ static int32_t box_gpu_view_write(
     const box_render_packet_t *packet,
     const box_render_target_t *frame)
 {
-    int32_t i, result = 0, extra = 0, slot = 0, count = ecs_vec_count(&packet->views);
+    int32_t i, result = 0, extra = 0, unfogged = 0, slot = 0;
+    int32_t count = ecs_vec_count(&packet->views);
     ecs_vec_set_count_t(NULL, &gpu->view_data, uint8_t, count * BOX_GPU_VIEW_STRIDE);
     gpu->origin[0] = packet->origin[0];
     gpu->origin[1] = packet->origin[1];
@@ -1123,6 +930,7 @@ static int32_t box_gpu_view_write(
         box_gpu_environment_uniforms(gpu, v, u);
         box_gpu_cookie_uniforms(gpu, v, u);
         box_gpu_water_fields_uniforms(gpu, v, u);
+        box_gpu_fog_volumes_uniforms(gpu, t, v, u);
         box_gpu_origin_split(packet->origin, u->origin);
         box_gpu_cull_add(gpu, t, packet, i, result, proj, u);
         result ++;
@@ -1147,12 +955,14 @@ static int32_t box_gpu_view_write(
         box_gpu_planar_uniforms(gpu, ecs_vec_first(&gpu->view_data));
     }
 
+    unfogged = box_gpu_fog_volumes_unfogged_write(gpu, result, result + extra);
     if (result) {
         box_gpu_cull_upload(gpu);
         box_gpu_shadow_upload(gpu, result);
-        box_gpu_view_reserve(gpu, result + extra);
+        box_gpu_view_reserve(gpu, result + extra + unfogged);
         wgpuQueueWriteBuffer(gpu->queue, gpu->view_buffer, 0,
-            ecs_vec_first(&gpu->view_data), (size_t)(result + extra) * BOX_GPU_VIEW_STRIDE);
+            ecs_vec_first(&gpu->view_data),
+            (size_t)(result + extra + unfogged) * BOX_GPU_VIEW_STRIDE);
     }
 
     return result;
@@ -1353,6 +1163,8 @@ static void box_gpu_draw_glass(
  * @param v The view
  * @param group The bind group of the view
  * @param slot Slot of the view in the view buffer
+ * @param offset Offset of the uniforms the forward pass binds in the view buffer, those of the
+ * view or the copy whose blended draws are not fogged
  * @param last Whether nothing draws after the particles
  * @return Whether the pipeline and material bound before are lost
  */
@@ -1365,9 +1177,9 @@ static bool box_gpu_draw_particles(
     const box_render_view_t *v,
     WGPUBindGroup group,
     int32_t slot,
+    uint32_t offset,
     bool last)
 {
-    uint32_t offset = (uint32_t)(slot * BOX_GPU_VIEW_STRIDE);
     bool result = true, rebind = true;
     if (!vp->soft && !vp->fog && !vp->planets) {
         result = box_gpu_particles_draw(gpu, vp->pass, format, v, NULL);
@@ -1412,8 +1224,11 @@ static bool box_gpu_draw_particles(
  * depth, then continue in a new pass with the groups of the forward pass bound again.
  *
  * Together with the part behind the glass, which the snapshot holds, every ray is fogged once,
- * so the glass is fogged as an opaque surface at its depth. Blended shapes drawn in front of the
- * glass before its last transmissive draw are fogged as the glass behind them.
+ * so the glass is fogged as an opaque surface at its depth.
+ *
+ * Blended shapes and particles drawn before it bind the uniforms of the view without its fog
+ * grid (box_gpu_fog_volumes_unfogged), so over glass they are fogged once, as the glass behind
+ * them; those drawn after it fog themselves at their depth.
  *
  * @param gpu The backend
  * @param t The target
@@ -1521,6 +1336,7 @@ static void box_gpu_draw_batches(
     WGPUBindGroup material = NULL, instances = NULL;
     uint32_t material_kind = 0;
     uint32_t offset = (uint32_t)(slot * BOX_GPU_VIEW_STRIDE);
+    uint32_t fogged = offset;
     bool sky = phase == 1 || !box_gpu_atmosphere_sky(gpu, v);
     bool stars = phase == 1 || !box_gpu_star_fields_ready(gpu, v);
     bool particles = phase == 1;
@@ -1539,12 +1355,18 @@ static void box_gpu_draw_batches(
         }
     }
 
+    if (vp->front >= 0) {
+        offset = box_gpu_fog_volumes_unfogged(gpu, slot);
+        wgpuRenderPassEncoderSetBindGroup(vp->pass, 0, group, 1, &offset);
+    }
+
     for (i = 0; cv && i < cv->draw_count; i ++) {
         const box_gpu_cull_draw_t *d = ecs_vec_get_t(
             &gpu->cull.draws, box_gpu_cull_draw_t, cv->first_draw + i);
         const box_render_batch_t *b = ecs_vec_get_t(
             &packet->batches, box_render_batch_t, d->batch);
         if (i == vp->front && vp->glass) {
+            offset = fogged;
             box_gpu_draw_fog_front(gpu, t, vp, format, packet, v, group, offset);
             bound = NULL;
             material = NULL;
@@ -1573,7 +1395,8 @@ static void box_gpu_draw_batches(
 
         if (!particles && !mesh && !b->atmosphere) {
             particles = true;
-            if (box_gpu_draw_particles(gpu, t, vp, format, packet, v, group, slot, false)) {
+            if (box_gpu_draw_particles(gpu, t, vp, format, packet, v, group, slot, offset,
+                false)) {
                 bound = NULL;
                 material = NULL;
                 instances = NULL;
@@ -1616,6 +1439,7 @@ static void box_gpu_draw_batches(
     }
 
     if (cv && vp->front == cv->draw_count && vp->glass) {
+        offset = fogged;
         box_gpu_draw_fog_front(gpu, t, vp, format, packet, v, group, offset);
     }
 
@@ -1628,7 +1452,7 @@ static void box_gpu_draw_batches(
     }
 
     if (!particles) {
-        box_gpu_draw_particles(gpu, t, vp, format, packet, v, group, slot, true);
+        box_gpu_draw_particles(gpu, t, vp, format, packet, v, group, slot, offset, true);
     }
 }
 

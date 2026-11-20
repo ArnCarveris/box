@@ -2426,6 +2426,232 @@ void FogVolume_history_grazing_slab(void) {
     ecs_fini(world);
 }
 
+/** Add a blended panel 0.2 thick facing the camera: black albedo with a gray emission, drawn at
+ * opacity 0.5.
+ *
+ * @param world The world
+ * @param z Z of its center
+ * @param size Width and height
+ * @param gray Emission, display encoded
+ * @return The panel
+ */
+static ecs_entity_t fv_blended_panel(
+    ecs_world_t *world,
+    float z,
+    float size,
+    uint8_t gray)
+{
+    ecs_entity_t e = fv_wall(world, 0, z, size, gray);
+    ecs_set(world, e, Opacity, {0.5f});
+
+    return e;
+}
+
+/** Render a blended panel 3 units across with nothing behind it, with or without a volume from
+ * z -6 to -14, and get the green of the center pixel, on the panel, and of a pixel at the left
+ * edge beside it.
+ *
+ * @param ambient Intensity of the white ambient
+ * @param volume Whether the volume is there
+ * @param z Z of the panel
+ * @param gray Emission of the panel, display encoded
+ * @param density Extinction per unit of the volume
+ * @param absorption Share of the extinction that is absorbed
+ * @param file Name of the PNG
+ * @param beside Receives the green of the pixel beside the panel, may be NULL
+ * @return The green of the center pixel
+ */
+static int32_t fv_blended(
+    float ambient,
+    bool volume,
+    float z,
+    uint8_t gray,
+    float density,
+    float absorption,
+    const char *file,
+    int32_t *beside)
+{
+    ecs_world_t *world = fv_world(ambient);
+    fv_view(world, fv_camera(world, 0, 0), true);
+    fv_blended_panel(world, z, 3, gray);
+    if (volume) {
+        fv_volume(world, (float[]){0, 0, -10}, (float[]){10, 10, 4}, density, absorption);
+    }
+
+    unsigned char *px = fv_render_still(world, file);
+    int32_t result = fv_px(px, 32, 32)[1];
+    if (beside) {
+        *beside = fv_px(px, 4, 32)[1];
+    }
+
+    stbi_image_free(px);
+    ecs_fini(world);
+
+    return result;
+}
+
+/** A blended panel inside a purely absorbing volume is dimmed by the part of the volume in front
+ * of it, as an opaque panel at its depth, where before it drew at full strength. */
+void FogVolume_blended_inside_fogged(void) {
+    // fog_volume/blended
+    int32_t clear = fv_blended(0, false, -10, FV_WALL, 0.3f, 1, "fog_blend_in_none.png", NULL);
+    int32_t fogged = fv_blended(0, true, -10, FV_WALL, 0.3f, 1, "fog_blend_in.png", NULL);
+    int32_t want = fv_srgb(0.5f * fv_lin(FV_WALL) * fv_grid(0.3f, 6, 14, 9.9f));
+    printf("clear %d, fogged %d, want %d\n", clear, fogged, want);
+    test_assert(abs(clear - fv_srgb(0.5f * fv_lin(FV_WALL))) <= 4);
+    test_assert(abs(fogged - want) <= 8);
+    test_assert(fogged < clear - 20);
+}
+
+/** A blended panel behind a purely absorbing volume is dimmed by the whole depth of the volume. */
+void FogVolume_blended_behind_fogged(void) {
+    // fog_volume/blended
+    int32_t clear = fv_blended(0, false, -20, FV_WALL, 0.3f, 1, "fog_blend_behind_none.png",
+        NULL);
+    int32_t fogged = fv_blended(0, true, -20, FV_WALL, 0.3f, 1, "fog_blend_behind.png", NULL);
+    int32_t want = fv_srgb(0.5f * fv_lin(FV_WALL) * fv_grid(0.3f, 6, 14, 19.9f));
+    printf("clear %d, fogged %d, want %d\n", clear, fogged, want);
+    test_assert(abs(fogged - want) <= 8);
+    test_assert(fogged < clear - 30);
+}
+
+/** A dark blended panel inside and one behind a dense scattering volume lit by the ambient take
+ * the color of the fog in front of them, as the fog beside them, where without the volume they
+ * show black. */
+void FogVolume_blended_fog_color(void) {
+    // fog_volume/blended
+    float z[2] = { -10, -20 };
+    int32_t i;
+    for (i = 0; i < 2; i ++) {
+        int32_t beside = 0;
+        int32_t clear = fv_blended(0.5f, false, z[i], 0, 20, 0, "fog_blend_color_none.png",
+            NULL);
+        int32_t fogged = fv_blended(0.5f, true, z[i], 0, 20, 0, "fog_blend_color.png",
+            &beside);
+        printf("z %.0f: clear %d, fogged %d, beside %d\n", (double)z[i], clear, fogged, beside);
+        test_assert(clear < 10);
+        test_assert(beside > 80);
+        test_assert(abs(fogged - beside) <= 6);
+    }
+}
+
+/** A blended panel in front of a volume, between it and the camera, is not fogged by it. */
+void FogVolume_blended_in_front_unchanged(void) {
+    // fog_volume/blended
+    int32_t clear = fv_blended(0, false, -4, FV_WALL, 0.3f, 1, "fog_blend_front_none.png",
+        NULL);
+    int32_t fogged = fv_blended(0, true, -4, FV_WALL, 0.3f, 1, "fog_blend_front.png", NULL);
+    printf("clear %d, fogged %d\n", clear, fogged);
+    test_assert(abs(fogged - clear) <= 3);
+}
+
+/** Add an additive or alpha pool of gray particles at rest in a box around z -10.
+ *
+ * @param world The world
+ * @param blend The ParticleBlend
+ * @return The emitter
+ */
+static ecs_entity_t fv_particles(
+    ecs_world_t *world,
+    ParticleBlend blend)
+{
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Position, {0, 0, -10});
+    ecs_add(world, e, ParticleEmitter);
+    ParticleEmitter *p = ecs_get_mut(world, e, ParticleEmitter);
+    p->rate = 6000;
+    p->max = 200;
+    p->shape = EmitterBox;
+    glm_vec3_copy((vec3){2, 2, 0.5f}, p->extents);
+    glm_vec3_zero(p->direction);
+    p->lifetime = (ParticleRange){100, 100};
+    p->size = (ParticleRange){0.6f, 0.6f};
+    p->opacity = (ParticleRange){0.5f, 0.5f};
+    p->color = (rgb){160, 160, 160};
+    ecs_modified(world, e, ParticleEmitter);
+    ecs_set(world, e, ParticleAppearance, {.blend = blend});
+
+    return e;
+}
+
+/** Sum the green of every pixel of a square capture.
+ *
+ * @param px The pixels
+ * @return The sum
+ */
+static int64_t fv_green_sum(
+    const unsigned char *px)
+{
+    int64_t result = 0;
+    int32_t i;
+    for (i = 0; i < FV_SIZE * FV_SIZE; i ++) {
+        result += px[i * 4 + 1];
+    }
+
+    return result;
+}
+
+/** An additive pool inside a purely absorbing volume adds less light than without the volume:
+ * the fog in front of each particle dims it. */
+void FogVolume_additive_particles_dimmed(void) {
+    // fog_volume/blended
+    const char *files[2] = { "fog_particles_none.png", "fog_particles.png" };
+    int64_t sums[2];
+    int32_t k;
+    for (k = 0; k < 2; k ++) {
+        ecs_world_t *world = fv_world(0);
+        fv_view(world, fv_camera(world, 0, 0), true);
+        fv_particles(world, ParticleAdditive);
+        if (k) {
+            fv_volume(world, (float[]){0, 0, -10}, (float[]){10, 10, 4}, 0.3f, 1);
+        }
+
+        unsigned char *px = fv_render_still(world, files[k]);
+        sums[k] = fv_green_sum(px);
+        stbi_image_free(px);
+        ecs_fini(world);
+    }
+
+    printf("additive green without fog %lld, in fog %lld\n", (long long)sums[0],
+        (long long)sums[1]);
+    test_assert(sums[0] > 2000);
+    test_assert(sums[1] * 10 < sums[0] * 8);
+    test_assert(sums[1] > 0);
+}
+
+/** A view without fog volumes draws blended panels, alpha and additive particles the same
+ * whether it renders fog volumes or not, and whether its scene has a volume it does not render. */
+void FogVolume_no_fog_blended_unchanged(void) {
+    // fog_volume/blended
+    const char *files[3] = {
+        "fog_blend_none_off.png", "fog_blend_none_on.png", "fog_blend_none_hidden.png"
+    };
+    unsigned char *px[3];
+    int32_t k;
+    for (k = 0; k < 3; k ++) {
+        ecs_world_t *world = fv_world(0.3f);
+        fv_view(world, fv_camera(world, 0, 0), k == 1);
+        fv_wall(world, 0, -20, 40, 60);
+        fv_blended_panel(world, -8, 3, FV_WALL);
+        fv_particles(world, ParticleAdditive);
+        ecs_set(world, fv_particles(world, ParticleAlpha), Position, {1, 0, -12});
+        if (k == 2) {
+            fv_volume(world, (float[]){0, 0, -10}, (float[]){10, 10, 4}, 0.3f, 1);
+        }
+
+        px[k] = fv_render(world, files[k]);
+        box_render_gpu_stats_t after = fv_frames(world, 0);
+        test_int(after.fog_volumes, 0);
+        ecs_fini(world);
+    }
+
+    test_assert(!memcmp(px[0], px[1], FV_SIZE * FV_SIZE * 4));
+    test_assert(!memcmp(px[0], px[2], FV_SIZE * FV_SIZE * 4));
+    for (k = 0; k < 3; k ++) {
+        stbi_image_free(px[k]);
+}
+
+
 /** A box volume with its shape, height_falloff and edge_noise at their defaults renders the
  * transmittance of its constant density, and an edge_noise that has nothing to erode, without
  * noise or with hard faces, renders the same pixels as without it. */
@@ -2474,6 +2700,39 @@ void FogVolume_falloff_defaults_unchanged(void) {
     for (k = 0; k < 6; k ++) {
         stbi_image_free(px[k]);
     }
+}
+
+/** Blended panels and particles in a view with a volume add no render pass and no dispatch of
+ * their own: the volume alone ends the pass once for the apply draw (two per frame), and the draws
+ * after it continue in the one more pass that followed the apply before (three per frame), with
+ * the dispatches of the volume alone. */
+void FogVolume_blended_no_new_pass(void) {
+    // fog_volume/blended
+    int32_t passes[2], dispatches[2], k;
+    for (k = 0; k < 2; k ++) {
+        ecs_world_t *world = fv_world(0);
+        fv_view(world, fv_camera(world, 0, 0), true);
+        fv_wall(world, 0, -20, 40, FV_WALL);
+        fv_volume(world, (float[]){0, 0, -10}, (float[]){10, 10, 4}, 0.3f, 1);
+        if (k) {
+            fv_blended_panel(world, -10, 3, FV_WALL);
+            fv_particles(world, ParticleAlpha);
+        }
+
+        unsigned char *px = fv_render(world, k ? "fog_blend_passes.png" : "fog_passes.png");
+        stbi_image_free(px);
+        box_render_gpu_stats_t before = fv_frames(world, 0);
+        box_render_gpu_stats_t after = fv_frames(world, 2);
+        passes[k] = after.forward_passes - before.forward_passes;
+        dispatches[k] = after.fog_dispatches - before.fog_dispatches;
+        test_int(after.errors, before.errors);
+        ecs_fini(world);
+    }
+
+    test_int(passes[0], 4);
+    test_int(passes[1], 6);
+    test_int(dispatches[1], dispatches[0]);
+    test_int(dispatches[0], 4);
 }
 
 /** An ellipsoid of hard faces in an orthographic view fogs the ray through the center of its box

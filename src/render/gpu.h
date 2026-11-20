@@ -940,9 +940,10 @@ WGPURenderPipeline box_gpu_forward_pipeline(
 
 /** Create the layouts the forward pass shares.
  *
- * Group 0 binds 10 sampled textures to the fragment stage, the planar reflection array (binding
- * 21) the last: with the 5 of the material group the mesh pipelines sample 15 of the 16 a device
- * has at least, the TextureBlend ones all 16, the particle and fog volume pipelines fewer.
+ * Group 0 binds 12 sampled textures to the fragment stage, with the spectrum of the water
+ * (binding 28) and the fog grid (binding 29): with the 5 of the material group the mesh pipelines
+ * sample 17, one more than the 16 a device has at least, so the device takes the limit of the
+ * adapter (box_gpu_fog_volumes_init warns below it); the particle and fog volume pipelines fewer.
  *
  * @param gpu The backend
  */
@@ -1154,6 +1155,17 @@ void box_gpu_draw_views(
     WGPUCommandEncoder encoder,
     WGPUTextureView color,
     WGPUTexture texture);
+
+/** Create the layout of the view group of the forward pass and the fog grid compute (all but the
+ * storage textures): view uniforms, lights, clusters, shadows, reflections, aerial perspective,
+ * environment, ambient occlusion, cookie, opaque snapshot, planar images, planet lights, water,
+ * fog grid.
+ *
+ * @param gpu The backend
+ * @return The layout
+ */
+WGPUBindGroupLayout box_gpu_light_layout(
+    box_gpu_t *gpu);
 
 /** Create the layouts of the cluster pass and the empty light buffer.
  *
@@ -2107,6 +2119,61 @@ void box_gpu_fog_volumes_inject(
     const box_render_packet_t *packet,
     const box_render_view_t *v,
     WGPUBindGroup group,
+    int32_t slot);
+
+/** Fill the members of the uniforms of a view in a target about its froxel grid (fog_grid and
+ * fog_range of the View uniform), with which its blended draws fog themselves
+ * (fog_blend.wgsl): the slicing of the grid of a lit view that draws fog volumes, zero for any
+ * other view.
+ *
+ * @param gpu The backend
+ * @param t The target, whose render size the grid follows
+ * @param v The view
+ * @param u The uniforms of the view
+ */
+void box_gpu_fog_volumes_uniforms(
+    box_gpu_t *gpu,
+    const box_gpu_target_t *t,
+    const box_render_view_t *v,
+    box_gpu_view_uniforms_t *u);
+
+/** Get the integrated froxel grid of a view in a target that its view group binds
+ * (BOX_GPU_FOG_GRID_BINDING), created at the size of the grid of this frame so the inject pass
+ * of the view writes it: a texel of no light and full transmittance for a view that draws no fog
+ * volumes or without a target.
+ *
+ * @param gpu The backend
+ * @param t The target, NULL for the captures
+ * @param v The view
+ * @return The view of the texture
+ */
+WGPUTextureView box_gpu_fog_volumes_grid_view(
+    box_gpu_t *gpu,
+    const box_gpu_target_t *t,
+    const box_render_view_t *v);
+
+/** Append a copy of the uniforms of each view whose blended draws fog themselves, without its
+ * fog grid, after the slots of the view buffer written so far (box_gpu_t.view_unfogged). A view
+ * with glass binds it for the draws before the fog in front of its glass, which fogs them.
+ *
+ * @param gpu The backend
+ * @param views Views of the target, the first slots of view_data
+ * @param count Slots of view_data written so far
+ * @return The copies appended
+ */
+int32_t box_gpu_fog_volumes_unfogged_write(
+    box_gpu_t *gpu,
+    int32_t views,
+    int32_t count);
+
+/** Offset in the view buffer of the uniforms of a view whose blended draws are not fogged.
+ *
+ * @param gpu The backend
+ * @param slot Slot of the view
+ * @return The offset of its copy (box_gpu_fog_volumes_unfogged_write), its own without one
+ */
+uint32_t box_gpu_fog_volumes_unfogged(
+    const box_gpu_t *gpu,
     int32_t slot);
 
 /** Segment of the rays of a view a fog volume apply draw takes (Froxel.segment of

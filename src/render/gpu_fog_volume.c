@@ -30,6 +30,10 @@
  * reflection probes and their SH, probe buffer of the view) and the records */
 #define BOX_GPU_FOG_STORAGE (6u)
 
+/** Sampled textures per shader stage the fragment stage of the forward pass binds: the twelve of
+ * the view group, with the fog grid, and the five of the material group */
+#define BOX_GPU_FOG_SAMPLED (17u)
+
 /** Packets after which the grid of a view that drew no fog volumes is released */
 #define BOX_GPU_FROXELS_IDLE (120u)
 
@@ -87,6 +91,10 @@ struct box_gpu_fog_volumes_t {
     WGPUTextureView noise_view;     /**< View of the noise texture */
     WGPUTexture placeholder;        /**< Texture of one texel views without noise bind */
     WGPUTextureView placeholder_view; /**< View of the placeholder */
+    WGPUTexture no_grid;            /**< Integrated grid of one texel of no light and full
+                                     *   transmittance, which the view group of a view without
+                                     *   fog volumes binds */
+    WGPUTextureView no_grid_view;   /**< View of no_grid */
     WGPUSampler sampler;            /**< Repeating trilinear sampler of the noise */
     WGPUSampler grid_sampler;       /**< Clamping trilinear sampler of the integrated grid */
     bool unsupported;               /**< The device binds too few storage buffers or textures
@@ -151,6 +159,42 @@ static WGPUTextureView box_gpu_fog_noise(
     }
 
     return f->noise_view;
+}
+
+/** Create the integrated grid of one texel that views without fog volumes bind in their view
+ * group: no scattered light and full transmittance (the half floats 0, 0, 0, 1), so their
+ * blended draws are not fogged.
+ *
+ * @param gpu The backend
+ * @param view Receives the view of the texture
+ * @return The texture
+ */
+static WGPUTexture box_gpu_fog_no_grid(
+    box_gpu_t *gpu,
+    WGPUTextureView *view)
+{
+    const uint16_t texel[4] = { 0, 0, 0, 0x3C00 };
+    WGPUTexture result = wgpuDeviceCreateTexture(gpu->device, &(WGPUTextureDescriptor){
+        .usage = WGPUTextureUsage_TextureBinding | WGPUTextureUsage_CopyDst,
+        .dimension = WGPUTextureDimension_3D,
+        .size = { 1, 1, 1 },
+        .format = WGPUTextureFormat_RGBA16Float,
+        .mipLevelCount = 1,
+        .sampleCount = 1
+    });
+    WGPUTexelCopyTextureInfo dst = { .texture = result, .aspect = WGPUTextureAspect_All };
+    WGPUTexelCopyBufferLayout layout = { .bytesPerRow = sizeof(texel), .rowsPerImage = 1 };
+    WGPUExtent3D extent = { 1, 1, 1 };
+    wgpuQueueWriteTexture(gpu->queue, &dst, texel, sizeof(texel), &layout, &extent);
+    *view = wgpuTextureCreateView(result, &(WGPUTextureViewDescriptor){
+        .format = WGPUTextureFormat_RGBA16Float,
+        .dimension = WGPUTextureViewDimension_3D,
+        .mipLevelCount = 1,
+        .arrayLayerCount = 1,
+        .aspect = WGPUTextureAspect_All
+    });
+
+    return result;
 }
 
 /** Release the textures of a grid and the grid.
@@ -328,6 +372,7 @@ void box_gpu_fog_volumes_init(
         .maxAnisotropy = 1
     });
     f->placeholder = box_gpu_fog_texture(gpu, 1, &placeholder, &f->placeholder_view);
+    f->no_grid = box_gpu_fog_no_grid(gpu, &f->no_grid_view);
     WGPUBindGroupLayout inject_groups[2] = { gpu->view_layout, f->inject_layout };
     WGPUBindGroupLayout integrate_groups[2] = {
         gpu->prepass_empty_layout, f->integrate_layout
@@ -355,6 +400,14 @@ void box_gpu_fog_volumes_init(
             ecs_warn("fog volumes need %u storage buffers per shader stage, the device has %u",
                 BOX_GPU_FOG_STORAGE, limits.maxStorageBuffersPerShaderStage);
             f->unsupported = true;
+        }
+
+        if (limits.maxSampledTexturesPerShaderStage != WGPU_LIMIT_U32_UNDEFINED &&
+            limits.maxSampledTexturesPerShaderStage < BOX_GPU_FOG_SAMPLED)
+        {
+            ecs_warn("the forward pass binds the fog grid in its view group and needs %u "
+                "sampled textures per shader stage, the device has %u", BOX_GPU_FOG_SAMPLED,
+                limits.maxSampledTexturesPerShaderStage);
         }
     }
 
@@ -413,6 +466,8 @@ void box_gpu_fog_volumes_fini(
 
     wgpuTextureViewRelease(f->placeholder_view);
     wgpuTextureRelease(f->placeholder);
+    wgpuTextureViewRelease(f->no_grid_view);
+    wgpuTextureRelease(f->no_grid);
     wgpuSamplerRelease(f->sampler);
     wgpuSamplerRelease(f->grid_sampler);
     wgpuPipelineLayoutRelease(f->inject_pipeline_layout);
@@ -761,6 +816,105 @@ static box_gpu_froxels_t* box_gpu_froxels_get(
     }
 
     return result;
+}
+
+/** Check whether the blended draws of a view fog themselves with its grid: a lit view, not an
+ * impostor frame, that draws fog volumes in a target.
+ *
+ * @param gpu The backend
+ * @param t The target, NULL for the captures
+ * @param v The view
+ * @return Whether its view group binds its grid
+ */
+static bool box_gpu_fog_blends(
+    box_gpu_t *gpu,
+    const box_gpu_target_t *t,
+    const box_render_view_t *v)
+{
+    return t && v->lights.enabled && !v->impostor && box_gpu_fog_volumes_ready(gpu, v);
+}
+
+void box_gpu_fog_volumes_uniforms(
+    box_gpu_t *gpu,
+    const box_gpu_target_t *t,
+    const box_render_view_t *v,
+    box_gpu_view_uniforms_t *u)
+{
+    box_gpu_fog_uniforms_t f;
+    glm_vec4_zero(u->fog_grid);
+    glm_vec4_zero(u->fog_range);
+    if (!box_gpu_fog_blends(gpu, t, v)) {
+        goto done;
+    }
+
+    box_gpu_fog_uniforms(t, v, BOX_GPU_FOG_SEGMENT_FULL, &f);
+    u->fog_grid[0] = f.size[2];
+    u->fog_grid[1] = f.size[3];
+    u->fog_grid[2] = (float)f.grid[2];
+    u->fog_grid[3] = 1.0f;
+    u->fog_range[0] = f.range[1];
+    u->fog_range[1] = f.range[2];
+    u->fog_range[2] = f.range[3];
+done:
+    return;
+}
+
+WGPUTextureView box_gpu_fog_volumes_grid_view(
+    box_gpu_t *gpu,
+    const box_gpu_target_t *t,
+    const box_render_view_t *v)
+{
+    box_gpu_fog_volumes_t *f = gpu->fog_volumes;
+    box_gpu_fog_uniforms_t u;
+    WGPUTextureView result = f->no_grid_view;
+    if (box_gpu_fog_blends(gpu, t, v)) {
+        box_gpu_fog_uniforms(t, v, BOX_GPU_FOG_SEGMENT_FULL, &u);
+        result = box_gpu_froxels_get(gpu, t, v, u.grid)->integrated_view;
+    }
+
+    return result;
+}
+
+int32_t box_gpu_fog_volumes_unfogged_write(
+    box_gpu_t *gpu,
+    int32_t views,
+    int32_t count)
+{
+    int32_t i, result = 0;
+    ecs_vec_set_count_t(NULL, &gpu->view_unfogged, int32_t, views);
+    for (i = 0; i < views; i ++) {
+        int32_t *unfogged = ecs_vec_get_t(&gpu->view_unfogged, int32_t, i);
+        const box_gpu_view_uniforms_t *u = (const box_gpu_view_uniforms_t*)ecs_vec_get_t(
+            &gpu->view_data, uint8_t, i * BOX_GPU_VIEW_STRIDE);
+        *unfogged = -1;
+        if (u->fog_grid[3] <= 0.0f) {
+            continue;
+        }
+
+        int32_t copy = count + result;
+        ecs_vec_set_count_t(NULL, &gpu->view_data, uint8_t, (copy + 1) * BOX_GPU_VIEW_STRIDE);
+        uint8_t *data = ecs_vec_first(&gpu->view_data);
+        ecs_os_memcpy(data + copy * BOX_GPU_VIEW_STRIDE, data + i * BOX_GPU_VIEW_STRIDE,
+            BOX_GPU_VIEW_STRIDE);
+        box_gpu_view_uniforms_t *c = (box_gpu_view_uniforms_t*)(
+            data + copy * BOX_GPU_VIEW_STRIDE);
+        glm_vec4_zero(c->fog_grid);
+        *unfogged = copy;
+        result ++;
+    }
+
+    return result;
+}
+
+uint32_t box_gpu_fog_volumes_unfogged(
+    const box_gpu_t *gpu,
+    int32_t slot)
+{
+    int32_t copy = slot < ecs_vec_count(&gpu->view_unfogged)
+        ? *ecs_vec_get_t(&gpu->view_unfogged, int32_t, slot)
+        : -1;
+
+    return (uint32_t)((copy >= 0 ? copy : slot) * BOX_GPU_VIEW_STRIDE);
 }
 
 /** Keep the uniform of the frame a grid is injected in and fill the members of the uniform

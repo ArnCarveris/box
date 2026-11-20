@@ -6,6 +6,7 @@
 #include "include/shadow.wgsl"
 #include "include/cookie.wgsl"
 #include "include/particle.wgsl"
+#include "include/fog_blend.wgsl"
 
 const PI: f32 = 3.141592653589793;
 
@@ -312,6 +313,16 @@ fn fs(in: VertexOut) -> @location(0) vec4f {
 
     if (in.look.z != 0u && view.aerial.w > 0.0) {
         color = aerial_perspective(color, in.clip, in.world, in.look.y);
+    }
+
+    if (view.fog_grid.w > 0.0) {
+        // The fog in front of a particle dims the light an additive one adds; an alpha one is
+        // dimmed and adds the in scattered light by its coverage.
+        let fog = fog_froxels(in.clip, in.world);
+        color *= fog.a;
+        if (in.look.y != PARTICLE_ADDITIVE) {
+            color += fog.rgb;
+        }
     }
 
     if (in.look.y == PARTICLE_ADDITIVE) {

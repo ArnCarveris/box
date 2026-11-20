@@ -374,15 +374,18 @@ ECS_ENUM(FogVolumeShape, {
  * overlapping volumes. The grid is applied after the opaque meshes and the sky, one lookup per
  * pixel at its depth; fog beyond fog_distance is not drawn, and the sky takes the fog up to it.
  * Detail smaller than a cell, such as a hard face of a box or a thin shaft, is softened over a
- * cell. Other blended shapes and particles in or behind it are not fogged. It is lit by the
- * ambient of the view, the first directional light through its shadow cascades and cookie, and
- * the point and spot lights of the clusters of the view.
+ * cell. Particles and blended shapes in or behind it are fogged at their own depth by one
+ * lookup in the grid, alpha blended ones taking on the fog in front of them and additive ones
+ * dimmed by it; 2D shapes and text are not fogged. It is lit by the ambient of the view, the
+ * first directional light through its shadow cascades and cookie, and the point and spot lights
+ * of the clusters of the view.
  *
  * A shape with Transmission in or behind it is fogged as an opaque surface at its depth: the fog
  * behind the nearest glass of a pixel is applied before the snapshot the glass shows, the fog in
  * front of it after the last transmissive draw, from a depth only pass of the transmissive shapes.
- * Blended shapes drawn in front of glass before the last glass are fogged as the glass; the fog
- * between two layers of glass is lost.
+ * Blended shapes and particles drawn before the last glass are not fogged at their own depth:
+ * over glass they are fogged as the glass, elsewhere not at all; the fog between two layers of
+ * glass is lost.
  *
  * A cell is lit by the first BOX_FOG_VOLUME_LIGHT_STEPS lights of its cluster, so dense clusters
  * may lose lights. Shadows are one depth comparison per cell.

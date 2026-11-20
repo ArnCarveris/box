@@ -104,6 +104,13 @@ struct View {
     // x: frames rendered since the last reset of the history, y: 1 when the history is valid,
     // z, w: unused
     temporal: vec4u,
+    // Integrated froxel grid of the fog volumes of the view, which blended draws look up
+    // (fog_blend.wgsl): x, y the share of the grid the render size covers across and down, z its
+    // slices, w 1 when the view has fog volumes and 0 when not
+    fog_grid: vec4f,
+    // x: view depth of the near plane of the grid, y: of its far end, z: 1 for an orthographic
+    // camera, w: unused
+    fog_range: vec4f,
 };
 
 // shadow is the index of the tile record of a spot or point light in the shadow atlas of the

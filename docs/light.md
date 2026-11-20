@@ -109,7 +109,8 @@ mirror { Position: {0, 1.5, -4}; Rotation: {1.5708, 0, 0}; Box: {2, 0.05, 3}
 - `FogVolume`s render through a grid per view: a cell per ~8x8 pixels (at most 240 cells
   across), 64 depth slices from the near plane to `fog_distance`, exponential (evenly for
   orthographic). Detail under a cell is softened; fog beyond `fog_distance` is not drawn and
-  the sky takes the fog up to it.
+  the sky takes the fog up to it. Particles and blended shapes are fogged at their own depth by
+  one lookup in the grid; 2D shapes, text and unlit views are not fogged.
 - `StarField` and `FogVolume` are invisible to probe/reflection captures and bakes.
 
 ## Cost

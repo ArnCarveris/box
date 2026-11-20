@@ -18,7 +18,9 @@
 //   in a pass that reads the depth of the view, look the integrated grid up at the depth of each
 //   pixel. A pixel without depth takes the last slice, so fog ends at fog_distance. In the slice
 //   of the depth it weighs the slice by the share of the density of the volumes before the depth
-//   along the ray of the pixel (slice_share), so faces that cross the slice do not step.
+//   along the ray of the pixel (slice_share), so faces that cross the slice do not step. The
+//   particles and blended draws after it fog themselves with one lookup at their own depth
+//   (fog_blend.wgsl).
 //
 // A view with transmissive draws splits each ray at the nearest transmissive surface of its
 // pixel (glass_texture, the depth of the transmissive draws over the opaque depth): before its
