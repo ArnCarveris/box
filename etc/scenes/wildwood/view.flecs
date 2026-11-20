@@ -9,8 +9,9 @@ using state
 // The view of the player, set up like the forest's (forest/view.flecs): ambient occlusion, the
 // height fog of the sky, bloom, auto exposure into the Tony McMapface tone map, the grade of the
 // season and the weather, a vignette and SMAA. The aerial perspective of the sky hazes the
-// terrain over the kilometers so it fades into the sky instead of ending. The shadow cascades
-// reach over the near forest; the mountains need none.
+// terrain over the kilometers so it fades into the sky instead of ending. The trees draw at
+// coarser levels of detail with the distance, two shadow cascades reach over the near forest
+// and the small casters stay out of them; the mountains need none.
 view {
   occlusion { Gtao: {radius: 0.7, final_value_power: 1.8, quality: GtaoHigh} }
   bloom { Bloom: {intensity: 0.12, threshold: 1.2, threshold_softness: 0.5} }
@@ -34,6 +35,7 @@ view {
 
   View: {
     camera: player,
+    lod: {levels: 4, distances: [0, 6, 18, 40]},
     clear: {enabled: true, color: {120, 140, 160, 255}},
     lighting: {
       enabled: true,
@@ -44,14 +46,15 @@ view {
     },
     shadows: {
       enabled: true,
-      cascades: 4,
-      resolution: 2048,
-      interval: [1, 2, 2, 4],
-      max_distance: 400,
+      cascades: 2,
+      resolution: 1536,
+      interval: [1, 2],
+      max_distance: 120,
       split_lambda: 0.85,
       filter_size: 5,
       fade: 0.2,
-      blend: 0.15
+      blend: 0.15,
+      min_caster_texels: 12
     },
     effects: [
       {effect: occlusion},

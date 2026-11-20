@@ -1,0 +1,244 @@
+using flecs.script
+using flecs.script.math
+using box.world
+using state
+using assets
+
+// The stands of the wildwood: a ChunkGrid of WILD_CELL cells around the focus whose template
+// scatters the trees of trees.flecs over the terrain. Placement is a function of absolute
+// positions, so the cells join without seams and a cell is the same each time it loads.
+//
+// Each Scatter keeps its trees on the forest floor (mask channel 0) or the grass of the
+// clearings (channel 1) at the slopes and heights its species grows at, so none stand on the
+// trails, in the clearings, on the rock or above the tree line, and keeps clear of the trees of
+// the scatters before it. Which species a tree is follows stand noise, a smooth value noise of
+// a few hundred meters evaluated at the middle of the cell, which sets the weights of the items:
+// - broadleaf: beech and oak stands on the gentle lowland floor, a few birches and patches of
+//   spruce and fir among them
+// - slopes and highland: spruce and fir on the slopes and at altitude, thinning out below the
+//   alpine meadows
+// - edges: birches along the rims of the clearings
+// - snags: an occasional dead tree, standing or fallen
+// Within WILD_NEAR (level 0) young trees and saplings grow in the gaps between the mature trees
+// and at the clearing edges; the cells further out, to WILD_FAR, place the same mature trees
+// only, which draw as impostors in the distance. A cell keeps its mature trees as it changes
+// level, so only the young ones come and go.
+state {
+  // Cells of WILD_CELL meters: level 0 within WILD_NEAR of the focus, the mature trees and the
+  // young ones, level 1 within WILD_FAR, the mature trees. WILD_BUDGET cells load per frame,
+  // within WILD_BUDGET_MS
+  export const WILD_CELL: f32 = 32
+  export const WILD_NEAR: f32 = 120
+  export const WILD_FAR: f32 = 720
+  export const WILD_BUDGET: i32 = 16
+  export const WILD_BUDGET_MS: f32 = 3
+
+  // Trees per 100 m² of the forest and the least distance between two mature trees
+  export const WILD_DENSITY: f32 = 0.75
+  export const WILD_SPACING: f32 = 6.5
+
+  // The broadleaf stands grow below WILD_BROAD_HEIGHT on slopes under WILD_BROAD_SLOPE degrees,
+  // the conifers on the slopes up to WILD_STEEP and above it up to the tree line, WILD_TREE_LINE
+  export const WILD_BROAD_HEIGHT: f32 = 150
+  export const WILD_BROAD_SLOPE: f32 = 18
+  export const WILD_STEEP: f32 = 38
+  export const WILD_TREE_LINE: f32 = 270
+
+  // Value noise of the stands, 0..1, smooth over cells of size meters
+  fn wild_noise(x: f64, z: f64, size: f64, seed: f64) -> f64 {
+    const gx = x / size
+    const gz = z / size
+    const ix = floor(gx)
+    const iz = floor(gz)
+    const sx = forest_smooth(0, 1, gx - ix)
+    const sz = forest_smooth(0, 1, gz - iz)
+    const a = forest_lerp(forest_hash2(ix, iz, seed), forest_hash2(ix + 1, iz, seed), sx)
+    const b = forest_lerp(forest_hash2(ix, iz + 1, seed), forest_hash2(ix + 1, iz + 1, seed), sx)
+    forest_lerp(a, b, sz)
+  }
+
+  // Two octaves of stand noise
+  fn wild_stand(x: f64, z: f64, seed: f64) -> f64 {
+    wild_noise(x, z, 340, seed) * 0.65 + wild_noise(x, z, 120, seed + 17) * 0.35
+  }
+}
+
+assets {
+  // A cell of the stands, its corner at cell_x cell_z cells
+  template WildCell {
+    prop cell_x: i32 = 0
+    prop cell_z: i32 = 0
+    prop level: i32 = 0
+    prop size: f32 = 32
+
+    // Stand noise at the middle of the cell
+    const cx = (cell_x + 0.5) * size
+    const cz = (cell_z + 0.5) * size
+    const oakness = forest_smooth(0.36, 0.64, wild_stand(cx, cz, 101))
+    const mixed = forest_smooth(0.56, 0.74, wild_stand(cx, cz, 202))
+    const grove = forest_smooth(0.58, 0.78, wild_stand(cx, cz, 303))
+    const firness = forest_smooth(0.32, 0.68, wild_stand(cx, cz, 404))
+
+    // Weights of a variant per species: the broadleaf stands with their conifer patches and
+    // birch groves, and the conifers of the slopes and the highland
+    const w_beech = (1 - oakness) * (1 - 0.7 * mixed)
+    const w_oak = oakness * 0.8 * (1 - 0.7 * mixed)
+    const w_birch = 0.08 + 0.3 * grove
+    const w_spruce = 0.7 * mixed * (1 - firness) + 0.02
+    const w_fir = 0.7 * mixed * firness + 0.02
+    const w_hspruce = 0.25 + 0.75 * (1 - firness)
+    const w_hfir = 0.25 + 0.75 * firness
+
+    broad {
+      Scatter: {
+        items: [
+          {wild_trees.beech_0.tree, w_beech}, {wild_trees.beech_1.tree, w_beech},
+          {wild_trees.beech_2.tree, w_beech}, {wild_trees.beech_3.tree, w_beech},
+          {wild_trees.oak_0.tree, w_oak}, {wild_trees.oak_1.tree, w_oak},
+          {wild_trees.oak_2.tree, w_oak}, {wild_trees.oak_3.tree, w_oak},
+          {wild_trees.birch_0.tree, w_birch}, {wild_trees.birch_1.tree, w_birch},
+          {wild_trees.birch_2.tree, w_birch}, {wild_trees.birch_3.tree, w_birch},
+          {wild_trees.spruce_0.tree, w_spruce}, {wild_trees.spruce_2.tree, w_spruce},
+          {wild_trees.fir_0.tree, w_fir}, {wild_trees.fir_2.tree, w_fir}
+        ],
+        density: WILD_DENSITY, spacing: WILD_SPACING, mode: ScatterPoisson, seed: 7101,
+        ground: wildwood.land, mask_channel: 0, mask_min: 0.6, mask_max: 1, mask_edge: 0.25,
+        height_min: GROUND_MIN, height_max: WILD_BROAD_HEIGHT, slope_max: WILD_BROAD_SLOPE,
+        scale_min: 0.88, scale_max: 1.12, spatial_ignore: true
+      }
+    }
+
+    // Spruce and fir on the slopes at any height below the tree line
+    slopes {
+      Scatter: {
+        items: [
+          {wild_trees.spruce_0.tree, w_hspruce}, {wild_trees.spruce_1.tree, w_hspruce},
+          {wild_trees.spruce_2.tree, w_hspruce}, {wild_trees.spruce_3.tree, w_hspruce},
+          {wild_trees.fir_0.tree, w_hfir}, {wild_trees.fir_1.tree, w_hfir},
+          {wild_trees.fir_2.tree, w_hfir}, {wild_trees.fir_3.tree, w_hfir},
+          {wild_trees.beech_2.tree, 0.15 * w_beech}, {wild_trees.oak_2.tree, 0.15 * w_oak}
+        ],
+        density: WILD_DENSITY, spacing: WILD_SPACING - 1, mode: ScatterPoisson, seed: 7202,
+        ground: wildwood.land, mask_channel: 0, mask_min: 0.55, mask_max: 1, mask_edge: 0.3,
+        height_min: GROUND_MIN, height_max: WILD_TREE_LINE,
+        slope_min: WILD_BROAD_SLOPE, slope_max: WILD_STEEP,
+        scale_min: 0.85, scale_max: 1.1, avoid: [broad], avoid_radius: 4, spatial_ignore: true
+      }
+    }
+
+    // Spruce and fir on the gentle ground of the highland, smaller towards the tree line
+    highland {
+      Scatter: {
+        items: [
+          {wild_trees.spruce_0.tree, w_hspruce}, {wild_trees.spruce_1.tree, w_hspruce},
+          {wild_trees.spruce_2.tree, 2 * w_hspruce}, {wild_trees.spruce_3.tree, w_hspruce},
+          {wild_trees.fir_0.tree, w_hfir}, {wild_trees.fir_1.tree, w_hfir},
+          {wild_trees.fir_2.tree, 2 * w_hfir}, {wild_trees.fir_3.tree, w_hfir},
+          {wild_trees.birch_2.tree, 0.2}
+        ],
+        density: WILD_DENSITY, spacing: WILD_SPACING - 1, mode: ScatterPoisson, seed: 7303,
+        ground: wildwood.land, mask_channel: 0, mask_min: 0.55, mask_max: 1, mask_edge: 0.3,
+        height_min: WILD_BROAD_HEIGHT, height_max: WILD_TREE_LINE, slope_max: WILD_BROAD_SLOPE,
+        scale_min: 0.8, scale_max: 1.08, avoid: [broad, slopes], avoid_radius: 4,
+        spatial_ignore: true
+      }
+    }
+
+    // Birches along the rims of the clearings
+    edges {
+      Scatter: {
+        items: [
+          {wild_trees.birch_0.tree, 1}, {wild_trees.birch_1.tree, 1},
+          {wild_trees.birch_2.tree, 1}, {wild_trees.birch_3.tree, 1},
+          {wild_trees.beech_2.tree, 0.25 * w_beech}, {wild_trees.oak_2.tree, 0.25 * w_oak}
+        ],
+        density: 1.6, spacing: 4.5, mode: ScatterPoisson, seed: 7404,
+        ground: wildwood.land, mask_channel: 1, mask_min: 0.1, mask_max: 0.45, mask_edge: 0.1,
+        height_min: GROUND_MIN, height_max: WILD_BROAD_HEIGHT + 60, slope_max: WILD_STEEP,
+        scale_min: 0.85, scale_max: 1.1, avoid: [broad, slopes, highland], avoid_radius: 4,
+        spatial_ignore: true
+      }
+    }
+
+    // An occasional snag
+    snags {
+      Scatter: {
+        items: [
+          {wild_trees.snag_0.tree, 1}, {wild_trees.snag_1.tree, 1}, {wild_trees.snag_2.tree, 1.2}
+        ],
+        density: 0.045, spacing: 12, mode: ScatterPoisson, seed: 7505,
+        ground: wildwood.land, mask_channel: 0, mask_min: 0.65, mask_max: 1, mask_edge: 0.15,
+        height_min: GROUND_MIN, height_max: WILD_TREE_LINE - 20, slope_max: 28,
+        avoid: [broad, slopes, highland, edges], avoid_radius: 3.5, spatial_ignore: true
+      }
+    }
+
+    if level == 0 {
+      // Young trees in the gaps between the mature ones, of the species of the stand
+      young {
+        Scatter: {
+          items: [
+            {wild_trees.beech_young_0.tree, w_beech}, {wild_trees.beech_young_1.tree, w_beech},
+            {wild_trees.oak_young_0.tree, w_oak}, {wild_trees.oak_young_1.tree, w_oak},
+            {wild_trees.birch_young_0.tree, w_birch}, {wild_trees.birch_young_1.tree, w_birch},
+            {wild_trees.spruce_young_0.tree, w_spruce + 0.2},
+            {wild_trees.spruce_young_1.tree, w_spruce + 0.2},
+            {wild_trees.fir_young_0.tree, w_fir + 0.2}, {wild_trees.fir_young_1.tree, w_fir + 0.2}
+          ],
+          density: 0.9, spacing: 3.5, mode: ScatterPoisson, seed: 7606,
+          ground: wildwood.land, mask_channel: 0, mask_min: 0.55, mask_max: 1, mask_edge: 0.25,
+          height_min: GROUND_MIN, height_max: WILD_TREE_LINE - 10, slope_max: WILD_STEEP - 4,
+          scale_min: 0.8, scale_max: 1.2, avoid: [broad, slopes, highland, edges],
+          avoid_radius: 3.8, spatial_ignore: true
+        }
+      }
+
+      // Saplings under the gaps
+      saplings {
+        Scatter: {
+          items: [
+            {wild_trees.beech_sapling.tree, w_beech}, {wild_trees.oak_sapling.tree, w_oak},
+            {wild_trees.birch_sapling.tree, w_birch}, {wild_trees.spruce_sapling.tree, w_spruce + 0.2},
+            {wild_trees.fir_sapling.tree, w_fir + 0.2}
+          ],
+          density: 1.1, spacing: 2.5, mode: ScatterPoisson, seed: 7707,
+          ground: wildwood.land, mask_channel: 0, mask_min: 0.5, mask_max: 1, mask_edge: 0.3,
+          height_min: GROUND_MIN, height_max: WILD_TREE_LINE - 10, slope_max: WILD_STEEP - 4,
+          scale_min: 0.7, scale_max: 1.3, avoid: [broad, slopes, highland, young],
+          avoid_radius: 2.4, spatial_ignore: true
+        }
+      }
+
+      // Young birches, beeches and spruces coming up at the rims of the clearings
+      fringe {
+        Scatter: {
+          items: [
+            {wild_trees.birch_young_0.tree, 2}, {wild_trees.birch_young_1.tree, 2},
+            {wild_trees.birch_sapling.tree, 2}, {wild_trees.beech_young_1.tree, w_beech},
+            {wild_trees.beech_sapling.tree, w_beech}, {wild_trees.spruce_young_1.tree, 0.4},
+            {wild_trees.spruce_sapling.tree, 0.4}, {wild_trees.oak_sapling.tree, w_oak}
+          ],
+          density: 1.4, spacing: 3, mode: ScatterPoisson, seed: 7808,
+          ground: wildwood.land, mask_channel: 1, mask_min: 0.3, mask_max: 0.7, mask_edge: 0.12,
+          height_min: GROUND_MIN, height_max: WILD_BROAD_HEIGHT + 60, slope_max: WILD_STEEP - 4,
+          scale_min: 0.75, scale_max: 1.2, avoid: [edges, broad, young], avoid_radius: 3,
+          spatial_ignore: true
+        }
+      }
+    }
+  }
+}
+
+wildwood {
+  // The stands around the focus
+  stands {
+    ChunkGrid: {
+      template: WildCell,
+      cell_size: {WILD_CELL, 0, WILD_CELL},
+      levels: [WILD_NEAR, WILD_FAR],
+      hysteresis: 8,
+      budget: WILD_BUDGET,
+      budget_ms: WILD_BUDGET_MS
+    }
+  }
+}
