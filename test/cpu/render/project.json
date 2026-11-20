@@ -18,6 +18,23 @@
     "test": {
         "testsuites": [
             {
+                "id": "ImpostorCards",
+                "testcases": [
+                    "none_before_ready",
+                    "card_per_instance",
+                    "children_fade_out",
+                    "one_batch_per_prefab",
+                    "packet_batch_binds_atlases",
+                    "mesh_holds_grid",
+                    "distance_change_updates_ranges",
+                    "owned_range_kept",
+                    "remove_impostor_removes_cards",
+                    "zero_distance_draws_full",
+                    "follow_instances",
+                    "bake_copy_has_no_card"
+                ]
+            },
+            {
                 "id": "DrawRangeKey",
                 "testcases": [
                     "none",

@@ -6,7 +6,8 @@
  *
  * The prefabs come from test/assets/impostor: ColorCube, a closed box with a color per face,
  * and DiscCard, an alpha tested quad that shows a disc. The atlases are written to PNG files in
- * the temporary folder and compared as stored.
+ * the temporary folder and compared as stored. The card cases draw Panel and Tower of draw.flecs
+ * beyond Impostor.distance and compare them with the full render of their hierarchy.
  */
 
 #include <box.h>
@@ -628,5 +629,297 @@ void Impostor_not_ready_cannot_write(void) {
     ecs_world_t *world = impostor_world("color_cube.flecs");
     ecs_entity_t cube = impostor_prefab(world, "ColorCube", true);
     test_int(box_impostor_write(world, cube, ImpostorAlbedo, "unused.png"), -1);
+    ecs_fini(world);
+}
+
+/** Edge in pixels of the images of the card cases */
+#define IMPOSTOR_IMAGE (64)
+
+/** Edge in pixels of the images of the shadow case */
+#define IMPOSTOR_SHADOW_IMAGE (128)
+
+/** Create a camera and its view, cleared to black.
+ *
+ * @param world The world
+ * @param position Position of the camera
+ * @param pitch Rotation.x of the camera, 0 looks down -z
+ * @param fov Vertical field of view in degrees
+ * @param lit Whether the view is lit, with shadows
+ * @return The view
+ */
+static ecs_entity_t impostor_view(
+    ecs_world_t *world,
+    Position position,
+    float pitch,
+    float fov,
+    bool lit)
+{
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set_ptr(world, camera, Position, &position);
+    ecs_set(world, camera, Rotation, {pitch, 0, 0});
+    ecs_set(world, camera, Camera, {.fov = fov, .near_ = 0.1f, .far_ = 1000});
+    ecs_entity_t result = ecs_new(world);
+    ecs_set(world, result, View, {.camera = camera,
+        .culling = {.enabled = true},
+        .clear = {.enabled = true, .color = {0, 0, 0, 255}},
+        .lighting.enabled = lit,
+        .shadows = {.enabled = lit, .cascades = 2, .resolution = 1024, .max_distance = 100,
+            .split_lambda = 0.5f, .depth_bias = 2, .normal_offset = 2, .filter_size = 3,
+            .fade = 0.1f, .blend = 0.1f}});
+
+    return result;
+}
+
+/** Change the distance and fade of an Impostor, keeping its grid, and run two frames so the
+ * cards and the instances take their new ranges.
+ *
+ * @param world The world
+ * @param e The impostor
+ * @param distance Impostor.distance
+ * @param fade Impostor.fade
+ */
+static void impostor_range(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    float distance,
+    float fade)
+{
+    Impostor *imp = ecs_get_mut(world, e, Impostor);
+    test_assert(imp != NULL);
+    imp->distance = distance;
+    imp->fade = fade;
+    ecs_modified(world, e, Impostor);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+}
+
+/** Render a frame into an image file and load its pixels.
+ *
+ * @param world The world
+ * @param file Image file in the temporary folder
+ * @param size Width and height of the image
+ * @return RGBA pixels, freed with stbi_image_free
+ */
+static unsigned char* impostor_capture(
+    ecs_world_t *world,
+    const char *file,
+    int32_t size)
+{
+    ecs_entity_t e = ecs_lookup(world, "capture");
+    if (!e) {
+        e = ecs_entity(world, { .name = "capture" });
+    }
+
+    ecs_set(world, e, Surface, {.width = size, .height = size,
+        .write_to_file = ECS_CONST_CAST(char*, file), .resolution_scale = 1});
+    ecs_progress(world, 0);
+    box_render_sync(world);
+
+    char *path = flecs_asprintf("%s/%s", ecs_singleton_get(world, AppStatus)->tmp_dir, file);
+    int w = 0, h = 0, n = 0;
+    unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    test_int(w, size);
+    test_int(h, size);
+    ecs_os_free(path);
+
+    return px;
+}
+
+/** Check whether a pixel shows the black background.
+ *
+ * @param p The pixel
+ * @return Whether every channel is below 20
+ */
+static bool impostor_background_px(
+    const unsigned char *p)
+{
+    return p[0] < 20 && p[1] < 20 && p[2] < 20;
+}
+
+/** Count the pixels of an image that are not background.
+ *
+ * @param px The pixels
+ * @param size Width and height
+ * @return The covered pixels
+ */
+static int32_t impostor_covered(
+    const unsigned char *px,
+    int32_t size)
+{
+    int32_t i, result = 0;
+    for (i = 0; i < size * size; i ++) {
+        result += !impostor_background_px(&px[i * 4]);
+    }
+
+    return result;
+}
+
+/** Load draw.flecs and give a prefab of it an Impostor with an instance at a position.
+ *
+ * @param name Name of the prefab
+ * @param position Position of the instance
+ * @param prefab Receives the prefab
+ * @param instance Receives the instance
+ * @return The world
+ */
+static ecs_world_t* impostor_draw_world(
+    const char *name,
+    Position position,
+    ecs_entity_t *prefab,
+    ecs_entity_t *instance)
+{
+    ecs_world_t *world = impostor_world("draw.flecs");
+    *prefab = impostor_prefab(world, name, true);
+    *instance = ecs_new_w_pair(world, EcsIsA, *prefab);
+    ecs_set_ptr(world, *instance, Position, &position);
+
+    return world;
+}
+
+void Impostor_card_matches_full_render(void) {
+    ecs_entity_t panel, inst;
+    ecs_world_t *world = impostor_draw_world("Panel", (Position){0, 0, -40}, &panel, &inst);
+    impostor_view(world, (Position){0, 0, 0}, 0, 12, false);
+    impostor_wait(world, panel, 1);
+    test_assert(ecs_owns(world, inst, DrawRange));
+
+    /* Far beyond the instance the hierarchy draws, nearer than it the card */
+    impostor_range(world, panel, 1000, 1);
+    unsigned char *full = impostor_capture(world, "impostor_full.png", IMPOSTOR_IMAGE);
+    impostor_range(world, panel, 10, 1);
+    unsigned char *card = impostor_capture(world, "impostor_card_draw.png", IMPOSTOR_IMAGE);
+
+    box_render_draws_stats_t stats;
+    box_render_draws_stats(world, &stats);
+    test_int(stats.impostors, 1);
+    test_int(stats.impostor_batches, 1);
+
+    int32_t covered = impostor_covered(full, IMPOSTOR_IMAGE);
+    int32_t card_covered = impostor_covered(card, IMPOSTOR_IMAGE);
+    test_assert(covered > 300);
+    test_assert(abs(card_covered - covered) <= covered * 15 / 100);
+
+    /* Where both show the panel, the card shows its color */
+    int32_t i, both = 0, c;
+    int64_t diff = 0;
+    for (i = 0; i < IMPOSTOR_IMAGE * IMPOSTOR_IMAGE; i ++) {
+        const unsigned char *a = &full[i * 4], *b = &card[i * 4];
+        if (impostor_background_px(a) || impostor_background_px(b)) {
+            continue;
+        }
+
+        for (c = 0; c < 3; c ++) {
+            diff += abs(a[c] - b[c]);
+        }
+
+        both ++;
+    }
+
+    test_assert(both > covered * 80 / 100);
+    test_assert(diff / (3 * both) <= IMPOSTOR_TOLERANCE);
+    stbi_image_free(full);
+    stbi_image_free(card);
+    ecs_fini(world);
+}
+
+void Impostor_crossfade_covers_once(void) {
+    ecs_entity_t panel, inst;
+    ecs_world_t *world = impostor_draw_world("Panel", (Position){0, 0, -40}, &panel, &inst);
+    impostor_view(world, (Position){0, 0, 0}, 0, 12, false);
+    impostor_wait(world, panel, 1);
+    test_assert(ecs_owns(world, inst, DrawRange));
+    impostor_range(world, panel, 1000, 1);
+    unsigned char *full = impostor_capture(world, "impostor_fade_full.png", IMPOSTOR_IMAGE);
+
+    /* The instance is in the middle of the band: half of its pixels show the hierarchy, the
+     * others the card, and the dithers of the two are complementary */
+    impostor_range(world, panel, 40, 8);
+    unsigned char *band = impostor_capture(world, "impostor_fade_band.png", IMPOSTOR_IMAGE);
+    int32_t i, mask = 0, holes = 0, extra = 0;
+    for (i = 0; i < IMPOSTOR_IMAGE * IMPOSTOR_IMAGE; i ++) {
+        bool in = !impostor_background_px(&full[i * 4]);
+        bool shown = !impostor_background_px(&band[i * 4]);
+        mask += in;
+        holes += in && !shown;
+        extra += !in && shown;
+    }
+
+    test_assert(mask > 300);
+    test_assert(holes <= mask * 5 / 100);
+    test_assert(extra <= mask * 5 / 100);
+
+    /* At the near and far ends of the band one of the two draws alone */
+    impostor_range(world, panel, 30, 8);
+    unsigned char *near = impostor_capture(world, "impostor_fade_near.png", IMPOSTOR_IMAGE);
+    impostor_range(world, panel, 50, 8);
+    unsigned char *far = impostor_capture(world, "impostor_fade_far.png", IMPOSTOR_IMAGE);
+    test_assert(abs(impostor_covered(near, IMPOSTOR_IMAGE) - mask) <= mask * 15 / 100);
+    test_assert(abs(impostor_covered(far, IMPOSTOR_IMAGE) - mask) <= mask * 5 / 100);
+    stbi_image_free(full);
+    stbi_image_free(band);
+    stbi_image_free(near);
+    stbi_image_free(far);
+    ecs_fini(world);
+}
+
+/** Count the pixels of the lit floor in shadow: darker than a quarter of white.
+ *
+ * @param px The pixels
+ * @return The dark pixels
+ */
+static int32_t impostor_shadowed(
+    const unsigned char *px)
+{
+    int32_t i, result = 0;
+    for (i = 0; i < IMPOSTOR_SHADOW_IMAGE * IMPOSTOR_SHADOW_IMAGE; i ++) {
+        const unsigned char *p = &px[i * 4];
+        result += p[0] + p[1] + p[2] < 3 * 64;
+    }
+
+    return result;
+}
+
+void Impostor_card_casts_shadow(void) {
+    ecs_entity_t tower, inst;
+    ecs_world_t *world = impostor_draw_world("Tower", (Position){0, 3, 0}, &tower, &inst);
+    ecs_singleton_set(world, AmbientLight, {.intensity = 0});
+    ecs_entity_t floor = ecs_new(world);
+    ecs_set(world, floor, Position, {0, -0.1f, 0});
+    ecs_set(world, floor, Box, {80, 0.2f, 80});
+    ecs_set(world, floor, Rgb, {255, 255, 255});
+    ecs_set(world, floor, PbrMaterial, {.roughness = 1});
+    ecs_entity_t sun = ecs_new(world);
+    ecs_set(world, sun, Rotation, {1.0f, 0, 0});
+    ecs_set(world, sun, DirectionalLight, {.intensity = GLM_PIf});
+    impostor_view(world, (Position){0, 45, 0}, -(float)GLM_PI_2, 40, true);
+    impostor_wait(world, tower, 1);
+
+    impostor_range(world, tower, 1000, 1);
+    unsigned char *full = impostor_capture(world, "impostor_shadow_full.png",
+        IMPOSTOR_SHADOW_IMAGE);
+    impostor_range(world, tower, 20, 1);
+    unsigned char *card = impostor_capture(world, "impostor_shadow_card.png",
+        IMPOSTOR_SHADOW_IMAGE);
+    box_render_draws_stats_t stats;
+    box_render_draws_stats(world, &stats);
+    test_int(stats.impostors, 1);
+
+    /* The tower shades a band of the floor along the light, the card about as much */
+    int32_t shadow = impostor_shadowed(full);
+    int32_t card_shadow = impostor_shadowed(card);
+    test_assert(shadow > 40);
+    test_assert(card_shadow > shadow / 2);
+    test_assert(card_shadow < shadow * 3 / 2);
+
+    /* Without the instance the floor is lit everywhere */
+    ecs_delete(world, inst);
+    unsigned char *none = impostor_capture(world, "impostor_shadow_none.png",
+        IMPOSTOR_SHADOW_IMAGE);
+    test_assert(impostor_shadowed(none) < shadow / 4);
+    stbi_image_free(full);
+    stbi_image_free(card);
+    stbi_image_free(none);
     ecs_fini(world);
 }

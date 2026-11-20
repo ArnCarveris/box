@@ -218,3 +218,5 @@ fn layered(f: VertexOut, front: bool, s: Surface, maps: texture_2d_array<f32>, f
     return lit(f, layered(f, front, s, blend_heights, blending.count, blend_low(b)));
 }
 #endif
+
+#include "include/mesh_impostor.wgsl"

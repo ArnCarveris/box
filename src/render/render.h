@@ -20,6 +20,9 @@ typedef struct box_render_draws_stats_t {
     int32_t batches;            /**< Batches alive */
     int32_t instances;          /**< Static instances in batches */
     int32_t dynamic;            /**< Dynamic instances in batches */
+    int32_t impostors;          /**< Instances drawn as the card of an Impostor beyond its
+                                 *   distance, one card per instance of its prefab */
+    int32_t impostor_batches;   /**< Batches of impostor cards, one per prefab */
     int32_t processed;          /**< Changed entities processed by the last extract */
     int32_t scattered;          /**< Instances the last extract sent through the scatter pass */
     int32_t scatters;           /**< Scatters the last extract sent, one per instance page with
@@ -2349,6 +2352,16 @@ uint32_t box_render_impostor_atlas(
     const ecs_world_t *world,
     ecs_entity_t impostor,
     ImpostorChannel channel);
+
+/** Card of an Impostor (ImpostorDraw), set on the card prefab of the impostor that the card of
+ * each of its instances inherits. The shapes with it draw as one alpha tested card that shows
+ * the atlases of the impostor, in a batch of their own. */
+typedef struct ImpostorCard {
+    ecs_entity_t impostor;      /**< Entity with the Impostor */
+} ImpostorCard;
+
+/** Component id of ImpostorCard */
+extern ECS_COMPONENT_DECLARE(ImpostorCard);
 
 /** Ask for a capture in the next extracted frame.
  *

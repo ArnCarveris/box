@@ -724,21 +724,27 @@ static ecs_entity_t box_draws_scene(
     return result;
 }
 
-/** Check whether a scene bakes its lighting or reflections, so captures tell its static shapes
- * apart.
+/** Set the bake flag of a key, so captures tell static shapes apart: an opaque shape that
+ * doesn't move, in a scene whose root (or the singleton) has LightBake or ReflectionBake. Then
+ * make the key that of an impostor card when the shape is one.
  *
  * @param world The world
- * @param scene The scene, 0 for the default scene
- * @return Whether the scene root, or for the default scene the singleton, has LightBake or
- *         ReflectionBake
+ * @param e The entity
+ * @param allowed Whether the shape can bake at all, false for 2D shapes
+ * @param key The key, its scene and blend computed
  */
-static bool box_draws_baked(
-    const ecs_world_t *world,
-    ecs_entity_t scene)
+static void box_draws_key_bake(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    bool allowed,
+    box_draw_key_t *key)
 {
-    bool light = ecs_has(world, scene ? scene : ecs_id(LightBake), LightBake);
-
-    return light || ecs_has(world, scene ? scene : ecs_id(ReflectionBake), ReflectionBake);
+    key->bake = allowed && key->blend == Opaque && !ecs_has_id(world, e, DynamicTransform) &&
+        !ecs_has_id(world, e, TransitionTransform) && !ecs_has_id(world, e, ManualTransform) &&
+        !ecs_has_id(world, e, NoBake) && !box_projection_anchored(world, e) &&
+        (ecs_has(world, key->scene ? key->scene : ecs_id(LightBake), LightBake) ||
+         ecs_has(world, key->scene ? key->scene : ecs_id(ReflectionBake), ReflectionBake));
+    box_draws_impostor_key(world, e, key);
 }
 
 /** Mark every shape in the batches of the scene of the entities of an observer event, after
@@ -953,10 +959,7 @@ static void box_draws_key(
         key->atmosphere = key->blend != Opaque ? planet : 0;
     }
 
-    key->bake = !shape2d && key->blend == Opaque && !ecs_has_id(world, e, DynamicTransform) &&
-        !ecs_has_id(world, e, TransitionTransform) &&
-        !ecs_has_id(world, e, ManualTransform) && !ecs_has_id(world, e, NoBake) &&
-        !box_projection_anchored(world, e) && box_draws_baked(world, key->scene);
+    box_draws_key_bake(world, e, !shape2d, key);
 }
 
 /** Update the fields of the key of a 3D shape that follow its blend and its alpha test, for a
@@ -989,10 +992,7 @@ static void box_draws_key_blend(
         key->atmosphere = key->blend != Opaque ? planet : 0;
     }
 
-    key->bake = key->blend == Opaque && !ecs_has_id(world, e, DynamicTransform) &&
-        !ecs_has_id(world, e, TransitionTransform) &&
-        !ecs_has_id(world, e, ManualTransform) && !ecs_has_id(world, e, NoBake) &&
-        !box_projection_anchored(world, e) && box_draws_baked(world, key->scene);
+    box_draws_key_bake(world, e, true, key);
 }
 
 /** Check whether a shape whose change is its material slot, or the Opacity or Tint of an

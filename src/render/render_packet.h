@@ -2313,6 +2313,11 @@ typedef struct box_render_batch_t {
                                  *   none: the cull pass drops the instances out of range and
                                  *   every pass draws them with the draw_range override, which
                                  *   dithers the fades */
+    bool impostor;              /**< The instances are the cards of an Impostor (ImpostorDraw):
+                                 *   every pass draws them with the _impostor entry points of
+                                 *   the mesh and shadow shaders, which read the card from the
+                                 *   per vertex data of the mesh and the albedo, depth and
+                                 *   normal atlases from textures 0, 2 and 3 */
     uint32_t mesh;              /**< Mesh handle */
     uint32_t lods[BOX_LOD_LEVELS_MAX]; /**< Mesh handle of each level of detail of an opaque 3D
                                  *   batch, lods[0] being mesh and a level that does not reduce

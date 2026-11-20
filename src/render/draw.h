@@ -236,6 +236,9 @@ typedef struct box_draw_key_t {
                              *   ChildOf ancestor has one (box_draws_range), all 0 without: the
                              *   cull pass drops the instances out of range and the pipelines
                              *   dither the fades (draw_range) */
+    ecs_entity_t impostor;  /**< Entity with the Impostor whose cards the shapes are
+                             *   (ImpostorCard), 0 for other shapes: a batch of cards is
+                             *   opaque, alpha tested and draws the atlases of the impostor */
     bool texture_blend;     /**< 3D shapes with a TextureBlend (texture_blend pipeline):
                              *   textures[0] is the owner of the TextureBlend, textures[2] and
                              *   textures[3] are 0, so the key does not grow */
@@ -2316,6 +2319,19 @@ bool box_draws_range(
     const ecs_world_t *world,
     ecs_entity_t e,
     float *out);
+
+/** Make the key of a 3D shape the key of an impostor card when it has an ImpostorCard: an
+ * opaque, alpha tested mesh batch of its own per impostor, without the material features, wind,
+ * layers or bakes that the card does not draw.
+ *
+ * @param world The world
+ * @param e The entity
+ * @param key The key box_draws_key computed, changed for a card
+ */
+void box_draws_impostor_key(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    box_draw_key_t *key);
 
 /** Multiply the Opacity and compose the Tint of the ancestors, through ChildOf and Parent.
  *

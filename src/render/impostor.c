@@ -1,13 +1,14 @@
 /**
  * @file render/impostor.c
- * @brief Bakes the octahedral atlases of the Impostor components.
+ * @brief Bakes the octahedral atlases of the Impostor components and draws them on cards.
  *
  * An Impostor gets a scene of its own with a copy of its hierarchy at the origin. A view of a
  * bake is three captures of that scene into targets that exist for one packet, unlit, one per
  * channel (box_render_view_t.impostor), which the backend copies into the atlases.
  *
- * A bake writes the back atlases and swaps them in after its last view. A change of the source,
- * which box_impostor_hash_tree hashes every frame, makes a new copy and bakes again.
+ * A bake swaps in its atlases after its last view; a change of the source makes a new copy and
+ * bakes again. Every instance of the prefab of a ready bake gets a card, an instance of the card
+ * prefab beyond Impostor.distance, and a DrawRange that ends there (ImpostorDraw).
  */
 
 #include "render.h"
@@ -31,6 +32,11 @@
 
 /** Deepest hierarchy or prefab chain the hash walks */
 #define BOX_IMPOSTOR_DEPTH_MAX (32)
+
+/** Roughness of the material of the cards, which the atlases do not hold */
+#define BOX_IMPOSTOR_ROUGHNESS (0.8f)
+
+ECS_COMPONENT_DECLARE(ImpostorCard);
 
 /** Clear color of the image of each channel: no albedo, a normal facing nowhere and the far
  * plane, all uncovered */
@@ -59,6 +65,16 @@ typedef struct box_impostor_t {
     ecs_time_t started;         /**< When the first view of the bake in progress was sent */
     ImpostorStatus status;      /**< Status last written */
     bool status_dirty;          /**< The status changed since it was written */
+    ecs_entity_t card;          /**< Card prefab whose instances are the cards, 0 for none */
+    ecs_map_t cards;            /**< Instance of the prefab to its card */
+    ecs_map_t ranges;           /**< Instance to a copy of the DrawRange it owned before its
+                                 *   card, which removing the card restores */
+    bool dirty;                 /**< Instances of the prefab were added or removed since the
+                                 *   cards were last matched to them */
+    vec3 extent;                /**< Half extents of the bounds the last bake framed */
+    int32_t card_revision;      /**< Bake revision whose grid the card mesh holds */
+    float distance;             /**< Impostor.distance the ranges of the cards have, -1 for none */
+    float fade;                 /**< Impostor.fade the ranges of the cards have */
 } box_impostor_t;
 
 /** An atlas to write to a file */
@@ -74,6 +90,7 @@ typedef struct box_impostors_t {
     ecs_vec_t sent;             /**< uint32_t, targets the previous packet created */
     ecs_vec_t released;         /**< uint32_t, atlases to destroy in the next packet */
     ecs_vec_t reads;            /**< box_impostor_read_t to add to the next packet */
+    ecs_vec_t scratch;          /**< ecs_entity_t, instances that the scan of the cards found */
     ecs_query_t *query;         /**< Impostor, prefabs included */
     uint32_t next_texture;      /**< Counter of atlas handles */
     uint32_t next_target;       /**< Counter of target handles */
@@ -107,6 +124,13 @@ static void box_impostor_free(
         }
     }
 
+    ecs_map_iter_t it = ecs_map_iter(&imp->ranges);
+    while (ecs_map_next(&it)) {
+        ecs_os_free(ecs_map_ptr(&it));
+    }
+
+    ecs_map_fini(&imp->cards);
+    ecs_map_fini(&imp->ranges);
     ecs_os_free(imp);
 }
 
@@ -144,6 +168,7 @@ static void box_render_impostors_dtor(
         ecs_vec_fini_t(NULL, &s->sent, uint32_t);
         ecs_vec_fini_t(NULL, &s->released, uint32_t);
         ecs_vec_fini_t(NULL, &s->reads, box_impostor_read_t);
+        ecs_vec_fini_t(NULL, &s->scratch, ecs_entity_t);
         ecs_os_free(s);
         c[i].impostors = NULL;
     }
@@ -716,7 +741,11 @@ static void box_impostor_update(
     if (!imp) {
         imp = ecs_os_calloc_t(box_impostor_t);
         ecs_map_insert_ptr(&s->impostors, e, imp);
+        ecs_map_init(&imp->cards, NULL);
+        ecs_map_init(&imp->ranges, NULL);
         imp->status_dirty = true;
+        imp->dirty = true;
+        imp->distance = -1.0f;
     }
 
     if (!imp->scene || !ecs_is_alive(world, imp->scene)) {
@@ -874,6 +903,8 @@ static void box_impostor_finish(
     imp->status.hemisphere = imp->hemisphere;
     imp->status.bake_time = (float)ecs_time_measure(&imp->started);
     glm_vec3_center(imp->min, imp->max, imp->status.center);
+    glm_vec3_sub(imp->max, imp->min, imp->extent);
+    glm_vec3_scale(imp->extent, 0.5f, imp->extent);
     imp->status.radius = glm_max(glm_vec3_distance(imp->min, imp->max) * 0.5f, 1e-3f);
     imp->status_dirty = true;
 }
@@ -929,6 +960,346 @@ static void box_impostor_bake(
     imp->status_dirty = true;
     if (imp->next == views) {
         box_impostor_finish(world, s, imp);
+    }
+
+done:
+    return;
+}
+
+/** Get the half size of the card of a bake: the radius of the sphere the views frame, widened
+ * by the margin the views leave around it, as box_impostor_send frames them.
+ *
+ * @param status The status of the bake
+ * @return The half size
+ */
+static float box_impostor_card_half(
+    const ImpostorStatus *status)
+{
+    int32_t res = glm_imax(status->resolution, BOX_IMPOSTOR_RESOLUTION_MIN);
+    int32_t pad = glm_imax(res / 16, 1);
+
+    return status->radius * (float)res / (float)(res - 2 * pad);
+}
+
+/** Give the card prefab of an impostor the mesh of its last bake.
+ *
+ * Two triangles whose UVs are the corners of the card and whose per vertex data holds the grid
+ * (impostor_grid of impostor_card.wgsl), which the shaders place the corners by.
+ *
+ * Their positions are corners of the box of the bake, the bounds that the cull pass tests, from
+ * which the shaders fit the card to the box as seen along the view (impostor_corner).
+ *
+ * @param world The world
+ * @param imp The impostor
+ */
+static void box_impostor_card_mesh(
+    ecs_world_t *world,
+    box_impostor_t *imp)
+{
+    static const float corners[4][2] = { {0, 0}, {1, 0}, {0, 1}, {1, 1} };
+    static const float signs[4][3] = { {-1, -1, -1}, {1, -1, 1}, {-1, 1, -1}, {1, 1, 1} };
+    static const uint32_t indices[6] = { 0, 1, 2, 2, 1, 3 };
+    const ImpostorStatus *st = &imp->status;
+    float half = box_impostor_card_half(st);
+    Mesh3 m = {0};
+    int32_t i;
+    ecs_vec_init_t(NULL, &m.vertices, vec3, 4);
+    ecs_vec_init_t(NULL, &m.normals, vec3, 4);
+    ecs_vec_init_t(NULL, &m.uvs, vec2, 4);
+    ecs_vec_init_t(NULL, &m.data0, vec4, 4);
+    ecs_vec_init_t(NULL, &m.data1, vec4, 4);
+    ecs_vec_init_t(NULL, &m.indices, uint32_t, 6);
+    for (i = 0; i < 4; i ++) {
+        float *p = *ecs_vec_append_t(NULL, &m.vertices, vec3);
+        p[0] = st->center[0] + signs[i][0] * imp->extent[0];
+        p[1] = st->center[1] + signs[i][1] * imp->extent[1];
+        p[2] = st->center[2] + signs[i][2] * imp->extent[2];
+        glm_vec3_copy((vec3){0.0f, 0.0f, 1.0f}, *ecs_vec_append_t(NULL, &m.normals, vec3));
+        float *uv = *ecs_vec_append_t(NULL, &m.uvs, vec2);
+        uv[0] = corners[i][0];
+        uv[1] = corners[i][1];
+        glm_vec4_copy((vec4){(float)st->frames, st->hemisphere ? 1.0f : 0.0f,
+            st->radius / half, half}, *ecs_vec_append_t(NULL, &m.data0, vec4));
+        glm_vec4_copy((vec4){st->center[0], st->center[1], st->center[2], 0.0f},
+            *ecs_vec_append_t(NULL, &m.data1, vec4));
+    }
+
+    ecs_os_memcpy(ecs_vec_grow_t(NULL, &m.indices, uint32_t, 6), indices, ECS_SIZEOF(indices));
+    ecs_set_ptr(world, imp->card, Mesh3, &m);
+    ecs_vec_fini_t(NULL, &m.vertices, vec3);
+    ecs_vec_fini_t(NULL, &m.normals, vec3);
+    ecs_vec_fini_t(NULL, &m.uvs, vec2);
+    ecs_vec_fini_t(NULL, &m.data0, vec4);
+    ecs_vec_fini_t(NULL, &m.data1, vec4);
+    ecs_vec_fini_t(NULL, &m.indices, uint32_t);
+}
+
+/** Make the card prefab of an impostor in its scene.
+ *
+ * @param world The world
+ * @param imp The impostor
+ * @param e The entity with Impostor
+ */
+static void box_impostor_card_prefab(
+    ecs_world_t *world,
+    box_impostor_t *imp,
+    ecs_entity_t e)
+{
+    imp->card = ecs_new_w_id(world, EcsPrefab);
+    ecs_add_pair(world, imp->card, EcsChildOf, imp->scene);
+    ecs_set(world, imp->card, ImpostorCard, { .impostor = e });
+    ecs_set(world, imp->card, Position, {0, 0, 0});
+    ecs_set(world, imp->card, PbrMaterial, {.metallic = 0, .roughness = BOX_IMPOSTOR_ROUGHNESS});
+    ecs_add(world, imp->card, NoBake);
+    imp->card_revision = 0;
+    imp->distance = -1.0f;
+    imp->dirty = true;
+}
+
+/** Give an instance with a card the DrawRange that ends at the distance of the impostor: the
+ * range it owned before its card or that of the prefab, its far end no farther than the
+ * distance.
+ *
+ * @param world The world
+ * @param imp The impostor
+ * @param e The entity with Impostor
+ * @param inst The instance
+ */
+static void box_impostor_instance_range(
+    ecs_world_t *world,
+    const box_impostor_t *imp,
+    ecs_entity_t e,
+    ecs_entity_t inst)
+{
+    const DrawRange *base = ecs_map_get_deref(&imp->ranges, DrawRange, inst);
+    if (!base) {
+        base = ecs_get(world, e, DrawRange);
+    }
+
+    DrawRange r = { .near_ = base ? base->near_ : 0.0f, .far_ = imp->distance,
+        .fade = imp->fade };
+    if (base && base->far_ > 0.0f && base->far_ < r.far_) {
+        r.far_ = base->far_;
+    }
+
+    ecs_set_ptr(world, inst, DrawRange, &r);
+}
+
+/** Give an instance of the prefab of an impostor its card.
+ *
+ * @param world The world
+ * @param imp The impostor
+ * @param e The entity with Impostor
+ * @param inst The instance
+ */
+static void box_impostor_card_add(
+    ecs_world_t *world,
+    box_impostor_t *imp,
+    ecs_entity_t e,
+    ecs_entity_t inst)
+{
+    const DrawRange *owned = ecs_owns(world, inst, DrawRange)
+        ? ecs_get(world, inst, DrawRange) : NULL;
+    if (owned) {
+        DrawRange *saved = ecs_os_malloc_t(DrawRange);
+        *saved = *owned;
+        ecs_map_insert_ptr(&imp->ranges, inst, saved);
+    }
+
+    ecs_entity_t card = ecs_new_w_pair(world, EcsIsA, imp->card);
+    ecs_add_pair(world, card, EcsChildOf, inst);
+    ecs_map_insert(&imp->cards, inst, card);
+    box_impostor_instance_range(world, imp, e, inst);
+}
+
+/** Remove the card of an instance and give it back the DrawRange it had.
+ *
+ * @param world The world
+ * @param imp The impostor
+ * @param inst The instance
+ */
+static void box_impostor_card_remove(
+    ecs_world_t *world,
+    box_impostor_t *imp,
+    ecs_entity_t inst)
+{
+    ecs_map_val_t *found = ecs_map_get(&imp->cards, inst);
+    ecs_entity_t card = found ? (ecs_entity_t)*found : 0;
+    DrawRange *saved = ecs_map_get_deref(&imp->ranges, DrawRange, inst);
+    bool alive = ecs_is_alive(world, inst);
+    if (card && ecs_is_alive(world, card)) {
+        ecs_delete(world, card);
+    }
+
+    if (alive && saved) {
+        ecs_set_ptr(world, inst, DrawRange, saved);
+    } else if (alive) {
+        ecs_remove(world, inst, DrawRange);
+    }
+
+    if (saved) {
+        ecs_os_free(saved);
+        ecs_map_remove(&imp->ranges, inst);
+    }
+
+    ecs_map_remove(&imp->cards, inst);
+}
+
+/** Remove the cards of every instance of an impostor, or of those that are no longer alive
+ * instances of its prefab.
+ *
+ * @param world The world
+ * @param s The impostor state
+ * @param imp The impostor
+ * @param e The entity with Impostor, 0 to remove every card
+ */
+static void box_impostor_cards_remove(
+    ecs_world_t *world,
+    box_impostors_t *s,
+    box_impostor_t *imp,
+    ecs_entity_t e)
+{
+    int32_t i;
+    ecs_vec_clear(&s->scratch);
+    ecs_map_iter_t it = ecs_map_iter(&imp->cards);
+    while (ecs_map_next(&it)) {
+        ecs_entity_t inst = ecs_map_key(&it);
+        if (!e || !ecs_is_alive(world, inst) || !ecs_has_pair(world, inst, EcsIsA, e)) {
+            *ecs_vec_append_t(NULL, &s->scratch, ecs_entity_t) = inst;
+        }
+    }
+
+    for (i = 0; i < ecs_vec_count(&s->scratch); i ++) {
+        box_impostor_card_remove(world, imp, *ecs_vec_get_t(&s->scratch, ecs_entity_t, i));
+    }
+
+    ecs_vec_clear(&s->scratch);
+    imp->dirty = true;
+}
+
+/** Check whether an instance is a prefab or lives in the scene of an impostor, such as the copy
+ * a bake renders, which get no card.
+ *
+ * @param world The world
+ * @param s The impostor state
+ * @param inst The instance
+ * @return Whether it gets no card
+ */
+static bool box_impostor_skipped(
+    const ecs_world_t *world,
+    const box_impostors_t *s,
+    ecs_entity_t inst)
+{
+    bool result = ecs_has_id(world, inst, EcsPrefab);
+    ecs_entity_t cur = inst;
+    int32_t depth = 0;
+    while (!result && cur && depth < BOX_IMPOSTOR_DEPTH_MAX) {
+        ecs_map_iter_t it = ecs_map_iter(&s->impostors);
+        while (ecs_map_next(&it)) {
+            result |= ((const box_impostor_t*)ecs_map_ptr(&it))->scene == cur;
+        }
+
+        cur = ecs_get_parent(world, cur);
+        depth ++;
+    }
+
+    return result;
+}
+
+/** Give the instances of the prefab of an impostor that have none a card, and remove the cards
+ * of the instances that are gone.
+ *
+ * @param world The world
+ * @param s The impostor state
+ * @param imp The impostor
+ * @param e The entity with Impostor
+ */
+static void box_impostor_cards_scan(
+    ecs_world_t *world,
+    box_impostors_t *s,
+    box_impostor_t *imp,
+    ecs_entity_t e)
+{
+    int32_t i, kept = 0, added = 0;
+    ecs_vec_clear(&s->scratch);
+    ecs_iter_t it = ecs_each_id(world, ecs_pair(EcsIsA, e));
+    while (ecs_each_next(&it)) {
+        for (i = 0; i < it.count; i ++) {
+            if (ecs_map_get(&imp->cards, it.entities[i])) {
+                kept ++;
+            } else {
+                *ecs_vec_append_t(NULL, &s->scratch, ecs_entity_t) = it.entities[i];
+            }
+        }
+    }
+
+    for (i = 0; i < ecs_vec_count(&s->scratch); i ++) {
+        ecs_entity_t inst = *ecs_vec_get_t(&s->scratch, ecs_entity_t, i);
+        if (!box_impostor_skipped(world, s, inst)) {
+            box_impostor_card_add(world, imp, e, inst);
+            added ++;
+        }
+    }
+
+    ecs_vec_clear(&s->scratch);
+    if (ecs_map_count(&imp->cards) > kept + added) {
+        box_impostor_cards_remove(world, s, imp, e);
+    }
+
+    imp->dirty = false;
+}
+
+/** Follow the instances of an impostor with cards while it has a ready bake and a distance, and
+ * remove them otherwise, so the instances draw their whole hierarchy until the bake is ready.
+ *
+ * @param world The world
+ * @param s The impostor state
+ * @param imp The impostor
+ * @param e The entity with Impostor
+ */
+static void box_impostor_cards(
+    ecs_world_t *world,
+    box_impostors_t *s,
+    box_impostor_t *imp,
+    ecs_entity_t e)
+{
+    const Impostor *value = ecs_get(world, e, Impostor);
+    float distance = value && isfinite(value->distance) ? value->distance : 0.0f;
+    float fade = value && isfinite(value->fade) ? glm_max(value->fade, 0.0f) : 0.0f;
+    ecs_map_iter_t it;
+    if (!imp->status.ready || !imp->front[ImpostorAlbedo] || distance <= 0.0f) {
+        if (ecs_map_count(&imp->cards)) {
+            box_impostor_cards_remove(world, s, imp, 0);
+        }
+
+        goto done;
+    }
+
+    if (!imp->card || !ecs_is_alive(world, imp->card)) {
+        box_impostor_cards_remove(world, s, imp, 0);
+        box_impostor_card_prefab(world, imp, e);
+    }
+
+    if (imp->card_revision != imp->status.revision) {
+        box_impostor_card_mesh(world, imp);
+        imp->card_revision = imp->status.revision;
+    }
+
+    if (distance != imp->distance || fade != imp->fade) {
+        imp->distance = distance;
+        imp->fade = fade;
+        ecs_set(world, imp->card, DrawRange, {.near_ = distance, .fade = fade});
+        it = ecs_map_iter(&imp->cards);
+        while (ecs_map_next(&it)) {
+            ecs_entity_t inst = ecs_map_key(&it);
+            if (ecs_is_alive(world, inst)) {
+                box_impostor_instance_range(world, imp, e, inst);
+            }
+        }
+    }
+
+    if (imp->dirty) {
+        box_impostor_cards_scan(world, s, imp, e);
     }
 
 done:
@@ -1018,6 +1389,32 @@ static void BoxRenderExtractImpostors(
             imp->status_dirty = false;
             ecs_set_ptr(world, e, ImpostorStatus, &imp->status);
         }
+
+        box_impostor_cards(world, s, imp, e);
+    }
+
+done:
+    return;
+}
+
+/** Mark the impostor whose prefab an entity became or stopped being an instance of, so its cards
+ * follow the instances.
+ *
+ * @param it The iterator of the observer
+ */
+static void box_impostor_on_instance(
+    ecs_iter_t *it)
+{
+    box_impostors_t *s = box_impostors_get(it->world);
+    ecs_id_t id = ecs_field_id(it, 0);
+    box_impostor_t *imp = NULL;
+    if (!s || ecs_is_fini(it->world) || !ECS_IS_PAIR(id)) {
+        goto done;
+    }
+
+    imp = ecs_map_get_deref(&s->impostors, box_impostor_t, ECS_PAIR_SECOND(id));
+    if (imp) {
+        imp->dirty = true;
     }
 
 done:
@@ -1044,6 +1441,7 @@ static void box_impostor_on_remove(
             continue;
         }
 
+        box_impostor_cards_remove(it->world, s, imp, 0);
         if (imp->scene && ecs_is_alive(it->world, imp->scene)) {
             ecs_delete(it->world, imp->scene);
         }
@@ -1119,6 +1517,8 @@ void box_render_impostors_init(
         .move = box_render_impostors_move
     });
 
+    ECS_COMPONENT_DEFINE(world, ImpostorCard);
+    ecs_add_pair(world, ecs_id(ImpostorCard), EcsOnInstantiate, EcsInherit);
     ecs_set_hooks(world, Impostor, {
         .ctor = box_impostor_ctor,
         .on_remove = box_impostor_on_remove
@@ -1134,6 +1534,7 @@ void box_render_impostors_init(
     ecs_vec_init_t(NULL, &s->sent, uint32_t, 0);
     ecs_vec_init_t(NULL, &s->released, uint32_t, 0);
     ecs_vec_init_t(NULL, &s->reads, box_impostor_read_t, 0);
+    ecs_vec_init_t(NULL, &s->scratch, ecs_entity_t, 0);
     box_impostor_watch_module(world, s, "box.geometry");
     box_impostor_watch_module(world, s, "box.material");
     ecs_map_insert(&s->watched, ecs_id(Position), 1);
@@ -1148,6 +1549,13 @@ void box_render_impostors_init(
         }
     });
     ecs_singleton_set(world, RenderImpostors, { .impostors = s });
+
+    ecs_observer(world, {
+        .entity = ecs_entity(world, { .name = "ImpostorInstances" }),
+        .query.terms = {{ .id = ecs_pair(EcsIsA, EcsWildcard), .src.id = EcsSelf }},
+        .events = { EcsOnAdd, EcsOnRemove },
+        .callback = box_impostor_on_instance
+    });
 
     ecs_system(world, {
         .entity = ecs_entity(world, { .name = "extract.Impostors" }),

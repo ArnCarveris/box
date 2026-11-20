@@ -1495,12 +1495,49 @@ void box_draws_batch_textures(
         out->textures[2] = b->key.atlas;
     }
 
+    if (b->key.impostor && d->world) {
+        out->textures[0] = box_render_impostor_atlas(d->world, b->key.impostor, ImpostorAlbedo);
+        out->textures[1] = 0;
+        out->textures[2] = box_render_impostor_atlas(d->world, b->key.impostor, ImpostorDepth);
+        out->textures[3] = box_render_impostor_atlas(d->world, b->key.impostor, ImpostorNormal);
+    }
+
     out->foam = b->key.foam ? box_textures_handle(d->textures, b->key.foam) : 0;
     if (b->key.foam && !out->foam && d->world) {
         out->foam = box_render_texture_target_handle(d->world, b->key.foam);
     }
 
     out->wrap = b->key.wrap;
+}
+
+void box_draws_impostor_key(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    box_draw_key_t *key)
+{
+    const ImpostorCard *card = ecs_id(ImpostorCard) ? ecs_get(world, e, ImpostorCard) : NULL;
+    if (!card || !card->impostor || key->pipeline == BOX_RENDER_SHADER_SHAPE2D) {
+        goto done;
+    }
+
+    key->impostor = card->impostor;
+    key->pipeline = BOX_RENDER_SHADER_MESH;
+    key->blend = Opaque;
+    key->cutout = true;
+    key->transmissive = false;
+    key->water = false;
+    key->foam = 0;
+    key->texture_blend = false;
+    key->wind = false;
+    key->frame = false;
+    key->bake = false;
+    key->atmosphere = 0;
+    key->wrap = WrapClamp;
+    key->back_face = BackFacePlain;
+    ecs_os_memset_n(key->textures, 0, ecs_entity_t, BOX_RENDER_TEXTURE_SLOTS);
+    ecs_os_memset_n(key->layers, 0, ecs_entity_t, BOX_RENDER_LAYERS);
+done:
+    return;
 }
 
 bool box_draws_range(

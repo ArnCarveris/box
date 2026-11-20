@@ -9,6 +9,7 @@ enable clip_distances;
 #include "include/blend.wgsl"
 #include "include/wind.wgsl"
 #include "include/draw_range.wgsl"
+#include "include/impostor_card.wgsl"
 
 // The casters of a WindSway material move by the Wind (Scene.wind) as the mesh shaders move
 // them, set per pipeline for the batches whose shapes have one (caster_wind).
@@ -47,6 +48,8 @@ const OCTANT_AXIS: f32 = 0.57735026919;
 @group(1) @binding(5) var<storage, read> frames: array<InstanceTransform>;
 
 @group(2) @binding(0) var albedo_map: texture_2d<f32>;
+// The depth atlas of the impostor cards (fs_impostor only), at the binding of the ORM map
+@group(2) @binding(2) var orm_map: texture_2d<f32>;
 @group(2) @binding(4) var material_sampler: sampler;
 
 // The blend group of an alpha tested caster with a TextureBlend (fs_cutout_blend and
@@ -565,3 +568,82 @@ fn octant_discard(clip: vec3f) {
     octant_discard(f.clip);
 }
 #endif
+
+// An impostor card in a cascade or a spot light tile (box_render_batch_t.impostor): the card
+// faces the light and shows the view of the atlases nearest the direction toward the light,
+// alpha tested, at the depth of the depth atlas. The image coordinates of the view are affine
+// across the card; the rest is the same for the whole card.
+struct ImpostorCasterOut {
+    @builtin(position) pos: vec4f,
+    @location(0) plane: vec2f,
+    // x the packed cell of the view, y the views per axis, 1 << 16 for a hemisphere grid, z the
+    // dither code of the DrawRange with draw_range
+    @location(1) @interpolate(flat) cell: vec4u,
+    // xyz the direction toward the light in the frame of the root, w the half size of the card
+    @location(2) @interpolate(flat) eye: vec4f,
+    // xyz the center of the sphere in the frame of the root, w its radius over the half size
+    @location(3) @interpolate(flat) center: vec4f,
+    @location(4) @interpolate(flat) row0: vec4f,
+    @location(5) @interpolate(flat) row1: vec4f,
+    @location(6) @interpolate(flat) row2: vec4f,
+};
+
+// Direction toward the light at a world position: the gradient of the depth of the cascade or
+// tile there, which grows toward the light.
+fn impostor_light_direction(world: vec4f) -> vec3f {
+    let m = cascade.matrix;
+    let c = m * world;
+    let row2 = vec3f(m[0].z, m[1].z, m[2].z);
+    let row3 = vec3f(m[0].w, m[1].w, m[2].w);
+    return row2 * c.w - row3 * c.z;
+}
+
+@vertex fn vs_impostor(v: VertexIn, d: VertexData) -> ImpostorCasterOut {
+    let slot = slot_of(v.slot);
+    let model = instance_model(transforms[slot]);
+    let grid = impostor_grid(d);
+    let center = model * vec4f(grid.center, 1.0);
+    let e = impostor_local_direction(model, impostor_light_direction(center), grid.hemisphere);
+    let q = impostor_corner(e, v.uv, grid.half, abs(v.position - grid.center));
+    let cell = impostor_nearest(grid.frames, grid.hemisphere, e);
+    let dir = impostor_frame_direction(grid.frames, grid.hemisphere, impostor_unpack(cell));
+    var o: ImpostorCasterOut;
+    o.pos = cascade.matrix * (model * vec4f(grid.center + q, 1.0));
+    o.plane = impostor_plane(q, e, dir, grid.half);
+    o.cell = vec4u(cell, grid.frames | select(0u, 1u << 16u, grid.hemisphere),
+        caster_range(v.slot), 0u);
+    o.eye = vec4f(e, grid.half);
+    o.center = vec4f(grid.center, grid.ratio);
+    o.row0 = transforms[slot].rows[0];
+    o.row1 = transforms[slot].rows[1];
+    o.row2 = transforms[slot].rows[2];
+    return o;
+}
+
+@fragment fn fs_impostor(f: ImpostorCasterOut) -> @builtin(frag_depth) f32 {
+    let frames = f.cell.y & 0xFFFFu;
+    let hemisphere = (f.cell.y >> 16u) != 0u;
+    let half = f.eye.w;
+    let res = f32(textureDimensions(albedo_map).x) / f32(frames);
+    let lod = impostor_lod(f.plane, res);
+    caster_dither(f.cell.z, f.pos);
+    let cell = impostor_unpack(f.cell.x);
+    let d = impostor_frame_direction(frames, hemisphere, cell);
+    let first = textureSampleLevel(orm_map, material_sampler, impostor_uv(frames, cell, f.plane),
+        lod).r;
+    let a = impostor_parallax(f.plane, f.eye.xyz, d, impostor_height(first, half, f.center.w),
+        half);
+    let uv = impostor_uv(frames, cell, a);
+    let alpha = textureSampleLevel(albedo_map, material_sampler, uv, lod).a;
+    let depth = textureSampleLevel(orm_map, material_sampler, uv, lod).r;
+    if (alpha < IMPOSTOR_CUTOFF || any(abs(a) > vec2f(1.0))) {
+        discard;
+    }
+
+    let axes = impostor_axes(d);
+    let point = f.center.xyz + (axes[0] * a.x + axes[1] * a.y) * half +
+        d * impostor_height(depth, half, f.center.w);
+    let model = impostor_model(f.row0, f.row1, f.row2);
+    let clip = cascade.matrix * (model * vec4f(point, 1.0));
+    return clip.z / clip.w;
+}

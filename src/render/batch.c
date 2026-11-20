@@ -53,6 +53,7 @@ static uint64_t box_draws_hash(
     h ^= ((uint64_t)key->surface + (uint64_t)key->water * 2 + (uint64_t)key->frame * 4 +
         (uint64_t)key->mover * 8 + (uint64_t)key->wind * 16) * 0x85EBCA77C2B2AE63ull;
     h ^= (((uint64_t)key->foam + 1) * 0x9FB21C651E98DF25ull) ^ box_draws_layers_hash(key);
+    h ^= key->impostor * 0xD1B54A32D192ED03ull;
     for (i = 0; i < BOX_RENDER_TEXTURE_SLOTS; i ++) {
         h = (h ^ (h >> 31)) * 0x9E3779B97F4A7C15ull + key->textures[i];
     }
@@ -91,7 +92,7 @@ static bool box_draws_key_eq(
         a->atmosphere == b->atmosphere && a->surface == b->surface && a->frame == b->frame &&
         a->box_shadow == b->box_shadow && a->slice == b->slice &&
         a->texture_blend == b->texture_blend && a->polygon == b->polygon && a->wind == b->wind &&
-        !ecs_os_memcmp(a->range, b->range, ECS_SIZEOF(a->range));
+        a->impostor == b->impostor && !ecs_os_memcmp(a->range, b->range, ECS_SIZEOF(a->range));
 }
 
 box_draw_batch_t* box_draws_batch(
@@ -1305,6 +1306,7 @@ static void box_draws_send_batch(
     out->wind = b->key.wind;
     out->wind_reach = b->key.wind ? b->wind_reach : 0.0f;
     ecs_os_memcpy_n(out->range, b->key.range, float, 3);
+    out->impostor = b->key.impostor != 0;
     out->mesh = b->key.mesh;
     ecs_os_memcpy_n(out->lods, b->lods, uint32_t, BOX_LOD_LEVELS_MAX);
     box_draws_batch_textures(d, b, out);
@@ -1821,6 +1823,8 @@ void box_draws_send(
     d->stats.box_shadows = d->box_shadows;
     d->stats.instances = 0;
     d->stats.dynamic = 0;
+    d->stats.impostors = 0;
+    d->stats.impostor_batches = 0;
     d->stats.scatters = 0;
     for (i = 0; i < count; i ++) {
         box_draw_batch_t *b = box_draws_batch(d, i);
@@ -1837,6 +1841,11 @@ void box_draws_send(
             d->stats.dynamic += ecs_vec_count(&b->entities);
         } else {
             d->stats.instances += ecs_vec_count(&b->entities);
+        }
+
+        if (b->key.impostor) {
+            d->stats.impostor_batches ++;
+            d->stats.impostors += ecs_vec_count(&b->entities);
         }
     }
 

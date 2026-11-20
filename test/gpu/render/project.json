@@ -45,7 +45,10 @@
                     "unchanged_does_not_rebake",
                     "budget_spreads_bake",
                     "remove_frees_atlases",
-                    "not_ready_cannot_write"
+                    "not_ready_cannot_write",
+                    "card_matches_full_render",
+                    "crossfade_covers_once",
+                    "card_casts_shadow"
                 ]
             },
             {

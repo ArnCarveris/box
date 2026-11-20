@@ -21,7 +21,7 @@ void box_gpu_shadow_init(
 {
     WGPUBindGroupLayoutEntry entry = {
         .binding = 0,
-        .visibility = WGPUShaderStage_Vertex,
+        .visibility = WGPUShaderStage_Vertex | WGPUShaderStage_Fragment,
         .buffer = {
             .type = WGPUBufferBindingType_Uniform,
             .hasDynamicOffset = true,
@@ -681,6 +681,8 @@ done:
  * ignored without cutout or wind
  * @param range Whether the casters have a DrawRange: both stages have the draw_range constant
  * and a plain caster discards with fs_range; ignored by the point light pipelines
+ * @param impostor Whether the casters are impostor cards, drawn with vs_impostor and
+ * fs_impostor from the frame of their atlases nearest the light; not for the point lights
  * @return The pipeline
  */
 static WGPURenderPipeline box_gpu_shadow_create(
@@ -693,7 +695,8 @@ static WGPURenderPipeline box_gpu_shadow_create(
     bool surface,
     bool wind,
     bool data,
-    bool range)
+    bool range,
+    bool impostor)
 {
     WGPUConstantEntry vertex_constants[2];
     WGPUConstantEntry range_constant = {
@@ -702,6 +705,7 @@ static WGPURenderPipeline box_gpu_shadow_create(
     };
     size_t vertex_count = 0;
     range = range && !point;
+    impostor = impostor && !point;
     if (wind) {
         vertex_constants[vertex_count ++] = (WGPUConstantEntry){
             .key = { .data = "material_wind", .length = WGPU_STRLEN },
@@ -744,6 +748,12 @@ static WGPURenderPipeline box_gpu_shadow_create(
 
         fs = point ? "fs_point_cutout_blend" : "fs_cutout_blend";
         layout = gpu->shadow_blend_layout;
+    }
+
+    if (impostor) {
+        vs = "vs_impostor";
+        fs = "fs_impostor";
+        data = true;
     }
 
     WGPUVertexAttribute vertex_attrs[3] = {
@@ -865,9 +875,9 @@ static WGPURenderPipeline box_gpu_shadow_pipeline(
     WGPURenderPipeline *current[3] = { &gpu->shadow, &gpu->shadow_cutout, &gpu->shadow_clear };
     WGPURenderPipeline next[3] = {
         box_gpu_shadow_create(gpu, s->module, false, false, false, false, false, false,
-            false, false),
+            false, false, false),
         box_gpu_shadow_create(gpu, s->module, true, false, false, false, false, false,
-            false, false),
+            false, false, false),
         box_gpu_shadow_clear_create(gpu, s->module)
     };
     if (!box_gpu_render_pipelines_swap(current, next, 3)) {
@@ -919,9 +929,9 @@ static WGPURenderPipeline box_gpu_shadow_point_pipeline(
     WGPURenderPipeline *current[2] = { &gpu->shadow_point, &gpu->shadow_point_cutout };
     WGPURenderPipeline next[2] = {
         box_gpu_shadow_create(gpu, s->module, false, true, discard, false, false, false,
-            false, false),
+            false, false, false),
         box_gpu_shadow_create(gpu, s->module, true, true, discard, false, false, false,
-            false, false)
+            false, false, false)
     };
     if (!box_gpu_render_pipelines_swap(current, next, 2)) {
         goto done;
@@ -974,6 +984,8 @@ done:
  * mesh (box_gpu_vertex_data); ignored without cutout or wind
  * @param range Whether the casters have a DrawRange (the draw_range constant), ignored by the
  * point light tiles
+ * @param impostor Whether the casters are impostor cards, which the point light tiles do not
+ * draw: the last two variants, without then with a DrawRange
  * @return The pipeline, NULL without a shader module or while it is being created
  */
 static WGPURenderPipeline box_gpu_shadow_variant(
@@ -984,7 +996,8 @@ static WGPURenderPipeline box_gpu_shadow_variant(
     bool surface,
     bool wind,
     bool data,
-    bool range)
+    bool range,
+    bool impostor)
 {
     texture_blend = texture_blend && cutout;
     data = data && (cutout || wind);
@@ -1006,6 +1019,10 @@ static WGPURenderPipeline box_gpu_shadow_variant(
         index = 38 + (range ? 2 : 0) + (surface ? 1 : 0);
     }
 
+    if (impostor) {
+        index = 42 + (int32_t)range;
+    }
+
     WGPURenderPipeline *slot = &gpu->shadow_variants[point][index];
     uint32_t handle = point && gpu->shadow_point_shader
         ? gpu->shadow_point_shader : BOX_RENDER_SHADER_SHADOW;
@@ -1015,7 +1032,7 @@ static WGPURenderPipeline box_gpu_shadow_variant(
     }
 
     *slot = box_gpu_shadow_create(gpu, s->module, cutout, point,
-        handle == BOX_RENDER_SHADER_SHADOW, texture_blend, surface, wind, data, range);
+        handle == BOX_RENDER_SHADER_SHADOW, texture_blend, surface, wind, data, range, impostor);
 done:
     return *slot;
 }
@@ -1035,10 +1052,11 @@ void box_gpu_shadow_request(
         bool data = (b->cutout || b->wind) && box_gpu_vertex_data(gpu, b);
         bool range = box_render_batch_ranged(b);
         if (b->shadow && b->view == -1 && b->blend == Opaque &&
-            box_render_is_mesh(b->pipeline) && (b->surface || blend || b->wind || data || range))
+            box_render_is_mesh(b->pipeline) &&
+            (b->surface || blend || b->wind || data || range || b->impostor))
         {
             box_gpu_shadow_variant(gpu, false, b->cutout, blend, b->surface, b->wind, data,
-                range);
+                range, b->impostor);
         }
     }
 
@@ -1093,13 +1111,17 @@ static bool box_gpu_shadow_draw(
         bool data = (cutout || b->wind) && box_gpu_vertex_data(gpu, b);
         bool range = !point && box_render_batch_ranged(b);
         WGPURenderPipeline pipeline = cutout ? alpha : plain;
-        if (blend || b->surface || b->wind || data || range) {
+        if (b->impostor && (point || !alpha)) {
+            continue;
+        }
+
+        if (blend || b->surface || b->wind || data || range || b->impostor) {
             pipeline = box_gpu_shadow_variant(gpu, point, cutout, blend, b->surface, b->wind,
-                data, range);
+                data, range, b->impostor);
             result = result && pipeline != NULL;
         }
 
-        if (!pipeline && !b->surface && !b->wind && !range) {
+        if (!pipeline && !b->surface && !b->wind && !range && !b->impostor) {
             cutout = false;
             pipeline = plain;
         }

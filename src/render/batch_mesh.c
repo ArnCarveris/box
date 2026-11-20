@@ -90,7 +90,9 @@ void box_draws_lods(
 {
     int32_t l;
     ecs_os_memset_n(b->lods, 0, uint32_t, BOX_LOD_LEVELS_MAX);
-    if (!b->ready || b->key.blend != Opaque || !box_render_is_mesh(b->key.pipeline)) {
+    if (!b->ready || b->key.blend != Opaque || !box_render_is_mesh(b->key.pipeline) ||
+        b->key.impostor)
+    {
         goto done;
     }
 

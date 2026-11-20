@@ -2,7 +2,7 @@
     "id": "bench_render",
     "type": "application",
     "value": {
-        "description": "Benchmarks for the packet data, the extract of the instanced batches and lights, the shadow pass, the frustum, occlusion and draw range cull passes, the effect passes, the fragment cost of the texture mappings, the fog volumes, the star fields, the baked lighting, prefab instantiation, streaming a ChunkGrid of forest cells, the atmosphere extract, the GPU cost of the cloud layers of the sky, the cost of the planet surface light without planets, the particle passes, the transitions, the GPU cost of Polygon2D next to the other 2D shapes, the cost of TextureLayers for the shapes without them and a scene with parametric surfaces and the levels of detail of round shapes of box.render, a 300 shape hierarchy against the same content as one MeshGraph, and the frame cost and memory of an unbounded Terrain of 6 levels",
+        "description": "Benchmarks for the packet data, the extract of the instanced batches and lights, the shadow pass, the frustum, occlusion and draw range cull passes, the effect passes, the fragment cost of the texture mappings, the fog volumes, the star fields, the baked lighting, prefab instantiation, 10k prefab instances drawn as impostor cards against their full hierarchy, streaming a ChunkGrid of forest cells, the atmosphere extract, the GPU cost of the cloud layers of the sky, the cost of the planet surface light without planets, the particle passes, the transitions, the GPU cost of Polygon2D next to the other 2D shapes, the cost of TextureLayers for the shapes without them and a scene with parametric surfaces and the levels of detail of round shapes of box.render, a 300 shape hierarchy against the same content as one MeshGraph, and the frame cost and memory of an unbounded Terrain of 6 levels",
         "public": false,
         "use": [
             "box"
@@ -248,6 +248,13 @@
                 "benchcases": [
                     "mesh3_instantiate",
                     "box_instantiate"
+                ]
+            },
+            {
+                "id": "Impostor",
+                "benchcases": [
+                    "cards_10k",
+                    "full_10k"
                 ]
             },
             {
