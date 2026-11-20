@@ -1042,26 +1042,29 @@ static void box_mg_card_sheet(
     }
 }
 
-/** Give the template of a card a back: a copy of its vertices with the normals turned around
- * and its triangles wound the other way.
+/** Give the template of a card a back: its triangles wound the other way, on a copy of its
+ * vertices with the normals turned around, or on its own vertices when shared.
  *
  * @param m The template
+ * @param shared Wind the back on the vertices of the front
  */
 static void box_mg_card_back(
-    box_mg_mesh_t *m)
+    box_mg_mesh_t *m,
+    bool shared)
 {
     int32_t vc = m->vertex_count, ic = m->index_count, i;
-    box_mg_mesh_resize(m, vc * 2, ic * 2);
-    for (i = 0; i < vc; i ++) {
+    uint32_t offset = shared ? 0u : (uint32_t)vc;
+    box_mg_mesh_resize(m, shared ? vc : vc * 2, ic * 2);
+    for (i = 0; !shared && i < vc; i ++) {
         glm_vec3_copy(m->positions[i], m->positions[vc + i]);
         glm_vec3_negate_to(m->normals[i], m->normals[vc + i]);
         glm_vec2_copy(m->uvs[i], m->uvs[vc + i]);
     }
 
     for (i = 0; i + 2 < ic; i += 3) {
-        m->indices[ic + i] = m->indices[i] + (uint32_t)vc;
-        m->indices[ic + i + 1] = m->indices[i + 2] + (uint32_t)vc;
-        m->indices[ic + i + 2] = m->indices[i + 1] + (uint32_t)vc;
+        m->indices[ic + i] = m->indices[i] + offset;
+        m->indices[ic + i + 1] = m->indices[i + 2] + offset;
+        m->indices[ic + i + 2] = m->indices[i + 1] + offset;
     }
 }
 
@@ -1091,12 +1094,12 @@ static void box_mg_card_template(
     }
 
     if (!mesh && n->double_sided) {
-        box_mg_card_back(&out->mesh);
+        box_mg_card_back(&out->mesh, n->shared_back);
     }
 }
 
 /** Reduce a MeshCards for a level of detail: lod_segments to the power of the level of its
- * segments, at least one kept.
+ * segments, at least one kept, and from lod_flat flat cards of one row with a shared back.
  *
  * @param node The snapshot of the MeshCards
  * @param level The level
@@ -1113,6 +1116,12 @@ static void box_mesh_cards_lod(
     reduced = reduced < 1 ? 1 : reduced;
     if (reduced != rows) {
         n->segments = reduced;
+    }
+
+    if (n->lod_flat > 0 && level >= n->lod_flat) {
+        n->shape = n->shape == MeshCardBent ? MeshCardQuad : n->shape;
+        n->segments = 1;
+        n->shared_back = true;
     }
 }
 
@@ -1800,8 +1809,9 @@ void box_mesh_nodes_foliage_register(
         .params = {
             BOX_MG_PARAM(MeshCards, shape), BOX_MG_PARAM(MeshCards, width),
             BOX_MG_PARAM(MeshCards, bend), BOX_MG_PARAM(MeshCards, segments),
-            BOX_MG_PARAM(MeshCards, double_sided), BOX_MG_PARAM(MeshCards, flutter),
-            BOX_MG_PARAM(MeshCards, lod_segments)
+            BOX_MG_PARAM(MeshCards, double_sided), BOX_MG_PARAM(MeshCards, shared_back),
+            BOX_MG_PARAM(MeshCards, flutter), BOX_MG_PARAM(MeshCards, lod_segments),
+            BOX_MG_PARAM(MeshCards, lod_flat)
         },
         .eval = box_mesh_cards_eval,
         .lod = box_mesh_cards_lod

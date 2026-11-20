@@ -125,7 +125,8 @@
                     "tree_levels",
                     "shape_variants",
                     "node_kinds",
-                    "displace_points"
+                    "displace_points",
+                    "cards_flat"
                 ]
             },
             {
@@ -139,6 +140,7 @@
                     "needles",
                     "cards_shapes",
                     "cards_data",
+                    "cards_shared_back",
                     "crown_normals",
                     "crown_occlusion",
                     "deterministic",

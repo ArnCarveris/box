@@ -475,6 +475,36 @@ void MeshFoliage_cards_shapes(void) {
     ecs_fini(world);
 }
 
+void MeshFoliage_cards_shared_back(void) {
+    ecs_world_t *world = test_world();
+    ecs_entity_t stem = foliage_stem(world, "stem", (vec3){0, 1, 0});
+    ecs_entity_t leaves = foliage_node(world, "leaves", ecs_id(MeshLeaves), &(MeshLeaves){
+        .curves = stem, .count = 3, .end = 1, .angle = 0.8f, .size = 0.5f });
+    ecs_entity_t cards = foliage_node(world, "cards", ecs_id(MeshCards), &(MeshCards){
+        .points = leaves, .shape = MeshCardQuad, .segments = 1, .double_sided = true,
+        .shared_back = true, .flutter = 1 });
+    box_mg_value_t *v = test_eval(world, cards);
+    test_int(v->mesh.vertex_count, 3 * 4);
+    test_int(v->mesh.index_count, 3 * 12);
+    int32_t k, i;
+    for (k = 0; k < 3; k ++) {
+        const uint32_t *idx = &v->mesh.indices[k * 12];
+        for (i = 0; i < 12; i ++) {
+            test_assert(idx[i] >= (uint32_t)(k * 4));
+            test_assert(idx[i] < (uint32_t)(k * 4 + 4));
+        }
+
+        for (i = 0; i < 6; i += 3) {
+            test_int(idx[6 + i], idx[i]);
+            test_int(idx[6 + i + 1], idx[i + 2]);
+            test_int(idx[6 + i + 2], idx[i + 1]);
+        }
+    }
+
+    box_mg_value_release(v);
+    ecs_fini(world);
+}
+
 /** Every vertex of a card holds the pivot and level of its twig, the flutter weight from its
  * stem to its tip, the seed and hue of its card, its growth and an open occlusion */
 void MeshFoliage_cards_data(void) {

@@ -701,9 +701,13 @@ ECS_STRUCT(MeshCards, {
     int32_t segments;      /**< Rows of quads along the card, 0 for 2, at most 16 */
     bool double_sided;     /**< Give the cards a back, true when added; a mesh input is kept
                             *   as it is */
+    bool shared_back;      /**< The back of a double sided card reuses the vertices of its
+                            *   front, its triangles wound the other way */
     float flutter;         /**< Flutter weight at the tip of the card, 0..1, 1 when added */
     float lod_segments;    /**< Factor of the segments per level of detail, at least 1 kept; 0
                             *   for 0.5, negative keeps them */
+    int32_t lod_flat;      /**< Level of detail from which the cards are flat quads of one row
+                            *   with a shared back, 0 for none */
 });
 
 /** Node of a MeshGraph that bends the normals of foliage toward the normals of the envelope of
