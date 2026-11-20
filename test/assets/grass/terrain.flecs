@@ -1,0 +1,54 @@
+// Grass on a terrain of smooth hills with masks for the Grass tests of
+// test/gpu/render/src/Grass.c. The terrain is sampled on the GPU because a Grass grows on it.
+// Its masks have a noise in r, the broad noise in g, 0.25 in b and 1 in a; three Grass entities
+// share it, weighed by b, by a and not at all. A camera that is the focus looks down on it.
+
+using box.transform
+using box.material
+using box.texture
+using box.terrain
+using box.camera
+using box.view
+using box.light
+using box.world
+using box.grass
+
+grass_hills {
+  broad  { nodes.Noise: {frequency: 0.004, octaves: 2, seed: 3} }
+  height { nodes.Multiply: {a: broad, b_value: {40, 40, 40, 40}} }
+  spots  { nodes.Noise: {frequency: 0.02, seed: 7} }
+  masks  { nodes.Combine: {r: spots, g: broad, b_value: 0.25, a_value: 1} }
+  Terrain: {height: height, masks: masks, tile_size: 32, resolution: 65, levels: 5,
+            lod_distance: 128, min_height: -10, max_height: 60, budget: 64,
+            query_spacing: 0.5, query_radius: 96}
+  Rgb: {120, 140, 90}
+  PbrMaterial: {roughness: 1}
+}
+
+grass_walker {
+  Position: {32, 60, 32}
+  Rotation: {-0.7, 0, 0}
+  Camera: {fov: 60, near_: 0.1, far_: 2000}
+  WorldFocus
+}
+
+grass_view {
+  View: {camera: grass_walker, clear: {enabled: true, color: {20, 30, 60, 255}}}
+}
+
+grass_sun {
+  Rotation: {0.8, 0.6, 0}
+  DirectionalLight: {intensity: 3.14}
+}
+
+grass_quarter {
+  Grass: {terrain: grass_hills, mask: 2, density: 16, lod: [30, 60, 120]}
+}
+
+grass_full {
+  Grass: {terrain: grass_hills, mask: 3, density: 16, lod: [30, 60, 120], seed: 1}
+}
+
+grass_unmasked {
+  Grass: {terrain: grass_hills, density: 16, lod: [30, 60, 120], seed: 2}
+}

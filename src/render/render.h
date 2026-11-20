@@ -846,6 +846,16 @@ int32_t box_render_planar_select(
 void box_render_planar_init(
     ecs_world_t *world);
 
+/** Check whether a packet places or draws grass blades with an engine shader.
+ *
+ * @param p The packet
+ * @param handle Handle of the shader
+ * @return Whether it is a grass shader and the packet has a Grass
+ */
+bool box_render_grass_use(
+    const box_render_packet_t *p,
+    uint32_t handle);
+
 /** Register the system that appends the heights of the terrain tiles that draw to the packet,
  * which the backend copies into the surface assets of their grid mesh (gpu_draw.c).
  *

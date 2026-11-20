@@ -1642,6 +1642,7 @@ typedef struct box_gpu_t {
     struct box_gpu_env_image_t *environment_image; /**< Conversion of environment images,
                                                     *   created by the first image */
     box_gpu_particles_t *particles; /**< Particle passes */
+    struct box_gpu_grass_t *grass;  /**< Grass passes and the blades of the Grass entities */
     box_gpu_ripples_t *ripples;     /**< Fields of WaterRipples */
     box_gpu_spectra_t *spectra;     /**< Spectra of WaterSpectrum */
     struct box_gpu_impostor_t *impostor; /**< Impostor frame copies, created by the first */

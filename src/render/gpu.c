@@ -401,6 +401,7 @@ static int box_gpu_init(
     box_gpu_draw_init(gpu);
     box_gpu_scatter_init(gpu);
     box_gpu_terrain_init(gpu);
+    box_gpu_grass_init(gpu);
     box_gpu_compose_init(gpu);
     ecs_map_init(&gpu->targets, NULL);
     ecs_map_init(&gpu->shaders, NULL);
@@ -589,9 +590,11 @@ static void box_gpu_render(
     box_gpu_star_fields_begin(gpu);
     box_gpu_planets_begin(gpu);
     box_gpu_debug_begin(gpu);
+    box_gpu_grass_begin(gpu, packet);
     box_gpu_bake_capture(gpu, packet);
     box_gpu_atlas_render(gpu, packet);
     box_gpu_targets_render(gpu, packet);
+    box_gpu_grass_end(gpu, packet);
     box_gpu_impostor_render(gpu, packet);
     box_gpu_pace(gpu);
 
@@ -660,6 +663,7 @@ static void box_gpu_fini(
         box_gpu_draw_fini(gpu);
         box_gpu_texture_fini(gpu);
         box_gpu_scatter_fini(gpu);
+        box_gpu_grass_fini(gpu);
         box_gpu_terrain_fini(gpu);
         box_gpu_compose_fini(gpu);
     }
@@ -995,6 +999,15 @@ void box_gpu_stats_publish(
     for (i = 0; i < BOX_RENDER_ATMOS_PASSES; i ++) {
         s->atmosphere_ns[i] += p->atmosphere_ns[i];
         s->atmosphere_passes[i] += p->atmosphere_passes[i];
+    }
+
+    s->grass_passes += p->grass_passes;
+    s->grass_ns += p->grass_ns;
+    s->grass_timed += p->grass_timed;
+    s->grass_reads += p->grass_reads;
+    for (i = 0; i < BOX_GRASS_LODS; i ++) {
+        s->grass_generated[i] += p->grass_generated[i];
+        s->grass_drawn[i] += p->grass_drawn[i];
     }
 
     ecs_os_mutex_unlock(gpu->lock);

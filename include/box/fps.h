@@ -379,6 +379,25 @@ ECS_STRUCT(GpuTimeStats, {
     double cull_ms;             /**< Cull passes of the views */
     double texture_graph_ms;    /**< Texture graph evaluations */
     double atmosphere_ms;       /**< Atmosphere passes */
+    double grass_ms;            /**< Grass passes that place the blades of the views */
+});
+
+/** Grass blades of a level of detail per frame, over the views that drew grass */
+ECS_STRUCT(GpuGrassLevel, {
+    double generated;           /**< Blades the grass passes placed in the patches the views
+                                 *   saw */
+    double drawn;               /**< Blades of those the views drew, in the frustum and not
+                                 *   faded out */
+});
+
+/** Grass blades per frame: those of every level and of each, the finest first */
+ECS_STRUCT(GpuGrassStats, {
+    double passes;              /**< Grass passes, one per lit view whose scene has a Grass */
+    double generated;           /**< Blades placed, every level */
+    double drawn;               /**< Blades drawn, every level */
+    GpuGrassLevel lod0;         /**< Level 0, the blades of 7 segments near the camera */
+    GpuGrassLevel lod1;         /**< Level 1, the blades of 3 segments */
+    GpuGrassLevel lod2;         /**< Level 2, the single triangles furthest out */
 });
 
 /** Renderer statistics, written by box.fps while GpuPanel is open, every GpuPanel.interval.
@@ -398,6 +417,7 @@ ECS_STRUCT(GpuStats, {
     GpuTextureGraphStats texture_graphs; /**< Texture graphs */
     GpuMeshGraphStats mesh_graphs; /**< Mesh graphs */
     GpuMemoryStats memory;      /**< Resources and memory */
+    GpuGrassStats grass;        /**< Grass blades */
     GpuTimeStats time;          /**< GPU time */
 });
 

@@ -965,6 +965,8 @@ void BoxFpsImport(
     ECS_META_COMPONENT(world, GpuTextureGraphStats);
     ECS_META_COMPONENT(world, GpuMeshGraphStats);
     ECS_META_COMPONENT(world, GpuMemoryStats);
+    ECS_META_COMPONENT(world, GpuGrassLevel);
+    ECS_META_COMPONENT(world, GpuGrassStats);
     ECS_META_COMPONENT(world, GpuTimeStats);
     ECS_META_COMPONENT(world, GpuStats);
     ecs_set_hooks(world, FpsPanel, { .ctor = flecs_default_ctor });

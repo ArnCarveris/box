@@ -51,6 +51,7 @@ void BoxImport(
     ECS_IMPORT(world, BoxMesh);
     ECS_IMPORT(world, BoxText);
     ECS_IMPORT(world, BoxRender);
+    ECS_IMPORT(world, BoxGrass);
     ECS_IMPORT(world, BoxShader);
     ECS_IMPORT(world, BoxCommand);
     ECS_IMPORT(world, BoxPerf);

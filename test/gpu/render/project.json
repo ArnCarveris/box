@@ -2116,6 +2116,19 @@
                 ]
             },
             {
+                "id": "Grass",
+                "testcases": [
+                    "plane_places_blades",
+                    "thins_with_distance",
+                    "stays_put_as_camera_moves",
+                    "stays_put_across_origin_shift",
+                    "follows_terrain_height",
+                    "mask_weighs_density",
+                    "stats_show_counts_and_time",
+                    "renders_lit_blades"
+                ]
+            },
+            {
                 "id": "TerrainSample",
                 "testcases": [
                     "matches_queries",

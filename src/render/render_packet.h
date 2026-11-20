@@ -165,6 +165,12 @@
  * spectra of WaterSpectrum */
 #define BOX_RENDER_SHADER_WATER_SPECTRUM (17)
 
+/** Shader handle of the engine compute shader that places the grass blades of a view */
+#define BOX_RENDER_SHADER_GRASS_PLACE (18)
+
+/** Shader handle of the engine shader that draws the grass blades */
+#define BOX_RENDER_SHADER_GRASS (19)
+
 /** Shader handle of the engine compute shader that steps the fields of WaterRipples */
 #define BOX_RENDER_SHADER_WATER_RIPPLES (15)
 
@@ -2218,6 +2224,25 @@ typedef struct box_render_terrain_sample_t {
                              *   center of a tile of each level where its morph starts and ends */
 } box_render_terrain_sample_t;
 
+/** A Grass whose blades the GPU backend places around the camera of each lit view of its scene
+ * and draws (gpu_grass.c), with its defaults resolved (box_grass_resolve) and its colors
+ * linear. Positions and heights are in the local frame of the packet. */
+typedef struct box_render_grass_t {
+    ecs_entity_t grass;     /**< The Grass entity, the key of its buffers in the backend */
+    ecs_entity_t terrain;   /**< Terrain with TerrainSampled it grows on, 0 for the plane */
+    ecs_entity_t scene;     /**< Scene of the Grass entity, 0 for the default scene */
+    float plane;            /**< Local y of the plane of a Grass without a terrain */
+    float ground[2];        /**< Lowest and highest local y of the ground the blades stand on */
+    int32_t mask;           /**< Mask channel that weighs the density, -1 for none */
+    float density;          /**< Blades per square meter */
+    float height[2];        /**< Shortest and tallest blade */
+    float width[2];         /**< Narrowest and widest blade */
+    float base[3];          /**< Linear color at the base */
+    float tip[3];           /**< Linear color at the tip */
+    float lod[3];           /**< Distances where levels 0 and 1 end and the blades end */
+    uint32_t seed;          /**< Seed of the hash of the cells */
+} box_render_grass_t;
+
 /** Description of a BOX_RENDER_SHADER create or update, followed by its code and its label.
  *
  * The preprocessed WGSL code and the label each end with a terminator that their size counts.
@@ -2633,6 +2658,8 @@ typedef struct box_render_packet_t {
                              *   tiles that draw, copied after the texture graphs evaluated */
     ecs_vec_t terrain_samples; /**< box_render_terrain_sample_t, the terrains with
                              *   TerrainSampled, bound after their heights were copied */
+    ecs_vec_t grasses;      /**< box_render_grass_t, the Grass entities, whose blades the lit
+                             *   views of their scene place and draw */
     ecs_vec_t debug_boxes;  /**< box_render_debug_box_t, the boxes of the spatial index trees
                              *   of the views */
     ecs_vec_t debug_poses;  /**< mat4, the matrices that place the boxes of the views */

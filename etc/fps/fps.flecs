@@ -511,6 +511,12 @@ template GpuWidget {
             value: match s.measured { true: "{s.atmosphere_ms:.2} ms"; _: "-" }
           }
         }
+        grass {
+          GpuRow: {
+            label: "Grass",
+            value: match s.measured { true: "{s.grass_ms:.2} ms"; _: "-" }
+          }
+        }
       }
     }
 
@@ -708,6 +714,40 @@ template GpuWidget {
           GpuRow: {
             label: "Cached",
             value: "{box.fps.count(s.values)}, {box.fps.bytes(s.bytes)}"
+          }
+        }
+      }
+
+      grass {
+        const s = GpuStats[GpuStats].grass
+
+        Layout: {direction: Column}
+
+        title {
+          GpuTitle: {label: "Grass blades"}
+        }
+        blades {
+          GpuRow: {
+            label: "Drawn",
+            value: "{box.fps.count(s.drawn)} of {box.fps.count(s.generated)}"
+          }
+        }
+        lod0 {
+          GpuRow: {
+            label: "Level 0",
+            value: "{box.fps.count(s.lod0.drawn)} of {box.fps.count(s.lod0.generated)}"
+          }
+        }
+        lod1 {
+          GpuRow: {
+            label: "Level 1",
+            value: "{box.fps.count(s.lod1.drawn)} of {box.fps.count(s.lod1.generated)}"
+          }
+        }
+        lod2 {
+          GpuRow: {
+            label: "Level 2",
+            value: "{box.fps.count(s.lod2.drawn)} of {box.fps.count(s.lod2.generated)}"
           }
         }
       }

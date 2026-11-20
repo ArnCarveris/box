@@ -303,7 +303,8 @@ void box_cmd_frames_init(
 
     box_command_register(world,
         "Show or hide the GPU stats panel: instances, triangles, draw calls, pipeline and bind "
-        "group switches, commands, texture and mesh graph work, memory and GPU time per frame",
+        "group switches, commands, texture and mesh graph work, grass blades, memory and GPU time "
+        "per frame",
         (ecs_function_desc_t){
             .name = "gpu_stats",
             .return_type = ecs_id(ecs_string_t),

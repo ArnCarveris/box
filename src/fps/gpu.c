@@ -220,11 +220,37 @@ static void box_fps_gpu_resources(
 
     timed += now->cull_passes - base->cull_passes;
     timed += now->texture_graph_timed - base->texture_graph_timed;
+    timed += now->grass_timed - base->grass_timed;
     out->time.measured = timed > 0;
     out->time.cull_ms = box_fps_gpu_rate(now->cull_ns, base->cull_ns, n) * 1e-6;
     out->time.texture_graph_ms = box_fps_gpu_rate(
         now->texture_graph_ns, base->texture_graph_ns, n) * 1e-6;
     out->time.atmosphere_ms = box_fps_gpu_rate(atmosphere, 0, n) * 1e-6;
+    out->time.grass_ms = box_fps_gpu_rate(now->grass_ns, base->grass_ns, n) * 1e-6;
+}
+
+/** Fill the grass stats from the blades read back, per packet whose counts arrived.
+ *
+ * @param now The counters of the renderer
+ * @param base The counters at the last update
+ * @param out Receives the stats
+ */
+static void box_fps_gpu_grass(
+    const box_render_gpu_stats_t *now,
+    const box_render_gpu_stats_t *base,
+    GpuGrassStats *out)
+{
+    int32_t n = now->packets - base->packets, reads = now->grass_reads - base->grass_reads;
+    GpuGrassLevel *levels[BOX_GRASS_LODS] = { &out->lod0, &out->lod1, &out->lod2 };
+    int32_t i;
+    out->passes = box_fps_gpu_rate(now->grass_passes, base->grass_passes, n);
+    for (i = 0; i < BOX_GRASS_LODS; i ++) {
+        levels[i]->generated = box_fps_gpu_rate(
+            now->grass_generated[i], base->grass_generated[i], reads);
+        levels[i]->drawn = box_fps_gpu_rate(now->grass_drawn[i], base->grass_drawn[i], reads);
+        out->generated += levels[i]->generated;
+        out->drawn += levels[i]->drawn;
+    }
 }
 
 /** Fill the mesh graph stats from their counters.
@@ -273,6 +299,7 @@ static void box_fps_gpu_publish(
     box_fps_gpu_commands(now, &g->base, &out.commands);
     box_fps_gpu_work(now, &g->base, &out);
     box_fps_gpu_resources(now, &g->base, draws, &out);
+    box_fps_gpu_grass(now, &g->base, &out.grass);
     box_fps_gpu_mesh(g, mesh, &out.mesh_graphs);
     out.packet.processed = g->frames ? g->processed / g->frames : 0;
     out.packet.instance_bytes = g->frames ? g->instance_bytes / g->frames : 0;

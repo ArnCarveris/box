@@ -1138,6 +1138,92 @@ WGPUBindGroup box_gpu_terrain_sample_group(
     box_gpu_t *gpu,
     ecs_entity_t terrain);
 
+/** Create the layouts of the grass passes: the place pass reads a sampled terrain and writes
+ * the blades of a Grass, the draw reads the blades in the vertex stage.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_grass_init(
+    box_gpu_t *gpu);
+
+/** Release the grass passes, their pipelines and the buffers of every Grass.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_grass_fini(
+    box_gpu_t *gpu);
+
+/** Start the grass work of a packet: publish the blade counts and times read back, make the
+ * buffers of its Grass entities and release those of the Grass entities it no longer has, and
+ * zero the counts of the packet.
+ *
+ * @param gpu The backend
+ * @param packet The packet
+ */
+void box_gpu_grass_begin(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet);
+
+/** End the grass work of a packet: copy its blade counts and the timestamps of its passes into
+ * a readback, mapped a packet later.
+ *
+ * @param gpu The backend
+ * @param packet The packet
+ */
+void box_gpu_grass_end(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet);
+
+/** Check whether a view draws grass: it is lit, has a depth, is not an impostor frame nor
+ * WireframeOnly and a Grass of its scene has its buffers and pipelines.
+ *
+ * @param gpu The backend
+ * @param packet The packet
+ * @param v The view
+ * @return Whether box_gpu_grass_record places blades for it
+ */
+bool box_gpu_grass_drawn(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet,
+    const box_render_view_t *v);
+
+/** Record the compute pass that places the blades of the Grass entities of the scene of a view
+ * around its camera: per Grass a reset, a place dispatch over the patches of its grid and a
+ * finish that clamps the indirect arguments of its levels and adds the counts of the packet.
+ *
+ * @param gpu The backend
+ * @param encoder The encoder of the frame
+ * @param packet The packet
+ * @param v The view
+ * @param slot Slot of the view in the view buffer, whose uniforms are in view_data
+ */
+void box_gpu_grass_record(
+    box_gpu_t *gpu,
+    WGPUCommandEncoder encoder,
+    const box_render_packet_t *packet,
+    const box_render_view_t *v,
+    int32_t slot);
+
+/** Record the draws of the blades a view placed (box_gpu_grass_record) into one of its passes,
+ * one indirect draw per Grass and level of detail. Replaces the pipeline and the bind group at 1.
+ *
+ * @param gpu The backend
+ * @param pass The pass, with the bind group of the view at 0
+ * @param packet The packet
+ * @param v The view
+ * @param format Format of the color target, Undefined for the depth prepass
+ * @param equal Whether the pass loads the depth of a prepass that drew the blades, so it tests
+ * against it without writing it
+ * @return Whether a blade draw was recorded
+ */
+bool box_gpu_grass_draw(
+    box_gpu_t *gpu,
+    WGPURenderPassEncoder pass,
+    const box_render_packet_t *packet,
+    const box_render_view_t *v,
+    WGPUTextureFormat format,
+    bool equal);
+
 /** Write the uploads of a packet into their buffers.
  *
  * @param gpu The backend

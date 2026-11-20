@@ -15,6 +15,7 @@
             "../../../src/render",
             "../../../src/texture",
             "../../../src/terrain",
+            "../../../src/grass",
             "../../../src/geometry"
         ]
     },
@@ -353,6 +354,19 @@
                     "sample_window_follows_focus",
                     "sample_window_without_terrain",
                     "sampled_tag"
+                ]
+            },
+            {
+                "id": "Grass",
+                "testcases": [
+                    "registered",
+                    "defaults",
+                    "script",
+                    "resolve",
+                    "terrain_sampled",
+                    "extract_plane",
+                    "extract_terrain",
+                    "extract_scene"
                 ]
             },
             {
