@@ -400,6 +400,7 @@ static int box_gpu_init(
     box_gpu_texture_init(gpu);
     box_gpu_draw_init(gpu);
     box_gpu_scatter_init(gpu);
+    box_gpu_terrain_init(gpu);
     box_gpu_compose_init(gpu);
     ecs_map_init(&gpu->targets, NULL);
     ecs_map_init(&gpu->shaders, NULL);
@@ -571,6 +572,7 @@ static void box_gpu_render(
     box_gpu_texture_graphs_evaluate(gpu, packet);
     box_gpu_texture_mips(gpu, packet);
     box_gpu_terrain_heights(gpu, packet);
+    box_gpu_terrain_samples(gpu, packet);
     box_gpu_copy(gpu, packet);
     box_gpu_upload(gpu, packet);
     box_gpu_scatter(gpu, packet);
@@ -658,6 +660,7 @@ static void box_gpu_fini(
         box_gpu_draw_fini(gpu);
         box_gpu_texture_fini(gpu);
         box_gpu_scatter_fini(gpu);
+        box_gpu_terrain_fini(gpu);
         box_gpu_compose_fini(gpu);
     }
 

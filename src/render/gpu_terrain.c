@@ -4,9 +4,15 @@
  * backend copies the R32Float image of each tile into its slot, which the vertex stages read,
  * and the masks of a tile with masks into its cell of the mask atlas of the mesh, which the
  * fragment stages of a terrain TextureBlend read.
+ *
+ * The bindings of the terrains with TerrainSampled: per terrain the params and the cells of the
+ * windows of its levels, bound with the heights and the mask atlas of its grid mesh, which the
+ * compute and vertex stages read by world position (etc/shaders/include/terrain_sample.wgsl).
  */
 
 #include "gpu.h"
+#include "preprocess.h"
+#include <math.h>
 
 #ifdef BOX_RENDER_WGPU
 
@@ -306,6 +312,503 @@ void box_gpu_terrain_heights(
         wgpuCommandBufferRelease(commands);
         wgpuCommandEncoderRelease(encoder);
     }
+}
+
+/** Bindings of the bind group of a sampled terrain (terrain_sample.wgsl) */
+#define BOX_GPU_TERRAIN_SAMPLE_BINDINGS (4)
+
+/** Bytes of the grid of a sampled terrain without cells */
+#define BOX_GPU_TERRAIN_SAMPLE_EMPTY (16u)
+
+_Static_assert(sizeof(box_gpu_terrain_sample_level_t) == 32,
+    "TerrainSampleLevel of terrain_sample.wgsl");
+_Static_assert(sizeof(box_gpu_terrain_sample_params_t) == 640,
+    "TerrainSampleParams of terrain_sample.wgsl");
+
+void box_gpu_terrain_init(
+    box_gpu_t *gpu)
+{
+    WGPUShaderStage stages = WGPUShaderStage_Compute | WGPUShaderStage_Vertex |
+        WGPUShaderStage_Fragment;
+    WGPUBindGroupLayoutEntry entries[BOX_GPU_TERRAIN_SAMPLE_BINDINGS] = {
+        {
+            .binding = 0,
+            .visibility = stages,
+            .buffer = {
+                .type = WGPUBufferBindingType_Uniform,
+                .minBindingSize = sizeof(box_gpu_terrain_sample_params_t)
+            }
+        },
+        {
+            .binding = 1,
+            .visibility = stages,
+            .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
+        },
+        {
+            .binding = 2,
+            .visibility = stages,
+            .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
+        },
+        {
+            .binding = 3,
+            .visibility = stages,
+            .texture = {
+                .sampleType = WGPUTextureSampleType_UnfilterableFloat,
+                .viewDimension = WGPUTextureViewDimension_2D
+            }
+        }
+    };
+    gpu->terrain_sample_layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
+        &(WGPUBindGroupLayoutDescriptor){
+            .entryCount = BOX_GPU_TERRAIN_SAMPLE_BINDINGS,
+            .entries = entries
+        });
+    ecs_map_init(&gpu->terrain_samples, NULL);
+}
+
+/** Release the bindings of a sampled terrain.
+ *
+ * @param ts The bindings, freed
+ */
+static void box_gpu_terrain_sample_free(
+    box_gpu_terrain_sample_t *ts)
+{
+    if (ts->group) {
+        wgpuBindGroupRelease(ts->group);
+    }
+
+    if (ts->params) {
+        wgpuBufferRelease(ts->params);
+    }
+
+    if (ts->grid) {
+        wgpuBufferRelease(ts->grid);
+    }
+
+    ecs_os_free(ts->cells);
+    ecs_os_free(ts);
+}
+
+void box_gpu_terrain_fini(
+    box_gpu_t *gpu)
+{
+    ecs_map_iter_t it = ecs_map_iter(&gpu->terrain_samples);
+    while (ecs_map_next(&it)) {
+        box_gpu_terrain_sample_free(ecs_map_ptr(&it));
+    }
+
+    ecs_map_fini(&gpu->terrain_samples);
+    if (gpu->terrain_sample_layout) {
+        wgpuBindGroupLayoutRelease(gpu->terrain_sample_layout);
+        gpu->terrain_sample_layout = NULL;
+    }
+}
+
+/** Split an absolute coordinate into whole meters and the rest of a meter.
+ *
+ * @param v The coordinate
+ * @param whole Receives the whole meters, clamped to int32_t
+ * @param rest Receives the rest, 0 to 1
+ */
+static void box_gpu_terrain_split(
+    double v,
+    int32_t *whole,
+    float *rest)
+{
+    double w = floor(v);
+    w = w < (double)INT32_MIN ? (double)INT32_MIN : w > (double)INT32_MAX ? (double)INT32_MAX : w;
+    *whole = (int32_t)w;
+    *rest = (float)(v - w);
+}
+
+/** Fill the params of a sampled terrain.
+ *
+ * @param packet The packet
+ * @param s The terrain
+ * @param m Its grid mesh, NULL before a tile draws
+ * @param out Receives the params
+ */
+static void box_gpu_terrain_params(
+    const box_render_packet_t *packet,
+    const box_render_terrain_sample_t *s,
+    const box_gpu_mesh_t *m,
+    box_gpu_terrain_sample_params_t *out)
+{
+    int32_t levels = s->levels > BOX_RENDER_TERRAIN_LEVELS
+        ? BOX_RENDER_TERRAIN_LEVELS : s->levels, foci, i;
+    uint32_t texels = (uint32_t)s->resolution + 4u;
+    foci = s->focus_count > BOX_RENDER_TERRAIN_FOCI ? BOX_RENDER_TERRAIN_FOCI : s->focus_count;
+    ecs_os_memset_t(out, 0, box_gpu_terrain_sample_params_t);
+    if (!m || !m->terrain_slots || levels <= 0 || s->resolution <= 0) {
+        levels = 0;
+    }
+
+    out->counts[0] = (uint32_t)levels;
+    out->counts[1] = (uint32_t)s->cells;
+    out->counts[2] = (uint32_t)s->resolution;
+    out->counts[3] = (uint32_t)foci;
+    if (levels) {
+        out->layout[0] = (uint32_t)(m->terrain_slot_size / texels / 4u);
+        out->layout[1] = (uint32_t)(m->terrain_slot_size / 4u);
+        if (s->masks && m->terrain_mask_view && m->terrain_mask_texels == texels) {
+            out->layout[2] = m->terrain_mask_texels;
+            out->layout[3] = m->terrain_mask_columns;
+        }
+    }
+
+    box_gpu_terrain_split(s->origin[0], &out->origin_whole[0], &out->origin[0]);
+    box_gpu_terrain_split(s->origin[2], &out->origin_whole[1], &out->origin[1]);
+    out->origin_whole[2] = s->extent > 0.0 ? 1 : 0;
+    out->origin[2] = (float)s->extent;
+    out->origin[3] = (float)(s->origin[1] - packet->origin[1]);
+    double corner[2] = {
+        (double)s->first[0][0] * s->tile_size,
+        (double)s->first[0][1] * s->tile_size
+    };
+    for (i = 0; i < foci; i ++) {
+        out->foci[i / 2][(i % 2) * 2] = (float)(s->foci[i][0] - corner[0]);
+        out->foci[i / 2][(i % 2) * 2 + 1] = (float)(s->foci[i][1] - corner[1]);
+    }
+
+    for (i = 0; i < levels; i ++) {
+        box_gpu_terrain_sample_level_t *l = &out->levels[i];
+        double size = ldexp(s->tile_size, i);
+        box_gpu_terrain_split(s->origin[0] + (double)s->first[i][0] * size, &l->whole[0],
+            &l->rest[0]);
+        box_gpu_terrain_split(s->origin[2] + (double)s->first[i][1] * size, &l->whole[1],
+            &l->rest[1]);
+        l->size = (float)size;
+        l->morph[0] = s->morph[i][0];
+        l->morph[1] = s->morph[i][1];
+        l->first = (uint32_t)(i * s->cells * s->cells);
+    }
+}
+
+/** Write the params and the cells of a sampled terrain when they changed and make its bind
+ * group again when what it binds changed.
+ *
+ * @param gpu The backend
+ * @param packet The packet
+ * @param s The terrain
+ */
+static void box_gpu_terrain_sample(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet,
+    const box_render_terrain_sample_t *s)
+{
+    box_gpu_terrain_sample_t *ts = ecs_map_get_deref(&gpu->terrain_samples,
+        box_gpu_terrain_sample_t, s->terrain);
+    box_gpu_mesh_t *m = s->mesh
+        ? ecs_map_get_deref(&gpu->meshes, box_gpu_mesh_t, s->mesh) : NULL;
+    box_gpu_terrain_sample_params_t params;
+    int32_t i;
+    if (!ts) {
+        ts = ecs_os_calloc_t(box_gpu_terrain_sample_t);
+        ecs_map_insert_ptr(&gpu->terrain_samples, s->terrain, ts);
+    }
+
+    ts->frame = packet->frame;
+    box_gpu_terrain_params(packet, s, m, &params);
+    int32_t count = params.counts[0] ? (int32_t)params.counts[0] * s->cells * s->cells : 0;
+    uint64_t bytes = (uint64_t)count * sizeof(uint32_t);
+    bytes = bytes < BOX_GPU_TERRAIN_SAMPLE_EMPTY ? BOX_GPU_TERRAIN_SAMPLE_EMPTY : bytes;
+    if (!ts->params) {
+        ts->params = wgpuDeviceCreateBuffer(gpu->device, &(WGPUBufferDescriptor){
+            .usage = WGPUBufferUsage_Uniform | WGPUBufferUsage_CopyDst,
+            .size = sizeof(box_gpu_terrain_sample_params_t)
+        });
+        ecs_os_memset_t(&ts->written, 0, box_gpu_terrain_sample_params_t);
+        wgpuQueueWriteBuffer(gpu->queue, ts->params, 0, &params, sizeof(params));
+        ts->written = params;
+    } else if (ecs_os_memcmp(&ts->written, &params, ECS_SIZEOF(params))) {
+        wgpuQueueWriteBuffer(gpu->queue, ts->params, 0, &params, sizeof(params));
+        ts->written = params;
+    }
+
+    if (!ts->grid || ts->grid_size < bytes) {
+        if (ts->grid) {
+            wgpuBufferRelease(ts->grid);
+        }
+
+        ts->grid = wgpuDeviceCreateBuffer(gpu->device, &(WGPUBufferDescriptor){
+            .usage = WGPUBufferUsage_Storage | WGPUBufferUsage_CopyDst,
+            .size = bytes
+        });
+        ts->grid_size = bytes;
+        ecs_os_free(ts->cells);
+        ts->cells = NULL;
+        ts->cell_count = 0;
+    }
+
+    if (count) {
+        const uint32_t *cells = box_render_packet_data(packet, s->grid);
+        uint32_t *valid = ecs_os_malloc_n(uint32_t, count);
+        for (i = 0; i < count; i ++) {
+            uint32_t v = cells[i];
+            if (v && ((int64_t)(v - 1u) >= m->terrain_slots || !m->terrain_serials ||
+                !m->terrain_serials[v - 1u]))
+            {
+                v = 0;
+            }
+
+            valid[i] = v;
+        }
+
+        if (ts->cell_count != count ||
+            ecs_os_memcmp(ts->cells, valid, count * ECS_SIZEOF(uint32_t)))
+        {
+            wgpuQueueWriteBuffer(gpu->queue, ts->grid, 0, valid,
+                (size_t)count * sizeof(uint32_t));
+            ecs_os_free(ts->cells);
+            ts->cells = valid;
+            ts->cell_count = count;
+        } else {
+            ecs_os_free(valid);
+        }
+    }
+
+    WGPUBuffer heights = m && m->surface_assets ? m->surface_assets : gpu->no_assets;
+    WGPUTextureView masks = m && m->terrain_mask_view
+        ? m->terrain_mask_view : gpu->white->linear;
+    if (ts->group && ts->group_heights == heights && ts->group_masks == masks &&
+        ts->group_grid == ts->grid)
+    {
+        goto done;
+    }
+
+    if (ts->group) {
+        wgpuBindGroupRelease(ts->group);
+    }
+
+    WGPUBindGroupEntry entries[BOX_GPU_TERRAIN_SAMPLE_BINDINGS] = {
+        {
+            .binding = 0,
+            .buffer = ts->params,
+            .size = sizeof(box_gpu_terrain_sample_params_t)
+        },
+        { .binding = 1, .buffer = ts->grid, .size = ts->grid_size },
+        { .binding = 2, .buffer = heights, .size = WGPU_WHOLE_SIZE },
+        { .binding = 3, .textureView = masks }
+    };
+    ts->group = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
+        .layout = gpu->terrain_sample_layout,
+        .entryCount = BOX_GPU_TERRAIN_SAMPLE_BINDINGS,
+        .entries = entries
+    });
+    ts->group_heights = heights;
+    ts->group_masks = masks;
+    ts->group_grid = ts->grid;
+done:
+    return;
+}
+
+void box_gpu_terrain_samples(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet)
+{
+    int32_t i, count = ecs_vec_count(&packet->terrain_samples);
+    ecs_entity_t stale[16];
+    int32_t stale_count;
+    for (i = 0; i < count; i ++) {
+        box_gpu_terrain_sample(gpu, packet, ecs_vec_get_t(&packet->terrain_samples,
+            box_render_terrain_sample_t, i));
+    }
+
+    do {
+        ecs_map_iter_t it = ecs_map_iter(&gpu->terrain_samples);
+        stale_count = 0;
+        while (ecs_map_next(&it) && stale_count < 16) {
+            box_gpu_terrain_sample_t *ts = ecs_map_ptr(&it);
+            if (ts->frame != packet->frame) {
+                stale[stale_count ++] = ecs_map_key(&it);
+            }
+        }
+
+        for (i = 0; i < stale_count; i ++) {
+            box_gpu_terrain_sample_free(ecs_map_get_deref(&gpu->terrain_samples,
+                box_gpu_terrain_sample_t, stale[i]));
+            ecs_map_remove(&gpu->terrain_samples, stale[i]);
+        }
+    } while (stale_count);
+}
+
+WGPUBindGroup box_gpu_terrain_sample_group(
+    box_gpu_t *gpu,
+    ecs_entity_t terrain)
+{
+    box_gpu_terrain_sample_t *ts = ecs_map_get_deref(&gpu->terrain_samples,
+        box_gpu_terrain_sample_t, terrain);
+
+    return ts ? ts->group : NULL;
+}
+
+bool box_render_gpu_terrain_compute(
+    ecs_world_t *world,
+    ecs_entity_t terrain,
+    const char *path,
+    const void *in,
+    uint32_t in_size,
+    void *out,
+    uint32_t out_size,
+    uint32_t groups)
+{
+    bool result = false;
+    box_render_gpu_stats_t stats;
+    box_shader_output_t code = {0};
+    WGPUShaderModule module = NULL;
+    WGPUBindGroupLayout layout = NULL;
+    WGPUPipelineLayout pipeline_layout = NULL;
+    WGPUComputePipeline pipeline = NULL;
+    WGPUBuffer input = NULL, output = NULL;
+    WGPUBindGroup group = NULL;
+    if (!box_render_gpu_stats(world, &stats) || !stats.ready || !out_size || (out_size & 3) ||
+        (in_size & 3) || !groups)
+    {
+        goto done;
+    }
+
+    box_gpu_t *gpu = box_render_get_backend(world)->ctx;
+    bool renders = ecs_os_thread_self() == gpu->thread;
+    ecs_assert(renders, ECS_INVALID_OPERATION,
+        "box_render_gpu_terrain_compute needs RenderSettings.main_thread and box_render_sync");
+    WGPUBindGroup sampled = renders ? box_gpu_terrain_sample_group(gpu, terrain) : NULL;
+    if (!sampled) {
+        goto done;
+    }
+
+    if (box_shader_preprocess(&(box_shader_desc_t){ .path = path }, &code)) {
+        ecs_err("%s", code.error ? code.error : path);
+        goto done;
+    }
+
+    WGPUShaderSourceWGSL wgsl = {
+        .chain = { .sType = WGPUSType_ShaderSourceWGSL },
+        .code = { .data = code.code, .length = WGPU_STRLEN }
+    };
+    module = wgpuDeviceCreateShaderModule(gpu->device, &(WGPUShaderModuleDescriptor){
+        .nextInChain = &wgsl.chain,
+        .label = { .data = path, .length = WGPU_STRLEN }
+    });
+    WGPUBindGroupLayoutEntry entries[2] = {
+        {
+            .binding = 0,
+            .visibility = WGPUShaderStage_Compute,
+            .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
+        },
+        {
+            .binding = 1,
+            .visibility = WGPUShaderStage_Compute,
+            .buffer = { .type = WGPUBufferBindingType_Storage }
+        }
+    };
+    layout = wgpuDeviceCreateBindGroupLayout(gpu->device, &(WGPUBindGroupLayoutDescriptor){
+        .entryCount = 2,
+        .entries = entries
+    });
+    WGPUBindGroupLayout layouts[2] = { gpu->terrain_sample_layout, layout };
+    pipeline_layout = wgpuDeviceCreatePipelineLayout(gpu->device,
+        &(WGPUPipelineLayoutDescriptor){
+            .bindGroupLayoutCount = 2,
+            .bindGroupLayouts = layouts
+        });
+    pipeline = wgpuDeviceCreateComputePipeline(gpu->device, &(WGPUComputePipelineDescriptor){
+        .layout = pipeline_layout,
+        .compute = {
+            .module = module,
+            .entryPoint = { .data = "main", .length = WGPU_STRLEN }
+        }
+    });
+    uint64_t in_bytes = in_size ? in_size : BOX_GPU_TERRAIN_SAMPLE_EMPTY;
+    input = wgpuDeviceCreateBuffer(gpu->device, &(WGPUBufferDescriptor){
+        .usage = WGPUBufferUsage_Storage | WGPUBufferUsage_CopyDst,
+        .size = in_bytes
+    });
+    if (in_size) {
+        wgpuQueueWriteBuffer(gpu->queue, input, 0, in, in_size);
+    }
+
+    output = wgpuDeviceCreateBuffer(gpu->device, &(WGPUBufferDescriptor){
+        .usage = WGPUBufferUsage_Storage | WGPUBufferUsage_CopySrc,
+        .size = out_size
+    });
+    WGPUBindGroupEntry bindings[2] = {
+        { .binding = 0, .buffer = input, .size = in_bytes },
+        { .binding = 1, .buffer = output, .size = out_size }
+    };
+    group = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
+        .layout = layout,
+        .entryCount = 2,
+        .entries = bindings
+    });
+    WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(gpu->device, NULL);
+    WGPUComputePassEncoder pass = box_gpu_compute_begin(encoder, NULL);
+    wgpuComputePassEncoderSetPipeline(pass, pipeline);
+    wgpuComputePassEncoderSetBindGroup(pass, 0, sampled, 0, NULL);
+    wgpuComputePassEncoderSetBindGroup(pass, 1, group, 0, NULL);
+    wgpuComputePassEncoderDispatchWorkgroups(pass, groups, 1, 1);
+    wgpuComputePassEncoderEnd(pass);
+    wgpuComputePassEncoderRelease(pass);
+    WGPUCommandBuffer commands = wgpuCommandEncoderFinish(encoder, NULL);
+    wgpuQueueSubmit(gpu->queue, 1, &commands);
+    wgpuCommandBufferRelease(commands);
+    wgpuCommandEncoderRelease(encoder);
+    result = box_gpu_read(gpu, output, 0, out_size, out);
+done:
+    if (group) {
+        wgpuBindGroupRelease(group);
+    }
+
+    if (output) {
+        wgpuBufferRelease(output);
+    }
+
+    if (input) {
+        wgpuBufferRelease(input);
+    }
+
+    if (pipeline) {
+        wgpuComputePipelineRelease(pipeline);
+    }
+
+    if (pipeline_layout) {
+        wgpuPipelineLayoutRelease(pipeline_layout);
+    }
+
+    if (layout) {
+        wgpuBindGroupLayoutRelease(layout);
+    }
+
+    if (module) {
+        wgpuShaderModuleRelease(module);
+    }
+
+    box_shader_output_fini(&code);
+
+    return result;
+}
+
+#else
+
+bool box_render_gpu_terrain_compute(
+    ecs_world_t *world,
+    ecs_entity_t terrain,
+    const char *path,
+    const void *in,
+    uint32_t in_size,
+    void *out,
+    uint32_t out_size,
+    uint32_t groups)
+{
+    (void)world;
+    (void)terrain;
+    (void)path;
+    (void)in;
+    (void)in_size;
+    (void)out;
+    (void)out_size;
+    (void)groups;
+
+    return false;
 }
 
 #endif

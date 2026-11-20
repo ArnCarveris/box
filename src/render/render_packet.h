@@ -2175,6 +2175,39 @@ typedef struct box_render_terrain_height_t {
                              *   at every second texel, 0 for none */
 } box_render_terrain_height_t;
 
+/** Levels of detail a sampled terrain indexes at most (BOX_TERRAIN_LEVELS) */
+#define BOX_RENDER_TERRAIN_LEVELS (16)
+
+/** Foci of a sampled terrain at most (BOX_TERRAIN_FOCI) */
+#define BOX_RENDER_TERRAIN_FOCI (8)
+
+/** A Terrain with TerrainSampled, whose tiles that draw the compute and vertex stages read by
+ * world position (terrain_sample.wgsl).
+ *
+ * The grid holds a window of cells by cells per level, the finest first, rows from -z, a cell per
+ * tile of the level from the tile first; each cell the slot of the tile of its node that draws
+ * plus one, 0 where none does. The backend binds the cells, the surface assets and the mask atlas
+ * of the grid mesh of the tiles, filled by the terrain_heights of the same packet. */
+typedef struct box_render_terrain_sample_t {
+    ecs_entity_t terrain;   /**< The terrain entity, the key of its bindings in the backend */
+    uint32_t mesh;          /**< Handle of the grid mesh of the tiles, 0 before one draws */
+    uint32_t grid;          /**< Data offset of the cells, levels * cells * cells uint32_t */
+    int32_t levels;         /**< Levels of detail, 0 when nothing is indexed yet */
+    int32_t cells;          /**< Cells along an edge of the window of a level */
+    int32_t resolution;     /**< Vertices along an edge of a tile */
+    int32_t focus_count;    /**< Foci in foci */
+    bool masks;             /**< The tiles have masks in the mask atlas of the mesh */
+    double origin[3];       /**< Absolute position of the frame of the terrain */
+    double tile_size;       /**< Edge of a tile of level 0 in meters */
+    double extent;          /**< Half size of a bounded terrain, 0 unbounded */
+    double foci[BOX_RENDER_TERRAIN_FOCI][2]; /**< Foci the tiles morph around in the frame of
+                             *   the terrain, x and z */
+    int32_t first[BOX_RENDER_TERRAIN_LEVELS][2]; /**< Column and row of the tile of the first
+                             *   cell of each level */
+    float morph[BOX_RENDER_TERRAIN_LEVELS][2]; /**< Distances of the nearest focus from the
+                             *   center of a tile of each level where its morph starts and ends */
+} box_render_terrain_sample_t;
+
 /** Description of a BOX_RENDER_SHADER create or update, followed by its code and its label.
  *
  * The preprocessed WGSL code and the label each end with a terminator that their size counts.
@@ -2588,6 +2621,8 @@ typedef struct box_render_packet_t {
                              *   files after the blits */
     ecs_vec_t terrain_heights; /**< box_render_terrain_height_t, the heights of the terrain
                              *   tiles that draw, copied after the texture graphs evaluated */
+    ecs_vec_t terrain_samples; /**< box_render_terrain_sample_t, the terrains with
+                             *   TerrainSampled, bound after their heights were copied */
     ecs_vec_t debug_boxes;  /**< box_render_debug_box_t, the boxes of the spatial index trees
                              *   of the views */
     ecs_vec_t debug_poses;  /**< mat4, the matrices that place the boxes of the views */

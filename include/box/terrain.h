@@ -152,6 +152,23 @@ ECS_STRUCT(Terrain, {
                              *   BOX_TERRAIN_QUERY_SCALE times as far */
 });
 
+/** Makes the height, normal and mask channels of a Terrain readable by world position from the
+ * compute and vertex stages of the engine (etc/shaders/include/terrain_sample.wgsl).
+ *
+ * Each frame the renderer indexes the tiles the terrain draws in a grid per level around its
+ * first focus, which points into the heights and the mask atlas the tiles already keep on the
+ * GPU, so a sample answers from the finest tile that draws there, as the surface is drawn. A
+ * terrain without the tag has no grid and costs nothing extra.
+ *
+ * @code
+ * hills {
+ *   Terrain: {height: height, masks: masks}
+ *   TerrainSampled
+ * }
+ * @endcode
+ */
+extern ECS_TAG_DECLARE(TerrainSampled);
+
 /** Tiles of a Terrain, written by the engine on the terrain entity, read only for
  * applications */
 ECS_STRUCT(TerrainStatus, {

@@ -992,6 +992,34 @@ uint64_t box_render_gpu_buffer_size(
     ecs_world_t *world,
     uint32_t handle);
 
+/** Run a compute shader that reads a terrain with TerrainSampled (terrain_sample.wgsl) and copy
+ * what it wrote into memory, waiting for the copy, for tests.
+ *
+ * The shader file is preprocessed as the engine shaders are; its entry point main gets the
+ * bindings of the terrain of the last packet at group 0, its input as a read only storage buffer
+ * at group 1 binding 0 and its output as a read write storage buffer at group 1 binding 1. Only
+ * call this when the main thread renders, after box_render_sync, as box_render_gpu_read_buffer.
+ *
+ * @param world The world
+ * @param terrain The terrain entity, with TerrainSampled
+ * @param path The WGSL file
+ * @param in The input, NULL when in_size is 0
+ * @param in_size Bytes of the input, a multiple of 4, 0 for an empty buffer
+ * @param out Receives the output
+ * @param out_size Bytes of the output, a multiple of 4
+ * @param groups Workgroups dispatched along x
+ * @return Whether the last packet sampled the terrain and the output was copied
+ */
+bool box_render_gpu_terrain_compute(
+    ecs_world_t *world,
+    ecs_entity_t terrain,
+    const char *path,
+    const void *in,
+    uint32_t in_size,
+    void *out,
+    uint32_t out_size,
+    uint32_t groups);
+
 /** Read back what the cull pass of a view kept in the last target the GPU backend rendered.
  *
  * Only call this when the main thread renders (RenderSettings.main_thread), after

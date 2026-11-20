@@ -2111,6 +2111,17 @@
                 ]
             },
             {
+                "id": "TerrainSample",
+                "testcases": [
+                    "matches_queries",
+                    "tile_edges",
+                    "after_origin_shift",
+                    "coarse_levels_further_out",
+                    "beyond_windows_not_found",
+                    "untagged_has_no_bindings"
+                ]
+            },
+            {
                 "id": "TerrainMaterial",
                 "testcases": [
                     "mask_matches_graph",

@@ -1100,6 +1100,44 @@ void box_gpu_terrain_heights(
     box_gpu_t *gpu,
     const box_render_packet_t *packet);
 
+/** Create the bind group layout of the sampled terrains (terrain_sample.wgsl).
+ *
+ * @param gpu The backend
+ */
+void box_gpu_terrain_init(
+    box_gpu_t *gpu);
+
+/** Release the bindings of the sampled terrains and their layout.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_terrain_fini(
+    box_gpu_t *gpu);
+
+/** Write the bindings of the terrains with TerrainSampled of a packet
+ * (box_render_terrain_sample_t), after box_gpu_terrain_heights copied their heights: the params
+ * and the cells when they changed, a cell whose slot holds no heights yet as no tile, and the bind
+ * group again when the surface assets or the mask atlas of the grid mesh were made again. The
+ * bindings of the terrains the packet does not sample are released.
+ *
+ * @param gpu The backend
+ * @param packet The packet
+ */
+void box_gpu_terrain_samples(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet);
+
+/** Get the bind group of a sampled terrain, for the passes whose compute or vertex stages read it
+ * with terrain_sample.wgsl at the group of terrain_sample_layout.
+ *
+ * @param gpu The backend
+ * @param terrain The terrain entity
+ * @return The group, valid until the next packet, NULL when the last packet did not sample it
+ */
+WGPUBindGroup box_gpu_terrain_sample_group(
+    box_gpu_t *gpu,
+    ecs_entity_t terrain);
+
 /** Write the uploads of a packet into their buffers.
  *
  * @param gpu The backend

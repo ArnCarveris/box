@@ -192,6 +192,43 @@ int32_t box_terrain_foci(
     const double local[3],
     double out[BOX_TERRAIN_FOCI][2]);
 
+/** Most cells along an edge of the window of a level of a sampled Terrain */
+#define BOX_TERRAIN_WINDOW_CELLS (64)
+
+/** Cells beyond the range of a level on each side of the window of the level of a sampled
+ * Terrain, for the tiles that stand in for wanted ones and for the foci moving between frames */
+#define BOX_TERRAIN_WINDOW_MARGIN (4)
+
+/** The windows of the levels of a Terrain with TerrainSampled, in which the renderer indexes
+ * the tiles that draw (terrain_sample.wgsl): per level a square of cells cells, a cell per tile of
+ * the level, from the tile first, centered on the first focus. */
+typedef struct box_terrain_window_t {
+    int32_t levels;         /**< Levels of detail */
+    int32_t cells;          /**< Cells along an edge of the window of every level */
+    int32_t resolution;     /**< Vertices along an edge of a tile */
+    int32_t focus_count;    /**< Foci in foci */
+    double tile_size;       /**< Edge of a tile of level 0 in meters */
+    double extent;          /**< Half size of a bounded terrain, 0 unbounded */
+    double foci[BOX_TERRAIN_FOCI][2]; /**< Foci the tiles morph around, x and z in the frame of
+                             *   the terrain */
+    int32_t first[BOX_TERRAIN_LEVELS][2]; /**< Column and row of the first tile of the window of
+                             *   each level */
+    float morph[BOX_TERRAIN_LEVELS][2]; /**< Distances of a focus from the center of a tile of each
+                             *   level where its morph into the coarser grid starts and ends */
+} box_terrain_window_t;
+
+/** Get the windows of the levels of a terrain, around the foci its tiles morph around.
+ *
+ * @param world The world
+ * @param terrain The terrain entity
+ * @param out Receives the windows
+ * @return Whether the terrain has tiles to index: its settings are applied and it has a focus
+ */
+bool box_terrain_window(
+    const ecs_world_t *world,
+    ecs_entity_t terrain,
+    box_terrain_window_t *out);
+
 /** Cells along the edge of a query tile of a Terrain */
 #define BOX_TERRAIN_QUERY_CELLS (64)
 
