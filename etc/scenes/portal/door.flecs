@@ -20,6 +20,7 @@ using box.geometry
 using box.animation
 using box.curve
 using box.portal
+using box.material
 
 // The raised frame, the wheel and the dogs of one face of a ship door, in the space of its panel
 template PortalDoorShipFace {
@@ -119,6 +120,7 @@ template PortalDoor {
 
     panel {
       Position: {0, 0, 0}
+      texture.Frame
       Box: {width, height, thickness}
 
       if material != 0 {

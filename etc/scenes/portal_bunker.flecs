@@ -126,6 +126,7 @@ freighter {
   Position: {0, 0, 0}
   Rotation: {0, 0, 0}
   DynamicTransform
+  texture.Frame
   hull { TriangleCollider }
   antifouling { TriangleCollider }
   deck { TriangleCollider }
@@ -137,6 +138,7 @@ freighter {
     Position: {55, 9.2, 1.82}
     Rotation: {0, 0, 0}
     DynamicTransform
+    texture.Frame
     box.picking.PickRange: {distance: 2.5}
     box.picking.ActionTrigger: {action: box.controllers.helm.Use}
     rim : BunkerMat_metal { Rotation: {1.5708, 0, 0}; Torus: {radius: 0.34, tube: 0.025} }
@@ -149,6 +151,7 @@ freighter {
     Position: {55.55, 9.1, 2.05}
     Rotation: {0, 0, 0}
     DynamicTransform
+    texture.Frame
     stick : BunkerMat_steel { Position: {0, 0.2, 0}; Box: {0.04, 0.4, 0.04} }
     knob : BunkerMat_metal { Position: {0, 0.42, 0}; Box: {0.08, 0.08, 0.08} }
   }
