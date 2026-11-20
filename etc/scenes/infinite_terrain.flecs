@@ -1,16 +1,14 @@
-// Infinite terrain: the ground of infinite_forest.flecs on its own, without trees, undergrowth, the
-// water of the brooks, the landmarks or the trails. Walk with WASD, F switches to flying.
 include ui/widgets
-include trees/generator
-include forest/library
-include infinite_forest/state
-include infinite_forest/materials
-include infinite_forest/terrain
-include infinite_forest/player
-include infinite_forest/view
+include infinite_terrain/state
+include infinite_terrain/materials
+include infinite_terrain/terrain
+include infinite_terrain/water
+include infinite_terrain/sky
+include infinite_terrain/player
+include infinite_terrain/view
+include infinite_terrain/hud
 
 using box.view
-using box.texture
 
 $ {
   box.app.FpsTarget: {60}
@@ -19,21 +17,10 @@ $ {
     environment: true,
     aerial_perspective: true,
     cookies: true,
-    alpha_cutout: true,
     blend_modes: true,
     texture_blend: true,
     water: true,
     texture_layers: true,
-    triplanar: true,
-    diffuse_transmission: true,
-    wind: true
-  }
-}
-
-// No trails: they neither sink into the ground nor paint it with dirt
-infinite_forest {
-  land {
-    trail_h { nodes.Multiply: {a: infinite_forest.land.track, b_value: {0, 0, 0, 0}} }
-    trail_w { nodes.Multiply: {a: infinite_forest.land.track, b_value: {0, 0, 0, 0}} }
+    triplanar: true
   }
 }

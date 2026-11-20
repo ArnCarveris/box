@@ -1,0 +1,181 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.camera
+using box.view
+using box.geometry
+using box.material
+using box.layout
+using box.text
+using box.input
+using box.picking
+using box.surface
+using box.ui
+using box.widgets
+using box.terrain
+using state
+
+state {
+  export const PANEL_W: f32 = 300
+  export const SLIDER_W: f32 = PANEL_W - 36
+
+  fn terrain_reach_text(detail: f64, tile: f64, levels: f64) -> string {
+    const fine = terrain_distance_text(terrain_detail(detail, tile))
+    const far = terrain_distance_text(terrain_reach(detail, tile, levels))
+    "Fine detail to {fine}, terrain to {far}"
+  }
+
+  fn terrain_tiles_text(drawn: f64, pending: f64, mb: f64) -> string {
+    "{drawn:.0} tiles drawn, {pending:.0} pending, {mb:.0} MB"
+  }
+}
+
+window {
+  Surface: {width: 1440, height: 960, vsync: true}
+}
+
+hud {
+  Scene: {blend_modes: true}
+
+  camera {
+    Position: {0, 0, 100}
+    Camera: {ortho: true, ortho_scale: 1}
+  }
+
+  screen {
+    Fill: {surface: window}
+    Layout: {}
+    FocusScope
+
+    panel {
+      InputBlocker
+      Layout: {}
+      Item: {h: Left, v: Bottom, x: state.hud_shown ? 18 : -2000, y: 18}
+
+      Panel body(title: "Terrain", width: PANEL_W) {
+        Slider detail(
+          label: "Detail distance",
+          unit: " m",
+          width: SLIDER_W,
+          min: DETAIL_MIN,
+          max: DETAIL_MAX,
+          step: 8,
+          value: state.detail
+        )
+
+        Slider levels(
+          label: "Levels",
+          width: SLIDER_W,
+          min: LEVELS_MIN,
+          max: LEVELS_MAX,
+          step: 1,
+          value: state.levels
+        )
+
+        Slider tile_size(
+          label: "Tile size",
+          unit: " m",
+          width: SLIDER_W,
+          min: TILE_MIN,
+          max: TILE_MAX,
+          step: 4,
+          value: state.tile_size
+        )
+
+        Slider resolution(
+          label: "Tile resolution",
+          width: SLIDER_W,
+          min: RESOLUTION_MIN,
+          max: RESOLUTION_MAX,
+          step: 8,
+          value: state.resolution
+        )
+
+        Slider budget(
+          label: "Tiles per frame",
+          width: SLIDER_W,
+          min: BUDGET_MIN,
+          max: BUDGET_MAX,
+          step: 1,
+          value: state.budget
+        )
+
+        Separator sep_switches()
+
+        Switch paths(label: "Paths", value: state.paths)
+        Switch water(label: "Water", value: state.water)
+
+        Separator sep_stats()
+
+        Label reach(
+          text: terrain_reach_text(state.detail, state.tile_size, state.levels),
+          variant: "muted",
+          width: SLIDER_W
+        )
+
+        Label tiles(
+          text: terrain_tiles_text(state.tiles_drawn, state.tiles_pending, state.tiles_mb),
+          variant: "muted"
+        )
+
+        Label hint(text: "F flies, H hides this panel", variant: "caption")
+      }
+    }
+  }
+
+  view {
+    View: {camera: hud.camera, order: 1, lighting: {enabled: false}, culling: {enabled: false}}
+  }
+}
+
+async {
+  while true {
+    const e = await on.change(hud.screen.panel)
+    const w = e.widget
+    const n = w.name()
+
+    if w.has(Slider) {
+      const v: f32 = w[Slider.mut].current
+
+      if n == "detail" {
+        state.detail = v
+      } else if n == "levels" {
+        state.levels = v
+      } else if n == "tile_size" {
+        state.tile_size = v
+      } else if n == "resolution" {
+        state.resolution = v
+      } else if n == "budget" {
+        state.budget = v
+      }
+    } else if w.has(Switch) {
+      const on: bool = w[Switch.mut].current
+
+      if n == "paths" {
+        state.paths = on
+      } else if n == "water" {
+        state.water = on
+      }
+    }
+  }
+}
+
+async {
+  while true {
+    await delay(0.25)
+    const s = infinite_terrain.land[TerrainStatus]
+    const mb: f32 = s.gpu_bytes / (1024 * 1024)
+
+    if s.drawn != state.tiles_drawn {
+      state.tiles_drawn = s.drawn
+    }
+
+    if s.pending != state.tiles_pending {
+      state.tiles_pending = s.pending
+    }
+
+    if abs(mb - state.tiles_mb) > 0.5 {
+      state.tiles_mb = mb
+    }
+  }
+}

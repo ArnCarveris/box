@@ -1,0 +1,61 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.camera
+using box.input
+using box.controllers
+using box.world
+using box.terrain
+using state
+
+state {
+  export mut start_y: f32 = 120
+  export mut started: bool = false
+}
+
+walk_keys {
+  Forward { Action: {description: "Walk forward"}; Binding: {key: W} }
+  Back { Action: {description: "Walk back"}; Binding: {key: S} }
+  Left { Action: {description: "Walk left"}; Binding: {key: A} }
+  Right { Action: {description: "Walk right"}; Binding: {key: D} }
+  Fast { Action: {description: "Run while held"}; Binding: {key: ShiftLeft} }
+  Look { Action: {description: "Turn with the cursor while held"}; Binding: {key: MouseRight} }
+  Jump { Action: {description: "Jump"}; Binding: {key: Space} }
+  Crouch { Action: {description: "Crouch while held"}; Binding: {key: CtrlLeft} }
+  TurnLeft { Action: {description: "Turn left while held"}; Binding: {key: Left} }
+  TurnRight { Action: {description: "Turn right while held"}; Binding: {key: Right} }
+  TurnUp { Action: {description: "Look up while held"}; Binding: {key: Up} }
+  TurnDown { Action: {description: "Look down while held"}; Binding: {key: Down} }
+}
+
+player {
+  Position: {START_X, start_y, START_Z}
+  Rotation: {-0.18, 0, 0}
+  Camera: {
+    fov: 62,
+    near_: 0.1,
+    far_: max(4000, terrain_reach(detail, tile_size, levels) * 1.25)
+  }
+  WorldFocus
+
+  if flying {
+    CameraController: {speed: FLY_SPEED, boost: 8}
+  } else if started {
+    FirstPersonController: {
+      speed: WALK_SPEED,
+      eye: EYE,
+      ground: GROUND_MIN - 100,
+      actions: walk_keys
+    }
+  }
+}
+
+async {
+  while !box.terrain.resident(infinite_terrain.land, START_X, START_Z) {
+    await next_frame()
+  }
+
+  state.start_y = box.terrain.height(infinite_terrain.land, START_X, START_Z) +
+    (state.flying ? 60 : EYE + 0.05)
+  state.started = true
+}

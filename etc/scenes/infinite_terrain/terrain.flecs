@@ -1,0 +1,310 @@
+using flecs.script
+using flecs.script.math
+using box.material
+using box.texture
+using box.terrain
+using box.render
+using state
+using assets
+
+infinite_terrain {
+  land {
+    roll { nodes.Noise: {frequency: 0.0032, octaves: 4, seed: 21} }
+    roll_h { nodes.Multiply: {a: roll, b_value: {34, 34, 34, 34}} }
+
+    broad { nodes.Noise: {frequency: 0.0009, octaves: 3, seed: 23} }
+    terraces {
+      nodes.Curve: {input: broad, curve: {keys: [
+        {0, 0}, {0.36, 0.1}, {0.42, 0.12}, {0.49, 0.24}, {0.55, 0.26}, {0.62, 0.38},
+        {0.68, 0.4}, {1, 0.6}
+      ]}}
+    }
+
+    terraces_h { nodes.Multiply: {a: terraces, b_value: {110, 110, 110, 110}} }
+
+    coords { nodes.Coords: {} }
+    meander { nodes.Noise: {channels: 3, frequency: 0.004, octaves: 2, seed: 25} }
+    warped { nodes.Warp: {coords: coords, offset: meander, amount_value: 36} }
+
+    clear_cells { nodes.Cells: {distance: CellsNearest, size: 300, seed: 31, coords: warped} }
+    clear_d { nodes.Split: {input: clear_cells, channel: ChannelR} }
+    clear_r { nodes.Split: {input: clear_cells, channel: ChannelB} }
+    clear_in {
+      nodes.Smoothstep: {input: clear_d, edge0_value: {0.19, 0, 0, 0}, edge1_value: {0.11, 0, 0, 0}}
+    }
+
+    clear_kept {
+      nodes.Smoothstep: {input: clear_r, edge0_value: {0.5, 0, 0, 0}, edge1_value: {0.46, 0, 0, 0}}
+    }
+
+    clearing { nodes.Multiply: {a: clear_in, b: clear_kept} }
+
+    range_n { nodes.Noise: {frequency: 0.00021, octaves: 2, seed: 51} }
+    range {
+      nodes.Smoothstep: {input: range_n, edge0_value: {0.54, 0, 0, 0}, edge1_value: {0.72, 0, 0, 0}}
+    }
+
+    ridges { nodes.Noise: {frequency: 0.0008, octaves: 6, fractal: NoiseRidged, seed: 52} }
+    peaks_r { nodes.Multiply: {a: ridges, b: range} }
+    peaks_h { nodes.Multiply: {a: peaks_r, b_value: {560, 560, 560, 560}} }
+    foothills_h { nodes.Multiply: {a: range, b_value: {90, 90, 90, 90}} }
+
+    brook_bend { nodes.Noise: {channels: 3, frequency: 0.0025, octaves: 2, seed: 81} }
+    brook_coords { nodes.Warp: {coords: coords, offset: brook_bend, amount_value: 60} }
+    brook_near {
+      nodes.Cells: {distance: CellsNearest, size: BROOK_SIZE, seed: 83, coords: brook_coords}
+    }
+
+    brook_second {
+      nodes.Cells: {distance: CellsSecond, size: BROOK_SIZE, seed: 83, coords: brook_coords}
+    }
+
+    brook_f1 { nodes.Split: {input: brook_near, channel: ChannelR} }
+    brook_f2 { nodes.Split: {input: brook_second, channel: ChannelR} }
+    brook_e { nodes.Subtract: {a: brook_f2, b: brook_f1} }
+    brook_x {
+      nodes.Multiply: {a: brook_e, b_value: {BROOK_SIZE, BROOK_SIZE, BROOK_SIZE, BROOK_SIZE}}
+    }
+
+    brook_g { nodes.Gradient: {height: brook_x} }
+    brook_gl { nodes.Length: {input: brook_g} }
+    brook_gb { nodes.Blur: {input: brook_gl, radius: 3} }
+    brook_gc { nodes.Max: {a: brook_gb, b_value: {0.7, 0.7, 0.7, 0.7}} }
+    brook_d0 { nodes.Divide: {a: brook_x, b: brook_gc} }
+    brook_away {
+      nodes.Smoothstep: {input: range_n, edge0_value: {0.53, 0, 0, 0}, edge1_value: {0.58, 0, 0, 0}}
+    }
+
+    brook_far { nodes.Multiply: {a: brook_away, b_value: {160, 160, 160, 160}} }
+    brook_d { nodes.Add: {a: brook_d0, b: brook_far} }
+
+    brook_vale {
+      nodes.Smoothstep: {input: brook_d, edge0_value: {150, 0, 0, 0}, edge1_value: {20, 0, 0, 0}}
+    }
+
+    brook_vale_h {
+      nodes.Multiply: {a: brook_vale, b_value: {
+        water ? -10 : 0, water ? -10 : 0, water ? -10 : 0, water ? -10 : 0
+      }}
+    }
+
+    brook_v0 {
+      nodes.Smoothstep: {input: brook_d, edge0_value: {40, 0, 0, 0}, edge1_value: {16, 0, 0, 0}}
+    }
+
+    brook_v {
+      nodes.Multiply: {a: brook_v0, b_value: {
+        water ? 1 : 0, water ? 1 : 0, water ? 1 : 0, water ? 1 : 0
+      }}
+    }
+
+    brook_open { nodes.Subtract: {a_value: {1, 1, 1, 1}, b: brook_v} }
+
+    band_n { nodes.Noise: {frequency: 0.0014, octaves: 2, seed: 41} }
+    jag { nodes.Noise: {frequency: 0.012, octaves: 3, seed: 43} }
+    jag_d { nodes.Remap: {input: jag, from_min: 0, from_max: 1, to_min: -0.012, to_max: 0.012} }
+    band { nodes.Add: {a: band_n, b: jag_d} }
+    step {
+      nodes.Curve: {input: band, curve: {keys: [
+        {0, 0}, {0.494, 0}, {0.4975, 0.4}, {0.4995, 0.48}, {0.503, 0.94}, {0.506, 1}, {1, 1}
+      ]}}
+    }
+
+    wall_n { nodes.Noise: {frequency: 0.0011, octaves: 2, seed: 42} }
+    wall_where {
+      nodes.Smoothstep: {input: wall_n, edge0_value: {0.44, 0, 0, 0}, edge1_value: {0.58, 0, 0, 0}}
+    }
+
+    wall_ok { nodes.Multiply: {a: wall_where, b: brook_open} }
+    wall_s { nodes.Multiply: {a: step, b: wall_ok} }
+    wall_h { nodes.Multiply: {a: wall_s, b_value: {38, 38, 38, 38}} }
+
+    face_lo {
+      nodes.Smoothstep: {input: band, edge0_value: {0.49, 0, 0, 0}, edge1_value: {0.497, 0, 0, 0}}
+    }
+
+    face_hi {
+      nodes.Smoothstep: {input: band, edge0_value: {0.51, 0, 0, 0}, edge1_value: {0.503, 0, 0, 0}}
+    }
+
+    face_b { nodes.Multiply: {a: face_lo, b: face_hi} }
+    face { nodes.Multiply: {a: face_b, b: wall_ok} }
+    crags { nodes.Noise: {frequency: 0.045, octaves: 3, fractal: NoiseRidged, seed: 44} }
+    crags_f { nodes.Multiply: {a: crags, b: face} }
+    crags_h { nodes.Multiply: {a: crags_f, b_value: {6, 6, 6, 6}} }
+
+    trail_cells { nodes.Cells: {distance: CellsEdge, size: 190, edge: 0.1, seed: 61, coords: warped} }
+    trail_e { nodes.Split: {input: trail_cells, channel: ChannelR} }
+    track_all {
+      nodes.Remap: {input: trail_e, from_min: 0.03, from_max: 0.1, to_min: 1, to_max: 0, clamp: true}
+    }
+
+    track {
+      nodes.Multiply: {a: track_all, b_value: {
+        paths ? 1 : 0, paths ? 1 : 0, paths ? 1 : 0, paths ? 1 : 0
+      }}
+    }
+
+    trail_h { nodes.Multiply: {a: track, b_value: {-0.35, -0.35, -0.35, -0.35}} }
+
+    h1 { nodes.Add: {a: roll_h, b: terraces_h} }
+    h2 { nodes.Add: {a: h1, b: brook_vale_h} }
+    h3 { nodes.Add: {a: h2, b: wall_h} }
+    h3c { nodes.Add: {a: h3, b: crags_h} }
+    h4 { nodes.Add: {a: h3c, b: peaks_h} }
+    h5 { nodes.Add: {a: h4, b: foothills_h} }
+
+    wooded { nodes.Subtract: {a_value: {1, 1, 1, 1}, b: clearing} }
+
+    bumps { nodes.Noise: {frequency: 0.018, octaves: 3, seed: 22} }
+    bumps_c { nodes.Remap: {input: bumps, from_min: 0, from_max: 1, to_min: -4, to_max: 4} }
+    bumps_w { nodes.Multiply: {a: bumps_c, b: wooded} }
+    bumps_h { nodes.Multiply: {a: bumps_w, b: brook_open} }
+
+    h6 { nodes.Add: {a: h5, b: bumps_h} }
+    h8 { nodes.Add: {a: h6, b: trail_h} }
+
+    brook_blur { nodes.Blur: {input: h5, radius: 24} }
+    brook_sunk { nodes.Add: {a: brook_blur, b_value: {-4.5, -4.5, -4.5, -4.5}} }
+    brook_sg { nodes.Gradient: {height: brook_sunk} }
+    brook_n { nodes.Normalize: {input: brook_g} }
+    brook_tilt { nodes.Dot: {a: brook_sg, b: brook_n} }
+    brook_lift { nodes.Multiply: {a: brook_tilt, b: brook_d0} }
+    brook_bed { nodes.Subtract: {a: brook_sunk, b: brook_lift} }
+    brook_q {
+      nodes.Divide: {a: brook_bed, b_value: {BROOK_STEP, BROOK_STEP, BROOK_STEP, BROOK_STEP}}
+    }
+
+    brook_qf { nodes.Floor: {input: brook_q} }
+    brook_steps {
+      nodes.Multiply: {a: brook_qf, b_value: {BROOK_STEP, BROOK_STEP, BROOK_STEP, BROOK_STEP}}
+    }
+
+    brook_rise {
+      nodes.Curve: {input: brook_d, curve: {kind: CurveCatmullRom, keys: [
+        {0, -0.5}, {0.9, -0.42}, {1.5, 0.1}, {2.2, 0.6}, {3, 1}, {4.5, 1.35}, {8, 1.9},
+        {14, 3.2}, {22, 5}, {32, 8}, {45, 16}, {60, 40}, {80, 200}, {100, 1000}
+      ]}}
+    }
+
+    brook_bank { nodes.Add: {a: brook_bed, b: brook_rise} }
+    brook_cut_w { nodes.Max: {a: brook_steps, b: brook_bank} }
+    brook_cut {
+      nodes.Add: {a: brook_cut_w, b_value: {
+        water ? 0 : 100000, water ? 0 : 100000, water ? 0 : 100000, water ? 0 : 100000
+      }}
+    }
+
+    height { nodes.Min: {a: h8, b: brook_cut} }
+
+    slope { nodes.Slope: {height: height} }
+    rock {
+      nodes.Smoothstep: {input: slope, edge0_value: {0.72, 0, 0, 0}, edge1_value: {1.15, 0, 0, 0}}
+    }
+
+    open { nodes.Subtract: {a_value: {1, 1, 1, 1}, b: rock} }
+
+    foot_lo {
+      nodes.Smoothstep: {input: band, edge0_value: {0.476, 0, 0, 0}, edge1_value: {0.489, 0, 0, 0}}
+    }
+
+    foot_hi {
+      nodes.Smoothstep: {input: band, edge0_value: {0.505, 0, 0, 0}, edge1_value: {0.496, 0, 0, 0}}
+    }
+
+    foot_b { nodes.Multiply: {a: foot_lo, b: foot_hi} }
+    foot { nodes.Multiply: {a: foot_b, b: wall_ok} }
+    talus_s {
+      nodes.Smoothstep: {input: slope, edge0_value: {0.48, 0, 0, 0}, edge1_value: {0.72, 0, 0, 0}}
+    }
+
+    talus { nodes.Multiply: {a: talus_s, b: range} }
+    scree { nodes.Max: {a: foot, b: talus} }
+    scree_w { nodes.Multiply: {a: scree, b: open} }
+    rest_a { nodes.Subtract: {a: open, b: scree_w} }
+
+    trail_w { nodes.Multiply: {a: track, b: rest_a} }
+    rest_c { nodes.Subtract: {a: rest_a, b: trail_w} }
+
+    brook_bank_m0 {
+      nodes.Smoothstep: {input: brook_d, edge0_value: {5.5, 0, 0, 0}, edge1_value: {2.4, 0, 0, 0}}
+    }
+
+    brook_bank_m {
+      nodes.Multiply: {a: brook_bank_m0, b_value: {
+        water ? 1 : 0, water ? 1 : 0, water ? 1 : 0, water ? 1 : 0
+      }}
+    }
+
+    brook_core_m {
+      nodes.Smoothstep: {input: brook_d, edge0_value: {2.4, 0, 0, 0}, edge1_value: {1.2, 0, 0, 0}}
+    }
+
+    brook_w { nodes.Multiply: {a: brook_bank_m, b: rest_c} }
+    rest_d { nodes.Subtract: {a: rest_c, b: brook_w} }
+    brook_core_w { nodes.Multiply: {a: brook_w, b: brook_core_m} }
+    brook_stone_w { nodes.Multiply: {a: brook_core_w, b_value: {0.55, 0.55, 0.55, 0.55}} }
+    brook_mud_w { nodes.Subtract: {a: brook_w, b: brook_stone_w} }
+
+    alpine {
+      nodes.Smoothstep: {input: height, edge0_value: {210, 0, 0, 0}, edge1_value: {300, 0, 0, 0}}
+    }
+
+    meadow { nodes.Max: {a: clearing, b: alpine} }
+    grass_w { nodes.Multiply: {a: meadow, b: rest_d} }
+    rough_w { nodes.Subtract: {a: rest_d, b: grass_w} }
+
+    scree_dirt { nodes.Multiply: {a: scree_w, b_value: {0.4, 0.4, 0.4, 0.4}} }
+    scree_rock { nodes.Multiply: {a: scree_w, b_value: {0.6, 0.6, 0.6, 0.6}} }
+    dirt_a { nodes.Add: {a: trail_w, b: scree_dirt} }
+    dirt_w { nodes.Add: {a: dirt_a, b: brook_mud_w} }
+    rock_a { nodes.Add: {a: rock, b: scree_rock} }
+    rock_w { nodes.Add: {a: rock_a, b: brook_stone_w} }
+    masks { nodes.Combine: {r: rough_w, g: grass_w, b: dirt_w, a: rock_w} }
+
+    Terrain: {
+      height: height,
+      masks: masks,
+      tile_size: tile_size,
+      resolution: resolution,
+      levels: levels,
+      lod_distance: detail,
+      min_height: GROUND_MIN,
+      max_height: GROUND_MAX,
+      budget: budget,
+      query_spacing: QUERY_SPACING,
+      query_radius: QUERY_RADIUS
+    }
+
+    texture.Blend: {
+      layers: [terrain_rough, terrain_grass, terrain_dirt, terrain_rock],
+      heights: [terrain_rough_height, terrain_grass_height, terrain_dirt_height, terrain_rock_height],
+      contrast: 6
+    }
+
+    texture.Mapping: {mode: MappingWorld, size: GROUND_MAP_SIZE, blend: 0.4}
+    texture.Layers: {layers: [terrain_peak_snow]}
+    Rgb: {212, 206, 196}
+    PbrMaterial: {roughness: 0.95}
+
+    brook_data_h { nodes.Subtract: {a: height, b_value: {BROOK_DATA_DROP, 0, 0, 0}} }
+    brook_data { nodes.Combine: {r: brook_d, g: brook_bed} }
+  }
+
+  brooks {
+    Terrain: {
+      height: infinite_terrain.land.brook_data_h,
+      masks: infinite_terrain.land.brook_data,
+      tile_size: 1024,
+      resolution: 5,
+      levels: 1,
+      lod_distance: 3072,
+      min_height: GROUND_MIN - BROOK_DATA_DROP,
+      max_height: GROUND_MAX - BROOK_DATA_DROP,
+      budget: 24,
+      query_spacing: QUERY_SPACING,
+      query_radius: BROOK_QUERY_RADIUS,
+      query_only: true
+    }
+  }
+}

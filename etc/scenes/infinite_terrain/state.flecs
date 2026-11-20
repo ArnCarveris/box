@@ -1,0 +1,97 @@
+using flecs.script
+using flecs.script.math
+using box.input
+
+state {
+  export const START_X: f32 = 0
+  export const START_Z: f32 = 400
+
+  export const EYE: f32 = 1.7
+  export const WALK_SPEED: f32 = 4
+  export const FLY_SPEED: f32 = 30
+
+  export const HOUR: f32 = 17
+  export const DAY_OF_YEAR: f32 = 225
+
+  export const QUERY_SPACING: f32 = 0.5
+  export const QUERY_RADIUS: f32 = 128
+  export const PROBE_FOLLOW: f32 = 24
+
+  export const GROUND_MIN: f32 = -20
+  export const GROUND_MAX: f32 = 900
+
+  export const BROOK_SIZE: f32 = 420
+  export const BROOK_STEP: f32 = 0.3
+  export const BROOK_DEPTH: f32 = 0.2
+  export const BROOK_DATA_DROP: f32 = 1000
+  export const BROOK_QUERY_RADIUS: f32 = 96
+
+  export const SNOW_LINE: f32 = 330
+  export const SNOW_FADE: f32 = 320
+
+  export const TILE_MIN: f32 = 4
+  export const TILE_MAX: f32 = 64
+  export const RESOLUTION_MIN: f32 = 9
+  export const RESOLUTION_MAX: f32 = 129
+  export const DETAIL_MIN: f32 = 16
+  export const DETAIL_MAX: f32 = 512
+  export const LEVELS_MIN: f32 = 1
+  export const LEVELS_MAX: f32 = 12
+  export const BUDGET_MIN: f32 = 1
+  export const BUDGET_MAX: f32 = 64
+
+  export mut tile_size: f32 = 16
+  export mut resolution: f32 = 33
+  export mut detail: f32 = 80
+  export mut levels: f32 = 9
+  export mut budget: f32 = 24
+
+  export mut paths: bool = true
+  export mut water: bool = true
+
+  export mut flying: bool = true
+  export mut hud_shown: bool = true
+
+  export mut tiles_drawn: i32 = 0
+  export mut tiles_pending: i32 = 0
+  export mut tiles_mb: f32 = 0
+
+  fn terrain_detail(detail: f64, tile: f64) -> f64 {
+    clamp(detail, 3 * tile, 16 * tile)
+  }
+
+  fn terrain_reach(detail: f64, tile: f64, levels: f64) -> f64 {
+    terrain_detail(detail, tile) * pow(2, levels - 1)
+  }
+
+  fn terrain_distance_text(m: f64) -> string {
+    const km = m / 1000
+    m < 1000 ? "{m:.0} m" : "{km:.1} km"
+  }
+
+  actions {
+    toggle_fly {
+      Action: {description: "Switch between walking and flying"}
+      Binding: {key: F}
+    }
+
+    toggle_hud {
+      Action: {description: "Hide or show the panel"}
+      Binding: {key: H}
+    }
+  }
+}
+
+async {
+  while true {
+    await on.pressed(state.actions.toggle_fly)
+    state.flying = !state.flying
+  }
+}
+
+async {
+  while true {
+    await on.pressed(state.actions.toggle_hud)
+    state.hud_shown = !state.hud_shown
+  }
+}
