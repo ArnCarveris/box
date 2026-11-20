@@ -1013,4 +1013,141 @@ bool box_render_gpu_cull_status(
 void box_render_cull_status_init(
     ecs_world_t *world);
 
+/** Frames the temporal sequences of a view cycle over (box_render_temporal_sequence_2d, 3d and
+ * TEMPORAL_SEQUENCE_LENGTH of etc/shaders/include/temporal.wgsl) */
+#define BOX_RENDER_TEMPORAL_LENGTH (16)
+
+/** What a view renders a frame with about the frame before it, the temporal members of View in
+ * etc/shaders/include/lights.wgsl */
+typedef struct box_render_temporal_t {
+    mat4 prev_view_proj;        /**< View projection of the previous frame the view rendered,
+                                 *   the one of this frame when the history is not valid */
+    vec4 prev_camera;           /**< World position of the camera in that frame, w 1 */
+    uint32_t frame_index;       /**< Frames rendered since the last reset, 0 on a reset */
+    bool valid;                 /**< The previous frame is the history of this one */
+    int64_t prev_frame;         /**< Packet frame of the previous frame the view rendered, -1
+                                 *   for none */
+} box_render_temporal_t;
+
+/** History of a view in a target, kept by a backend from frame to frame */
+typedef struct box_render_history_t {
+    uint32_t target;            /**< Handle of the target */
+    ecs_entity_t view;          /**< View entity, 0 for a capture without a view */
+    int64_t frame;              /**< Packet frame the view last rendered in */
+    ecs_entity_t camera;        /**< Camera entity of that frame */
+    int32_t width;              /**< Render width of that frame */
+    int32_t height;             /**< Render height of that frame */
+    mat4 proj;                  /**< Projection of that frame */
+    mat4 view_proj;             /**< View projection of that frame */
+    vec4 camera_position;       /**< World position of the camera in that frame, w 1 */
+    box_render_temporal_t current; /**< What the view rendered that frame with */
+} box_render_history_t;
+
+/** Advance the history of a view in a target to a frame and get what the frame renders with.
+ *
+ * The history restarts, invalid and at frame index 0, on the first frame of the view in the
+ * target, and when the render size, the camera entity or the projection changed or the view has
+ * history_reset. A second call in the same frame returns what the first one did.
+ *
+ * @param histories box_render_history_t of the backend
+ * @param target Handle of the target
+ * @param v The view
+ * @param frame Packet frame
+ * @param width Render width
+ * @param height Render height
+ * @param proj Projection the view renders the target with
+ * @return The temporal state of the frame, valid until the next call
+ */
+const box_render_temporal_t* box_render_history_update(
+    ecs_vec_t *histories,
+    uint32_t target,
+    const box_render_view_t *v,
+    int64_t frame,
+    int32_t width,
+    int32_t height,
+    const mat4 proj);
+
+/** Find the history of a view in a target.
+ *
+ * @param histories box_render_history_t of the backend
+ * @param target Handle of the target, 0 for the first target of the view
+ * @param view View entity
+ * @return The history, NULL for none
+ */
+const box_render_history_t* box_render_history_find(
+    const ecs_vec_t *histories,
+    uint32_t target,
+    ecs_entity_t view);
+
+/** Drop the histories of the views that did not render in a frame.
+ *
+ * @param histories box_render_history_t of the backend
+ * @param frame Packet frame that rendered
+ */
+void box_render_history_sweep(
+    ecs_vec_t *histories,
+    int64_t frame);
+
+/** Point of the 2D low discrepancy sequence of a frame index, the R2 sequence over
+ * BOX_RENDER_TEMPORAL_LENGTH frames, as temporal_sequence_2d of temporal.wgsl.
+ *
+ * @param index Frame index
+ * @param out Receives the point, each coordinate in [0, 1)
+ */
+void box_render_temporal_sequence_2d(
+    uint32_t index,
+    float *out);
+
+/** Point of the 3D low discrepancy sequence of a frame index, Halton 2, 3, 5 over
+ * BOX_RENDER_TEMPORAL_LENGTH frames, as temporal_sequence_3d of temporal.wgsl.
+ *
+ * @param index Frame index
+ * @param out Receives the point, each coordinate in (0, 1)
+ */
+void box_render_temporal_sequence_3d(
+    uint32_t index,
+    float *out);
+
+/** A history texture pair of the GPU backend, for tests */
+typedef struct box_render_gpu_history_pair_t {
+    uint32_t target;            /**< Handle of the target */
+    ecs_entity_t view;          /**< View entity */
+    uint32_t consumer;          /**< Consumer kind, BOX_GPU_HISTORY_* */
+    ecs_entity_t entity;        /**< Entity of the consumer, such as the Bloom effect */
+    uint32_t width;             /**< Width of the textures */
+    uint32_t height;            /**< Height of the textures */
+    uint32_t depth;             /**< Depth of 3D textures, 1 for 2D */
+    uint32_t format;            /**< WGPUTextureFormat of the textures */
+    const void *read;           /**< Texture view read in the last frame it was used */
+    const void *write;          /**< Texture view written in that frame */
+    bool valid;                 /**< The read view held the frame before */
+    int64_t frame;              /**< Packet frame it was last used in */
+} box_render_gpu_history_pair_t;
+
+/** Get the history of a view the GPU backend keeps, for tests. Only call this after
+ * box_render_sync, while the render thread is idle.
+ *
+ * @param world The world
+ * @param view The view entity
+ * @param out Receives the history of the first target that renders the view
+ * @return Whether the world renders with the GPU backend and the view has a history
+ */
+bool box_render_gpu_view_history(
+    ecs_world_t *world,
+    ecs_entity_t view,
+    box_render_history_t *out);
+
+/** Get the history texture pairs of the GPU backend, for tests. Only call this after
+ * box_render_sync, while the render thread is idle.
+ *
+ * @param world The world
+ * @param out Receives the pairs, NULL to only count them
+ * @param capacity Pairs out holds
+ * @return The pairs of the backend, 0 without the GPU backend
+ */
+int32_t box_render_gpu_history_pairs(
+    ecs_world_t *world,
+    box_render_gpu_history_pair_t *out,
+    int32_t capacity);
+
 #endif

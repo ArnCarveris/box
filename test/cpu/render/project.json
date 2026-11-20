@@ -745,6 +745,26 @@
                 ]
             },
             {
+                "id": "ViewHistory",
+                "testcases": [
+                    "first_frame_invalid",
+                    "second_frame_valid",
+                    "frame_index_counts_frames",
+                    "same_frame_twice",
+                    "moving_camera_keeps_history",
+                    "resize_resets",
+                    "camera_entity_resets",
+                    "projection_change_resets",
+                    "history_reset_resets",
+                    "history_reset_from_script",
+                    "two_views_independent",
+                    "sweep_drops_unrendered_view",
+                    "sequence_2d_deterministic_in_range",
+                    "sequence_3d_deterministic_in_range",
+                    "sequence_2d_covers_square"
+                ]
+            },
+            {
                 "id": "ViewOrder",
                 "testcases": [
                     "default_is_zero",

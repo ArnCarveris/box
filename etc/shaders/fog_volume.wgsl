@@ -29,6 +29,7 @@
 #include "include/aerial.wgsl"
 #include "include/fullscreen.wgsl"
 #include "include/froxel.wgsl"
+#include "include/temporal.wgsl"
 
 const PI: f32 = 3.141592653589793;
 

@@ -117,10 +117,6 @@ typedef struct box_gpu_fx_state_t {
     WGPUTexture up;                 /**< Upsampled levels of a bloom, one fewer than the chain */
     WGPUTextureView up_mips[BOX_GPU_BLOOM_MIPS]; /**< View of every upsampled level */
     WGPUBuffer steps;               /**< Blend of each upsample, BOX_GPU_BLOOM_STEP bytes apart */
-    WGPUTexture history[2];         /**< First mip of the previous and the current frame */
-    WGPUTextureView history_views[2]; /**< Views of the history images */
-    int32_t history_index;          /**< History image that holds the last frame */
-    bool history_valid;             /**< The history holds a frame */
     box_gpu_fx_bloom_group_t groups[BOX_GPU_BLOOM_GROUPS]; /**< Bind groups of the dispatches
                                      *   of a bloom */
     int32_t group_count;            /**< Bind groups kept */

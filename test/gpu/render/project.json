@@ -1210,6 +1210,24 @@
                 ]
             },
             {
+                "id": "ViewHistory",
+                "testcases": [
+                    "first_frame_invalid",
+                    "second_frame_has_previous_projection",
+                    "frame_index_counts_frames",
+                    "moving_camera_keeps_history",
+                    "resize_resets",
+                    "camera_entity_resets",
+                    "projection_change_resets",
+                    "history_reset_resets",
+                    "two_views_independent",
+                    "pair_swaps_every_frame",
+                    "pair_invalid_after_resize",
+                    "pair_freed_when_unused",
+                    "bloom_reset_clears_temporal"
+                ]
+            },
+            {
                 "id": "ShaderCompile",
                 "testcases": [
                     "failed_recompile_keeps_module",

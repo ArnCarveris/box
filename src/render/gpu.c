@@ -570,6 +570,7 @@ static void box_gpu_render(
     box_gpu_pace(gpu);
 
     box_gpu_effects_sweep(gpu, packet);
+    box_gpu_history_sweep(gpu, packet);
     box_gpu_atmosphere_sweep(gpu, packet);
     box_gpu_planar_sweep(gpu, packet);
     box_gpu_stats_publish(gpu);

@@ -325,6 +325,7 @@ static void box_render_extract_view(
     v->camera_data = *data;
     v->clear = view->clear;
     v->debug = view->debug;
+    v->history_reset = ecs_has_id(world, e, HistoryReset);
     box_render_lod_settings(&view->lod, &v->lod);
     v->cull.enabled = view->culling.enabled;
     v->cull.occlusion = view->culling.enabled && view->culling.occlusion &&
@@ -365,7 +366,8 @@ void box_render_lod_settings(
 }
 
 /** Add a view to the packet for every View whose camera is alive and has a Camera, in
- * render order: by View.order, then by creation.
+ * render order: by View.order, then by creation. Remove HistoryReset from every View, which the
+ * view in the packet carries as history_reset.
  *
  * @param it The iterator of the system
  */
@@ -378,6 +380,9 @@ static void BoxRenderExtractViews(
         const View *views = ecs_field(it, View, 0);
         for (i = 0; i < it->count; i ++) {
             box_render_extract_view(it->world, p, it->entities[i], &views[i]);
+            if (ecs_has_id(it->world, it->entities[i], HistoryReset)) {
+                ecs_remove_id(it->stage, it->entities[i], HistoryReset);
+            }
         }
     }
 

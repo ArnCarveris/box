@@ -4,7 +4,10 @@
  *
  * A view with effects renders into an HDR image; its effects run in order as fullscreen passes
  * between two HDR images and the last pass writes the target. State kept across frames, such
- * as an adapted exposure or bloom history, is keyed by target, view and effect entity.
+ * as an adapted exposure, is keyed by target, view and effect entity.
+ *
+ * The history of a bloom is a pair of history textures (gpu_history.c), which a reset of the
+ * view invalidates.
  */
 
 #include "gpu_effects.h"
@@ -319,19 +322,6 @@ void box_gpu_effects_init(
     gpu->effects = fx;
 }
 
-/** Release the history images of a bloom.
- *
- * @param s The state
- */
-static void box_gpu_fx_history_free(
-    box_gpu_fx_state_t *s)
-{
-    box_gpu_fx_release(&s->history[0], &s->history_views[0]);
-    box_gpu_fx_release(&s->history[1], &s->history_views[1]);
-    s->history_valid = false;
-    s->history_index = 0;
-}
-
 /** Release the mip chain and the prefilter levels of a bloom.
  *
  * @param s The state
@@ -391,7 +381,6 @@ static void box_gpu_fx_state_free(
     box_gpu_fx_state_t *s)
 {
     box_gpu_fx_mips_free(s);
-    box_gpu_fx_history_free(s);
     if (s->uniforms) {
         wgpuBufferRelease(s->uniforms);
     }
@@ -1000,7 +989,6 @@ static void box_gpu_fx_bloom_mips(
     }
 
     box_gpu_fx_mips_free(s);
-    box_gpu_fx_history_free(s);
     if (w != hw || h != hh) {
         uint32_t edge = w > h ? w : h;
         level = hw > hh ? hw : hh;
@@ -1048,11 +1036,13 @@ done:
  *
  * @param s The state, with its mip chain
  * @param b The settings
+ * @param history Whether the history of the first mip holds the previous frame
  * @param out Receives the uniforms
  */
 static void box_gpu_fx_bloom_settings(
     const box_gpu_fx_state_t *s,
     const Bloom *b,
+    bool history,
     box_gpu_bloom_uniforms_t *out)
 {
     float knee = b->threshold * b->threshold_softness;
@@ -1063,16 +1053,44 @@ static void box_gpu_fx_bloom_settings(
     out->threshold[3] = 0.25f / (knee + 1e-5f);
     out->params[0] = b->firefly_clamp;
     out->params[1] = box_gpu_fx_bloom_blend(b, 0, (float)(s->mip_count - 1));
-    out->params[2] = s->history_valid ? b->temporal : 0.0f;
+    out->params[2] = history ? b->temporal : 0.0f;
     out->first[0] = 1.0f / (float)s->width;
     out->first[1] = 1.0f / (float)s->height;
 }
 
-/** Blend the first mip of a bloom with the previous frame.
+/** Describe the history of the first mip of a bloom.
+ *
+ * @param ctx The chain
+ * @param e The pass
+ * @param s The state, with its mip chain
+ * @param out Receives the key and shape of the history pair
+ */
+static void box_gpu_fx_bloom_history_desc(
+    const box_gpu_fx_ctx_t *ctx,
+    const box_render_effect_t *e,
+    const box_gpu_fx_state_t *s,
+    box_gpu_history_desc_t *out)
+{
+    *out = (box_gpu_history_desc_t){
+        .target = ctx->t->handle,
+        .view = ctx->v->view,
+        .consumer = BOX_GPU_HISTORY_BLOOM,
+        .entity = e->entity,
+        .dimension = WGPUTextureDimension_2D,
+        .width = s->width,
+        .height = s->height,
+        .depth = 1,
+        .format = BOX_GPU_HDR_FORMAT
+    };
+}
+
+/** Blend the first mip of a bloom with the previous frame into the write image of its history.
  *
  * @param gpu The backend
  * @param ctx The chain
  * @param s The state
+ * @param desc The key of the history pair
+ * @param h The history images of the frame
  * @param first The first mip of the bloom
  * @return The image the composite reads, the first mip when the history pass did not run
  */
@@ -1080,31 +1098,25 @@ static WGPUTextureView box_gpu_fx_bloom_history(
     box_gpu_t *gpu,
     const box_gpu_fx_ctx_t *ctx,
     box_gpu_fx_state_t *s,
+    const box_gpu_history_desc_t *desc,
+    const box_gpu_history_t *h,
     WGPUTextureView first)
 {
     WGPUTextureView result = first;
-    int32_t i, next = s->history_index ^ 1;
-    for (i = 0; i < 2; i ++) {
-        if (!s->history[i]) {
-            s->history[i] = box_gpu_fx_texture(gpu, s->width, s->height, BOX_GPU_HDR_FORMAT, 1);
-            s->history_views[i] = wgpuTextureCreateView(s->history[i], NULL);
-        }
-    }
-
     bool drawn = box_gpu_fx_draw(gpu, ctx, &(box_gpu_fx_pass_t){
         .shader = BOX_RENDER_SHADER_BLOOM,
         .entry = "history",
         .input = first,
-        .aux = s->history_views[s->history_index],
+        .aux = h->read,
         .uniforms = s->uniforms,
-        .output = s->history_views[next],
+        .output = h->write,
         .format = BOX_GPU_HDR_FORMAT,
         .blend = BOX_GPU_FX_REPLACE
     });
     if (drawn) {
-        s->history_index = next;
-        s->history_valid = true;
-        result = s->history_views[next];
+        result = h->write;
+    } else {
+        box_gpu_history_discard(gpu, desc);
     }
 
     return result;
@@ -1250,14 +1262,12 @@ static bool box_gpu_fx_bloom(
     float steps[BOX_GPU_BLOOM_MIPS * BOX_GPU_BLOOM_STEP / sizeof(float)] = {0};
     uint32_t hw, hh;
     int32_t i, last;
-    bool result = false;
+    box_gpu_history_desc_t desc;
+    box_gpu_history_t h = {0};
+    bool result = false, temporal = false;
     box_gpu_fx_bloom_mips(gpu, ctx, s, b);
     hw = s->render_width >> 1;
     hh = s->render_height >> 1;
-    if (b->temporal <= 0) {
-        box_gpu_fx_history_free(s);
-    }
-
     if (!box_gpu_fx_bloom_pipelines(gpu)) {
         goto done;
     }
@@ -1267,7 +1277,9 @@ static bool box_gpu_fx_bloom(
             WGPUBufferUsage_Uniform);
     }
 
-    box_gpu_fx_bloom_settings(s, b, &u);
+    box_gpu_fx_bloom_history_desc(ctx, e, s, &desc);
+    temporal = b->temporal > 0 && box_gpu_history_acquire(gpu, ctx->packet, &desc, &h);
+    box_gpu_fx_bloom_settings(s, b, h.valid, &u);
     box_gpu_fx_uniforms(gpu, s, &u, sizeof(u));
     last = s->mip_count - 1;
     for (i = 1; i <= last; i ++) {
@@ -1308,7 +1320,9 @@ static bool box_gpu_fx_bloom(
     wgpuComputePassEncoderRelease(cp);
 
     WGPUTextureView first = last > 0 ? s->up_mips[0] : s->mips[0];
-    WGPUTextureView glow = b->temporal > 0 ? box_gpu_fx_bloom_history(gpu, ctx, s, first) : first;
+    WGPUTextureView glow = temporal
+        ? box_gpu_fx_bloom_history(gpu, ctx, s, &desc, &h, first)
+        : first;
     result = box_gpu_fx_draw(gpu, ctx, &(box_gpu_fx_pass_t){
         .shader = BOX_RENDER_SHADER_BLOOM,
         .entry = "composite",

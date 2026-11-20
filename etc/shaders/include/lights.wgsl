@@ -98,6 +98,12 @@ struct View {
     // The absolute position of the local origin (WorldOrigin) as box_gpu_origin_split packs it:
     // its whole world units (xyz) and the rest of a unit of each (w), see world_origin.wgsl
     origin: vec4i,
+    // view_proj of the previous frame the view rendered, see temporal.wgsl; view_proj itself
+    // when the history is not valid
+    prev_view_proj: mat4x4f,
+    // x: frames rendered since the last reset of the history, y: 1 when the history is valid,
+    // z, w: unused
+    temporal: vec4u,
 };
 
 // shadow is the index of the tile record of a spot or point light in the shadow atlas of the

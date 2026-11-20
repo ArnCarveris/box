@@ -2419,6 +2419,119 @@ void box_gpu_gtao_sweep(
     box_gpu_t *gpu,
     const box_render_packet_t *packet);
 
+/** Consumer kind of the history of the first mip of a Bloom, keyed by its effect entity */
+#define BOX_GPU_HISTORY_BLOOM (1)
+
+/** Packets a history pair is kept without being used before it is released */
+#define BOX_GPU_HISTORY_IDLE (4)
+
+/** What a temporal pass asks the history textures for: the key of a pair and its shape */
+typedef struct box_gpu_history_desc_t {
+    uint32_t target;                /**< Handle of the target */
+    ecs_entity_t view;              /**< View entity */
+    uint32_t consumer;              /**< Kind of consumer, BOX_GPU_HISTORY_* */
+    ecs_entity_t entity;            /**< Entity of the consumer, 0 for one per view */
+    WGPUTextureDimension dimension; /**< 2D or 3D */
+    uint32_t width;                 /**< Width in texels */
+    uint32_t height;                /**< Height in texels */
+    uint32_t depth;                 /**< Depth of a 3D texture, 1 for 2D */
+    WGPUTextureFormat format;       /**< Format */
+    WGPUTextureUsage usage;         /**< Usage, 0 for TextureBinding with RenderAttachment in 2D
+                                     *   and with StorageBinding in 3D */
+} box_gpu_history_desc_t;
+
+/** The textures of a history pair in a frame */
+typedef struct box_gpu_history_t {
+    WGPUTexture read_texture;       /**< Texture the last frame wrote */
+    WGPUTextureView read;           /**< Its view, which the pass reads */
+    WGPUTexture write_texture;      /**< Texture this frame writes */
+    WGPUTextureView write;          /**< Its view, which the pass writes */
+    bool valid;                     /**< read holds the previous frame of the view, of the same
+                                     *   size and format, and the history of the view is valid */
+} box_gpu_history_t;
+
+/** Create the lists of the view histories and the history textures.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_history_init(
+    box_gpu_t *gpu);
+
+/** Release the history textures and forget the view histories, on fini and device loss.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_history_fini(
+    box_gpu_t *gpu);
+
+/** Advance the history of a view in a target and write its temporal members of the View
+ * uniforms: prev_view_proj and temporal.
+ *
+ * @param gpu The backend
+ * @param t The target
+ * @param packet The packet
+ * @param v The view
+ * @param proj Projection the view renders the target with
+ * @param u The uniforms of the view, with view_proj
+ */
+void box_gpu_history_uniforms(
+    box_gpu_t *gpu,
+    const box_gpu_target_t *t,
+    const box_render_packet_t *packet,
+    const box_render_view_t *v,
+    const mat4 proj,
+    box_gpu_view_uniforms_t *u);
+
+/** Get the temporal state a view renders a target with in the current packet.
+ *
+ * @param gpu The backend
+ * @param target Handle of the target
+ * @param view View entity
+ * @return The state, NULL when the view has no history in the target
+ */
+const box_render_temporal_t* box_gpu_history_view(
+    box_gpu_t *gpu,
+    uint32_t target,
+    ecs_entity_t view);
+
+/** Get the ping-pong pair of a temporal pass for a frame, created on first use and created again
+ * when its shape changes. The first use in a packet swaps the read and write textures; later
+ * uses in the same packet get the same ones.
+ *
+ * The pass writes the whole write texture, or calls box_gpu_history_discard when it does not.
+ *
+ * @param gpu The backend
+ * @param packet The packet
+ * @param desc The key and shape of the pair
+ * @param out Receives the textures
+ * @return Whether the pair exists, false for an empty size
+ */
+bool box_gpu_history_acquire(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet,
+    const box_gpu_history_desc_t *desc,
+    box_gpu_history_t *out);
+
+/** Mark the write texture of a pair as not holding the frame, when its pass did not run, so
+ * the next frame does not read it as valid.
+ *
+ * @param gpu The backend
+ * @param desc The key of the pair
+ */
+void box_gpu_history_discard(
+    box_gpu_t *gpu,
+    const box_gpu_history_desc_t *desc);
+
+/** Release the history pairs no pass used for BOX_GPU_HISTORY_IDLE packets and forget the
+ * histories of the views that did not render in a packet.
+ *
+ * @param gpu The backend
+ * @param packet The packet that rendered
+ */
+void box_gpu_history_sweep(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet);
+
 /** Create the bind group layout, sampler and white fallback of the opaque snapshot of
  * transmission.
  *

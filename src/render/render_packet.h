@@ -1102,6 +1102,8 @@ typedef struct box_render_view_t {
                                  *   BOX_PLANAR_REFLECTION_MAX */
     uint32_t impostor;          /**< BOX_RENDER_IMPOSTOR_* channel of an impostor frame the view
                                  *   renders unlit, 0 for any other view */
+    bool history_reset;         /**< The View has HistoryReset this frame, so its history is
+                                 *   thrown away (box_render_history_update) */
 } box_render_view_t;
 
 /** Channels of an impostor frame (box_render_view_t.impostor), each its own view and atlas.

@@ -297,6 +297,7 @@ void box_gpu_draw_init(
     box_gpu_shadow_init(gpu);
     box_gpu_effects_init(gpu);
     box_gpu_gtao_init(gpu);
+    box_gpu_history_init(gpu);
     box_gpu_transmission_init(gpu);
     box_gpu_atmosphere_init(gpu);
     box_gpu_particles_init(gpu);
@@ -775,6 +776,7 @@ void box_gpu_draw_fini(
     box_gpu_environment_fini(gpu);
     box_gpu_effects_fini(gpu);
     box_gpu_gtao_fini(gpu);
+    box_gpu_history_fini(gpu);
     box_gpu_transmission_fini(gpu);
     box_gpu_atmosphere_fini(gpu);
     box_gpu_particles_fini(gpu);
@@ -1113,6 +1115,7 @@ static int32_t box_gpu_view_write(
         u->viewport[1] = (float)t->desc.render_height;
         u->viewport[2] = 1.0f / (float)(t->desc.render_width > 0 ? t->desc.render_width : 1);
         u->viewport[3] = 1.0f / (float)(t->desc.render_height > 0 ? t->desc.render_height : 1);
+        box_gpu_history_uniforms(gpu, t, packet, v, proj, u);
         box_gpu_light_uniforms(gpu, v, proj, u);
         box_gpu_shadow_uniforms(gpu, v, proj, result, packet->frame, u);
         box_gpu_atlas_uniforms(gpu, v, u);

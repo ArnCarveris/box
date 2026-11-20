@@ -285,6 +285,12 @@ ECS_STRUCT(View, {
     LodSettings lod;                /**< Levels of detail, default none */
 });
 
+/** Throws away the history of a view: added to a View entity, from C or a script, for a cut. The
+ * frame that renders next starts the temporal effects of the view over, as its first frame does,
+ * and the renderer removes the tag. A moving camera is not a cut: effects reproject instead.
+ */
+extern ECS_TAG_DECLARE(HistoryReset);
+
 /** Component added to scene root.
  * A view renders only the scene of its camera, lit by the lights of that scene.
  *

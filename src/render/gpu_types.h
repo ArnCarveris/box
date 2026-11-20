@@ -937,6 +937,10 @@ typedef struct box_gpu_view_uniforms_t {
     uint32_t spectrum_c[4];         /**< Cascades, 0 without a spectrum, three unused */
     int32_t origin[4];              /**< Absolute position of the local origin (WorldOrigin)
                                      *   as box_gpu_origin_split packs it */
+    mat4 prev_view_proj;            /**< view_proj of the previous frame the view rendered,
+                                     *   view_proj without a valid history (temporal.c) */
+    uint32_t temporal[4];           /**< Frames since the last reset of the history, 1 when it
+                                     *   is valid, two unused */
 } box_gpu_view_uniforms_t;
 
 _Static_assert(sizeof(box_gpu_view_uniforms_t) <= BOX_GPU_VIEW_STRIDE,
@@ -1307,6 +1311,9 @@ typedef struct box_gpu_t {
     uint32_t canvas;                /**< Target presented on the page canvas, 0 for none */
     box_gpu_effects_t *effects;     /**< Effect passes of the views */
     box_gpu_gtao_t *gtao;           /**< Ambient occlusion of the views */
+    ecs_vec_t histories;            /**< box_render_history_t of the views of the targets */
+    ecs_vec_t history_pairs;        /**< box_gpu_history_pair_t*, the history textures of the
+                                     *   temporal passes (gpu_history.c) */
     box_gpu_transmission_t *transmission; /**< Opaque snapshots of transmission */
     uint32_t rendering;             /**< Target that is rendering, materials cannot sample it */
     bool timestamps;                /**< The device has timestamp queries */
