@@ -45,6 +45,9 @@ state {
   export const LANDMARK_BUDGET_MS: f32 = 4
   export const LANDMARK_REACH: f32 = 52
 
+  // No landmark stands within LANDMARK_BROOK meters of the middle of a brook
+  export const LANDMARK_BROOK: f32 = 9
+
   // The lattice of the landmarks of the terrain: LANDMARK_LATTICE points of LANDMARK_STEP meters
   // across a cell
   export const LANDMARK_STEP: f32 = 8
@@ -233,12 +236,21 @@ state {
     atan2(sz, sx)
   }
 
-  // Whether the terrain is known LANDMARK_REACH around the cell at x0 z0
+  // Whether the terrain is known LANDMARK_REACH around the cell at x0 z0, and the brooks under
+  // the cell
   fn wild_mark_ready(x0: f64, z0: f64, size: f64) -> bool {
     box.terrain.known(wildwood.land, x0 - LANDMARK_REACH, z0 - LANDMARK_REACH) &&
       box.terrain.known(wildwood.land, x0 + size + LANDMARK_REACH, z0 - LANDMARK_REACH) &&
       box.terrain.known(wildwood.land, x0 - LANDMARK_REACH, z0 + size + LANDMARK_REACH) &&
-      box.terrain.known(wildwood.land, x0 + size + LANDMARK_REACH, z0 + size + LANDMARK_REACH)
+      box.terrain.known(wildwood.land, x0 + size + LANDMARK_REACH, z0 + size + LANDMARK_REACH) &&
+      box.terrain.known(wildwood.brooks, x0, z0) &&
+      box.terrain.known(wildwood.brooks, x0 + size, z0 + size)
+  }
+
+  // Whether x z is clear of the brooks: their stony beds are not scree and their channels not
+  // hollows for a pond (brooks.flecs)
+  fn wild_mark_dry(x: f64, z: f64) -> bool {
+    wild_brook_d(x, z) > LANDMARK_BROOK
   }
 
   // Offset of the vertex of the parabola through hm, h0 and hp at -s, 0 and s, within s
@@ -1053,8 +1065,8 @@ assets {
       const bx = x0 + size * (0.2 + 0.6 * wild_mark_hash(cell_x, cell_z, 13))
       const bz = z0 + size * (0.2 + 0.6 * wild_mark_hash(cell_x, cell_z, 14))
       const roll = wild_mark_hash(cell_x, cell_z, 15)
-      const ka = wild_mark_kind(ax, az, roll)
-      const kb = ka > 0 ? 0 : wild_mark_kind(bx, bz, roll)
+      const ka = wild_mark_dry(ax, az) ? wild_mark_kind(ax, az, roll) : 0
+      const kb = ka > 0 || !wild_mark_dry(bx, bz) ? 0 : wild_mark_kind(bx, bz, roll)
       const px = ka > 0 ? ax : bx
       const pz = ka > 0 ? az : bz
       const kind = ka > 0 ? ka : kb
@@ -1088,9 +1100,10 @@ assets {
           const dirt = wild_mark_m(x, z, 2)
           const grass = wild_mark_m(x, z, 1)
           const lseed = 1 + floor(9973 * wild_mark_hash(ix, iz, 18))
+          const dry = wild_mark_dry(x, z)
 
           // A signpost where three or more trails meet
-          if dirt > 0.35 && wild_mark_m(x, z, 3) < 0.05 {
+          if dry && dirt > 0.35 && wild_mark_m(x, z, 3) < 0.05 {
             if wild_mark_arms(x, z, 9) >= 3 && wild_mark_ring_sum(x, z, 9, 3) < 0.5 {
               if wild_mark_cross_best(x, z) {
                 "sign_{i}_{j}" {
@@ -1102,7 +1115,7 @@ assets {
           }
 
           // A giant in the middle of some of the clearings
-          if grass > 0.95 && wild_mark_hash(ix, iz, 19) < LANDMARK_GIANTS {
+          if dry && grass > 0.95 && wild_mark_hash(ix, iz, 19) < LANDMARK_GIANTS {
             if wild_mark_giant_key(x, z) > 22 {
               if wild_mark_giant_best(x, z) {
                 "giant_{i}_{j}" {
@@ -1119,7 +1132,7 @@ assets {
           }
 
           // A pond at the bottom of a hollow in a glade, not in the forest
-          if h0 < wild_mark_ring4_min(x, z, 20) - 1.4 && wild_mark_m(x, z, 0) < 0.2 &&
+          if dry && h0 < wild_mark_ring4_min(x, z, 20) - 1.4 && wild_mark_m(x, z, 0) < 0.2 &&
             wild_mark_ring_sum(x, z, 16, 0) < 2
           {
             if h0 < wild_mark_ring_min(x, z, 20) - 1.4 && wild_mark_lowest(x, z) {
@@ -1131,7 +1144,7 @@ assets {
           }
 
           // A ruin or a cairn on the top of a knoll in the open
-          if grass > 0.5 && h0 > wild_mark_ring4_max(x, z, 22) + 1.6 {
+          if dry && grass > 0.5 && h0 > wild_mark_ring4_max(x, z, 22) + 1.6 {
             if h0 > wild_mark_ring_max(x, z, 22) + 1.6 && wild_mark_highest(x, z) {
               "knoll_{i}_{j}" {
                 Position: {x - x0, 0, z - z0}

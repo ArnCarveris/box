@@ -1,17 +1,18 @@
-// Wildwood: an endless forest to walk through: terrain without end, rolling forest floor with
-// flat shelves, clearings, a network of trails, tall rock walls with scree at their feet and
-// mountain ranges with snow on their peaks in the distance, grown over with stands of beech,
-// oak, birch, spruce and fir, young trees and snags, and an undergrowth of grass, flowers,
-// ferns, shrubs, logs, stumps, rocks and litter around the player.
-// Walk with WASD, F switches to flying and back; the panel of the forest library (H hides it)
-// sets the season, the weather, the wind and the time of day.
+// Wildwood: an endless forest to walk through: terrain without end, rolling forest floor with flat
+// shelves, clearings, a network of trails, brooks stepping down the valleys, tall rock walls with
+// scree at their feet and mountain ranges with snow on their peaks in the distance, grown over with
+// stands of beech, oak, birch, spruce and fir, young trees and snags, and an undergrowth of grass,
+// flowers, ferns, shrubs, logs, stumps, rocks and litter around the player.
+// Walk with WASD, F switches to flying and back; the panel of the forest library (H hides it) sets
+// the season, the weather, the wind and the time of day.
 //
 // The forest library (forest/library) brings the state the sliders write, the materials, the
 // weather, the sky and the HUD. This scene adds one file per concern in wildwood/: its constants
-// and the fly toggle, the terrain materials, the terrain, the player, the tree library, the
-// stands that stream its trees over the terrain, the undergrowth that streams the plants of the
-// forest library close around the player, the rare landmarks along the way (boulder fields and
-// crags, fallen trunks, signposts, giant trees, ruins, cairns and ponds) and the view.
+// and the fly toggle, the terrain materials, the terrain, the player, the tree library, the stands
+// that stream its trees over the terrain, the undergrowth that streams the plants of the forest
+// library close around the player, the water, stones and reeds of the brooks, the rare landmarks
+// along the way (boulder fields and crags, fallen trunks, signposts, giant trees, ruins, cairns and
+// ponds) and the view.
 include ui/widgets
 include trees/generator
 include forest/library
@@ -22,6 +23,7 @@ include wildwood/player
 include wildwood/trees
 include wildwood/stands
 include wildwood/undergrowth
+include wildwood/brooks
 include wildwood/landmarks
 include wildwood/view
 

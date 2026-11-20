@@ -37,6 +37,18 @@ state {
   export const GROUND_MIN: f32 = -20
   export const GROUND_MAX: f32 = 900
 
+  // The brooks (terrain.flecs, brooks.flecs) run along the edges of cells of about BROOK_SIZE
+  // meters. Their beds step down in terraces of BROOK_STEP meters with the water BROOK_DEPTH
+  // over each, so the water of a terrace hides under the bed of the one above it. The heights of
+  // the land and the values of the brooks that the cells read come from a second terrain, drawn
+  // BROOK_DATA_DROP meters under the land, whose CPU heights reach BROOK_QUERY_RADIUS around the
+  // focus
+  export const BROOK_SIZE: f32 = 420
+  export const BROOK_STEP: f32 = 0.3
+  export const BROOK_DEPTH: f32 = 0.2
+  export const BROOK_DATA_DROP: f32 = 1000
+  export const BROOK_QUERY_RADIUS: f32 = 96
+
   // Peaks above SNOW_LINE carry snow, more of it higher up, filling the band of SNOW_FADE
   // meters above it in winter
   export const SNOW_LINE: f32 = 330
