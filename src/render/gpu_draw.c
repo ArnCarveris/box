@@ -1072,7 +1072,7 @@ static WGPURenderPassEncoder box_gpu_view_pass_continue(
 
     box_gpu_count(gpu, BOX_GPU_STAT_FORWARD_PASS);
 
-    return wgpuCommandEncoderBeginRenderPass(vp->encoder, &desc);
+    return box_gpu_profile_render_pass(gpu, vp->encoder, &desc, "forward");
 }
 
 /** Record the transmissive draws of a view depth only into the glass depth of its snapshot, a
@@ -1108,8 +1108,8 @@ static void box_gpu_draw_glass(
         .depthLoadOp = WGPULoadOp_Load,
         .depthStoreOp = WGPUStoreOp_Store
     };
-    WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(vp->encoder,
-        &(WGPURenderPassDescriptor){ .depthStencilAttachment = &depth });
+    WGPURenderPassEncoder pass = box_gpu_profile_render_pass(gpu, vp->encoder,
+        &(WGPURenderPassDescriptor){ .depthStencilAttachment = &depth }, "forward glass");
     wgpuRenderPassEncoderSetBindGroup(pass, 0, group, 1, &offset);
     wgpuRenderPassEncoderSetBindGroup(pass, 3, box_gpu_volume_group(gpu, v), 0, NULL);
     for (i = 0; cv && i < cv->draw_count; i ++) {
@@ -1541,7 +1541,7 @@ static void box_gpu_draw_pass(
     };
     uint32_t offset = (uint32_t)(slot * BOX_GPU_VIEW_STRIDE);
     WGPUTextureFormat format = hdr ? BOX_GPU_HDR_FORMAT : t->format;
-    vp.pass = wgpuCommandEncoderBeginRenderPass(encoder, &desc);
+    vp.pass = box_gpu_profile_render_pass(gpu, encoder, &desc, "forward");
     box_gpu_count(gpu, BOX_GPU_STAT_FORWARD_PASS);
     if (phase != 2) {
         box_gpu_environment_draw_background(gpu, vp.pass, format, v, offset);
@@ -1688,7 +1688,7 @@ static void box_gpu_draw_prepass(
         .depthClearValue = 0.0f
     };
     WGPURenderPassDescriptor desc = { .depthStencilAttachment = &depth };
-    WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &desc);
+    WGPURenderPassEncoder pass = box_gpu_profile_render_pass(gpu, encoder, &desc, "prepass");
     box_gpu_draw_prepass_draws(gpu, pass, packet, v, group, slot, late,
         WGPUTextureFormat_Undefined, BOX_GPU_STAT_PREPASS_DRAW);
     wgpuRenderPassEncoderEnd(pass);
@@ -1728,12 +1728,12 @@ bool box_gpu_draw_overdraw(
         .depthStoreOp = WGPUStoreOp_Discard,
         .depthClearValue = 0.0f
     };
-    WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder,
+    WGPURenderPassEncoder pass = box_gpu_profile_render_pass(gpu, encoder,
         &(WGPURenderPassDescriptor){
             .colorAttachmentCount = 1,
             .colorAttachments = &attachment,
             .depthStencilAttachment = &depth_attachment
-        });
+        }, "overdraw");
     wgpuRenderPassEncoderSetViewport(pass, 0, 0, (float)width, (float)height, 0, 1);
     box_gpu_draw_prepass_draws(gpu, pass, packet, v, group, slot, false, format,
         BOX_GPU_STAT_DRAW);

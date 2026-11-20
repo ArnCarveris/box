@@ -640,12 +640,14 @@ done:
 
 /** Record a fullscreen pass with its pipeline and bind group, and release the bind group.
  *
+ * @param gpu The backend
  * @param ctx The chain
  * @param pass The pass
  * @param pipeline The pipeline of the pass
  * @param group The bind group of the pass
  */
 static void box_gpu_fx_record(
+    box_gpu_t *gpu,
     const box_gpu_fx_ctx_t *ctx,
     const box_gpu_fx_pass_t *pass,
     WGPURenderPipeline pipeline,
@@ -661,7 +663,8 @@ static void box_gpu_fx_record(
         .colorAttachmentCount = 1,
         .colorAttachments = &attachment
     };
-    WGPURenderPassEncoder rp = wgpuCommandEncoderBeginRenderPass(ctx->encoder, &desc);
+    WGPURenderPassEncoder rp = box_gpu_profile_render_pass(gpu, ctx->encoder, &desc,
+        box_gpu_shader_label(gpu, box_gpu_shader_get(gpu, pass->shader)));
     wgpuRenderPassEncoderSetPipeline(rp, pipeline);
     wgpuRenderPassEncoderSetBindGroup(rp, 0, group, 0, NULL);
     if (pass->blend == BOX_GPU_FX_ADD) {
@@ -702,7 +705,7 @@ bool box_gpu_fx_draw(
         .entryCount = 7,
         .entries = entries
     });
-    box_gpu_fx_record(ctx, pass, pipeline, group);
+    box_gpu_fx_record(gpu, ctx, pass, pipeline, group);
 done:
     return pipeline != NULL;
 }
@@ -866,7 +869,7 @@ static WGPUBuffer box_gpu_fx_measure(
     });
     w = (w + stride - 1) / stride;
     h = (h + stride - 1) / stride;
-    WGPUComputePassEncoder cp = wgpuCommandEncoderBeginComputePass(ctx->encoder, NULL);
+    WGPUComputePassEncoder cp = box_gpu_profile_compute_pass(gpu, ctx->encoder, "auto exposure");
     wgpuComputePassEncoderSetBindGroup(cp, 0, group, 0, NULL);
     wgpuComputePassEncoderSetPipeline(cp, fx->histogram);
     wgpuComputePassEncoderDispatchWorkgroups(cp,
@@ -1290,7 +1293,7 @@ static bool box_gpu_fx_bloom(
     wgpuQueueWriteBuffer(gpu->queue, s->steps, 0, steps,
         (size_t)s->mip_count * BOX_GPU_BLOOM_STEP);
 
-    WGPUComputePassEncoder cp = wgpuCommandEncoderBeginComputePass(ctx->encoder, NULL);
+    WGPUComputePassEncoder cp = box_gpu_profile_compute_pass(gpu, ctx->encoder, "bloom");
     if (s->prefilter_count) {
         box_gpu_fx_bloom_dispatch(gpu, cp, s, s->prefilter_count > 1 ? 1 : 0, ctx->input,
             NULL, s->prefilter_mips[0], 0, hw, hh);
@@ -1462,7 +1465,7 @@ static bool box_gpu_fx_smaa_draw(
         .entryCount = BOX_GPU_SMAA_BINDINGS,
         .entries = entries
     });
-    box_gpu_fx_record(ctx, pass, pipeline, group);
+    box_gpu_fx_record(gpu, ctx, pass, pipeline, group);
 done:
     return pipeline != NULL;
 }

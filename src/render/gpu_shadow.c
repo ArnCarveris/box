@@ -1208,7 +1208,8 @@ void box_gpu_shadow_render(
             .depthClearValue = 0.0f
         };
         WGPURenderPassDescriptor desc = { .depthStencilAttachment = &depth };
-        WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &desc);
+        WGPURenderPassEncoder pass = box_gpu_profile_render_pass(gpu, encoder, &desc,
+            "shadow atlas");
         wgpuRenderPassEncoderSetBindGroup(pass, 0, group, 1, &offset);
         if (cv) {
             complete = box_gpu_shadow_draw(gpu, pass, packet, cv, gpu->shadow,
@@ -1357,7 +1358,8 @@ WGPUTextureView box_gpu_shadow_capture(
         .depthClearValue = 0.0f
     };
     WGPURenderPassDescriptor desc = { .depthStencilAttachment = &depth };
-    WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &desc);
+    WGPURenderPassEncoder pass = box_gpu_profile_render_pass(gpu, encoder, &desc,
+        "shadow cascades");
     wgpuRenderPassEncoderSetBindGroup(pass, 0, gpu->capture_shadow_group, 1, &offset);
     if (cv) {
         box_gpu_shadow_draw(gpu, pass, packet, cv, gpu->shadow, gpu->shadow_cutout, false,
@@ -1673,7 +1675,7 @@ static void box_gpu_atlas_pass(
         .depthClearValue = 0.0f
     };
     WGPURenderPassDescriptor desc = { .depthStencilAttachment = &depth };
-    WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &desc);
+    WGPURenderPassEncoder pass = box_gpu_profile_render_pass(gpu, encoder, &desc, "shadow other");
     box_gpu_count(gpu, BOX_GPU_STAT_SHADOW_PASS);
     for (i = 0; i < a->count; i ++) {
         const box_render_shadow_tile_t *tile = ecs_vec_get_t(

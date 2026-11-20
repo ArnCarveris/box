@@ -235,7 +235,7 @@ void box_gpu_scatter(
     }
 
     WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(gpu->device, NULL);
-    WGPUComputePassEncoder pass = wgpuCommandEncoderBeginComputePass(encoder, NULL);
+    WGPUComputePassEncoder pass = box_gpu_profile_compute_pass(gpu, encoder, "scatter");
     wgpuComputePassEncoderSetPipeline(pass, pipeline);
     for (i = 0; i < count; i ++) {
         copied += box_gpu_scatter_one(gpu, pass,

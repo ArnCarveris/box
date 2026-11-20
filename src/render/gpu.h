@@ -1149,6 +1149,52 @@ void box_gpu_terrain_bake(
     WGPUBindGroup group,
     int32_t slot);
 
+/** Get the timestamp writes of a pass to measure with the GPU profile (gpu_profile.c), on
+ * when the BOX_GPU_PROFILE environment variable is set.
+ *
+ * @param gpu The backend
+ * @param label Label of the pass, a string that outlives the backend
+ * @param out Receives the writes
+ * @return out, NULL when the profile is off or its queries are taken
+ */
+const WGPUPassTimestampWrites* box_gpu_profile_writes(
+    box_gpu_t *gpu,
+    const char *label,
+    WGPUPassTimestampWrites *out);
+
+/** Begin a render pass that the GPU profile measures under a label when it is on.
+ *
+ * @param gpu The backend
+ * @param encoder The encoder
+ * @param desc The pass, measured only without timestamp writes of its own
+ * @param label Label of the pass, a string that outlives the backend
+ * @return The pass
+ */
+WGPURenderPassEncoder box_gpu_profile_render_pass(
+    box_gpu_t *gpu,
+    WGPUCommandEncoder encoder,
+    const WGPURenderPassDescriptor *desc,
+    const char *label);
+
+/** Begin a compute pass that the GPU profile measures under a label when it is on.
+ *
+ * @param gpu The backend
+ * @param encoder The encoder
+ * @param label Label of the pass, a string that outlives the backend
+ * @return The pass
+ */
+WGPUComputePassEncoder box_gpu_profile_compute_pass(
+    box_gpu_t *gpu,
+    WGPUCommandEncoder encoder,
+    const char *label);
+
+/** End the frame of the GPU profile: read the frames the queue finished and log their means.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_profile_frame(
+    box_gpu_t *gpu);
+
 /** Release the bake atlas of a terrain grid mesh.
  *
  * @param m The mesh

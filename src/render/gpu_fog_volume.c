@@ -1054,7 +1054,7 @@ void box_gpu_fog_volumes_inject(
             .entries = integrate
         });
     uint32_t view_offset = (uint32_t)(slot * BOX_GPU_VIEW_STRIDE);
-    WGPUComputePassEncoder pass = wgpuCommandEncoderBeginComputePass(encoder, NULL);
+    WGPUComputePassEncoder pass = box_gpu_profile_compute_pass(gpu, encoder, "fog volumes");
     wgpuComputePassEncoderSetPipeline(pass, f->inject);
     wgpuComputePassEncoderSetBindGroup(pass, 0, group, 1, &view_offset);
     wgpuComputePassEncoderSetBindGroup(pass, 1, inject_group, 0, NULL);

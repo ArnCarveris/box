@@ -692,7 +692,8 @@ static void box_gpu_texture_blit(
         .colorAttachmentCount = 1,
         .colorAttachments = &attachment
     };
-    WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &pass_desc);
+    WGPURenderPassEncoder pass = box_gpu_profile_render_pass(gpu, encoder, &pass_desc,
+        "texture mips");
     wgpuRenderPassEncoderSetPipeline(pass, pipeline);
     wgpuRenderPassEncoderSetBindGroup(pass, 0, group, 0, NULL);
     wgpuRenderPassEncoderDraw(pass, 3, 1, 0, 0);

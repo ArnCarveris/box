@@ -591,6 +591,7 @@ static void box_gpu_render(
     box_gpu_atlas_render(gpu, packet);
     box_gpu_targets_render(gpu, packet);
     box_gpu_impostor_render(gpu, packet);
+    box_gpu_profile_frame(gpu);
     box_gpu_pace(gpu);
 
     box_gpu_effects_sweep(gpu, packet);

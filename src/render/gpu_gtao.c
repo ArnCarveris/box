@@ -793,9 +793,9 @@ static void box_gpu_gtao_upsample(
         .loadOp = WGPULoadOp_Clear,
         .storeOp = WGPUStoreOp_Store
     };
-    WGPURenderPassEncoder rp = wgpuCommandEncoderBeginRenderPass(encoder,
+    WGPURenderPassEncoder rp = box_gpu_profile_render_pass(gpu, encoder,
         &(WGPURenderPassDescriptor){ .colorAttachmentCount = 1,
-            .colorAttachments = &attachment });
+            .colorAttachments = &attachment }, "gtao upsample");
     wgpuRenderPassEncoderSetPipeline(rp, gpu->gtao->upsample);
     wgpuRenderPassEncoderSetBindGroup(rp, 0, s->upsample[term], 0, NULL);
     wgpuRenderPassEncoderDraw(rp, 3, 1, 0, 0);
@@ -823,7 +823,7 @@ void box_gpu_gtao_record(
     box_gpu_gtao_settings(t, v, s, &u);
     wgpuQueueWriteBuffer(gpu->queue, s->uniforms, 0, &u, sizeof(u));
     box_gpu_gtao_groups(gpu, t, s);
-    WGPUComputePassEncoder cp = wgpuCommandEncoderBeginComputePass(encoder, NULL);
+    WGPUComputePassEncoder cp = box_gpu_profile_compute_pass(gpu, encoder, "gtao");
     box_gpu_gtao_dispatch(gpu, cp, BOX_GPU_GTAO_PREFILTER, s->prefilter,
         (ww + group * 2 - 1) / (group * 2), (wh + group * 2 - 1) / (group * 2));
     box_gpu_gtao_dispatch(gpu, cp, BOX_GPU_GTAO_PREFILTER_LAST, s->prefilter_last,

@@ -494,11 +494,11 @@ void box_gpu_transmission_record(
             .loadOp = WGPULoadOp_Clear,
             .storeOp = WGPUStoreOp_Store
         };
-        WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder,
+        WGPURenderPassEncoder pass = box_gpu_profile_render_pass(gpu, encoder,
             &(WGPURenderPassDescriptor){
                 .colorAttachmentCount = 1,
                 .colorAttachments = &attachment
-            });
+            }, "transmission");
         wgpuRenderPassEncoderSetPipeline(pass, pipeline);
         wgpuRenderPassEncoderSetBindGroup(pass, 0, s->groups[i], 0, NULL);
         wgpuRenderPassEncoderDraw(pass, 3, 1, 0, 0);

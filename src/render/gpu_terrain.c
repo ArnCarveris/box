@@ -1034,11 +1034,11 @@ static void box_gpu_terrain_bake_pass(
         };
     }
 
-    WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder,
+    WGPURenderPassEncoder pass = box_gpu_profile_render_pass(gpu, encoder,
         &(WGPURenderPassDescriptor){
             .colorAttachmentCount = BOX_GPU_TERRAIN_BAKE_LAYERS,
             .colorAttachments = attachments
-        });
+        }, "terrain bake");
     wgpuRenderPassEncoderSetBindGroup(pass, 0, group, 1, &view_offset);
     wgpuRenderPassEncoderSetVertexBuffer(pass, 0, m->buffer, m->offset, m->vertex_size);
     wgpuRenderPassEncoderSetIndexBuffer(pass, m->buffer, WGPUIndexFormat_Uint32,

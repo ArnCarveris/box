@@ -730,7 +730,7 @@ void box_gpu_light_cluster_with(
     };
     WGPUBindGroup group = wgpuDeviceCreateBindGroup(gpu->device, &desc);
     wgpuCommandEncoderClearBuffer(encoder, clusters, 0, sizeof(uint32_t));
-    WGPUComputePassEncoder pass = wgpuCommandEncoderBeginComputePass(encoder, NULL);
+    WGPUComputePassEncoder pass = box_gpu_profile_compute_pass(gpu, encoder, "light clusters");
     wgpuComputePassEncoderSetPipeline(pass, pipeline);
     wgpuComputePassEncoderSetBindGroup(pass, 0, group, 1, &offset);
     wgpuComputePassEncoderDispatchWorkgroups(pass,
