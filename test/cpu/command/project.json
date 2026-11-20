@@ -226,6 +226,18 @@
                     "aspect_of_view_surface",
                     "aspect_of_claimed_view_surface"
                 ]
+            },
+            {
+                "id": "Ablate",
+                "testcases": [
+                    "report",
+                    "skips_lighting_when_unlit",
+                    "stop_restores",
+                    "no_view",
+                    "unknown_option",
+                    "invalid_rounds",
+                    "not_a_view"
+                ]
             }
         ]
     }
