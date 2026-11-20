@@ -577,6 +577,7 @@
                     "gpu_mip_shared_color_and_data",
                     "gpu_mip_reload_keeps_color",
                     "gpu_emissive_mip_linear_average",
+                    "gpu_mips_many_textures_one_frame",
                     "gpu_orm_roughness_green",
                     "gpu_orm_metallic_blue",
                     "gpu_orm_occlusion_indirect_only",

@@ -1929,6 +1929,67 @@ void Texture_gpu_emissive_mip_linear_average(void) {
     ecs_fini(world);
 }
 
+void Texture_gpu_mips_many_textures_one_frame(void) {
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+    const char *tmp = ecs_singleton_get(world, AppStatus)->tmp_dir;
+    char *file = flecs_asprintf("%s/many_mips.png", tmp);
+    uint8_t *pixels = ecs_os_malloc(64 * 64 * 4);
+    int32_t i;
+    for (i = 0; i < 64 * 64; i ++) {
+        pixels[i * 4 + 0] = (uint8_t)(i % 64 * 4);
+        pixels[i * 4 + 1] = (uint8_t)(i / 64 * 4);
+        pixels[i * 4 + 2] = 128;
+        pixels[i * 4 + 3] = 255;
+    }
+
+    test_assert(stbi_write_png(file, 64, 64, 4, pixels, 64 * 4) != 0);
+    ecs_os_free(pixels);
+
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 6});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {
+        .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
+    for (i = 0; i < 1200; i ++) {
+        ecs_entity_t tex = ecs_new(world);
+        ecs_set(world, tex, TexturePath, {.path = file});
+        ecs_entity_t e = ecs_new(world);
+        ecs_set(world, e, Position, {(float)(i % 40) * 0.08f - 1.6f, (float)(i / 40) * 0.08f - 1.2f, 0});
+        ecs_set(world, e, Quad, {0.08f, 0.08f});
+        ecs_set(world, e, Rgb, {255, 255, 255});
+        ecs_set(world, e, PbrTextures, {.albedo = tex});
+    }
+
+    ecs_entity_t s = ecs_new(world);
+    ecs_set(world, s, Surface, {.width = 64, .height = 64, .write_to_file = "many_mips.png",
+        .resolution_scale = 1});
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+
+    char *path = flecs_asprintf("%s/many_mips.png", tmp);
+    int w = 0, h = 0, n = 0;
+    unsigned char *img = stbi_load(path, &w, &h, &n, 4);
+    test_assert(img != NULL);
+    test_int(w, 64);
+    test_int(h, 64);
+    unsigned char *center = &img[(32 * 64 + 32) * 4];
+    test_assert(center[0] + center[1] + center[2] > 0);
+
+    stbi_image_free(img);
+    ecs_os_free(path);
+    ecs_os_free(file);
+    ecs_fini(world);
+}
+
 void Texture_gpu_orm_roughness_green(void) {
     // materials/textures
     ecs_world_t *world = ecs_init();

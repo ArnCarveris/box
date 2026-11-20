@@ -19,6 +19,8 @@
 /** Layers below this one sample color: albedo and emissive, decoded from sRGB */
 #define BOX_GPU_COLOR_LAYERS (2)
 
+#define BOX_GPU_MIP_PASSES (256)
+
 /** Pixel of the default albedo, emissive and ORM layers: no occlusion, the material roughness
  * and metallic */
 static const uint8_t box_gpu_white[4] = { 255, 255, 255, 255 };
@@ -789,6 +791,7 @@ void box_gpu_texture_mips(
 
     box_gpu_texture_mips_usage(gpu, packet);
     WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(gpu->device, NULL);
+    uint32_t passes = 0;
     for (i = 0; i < count; i ++) {
         uint32_t handle = *ecs_vec_get_t(&gpu->mips, uint32_t, i);
         box_gpu_texture_t *tex = ecs_map_get_deref(&gpu->textures, box_gpu_texture_t, handle);
@@ -801,6 +804,16 @@ void box_gpu_texture_mips(
             entry->space = BOX_GPU_MIP_LINEAR;
         }
 
+        if (passes && passes + tex->mips > BOX_GPU_MIP_PASSES) {
+            WGPUCommandBuffer commands = wgpuCommandEncoderFinish(encoder, NULL);
+            wgpuQueueSubmit(gpu->queue, 1, &commands);
+            wgpuCommandBufferRelease(commands);
+            wgpuCommandEncoderRelease(encoder);
+            encoder = wgpuDeviceCreateCommandEncoder(gpu->device, NULL);
+            passes = 0;
+        }
+
+        passes += tex->mips;
         box_gpu_texture_mip_chain(gpu, tex, entry->space, encoder);
         if (!tex->mipped) {
             *ecs_vec_get_t(&gpu->mips, uint32_t, kept ++) = handle;
