@@ -11,6 +11,7 @@ using box.light
 // shafts. The camera stands inside the fog by the right wall and looks back at the windows, so
 // the forward phase of the fog makes the shafts brighter toward them; the ambient keeps the fog
 // in the shadows faintly visible, and a crate stands in the fog in front of the right shaft.
+// frames: 30
 
 camera {
   Position: {7.6, 1.6, 0}

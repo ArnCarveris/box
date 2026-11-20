@@ -2422,6 +2422,9 @@ void box_gpu_gtao_sweep(
 /** Consumer kind of the history of the first mip of a Bloom, keyed by its effect entity */
 #define BOX_GPU_HISTORY_BLOOM (1)
 
+/** Consumer kind of the injected froxel grid of the fog volumes of a view, one per view */
+#define BOX_GPU_HISTORY_FOG_VOLUMES (2)
+
 /** Packets a history pair is kept without being used before it is released */
 #define BOX_GPU_HISTORY_IDLE (4)
 

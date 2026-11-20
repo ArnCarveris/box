@@ -10,6 +10,7 @@ using box.light
 // shadows and a soft ambient. The volumes blend back to front where they overlap, fade over half
 // a unit at their faces, and fog the parts of the sphere, the pillar and the block inside them
 // by the fog in front of each pixel only; the shadows of the objects darken the fog behind them.
+// frames: 30
 
 camera {
   Position: {0, 5.5, 11}

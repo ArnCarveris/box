@@ -1,18 +1,24 @@
 // Fog volumes: the FogVolumes a view draws (box_render_fog_volume_t) go through a froxel grid
 // aligned with its frustum (include/froxel.wgsl), in three entry points:
 //
-// - inject, one thread per cell, sums the density of every volume at the center of the cell, the
+// - inject, one thread per cell, sums the density of every volume at a point of the cell, the
 //   share of the cell its box covers taken at BOX_FROXEL_SAMPLES points along the depth of the
 //   cell, and lights it once: the sun through the cascades, its shadow taken at the same points,
 //   and the cookie, the ambient and the point and spot lights of the cluster of the cell. It
 //   stores the light scattered toward the eye per unit length (rgb) and the extinction (a) of
-//   the cell.
+//   the cell. With a valid history the point and the depth samples are jittered inside the cell
+//   by the 3D sequence of the frame (temporal.wgsl), interleaved per cell, and the result is
+//   blended with the cells of the previous frame (history) at the center of the cell,
+//   reprojected into the previous grid; without one, or in a cell no volume reaches, the cell is
+//   sampled at its center alone.
 // - integrate, one thread per column of cells, accumulates the cells front to back, each slice
 //   integrated analytically, and stores the light scattered toward the camera (rgb) and the
 //   transmittance (a) from the camera to the far side of each slice.
 // - vs and fs, one fullscreen triangle in the forward pass after the opaque meshes and the sky,
 //   in a pass that reads the depth of the view, look the integrated grid up at the depth of each
-//   pixel. A pixel without depth takes the last slice, so fog ends at fog_distance.
+//   pixel. A pixel without depth takes the last slice, so fog ends at fog_distance. In the slice
+//   of the depth it weighs the slice by the share of the density of the volumes before the depth
+//   along the ray of the pixel (slice_share), so faces that cross the slice do not step.
 //
 // A view with transmissive draws splits each ray at the nearest transmissive surface of its
 // pixel (glass_texture, the depth of the transmissive draws over the opaque depth): before its
@@ -84,6 +90,9 @@ struct FogVolume {
 @group(1) @binding(8) var integrated_out: texture_storage_3d<rgba16float, write>;
 @group(1) @binding(9) var integrated: texture_3d<f32>;
 @group(1) @binding(10) var grid_sampler: sampler;
+// Injected cells of the previous frame of the view, and their clamping trilinear sampler.
+@group(1) @binding(11) var history: texture_3d<f32>;
+@group(1) @binding(12) var history_sampler: sampler;
 
 // Henyey-Greenstein phase of an asymmetry g times 4 pi, so isotropic scattering is 1.
 fn phase(cos_theta: f32, g: f32) -> f32 {
@@ -131,7 +140,7 @@ fn density(fog: FogVolume, cover: f32, p: vec3f) -> f32 {
 }
 
 // Light of the cell a thread injects, shared by its volumes: the ambient, the sun through the
-// cascades and the cookie over pi and its direction, and the point and spot lights of the
+// cookie over pi and its direction, without its shadow, and the point and spot lights of the
 // cluster of the cell, each its color times attenuation over pi and shadow, and its direction.
 var<private> cell_ambient: vec3f;
 var<private> cell_sun: vec3f;
@@ -139,24 +148,38 @@ var<private> cell_sun_dir: vec3f;
 var<private> cell_lights: array<vec3f, FOG_LIGHTS>;
 var<private> cell_light_dirs: array<vec3f, FOG_LIGHTS>;
 var<private> cell_light_count: u32;
+// Density of the volumes at the BOX_FROXEL_SAMPLES points of the cell, which weighs the shadow
+// of the sun at them.
+var<private> cell_weights: array<f32, BOX_FROXEL_SAMPLES>;
 
-// Light a cell at a world position: the ambient and the sun, its shadow averaged over the
-// BOX_FROXEL_SAMPLES points of the cell from a to b.
-fn light_cell(p: vec3f, a: vec3f, b: vec3f) {
+// Light a cell at a world position: the ambient and the sun.
+fn light_cell(p: vec3f) {
     let up = vec3f(0.0, 1.0, 0.0);
     cell_ambient = (ambient(up) + ambient(-up)) * 0.5;
     cell_sun = vec3f(0.0);
     cell_sun_dir = up;
     if (view.lights.x > 0u) {
-        var visible = 0.0;
-        for (var j = 0u; j < BOX_FROXEL_SAMPLES; j++) {
-            visible += shadow_point(mix(a, b, froxel_sample(j)));
-        }
-
         cell_sun_dir = normalize(lights[0].position);
-        cell_sun = lights[0].color / PI * (visible / f32(BOX_FROXEL_SAMPLES)) *
-            light_cookie(p, cell_sun_dir, up);
+        cell_sun = lights[0].color / PI * light_cookie(p, cell_sun_dir, up);
     }
+}
+
+// Share of the sun the cell sees through the cascades: its shadow at the BOX_FROXEL_SAMPLES
+// points of the cell from a to b, offset inside their strata by offset, weighed by the density
+// there (cell_weights), so where a face of a volume meets a wall the light outside the wall does
+// not leak into the fog inside it.
+fn sun_visible(a: vec3f, b: vec3f, offset: f32) -> f32 {
+    var visible = 0.0;
+    var total = 0.0;
+    for (var j = 0u; j < BOX_FROXEL_SAMPLES; j++) {
+        let w = cell_weights[j];
+        if (w > 0.0) {
+            visible += w * shadow_point(mix(a, b, froxel_sample(j, offset)));
+            total += w;
+        }
+    }
+
+    return select(0.0, visible / total, total > 0.0);
 }
 
 // Keep the first FOG_LIGHTS point and spot lights of the cluster of a world position that reach
@@ -202,28 +225,107 @@ fn light_local(dir: vec3f, g: f32) -> vec3f {
     return sum;
 }
 
+// Whether inject blends with the cells of the previous frame.
+fn history_blends() -> bool {
+    return froxel.prev_range.w > 0.5 && history_valid();
+}
+
+// Texture coordinate of the injected grid of the previous frame at a world position, through
+// the previous view projection and slicing, and in w 1 when the position is inside that grid.
+fn history_uvw(p: vec3f) -> vec4f {
+    let r = reproject(p);
+    let depth = dot(froxel.prev_depth_plane, vec4f(p, 1.0));
+    let uvw = vec3f(r.xy * froxel.size.zw, froxel_share_of(depth, froxel.prev_range.x,
+        froxel.prev_range.y, froxel.prev_range.z > 0.5));
+    let inside = all(uvw.xy >= vec2f(0.0)) && all(uvw.xy <= vec2f(1.0)) &&
+        depth >= froxel.prev_range.x && depth <= froxel.prev_range.y;
+    return vec4f(uvw, select(0.0, 1.0, inside));
+}
+
+// The injected cells of the previous frame at a texture coordinate of its grid, Catmull-Rom
+// across and down from 9 bilinear taps and linear along the depth: a moving camera samples the
+// history between its cells every frame, which a bilinear sample alone would blur a little more
+// each time, so edges such as the side of a shaft would smear while the camera moves.
+fn history_sample(uvw: vec3f) -> vec4f {
+    let size = vec2f(froxel.grid.xy);
+    let pos = uvw.xy * size;
+    let center = floor(pos - 0.5) + 0.5;
+    let f = pos - center;
+    let w0 = f * (-0.5 + f * (1.0 - 0.5 * f));
+    let w1 = 1.0 + f * f * (-2.5 + 1.5 * f);
+    let w2 = f * (0.5 + f * (2.0 - 1.5 * f));
+    let w3 = f * f * (-0.5 + 0.5 * f);
+    let w12 = w1 + w2;
+    let t0 = (center - 1.0) / size;
+    let t12 = (center + w2 / w12) / size;
+    let t3 = (center + 2.0) / size;
+    let x = array<f32, 3>(t0.x, t12.x, t3.x);
+    let y = array<f32, 3>(t0.y, t12.y, t3.y);
+    let wx = array<f32, 3>(w0.x, w12.x, w3.x);
+    let wy = array<f32, 3>(w0.y, w12.y, w3.y);
+    var result = vec4f(0.0);
+    for (var j = 0u; j < 3u; j++) {
+        for (var i = 0u; i < 3u; i++) {
+            result += textureSampleLevel(history, history_sampler, vec3f(x[i], y[j], uvw.z),
+                0.0) * (wx[i] * wy[j]);
+        }
+    }
+
+    return max(result, vec4f(0.0));
+}
+
+// Point a cell is sampled at this frame, from its top left near corner by 0..1 of its size
+// across, down and along its slice: the 3D sequence of the frame shifted by the noise of the
+// cell, so neighbouring cells take different points, or its center without a history.
+fn cell_jitter(id: vec3u) -> vec3f {
+    if (!history_blends()) {
+        return vec3f(0.5);
+    }
+
+    return temporal_interleaved_3d(vec2f(id.xy) + f32(id.z) * vec2f(17.0, 29.0));
+}
+
 @compute @workgroup_size(BOX_FROXEL_INJECT_GROUP, BOX_FROXEL_INJECT_GROUP, BOX_FROXEL_INJECT_GROUP)
 fn inject(@builtin(global_invocation_id) id: vec3u) {
     if (any(id >= froxel.grid.xyz)) {
         return;
     }
 
-    let uv = froxel_cell_uv(id.xy);
+    let jitter = cell_jitter(id);
+    let uv = froxel_cell_point_uv(id.xy, jitter.xy);
     let ray = froxel_ray(uv);
     let slices = f32(froxel.grid.z);
-    let p = ray.origin + ray.dir * froxel_depth((f32(id.z) + 0.5) / slices);
+    let p = ray.origin + ray.dir * froxel_depth((f32(id.z) + jitter.z) / slices);
     // The near and far side of the cell along its ray, between which the faces of the volumes
     // and the sun's shadow are sampled, so they cover a share of the cell instead of stepping
     // from slice to slice.
     let a = ray.origin + ray.dir * froxel_depth(f32(id.z) / slices);
     let b = ray.origin + ray.dir * froxel_depth((f32(id.z) + 1.0) / slices);
     let dir = normalize(ray.dir);
+    // The unjittered center of the cell, and the distance from it to its far corners: a cell
+    // no box comes that near holds no fog at any jittered point, so it takes no history, and a
+    // volume that is removed or moved away leaves no fog behind.
+    let center_ray = froxel_ray(froxel_cell_uv(id.xy));
+    let center = center_ray.origin + center_ray.dir * froxel_depth((f32(id.z) + 0.5) / slices);
+    let far_ = froxel_depth((f32(id.z) + 1.0) / slices);
+    let corner_a = froxel_ray(froxel_cell_point_uv(id.xy, vec2f(0.0)));
+    let corner_b = froxel_ray(froxel_cell_point_uv(id.xy, vec2f(1.0)));
+    let reach = max(length(corner_a.origin + corner_a.dir * far_ - center),
+        length(corner_b.origin + corner_b.dir * far_ - center));
+    var occupied = false;
     var lit = false;
     var local = false;
     var extinction = 0.0;
     var scatter = vec3f(0.0);
+    // The light of the sun the volumes scatter before its shadow (sun_visible)
+    var sunlit = vec3f(0.0);
+    for (var j = 0u; j < BOX_FROXEL_SAMPLES; j++) {
+        cell_weights[j] = 0.0;
+    }
+
     for (var i = 0u; i < froxel.grid.w; i++) {
         let fog = volumes[i];
+        occupied = occupied || inside(fog, volume_local(fog, center)) > -reach;
         let qa = volume_local(fog, a);
         let qb = volume_local(fog, b);
         // The distance inside a box is concave along a segment: a cell whose sides are both
@@ -232,10 +334,16 @@ fn inject(@builtin(global_invocation_id) id: vec3u) {
         if (min(inside(fog, qa), inside(fog, qb)) < max(fog.edge_fade, 1e-6)) {
             cover = 0.0;
             for (var j = 0u; j < BOX_FROXEL_SAMPLES; j++) {
-                cover += edge(fog, mix(qa, qb, froxel_sample(j)));
+                let e = edge(fog, mix(qa, qb, froxel_sample(j, jitter.z)));
+                cover += e;
+                cell_weights[j] += fog.density * e;
             }
 
             cover /= f32(BOX_FROXEL_SAMPLES);
+        } else {
+            for (var j = 0u; j < BOX_FROXEL_SAMPLES; j++) {
+                cell_weights[j] += fog.density;
+            }
         }
 
         let sigma = density(fog, cover, p);
@@ -244,12 +352,14 @@ fn inject(@builtin(global_invocation_id) id: vec3u) {
         }
 
         if (!lit) {
-            light_cell(p, a, b);
+            light_cell(p);
             lit = true;
         }
 
-        var light = cell_ambient * fog.ambient_inscatter +
-            cell_sun * (phase(dot(dir, cell_sun_dir), fog.asymmetry) * fog.sun_inscatter);
+        let albedo = fog.color * (sigma * (1.0 - fog.absorption));
+        sunlit += albedo * cell_sun *
+            (phase(dot(dir, cell_sun_dir), fog.asymmetry) * fog.sun_inscatter);
+        var light = cell_ambient * fog.ambient_inscatter;
         if (fog.light_inscatter > 0.0) {
             if (!local) {
                 light_cell_local(p);
@@ -260,14 +370,33 @@ fn inject(@builtin(global_invocation_id) id: vec3u) {
         }
 
         extinction += sigma;
-        scatter += fog.color * (sigma * (1.0 - fog.absorption)) * light;
+        scatter += albedo * light;
+    }
+
+    if (any(sunlit > vec3f(0.0))) {
+        scatter += sunlit * sun_visible(a, b, jitter.z);
     }
 
     if (extinction > 0.0 && view.aerial.w > 0.0) {
         scatter *= aerial_sample(vec4f(uv * view.viewport.xy, 0.0, 1.0), p).a;
     }
 
-    textureStore(scatter_out, id, vec4f(scatter, extinction));
+    var result = vec4f(scatter, extinction);
+    if (occupied && history_blends()) {
+        // The previous cells are kept at their centers: the unjittered center of this cell
+        // lands between them in the previous grid.
+        let c = history_uvw(center);
+        if (c.w > 0.5) {
+            // The first frames after a reset average all of them, so the cells converge from
+            // the center sample as fast as the sequence allows.
+            let n = f32(temporal_frame());
+            let blend = min(BOX_FROXEL_HISTORY_BLEND, n / (n + 1.0));
+            let previous = history_sample(c.xyz);
+            result = mix(result, previous, blend);
+        }
+    }
+
+    textureStore(scatter_out, id, result);
 }
 
 @compute @workgroup_size(BOX_FROXEL_INTEGRATE_GROUP, BOX_FROXEL_INTEGRATE_GROUP, 1)
@@ -299,17 +428,81 @@ fn integrate(@builtin(global_invocation_id) id: vec3u) {
     }
 }
 
+// Whether the segment of the local frame of a volume from qa to qb meets its box.
+fn segment_meets(fog: FogVolume, qa: vec3f, qb: vec3f) -> bool {
+    let d = qb - qa;
+    let inv = 1.0 / select(d, vec3f(1e-6), abs(d) < vec3f(1e-6));
+    let t0 = (-fog.extent - qa) * inv;
+    let t1 = (fog.extent - qa) * inv;
+    let lo = max(max(min(t0.x, t1.x), min(t0.y, t1.y)), max(min(t0.z, t1.z), 0.0));
+    let hi = min(min(max(t0.x, t1.x), max(t0.y, t1.y)), min(max(t0.z, t1.z), 1.0));
+    return lo <= hi;
+}
+
+// Share of the density of the volumes in slice s along the ray of a uv of the image that lies
+// before share f of the slice, the share f itself where the slice is empty or evenly dense.
+// The grid knows the density of a cell as a whole, so where a face crosses the slice of a surface
+// the lookup weighs the slice by where its density is along the ray instead of by depth: a thin
+// slab on a floor or a volume against a wall does not step where the slices cross it.
+fn slice_share(uv: vec2f, s: f32, f: f32) -> f32 {
+    let slices = f32(froxel.grid.z);
+    let ray = froxel_ray(uv);
+    let a = ray.origin + ray.dir * froxel_depth(s / slices);
+    let b = ray.origin + ray.dir * froxel_depth((s + 1.0) / slices);
+    let n = f32(BOX_FROXEL_APPLY_SAMPLES);
+    var before = 0.0;
+    var total = 0.0;
+    for (var i = 0u; i < froxel.grid.w; i++) {
+        let fog = volumes[i];
+        let qa = volume_local(fog, a);
+        let qb = volume_local(fog, b);
+        if (min(inside(fog, qa), inside(fog, qb)) >= max(fog.edge_fade, 1e-6)) {
+            before += fog.density * f;
+            total += fog.density;
+            continue;
+        }
+
+        if (!segment_meets(fog, qa, qb)) {
+            continue;
+        }
+
+        for (var k = 0u; k < BOX_FROXEL_APPLY_SAMPLES; k++) {
+            let p = ray.origin + ray.dir * froxel_depth((s + (f32(k) + 0.5) / n) / slices);
+            let g = fog.density * edge(fog, volume_local(fog, p)) / n;
+            before += g * saturate(f * n - f32(k));
+            total += g;
+        }
+    }
+
+    if (total <= 1e-6) {
+        return f;
+    }
+
+    return before / total;
+}
+
 // Light scattered toward the camera (rgb) and transmittance (a) from the camera to a clip depth
-// of a uv of the image, the far end of the grid for no depth.
+// of a uv of the image, the far end of the grid for no depth. The grid stores them at the far
+// side of each slice: the lookup takes the far sides of the slice of the depth and of the slice
+// before it, nothing before the first, and weighs them by the share of the slice's density
+// before the depth.
 fn lookup(uv: vec2f, depth: f32) -> vec4f {
     var d = froxel.range.z;
     if (depth > 0.0) {
         d = froxel_view_depth(froxel_world(uv, depth));
     }
 
-    let c = froxel_uvw(uv, d);
-    let s = textureSampleLevel(integrated, grid_sampler, c.xyz, 0.0);
-    return mix(vec4f(0.0, 0.0, 0.0, 1.0), s, c.w);
+    let slices = f32(froxel.grid.z);
+    let t = froxel_share(d) * slices;
+    let s = min(floor(t), slices - 1.0);
+    let xy = uv * froxel.size.zw;
+    let far_ = textureSampleLevel(integrated, grid_sampler, vec3f(xy, (s + 0.5) / slices), 0.0);
+    var near_ = vec4f(0.0, 0.0, 0.0, 1.0);
+    if (s > 0.5) {
+        near_ = textureSampleLevel(integrated, grid_sampler, vec3f(xy, (s - 0.5) / slices), 0.0);
+    }
+
+    return mix(near_, far_, slice_share(uv, s, saturate(t - s)));
 }
 
 @fragment

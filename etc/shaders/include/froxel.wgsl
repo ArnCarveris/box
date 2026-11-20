@@ -4,6 +4,9 @@
 // exponentially (BOX_FROXEL_EXPONENT), an orthographic one linearly. Depths are view depths, the
 // distance in front of the camera along its axis, so a slice is a plane parallel to the image.
 //
+// The injected grid is temporal: the cells of the previous frame of the view are found through
+// its slicing, prev_depth_plane and prev_range.
+//
 // The includer declares the Froxel uniform as froxel.
 #pragma once
 
@@ -24,6 +27,11 @@ struct Froxel {
     size: vec4f,
     // x: segment of the rays an apply draw takes, SEGMENT_* of fog_volume.wgsl
     segment: vec4u,
+    // depth_plane of the previous frame
+    prev_depth_plane: vec4f,
+    // x: view depth of the near plane and y: of the far end of the grid in the previous frame,
+    // z: 1 for an orthographic camera then, w: 1 when inject blends with the previous cells
+    prev_range: vec4f,
 };
 
 // A ray of the grid through a point of the image: the world position at view depth 0 and the
@@ -58,16 +66,22 @@ fn froxel_ray(uv: vec2f) -> FroxelRay {
     return r;
 }
 
-// Share of the depth of the grid, 0 at the near plane and 1 at its far end, of a view depth,
-// clamped to 0..1.
-fn froxel_share(depth: f32) -> f32 {
-    let x = saturate((depth - froxel.range.y) / max(froxel.range.z - froxel.range.y, 1e-6));
-    if (froxel.range.w > 0.5) {
+// Share of the depth of a grid from view depth near_ to far_, 0 at the near plane and 1 at its
+// far end, of a view depth, clamped to 0..1.
+fn froxel_share_of(depth: f32, near_: f32, far_: f32, ortho: bool) -> f32 {
+    let x = saturate((depth - near_) / max(far_ - near_, 1e-6));
+    if (ortho) {
         return x;
     }
 
     let k = exp2(BOX_FROXEL_EXPONENT) - 1.0;
     return log2(1.0 + x * k) / BOX_FROXEL_EXPONENT;
+}
+
+// Share of the depth of the grid, 0 at the near plane and 1 at its far end, of a view depth,
+// clamped to 0..1.
+fn froxel_share(depth: f32) -> f32 {
+    return froxel_share_of(depth, froxel.range.y, froxel.range.z, froxel.range.w > 0.5);
 }
 
 // View depth at a share of the depth of the grid, the inverse of froxel_share.
@@ -81,23 +95,17 @@ fn froxel_depth(share: f32) -> f32 {
 }
 
 // Share of the depth of a cell, from its near to its far side, of the sample point j of
-// BOX_FROXEL_SAMPLES.
-fn froxel_sample(j: u32) -> f32 {
-    return (f32(j) + 0.5) / f32(BOX_FROXEL_SAMPLES);
+// BOX_FROXEL_SAMPLES, offset inside its stratum by 0..1, 0.5 at its middle.
+fn froxel_sample(j: u32, offset: f32) -> f32 {
+    return (f32(j) + offset) / f32(BOX_FROXEL_SAMPLES);
 }
 
 // uv of the image at the center of a cell.
 fn froxel_cell_uv(cell: vec2u) -> vec2f {
-    return (vec2f(cell) + 0.5) * froxel.range.x / froxel.size.xy;
+    return froxel_cell_point_uv(cell, vec2f(0.5));
 }
 
-// Texture coordinate of the integrated grid that holds the fog from the camera to a view depth:
-// the grid stores it at the far side of each slice, so the share maps half a slice nearer. The
-// fog before the far side of the first slice is that of the first slice times the share of it
-// the depth reaches, w of the result.
-fn froxel_uvw(uv: vec2f, depth: f32) -> vec4f {
-    let slices = f32(froxel.grid.z);
-    let t = froxel_share(depth) * slices;
-    let w = (max(t, 1.0) - 0.5) / slices;
-    return vec4f(uv * froxel.size.zw, w, saturate(t));
+// uv of the image at a point of a cell, offset from its top left corner by 0..1 of its size.
+fn froxel_cell_point_uv(cell: vec2u, offset: vec2f) -> vec2f {
+    return (vec2f(cell) + offset) * froxel.range.x / froxel.size.xy;
 }

@@ -1632,7 +1632,14 @@
                     "no_new_splits",
                     "overlap_no_new_pass",
                     "fog_distance_sky",
-                    "grid_size_4k"
+                    "grid_size_4k",
+                    "history_converges",
+                    "history_reset",
+                    "history_camera_turns",
+                    "history_removed_volume",
+                    "history_two_views",
+                    "history_resize",
+                    "history_grazing_slab"
                 ]
             },
             {

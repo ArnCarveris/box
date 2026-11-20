@@ -9,8 +9,9 @@ using box.light
 // pillars, seen from above. The left one has noise_strength 1 and a noise_scale of 5, so its
 // density breaks into billows a few units across, with the finer detail octave on top, and its
 // wind drifts them; the right one has no noise and shows the constant density next to it. The
-// visual runner captures the third frame with a fixed delta of 1/60 s, so the wind has moved
-// the noise by the same distance on every run.
+// visual runner captures frame 30, after the history of the froxel grid has converged, with a
+// fixed delta of 1/60 s, so the wind has moved the noise by the same distance on every run.
+// frames: 30
 
 camera {
   Position: {0, 10, 11}

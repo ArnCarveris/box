@@ -4,8 +4,8 @@
  * aligned with its frustum and applied in its forward pass (etc/shaders/fog_volume.wgsl).
  *
  * Each view with volumes in a target has a grid (box_gpu_froxels_t): before its forward pass a
- * compute pass lights every cell for all its volumes (inject) and accumulates the cells front to
- * back along every column (integrate). Without volumes nothing is recorded.
+ * compute pass lights every cell for all its volumes blended with its previous frame (inject) and
+ * accumulates the cells front to back along every column (integrate). No volumes, no passes.
  *
  * The forward pass ends after the opaque meshes and the sky and continues in a pass that reads
  * the depth, where one fullscreen draw applies the grid before the particles. The uniforms and
@@ -21,7 +21,7 @@
 #define BOX_GPU_FOG_UNIFORM_STRIDE (256u)
 
 /** Bytes of the uniform of a pass, Froxel in froxel.wgsl */
-#define BOX_GPU_FOG_UNIFORM_SIZE (144u)
+#define BOX_GPU_FOG_UNIFORM_SIZE (176u)
 
 /** Smallest buffer of the passes of a packet in bytes */
 #define BOX_GPU_FOG_BUFFER_MIN (16384u)
@@ -42,24 +42,33 @@ typedef struct box_gpu_fog_uniforms_t {
                                      *   the far end of the grid, 1 for orthographic */
     float size[4];                  /**< Render size and the share of the grid it covers */
     uint32_t segment[4];            /**< box_gpu_fog_segment_t an apply draw takes */
+    float prev_depth_plane[4];      /**< depth_plane of the previous frame */
+    float prev_range[4];            /**< View depth of the near plane and of the far end of the
+                                     *   grid in the previous frame, 1 for orthographic, and 1
+                                     *   when inject blends with the previous cells */
 } box_gpu_fog_uniforms_t;
 
 /** The froxel grid of a view in a target */
 typedef struct box_gpu_froxels_t {
-    WGPUTexture scatter;            /**< In scattered light per unit length and extinction of
-                                     *   each cell, rgba16float */
-    WGPUTextureView scatter_view;   /**< View of scatter */
     WGPUTexture integrated;         /**< Light scattered toward the camera and transmittance
                                      *   from the camera to the far side of each cell */
     WGPUTextureView integrated_view; /**< View of integrated */
     uint32_t size[3];               /**< Cells across, down and slices */
     uint64_t used;                  /**< Packet the grid was injected in last */
+    box_gpu_fog_uniforms_t current; /**< Uniform of the last frame the grid was injected in */
+    box_gpu_fog_uniforms_t previous; /**< Uniform of the frame before that one */
+    float current_distance;         /**< Fog distance of current */
+    float previous_distance;        /**< Fog distance of previous */
+    int64_t frame;                  /**< Packet frame of current, -1 for none */
+    bool has_previous;              /**< previous holds a frame */
 } box_gpu_froxels_t;
 
 struct box_gpu_fog_volumes_t {
-    WGPUBindGroupLayout inject_layout; /**< Records, uniform, noise and the cells written */
+    WGPUBindGroupLayout inject_layout; /**< Records, uniform, noise, the cells written and the
+                                     *   cells of the previous frame */
     WGPUBindGroupLayout integrate_layout; /**< Uniform, cells and the integrated grid written */
-    WGPUBindGroupLayout apply_layout; /**< Uniform, depth, glass depth and integrated grid */
+    WGPUBindGroupLayout apply_layout; /**< Records, uniform, depth, glass depth and integrated
+                                       * grid */
     WGPUPipelineLayout inject_pipeline_layout; /**< View group and inject_layout */
     WGPUPipelineLayout integrate_pipeline_layout; /**< Empty group and integrate_layout */
     WGPUPipelineLayout apply_pipeline_layout; /**< View group and apply_layout */
@@ -151,9 +160,7 @@ static WGPUTextureView box_gpu_fog_noise(
 static void box_gpu_froxels_free(
     box_gpu_froxels_t *g)
 {
-    if (g->scatter) {
-        wgpuTextureViewRelease(g->scatter_view);
-        wgpuTextureRelease(g->scatter);
+    if (g->integrated) {
         wgpuTextureViewRelease(g->integrated_view);
         wgpuTextureRelease(g->integrated);
     }
@@ -167,7 +174,7 @@ void box_gpu_fog_volumes_init(
     box_gpu_fog_volumes_t *f = ecs_os_calloc_t(box_gpu_fog_volumes_t);
     WGPULimits limits = WGPU_LIMITS_INIT;
     const uint8_t placeholder = 128;
-    WGPUBindGroupLayoutEntry inject[5] = {
+    WGPUBindGroupLayoutEntry inject[7] = {
         {
             .binding = 0,
             .visibility = WGPUShaderStage_Compute,
@@ -205,6 +212,19 @@ void box_gpu_fog_volumes_init(
                 .format = WGPUTextureFormat_RGBA16Float,
                 .viewDimension = WGPUTextureViewDimension_3D
             }
+        },
+        {
+            .binding = 11,
+            .visibility = WGPUShaderStage_Compute,
+            .texture = {
+                .sampleType = WGPUTextureSampleType_Float,
+                .viewDimension = WGPUTextureViewDimension_3D
+            }
+        },
+        {
+            .binding = 12,
+            .visibility = WGPUShaderStage_Compute,
+            .sampler = { .type = WGPUSamplerBindingType_Filtering }
         }
     };
     WGPUBindGroupLayoutEntry integrate[3] = {
@@ -234,7 +254,15 @@ void box_gpu_fog_volumes_init(
             }
         }
     };
-    WGPUBindGroupLayoutEntry apply[5] = {
+    WGPUBindGroupLayoutEntry apply[6] = {
+        {
+            .binding = 0,
+            .visibility = WGPUShaderStage_Fragment,
+            .buffer = {
+                .type = WGPUBufferBindingType_ReadOnlyStorage,
+                .minBindingSize = sizeof(box_render_fog_volume_t)
+            }
+        },
         {
             .binding = 1,
             .visibility = WGPUShaderStage_Fragment,
@@ -274,11 +302,11 @@ void box_gpu_fog_volumes_init(
         }
     };
     f->inject_layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
-        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 5, .entries = inject });
+        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 7, .entries = inject });
     f->integrate_layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
         &(WGPUBindGroupLayoutDescriptor){ .entryCount = 3, .entries = integrate });
     f->apply_layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
-        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 5, .entries = apply });
+        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 6, .entries = apply });
     f->sampler = wgpuDeviceCreateSampler(gpu->device, &(WGPUSamplerDescriptor){
         .addressModeU = WGPUAddressMode_Repeat,
         .addressModeV = WGPUAddressMode_Repeat,
@@ -653,7 +681,8 @@ static void box_gpu_fog_uniforms(
     u->segment[0] = (uint32_t)segment;
 }
 
-/** Create a 3D texture of the grid that the compute stage writes and the passes after it read.
+/** Create the integrated 3D texture of the grid that the compute stage writes and the passes
+ * after it read.
  *
  * @param gpu The backend
  * @param size Cells across, down and slices
@@ -717,23 +746,64 @@ static box_gpu_froxels_t* box_gpu_froxels_get(
     box_gpu_froxels_t *result = ecs_map_get_deref(&f->grids, box_gpu_froxels_t, key);
     if (!result) {
         result = ecs_os_calloc_t(box_gpu_froxels_t);
+        result->frame = -1;
         ecs_map_insert_ptr(&f->grids, key, result);
     }
 
-    if (!result->scatter || memcmp(result->size, size, sizeof(result->size))) {
-        if (result->scatter) {
-            wgpuTextureViewRelease(result->scatter_view);
-            wgpuTextureRelease(result->scatter);
+    if (!result->integrated || memcmp(result->size, size, sizeof(result->size))) {
+        if (result->integrated) {
             wgpuTextureViewRelease(result->integrated_view);
             wgpuTextureRelease(result->integrated);
         }
 
-        result->scatter = box_gpu_froxel_texture(gpu, size, &result->scatter_view);
         result->integrated = box_gpu_froxel_texture(gpu, size, &result->integrated_view);
         memcpy(result->size, size, sizeof(result->size));
     }
 
     return result;
+}
+
+/** Keep the uniform of the frame a grid is injected in and fill the members of the uniform
+ * about the previous frame: its slicing, and whether inject blends with its cells, which needs
+ * a valid history pair of the same grid size and fog distance.
+ *
+ * The injected cells of a view are kept in a ping-pong pair of gpu_history.c: inject samples
+ * each cell at a point jittered inside it by the sequence of the frame and blends it with the
+ * previous cells, found at its center through the previous view projection and this slicing.
+ *
+ * @param g The grid
+ * @param packet The packet
+ * @param distance Fog distance of the view
+ * @param valid Whether the history pair holds the previous frame of the view
+ * @param u The uniform of the frame, receives the members about the previous frame
+ */
+static void box_gpu_froxels_history(
+    box_gpu_froxels_t *g,
+    const box_render_packet_t *packet,
+    float distance,
+    bool valid,
+    box_gpu_fog_uniforms_t *u)
+{
+    int32_t k;
+    if (g->frame != packet->frame) {
+        g->has_previous = g->frame >= 0;
+        g->previous = g->current;
+        g->previous_distance = g->current_distance;
+    }
+
+    valid = valid && g->has_previous && g->previous_distance == distance &&
+        !memcmp(g->previous.grid, u->grid, 3 * sizeof(uint32_t));
+    for (k = 0; k < 4; k ++) {
+        u->prev_depth_plane[k] = g->previous.depth_plane[k];
+    }
+
+    u->prev_range[0] = g->previous.range[1];
+    u->prev_range[1] = g->previous.range[2];
+    u->prev_range[2] = g->previous.range[3];
+    u->prev_range[3] = valid ? 1.0f : 0.0f;
+    g->current = *u;
+    g->current_distance = distance;
+    g->frame = packet->frame;
 }
 
 void box_gpu_fog_volumes_inject(
@@ -766,13 +836,29 @@ void box_gpu_fog_volumes_inject(
 
     box_gpu_fog_uniforms(t, v, BOX_GPU_FOG_SEGMENT_FULL, &u);
     box_gpu_froxels_t *g = box_gpu_froxels_get(gpu, t, v, u.grid);
+    box_gpu_history_desc_t desc = {
+        .target = t->handle,
+        .view = v->view,
+        .consumer = BOX_GPU_HISTORY_FOG_VOLUMES,
+        .dimension = WGPUTextureDimension_3D,
+        .width = g->size[0],
+        .height = g->size[1],
+        .depth = g->size[2],
+        .format = WGPUTextureFormat_RGBA16Float
+    };
+    box_gpu_history_t h;
+    if (!box_gpu_history_acquire(gpu, packet, &desc, &h)) {
+        goto done;
+    }
+
+    box_gpu_froxels_history(g, packet, box_render_fog_distance(v->fog_distance), h.valid, &u);
     uint64_t records = (uint64_t)v->fog_count * sizeof(box_render_fog_volume_t);
     uint64_t offset = box_gpu_fog_reserve(gpu, BOX_GPU_FOG_UNIFORM_STRIDE + records);
     wgpuQueueWriteBuffer(gpu->queue, f->buffer, offset, &u, sizeof(u));
     wgpuQueueWriteBuffer(gpu->queue, f->buffer, offset + BOX_GPU_FOG_UNIFORM_STRIDE,
         fogs, (size_t)records);
 
-    WGPUBindGroupEntry inject[5] = {
+    WGPUBindGroupEntry inject[7] = {
         {
             .binding = 0,
             .buffer = f->buffer,
@@ -787,7 +873,9 @@ void box_gpu_fog_volumes_inject(
         },
         { .binding = 3, .textureView = noise },
         { .binding = 4, .sampler = f->sampler },
-        { .binding = 6, .textureView = g->scatter_view }
+        { .binding = 6, .textureView = h.write },
+        { .binding = 11, .textureView = h.read },
+        { .binding = 12, .sampler = f->grid_sampler }
     };
     WGPUBindGroupEntry integrate[3] = {
         {
@@ -796,13 +884,13 @@ void box_gpu_fog_volumes_inject(
             .offset = offset,
             .size = BOX_GPU_FOG_UNIFORM_SIZE
         },
-        { .binding = 7, .textureView = g->scatter_view },
+        { .binding = 7, .textureView = h.write },
         { .binding = 8, .textureView = g->integrated_view }
     };
     WGPUBindGroup inject_group = wgpuDeviceCreateBindGroup(gpu->device,
         &(WGPUBindGroupDescriptor){
             .layout = f->inject_layout,
-            .entryCount = 5,
+            .entryCount = 7,
             .entries = inject
         });
     WGPUBindGroup integrate_group = wgpuDeviceCreateBindGroup(gpu->device,
@@ -864,7 +952,6 @@ bool box_gpu_fog_volumes_draw(
         : NULL;
     box_gpu_fog_uniforms_t u;
     bool result = false;
-    (void)packet;
     if (!glass) {
         glass = depth;
         segment = BOX_GPU_FOG_SEGMENT_FULL;
@@ -875,9 +962,19 @@ bool box_gpu_fog_volumes_draw(
     }
 
     box_gpu_fog_uniforms(t, v, segment, &u);
-    uint64_t offset = box_gpu_fog_reserve(gpu, BOX_GPU_FOG_UNIFORM_STRIDE);
+    uint64_t records = (uint64_t)v->fog_count * sizeof(box_render_fog_volume_t);
+    uint64_t offset = box_gpu_fog_reserve(gpu, BOX_GPU_FOG_UNIFORM_STRIDE + records);
     wgpuQueueWriteBuffer(gpu->queue, f->buffer, offset, &u, sizeof(u));
-    WGPUBindGroupEntry entries[5] = {
+    wgpuQueueWriteBuffer(gpu->queue, f->buffer, offset + BOX_GPU_FOG_UNIFORM_STRIDE,
+        ecs_vec_get_t(&packet->fog_volumes, box_render_fog_volume_t, v->fog_first),
+        (size_t)records);
+    WGPUBindGroupEntry entries[6] = {
+        {
+            .binding = 0,
+            .buffer = f->buffer,
+            .offset = offset + BOX_GPU_FOG_UNIFORM_STRIDE,
+            .size = records
+        },
         {
             .binding = 1,
             .buffer = f->buffer,
@@ -891,7 +988,7 @@ bool box_gpu_fog_volumes_draw(
     };
     WGPUBindGroup group = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
         .layout = f->apply_layout,
-        .entryCount = 5,
+        .entryCount = 6,
         .entries = entries
     });
     wgpuRenderPassEncoderSetPipeline(pass, pipeline);

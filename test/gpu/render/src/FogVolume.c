@@ -3,8 +3,9 @@
  * @brief Tests for the fog volumes a view lights in its froxel grid and applies in its forward
  * pass: transmittance, scattered light, clipping to the depth, the camera inside and behind,
  * edges, rotation, sun shafts, the phase, the order of overlapping volumes, glass, orthographic
- * cameras, resizes, several views, the fog distance, the size of the grid and the captures,
- * which do not see them; checked on PNG captures.
+ * cameras, resizes, several views, the fog distance, the size of the grid, the captures,
+ * which do not see them, and the history of the grid from frame to frame; checked on PNG
+ * captures.
  *
  * A 64 pixel capture has a grid of 8 by 8 cells: hard faces of a box land on the depth slices of
  * the grid, so the expected transmittance of a box follows from the share of the sample points
@@ -254,6 +255,52 @@ static unsigned char* fv_render(
     box_render_gpu_stats_t before = fv_frames(world, 0), after;
     fv_surface(world, FV_SIZE, FV_SIZE, file);
     after = fv_frames(world, 3);
+    test_int(after.errors, before.errors);
+
+    return fv_load(world, file, FV_SIZE, FV_SIZE);
+}
+
+/** Views fv_still resets at most */
+#define FV_VIEWS (8)
+
+/** Add HistoryReset to every view, so the next frame samples each cell of the froxel grids at its
+ * center alone, as without the history, where a test measures the fog of one frame.
+ *
+ * @param world The world
+ */
+static void fv_still(
+    ecs_world_t *world)
+{
+    ecs_entity_t views[FV_VIEWS];
+    int32_t i, count = 0;
+    ecs_iter_t it = ecs_each(world, View);
+    while (ecs_each_next(&it)) {
+        for (i = 0; i < it.count && count < FV_VIEWS; i ++) {
+            views[count ++] = it.entities[i];
+        }
+    }
+
+    for (i = 0; i < count; i ++) {
+        ecs_add(world, views[i], HistoryReset);
+    }
+}
+
+/** Render frames into a square capture as fv_render does, the last one without the history of
+ * the views, and load it.
+ *
+ * @param world The world
+ * @param file Name of the PNG
+ * @return The pixels, RGBA, freed with stbi_image_free
+ */
+static unsigned char* fv_render_still(
+    ecs_world_t *world,
+    const char *file)
+{
+    box_render_gpu_stats_t before = fv_frames(world, 0), after;
+    fv_surface(world, FV_SIZE, FV_SIZE, file);
+    fv_frames(world, 2);
+    fv_still(world);
+    after = fv_frames(world, 1);
     test_int(after.errors, before.errors);
 
     return fv_load(world, file, FV_SIZE, FV_SIZE);
@@ -1265,7 +1312,7 @@ void FogVolume_noise_zero_unchanged(void) {
 }
 
 /** Noise of strength 1 varies the fog across the wall, which a strength of 0 fogs evenly,
- * around about the same mean. */
+ * around about the same mean, in a frame of cells sampled at their centers. */
 void FogVolume_noise_varies(void) {
     // fog_volume/noise
     double mean[2], deviation[2], neighbours[2];
@@ -1273,7 +1320,8 @@ void FogVolume_noise_varies(void) {
     for (k = 0; k < 2; k ++) {
         ecs_world_t *world = fv_world(0);
         fv_noise_volume(world, (float)k, 4, (float[]){0, 0, 0});
-        unsigned char *px = fv_render(world, k ? "fog_noise_one.png" : "fog_noise_none.png");
+        unsigned char *px = fv_render_still(world,
+            k ? "fog_noise_one.png" : "fog_noise_none.png");
         fv_measure(px, &mean[k], &deviation[k], &neighbours[k]);
         stbi_image_free(px);
         ecs_fini(world);
@@ -1288,7 +1336,8 @@ void FogVolume_noise_varies(void) {
         fv_grid_transmittance(0.4f, 9, 11, 19.9f, true, 100))) < 4.0);
 }
 
-/** A larger noise_scale makes larger billows: neighbouring pixels differ less. */
+/** A larger noise_scale makes larger billows: neighbouring pixels differ less, in a frame of
+ * cells sampled at their centers. */
 void FogVolume_noise_scale(void) {
     // fog_volume/noise
     double mean[2], deviation[2], neighbours[2];
@@ -1296,7 +1345,8 @@ void FogVolume_noise_scale(void) {
     for (k = 0; k < 2; k ++) {
         ecs_world_t *world = fv_world(0);
         fv_noise_volume(world, 1, k ? 32.0f : 4.0f, (float[]){0, 0, 0});
-        unsigned char *px = fv_render(world, k ? "fog_noise_large.png" : "fog_noise_small.png");
+        unsigned char *px = fv_render_still(world,
+            k ? "fog_noise_large.png" : "fog_noise_small.png");
         fv_measure(px, &mean[k], &deviation[k], &neighbours[k]);
         stbi_image_free(px);
         ecs_fini(world);
@@ -1310,7 +1360,8 @@ void FogVolume_noise_scale(void) {
 }
 
 /** With a fixed delta time a wind of 120 units a second along +X moves the fog 2 units, 8
- * pixels, to the right each frame; without wind two frames are the same. */
+ * pixels, to the right each frame; without wind two frames are the same. The frames are taken
+ * without the history of the grid, which lags behind the wind by its blend. */
 void FogVolume_wind_moves(void) {
     // fog_volume/noise
     int32_t k;
@@ -1318,8 +1369,11 @@ void FogVolume_wind_moves(void) {
         ecs_world_t *world = fv_world(0);
         fv_noise_volume(world, 1, 8, (float[]){k ? 120.0f : 0.0f, 0, 0});
         fv_surface(world, FV_SIZE, FV_SIZE, "fog_wind.png");
-        box_render_gpu_stats_t before = fv_frames(world, 3);
+        box_render_gpu_stats_t before = fv_frames(world, 2);
+        fv_still(world);
+        fv_frames(world, 1);
         unsigned char *a = fv_load(world, "fog_wind.png", FV_SIZE, FV_SIZE);
+        fv_still(world);
         box_render_gpu_stats_t after = fv_frames(world, 1);
         unsigned char *b = fv_load(world, "fog_wind.png", FV_SIZE, FV_SIZE);
         test_int(after.errors, before.errors);
@@ -1353,7 +1407,8 @@ void FogVolume_wind_moves(void) {
 /** After three days a frame at a time T and one at T plus the period of the noise along the
  * wind, 10 noise_scale over its speed, render the same pixels, while one moved by half a
  * noise_scale does not: half the period would move the coarse sample by whole cells and change
- * only the detail. */
+ * only the detail. The frames are taken without the history of the grid, which the jumps in
+ * time would blend with billows from elsewhere. */
 void FogVolume_wind_period(void) {
     // fog_volume/noise
     const float scale = 4, speed = 2;
@@ -1363,12 +1418,15 @@ void FogVolume_wind_period(void) {
     fv_surface(world, FV_SIZE, FV_SIZE, "fog_wind_period.png");
     box_render_gpu_stats_t before = fv_frames(world, 3), after;
     // Three days of uptime, where a float32 time steps by 16 ms
+    fv_still(world);
     ecs_progress(world, 3 * 86400.0f + 0.37f);
     box_render_sync(world);
     unsigned char *a = fv_load(world, "fog_wind_period.png", FV_SIZE, FV_SIZE);
+    fv_still(world);
     ecs_progress(world, period);
     box_render_sync(world);
     unsigned char *b = fv_load(world, "fog_wind_period.png", FV_SIZE, FV_SIZE);
+    fv_still(world);
     ecs_progress(world, period / 20);
     box_render_sync(world);
     unsigned char *c = fv_load(world, "fog_wind_period.png", FV_SIZE, FV_SIZE);
@@ -1397,12 +1455,12 @@ void FogVolume_wind_period(void) {
     ecs_fini(world);
 }
 
-/** Two headless runs of 7 frames with --delta-time render the same pixels at the last frame,
- * wind and all. */
+/** Two headless runs of 30 frames with --delta-time render the same pixels at the last frame,
+ * wind, jitter and the history of the grid and all. */
 void FogVolume_noise_deterministic(void) {
     // fog_volume/noise
     const char *files[2] = { "fog_noise_run_a.png", "fog_noise_run_b.png" };
-    char *argv[] = {"boxrun", "--headless", "--frames", "7", "--delta-time", "0.016666667"};
+    char *argv[] = {"boxrun", "--headless", "--frames", "30", "--delta-time", "0.016666667"};
     unsigned char *px[2];
     int32_t k;
     for (k = 0; k < 2; k ++) {
@@ -1412,17 +1470,18 @@ void FogVolume_noise_deterministic(void) {
         app->unguarded = true;
         app->unpaced = true;
         ecs_singleton_modified(world, App);
-        fv_noise_volume(world, 0.8f, 5, (float[]){1.5f, 0.5f, -0.75f});
+        fv_noise_volume(world, 0.8f, 12, (float[]){1.5f, 0.5f, -0.75f});
         fv_surface(world, FV_SIZE, FV_SIZE, files[k]);
         test_int(box_app_run(world), 0);
         box_render_sync(world);
-        test_int(ecs_get_world_info(world)->frame_count_total, 7);
+        test_int(ecs_get_world_info(world)->frame_count_total, 30);
         px[k] = fv_load(world, files[k], FV_SIZE, FV_SIZE);
         ecs_fini(world);
     }
 
     double mean, deviation, neighbours;
     fv_measure(px[0], &mean, &deviation, &neighbours);
+    printf("deterministic run: deviation %.2f\n", deviation);
     test_assert(deviation > 4.0);
     test_assert(!memcmp(px[0], px[1], FV_SIZE * FV_SIZE * 4));
     stbi_image_free(px[0]);
@@ -1430,12 +1489,12 @@ void FogVolume_noise_deterministic(void) {
 }
 
 /** After a device loss the restarted backend makes the noise texture again: the fog renders
- * the same billows as before. */
+ * the same billows as before, both frames without the history of the grid. */
 void FogVolume_noise_device_loss(void) {
     // fog_volume/noise
     ecs_world_t *world = fv_world(0);
     fv_noise_volume(world, 1, 4, (float[]){0, 0, 0});
-    unsigned char *before = fv_render(world, "fog_noise_lost.png");
+    unsigned char *before = fv_render_still(world, "fog_noise_lost.png");
     double mean, deviation, neighbours;
     fv_measure(before, &mean, &deviation, &neighbours);
     test_assert(deviation > 6.0);
@@ -1447,6 +1506,10 @@ void FogVolume_noise_device_loss(void) {
     box_render_gpu_lose_device(world);
     int32_t i, wrong = 0;
     for (i = 0; i < 4; i ++) {
+        if (i == 3) {
+            fv_still(world);
+        }
+
         ecs_progress(world, 0);
         box_render_sync(world);
     }
@@ -1684,14 +1747,15 @@ static unsigned char* fv_point_shadow_render(
         ecs_set(world, bar, Box, {1, 0.2f, 4});
     }
 
-    unsigned char *px = fv_render(world, file);
+    unsigned char *px = fv_render_still(world, file);
     ecs_fini(world);
 
     return px;
 }
 
 /** A bar under a shadowed point light leaves a dark wedge in the fog under it, while the fog
- * beside the wedge stays as lit. */
+ * beside the wedge stays as lit, in a frame of cells sampled at their centers: the wedge is
+ * about a cell and a half wide, which the cells averaged over many frames soften. */
 void FogVolume_point_shadow_in_fog(void) {
     // fog_volume/lights
     unsigned char *open = fv_point_shadow_render(false, "fog_point_shadow_open.png");
@@ -1912,5 +1976,452 @@ void FogVolume_grid_size_4k(void) {
         test_int(after.errors, first.errors);
     }
 
+    ecs_fini(world);
+}
+
+/** Consumer kind of the history pair of the froxel grid of a view,
+ * BOX_GPU_HISTORY_FOG_VOLUMES of the backend */
+#define FV_HISTORY_FOG (2)
+
+/** History pairs read at most */
+#define FV_HISTORY_PAIRS (8)
+
+/** Get the history pair of the froxel grid of a view.
+ *
+ * @param world The world
+ * @param view The view
+ * @param out Receives the pair
+ * @return Whether the pair exists
+ */
+static bool fv_history(
+    ecs_world_t *world,
+    ecs_entity_t view,
+    box_render_gpu_history_pair_t *out)
+{
+    box_render_gpu_history_pair_t pairs[FV_HISTORY_PAIRS];
+    int32_t i, count = box_render_gpu_history_pairs(world, pairs, FV_HISTORY_PAIRS);
+    bool result = false;
+    for (i = 0; i < count && i < FV_HISTORY_PAIRS && !result; i ++) {
+        if (pairs[i].consumer == FV_HISTORY_FOG && pairs[i].view == view) {
+            *out = pairs[i];
+            result = true;
+        }
+    }
+
+    return result;
+}
+
+/** Run one frame and load the square capture it wrote.
+ *
+ * @param world The world
+ * @param file Name of the PNG of the surface
+ * @return The pixels, RGBA, freed with stbi_image_free
+ */
+static unsigned char* fv_next(
+    ecs_world_t *world,
+    const char *file)
+{
+    fv_frames(world, 1);
+
+    return fv_load(world, file, FV_SIZE, FV_SIZE);
+}
+
+/** Mean absolute difference of the green of two square captures inside a margin of 4 pixels.
+ *
+ * @param a The first capture
+ * @param b The second capture
+ * @return The mean difference
+ */
+static double fv_diff(
+    const unsigned char *a,
+    const unsigned char *b)
+{
+    double diff = 0;
+    int32_t x, y, count = 0;
+    for (y = 4; y < FV_SIZE - 4; y ++) {
+        for (x = 4; x < FV_SIZE - 4; x ++) {
+            diff += abs((int32_t)fv_px(a, x, y)[1] - (int32_t)fv_px(b, x, y)[1]);
+            count ++;
+        }
+    }
+
+    return diff / count;
+}
+
+/** Largest difference of the green of two square captures.
+ *
+ * @param a The first capture
+ * @param b The second capture
+ * @return The largest difference
+ */
+static int32_t fv_max_diff(
+    const unsigned char *a,
+    const unsigned char *b)
+{
+    int32_t i, result = 0;
+    for (i = 0; i < FV_SIZE * FV_SIZE; i ++) {
+        int32_t d = abs((int32_t)a[i * 4 + 1] - (int32_t)b[i * 4 + 1]);
+        result = d > result ? d : result;
+    }
+
+    return result;
+}
+
+/** Build the scene of the temporal cases: the sun shining straight down through a volume with
+ * noise and without wind, a roof over its left side that leaves a shadow edge at x 2, seen by a
+ * camera at the origin turned about +Y.
+ *
+ * @param world The world
+ * @param yaw Rotation of the camera about +Y
+ * @param camera Receives the camera
+ * @return The view
+ */
+static ecs_entity_t fv_history_scene(
+    ecs_world_t *world,
+    float yaw,
+    ecs_entity_t *camera)
+{
+    *camera = fv_camera(world, 0, yaw);
+    ecs_entity_t view = fv_view(world, *camera, true);
+    View *v = ecs_get_mut(world, view, View);
+    v->shadows = fv_shadows;
+    ecs_modified(world, view, View);
+    ecs_entity_t sun = ecs_new(world);
+    ecs_set(world, sun, Rotation, {(float)GLM_PI_2, 0, 0});
+    ecs_set(world, sun, DirectionalLight, {.intensity = GLM_PIf});
+    ecs_entity_t e = fv_volume(world, (float[]){0, 0, -15}, (float[]){8, 4, 6}, 0.2f, 0);
+    FogVolume *f = ecs_get_mut(world, e, FogVolume);
+    f->asymmetry = 0;
+    f->noise_strength = 0.6f;
+    f->noise_scale = 3;
+    ecs_modified(world, e, FogVolume);
+    ecs_entity_t roof = ecs_new(world);
+    ecs_set(world, roof, Position, {-3, 8, -15});
+    ecs_set(world, roof, Box, {10, 0.5f, 20});
+
+    return view;
+}
+
+/** With a static camera the cells converge: a frame differs from the frame a sequence period
+ * later far less after 40 frames than at the start, and consecutive frames differ little. */
+void FogVolume_history_converges(void) {
+    // fog_volume/temporal
+    const int32_t period = 16;
+    const char *file = "fog_converge.png";
+    unsigned char *px[64];
+    ecs_entity_t camera;
+    ecs_world_t *world = fv_world(0);
+    fv_history_scene(world, 0, &camera);
+    box_render_gpu_stats_t before = fv_frames(world, 0);
+    fv_surface(world, FV_SIZE, FV_SIZE, file);
+    int32_t i;
+    for (i = 0; i < 64; i ++) {
+        px[i] = fv_next(world, file);
+    }
+
+    double early = fv_diff(px[0], px[period]);
+    double late = fv_diff(px[40], px[40 + period]);
+    double step = 0;
+    for (i = 48; i < 63; i ++) {
+        step += fv_diff(px[i], px[i + 1]) / 15;
+    }
+
+    printf("period difference early %.3f, late %.3f, consecutive late %.3f\n",
+        early, late, step);
+    test_assert(early > 0);
+    test_assert(late * 4 < early);
+    test_assert(step < 1.5);
+    test_int(fv_frames(world, 0).errors, before.errors);
+    for (i = 0; i < 64; i ++) {
+        stbi_image_free(px[i]);
+    }
+
+    ecs_fini(world);
+}
+
+/** The first frame and the frame after a HistoryReset sample every cell at its center without
+ * the previous cells, so they render the same pixels; the frames between them blend. */
+void FogVolume_history_reset(void) {
+    // fog_volume/temporal
+    const char *file = "fog_history_reset.png";
+    box_render_gpu_history_pair_t pair;
+    ecs_entity_t camera;
+    ecs_world_t *world = fv_world(0);
+    ecs_entity_t view = fv_history_scene(world, 0, &camera);
+    fv_surface(world, FV_SIZE, FV_SIZE, file);
+    unsigned char *first = fv_next(world, file);
+    test_assert(fv_history(world, view, &pair));
+    test_bool(pair.valid, false);
+    test_int(pair.depth, BOX_FROXEL_SLICES);
+
+    fv_frames(world, 19);
+    unsigned char *blended = fv_next(world, file);
+    test_assert(fv_history(world, view, &pair));
+    test_bool(pair.valid, true);
+    printf("blended frame differs by %.3f\n", fv_diff(first, blended));
+    test_assert(fv_diff(first, blended) > 0);
+
+    ecs_add(world, view, HistoryReset);
+    unsigned char *reset = fv_next(world, file);
+    test_assert(fv_history(world, view, &pair));
+    test_bool(pair.valid, false);
+    printf("reset frame differs by at most %d\n", fv_max_diff(first, reset));
+    test_assert(fv_max_diff(first, reset) <= 1);
+
+    stbi_image_free(first);
+    stbi_image_free(blended);
+    stbi_image_free(reset);
+    ecs_fini(world);
+}
+
+/** The column of a square capture where the green, averaged down its middle rows, first rises
+ * above halfway from its darkest to its brightest column: the shadow edge of the shaft of
+ * fv_history_scene.
+ *
+ * @param px The pixels
+ * @return The column, with the fraction of the pixel the crossing lies at
+ */
+static double fv_edge(
+    const unsigned char *px)
+{
+    double cols[FV_SIZE], lo = 1e30, hi = -1e30, result = -1;
+    int32_t x, y;
+    for (x = 0; x < FV_SIZE; x ++) {
+        cols[x] = 0;
+        for (y = 16; y < 48; y ++) {
+            cols[x] += fv_px(px, x, y)[1];
+        }
+
+        cols[x] /= 32;
+        lo = fmin(lo, cols[x]);
+        hi = fmax(hi, cols[x]);
+    }
+
+    double half = (lo + hi) / 2;
+    for (x = 1; x < FV_SIZE && result < 0; x ++) {
+        if (cols[x - 1] < half && cols[x] >= half) {
+            result = x - 1 + (half - cols[x - 1]) / (cols[x] - cols[x - 1]);
+        }
+    }
+
+    return result;
+}
+
+/** A camera that turns and stops shows the shadow edge of the shaft where a camera that stood at
+ * its final rotation all along shows it: the previous cells are found where they were in the
+ * world, so the edge does not trail behind the turn: two frames after it stopped it is within a
+ * pixel and a half, where the cells of the old rotation, blended in at the same rate without
+ * being reprojected, would leave it several behind. */
+void FogVolume_history_camera_turns(void) {
+    // fog_volume/temporal
+    const float yaw = 0.12f;
+    const int32_t steps = 10;
+    ecs_entity_t camera;
+    ecs_world_t *world = fv_world(0);
+    fv_history_scene(world, yaw, &camera);
+    fv_surface(world, FV_SIZE, FV_SIZE, "fog_turn_ref.png");
+    fv_frames(world, 41);
+    unsigned char *ref = fv_load(world, "fog_turn_ref.png", FV_SIZE, FV_SIZE);
+    ecs_fini(world);
+
+    world = fv_world(0);
+    fv_history_scene(world, 0, &camera);
+    fv_surface(world, FV_SIZE, FV_SIZE, "fog_turn.png");
+    fv_frames(world, 30);
+    unsigned char *start = fv_load(world, "fog_turn.png", FV_SIZE, FV_SIZE);
+    int32_t i;
+    for (i = 1; i <= steps; i ++) {
+        ecs_set(world, camera, Rotation, {0, yaw * (float)i / (float)steps, 0});
+        fv_frames(world, 1);
+    }
+
+    fv_frames(world, 2);
+    unsigned char *turned = fv_load(world, "fog_turn.png", FV_SIZE, FV_SIZE);
+    double from = fv_edge(start), want = fv_edge(ref), got = fv_edge(turned);
+    printf("edge from %.2f to %.2f, turned camera at %.2f, differs by %.3f on average\n",
+        from, want, got, fv_diff(ref, turned));
+    test_assert(want - from > 4);
+    test_assert(fabs(got - want) < 1.5);
+    test_assert(fv_diff(ref, turned) < 6.0);
+    stbi_image_free(ref);
+    stbi_image_free(start);
+    stbi_image_free(turned);
+    ecs_fini(world);
+}
+
+/** A volume removed beside another one leaves no fog 10 frames later, while the other one keeps
+ * its fog. */
+void FogVolume_history_removed_volume(void) {
+    // fog_volume/temporal
+    const char *file = "fog_history_removed.png";
+    ecs_world_t *world = fv_world(0);
+    fv_view(world, fv_camera(world, 0, 0), true);
+    fv_wall(world, 0, -20, 40, FV_WALL);
+    fv_volume(world, (float[]){-3, 0, -10}, (float[]){2.5f, 2.5f, 1}, 0.08f, 1);
+    ecs_entity_t right = fv_volume(world, (float[]){3, 0, -10}, (float[]){2.5f, 2.5f, 1},
+        0.08f, 1);
+    fv_surface(world, FV_SIZE, FV_SIZE, file);
+    fv_frames(world, 30);
+    unsigned char *px = fv_load(world, file, FV_SIZE, FV_SIZE);
+    int32_t left_before = fv_px(px, 15, 32)[1], right_before = fv_px(px, 48, 32)[1];
+    stbi_image_free(px);
+
+    ecs_delete(world, right);
+    fv_frames(world, 10);
+    px = fv_load(world, file, FV_SIZE, FV_SIZE);
+    int32_t left_after = fv_px(px, 15, 32)[1], right_after = fv_px(px, 48, 32)[1];
+    stbi_image_free(px);
+    printf("left %d -> %d, right %d -> %d, wall %d\n", left_before, left_after,
+        right_before, right_after, FV_WALL);
+    test_assert(FV_WALL - right_before > 10);
+    test_assert(abs(FV_WALL - right_after) <= 3);
+    test_assert(abs(left_after - left_before) <= 2);
+    ecs_fini(world);
+}
+
+/** Two views of one target keep a history pair each: a HistoryReset of one does not reset the
+ * other. */
+void FogVolume_history_two_views(void) {
+    // fog_volume/temporal
+    box_render_gpu_history_pair_t a, b;
+    ecs_world_t *world = fv_world(0);
+    ecs_entity_t first = fv_view(world, fv_camera(world, 0, 0), true);
+    ecs_entity_t second = ecs_new(world);
+    ecs_set(world, second, View, {.camera = fv_camera(world, 0, (float)GLM_PI),
+        .clear = {.enabled = true, .color = {0, 0, 0, 255}},
+        .lighting = {.enabled = true, .fog_volumes = true}, .order = 1});
+    fv_wall(world, 0, -20, 40, FV_WALL);
+    fv_wall(world, 0, 20, 40, FV_WALL);
+    fv_volume(world, (float[]){0, 0, -10}, (float[]){8, 8, 2}, 0.1f, 1);
+    fv_volume(world, (float[]){0, 0, 10}, (float[]){8, 8, 2}, 0.3f, 1);
+    unsigned char *px = fv_render(world, "fog_history_two_views.png");
+    fv_expect(fv_px(px, 32, 32), fv_srgb(fv_lin(FV_WALL) * fv_grid(0.3f, 8, 12, 19.9f)), 4);
+    stbi_image_free(px);
+
+    test_assert(fv_history(world, first, &a));
+    test_assert(fv_history(world, second, &b));
+    test_assert(a.read != b.read);
+    test_assert(a.write != b.write);
+    test_bool(a.valid, true);
+    test_bool(b.valid, true);
+
+    ecs_add(world, second, HistoryReset);
+    fv_frames(world, 1);
+    test_assert(fv_history(world, first, &a));
+    test_assert(fv_history(world, second, &b));
+    test_bool(a.valid, true);
+    test_bool(b.valid, false);
+    fv_frames(world, 1);
+    test_assert(fv_history(world, second, &b));
+    test_bool(b.valid, true);
+    ecs_fini(world);
+}
+
+/** The first frame at a new size renders the volume as a first frame does, without the cells of
+ * the old size. */
+void FogVolume_history_resize(void) {
+    // fog_volume/temporal
+    box_render_gpu_history_pair_t pair;
+    ecs_world_t *world = fv_world(0);
+    ecs_entity_t view = fv_view(world, fv_camera(world, 0, 0), true);
+    fv_wall(world, 0, -20, 40, FV_WALL);
+    fv_volume(world, (float[]){0, 0, -10}, (float[]){20, 20, 2}, 0.2f, 1);
+    int32_t want = fv_srgb(fv_lin(FV_WALL) * fv_grid(0.2f, 8, 12, 19.9f));
+    ecs_entity_t s = fv_surface(world, FV_SIZE, FV_SIZE, "fog_history_resize_a.png");
+    box_render_gpu_stats_t before = fv_frames(world, 20);
+    test_assert(fv_history(world, view, &pair));
+    test_bool(pair.valid, true);
+
+    ecs_set(world, s, Surface, {.width = 96, .height = 48,
+        .write_to_file = "fog_history_resize_b.png", .resolution_scale = 1});
+    box_render_gpu_stats_t after = before;
+    int32_t i;
+    for (i = 0; i < 3 && after.fog_grid[0] != 12; i ++) {
+        after = fv_frames(world, 1);
+    }
+
+    test_int(after.fog_grid[0], 12);
+    test_int(after.fog_grid[1], 6);
+    test_assert(fv_history(world, view, &pair));
+    test_bool(pair.valid, false);
+    test_int(pair.width, 12);
+    unsigned char *px = fv_load(world, "fog_history_resize_b.png", 96, 48);
+    fv_expect(&px[(24 * 96 + 48) * 4], want, 4);
+    stbi_image_free(px);
+    test_int(after.errors, before.errors);
+    ecs_fini(world);
+}
+
+/** Mean size of the bumps of the rows of a square capture: the green of each row averaged over
+ * its middle half, and the mean absolute second difference of those means down the rows inside
+ * a margin of an eighth. Stripes where a face crosses the depth slices make it large.
+ *
+ * @param px The pixels
+ * @param size Width and height
+ * @return The mean bump
+ */
+static double fv_row_bumps(
+    const unsigned char *px,
+    int32_t size)
+{
+    double *rows = ecs_os_malloc_n(double, size), result = 0;
+    int32_t x, y, margin = size / 8;
+    for (y = 0; y < size; y ++) {
+        rows[y] = 0;
+        for (x = size / 4; x < size - size / 4; x ++) {
+            rows[y] += px[(y * size + x) * 4 + 1];
+        }
+
+        rows[y] /= size - 2 * (size / 4);
+    }
+
+    for (y = margin; y < size - margin; y ++) {
+        result += fabs(rows[y + 1] - 2 * rows[y] + rows[y - 1]);
+    }
+
+    ecs_os_free(rows);
+
+    return result / (size - 2 * margin);
+}
+
+/** A thin slab with the soft faces of the plain volume of fog_volume_noise.flecs lies on a floor,
+ * seen from above at a grazing angle like there: its top face and the floor cross the depth
+ * slices at different depths along each row, which steps the fog into stripes when a slice is
+ * weighed by depth alone. After the history converged the rows change smoothly. */
+void FogVolume_history_grazing_slab(void) {
+    // fog_volume/temporal
+    const char *file = "fog_grazing_slab.png";
+    const int32_t size = 256;
+    ecs_world_t *world = fv_world(1);
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 10, 11});
+    ecs_set(world, camera, Rotation, {-0.75f, 0, 0});
+    ecs_set(world, camera, Camera, {.fov = 50, .near_ = FV_NEAR, .far_ = 1000});
+    fv_view(world, camera, true);
+    ecs_entity_t floor = ecs_new(world);
+    ecs_set(world, floor, Position, {0, -0.1f, 0});
+    ecs_set(world, floor, Box, {80, 0.2f, 80});
+    ecs_set(world, floor, Rgb, {0, 0, 0});
+    ecs_set(world, floor, PbrMaterial, {.metallic = 1, .roughness = 1});
+    ecs_set(world, floor, Emissive, {.strength = 1, .color = {30, 30, 30}});
+    ecs_entity_t e = fv_volume(world, (float[]){0, 0.75f, 0}, (float[]){40, 0.75f, 40}, 0.35f,
+        0);
+    FogVolume *f = ecs_get_mut(world, e, FogVolume);
+    f->asymmetry = 0;
+    f->edge_fade = 0.4f;
+    ecs_modified(world, e, FogVolume);
+    fv_surface(world, size, size, file);
+    fv_frames(world, 1);
+    unsigned char *first = fv_load(world, file, size, size);
+    fv_frames(world, 39);
+    unsigned char *converged = fv_load(world, file, size, size);
+    double before = fv_row_bumps(first, size), after = fv_row_bumps(converged, size);
+    printf("row bumps first %.3f, converged %.3f, center %d\n", before, after,
+        converged[(size / 2 * size + size / 2) * 4 + 1]);
+    test_assert(converged[(size / 2 * size + size / 2) * 4 + 1] > 60);
+    test_assert(after < 0.2);
+    test_assert(after <= before);
+    stbi_image_free(first);
+    stbi_image_free(converged);
     ecs_fini(world);
 }

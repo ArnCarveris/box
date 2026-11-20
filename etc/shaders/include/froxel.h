@@ -28,6 +28,18 @@
  * injection takes the share of each volume that covers the cell and the shadow of the sun */
 #define BOX_FROXEL_SAMPLES 4
 
+/** Points along the slice of the depth of a pixel at which the apply draw finds where the density
+ * of the volumes that partly cover the slice lies along the ray of the pixel */
+#define BOX_FROXEL_APPLY_SAMPLES 8
+
+/** Weight of the previous frame when the light injection blends a cell with the previous cells
+ * reprojected to it, so it averages a jittered point per frame. Higher is smoother but lags
+ * changing volumes and wind longer, BLEND^n of an old value is left after n frames, and trails a
+ * turning camera further: at 0.85 a still view flickers about a quarter less than at 0.8, while
+ * 0.9 leaves a shaft edge nearly twice as far behind a turn (FogVolume.history_camera_turns).
+ * Cells no volume reaches take no history, so a removed volume leaves nothing behind at all */
+#define BOX_FROXEL_HISTORY_BLEND 0.85
+
 /** Edge of the workgroup of the light injection, which runs one thread per cell */
 #define BOX_FROXEL_INJECT_GROUP 4
 
