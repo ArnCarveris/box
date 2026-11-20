@@ -1,0 +1,31 @@
+// The long walk through the wildwood: the scene of wildwood.flecs, walked 10 km by the course
+// of wildwood/course.flecs from the trail at the start, in seven legs that turn at 1.4, 2.7,
+// 4.3, 5.5, 7 and 8.5 km, keeping to the trails it comes upon. It walks at the speed of the
+// player (4 m/s) by 1/60 s of the world per frame, 150000 frames, with the frames capped at 120
+// FPS: the streaming has a walk's work per frame while the 10 km take 21 to 42 minutes. When the
+// walk starts, a perf run measures its frames (p50, p95, p99, worst) and writes them to
+// wildwood_walk.json; the course panel shows a row of the streaming every 500 m and what the
+// frames over 16.7 ms did.
+//
+// To start further out, for a look at the far walk, set state.course_seek to the meters to skip
+// (the course goes there along the headings of its legs and waits for the ground).
+include wildwood
+include wildwood/course
+
+using box.perf
+
+// The keys the perf run holds (forward and left) reach no controller: the course moves the
+// player itself
+$ {
+  if state.course_started {
+    box.perf.Run: {
+      fps: 120,
+      frames: 149800,
+      warmup: 120,
+      period: 0,
+      camera: player,
+      fly: true,
+      report: "wildwood_walk.json"
+    }
+  }
+}

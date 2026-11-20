@@ -66,6 +66,7 @@ void box_perf_stats(
     stats->max = sorted[count - 1];
     stats->mean = sum / (double)count;
     stats->p50 = box_perf_percentile(sorted, count, 50);
+    stats->p95 = box_perf_percentile(sorted, count, 95);
     stats->p99 = box_perf_percentile(sorted, count, 99);
     ecs_os_free(sorted);
 done:
@@ -153,13 +154,13 @@ static void box_perf_report_stats(
         "  \"passed\": %s,\n  \"frames\": %d,\n  \"errors\": %d,\n  \"slow\": %d,\n"
         "  \"fast\": %d,\n  \"target_ms\": %.4f,\n  \"tolerance\": %.2f,\n"
         "  \"min_ms\": %.4f,\n  \"mean_ms\": %.4f,\n  \"p50_ms\": %.4f,\n"
-        "  \"p99_ms\": %.4f,\n  \"max_ms\": %.4f,\n  \"fps\": %.2f,\n"
+        "  \"p95_ms\": %.4f,\n  \"p99_ms\": %.4f,\n  \"max_ms\": %.4f,\n  \"fps\": %.2f,\n"
         "  \"slept_ms\": %.3f,\n  \"stalls\": %d,\n  \"shapes\": %d,\n"
         "  \"audio_load\": %.4f,\n",
         status->passed ? "true" : "false", status->frame, status->errors, status->slow,
         status->fast, status->target_ms, BOX_PERF_TOLERANCE, status->min_ms, status->mean_ms,
-        status->p50_ms, status->p99_ms, status->max_ms, fps, status->slept_ms, status->stalls,
-        status->shapes, (double)status->audio_load);
+        status->p50_ms, status->p95_ms, status->p99_ms, status->max_ms, fps, status->slept_ms,
+        status->stalls, status->shapes, (double)status->audio_load);
     ecs_strbuf_append(buf,
         "  \"delta_errors\": %d,\n  \"delta_tolerance_ms\": %.3f,\n  \"delta_max_ms\": %.4f,\n"
         "  \"present_mean_ms\": %.4f,\n"

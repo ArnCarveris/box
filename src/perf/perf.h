@@ -54,6 +54,7 @@ typedef struct box_perf_stats_t {
     double min;   /**< Shortest duration */
     double mean;  /**< Mean duration */
     double p50;   /**< Median duration */
+    double p95;   /**< 95th percentile duration, nearest rank */
     double p99;   /**< 99th percentile duration, nearest rank */
     double max;   /**< Longest duration */
 } box_perf_stats_t;

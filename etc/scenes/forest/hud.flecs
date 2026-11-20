@@ -183,7 +183,7 @@ hud {
         h: Left,
         v: Bottom,
         x: state.hud_shown ? 18 : -2000,
-        y: -18,
+        y: 18,
         width: {mode: Fixed, value: PANEL_W}
       }
       Rect: {1, 1}

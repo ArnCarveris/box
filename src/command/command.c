@@ -301,6 +301,7 @@ void BoxCommandImport(
     box_cmd_fit_init(world);
     box_cmd_audio_init(world);
     box_cmd_frames_init(world);
+    box_cmd_counts_init(world);
     box_cmd_edit_init(world);
     box_cmd_geometry_init(world);
     box_cmd_ablate_init(world);

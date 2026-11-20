@@ -12,13 +12,15 @@ using state
 // origin follow. It walks on the terrain with a FirstPersonController and flies with a
 // CameraController while state.flying (F) is set; both move the same entity, so the view and
 // the focus stay with it. It waits in the air above the start until the terrain there is known,
-// then stands on the trail in a clearing nearest to the start.
+// then stands on the trail in a clearing nearest to the start. While state.scripted is set it
+// has no controller and a script moves it by writing its pose (course.flecs).
 state {
   // Where the player starts and whether it stands on the ground yet
   export mut start_x: f32 = START_X
   export mut start_y: f32 = 120
   export mut start_z: f32 = START_Z
   export mut start_yaw: f32 = 0
+  export mut start_pitch: f32 = -0.04
   export mut started: bool = false
 
   // The best place for the start found so far, and the best direction along its trail
@@ -66,13 +68,13 @@ walk_keys {
 
 player {
   Position: {start_x, start_y, start_z}
-  Rotation: {-0.04, start_yaw, 0}
+  Rotation: {start_pitch, start_yaw, 0}
   Camera: {fov: 62, near_: 0.1, far_: VIEW_FAR}
   WorldFocus
 
-  if flying {
+  if flying && !scripted {
     CameraController: {speed: FLY_SPEED, boost: 8}
-  } else if started {
+  } else if started && !scripted {
     FirstPersonController: {
       speed: WALK_SPEED,
       eye: EYE,

@@ -620,6 +620,7 @@ static void box_perf_end(
     status->min_ms = frames.min;
     status->mean_ms = frames.mean;
     status->p50_ms = frames.p50;
+    status->p95_ms = frames.p95;
     status->p99_ms = frames.p99;
     status->max_ms = frames.max;
     status->slept_ms = app ? (app->slept - perf->slept) * 1000.0 : 0;

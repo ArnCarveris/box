@@ -112,6 +112,7 @@ ECS_STRUCT(PerfStatus, {
     double min_ms;        /**< Shortest frame interval */
     double mean_ms;       /**< Mean frame interval */
     double p50_ms;        /**< Median frame interval */
+    double p95_ms;        /**< 95th percentile frame interval */
     double p99_ms;        /**< 99th percentile frame interval */
     double max_ms;        /**< Longest frame interval */
     double slept_ms;      /**< Milliseconds the CPU budget of App slept during the measurement */

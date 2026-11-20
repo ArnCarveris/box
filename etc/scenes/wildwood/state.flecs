@@ -45,6 +45,10 @@ state {
   // Whether the player flies with the camera controller instead of walking, toggled by F
   export mut flying: bool = false
 
+  // Whether a script moves the player instead of either controller, as the course of the long
+  // walk and flight does (course.flecs)
+  export mut scripted: bool = false
+
   actions {
     toggle_fly {
       Action: {description: "Switch between walking and flying"}

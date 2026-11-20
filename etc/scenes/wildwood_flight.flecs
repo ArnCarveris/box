@@ -1,0 +1,28 @@
+// The long flight over the wildwood: the course of wildwood_walk.flecs flown at 40 m/s, 70 m
+// over the highest ground ahead, by 1/60 s of the world per frame, 15000 frames, with the frames
+// capped at 120 FPS. A perf run measures its frames and writes them to wildwood_flight.json; the
+// course panel shows a row of the streaming every 500 m and what the frames over 16.7 ms did.
+include wildwood
+include wildwood/course
+
+using box.perf
+
+async {
+  state.course_flight = true
+}
+
+// The keys the perf run holds (forward and left) reach no controller: the course moves the
+// player itself
+$ {
+  if state.course_started {
+    box.perf.Run: {
+      fps: 120,
+      frames: 14800,
+      warmup: 120,
+      period: 0,
+      camera: player,
+      fly: true,
+      report: "wildwood_flight.json"
+    }
+  }
+}
