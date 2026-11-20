@@ -193,6 +193,7 @@ void Wind_defaults(void) {
     test_assert(s->offset_z == 0.0);
     test_assert(s->sway == 0.0);
     test_assert(s->time == 0.0);
+    test_assert(s->clock == 0.0);
 
     /* Every member is reflected */
     test_assert(ecs_script_run(world, "wind",
@@ -399,6 +400,7 @@ void Wind_speed_change_continuous(void) {
     test_assert(fabs(wind_step(before.sway, s.sway, 1.0) - BOX_RENDER_WIND_SWAY_BASE * dt) <
         1e-9);
     test_assert(s.time > before.time);
+    test_assert(fabs((s.clock - before.clock) - BOX_RENDER_WIND_CLOCK_CALM * dt) < 1e-9);
 }
 
 /** The engine advances the status of the singleton by the frame delta, so a fixed delta gives
@@ -430,6 +432,7 @@ void Wind_system_fixed_delta(void) {
         test_assert(fabs(s->offset_z - expect.offset_z) < 1e-9);
         test_assert(fabs(s->sway - expect.sway) < 1e-9);
         test_assert(fabs(s->time - 100.0 * WIND_DELTA) < 1e-9);
+        test_assert(fabs(s->clock - expect.clock) < 1e-9);
 
         /* The frame of the renderer reads the singleton */
         box_render_wind_t frame;
@@ -441,6 +444,7 @@ void Wind_system_fixed_delta(void) {
         test_flt(frame.frequency, 0.1f);
         test_flt(frame.offset[0], (float)s->offset_x);
         test_flt(frame.sway, (float)s->sway);
+        test_assert(frame.clock == s->clock);
         ecs_fini(world);
     }
 
@@ -478,7 +482,7 @@ void Wind_pack(void) {
     /* A wind without a WindSway changes nothing */
     box_render_wind_t wind = {
         .direction = {0, 1}, .offset = {12.5f, 3}, .speed = 6, .gust = 0.25f,
-        .frequency = 0.05f, .sway = 0.375f, .time = 1000.25
+        .frequency = 0.05f, .sway = 0.375f, .clock = 1000.25
     };
     box_draws_material_pack(&record, &(box_draw_material_t){ .wind = wind, .fade = 1 });
     test_assert(!ecs_os_memcmp_t(&record, &plain, box_render_material_t));
@@ -532,7 +536,7 @@ void Wind_pack(void) {
     test_assert(!ecs_os_memcmp_t(&encoded, &record, box_render_material_t));
 }
 
-/** The flutter phase is the flutter frequency times the time of the wind, wrapped in double
+/** The flutter phase is the flutter frequency times the wind clock, wrapped in double
  * precision, so it keeps its steps after hours */
 void Wind_flutter_phase_wraps(void) {
     // materials/wind_sway
@@ -542,14 +546,81 @@ void Wind_flutter_phase_wraps(void) {
     box_render_wind_t wind = { .direction = {1, 0}, .speed = 4, .frequency = 0.05f };
     int32_t f;
     for (f = 0; f < 600; f ++) {
-        wind.time = 4.0 * 3600.0 + (double)f / 60.0;
+        wind.clock = 4.0 * 3600.0 + (double)f / 60.0;
         box_render_wind_pack(&a, &sway, &wind);
-        wind.time += 1.0 / 60.0;
+        wind.clock += 1.0 / 60.0;
         box_render_wind_pack(&b, &sway, &wind);
         test_assert(a.wind_flutter_phase >= 0.0f && a.wind_flutter_phase < 1.0f);
         test_assert(fabs(wind_step(a.wind_flutter_phase, b.wind_flutter_phase, 1.0) -
             (double)2.3f / 60.0) < 1e-5);
     }
+}
+
+/** The wind clock runs at a sixth of its full rate in a calm, a third at 2 m/s and at full rate
+ * from BOX_WIND_FULL_SPEED; a change of the speed changes how fast it and the flutter and branch
+ * phases advance, never where they are, and they keep their steps after hours */
+void Wind_clock_rate(void) {
+    // atmosphere/wind
+    test_assert(fabs(box_render_wind_clock_rate(&(Wind){ .speed = 0 }) - 1.0 / 6.0) < 1e-12);
+    test_assert(fabs(box_render_wind_clock_rate(&(Wind){ .speed = 2 }) - 1.0 / 3.0) < 1e-6);
+    test_assert(box_render_wind_clock_rate(&(Wind){ .speed = BOX_WIND_FULL_SPEED }) == 1.0);
+    test_assert(box_render_wind_clock_rate(&(Wind){ .speed = 1000 }) == 1.0);
+    test_assert(box_render_wind_clock_rate(&(Wind){ .speed = 6 }) >
+        box_render_wind_clock_rate(&(Wind){ .speed = 4 }));
+    test_assert(box_render_wind_clock_rate(&(Wind){ .speed = NAN }) == BOX_RENDER_WIND_CLOCK_CALM);
+    test_assert(box_render_wind_clock_rate(&(Wind){ .speed = -3 }) == BOX_RENDER_WIND_CLOCK_CALM);
+
+    /* An hour of a breeze advances the clock by a third of the time */
+    Wind wind = { .direction = {1, 0}, .speed = 2, .gust = 0.5f, .gust_scale = 20 };
+    WindStatus s = {0};
+    double dt = 1.0 / 64.0;
+    int32_t f;
+    for (f = 0; f < 64 * 3600 + 13; f ++) {
+        box_render_wind_advance(&wind, dt, &s);
+    }
+
+    test_assert(fabs(s.time - (3600.0 + 13.0 * dt)) < 1e-6);
+    test_assert(fabs(s.clock - s.time * box_render_wind_clock_rate(&wind)) < 1e-6);
+
+    /* A gale: the phases of the next frame move by the full rates times the delta */
+    WindSway sway = { .bend = 0.05f, .height = 4, .flutter = 0.1f, .flutter_frequency = 2.5f,
+        .flutter_reach = 0.5f, .pivots = true, .branch = 0.3f, .branch_frequency = 0.75f };
+    box_render_wind_t frame = { .direction = {1, 0}, .speed = 2, .frequency = 0.05f,
+        .time = s.time, .clock = s.clock };
+    box_render_material_t a, b;
+    box_render_wind_pack(&a, &sway, &frame);
+    wind.speed = 12;
+    box_render_wind_advance(&wind, dt, &s);
+    frame.speed = 12;
+    frame.time = s.time;
+    frame.clock = s.clock;
+    box_render_wind_pack(&b, &sway, &frame);
+    test_assert(fabs(wind_step(a.wind_flutter_phase, b.wind_flutter_phase, 1.0) -
+        2.5 * dt) < 1e-5);
+    test_assert(fabs(wind_step(a.wind_branch_phase, b.wind_branch_phase, 1.0) -
+        0.75 * dt) < 1e-5);
+
+    /* The naive phase, the frequency times the time, would have jumped */
+    float naive = (float)fmod(2.5 * s.time, 1.0);
+    test_assert(fabs(wind_step(a.wind_flutter_phase, naive, 1.0)) > 0.01);
+
+    /* Back to a breeze the phases move by a third of the rates */
+    a = b;
+    wind.speed = 2;
+    box_render_wind_advance(&wind, dt, &s);
+    frame.speed = 2;
+    frame.clock = s.clock;
+    box_render_wind_pack(&b, &sway, &frame);
+    double rate = box_render_wind_clock_rate(&wind);
+    test_assert(fabs(wind_step(a.wind_flutter_phase, b.wind_flutter_phase, 1.0) -
+        2.5 * rate * dt) < 1e-5);
+    test_assert(fabs(wind_step(a.wind_branch_phase, b.wind_branch_phase, 1.0) -
+        0.75 * rate * dt) < 1e-5);
+
+    /* A broken clock starts over */
+    s.clock = NAN;
+    box_render_wind_advance(&wind, dt, &s);
+    test_assert(fabs(s.clock - rate * dt) < 1e-12);
 }
 
 /** The reach is 0 when calm, grows with the speed, the gust, the bend and the flutter */
@@ -583,7 +654,7 @@ void Wind_pack_pivots(void) {
     // materials/wind_sway
     box_render_material_t record;
     box_render_wind_t wind = {
-        .direction = {1, 0}, .speed = 6, .frequency = 0.05f, .sway = 0.25f, .time = 1000.25
+        .direction = {1, 0}, .speed = 6, .frequency = 0.05f, .sway = 0.25f, .clock = 1000.25
     };
     WindSway sway = { .bend = 0.05f, .height = 4, .flutter = 0.1f, .flutter_frequency = 3,
         .flutter_reach = 0.5f, .branch = 0.3f, .branch_frequency = 0.5f };
@@ -628,9 +699,9 @@ void Wind_pack_pivots(void) {
     sway.branch = 0.3f;
     sway.branch_frequency = 0.7f;
     for (f = 0; f < 600; f ++) {
-        wind.time = 4.0 * 3600.0 + (double)f / 60.0;
+        wind.clock = 4.0 * 3600.0 + (double)f / 60.0;
         box_render_wind_pack(&a, &sway, &wind);
-        wind.time += 1.0 / 60.0;
+        wind.clock += 1.0 / 60.0;
         box_render_wind_pack(&b, &sway, &wind);
         test_assert(a.wind_branch_phase >= 0.0f && a.wind_branch_phase < 1.0f);
         test_assert(fabs(wind_step(a.wind_branch_phase, b.wind_branch_phase, 1.0) -

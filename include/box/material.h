@@ -1047,7 +1047,7 @@ ECS_STRUCT(WindSway, {
     float base;             /**< World Y at which the displacement is 0, the ground */
     float flutter;          /**< World units of the fast local flutter at full wind, 0 for
                              *   none */
-    float flutter_frequency; /**< Hz of the flutter */
+    float flutter_frequency; /**< Hz of the flutter at full wind, slower in a light wind */
     float flutter_reach;    /**< World distance from the origin of the shape over which the
                              *   flutter rises from 0 to full; at least 0.001; unused with pivots
                              *   on a mesh with data, whose flutter is weighted by data0.w */
@@ -1055,8 +1055,8 @@ ECS_STRUCT(WindSway, {
                              *   every vertex from the per vertex data of the mesh */
     float branch;           /**< Radians a branch with pivots and a stiffness of 0 turns about
                              *   its pivot at full wind, 0 for rigid branches */
-    float branch_frequency; /**< Hz of the swing of the branches of level 1; level n swings n
-                             *   times as fast */
+    float branch_frequency; /**< Hz of the swing of the branches of level 1 at full wind,
+                             *   slower in a light wind; level n swings n times as fast */
 });
 
 /** Pack the per vertex data a WindSway with pivots reads for a vertex of a branch.

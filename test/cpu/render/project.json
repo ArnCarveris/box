@@ -1269,6 +1269,7 @@
                     "system_fixed_delta",
                     "pack",
                     "flutter_phase_wraps",
+                    "clock_rate",
                     "reach",
                     "pack_pivots",
                     "reach_pivots",

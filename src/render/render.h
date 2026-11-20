@@ -458,7 +458,8 @@ typedef struct box_render_wind_t {
     float gust;             /**< Gust, clamped to 0..1 */
     float frequency;        /**< 1 over the gust scale, gust patches per world unit */
     float sway;             /**< Phase of the sway, 0..1 */
-    double time;            /**< Seconds the wind was advanced, the clock of the flutter */
+    double time;            /**< Seconds the wind was advanced */
+    double clock;           /**< WindStatus.clock, the clock of the flutter and branches */
     double origin_y;        /**< Absolute Y of the local origin, which the WindSway.base of a
                              *   record is made local by */
 } box_render_wind_t;
@@ -491,6 +492,10 @@ typedef struct box_render_wind_t {
 #define BOX_RENDER_WIND_SWAY_RATE (0.05)
 #define BOX_RENDER_WIND_SWAY_MAX (1.5)
 
+/** Rate of the wind clock in a calm, relative to its rate at BOX_WIND_FULL_SPEED: the rate grows
+ * linearly from it to 1 at full speed, so a breeze of 2 m/s runs at a third */
+#define BOX_RENDER_WIND_CLOCK_CALM (1.0 / 6.0)
+
 /** Resolve the values of a Wind: the direction normalized ({1, 0} when zero or not finite), the
  * speed 0 when negative or not finite, the gust clamped to 0..1, the gust scale at least
  * BOX_RENDER_WIND_GUST_SCALE_MIN.
@@ -508,6 +513,15 @@ void box_render_wind_resolve(
  * @return The frequency
  */
 double box_render_wind_sway_frequency(
+    const Wind *wind);
+
+/** Rate of the wind clock of a resolved Wind, seconds of the clock per second: from
+ * BOX_RENDER_WIND_CLOCK_CALM in a calm linearly to 1 at BOX_WIND_FULL_SPEED and above.
+ *
+ * @param wind The resolved Wind
+ * @return The rate
+ */
+double box_render_wind_clock_rate(
     const Wind *wind);
 
 /** Advance the status of a Wind by a delta: the gust offset moves along the direction by the

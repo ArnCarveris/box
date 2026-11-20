@@ -1773,7 +1773,7 @@ typedef struct box_render_material_t {
     float wind_flutter;     /**< WindSway.flutter, 0 without one, when negative or not finite */
     float wind_reach;       /**< WindSway.flutter_reach, at least BOX_RENDER_WIND_MIN, 0
                              *   without one */
-    float wind_flutter_phase; /**< WindSway.flutter_frequency times the time of the wind wrapped
+    float wind_flutter_phase; /**< WindSway.flutter_frequency times the wind clock wrapped
                              *   to 0..1, 0 without one */
     uint32_t flags;         /**< BOX_RENDER_WIND_PRESENT with a WindSway, and
                              *   BOX_RENDER_WIND_PIVOTS with WindSway.pivots; with a VertexReveal
@@ -1786,7 +1786,7 @@ typedef struct box_render_material_t {
     float reveal_threshold; /**< VertexReveal.threshold, 0 without one or when not finite */
     float wind_branch;      /**< WindSway.branch of a record with BOX_RENDER_WIND_PIVOTS, 0
                              *   without pivots or when not finite */
-    float wind_branch_phase; /**< WindSway.branch_frequency times the time of the wind wrapped
+    float wind_branch_phase; /**< WindSway.branch_frequency times the wind clock wrapped
                              *   to 0..1 with BOX_RENDER_WIND_PIVOTS, 0 without */
     float occlusion_strength; /**< VertexOcclusion.strength clamped to 0..1 of a record with
                              *   BOX_RENDER_OCCLUSION_PRESENT, 0 without one */

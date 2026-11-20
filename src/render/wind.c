@@ -7,7 +7,9 @@
  * precision and wrapped to their periods, like the wind offset of a FogVolume, so the motion
  * stays smooth after hours and a fixed delta time renders the same frames every run.
  *
- * A change of the speed only changes how fast they advance, so the plants do not jump.
+ * The clock of the flutter and the branches runs slower in a light wind and at full rate at
+ * BOX_WIND_FULL_SPEED. A change of the speed only changes how fast they advance, so the plants
+ * do not jump.
  */
 
 #include "draw.h"
@@ -40,6 +42,16 @@ double box_render_wind_sway_frequency(
     double result = BOX_RENDER_WIND_SWAY_BASE + BOX_RENDER_WIND_SWAY_RATE * (double)wind->speed;
 
     return result < BOX_RENDER_WIND_SWAY_MAX ? result : BOX_RENDER_WIND_SWAY_MAX;
+}
+
+double box_render_wind_clock_rate(
+    const Wind *wind)
+{
+    double speed = isfinite(wind->speed) && wind->speed > 0.0f ? (double)wind->speed : 0.0;
+    double result = BOX_RENDER_WIND_CLOCK_CALM +
+        (1.0 - BOX_RENDER_WIND_CLOCK_CALM) * speed / (double)BOX_WIND_FULL_SPEED;
+
+    return result < 1.0 ? result : 1.0;
 }
 
 /** Wrap a value to 0..period, a value that is not finite to 0.
@@ -97,6 +109,8 @@ void box_render_wind_advance(
     status->sway = box_wind_wrap(
         status->sway + box_render_wind_sway_frequency(&w) * delta, 1.0);
     status->time = isfinite(status->time) ? status->time + delta : delta;
+    double tick = box_render_wind_clock_rate(&w) * delta;
+    status->clock = isfinite(status->clock) ? status->clock + tick : tick;
 done:
     return;
 }
@@ -146,6 +160,7 @@ void box_render_wind_frame(
         sway - 0.5 * along * (double)out->frequency / (2.0 * GLM_PI), 1.0);
     if (s) {
         out->time = isfinite(s->time) ? s->time : 0.0;
+        out->clock = isfinite(s->clock) ? s->clock : 0.0;
     }
 
 done:
@@ -198,7 +213,7 @@ void box_render_wind_pack(
     out->wind_flutter = isfinite(sway->flutter) && sway->flutter > 0.0f ? sway->flutter : 0.0f;
     out->wind_reach = isfinite(sway->flutter_reach)
         ? glm_max(sway->flutter_reach, BOX_RENDER_WIND_MIN) : BOX_MATERIAL_SWAY_FLUTTER_REACH;
-    out->wind_flutter_phase = box_wind_wrap_float(frequency * wind->time, 1.0);
+    out->wind_flutter_phase = box_wind_wrap_float(frequency * wind->clock, 1.0);
     out->flags = BOX_RENDER_WIND_PRESENT;
     out->reveal_threshold = 0.0f;
     out->wind_branch = 0.0f;
@@ -210,7 +225,7 @@ void box_render_wind_pack(
             ? (double)sway->branch_frequency : 0.0;
         out->flags |= BOX_RENDER_WIND_PIVOTS;
         out->wind_branch = isfinite(sway->branch) ? sway->branch : 0.0f;
-        out->wind_branch_phase = box_wind_wrap_float(branch * wind->time, 1.0);
+        out->wind_branch_phase = box_wind_wrap_float(branch * wind->clock, 1.0);
     }
 done:
     return;
