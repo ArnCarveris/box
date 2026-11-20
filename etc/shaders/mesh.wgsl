@@ -113,6 +113,7 @@ fn lit(f: VertexOut, shaded: Surface) -> vec4f {
     range_fragment(f);
     planet_fragment(f);
     var s = shaded;
+    s.occlusion *= vo_occlusion(f);
     if (kind.blend_mode == 0u) {
         s.occlusion = min(s.occlusion, view_occlusion(f.pos));
     }

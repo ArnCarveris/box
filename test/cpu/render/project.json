@@ -1279,7 +1279,9 @@
                     "pack",
                     "mesh_upload",
                     "batches",
-                    "threshold_animates"
+                    "threshold_animates",
+                    "occlusion_defaults",
+                    "occlusion_pack"
                 ]
             },
             {

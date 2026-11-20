@@ -1779,14 +1779,23 @@ typedef struct box_render_material_t {
                              *   BOX_RENDER_REVEAL_INVERT, the channel at
                              *   BOX_RENDER_REVEAL_CHANNEL_SHIFT and its softness (0 when
                              *   negative or not finite) as a half float in the high 16 bits;
-                             *   0 without either */
+                             *   with a VertexOcclusion BOX_RENDER_OCCLUSION_PRESENT and its
+                             *   channel at BOX_RENDER_OCCLUSION_CHANNEL_SHIFT; 0 without any */
     float reveal_threshold; /**< VertexReveal.threshold, 0 without one or when not finite */
     float wind_branch;      /**< WindSway.branch of a record with BOX_RENDER_WIND_PIVOTS, 0
                              *   without pivots or when not finite */
     float wind_branch_phase; /**< WindSway.branch_frequency times the time of the wind wrapped
                              *   to 0..1 with BOX_RENDER_WIND_PIVOTS, 0 without */
-    float wind_pad[2];      /**< 0, pads the record to a multiple of 16 bytes */
+    float occlusion_strength; /**< VertexOcclusion.strength clamped to 0..1 of a record with
+                             *   BOX_RENDER_OCCLUSION_PRESENT, 0 without one */
+    float wind_pad;         /**< 0, pads the record to a multiple of 16 bytes */
 } box_render_material_t;
+
+/** Flag of a record with a VertexOcclusion whose channel is 0..7 (box_render_material_t.flags) */
+#define BOX_RENDER_OCCLUSION_PRESENT (1u << 7)
+
+/** Bit of the flags at which the data channel of a VertexOcclusion record starts, 3 bits */
+#define BOX_RENDER_OCCLUSION_CHANNEL_SHIFT (8)
 
 /** Flag of a record with a VertexReveal (box_render_material_t.flags) */
 #define BOX_RENDER_REVEAL_PRESENT (1u << 1)

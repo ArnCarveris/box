@@ -329,6 +329,8 @@ typedef struct box_draw_material_t {
     box_render_wind_t wind;     /**< Wind of the frame the sway is packed with, read with sway */
     const VertexReveal *reveal; /**< Hides the parts of a 3D mesh by its per vertex data, ignored
                                  *   by 2D shapes */
+    const VertexOcclusion *occlusion; /**< Occludes the indirect light of a 3D mesh by its per
+                                 *   vertex data, ignored by 2D shapes */
     const Tint *tint;           /**< Tint of the shape itself, applied after the inherited */
     const box_draw_tint_t *inherited; /**< Composed tints of the ancestors, NULL for none */
     const Shape2D *shape2d;     /**< Resolved 2D shape, NULL for a 3D shape */
@@ -400,6 +402,9 @@ typedef struct box_draw_transition_material_t {
     bool swayed;            /**< The material has a WindSway */
     VertexReveal reveal;    /**< VertexReveal, which has no transition: the record keeps it */
     bool revealed;          /**< The material has a VertexReveal */
+    VertexOcclusion occlusion; /**< VertexOcclusion, which has no transition: the record keeps
+                             *   it */
+    bool occluded;          /**< The material has a VertexOcclusion */
     box_render_wind_t wind; /**< Wind of the frame the sway was packed with */
     Opacity opacity;        /**< Opacity of the shape itself */
     Tint tint;              /**< Tint of the shape itself */

@@ -176,8 +176,8 @@ void box_render_wind_pack(
         out->reveal_threshold = 0.0f;
         out->wind_branch = 0.0f;
         out->wind_branch_phase = 0.0f;
-        out->wind_pad[0] = 0.0f;
-        out->wind_pad[1] = 0.0f;
+        out->occlusion_strength = 0.0f;
+        out->wind_pad = 0.0f;
         goto done;
     }
 
@@ -203,8 +203,8 @@ void box_render_wind_pack(
     out->reveal_threshold = 0.0f;
     out->wind_branch = 0.0f;
     out->wind_branch_phase = 0.0f;
-    out->wind_pad[0] = 0.0f;
-    out->wind_pad[1] = 0.0f;
+    out->occlusion_strength = 0.0f;
+    out->wind_pad = 0.0f;
     if (sway->pivots) {
         double branch = isfinite(sway->branch_frequency)
             ? (double)sway->branch_frequency : 0.0;

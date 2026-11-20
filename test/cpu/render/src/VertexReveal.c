@@ -198,6 +198,73 @@ void VertexReveal_defaults(void) {
     ecs_fini(world);
 }
 
+/** VertexOcclusion reads the occlusion channel of foliage at full strength by default and is
+ * an inherited material component */
+void VertexReveal_occlusion_defaults(void) {
+    // materials/vertex_occlusion
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t e = ecs_new(world);
+    ecs_add(world, e, VertexOcclusion);
+    const VertexOcclusion *o = ecs_get(world, e, VertexOcclusion);
+    test_assert(o != NULL);
+    test_int(o->channel, BOX_MATERIAL_OCCLUSION_CHANNEL);
+    test_int(o->channel, BOX_MESH_DATA_OCCLUSION);
+    test_flt(o->strength, 1);
+    test_assert(ecs_has_pair(world, ecs_id(VertexOcclusion), EcsOnInstantiate, EcsInherit));
+    test_assert(ecs_has(world, e, MaterialId));
+    test_assert(ecs_lookup(world, "box.material.VertexOcclusion") == ecs_id(VertexOcclusion));
+    ecs_fini(world);
+}
+
+/** The record holds the channel of a VertexOcclusion in the flags and its clamped strength,
+ * next to a VertexReveal; a channel out of range packs the record of a material without one */
+void VertexReveal_occlusion_pack(void) {
+    // materials/vertex_occlusion
+    box_render_material_t record, plain;
+    ecs_os_memset_t(&record, 0x55, box_render_material_t);
+    box_draws_material_pack(&record, &(box_draw_material_t){ .fade = 1 });
+    test_flt(record.occlusion_strength, 0);
+    test_flt(record.wind_pad, 0);
+    plain = record;
+
+    VertexOcclusion occlusion = { .channel = 7, .strength = 0.75f };
+    box_draws_material_pack(&record, &(box_draw_material_t){ .occlusion = &occlusion,
+        .fade = 1 });
+    test_flt(record.occlusion_strength, 0.75f);
+    test_uint(record.flags, BOX_RENDER_OCCLUSION_PRESENT |
+        (7u << BOX_RENDER_OCCLUSION_CHANNEL_SHIFT));
+
+    /* Next to a VertexReveal both are in the flags */
+    VertexReveal reveal = { .channel = 4, .threshold = 0.5f };
+    occlusion = (VertexOcclusion){ .channel = 2, .strength = 3 };
+    box_draws_material_pack(&record, &(box_draw_material_t){ .reveal = &reveal,
+        .occlusion = &occlusion, .fade = 1 });
+    test_flt(record.occlusion_strength, 1);
+    test_flt(record.reveal_threshold, 0.5f);
+    test_uint(record.flags, BOX_RENDER_REVEAL_PRESENT | (4u << BOX_RENDER_REVEAL_CHANNEL_SHIFT) |
+        BOX_RENDER_OCCLUSION_PRESENT | (2u << BOX_RENDER_OCCLUSION_CHANNEL_SHIFT));
+
+    /* Broken values are clamped, a channel out of range is none */
+    occlusion = (VertexOcclusion){ .channel = 0, .strength = NAN };
+    box_draws_material_pack(&record, &(box_draw_material_t){ .occlusion = &occlusion,
+        .fade = 1 });
+    test_flt(record.occlusion_strength, 0);
+    test_uint(record.flags, BOX_RENDER_OCCLUSION_PRESENT);
+    occlusion = (VertexOcclusion){ .channel = 8, .strength = 1 };
+    box_draws_material_pack(&record, &(box_draw_material_t){ .occlusion = &occlusion,
+        .fade = 1 });
+    test_assert(!ecs_os_memcmp_t(&record, &plain, box_render_material_t));
+
+    /* A 2D shape ignores it */
+    Shape2D shape2d = {0};
+    occlusion = (VertexOcclusion){ .channel = 7, .strength = 1 };
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .occlusion = &occlusion, .shape2d = &shape2d, .fade = 1 });
+    test_uint(record.flags, 0);
+    test_flt(record.occlusion_strength, 0);
+}
+
 /** The record holds the threshold, the channel, the invert flag and the softness as a half
  * float next to the wind flag; a material without VertexReveal packs the bytes it did before */
 void VertexReveal_pack(void) {

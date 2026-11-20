@@ -12,9 +12,6 @@
 /** Most children a Branches sprouts on one parent */
 #define BOX_MG_BRANCH_CHILDREN (10000)
 
-/** The golden angle in radians, the turn between the children of a Spiral by default */
-#define BOX_MG_GOLDEN_ANGLE (2.39996323f)
-
 /** How a curve grows from its root, step by step */
 typedef struct box_mg_grow_t {
     vec3 position;               /**< Root */

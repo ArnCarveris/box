@@ -20,6 +20,9 @@
 /** Bytes the value cache holds when MeshGraphCache sets no budget */
 #define BOX_MESH_CACHE_BUDGET (256ll * 1024 * 1024)
 
+/** The golden angle in radians, the turn between the children of a spiral by default */
+#define BOX_MG_GOLDEN_ANGLE (2.39996323f)
+
 /** Most nodes a graph reaches */
 #define BOX_MESH_GRAPH_NODES (4096)
 
@@ -519,6 +522,14 @@ void box_mesh_nodes_curves_register(
  * @param world The world
  */
 void box_mesh_nodes_branch_register(
+    ecs_world_t *world);
+
+/** Register the node kinds of foliage: Leaves, Needles, Cards, CrownNormals and
+ * CrownOcclusion.
+ *
+ * @param world The world
+ */
+void box_mesh_nodes_foliage_register(
     ecs_world_t *world);
 
 /** Register the MeshGraph shape and its observers.

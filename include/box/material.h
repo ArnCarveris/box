@@ -945,6 +945,32 @@ ECS_STRUCT(VertexReveal, {
     bool invert;            /**< Hide above the threshold instead, the edge below it */
 });
 
+/** Default data channel of a constructed VertexOcclusion, the occlusion channel of foliage
+ * (BOX_MESH_DATA_OCCLUSION) */
+#define BOX_MATERIAL_OCCLUSION_CHANNEL (7)
+
+/** Occlusion of the indirect light of a 3D mesh by one of its per vertex data channels, a
+ * material component inherited by instances like Rgb, default channel 7 and strength 1.
+ *
+ * channel picks one of the 8 floats of the per vertex data of the mesh (Mesh3.data0 channels 0
+ * to 3, data1 channels 4 to 7, box_mesh_vertex_data), the occlusion of the vertex in 0..1: 1 is
+ * open, 0 fully occluded, as the CrownOcclusion node of a mesh graph writes it for the depth of
+ * a leaf in its crown. Across a triangle it is interpolated between the vertices. The forward
+ * pass multiplies the occlusion of the material (its PbrTextures and the view's ambient
+ * occlusion) by 1 - strength (1 - value), on front and back faces, so it darkens the indirect
+ * diffuse and specular light only; the direct light and the shadows are left alone.
+ *
+ * It applies to the materials whose texture coordinates are the UVs of the mesh (MappingUv),
+ * which foliage cards have; a projected TextureMapping ignores it, as do meshes without per
+ * vertex data, 2D shapes and text. Its record is in the material table: writing it changes the
+ * shading of every shape that shares the material without rebuilding meshes or batches.
+ */
+ECS_STRUCT(VertexOcclusion, {
+    int32_t channel;        /**< Data channel 0 to 7: data0.x to data0.w, then data1.x to
+                             *   data1.w; out of range for none */
+    float strength;         /**< How much of the occlusion applies, clamped to 0..1 */
+});
+
 /** Height of a constructed WindSway: world units above base at which the bend is full */
 #define BOX_MATERIAL_SWAY_HEIGHT (1.0f)
 

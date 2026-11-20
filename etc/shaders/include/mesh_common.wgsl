@@ -152,6 +152,9 @@ struct VertexOut {
     @location(5) uv: vec4f,
     @location(6) @interpolate(flat) flat2: vec4u,
     @location(7) @interpolate(flat) flat3: vec4u,
+    // xyz the projected position of a mapped material (VertexShading.object), w its projection
+    // data; of a material with the UVs of the mesh (mapped 0) w is the occlusion of the indirect
+    // light of a VertexOcclusion (vo_occlusion), 1 without one or without data.
     @location(11) object: vec4f,
     // xyz the normal mapping_uv projects (VertexShading.object_normal); w the reveal edge of a
     // VertexReveal material of a mesh with per vertex data, passed on by the _data vertex
@@ -342,6 +345,12 @@ fn vo_scalars(f: VertexOut) -> vec4f {
     return vec4f(unpack2x16float(f.flat1.x), unpack2x16float(f.flat1.y));
 }
 
+// The occlusion of the indirect light by the per vertex data of a VertexOcclusion material, in
+// object.w of a material with the UVs of the mesh (vertex_occlusion_out); 1 for a mapped one.
+fn vo_occlusion(f: VertexOut) -> f32 {
+    return select(1.0, clamp(f.object.w, 0.0, 1.0), vo_scalars(f).w == 0.0);
+}
+
 fn vo_layers(f: VertexOut) -> vec4f {
     return vec4f(unpack2x16unorm(f.flat1.z), unpack2x16unorm(f.flat1.w));
 }
@@ -385,7 +394,7 @@ fn vertex_base(v: VertexIn, shading: MeshShading, material: Material) -> VertexS
     o.material = vec2f(material.metallic, material.roughness);
     o.uv = v.uv * material.uv.xy + material.uv.zw;
     o.mapped = 0.0;
-    o.object = vec4f(0.0);
+    o.object = vec4f(0.0, 0.0, 0.0, 1.0);
     o.object_normal = vec3f(0.0);
     o.rotation = vec4f(0.0, 0.0, 0.0, 1.0);
     return o;
@@ -548,7 +557,7 @@ fn vertex_distortion(o: ptr<function, VertexOut>, p: Placed, material: Material,
     frame: ModelFrame, mapped: f32) {
     var k = vec2f(material.distortion_frequency);
     if (mapped == 0.0) {
-        (*o).object = vec4f(p.local * frame.scale, 0.0);
+        (*o).object = vec4f(p.local * frame.scale, 1.0);
     } else {
         let uv = select(material.uv.xy, vec2f(1.0), material.uv.xy == vec2f(0.0));
         k = material.distortion_frequency * material.mapping_size / uv;
@@ -753,13 +762,22 @@ fn mesh_vertex_surface(v: VertexIn) -> VertexOut {
     return mesh_vertex_surface(v);
 }
 
+// Pass the occlusion of a VertexOcclusion material on in object.w of a vertex whose material
+// takes the UVs of the mesh (vo_occlusion), where nothing else reads it.
+fn vertex_occlusion_out(o: ptr<function, VertexOut>, material: Material, d: VertexData) {
+    if (vo_scalars(*o).w == 0.0) {
+        (*o).object.w = vertex_occlusion(material, d.data0, d.data1);
+    }
+}
+
 // The vertex stages of the meshes with per vertex data (box_gpu_vertex_data): the reveal edge
-// of the data is passed on in VertexOut.object_normal.w.
+// of the data is passed on in VertexOut.object_normal.w, the occlusion in object.w.
 @vertex fn vs_data(v: VertexIn, d: VertexData) -> VertexOut {
     wind_vertex_data(d.data0, d.data1);
     var o = mesh_vertex(v);
     let material = material_fetch(shading_material(shadings[slot_of(v.slot)]));
     o.object_normal.w = reveal_edge(material, d.data0, d.data1);
+    vertex_occlusion_out(&o, material, d);
     return o;
 }
 
@@ -768,6 +786,7 @@ fn mesh_vertex_surface(v: VertexIn) -> VertexOut {
     var o = mesh_vertex_surface(v);
     let material = material_fetch(shading_material(shadings[slot_of(v.slot)]));
     o.object_normal.w = reveal_edge(material, d.data0, d.data1);
+    vertex_occlusion_out(&o, material, d);
     return o;
 }
 

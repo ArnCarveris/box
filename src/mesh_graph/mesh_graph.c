@@ -599,6 +599,15 @@ static void box_mesh_register(
     BOX_MESH_COMPONENT(world, MeshBranchDistribution, "BranchDistribution");
     ecs_set_name_prefix(world, "MeshEnvelope");
     BOX_MESH_COMPONENT(world, MeshEnvelopeShape, "EnvelopeShape");
+    ecs_set_name_prefix(world, "MeshLeaf");
+    BOX_MESH_COMPONENT(world, MeshLeafPlacement, "LeafPlacement");
+    BOX_MESH_COMPONENT(world, MeshLeafOrientation, "LeafOrientation");
+    ecs_set_name_prefix(world, "MeshCard");
+    BOX_MESH_COMPONENT(world, MeshCardShape, "CardShape");
+    ecs_set_name_prefix(world, "MeshCrown");
+    BOX_MESH_COMPONENT(world, MeshCrownShape, "CrownShape");
+    ecs_set_name_prefix(world, "MeshNeedle");
+    BOX_MESH_COMPONENT(world, MeshNeedleStyle, "NeedleStyle");
     ecs_set_name_prefix(world, NULL);
     BOX_MESH_COMPONENT(world, MeshGraph, "Graph");
     BOX_MESH_COMPONENT(world, MeshGraphStatus, "Status");
@@ -626,6 +635,11 @@ static void box_mesh_register(
     ECS_META_COMPONENT(world, MeshCut);
     ECS_META_COMPONENT(world, MeshStrata);
     ECS_META_COMPONENT(world, MeshJitter);
+    ECS_META_COMPONENT(world, MeshLeaves);
+    ECS_META_COMPONENT(world, MeshNeedles);
+    ECS_META_COMPONENT(world, MeshCards);
+    ECS_META_COMPONENT(world, MeshCrownNormals);
+    ECS_META_COMPONENT(world, MeshCrownOcclusion);
     ecs_set_name_prefix(world, NULL);
     ecs_set_scope(world, module);
 
@@ -743,6 +757,7 @@ void BoxMeshImport(
     box_mesh_nodes_mesh_register(world);
     box_mesh_nodes_curves_register(world);
     box_mesh_nodes_branch_register(world);
+    box_mesh_nodes_foliage_register(world);
 
     ecs_system(world, {
         .entity = ecs_entity(world, { .name = "Build" }),

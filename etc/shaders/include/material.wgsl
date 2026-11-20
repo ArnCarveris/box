@@ -123,8 +123,8 @@ struct Material {
     wind_flutter_phase: f32,
     // WIND_PRESENT with a WindSway, WIND_PIVOTS with its pivots; REVEAL_PRESENT with a
     // VertexReveal, REVEAL_INVERT, its data channel 0..7 at REVEAL_CHANNEL_SHIFT and its softness
-    // (0 for a hard edge) as a half float in the high 16 bits (unpack2x16float); 0 without
-    // either
+    // (0 for a hard edge) as a half float in the high 16 bits (unpack2x16float); OCCLUSION_PRESENT
+    // with a VertexOcclusion and its data channel 0..7 at OCCLUSION_CHANNEL_SHIFT; 0 without any
     flags: u32,
     // VertexReveal threshold, 0 without one
     reveal_threshold: f32,
@@ -132,7 +132,9 @@ struct Material {
     // WIND_PIVOTS, 0 without
     wind_branch: f32,
     wind_branch_phase: f32,
-    wind_pad: vec2f,
+    // VertexOcclusion strength 0..1 with OCCLUSION_PRESENT, 0 without
+    occlusion_strength: f32,
+    wind_pad: f32,
 };
 
 // Water.scatter_color of a Water record, display encoded, r | g << 8 | b << 16, 0 without a
@@ -217,6 +219,23 @@ fn reveal_edge(m: Material, data0: vec4f, data1: vec4f) -> f32 {
             d = -d;
         }
         result = d / max(unpack2x16float(m.flags).y, REVEAL_HARD);
+    }
+    return result;
+}
+
+// Flag of the VertexOcclusion of a record (BOX_RENDER_OCCLUSION_PRESENT) and the bit its data
+// channel starts at (BOX_RENDER_OCCLUSION_CHANNEL_SHIFT).
+const OCCLUSION_PRESENT: u32 = 128u;
+const OCCLUSION_CHANNEL_SHIFT: u32 = 8u;
+
+// The occlusion of the indirect light of a vertex by the per vertex data of its mesh, 0..1, of a
+// VertexOcclusion material: 1 - strength (1 - the value of its channel); 1 without one.
+fn vertex_occlusion(m: Material, data0: vec4f, data1: vec4f) -> f32 {
+    var result = 1.0;
+    if ((m.flags & OCCLUSION_PRESENT) != 0u) {
+        let channel = (m.flags >> OCCLUSION_CHANNEL_SHIFT) & 7u;
+        let value = select(data0[channel & 3u], data1[channel & 3u], channel >= 4u);
+        result = 1.0 - m.occlusion_strength * (1.0 - clamp(value, 0.0, 1.0));
     }
     return result;
 }

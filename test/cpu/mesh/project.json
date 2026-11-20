@@ -112,6 +112,24 @@
                     "points_attrs",
                     "script_tree"
                 ]
+            },
+            {
+                "id": "MeshFoliage",
+                "testcases": [
+                    "leaves_count",
+                    "leaves_placement",
+                    "leaves_orientation",
+                    "leaves_size",
+                    "leaves_attrs",
+                    "needles",
+                    "cards_shapes",
+                    "cards_data",
+                    "crown_normals",
+                    "crown_occlusion",
+                    "deterministic",
+                    "script_crowns",
+                    "node_kinds"
+                ]
             }
         ]
     }

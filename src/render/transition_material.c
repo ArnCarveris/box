@@ -95,6 +95,11 @@ void box_draws_transition_target(
         out->reveal = *material->reveal;
     }
 
+    if (material->occlusion) {
+        out->occluded = true;
+        out->occlusion = *material->occlusion;
+    }
+
     out->time = material->time;
     out->origin[0] = material->origin[0];
     out->origin[1] = material->origin[1];
@@ -273,6 +278,7 @@ static void box_draws_transition_parts(
         .sway = material->swayed ? &material->sway : NULL,
         .wind = material->wind,
         .reveal = material->revealed ? &material->reveal : NULL,
+        .occlusion = material->occluded ? &material->occlusion : NULL,
         .tint = box_draws_transition_part(material, BOX_RENDER_TRANSITION_TINT,
             &material->tint),
         .inherited = material->tinted ? &material->inherited : NULL,

@@ -816,6 +816,29 @@ done:
     return;
 }
 
+/** Pack a VertexOcclusion into the occlusion bits of the flags and the strength of a material
+ * record, after the wind fields, which set the flags.
+ *
+ * @param out The record
+ * @param occlusion The VertexOcclusion, NULL for none
+ */
+static void box_draws_occlusion_pack(
+    box_render_material_t *out,
+    const VertexOcclusion *occlusion)
+{
+    out->occlusion_strength = 0.0f;
+    if (!occlusion || occlusion->channel < 0 || occlusion->channel > 7) {
+        goto done;
+    }
+
+    out->occlusion_strength = isfinite(occlusion->strength)
+        ? glm_clamp(occlusion->strength, 0.0f, 1.0f) : 0.0f;
+    out->flags |= BOX_RENDER_OCCLUSION_PRESENT |
+        ((uint32_t)occlusion->channel << BOX_RENDER_OCCLUSION_CHANNEL_SHIFT);
+done:
+    return;
+}
+
 void box_draws_material_pack(
     box_render_material_t *out,
     const box_draw_material_t *material)
@@ -866,6 +889,7 @@ void box_draws_material_pack(
 
     box_render_wind_pack(out, material->sway, &material->wind);
     box_draws_reveal_pack(out, material->shape2d ? NULL : material->reveal);
+    box_draws_occlusion_pack(out, material->shape2d ? NULL : material->occlusion);
     out->transmission_factor = transmission ? transmission->transmission_factor : 0.0f;
     out->ior = transmission ? transmission->ior : BOX_MATERIAL_IOR;
     out->thickness_factor = transmission ? glm_max(transmission->thickness_factor, 0.0f) : 0.0f;

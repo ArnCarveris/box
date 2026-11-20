@@ -1031,22 +1031,22 @@ void box_draws_materials_observers(
     ecs_world_t *world,
     box_render_draws_t *d)
 {
-    ecs_entity_t components[22] = {
+    ecs_entity_t components[23] = {
         ecs_id(Rgb), ecs_id(PbrMaterial), ecs_id(Emissive), ecs_id(TextureTransform),
         ecs_id(AlphaCutoff), ecs_id(Transmission), ecs_id(ClearCoat), ecs_id(SpecularAnisotropy),
         ecs_id(Sheen), ecs_id(DiffuseTransmission), ecs_id(TextureMapping), ecs_id(TextureScroll),
         ecs_id(Fresnel), ecs_id(Water), ecs_id(PlanarReflection), ecs_id(Distortion),
         ecs_id(WaterWaves), ecs_id(WindSway), ecs_id(VertexReveal), ecs_id(WaterCaustics),
-        ecs_id(WaterFlow), ecs_id(WaterSpectrum)
+        ecs_id(WaterFlow), ecs_id(WaterSpectrum), ecs_id(VertexOcclusion)
     };
-    const char *names[22] = {
+    const char *names[23] = {
         "DrawsOnColor", "DrawsOnPbrMaterial", "DrawsOnEmissive", "DrawsOnTextureTransform",
         "DrawsOnAlphaCutoff", "DrawsOnTransmission", "DrawsOnClearCoat",
         "DrawsOnSpecularAnisotropy", "DrawsOnSheen", "DrawsOnDiffuseTransmission",
         "DrawsOnTextureMapping", "DrawsOnTextureScroll", "DrawsOnFresnel", "DrawsOnWater",
         "DrawsOnPlanarReflection", "DrawsOnDistortion", "DrawsOnWaterWaves",
         "DrawsOnWindSway", "DrawsOnVertexReveal", "DrawsOnWaterCaustics", "DrawsOnWaterFlow",
-        "DrawsOnWaterSpectrum"
+        "DrawsOnWaterSpectrum", "DrawsOnVertexOcclusion"
     };
     int32_t i;
     box_draws_observer(world, d, "MaterialsOnPrefab", (ecs_observer_desc_t){
@@ -1071,7 +1071,7 @@ void box_draws_materials_observers(
         .query.flags = EcsQueryMatchPrefab,
         .events = { EcsOnAdd, EcsOnRemove } }, BoxMaterialsOnIsA);
 
-    for (i = 0; i < 22; i ++) {
+    for (i = 0; i < 23; i ++) {
         bool keyed = box_materials_keyed(components[i]) || box_materials_slotted(components[i]) ||
             components[i] == ecs_id(WaterSpectrum);
         bool owned = components[i] == ecs_id(PlanarReflection);
@@ -1113,6 +1113,7 @@ void box_draws_material_of(
         out->distortion = ecs_get(world, owner, Distortion);
         out->sway = ecs_get(world, owner, WindSway);
         out->reveal = ecs_get(world, owner, VertexReveal);
+        out->occlusion = ecs_get(world, owner, VertexOcclusion);
         if (out->water) {
             out->waves = ecs_get(world, owner, WaterWaves);
             out->flow = ecs_get(world, owner, WaterFlow);

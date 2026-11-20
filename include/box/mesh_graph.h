@@ -64,6 +64,26 @@ extern "C" {
 /** Data channel of the bark of branching curves: the fraction of the length of the branch */
 #define BOX_MESH_DATA_ALONG (7)
 
+/** Data channel of foliage (Cards): the level of the twig a card grows on in its integer part,
+ * plus 0.5 times the flutter weight of the vertex, 0..1 from the stem of the card to its tip,
+ * as WindSway packs data0.w; the same channel as BOX_MESH_DATA_LEVEL of the bark, whose flutter
+ * weight is 0. Its pivot is the pivot of the twig, in BOX_MESH_DATA_PIVOT */
+#define BOX_MESH_DATA_FLUTTER (3)
+
+/** Data channel of foliage: the seed of the card in 0..1, the same for every vertex of a card
+ * and evenly spread over the cards, so a VertexReveal on it thins a crown card by card (a
+ * threshold of 0.3 hides about 30% of the cards) */
+#define BOX_MESH_DATA_SEED (4)
+
+/** Data channel of foliage: the hue and tone variation of the card in 0..1, the same for every
+ * vertex of a card, which a material can turn into a shift of its color */
+#define BOX_MESH_DATA_HUE (5)
+
+/** Data channel of foliage: the occlusion of the indirect light of the vertex by the crown, 1
+ * open and 0 fully occluded, which CrownOcclusion writes and a VertexOcclusion material applies;
+ * Cards writes 1 */
+#define BOX_MESH_DATA_OCCLUSION (7)
+
 /** A capture got its value */
 #define BOX_MESH_CAPTURE_OK (0)
 
@@ -472,6 +492,184 @@ ECS_STRUCT(MeshJitter, {
     float scale_min;     /**< Least factor of the scale, 0 for 1 */
     float scale_max;     /**< Largest factor of the scale, below scale_min for scale_min */
     int32_t seed;        /**< Seed of the turns and scales */
+});
+
+/** Where Leaves and Needles place their points on branching curves */
+ECS_ENUM(MeshLeafPlacement, {
+    MeshLeafTwigs = 0,  /**< Along the curves of the highest level, the twigs */
+    MeshLeafTips = 1,   /**< At the tip of every curve without children, in a cluster */
+    MeshLeafLevels = 2  /**< Along every curve of level or a higher level */
+});
+
+/** How Leaves turns a leaf: +Y of a point runs from the stem of the leaf to its tip, +Z is the
+ * face of the leaf */
+ECS_ENUM(MeshLeafOrientation, {
+    MeshLeafAlong = 0,   /**< The face looks away from the twig, the leaf off it by angle */
+    MeshLeafFaceUp = 1,  /**< The face looks up as far as the direction of the leaf allows */
+    MeshLeafFaceOut = 2  /**< The face looks away from the center of the crown */
+});
+
+/** Shape of the card that Cards instances when it has no mesh input; +Y runs from the stem at
+ * the origin to the tip at 1, +Z is the face */
+ECS_ENUM(MeshCardShape, {
+    MeshCardQuad = 0,  /**< A flat quad width wide */
+    MeshCardBent = 1,  /**< A quad folded along its midrib and curled back toward its tip by
+                        *   bend, as the leaf cards of the forest */
+    MeshCardCross = 2  /**< Two quads crossing along the Y axis */
+});
+
+/** Envelope of a crown for CrownNormals and CrownOcclusion */
+ECS_ENUM(MeshCrownShape, {
+    MeshCrownEllipsoid = 0, /**< Ellipsoid around center with the half extents of size; a
+                             *   size of zero fits it to the bounds of the mesh */
+    MeshCrownDensity = 1    /**< The smoothed shape of the vertices: their density in a grid
+                             *   over the bounds of the mesh, blurred */
+});
+
+/** How Needles lays the fronds of a conifer along its twigs */
+ECS_ENUM(MeshNeedleStyle, {
+    MeshNeedleFir = 0,   /**< One flat, level card per frond that faces up, as the flat sprays
+                          *   of a fir */
+    MeshNeedleSpruce = 1 /**< Two cards per frond banked to either side of the twig by bank,
+                          *   as the shoots of a spruce that stand all around */
+});
+
+/** Node of a MeshGraph that places the Points of leaves on branching curves (Stem, Branches,
+ * Prune): along the twigs, at the tips or along the last levels.
+ *
+ * Leaves sit in nodes spread evenly over the range of a curve, per_node leaves around each
+ * node, each node turned by the phyllotaxis angle from the last (pi for alternate leaves, pi /
+ * 2 with 2 per node for opposite pairs, the golden angle for a spiral). At a tip the nodes are
+ * a cluster at the last point of the curve. A leaf leaves its twig at angle, then the
+ * orientation turns its face, and a random tilt and bank vary it.
+ *
+ * The point turns +Y to the direction of the leaf and +Z to its face, scaled by its size:
+ * size, times the factor of size_tip at the end of the range (linear from 1 at its start), times
+ * size_level for every level below the highest, varied by size_variation.
+ *
+ * Each point has the attributes t (the fraction of the length of its curve), curve, level,
+ * pivot_x, pivot_y and pivot_z (the root of its twig, the pivot of the twig for the wind),
+ * root_distance (from the root of the plant), seed and hue (0..1, random per leaf) and index.
+ * Defaults are set when the component is added.
+ */
+ECS_STRUCT(MeshLeaves, {
+    ecs_entity_t curves;           /**< Curves input node */
+    MeshLeafPlacement placement;   /**< Where the leaves grow */
+    int32_t level;                 /**< Lowest level of MeshLeafLevels */
+    int32_t count;                 /**< Nodes per curve, 6 when added, 0 for 6 */
+    float density;                 /**< Nodes per meter of the range instead of count, 0 for
+                                    *   count; unused at tips */
+    int32_t per_node;              /**< Leaves around a node, 0 for 1, at most 16 */
+    float start;                   /**< Start of the range, a fraction of the curve length */
+    float end;                     /**< End of the range, 1 when added, 0 for 1 */
+    float phyllotaxis;             /**< Turn between nodes in radians, 0 for the golden angle */
+    float angle;                   /**< Angle between a leaf and its twig in radians, 0.8 when
+                                    *   added */
+    MeshLeafOrientation orientation; /**< How the face of a leaf turns */
+    vec3 center;                   /**< Center of the crown of MeshLeafFaceOut, all 0 for the
+                                    *   center of the bounds of the curves that grow leaves */
+    float tilt;                    /**< Largest random tilt of a leaf about its side, radians */
+    float bank;                    /**< Largest random bank of a leaf about its length, radians */
+    float size;                    /**< Length of a leaf, 0.1 when added, 0 for 0.1 */
+    float size_tip;                /**< Factor of the size at the end of the range, 0 for 1 */
+    float size_level;              /**< Factor of the size per level below the highest, 0 for 1 */
+    float size_variation;          /**< Random change of the size, a fraction of it */
+    int32_t seed;                  /**< Seed of the variations, seeds and hues */
+});
+
+/** Node of a MeshGraph that places the Points of the fronds of a conifer along its twigs: each
+ * twig is split into cards fronds over its range, a frond runs from its start along the chord
+ * to its end, and lies flat facing up (fir) or as two cards banked to either side (spruce).
+ *
+ * A point turns +Y along the frond and +Z to its face, scaled by the length of the frond in Y
+ * and Z and by width times it in X, so a Cards of width 1 covers it. Points have the
+ * attributes of Leaves. Defaults are set when the component is added.
+ */
+ECS_STRUCT(MeshNeedles, {
+    ecs_entity_t curves;         /**< Curves input node */
+    MeshLeafPlacement placement; /**< Curves that carry fronds; tips are the twigs without
+                                  *   children */
+    int32_t level;               /**< Lowest level of MeshLeafLevels */
+    MeshNeedleStyle style;       /**< How the cards of a frond lie */
+    int32_t cards;               /**< Fronds per curve, 0 for 1, at most 64 */
+    float start;                 /**< Start of the range, a fraction of the curve length */
+    float end;                   /**< End of the range, 1 when added, 0 for 1 */
+    float width;                 /**< Width of a frond over its length, 0.5 when added, 0 for
+                                  *   0.5 */
+    float bank;                  /**< Bank of the cards of a spruce frond to either side,
+                                  *   radians, 0.6 when added */
+    float droop;                 /**< Turn of a frond down toward -Y, radians */
+    float tilt;                  /**< Largest random tilt of a frond about its side, radians */
+    int32_t seed;                /**< Seed of the tilts, seeds and hues */
+});
+
+/** Node of a MeshGraph whose Mesh holds a card at every point of a Points, as Leaves and
+ * Needles place them: the card's stem at the origin sits on the point, its +Y turns to the +Y
+ * of the point and its face +Z to the +Z of the point, scaled by the point.
+ *
+ * The card is the mesh input, or a shape of width by 1, double sided when double_sided gives
+ * every card a back with its own vertices and normals. The cards have the attribute card (the
+ * index of the point) and the data channels of foliage: BOX_MESH_DATA_PIVOT from the pivot
+ * attributes of the points (the point without them), BOX_MESH_DATA_FLUTTER from their level
+ * and the flutter weight (flutter times the height of the vertex along +Y from the stem over
+ * the length of the card), BOX_MESH_DATA_SEED and BOX_MESH_DATA_HUE from their seed and hue (from
+ * the index without them), BOX_MESH_DATA_GROWTH from their root_distance and
+ * BOX_MESH_DATA_OCCLUSION 1. Defaults are set when the component is added.
+ */
+ECS_STRUCT(MeshCards, {
+    ecs_entity_t points;   /**< Points input node */
+    ecs_entity_t mesh;     /**< Mesh node of the card with its stem at the origin, 0 for shape */
+    MeshCardShape shape;   /**< Card without a mesh */
+    float width;           /**< Width of the card over its length, 0 for 1 */
+    float bend;            /**< Depth of the fold and the curl of a MeshCardBent over its
+                            *   length, 0.15 when added */
+    int32_t segments;      /**< Rows of quads along the card, 0 for 2, at most 16 */
+    bool double_sided;     /**< Give the cards a back, true when added; a mesh input is kept
+                            *   as it is */
+    float flutter;         /**< Flutter weight at the tip of the card, 0..1, 1 when added */
+});
+
+/** Node of a MeshGraph that bends the normals of foliage toward the normals of the envelope of
+ * its crown, so the crown shades as one volume instead of a stack of cards: each normal turns
+ * toward the outward normal of the envelope at the vertex by strength, 1 for the normal of the
+ * envelope itself. Both sides of a double sided card face out. Defaults are set when the
+ * component is added.
+ */
+ECS_STRUCT(MeshCrownNormals, {
+    ecs_entity_t mesh;     /**< Mesh input node */
+    MeshCrownShape shape;  /**< Envelope */
+    vec3 center;           /**< Center of the ellipsoid */
+    vec3 size;             /**< Half extents of the ellipsoid, all 0 to fit it to the bounds
+                            *   of the mesh; a single 0 is 1 */
+    float strength;        /**< Share of the normal of the envelope, 0..1, 0.75 when added */
+    int32_t resolution;    /**< Cells of the density grid along its longest side, 0 for 16, 4
+                            *   to 64 */
+    int32_t smoothing;     /**< Blur passes of the density grid, 0 for 2 */
+});
+
+/** Node of a MeshGraph that writes the occlusion of the indirect light of foliage by the depth
+ * of each vertex in its crown into the data channel BOX_MESH_DATA_OCCLUSION, which a
+ * VertexOcclusion material applies (1 open, 0 fully occluded).
+ *
+ * With an ellipsoid the depth is 1 - the ellipsoid distance of the vertex from the center (1
+ * at the center, 0 on and outside the surface), and the occlusion is 1 - strength * depth. With
+ * the density shape the leaves between a vertex and the outside occlude it: the density summed
+ * along the outward normal of the envelope, in cells, gives 1 - strength * (1 - exp(-absorption
+ * * sum)). Either increases toward the center of the crown. Defaults are set when the component
+ * is added.
+ */
+ECS_STRUCT(MeshCrownOcclusion, {
+    ecs_entity_t mesh;     /**< Mesh input node */
+    MeshCrownShape shape;  /**< Envelope */
+    vec3 center;           /**< Center of the ellipsoid */
+    vec3 size;             /**< Half extents of the ellipsoid, all 0 to fit it to the bounds
+                            *   of the mesh; a single 0 is 1 */
+    float strength;        /**< Occlusion at full depth, 0..1, 0.8 when added */
+    float absorption;      /**< Occlusion per cell of full density of MeshCrownDensity, 0 for
+                            *   0.5 */
+    int32_t resolution;    /**< Cells of the density grid along its longest side, 0 for 16, 4
+                            *   to 64 */
+    int32_t smoothing;     /**< Blur passes of the density grid, 0 for 2 */
 });
 
 /** Float attribute of the elements of a value, such as the fraction along a curve */

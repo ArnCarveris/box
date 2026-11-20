@@ -592,8 +592,8 @@ void Wind_pack_pivots(void) {
     test_uint(record.flags, BOX_RENDER_WIND_PRESENT);
     test_flt(record.wind_branch, 0);
     test_flt(record.wind_branch_phase, 0);
-    test_flt(record.wind_pad[0], 0);
-    test_flt(record.wind_pad[1], 0);
+    test_flt(record.occlusion_strength, 0);
+    test_flt(record.wind_pad, 0);
     box_render_material_t plain = record;
 
     sway.pivots = true;
@@ -601,8 +601,8 @@ void Wind_pack_pivots(void) {
     test_uint(record.flags, BOX_RENDER_WIND_PRESENT | BOX_RENDER_WIND_PIVOTS);
     test_flt(record.wind_branch, 0.3f);
     test_flt(record.wind_branch_phase, 0.125f);
-    test_flt(record.wind_pad[0], 0);
-    test_flt(record.wind_pad[1], 0);
+    test_flt(record.occlusion_strength, 0);
+    test_flt(record.wind_pad, 0);
 
     /* The pivots leave the other words as they are */
     record.flags = plain.flags;

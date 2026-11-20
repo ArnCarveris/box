@@ -1295,7 +1295,7 @@ void box_draws_shape_material(
         .uv = ecs_get(world, e, TextureTransform),
         .transmission = ecs_get(world, e, Transmission),
         .shape2d = ecs_get(world, e, Shape2D),
-        .tint = ecs_get(world, e, Tint),
+        .tint = ecs_get(world, e, Tint), .occlusion = ecs_get(world, e, VertexOcclusion),
         .inherited = s->tinted ? &s->tint : NULL,
         .fade = s->fade
     };

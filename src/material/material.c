@@ -615,6 +615,27 @@ static void box_texture_scroll_ctor(
     }
 }
 
+/** Construct VertexOcclusion values that read the occlusion channel of foliage at full
+ * strength.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_vertex_occlusion_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    VertexOcclusion *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (VertexOcclusion){ .channel = BOX_MATERIAL_OCCLUSION_CHANNEL,
+            .strength = 1.0f };
+    }
+}
+
 /** Construct WindSway values that do not bend, with a height of 1 at a base of 0, a 2 Hz
  * flutter of no amplitude that reaches full over 0.3 world units, and rigid branches that would
  * swing at 0.5 Hz.
@@ -759,6 +780,7 @@ void BoxMaterialImport(
     ECS_META_COMPONENT(world, RippleSource);
     ECS_META_COMPONENT(world, WindSway);
     ECS_META_COMPONENT(world, VertexReveal);
+    ECS_META_COMPONENT(world, VertexOcclusion);
     ECS_META_COMPONENT(world, BlendMode);
     ECS_META_COMPONENT(world, BackFaceMode);
     ECS_META_COMPONENT(world, PbrTextures);
@@ -806,6 +828,7 @@ void BoxMaterialImport(
     ecs_set_hooks(world, WaterRipples, { .ctor = box_water_ripples_ctor });
     ecs_set_hooks(world, RippleSource, { .ctor = box_ripple_source_ctor });
     ecs_set_hooks(world, WindSway, { .ctor = box_wind_sway_ctor });
+    ecs_set_hooks(world, VertexOcclusion, { .ctor = box_vertex_occlusion_ctor });
     ecs_set_hooks(world, TextureLayer, { .ctor = box_texture_layer_ctor });
     ecs_set_hooks(world, MaterialId, { .ctor = box_material_id_ctor });
     ecs_add_pair(world, ecs_id(MaterialId), EcsOnInstantiate, EcsInherit);
@@ -813,15 +836,15 @@ void BoxMaterialImport(
     ecs_add_pair(world, ecs_id(TextureBlend), EcsOnInstantiate, EcsInherit);
     ecs_add_pair(world, ecs_id(TextureLayers), EcsOnInstantiate, EcsInherit);
 
-    ecs_entity_t materials[17] = {
+    ecs_entity_t materials[18] = {
         ecs_id(Rgb), ecs_id(PbrMaterial), ecs_id(Emissive), ecs_id(TextureTransform),
         ecs_id(AlphaCutoff), ecs_id(Transmission), ecs_id(ClearCoat), ecs_id(SpecularAnisotropy),
         ecs_id(Sheen), ecs_id(DiffuseTransmission), ecs_id(TextureMapping), ecs_id(TextureScroll),
         ecs_id(Fresnel), ecs_id(Water), ecs_id(Distortion), ecs_id(WindSway),
-        ecs_id(VertexReveal)
+        ecs_id(VertexReveal), ecs_id(VertexOcclusion)
     };
     int32_t i;
-    for (i = 0; i < 17; i ++) {
+    for (i = 0; i < 18; i ++) {
         ecs_add_pair(world, materials[i], EcsOnInstantiate, EcsInherit);
         ecs_add_pair(world, materials[i], EcsWith, ecs_id(MaterialId));
     }
