@@ -13,6 +13,8 @@ the `ActionState` of named actions in its action scope, never a device: remap by
 | `FirstPersonController` | `speed` 4, `crouch_speed` 2, `fly_speed` 10, `boost` 4, `jump` 5, `gravity` 18, `eye` 1.7, `crouch_eye` 0.9, `ground` 0, `radius` 0.3, `step` 0.3, `run` 0 (Fast ignored), `climb` 2, `swim_speed` 0.45, `swim_jump` 3.5, `swim_depth` 1.3, `swim_step` 3.2, `sensitivity` 0.003, `acceleration` 0 (snap), `turn_speed` 1.5, `turn_acceleration` 5, `turn_deceleration` 15, `invert_y`, `actions` (`box.controllers.first_person`), `flying` | Walking body with gravity, jump, crouch, fly toggle. Writes `velocity`, `angular_velocity`, `height`, `grounded`, `crouched`, `climbing`, `swimming` |
 | `Climbable` | tag, on a shape or an ancestor, inherited through IsA | A first person controller touching it climbs it like a ladder: Forward up, Back down at `climb` speed, Forward steps off at the top |
 | `TriangleCollider` | tag, on a mesh shape | Controllers collide with the triangles of the mesh instead of its bounding box |
+| `Vessel` | `route` (closed `Path3D`), `pivot`, `dock` 0, `speed` 6, `accel` 0.3, `wait` 25, `max_speed` 9, `max_yaw_rate` 0.12, `yaw_response` 2.5, `steer_heel` 0.6, `max_heel` 0.105, `waves` (pitch, roll, heave), `outline` (`Path2D`), `keel` -5, `deck` 5, `inset` 1.2, `water` 0, `stand`, `reach` 1.4, `wheel`, `lever`, `throttle_rate` 0.35, `rudder_rate` 0.9, `rudder_return` 0.5, `actions` (`box.controllers.helm`) | Ship that cruises its route and docks, or that the first person controller that used `Use` at the stand steers (throttle, rudder, hull kept off ground and quays). Writes `Position`, `Rotation`, wheel `Rotation.z`, lever `Rotation.x` |
+| `VesselStatus` | `mode` (`VesselDocked`, `VesselCruising`, `VesselManual`, `VesselRejoining`), `distance`, `speed`, `heading`, `yaw_rate`, `throttle`, `rudder`, `wait`, `to_dock`, `heel`, `pitch`, `roll`, `heave`, `x`, `z`, `pilot`, `bumps`, ... | State of a `Vessel`, written every frame; set `mode` or `distance` to seek |
 
 Both imply `Position` and `Rotation` and write them (local space) with `ecs_modified`.
 Defaults come from the component constructor, so `CameraController: {speed: 12}` keeps the rest.
@@ -30,7 +32,7 @@ Defaults come from the component constructor, so `CameraController: {speed: 12}`
 | `Crouch` | - | CtrlLeft |
 | `Fly` | - | F (toggles `flying`) |
 
-Scopes: `box.controllers.camera`, `box.controllers.first_person`. The actions of a scope are
+Scopes: `box.controllers.camera`, `box.controllers.first_person`, `box.controllers.helm` (`Use` F, `Ahead` W, `Astern` S, `Port` A, `Starboard` D, `Stop` X, `Centre` Space, `Look`, turn actions). The actions of a scope are
 disabled (do not bind, are not listed) while no controller uses that scope.
 
 ## Flecs script
@@ -73,6 +75,8 @@ Missing actions in a custom scope are simply never held.
 | System | Phase |
 |---|---|
 | `CameraActionsActivate`, `FirstPersonActionsActivate` | `EcsPreFrame` (enable/disable the default scopes) |
+| `HelmActionsActivate` | `EcsPreFrame` |
+| `VesselUpdate` (before the controllers, so riders and the pilot follow in the same frame) | `EcsOnUpdate` |
 | `CameraControllerUpdate`, `FirstPersonControllerUpdate` | `EcsOnUpdate` |
 
 ## Behavior and gotchas

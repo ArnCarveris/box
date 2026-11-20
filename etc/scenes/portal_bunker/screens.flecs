@@ -18,13 +18,14 @@ using box.transform
 // so that the screen can name it before the scene adds to it
 camera {}
 
-// The ship the ship screens show: moored at the quay, its engine idling. Nothing moves it yet; what
-// runs the ship writes this PortalShipStatus (portal/ship_chart.flecs) and the screens follow.
-// The route of the ship round the island (placeholder), the chart of both screens that show it
+// The ship the ship screens show: its Vessel (etc/scenes/portal_bunker.flecs) runs it, and
+// ship_feed writes this PortalShipStatus (portal/ship_chart.flecs) from it; the screens follow.
+// The marks of its route round the island (every other waypoint of the Vessel's route), the
+// chart of both screens that show it
 const ship_route: PortalWaypoint[] = [
-  {"DOCK", 55, 30}, {"FAIRWAY", 110, 30}, {"EAST CAPE", 140, -60}, {"SOUTH BAR", 50, -115},
-  {"WEST REEF", -90, -100}, {"WEST POINT", -150, 10}, {"NORTH BAY", -110, 110},
-  {"NORTH POINT", 0, 130}, {"HARBOUR MOUTH", 100, 100}
+  {"QUAY", 55, 29}, {"NORTH CHANNEL", 55, 125}, {"NORTH CAPE", 20, 190}, {"NORTH BAY", -130, 150},
+  {"WEST POINT", -158, 60}, {"SOUTH WEST", -125, -110}, {"SOUTH BAR", 20, -140},
+  {"FAIRWAY", 55, -70}
 ]
 
 freighter {
@@ -33,6 +34,8 @@ freighter {
     exhaust: 140, heel: 0.3, trim: 0.5, eta: -1, sails: 272, moored: true, manual: true
   }
 }
+
+PortalShipFeed ship_feed(ship: freighter)
 
 bunker {
   props {
@@ -123,7 +126,10 @@ bunker {
     }
 
     prop_16 {
-      PortalHarbourScreen screen(width: 1.92, height: 0.72, ship: freighter, route: ship_route) {
+      PortalHarbourScreen screen(
+        width: 1.92, height: 0.72,
+        ship: freighter, route: ship_route, x0: -200, z0: -170, x1: 100, z1: 220
+      ) {
         Position: {0, 1.35, 0.208}
         Rotation: {0, 3.14159265, 0}
       }
@@ -144,7 +150,10 @@ freighter {
       }
     }
     prop_104 {
-      PortalNavigationScreen screen(width: 1.12, height: 0.47, ship: freighter, route: ship_route) {
+      PortalNavigationScreen screen(
+        width: 1.12, height: 0.47,
+        ship: freighter, route: ship_route, x0: -200, z0: -170, x1: 100, z1: 220
+      ) {
         Position: {0, 1.0483, 0.0938}
         Rotation: {-0.6109, 3.14159265, 0}
       }

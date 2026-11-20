@@ -1,0 +1,58 @@
+// A vessel on a closed route of eight waypoints, docked at the first one, on a straight along
+// +Z. Its hull is 6 by 20 m with its deck at height 2 and its keel at -1; the stand of the helm
+// is on the deck 6 m aft of the middle. Nothing is around it: a test adds quays.
+using box.transform
+using box.geometry
+using box.controllers
+
+route {
+  Path3D: {
+    start: {0, 0, 0},
+    segments: [
+      {kind: CatmullRom, end: {0, 0, 100}},
+      {kind: CatmullRom, end: {0, 0, 200}},
+      {kind: CatmullRom, end: {-60, 0, 250}},
+      {kind: CatmullRom, end: {-120, 0, 200}},
+      {kind: CatmullRom, end: {-120, 0, -100}},
+      {kind: CatmullRom, end: {-60, 0, -150}},
+      {kind: CatmullRom, end: {0, 0, -100}}
+    ],
+    closed: true
+  }
+}
+
+hull_outline {
+  Path2D: {
+    start: {-3, -10},
+    segments: [
+      {kind: Line, end: {3, -10}},
+      {kind: Line, end: {3, 10}},
+      {kind: Line, end: {-3, 10}}
+    ],
+    closed: true
+  }
+}
+
+ship {
+  deck {
+    Position: {0, 1.5, 0}
+    Box: {6, 1, 20}
+  }
+
+  wheel {
+    Position: {0, 3, -5}
+    Rotation: {0, 0, 0}
+    DynamicTransform
+  }
+
+  lever {
+    Position: {0.5, 3, -5}
+    Rotation: {0, 0, 0}
+    DynamicTransform
+  }
+
+  Vessel: {
+    route: route, dock: 0, speed: 6, accel: 0.5, wait: 2, outline: hull_outline,
+    keel: -1, deck: 2, inset: 1, stand: {0, 2, -6}, reach: 1.5, wheel: wheel, lever: lever
+  }
+}

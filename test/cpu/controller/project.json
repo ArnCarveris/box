@@ -201,6 +201,21 @@
                     "triangle_ramp",
                     "run"
                 ]
+            },
+            {
+                "id": "Vessel",
+                "testcases": [
+                    "cruises_and_docks",
+                    "heading_follows_route",
+                    "wheel_and_lever_follow",
+                    "helm_throttle_and_rudder",
+                    "rudder_reverses_astern",
+                    "quay_ahead_stops",
+                    "turn_into_quay_goes_straight",
+                    "open_water_turns",
+                    "autopilot_rejoins",
+                    "walker_rides"
+                ]
             }
         ]
     }

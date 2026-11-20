@@ -26,24 +26,23 @@ bool box_controller_ride(
     Position *p,
     Rotation *r)
 {
-    WorldTransform buf;
-    const WorldTransform *now = NULL;
-    mat4 last, rest, delta;
+    mat4 now, last, rest, delta;
     vec3 at;
     bool result = false;
+    bool placed = false;
 
     if (*carrier && !ecs_is_alive(world, *carrier)) {
         *carrier = 0;
     }
 
     if (*carrier) {
-        now = box_transform_world(world, *carrier, &buf);
+        placed = box_controller_pose(world, *carrier, now);
     }
 
-    if (now) {
+    if (placed) {
         ecs_os_memcpy(last, pose, ECS_SIZEOF(mat4));
         glm_mat4_inv(last, rest);
-        glm_mat4_mul(ECS_CONST_CAST(vec4*, now->m), rest, delta);
+        glm_mat4_mul(now, rest, delta);
         glm_mat4_mulv3(delta, (vec3){ p->x, p->y, p->z }, 1.0f, at);
         result = at[0] != p->x || at[1] != p->y || at[2] != p->z;
         p->x = at[0];
@@ -56,7 +55,7 @@ bool box_controller_ride(
             r->y += yaw;
         }
 
-        ecs_os_memcpy(pose, now->m, ECS_SIZEOF(mat4));
+        ecs_os_memcpy(pose, now, ECS_SIZEOF(mat4));
     }
 
     return result;
@@ -69,14 +68,13 @@ void box_controller_board(
     float *pose)
 {
     ecs_entity_t mover = shape ? box_spatial_mover_of(world, shape) : 0;
-    WorldTransform buf;
-    const WorldTransform *now = NULL;
+    mat4 now;
 
     if (mover != *carrier) {
-        now = mover ? box_transform_world(world, mover, &buf) : NULL;
-        *carrier = now ? mover : 0;
-        if (now) {
-            ecs_os_memcpy(pose, now->m, ECS_SIZEOF(mat4));
+        bool placed = mover && box_controller_pose(world, mover, now);
+        *carrier = placed ? mover : 0;
+        if (placed) {
+            ecs_os_memcpy(pose, now, ECS_SIZEOF(mat4));
         }
     }
 }

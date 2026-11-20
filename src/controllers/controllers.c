@@ -119,6 +119,7 @@ void BoxControllersImport(
     ECS_IMPORT(world, BoxTypes);
     ECS_IMPORT(world, BoxTransform);
     ECS_IMPORT(world, BoxInput);
+    ECS_IMPORT(world, BoxGeometry);
 
     ECS_TAG_DEFINE(world, Climbable);
     ecs_add_pair(world, Climbable, EcsOnInstantiate, EcsInherit);
@@ -179,6 +180,41 @@ void BoxControllersImport(
         .immediate = true
     });
 
+    ECS_META_COMPONENT(world, VesselMode);
+    ECS_META_COMPONENT(world, Vessel);
+    ECS_META_COMPONENT(world, VesselStatus);
+    ECS_COMPONENT_DEFINE(world, HelmActionMap);
+    ecs_set_hooks(world, HelmActionMap, { .ctor = flecs_default_ctor });
+    ecs_add_pair(world, ecs_id(Vessel), EcsWith, ecs_id(VesselStatus));
+    ecs_add_pair(world, ecs_id(Vessel), EcsWith, ecs_id(Position));
+    ecs_add_pair(world, ecs_id(Vessel), EcsWith, ecs_id(Rotation));
+    ecs_add_pair(world, ecs_id(Vessel), EcsWith, DynamicTransform);
+
+    HelmActionMap *helm = ecs_singleton_ensure(world, HelmActionMap);
+    helm->scope = box_controller_actions_create(world, "helm", box_helm_actions,
+        BoxHelmActionCount, helm->actions, helm->alts);
+    box_controllers_ctor(world, ecs_id(Vessel), box_vessel_ctor, helm->scope);
+
+    ecs_system(world, {
+        .entity = ecs_entity(world, { .name = "HelmActionsActivate" }),
+        .phase = EcsPreFrame,
+        .query.terms = {{ .id = ecs_id(Vessel), .inout = EcsIn }},
+        .run = BoxHelmActionsActivate,
+        .immediate = true
+    });
+
+    ecs_system(world, {
+        .entity = ecs_entity(world, { .name = "VesselUpdate" }),
+        .phase = EcsOnUpdate,
+        .query.terms = {
+            { .id = ecs_id(Vessel), .inout = EcsIn },
+            { .id = ecs_id(VesselStatus), .inout = EcsInOut },
+            { .id = ecs_id(Position), .inout = EcsInOut },
+            { .id = ecs_id(Rotation), .inout = EcsInOut }
+        },
+        .callback = BoxVesselUpdate
+    });
+
     ecs_system(world, {
         .entity = ecs_entity(world, { .name = "FirstPersonControllerUpdate" }),
         .phase = EcsOnUpdate,
@@ -189,4 +225,5 @@ void BoxControllersImport(
         },
         .callback = BoxFirstPersonControllerUpdate
     });
+
 }

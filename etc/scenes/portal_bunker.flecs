@@ -16,6 +16,7 @@ include portal/facility_screen
 include portal/power_screen
 include portal/generator_screen
 include portal/ship_chart
+include portal/ship_feed
 include portal/harbour_screen
 include portal/engine_screen
 include portal/navigation_screen
@@ -73,6 +74,50 @@ island {
   terrain_sand { TriangleCollider }
 }
 
+// The route of the freighter seen from above (x, z; the height is not used) and the outline of
+// its hull at the deck in its local frame (x, z), which the seabed and the quay must stay clear of
+freighter_voyage {
+  route {
+    Path3D: {
+      start: {55, 0, 29},
+      segments: [
+        {kind: CatmullRom, end: {55, 0, 75}},
+        {kind: CatmullRom, end: {55, 0, 125}},
+        {kind: CatmullRom, end: {55, 0, 160}},
+        {kind: CatmullRom, end: {20, 0, 190}},
+        {kind: CatmullRom, end: {-60, 0, 188}},
+        {kind: CatmullRom, end: {-130, 0, 150}},
+        {kind: CatmullRom, end: {-158, 0, 60}},
+        {kind: CatmullRom, end: {-155, 0, -40}},
+        {kind: CatmullRom, end: {-125, 0, -110}},
+        {kind: CatmullRom, end: {-50, 0, -140}},
+        {kind: CatmullRom, end: {20, 0, -140}},
+        {kind: CatmullRom, end: {55, 0, -110}},
+        {kind: CatmullRom, end: {55, 0, -70}},
+        {kind: CatmullRom, end: {55, 0, -40}}
+      ],
+      closed: true
+    }
+  }
+
+  outline {
+    Path2D: {
+      start: {49, -6},
+      segments: [
+        {kind: Line, end: {50, -8}},
+        {kind: Line, end: {60, -8}},
+        {kind: Line, end: {61, -6}},
+        {kind: Line, end: {61, 52}},
+        {kind: Line, end: {58.5, 60}},
+        {kind: Line, end: {55, 66}},
+        {kind: Line, end: {51.5, 60}},
+        {kind: Line, end: {49, 52}}
+      ],
+      closed: true
+    }
+  }
+}
+
 // The freighter is the mover of the whole ship: the docked pose is its local frame (the identity), and
 // moving or turning it carries the ship's rooms, portals, doors, lights, screens and props, which are
 // its children (portal_bunker/rooms, shell, props, lights, screens).
@@ -84,6 +129,38 @@ freighter {
   antifouling { TriangleCollider }
   deck { TriangleCollider }
   bulwark { TriangleCollider }
+
+  // The helm on the bridge: the wheel turns with the rudder about the fore-and-aft axis, the lever
+  // tilts with the throttle; a click on the wheel within reach takes the helm like F at the stand
+  helm_wheel {
+    Position: {55, 9.2, 1.82}
+    Rotation: {0, 0, 0}
+    DynamicTransform
+    box.picking.PickRange: {distance: 2.5}
+    box.picking.ActionTrigger: {action: box.controllers.helm.Use}
+    rim : BunkerMat_metal { Rotation: {1.5708, 0, 0}; Torus: {radius: 0.34, tube: 0.025} }
+    spoke_across : BunkerMat_metal { Box: {0.66, 0.03, 0.03} }
+    spoke_along : BunkerMat_metal { Box: {0.03, 0.66, 0.03} }
+    hub : BunkerMat_steel { Position: {0, 0, -0.03}; Box: {0.08, 0.08, 0.08} }
+  }
+
+  helm_lever {
+    Position: {55.55, 9.1, 2.05}
+    Rotation: {0, 0, 0}
+    DynamicTransform
+    stick : BunkerMat_steel { Position: {0, 0.2, 0}; Box: {0.04, 0.4, 0.04} }
+    knob : BunkerMat_metal { Position: {0, 0.42, 0}; Box: {0.08, 0.08, 0.08} }
+  }
+
+  // The voyage of the original (scenario vehicles.freighter): round the island on the route of
+  // freighter_voyage.route, docking at its first waypoint, the quay
+  Vessel: {
+    route: freighter_voyage.route, pivot: {55, -1.2, 29}, dock: 0, speed: 7, accel: 0.35,
+    wait: 30, max_speed: 9, max_yaw_rate: 0.12, yaw_response: 2.5, steer_heel: 0.6,
+    max_heel: 0.1047, waves: {0.0192, 0.0314, 0.25}, outline: freighter_voyage.outline,
+    keel: -5, deck: 5, inset: 1.2, water: -1.2, stand: {55, 8, 0.65}, reach: 1.6,
+    wheel: helm_wheel, lever: helm_lever
+  }
 }
 
 sun {

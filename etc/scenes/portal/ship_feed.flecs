@@ -1,0 +1,54 @@
+// What the ship screens show of a vessel that the engine runs (box.controllers.Vessel): a
+// PortalShipFeed writes the PortalShipStatus (portal/ship_chart.flecs) of a ship from its
+// VesselStatus four times a second, the engine room's numbers made up from the throttle.
+//
+//   PortalShipFeed ship_feed(ship: freighter)
+
+using flecs.script
+using flecs.script.math
+using box.controllers
+
+template PortalShipFeed {
+  prop ship: entity = 0               // Entity with the Vessel and the PortalShipStatus
+  prop period: f32 = 0.25             // Seconds between two writes
+
+  async {
+    mut rpm: f32 = 0
+    mut load: f32 = 0
+    mut exhaust: f32 = 140
+
+    while true {
+      await delay(period)
+
+      mut throttle: f32 = ship[VesselStatus].throttle
+      mut speed: f32 = ship[VesselStatus].speed
+      mut docked = ship[VesselStatus].mode == VesselDocked
+      mut ahead: f32 = throttle < 0 ? -throttle : throttle
+      mut moving: f32 = speed < 0 ? -speed : speed
+      mut heading: f32 = ship[VesselStatus].heading * 57.29578
+      mut astern: i32 = throttle < -0.3 ? -2 : -1
+      mut order: i32 = throttle < 0.45 ? 1 : throttle < 0.8 ? 2 : 3
+      mut turning: f32 = docked && ahead < 0.03 ? 0 : 22 + 98 * ahead
+
+      rpm = rpm + (turning - rpm) * 0.15
+      load = load + (ahead - load) * 0.15
+      exhaust = exhaust + (160 + 280 * ahead - exhaust) * 0.04
+
+      ship[PortalShipStatus].x = ship[VesselStatus].x
+      ship[PortalShipStatus].z = ship[VesselStatus].z
+      ship[PortalShipStatus].heading = heading < -0.5 ? heading + 360 : heading < 0 ? 0 : heading
+      ship[PortalShipStatus].speed = moving * 1.9438
+      ship[PortalShipStatus].rudder = ship[VesselStatus].rudder * 35
+      ship[PortalShipStatus].telegraph = throttle < -0.03 ? astern : throttle < 0.03 ? 0 : order
+      ship[PortalShipStatus].rpm = rpm
+      ship[PortalShipStatus].load = load
+      ship[PortalShipStatus].exhaust = exhaust
+      ship[PortalShipStatus].heel = ship[VesselStatus].roll * 57.29578
+      ship[PortalShipStatus].trim = ship[VesselStatus].pitch * 57.29578
+      ship[PortalShipStatus].eta = docked ? -1 : ship[VesselStatus].to_dock / max(moving, 0.5)
+      ship[PortalShipStatus].sails = docked ? ship[VesselStatus].wait : -1
+      ship[PortalShipStatus].moored = docked
+      ship[PortalShipStatus].manual = ship[VesselStatus].mode == VesselManual
+    }
+  }
+}

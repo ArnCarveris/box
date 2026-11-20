@@ -289,6 +289,19 @@ ecs_entity_t box_controller_ground_shape(
     const box_controller_body_t *body,
     const Position *feet);
 
+/** Get the world transform of a mover from its Position, Rotation and Scale as they are now,
+ * not as the last WorldTransform update left it (controllers/pose.c).
+ *
+ * @param world The world
+ * @param e The entity
+ * @param out Receives the transform
+ * @return false when the entity has no place in the world
+ */
+bool box_controller_pose(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    mat4 out);
+
 /** Move a point and its yaw with the mover that carries it since the last call
  * (controllers/ride.c).
  *
@@ -631,5 +644,207 @@ bool box_controller_water(
     float reach,
     float below,
     float *level);
+
+/** The actions of the helm of a vessel, the index of their name in the action table */
+typedef enum box_helm_action_t {
+    BoxHelmUse,         /**< Take the helm near the stand, or let go of it */
+    BoxHelmAhead,       /**< Move the throttle ahead while held */
+    BoxHelmAstern,      /**< Move the throttle astern while held */
+    BoxHelmPort,        /**< Turn the rudder to port while held */
+    BoxHelmStarboard,   /**< Turn the rudder to starboard while held */
+    BoxHelmStop,        /**< Stop the engine */
+    BoxHelmCentre,      /**< Centre the rudder */
+    BoxHelmLook,        /**< Turn the pilot's view with the cursor while held */
+    BoxHelmTurnLeft,    /**< Turn the pilot's view left while held */
+    BoxHelmTurnRight,   /**< Turn the pilot's view right while held */
+    BoxHelmTurnUp,      /**< Turn the pilot's view up while held */
+    BoxHelmTurnDown,    /**< Turn the pilot's view down while held */
+    BoxHelmActionCount  /**< Number of helm actions */
+} box_helm_action_t;
+
+/** The helm actions, indexed by box_helm_action_t */
+extern const box_controller_action_t box_helm_actions[BoxHelmActionCount];
+
+/** The default helm actions, a private singleton, disabled while no vessel uses them */
+typedef struct HelmActionMap {
+    ecs_entity_t scope;                       /**< box.controllers.helm */
+    ecs_entity_t actions[BoxHelmActionCount]; /**< The actions, by index */
+    ecs_entity_t alts[BoxHelmActionCount];    /**< Their child bindings, 0 for none */
+    bool active;                              /**< The actions are enabled */
+} HelmActionMap;
+
+extern ECS_COMPONENT_DECLARE(HelmActionMap);
+
+/** What the helm actions of a vessel do in one frame */
+typedef struct box_helm_input_t {
+    bool held[BoxHelmActionCount];    /**< The action is held */
+    bool pressed[BoxHelmActionCount]; /**< The action went down this frame */
+} box_helm_input_t;
+
+/** Arc length table of a closed route seen from above (controllers/route.c) */
+typedef struct box_route_t {
+    int32_t count;     /**< Segments, one per waypoint */
+    int32_t samples;   /**< Samples, BOX_ROUTE_STEPS per segment */
+    vec3 (*cubics)[4]; /**< Cubic Bezier points of every segment */
+    float *lengths;    /**< Arc length at every sample, from 0 */
+    float *params;     /**< Segment index plus segment parameter at every sample */
+    float total;       /**< Length of the route, back to its start */
+} box_route_t;
+
+/** Samples of one segment of a route */
+#define BOX_ROUTE_STEPS 64
+
+/** Build the arc length table of a closed Path3D in the XZ plane.
+ *
+ * @param path The path, may be NULL
+ * @param route The table, written; free it with box_route_fini
+ * @return Whether the path is valid, closed and longer than zero
+ */
+bool box_route_init(
+    const Path3D *path,
+    box_route_t *route);
+
+/** Free the arrays of a route table.
+ *
+ * @param route The table
+ */
+void box_route_fini(
+    box_route_t *route);
+
+/** Wrap a distance into a route, 0 up to its length.
+ *
+ * @param route The table
+ * @param distance The distance, any value
+ * @return The distance on the route
+ */
+float box_route_wrap(
+    const box_route_t *route,
+    float distance);
+
+/** Evaluate the place and the heading of the tangent at a distance along a route.
+ *
+ * @param route The table
+ * @param distance The distance, wrapped into the route
+ * @param x Receives X
+ * @param z Receives Z
+ * @param heading Receives the heading of the tangent, 0 along +Z, positive toward +X
+ */
+void box_route_at(
+    const box_route_t *route,
+    float distance,
+    float *x,
+    float *z,
+    float *heading);
+
+/** Find the sample of a route nearest to a point.
+ *
+ * @param route The table
+ * @param x X of the point
+ * @param z Z of the point
+ * @return The distance along the route of that sample
+ */
+float box_route_nearest(
+    const box_route_t *route,
+    float x,
+    float z);
+
+/** The distance along a route of one of its waypoints.
+ *
+ * @param route The table
+ * @param index The waypoint, wrapped into the route
+ * @return Its distance
+ */
+float box_route_waypoint(
+    const box_route_t *route,
+    int32_t index);
+
+/** Count the samples of the hull of a vessel at a place and heading that come down on ground
+ * or a shape (controllers/hull.c).
+ *
+ * @param world The world
+ * @param e The vessel, whose own shapes do not count
+ * @param vessel Its settings
+ * @param y Height of its frame in the parent space, unturned (the heave)
+ * @param x X of the pivot in the parent space
+ * @param z Z of the pivot in the parent space
+ * @param heading The heading
+ * @return Samples of the keel line and the deck line that are blocked, 0 when clear
+ */
+int32_t box_vessel_blocked(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    const Vessel *vessel,
+    float y,
+    float x,
+    float z,
+    float heading);
+
+/** Read the helm actions of a scope (controllers/helm.c).
+ *
+ * @param world The world
+ * @param scope The scope, the default scope or 0 for none
+ * @param out The input, written
+ */
+void box_helm_read(
+    ecs_world_t *world,
+    ecs_entity_t scope,
+    box_helm_input_t *out);
+
+/** Move the throttle and the rudder of a vessel as the pilot's actions say (controllers/helm.c).
+ *
+ * @param vessel The settings
+ * @param status The state, throttle and rudder written
+ * @param in The actions
+ * @param dt Seconds of the frame
+ */
+void box_helm_steer(
+    const Vessel *vessel,
+    VesselStatus *status,
+    const box_helm_input_t *in,
+    float dt);
+
+/** Hand the helm to the first person controller within reach of the stand, or let it go when
+ * its pilot uses it again (controllers/helm.c).
+ *
+ * @param world The world
+ * @param e The vessel
+ * @param vessel The settings
+ * @param status The state, pilot and mode written
+ * @param in The helm actions
+ */
+void box_helm_use(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    const Vessel *vessel,
+    VesselStatus *status,
+    const box_helm_input_t *in);
+
+/** Keep the pilot at the stand of a vessel at its pose of this frame, and turn the wheel and
+ * the lever (controllers/helm.c).
+ *
+ * @param world The world
+ * @param e The vessel
+ * @param vessel The settings
+ * @param status The state
+ */
+void box_helm_place(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    const Vessel *vessel,
+    const VesselStatus *status);
+
+/** Constructor of Vessel with its defaults and the default helm actions (controllers/vessel.c). */
+void box_vessel_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti);
+
+/** Enable the default helm actions while a vessel uses them (controllers/helm.c). */
+void BoxHelmActionsActivate(
+    ecs_iter_t *it);
+
+/** Move every Vessel along its route or as its pilot steers (controllers/vessel.c). */
+void BoxVesselUpdate(
+    ecs_iter_t *it);
 
 #endif

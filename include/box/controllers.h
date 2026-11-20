@@ -112,14 +112,102 @@ extern ECS_TAG_DECLARE(Climbable);
  */
 extern ECS_TAG_DECLARE(TriangleCollider);
 
+/** What steers a Vessel */
+ECS_ENUM(VesselMode, {
+    VesselDocked,    /**< At rest on the dock mark, waiting to sail */
+    VesselCruising,  /**< The autopilot follows the route and stops at the dock mark */
+    VesselManual,    /**< A pilot steers at the helm */
+    VesselRejoining  /**< The autopilot steers back onto the route after the pilot let go */
+});
+
+/** A ship that cruises a closed route and docks, or that a first person controller steers.
+ *
+ * Its pivot, a point in its local frame, follows the Catmull-Rom Path3D of route, in the parent
+ * space of the vessel (its x and z, seen from above). On the route the vessel accelerates at
+ * accel to speed, brakes to rest exactly on waypoint dock of the route, waits wait seconds and
+ * sails again; its heading (Rotation.y, 0 along +Z) turns toward the tangent through a
+ * critically damped spring of rate yaw_response. Waves pitch, roll and heave it, calmer while
+ * docked, and it heels into a turn.
+ *
+ * The Use action of actions with a first person controller within reach of stand makes that
+ * controller its pilot: the controller stays at the stand, reads only Look and the turn actions,
+ * and Ahead and Astern move the throttle, Port and Starboard turn the self-centring rudder, Stop
+ * stops the engine, Centre centres the rudder and Use lets go. The rudder only turns the vessel
+ * with water flowing past it, so the turn rate follows the speed and reverses astern. The hull,
+ * the Path2D of outline in local x and z at the deck, must not come down on ground higher than
+ * keel (along its outline moved inset toward the middle) or on shapes higher than water (along
+ * the outline itself) below deck: a turn into them goes straight on, running into them stops
+ * the vessel with a bump, and a hull already on them only moves where no more of it is. Let go,
+ * the autopilot steers back onto the route and docks.
+ *
+ * Writes its Position and Rotation, the Rotation.z of wheel (the rudder) and the Rotation.x of
+ * lever (the throttle). Implies VesselStatus, Position, Rotation and DynamicTransform.
+ */
+ECS_STRUCT(Vessel, {
+    ecs_entity_t route;   /**< Entity with the closed Path3D to cruise, its waypoints the anchors */
+    vec3 pivot;           /**< Point of the local frame that follows the route */
+    int32_t dock;         /**< Waypoint of the route the vessel docks at, 0 by default */
+    float speed;          /**< Cruising speed in units per second, 6 by default */
+    float accel;          /**< Acceleration in units per second squared, 0.3 by default */
+    float wait;           /**< Seconds at the dock before sailing, 25 by default */
+    float max_speed;      /**< Speed at full ahead, half of it full astern, 9 by default */
+    float max_yaw_rate;   /**< Turn rate at full rudder and half max_speed, 0.12 rad/s */
+    float yaw_response;   /**< Rate of the heading spring on the route, 2.5 per second */
+    float steer_heel;     /**< Heel per turn rate times speed, 0.6 by default */
+    float max_heel;       /**< Greatest heel from steering in radians, 0.105 by default */
+    vec3 waves;           /**< Pitch and roll in radians and heave in units of the waves */
+    ecs_entity_t outline; /**< Entity with the Path2D of the hull, 0 for no collision */
+    float keel;           /**< Local height of the keel, -5 by default */
+    float deck;           /**< Local height of the deck, 5 by default */
+    float inset;          /**< How far the keel line lies inside the outline, 1.2 by default */
+    float water;          /**< Height of the water in the parent space, 0 by default */
+    vec3 stand;           /**< Local point the pilot's feet stand on at the helm */
+    float reach;          /**< Distance from the stand within which Use takes the helm, 1.4 */
+    ecs_entity_t wheel;   /**< Entity turned with the rudder about its Z, 0 for none */
+    ecs_entity_t lever;   /**< Entity tilted with the throttle about its X, 0 for none */
+    float throttle_rate;  /**< Throttle per second Ahead and Astern move, 0.35 by default */
+    float rudder_rate;    /**< Rudder per second Port and Starboard move, 0.9 by default */
+    float rudder_return;  /**< Rudder per second it centres by itself, 0.5 by default */
+    ecs_entity_t actions; /**< Scope of the helm actions, default box.controllers.helm */
+});
+
+/** The state of a Vessel, written by its system every frame; set mode or distance to seek */
+ECS_STRUCT(VesselStatus, {
+    VesselMode mode;      /**< What steers the vessel */
+    float distance;       /**< Distance along the route of the autopilot */
+    float speed;          /**< Speed in units per second, negative astern */
+    float heading;        /**< Heading in radians, 0 along +Z, positive toward +X */
+    float yaw_rate;       /**< Turn rate in radians per second */
+    float throttle;       /**< Throttle, -0.5 full astern to 1 full ahead */
+    float rudder;         /**< Rudder, -1 hard to port to 1 hard to starboard */
+    float wait;           /**< Seconds left at the dock, 0 when not docked */
+    float to_dock;        /**< Distance along the route to the dock mark */
+    float heel;           /**< Heel from steering in radians */
+    float pitch;          /**< Pitch in radians, bow up positive */
+    float roll;           /**< Roll in radians, heel included */
+    float heave;          /**< Heave in units */
+    float swell;          /**< Share of the waves the vessel feels, low while docked */
+    float x;              /**< X of the pivot in the parent space */
+    float z;              /**< Z of the pivot in the parent space */
+    vec2 offset;          /**< Place off the route after rejoining it, easing to zero */
+    float time;           /**< Seconds the waves have run */
+    float backoff;        /**< Seconds the autopilot backs away from a bump */
+    int32_t bumps;        /**< Collisions that stopped the vessel so far */
+    ecs_entity_t pilot;   /**< First person controller at the helm, 0 for none */
+    ecs_entity_t pilot_actions; /**< The pilot's own action scope, given back when it lets go */
+    bool placed;          /**< The vessel was put on its route, false to put it at the dock */
+});
+
 /** Register the box.controllers module and the default controller actions.
  *
  * Under box.controllers.camera: Forward (W), Back (S), Left (A), Right (D), Up (E), Down (Q),
  * Fast (ShiftLeft, ShiftRight as a child binding), Look (MouseRight) and TurnLeft, TurnRight,
  * TurnUp and TurnDown (the arrow keys). Under box.controllers.first_person the same.
  *
- * The first person scope adds Jump (Space), Crouch (CtrlLeft) and Fly (F). The actions of a
- * scope stay disabled while no controller uses them, so they only bind in worlds that do.
+ * The first person scope adds Jump (Space), Crouch (CtrlLeft) and Fly (F). Under
+ * box.controllers.helm: Use (F), Ahead (W), Astern (S), Port (A), Starboard (D), Stop (X),
+ * Centre (Space), Look and the turn actions. The actions of a scope stay disabled while no
+ * controller uses them, so they only bind in worlds that do.
  *
  * @param world The world
  */
