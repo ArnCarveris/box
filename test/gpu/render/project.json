@@ -1647,7 +1647,12 @@
                     "history_removed_volume",
                     "history_two_views",
                     "history_resize",
-                    "history_grazing_slab"
+                    "history_grazing_slab",
+                    "falloff_defaults_unchanged",
+                    "ellipsoid_corner",
+                    "ellipsoid_camera_inside",
+                    "height_falloff",
+                    "edge_noise"
                 ]
             },
             {

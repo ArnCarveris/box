@@ -158,7 +158,10 @@
                     "offset_record",
                     "fog_distance",
                     "froxel_grid_size",
-                    "froxel_slices"
+                    "froxel_slices",
+                    "falloff_script_keeps_others",
+                    "falloff_record",
+                    "falloff_clamped"
                 ]
             },
             {

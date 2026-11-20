@@ -50,6 +50,14 @@ const SEGMENT_FULL: u32 = 0u;
 const SEGMENT_BEHIND: u32 = 1u;
 const SEGMENT_FRONT: u32 = 2u;
 
+// Shapes of the fog of a volume in its box (FogVolumeShape).
+const FOG_SHAPE_BOX: u32 = 0u;
+const FOG_SHAPE_ELLIPSOID: u32 = 1u;
+
+// Width of the noise values over which edge_noise lets the fog of a border in: the threshold of
+// the noise moves from 0 deep inside to 1 + this at the surface.
+const FOG_EDGE_NOISE_WIDTH: f32 = 0.3;
+
 struct FogVolume {
     center: vec3f,
     density: f32,
@@ -66,9 +74,10 @@ struct FogVolume {
     offset: vec3f,
     noise_strength: f32,
     noise_scale: f32,
-    pad0: f32,
-    pad1: f32,
-    pad2: f32,
+    // FOG_SHAPE_BOX or FOG_SHAPE_ELLIPSOID
+    shape: u32,
+    height_falloff: f32,
+    edge_noise: f32,
 };
 
 @group(0) @binding(0) var<uniform> view: View;
@@ -106,10 +115,22 @@ fn inside(fog: FogVolume, q: vec3f) -> f32 {
     return min(min(d.x, d.y), d.z);
 }
 
-// Share of the density of a volume at a point of its local frame: 0 at the faces of the box, 1
-// from edge_fade inside.
+// Distance of a point of the local frame of a volume inside the surface of its shape, negative
+// outside, at most the true distance and concave along a segment for every shape. The ellipsoid
+// takes the distance in the unit sphere scaled by its smallest semi-axis.
+fn shape_inside(fog: FogVolume, q: vec3f) -> f32 {
+    if (fog.shape == FOG_SHAPE_ELLIPSOID) {
+        let e = max(fog.extent, vec3f(1e-6));
+        return (1.0 - length(q / e)) * min(min(e.x, e.y), e.z);
+    }
+
+    return inside(fog, q);
+}
+
+// Share of the density of a volume at a point of its local frame: 0 at the surface of its shape,
+// 1 from edge_fade inside.
 fn edge(fog: FogVolume, q: vec3f) -> f32 {
-    let d = inside(fog, q);
+    let d = shape_inside(fog, q);
     if (fog.edge_fade <= 0.0) {
         return select(0.0, 1.0, d > 0.0);
     }
@@ -124,16 +145,39 @@ fn volume_local(fog: FogVolume, p: vec3f) -> vec3f {
         dot(rel, fog.axes[2].xyz));
 }
 
+// Share of the density of a volume left at a height q.y of its local frame by its
+// height_falloff: 1 at the bottom of the box, thinning out exponentially above it.
+fn height_share(fog: FogVolume, q: vec3f) -> f32 {
+    if (fog.height_falloff <= 0.0) {
+        return 1.0;
+    }
+
+    return exp(-fog.height_falloff * max(q.y + fog.extent.y, 0.0));
+}
+
+// The share of a border edge_noise leaves of a noise value v at an edge factor e: a threshold on
+// the noise that moves from 0 deep inside (e 1) to above every value at the surface (e 0), so
+// the fog reaches further out where the noise is high, mixed with the plain factor.
+fn edge_eroded(fog: FogVolume, e: f32, v: f32) -> f32 {
+    let t = (1.0 - e) * (1.0 + FOG_EDGE_NOISE_WIDTH);
+    return mix(e, smoothstep(t - FOG_EDGE_NOISE_WIDTH, t, v), fog.edge_noise);
+}
+
 // Density of a volume at a point p of the world, of the share of the volume it covers there
-// (edge).
-fn density(fog: FogVolume, cover: f32, p: vec3f) -> f32 {
-    var value = fog.density * cover;
+// (edge) and the share its height leaves (height_share).
+fn density(fog: FogVolume, cover: f32, p: vec3f, h: f32) -> f32 {
+    var value = fog.density * cover * h;
     if (value > 0.0 && fog.noise_strength > 0.0) {
         let uvw = (p - fog.offset) / fog.noise_scale;
         let n = textureSampleLevel(noise, noise_sampler, uvw, 0.0).r;
         let detail = textureSampleLevel(noise, noise_sampler, uvw * 3.1 + vec3f(0.37), 0.0).r;
         let v = n * 0.75 + detail * 0.25;
         value *= mix(1.0, saturate(v * 2.0), fog.noise_strength);
+        // The faded border is a threshold on the same noise: the cover is the edge factor of
+        // the cell, swapped for its eroded share.
+        if (fog.edge_noise > 0.0 && fog.edge_fade > 0.0 && cover < 1.0) {
+            value *= edge_eroded(fog, cover, v) / cover;
+        }
     }
 
     return value;
@@ -325,28 +369,34 @@ fn inject(@builtin(global_invocation_id) id: vec3u) {
 
     for (var i = 0u; i < froxel.grid.w; i++) {
         let fog = volumes[i];
+        // The box bounds every shape.
         occupied = occupied || inside(fog, volume_local(fog, center)) > -reach;
         let qa = volume_local(fog, a);
         let qb = volume_local(fog, b);
-        // The distance inside a box is concave along a segment: a cell whose sides are both
+        var h = 1.0;
+        if (fog.height_falloff > 0.0) {
+            h = height_share(fog, volume_local(fog, p));
+        }
+
+        // The distance inside a shape is concave along a segment: a cell whose sides are both
         // edge_fade inside is covered whole.
         var cover = 1.0;
-        if (min(inside(fog, qa), inside(fog, qb)) < max(fog.edge_fade, 1e-6)) {
+        if (min(shape_inside(fog, qa), shape_inside(fog, qb)) < max(fog.edge_fade, 1e-6)) {
             cover = 0.0;
             for (var j = 0u; j < BOX_FROXEL_SAMPLES; j++) {
                 let e = edge(fog, mix(qa, qb, froxel_sample(j, jitter.z)));
                 cover += e;
-                cell_weights[j] += fog.density * e;
+                cell_weights[j] += fog.density * h * e;
             }
 
             cover /= f32(BOX_FROXEL_SAMPLES);
         } else {
             for (var j = 0u; j < BOX_FROXEL_SAMPLES; j++) {
-                cell_weights[j] += fog.density;
+                cell_weights[j] += fog.density * h;
             }
         }
 
-        let sigma = density(fog, cover, p);
+        let sigma = density(fog, cover, p, h);
         if (sigma <= 0.0) {
             continue;
         }
@@ -456,7 +506,10 @@ fn slice_share(uv: vec2f, s: f32, f: f32) -> f32 {
         let fog = volumes[i];
         let qa = volume_local(fog, a);
         let qb = volume_local(fog, b);
-        if (min(inside(fog, qa), inside(fog, qb)) >= max(fog.edge_fade, 1e-6)) {
+        // A volume whose density changes with height is not even along the slice.
+        if (fog.height_falloff <= 0.0 &&
+            min(shape_inside(fog, qa), shape_inside(fog, qb)) >= max(fog.edge_fade, 1e-6))
+        {
             before += fog.density * f;
             total += fog.density;
             continue;
@@ -468,7 +521,8 @@ fn slice_share(uv: vec2f, s: f32, f: f32) -> f32 {
 
         for (var k = 0u; k < BOX_FROXEL_APPLY_SAMPLES; k++) {
             let p = ray.origin + ray.dir * froxel_depth((s + (f32(k) + 0.5) / n) / slices);
-            let g = fog.density * edge(fog, volume_local(fog, p)) / n;
+            let q = volume_local(fog, p);
+            let g = fog.density * edge(fog, q) * height_share(fog, q) / n;
             before += g * saturate(f * n - f32(k));
             total += g;
         }

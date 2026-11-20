@@ -298,7 +298,10 @@ static void box_fog_volume_ctor(
             .light_inscatter = 1.0f,
             .noise_strength = 0.0f,
             .noise_scale = 4.0f,
-            .wind = {0.0f, 0.0f, 0.0f}
+            .wind = {0.0f, 0.0f, 0.0f},
+            .shape = FogVolumeBox,
+            .height_falloff = 0.0f,
+            .edge_noise = 0.0f
         };
     }
 }
@@ -448,6 +451,7 @@ void BoxLightImport(
     ecs_set_hooks(world, ReflectionProbe, { .ctor = box_reflection_probe_ctor });
     ECS_META_COMPONENT(world, PlanarReflection);
     ecs_set_hooks(world, PlanarReflection, { .ctor = box_planar_reflection_ctor });
+    ECS_META_COMPONENT(world, FogVolumeShape);
     ECS_META_COMPONENT(world, FogVolume);
     ecs_set_hooks(world, FogVolume, { .ctor = box_fog_volume_ctor });
     ECS_META_COMPONENT(world, StarField);

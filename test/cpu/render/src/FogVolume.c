@@ -183,6 +183,9 @@ void FogVolume_defaults(void) {
     test_flt(f->wind[0], 0);
     test_flt(f->wind[1], 0);
     test_flt(f->wind[2], 0);
+    test_int(f->shape, FogVolumeBox);
+    test_flt(f->height_falloff, 0);
+    test_flt(f->edge_noise, 0);
 
     ecs_entity_t added = ecs_new(world);
     ecs_add(world, added, FogVolume);
@@ -193,6 +196,9 @@ void FogVolume_defaults(void) {
     test_flt(f->noise_strength, 0);
     test_flt(f->noise_scale, 4);
     test_flt(f->wind[0], 0);
+    test_int(f->shape, FogVolumeBox);
+    test_flt(f->height_falloff, 0);
+    test_flt(f->edge_noise, 0);
 
     ecs_entity_t view = ecs_new(world);
     ecs_add(world, view, View);
@@ -887,4 +893,106 @@ void FogVolume_froxel_slices(void) {
         test_assert(fabsf(box_render_froxel_depth(t, -2, 98, true) - (-2 + 100 * t)) < 1e-3f);
         test_assert(fabsf(box_render_froxel_share(-2 + 100 * t, -2, 98, true) - t) < 1e-5f);
     }
+}
+
+void FogVolume_falloff_script_keeps_others(void) {
+    // fog_volume/falloff
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    test_assert(ecs_script_run(world, "fog",
+        "using box.light\n"
+        "fog { FogVolume: {shape: FogVolumeEllipsoid, edge_noise: 0.5} }\n", NULL) == 0);
+    const FogVolume *f = ecs_get(world, ecs_lookup(world, "fog"), FogVolume);
+    test_int(f->shape, FogVolumeEllipsoid);
+    test_flt(f->edge_noise, 0.5f);
+    test_flt(f->height_falloff, 0);
+    test_flt(f->extent[0], 5);
+    test_flt(f->density, 0.1f);
+    test_flt(f->edge_fade, 1);
+    test_flt(f->noise_strength, 0);
+    test_flt(f->noise_scale, 4);
+
+    test_assert(ecs_script_run(world, "fog2",
+        "using box.light\n"
+        "fog2 { FogVolume: {height_falloff: 1.5, density: 0.3} }\n", NULL) == 0);
+    f = ecs_get(world, ecs_lookup(world, "fog2"), FogVolume);
+    test_flt(f->height_falloff, 1.5f);
+    test_flt(f->density, 0.3f);
+    test_int(f->shape, FogVolumeBox);
+    test_flt(f->edge_noise, 0);
+    test_flt(f->edge_fade, 1);
+    test_flt(f->asymmetry, 0.3f);
+
+    ecs_fini(world);
+}
+
+void FogVolume_falloff_record(void) {
+    // fog_volume/falloff
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t view = view_new(world, 0);
+    ecs_entity_t plain = volume_new(world, 0, 0, 0, -20);
+    ecs_entity_t round = volume_new(world, 0, 0, 0, -5);
+    ecs_set(world, round, FogVolume, {
+        .extent = {2, 1, 3}, .density = 0.4f, .edge_fade = 0.5f, .noise_strength = 0.5f,
+        .noise_scale = 4, .shape = FogVolumeEllipsoid, .height_falloff = 0.75f,
+        .edge_noise = 0.25f});
+    (void)plain;
+    frame(world);
+
+    const box_render_view_t *v = packet_view(null, view);
+    test_int(v->fog_count, 2);
+    const box_render_fog_volume_t *far_ = record_of(null, v, 0);
+    const box_render_fog_volume_t *near_ = record_of(null, v, 1);
+    test_flt(far_->center[2], -20);
+    test_int(far_->shape, FogVolumeBox);
+    test_flt(far_->height_falloff, 0);
+    test_flt(far_->edge_noise, 0);
+
+    test_flt(near_->center[2], -5);
+    test_int(near_->shape, FogVolumeEllipsoid);
+    test_flt(near_->height_falloff, 0.75f);
+    test_flt(near_->edge_noise, 0.25f);
+    test_flt(near_->extent[0], 2);
+    test_flt(near_->extent[1], 1);
+    test_flt(near_->extent[2], 3);
+    test_flt(near_->density, 0.4f);
+    test_flt(near_->edge_fade, 0.5f);
+    test_flt(near_->noise_strength, 0.5f);
+    test_assert(sizeof(box_render_fog_volume_t) % 16 == 0);
+
+    ecs_fini(world);
+}
+
+void FogVolume_falloff_clamped(void) {
+    // fog_volume/falloff
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t view = view_new(world, 0);
+    ecs_entity_t low = volume_new(world, 0, 0, 0, -5);
+    ecs_entity_t high = volume_new(world, 0, 0, 0, -20);
+    ecs_set(world, low, FogVolume, {
+        .extent = {2, 2, 2}, .density = 0.1f, .edge_fade = 1,
+        .shape = (FogVolumeShape)7, .height_falloff = -2, .edge_noise = -0.5f});
+    ecs_set(world, high, FogVolume, {
+        .extent = {2, 2, 2}, .density = 0.1f, .edge_fade = 1,
+        .shape = (FogVolumeShape)-1, .height_falloff = 3, .edge_noise = 4});
+    frame(world);
+
+    const box_render_view_t *v = packet_view(null, view);
+    test_int(v->fog_count, 2);
+    const box_render_fog_volume_t *far_ = record_of(null, v, 0);
+    const box_render_fog_volume_t *near_ = record_of(null, v, 1);
+    test_flt(near_->center[2], -5);
+    test_int(near_->shape, FogVolumeBox);
+    test_flt(near_->height_falloff, 0);
+    test_flt(near_->edge_noise, 0);
+
+    test_flt(far_->center[2], -20);
+    test_int(far_->shape, FogVolumeBox);
+    test_flt(far_->height_falloff, 3);
+    test_flt(far_->edge_noise, 1);
+
+    ecs_fini(world);
 }

@@ -2425,3 +2425,235 @@ void FogVolume_history_grazing_slab(void) {
     stbi_image_free(converged);
     ecs_fini(world);
 }
+
+/** A box volume with its shape, height_falloff and edge_noise at their defaults renders the
+ * transmittance of its constant density, and an edge_noise that has nothing to erode, without
+ * noise or with hard faces, renders the same pixels as without it. */
+void FogVolume_falloff_defaults_unchanged(void) {
+    // fog_volume/falloff
+    const char *files[6] = {
+        "fog_falloff_default.png", "fog_falloff_default_edge.png",
+        "fog_falloff_hard_noise.png", "fog_falloff_hard_noise_edge.png",
+        "fog_falloff_fade.png", "fog_falloff_fade_edge.png" };
+    unsigned char *px[6];
+    int32_t k;
+    for (k = 0; k < 6; k ++) {
+        ecs_world_t *world = fv_world(0);
+        fv_view(world, fv_camera(world, 0, 0), true);
+        fv_wall(world, 0, -20, 40, FV_WALL);
+        ecs_entity_t e = fv_volume(world, (float[]){0, 0, -10}, (float[]){20, 20, 2}, 0.2f, 1);
+        FogVolume *f = ecs_get_mut(world, e, FogVolume);
+        test_int(f->shape, FogVolumeBox);
+        test_flt(f->height_falloff, 0);
+        test_flt(f->edge_noise, 0);
+        /* Pairs without and with edge_noise: no noise, hard faces with noise, a fade without
+         * noise */
+        if (k / 2 == 1) {
+            f->noise_strength = 1;
+            f->noise_scale = 2;
+        } else if (k / 2 == 2) {
+            f->edge_fade = 1;
+        }
+
+        if (k % 2) {
+            f->edge_noise = 1;
+        }
+
+        ecs_modified(world, e, FogVolume);
+        px[k] = fv_render_still(world, files[k]);
+        ecs_fini(world);
+    }
+
+    int32_t want = fv_srgb(fv_lin(FV_WALL) * fv_grid(0.2f, 8, 12, 19.9f));
+    fv_expect(fv_px(px[0], 32, 32), want, 4);
+    fv_expect(fv_px(px[0], 40, 24), want, 6);
+    for (k = 0; k < 6; k += 2) {
+        test_assert(!memcmp(px[k], px[k + 1], FV_SIZE * FV_SIZE * 4));
+    }
+
+    for (k = 0; k < 6; k ++) {
+        stbi_image_free(px[k]);
+    }
+}
+
+/** An ellipsoid of hard faces in an orthographic view fogs the ray through the center of its box
+ * as the box does, and leaves the ray through a corner of the box, outside the ellipsoid,
+ * unfogged, which the box fogs. */
+void FogVolume_ellipsoid_corner(void) {
+    // fog_volume/falloff
+    const char *files[2] = { "fog_ellipsoid_box.png", "fog_ellipsoid.png" };
+    unsigned char *px[2];
+    int32_t k;
+    for (k = 0; k < 2; k ++) {
+        ecs_world_t *world = fv_world(0);
+        fv_view(world, fv_ortho(world), true);
+        fv_wall(world, 0, -10, 40, FV_WALL);
+        ecs_entity_t e = fv_volume(world, (float[]){0, 0, 0}, (float[]){6, 6, 2}, 0.5f, 1);
+        FogVolume *f = ecs_get_mut(world, e, FogVolume);
+        f->shape = k ? FogVolumeEllipsoid : FogVolumeBox;
+        ecs_modified(world, e, FogVolume);
+        px[k] = fv_render_still(world, files[k]);
+        ecs_fini(world);
+    }
+
+    /* The corner at x and y 5.5, 4 pixels a unit from the center of the image, where the
+     * box fogs a share of the cells the filtering of the grid blends with the wall */
+    int32_t want = fv_srgb(fv_lin(FV_WALL) *
+        fv_grid_transmittance(0.5f, 8, 12, 19.9f, true, 100));
+    printf("center box %d ellipsoid %d, corner box %d ellipsoid %d, want %d\n",
+        fv_px(px[0], 32, 32)[1], fv_px(px[1], 32, 32)[1], fv_px(px[0], 54, 10)[1],
+        fv_px(px[1], 54, 10)[1], want);
+    fv_expect(fv_px(px[0], 32, 32), want, 6);
+    fv_expect(fv_px(px[1], 32, 32), want, 6);
+    test_assert(fv_px(px[0], 54, 10)[1] < FV_WALL - 40);
+    test_assert(fv_px(px[0], 10, 54)[1] < FV_WALL - 40);
+    fv_expect(fv_px(px[1], 54, 10), FV_WALL, 2);
+    fv_expect(fv_px(px[1], 10, 54), FV_WALL, 2);
+    stbi_image_free(px[0]);
+    stbi_image_free(px[1]);
+}
+
+/** A camera inside an ellipsoid long along the view sees the fog of the wall through its
+ * center as through the box, and less fog toward the corners of the image, whose rays leave the
+ * ellipsoid before they leave its box. */
+void FogVolume_ellipsoid_camera_inside(void) {
+    // fog_volume/falloff
+    const char *files[2] = { "fog_ellipsoid_inside_box.png", "fog_ellipsoid_inside.png" };
+    unsigned char *px[2];
+    int32_t k;
+    for (k = 0; k < 2; k ++) {
+        ecs_world_t *world = fv_world(0);
+        fv_view(world, fv_camera(world, 0, 0), true);
+        fv_wall(world, 0, -20, 60, FV_WALL);
+        ecs_entity_t e = fv_volume(world, (float[]){0, 0, 0}, (float[]){6, 6, 30}, 0.1f, 1);
+        FogVolume *f = ecs_get_mut(world, e, FogVolume);
+        f->shape = k ? FogVolumeEllipsoid : FogVolumeBox;
+        ecs_modified(world, e, FogVolume);
+        px[k] = fv_render_still(world, files[k]);
+        ecs_fini(world);
+    }
+
+    int32_t center = fv_px(px[1], 32, 32)[1];
+    printf("center box %d ellipsoid %d, corner box %d ellipsoid %d\n",
+        fv_px(px[0], 32, 32)[1], center, fv_px(px[0], 4, 4)[1], fv_px(px[1], 4, 4)[1]);
+    test_assert(center < FV_WALL - 60);
+    test_assert(abs(center - (int32_t)fv_px(px[0], 32, 32)[1]) <= 6);
+    test_assert(fv_px(px[1], 4, 4)[1] > fv_px(px[0], 4, 4)[1] + 12);
+    test_assert(fv_px(px[1], 59, 59)[1] > fv_px(px[0], 59, 59)[1] + 12);
+    stbi_image_free(px[0]);
+    stbi_image_free(px[1]);
+}
+
+/** With a height_falloff the fog thins toward the top of the box: the wall shows through a ray
+ * across the top of the volume more than through one across its bottom, which fog without it
+ * dims alike. */
+void FogVolume_height_falloff(void) {
+    // fog_volume/falloff
+    const char *files[2] = { "fog_height_none.png", "fog_height.png" };
+    unsigned char *px[2];
+    int32_t k;
+    for (k = 0; k < 2; k ++) {
+        ecs_world_t *world = fv_world(0);
+        fv_view(world, fv_ortho(world), true);
+        fv_wall(world, 0, -10, 40, FV_WALL);
+        ecs_entity_t e = fv_volume(world, (float[]){0, 0, 0}, (float[]){20, 6, 2}, 0.5f, 1);
+        FogVolume *f = ecs_get_mut(world, e, FogVolume);
+        f->height_falloff = k ? 0.5f : 0.0f;
+        ecs_modified(world, e, FogVolume);
+        px[k] = fv_render_still(world, files[k]);
+        ecs_fini(world);
+    }
+
+    /* Rows 16 and 48 are 4 units above and below the center: 10 and 2 above the bottom */
+    int32_t top[2], bottom[2];
+    for (k = 0; k < 2; k ++) {
+        top[k] = fv_px(px[k], 32, 16)[1];
+        bottom[k] = fv_px(px[k], 32, 48)[1];
+    }
+
+    printf("no falloff top %d bottom %d, falloff top %d bottom %d\n", top[0], bottom[0],
+        top[1], bottom[1]);
+    test_assert(abs(top[0] - bottom[0]) <= 2);
+    test_assert(top[1] > bottom[1] + 30);
+    test_assert(bottom[1] > bottom[0] + 10);
+    test_assert(top[1] > FV_WALL - 20);
+    stbi_image_free(px[0]);
+    stbi_image_free(px[1]);
+}
+
+/** Deviation of the green of the columns of a square capture along them, between two pairs of
+ * columns, left and right of the center, over the rows inside a margin of 4 pixels: the root
+ * mean square of each pixel's difference from the mean of its column, so the fade across the
+ * columns does not count.
+ *
+ * @param px The pixels
+ * @param from First column of the left band, mirrored for the right one
+ * @param to Column after the last of the left band
+ * @return The deviation
+ */
+static double fv_band_deviation(
+    const unsigned char *px,
+    int32_t from,
+    int32_t to)
+{
+    double sq = 0;
+    int32_t x, y, side, count = 0;
+    for (x = from; x < to; x ++) {
+        for (side = 0; side < 2; side ++) {
+            int32_t c = side ? FV_SIZE - 1 - x : x;
+            double sum = 0;
+            for (y = 4; y < FV_SIZE - 4; y ++) {
+                sum += fv_px(px, c, y)[1];
+            }
+
+            double mean = sum / (FV_SIZE - 8);
+            for (y = 4; y < FV_SIZE - 4; y ++) {
+                double d = fv_px(px, c, y)[1] - mean;
+                sq += d * d;
+                count ++;
+            }
+        }
+    }
+
+    return sqrt(sq / count);
+}
+
+/** An orthographic camera inside a noisy volume narrow along X looks at a wall a few units
+ * away inside it: the pixels of the rays through the faded border at the sides vary more along
+ * the border with an edge_noise of 1 than without, and the center, whose rays stay deeper
+ * inside than edge_fade, is unchanged. */
+void FogVolume_edge_noise(void) {
+    // fog_volume/falloff
+    const char *files[2] = { "fog_edge_noise_none.png", "fog_edge_noise.png" };
+    unsigned char *px[2];
+    int32_t k;
+    for (k = 0; k < 2; k ++) {
+        ecs_world_t *world = fv_world(0);
+        fv_view(world, fv_ortho(world), true);
+        fv_wall(world, 0, 7, 40, FV_WALL);
+        ecs_entity_t e = fv_volume(world, (float[]){0, 0, 0}, (float[]){7, 20, 20}, 0.8f, 1);
+        FogVolume *f = ecs_get_mut(world, e, FogVolume);
+        f->edge_fade = 5;
+        f->noise_strength = 1;
+        f->noise_scale = 4;
+        f->edge_noise = (float)k;
+        ecs_modified(world, e, FogVolume);
+        px[k] = fv_render_still(world, files[k]);
+        ecs_fini(world);
+    }
+
+    /* The fade between x 2 and 7, 4 pixels a unit from the center of the image */
+    double border[2];
+    for (k = 0; k < 2; k ++) {
+        border[k] = fv_band_deviation(px[k], 4, 20);
+    }
+
+    printf("border deviation edge_noise 0 %.2f, 1 %.2f, center %d %d\n", border[0], border[1],
+        fv_px(px[0], 32, 32)[1], fv_px(px[1], 32, 32)[1]);
+    test_assert(border[1] > border[0] * 1.5 + 1.0);
+    test_assert(fv_px(px[0], 32, 32)[1] < FV_WALL - 20);
+    fv_expect(fv_px(px[1], 32, 32), fv_px(px[0], 32, 32)[1], 1);
+    fv_expect(fv_px(px[1], 31, 31), fv_px(px[0], 31, 31)[1], 1);
+    stbi_image_free(px[0]);
+    stbi_image_free(px[1]);
+}

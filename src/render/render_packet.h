@@ -810,7 +810,9 @@ typedef struct box_render_fog_volume_t {
                              *   the period of the noise, see box_render_fog_offset */
     float noise_strength;   /**< FogVolume.noise_strength, 0 to 1 */
     float noise_scale;      /**< FogVolume.noise_scale, at least BOX_RENDER_FOG_NOISE_SCALE_MIN */
-    float pad[3];           /**< Pads the record to the 16 byte stride of its WGSL array */
+    uint32_t shape;         /**< FogVolume.shape, FogVolumeBox for an unknown shape */
+    float height_falloff;   /**< FogVolume.height_falloff, at least 0 */
+    float edge_noise;       /**< FogVolume.edge_noise, 0 to 1 */
 } box_render_fog_volume_t;
 
 /** A PlanarReflection a view renders a mirrored image of, resolved by the extract

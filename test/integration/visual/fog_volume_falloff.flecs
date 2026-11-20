@@ -1,0 +1,79 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+
+// Fog falloff at the borders of FogVolumes, side by side on a dark floor, lit by a sun and seen
+// from slightly above so their outlines show: a box with edge_fade, whose fade keeps a
+// rectangular outline; an ellipsoid of the same box, round; a low ground mist box with
+// height_falloff, which thins out toward its top instead of ending in a flat face; and a noisy
+// box with edge_noise 1, whose faded border the noise erodes into billows that drift with its
+// wind. The visual runner captures frame 30, after the history of the froxel grid has
+// converged, with a fixed delta of 1/60 s, so the wind has moved the noise by the same distance
+// on every run.
+// frames: 30
+
+camera {
+  Position: {0, 7, 20}
+  Rotation: {-0.4, 0, 0}
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {20, 22, 28, 255}}, shadows: {enabled: true}}
+}
+
+$ {
+  AmbientLight: {sky: {90, 96, 110}, ground: {40, 36, 32}}
+}
+
+sun {
+  Rotation: {1.0, 0.5, 0}
+  DirectionalLight: {intensity: 0.8 * flecs.script.math.PI}
+  Rgb: {255, 240, 220}
+}
+
+floor {
+  Position: {0, -0.1, 0}
+  Box: {48, 0.2, 48}
+  Rgb: {28, 30, 36}
+}
+
+back_wall {
+  Position: {0, 3, -8}
+  Box: {48, 6, 0.4}
+  Rgb: {60, 62, 70}
+}
+
+faded_box {
+  Position: {-10.5, 2, 0}
+  FogVolume: {
+    extent: {3, 2, 3}, density: 0.5, color: {240, 242, 248}, asymmetry: 0, edge_fade: 1.2
+  }
+}
+
+ellipsoid {
+  Position: {-3.5, 2, 0}
+  FogVolume: {
+    extent: {3, 2, 3}, density: 0.5, color: {240, 242, 248}, asymmetry: 0, edge_fade: 1.2,
+    shape: FogVolumeEllipsoid
+  }
+}
+
+ground_mist {
+  Position: {3.5, 1.5, 0}
+  FogVolume: {
+    extent: {3, 1.5, 3}, density: 0.8, color: {240, 242, 248}, asymmetry: 0, edge_fade: 0.4,
+    height_falloff: 1.5
+  }
+}
+
+eroded {
+  Position: {10.5, 2, 0}
+  FogVolume: {
+    extent: {3, 2, 3}, density: 0.5, color: {240, 242, 248}, asymmetry: 0, edge_fade: 2,
+    noise_strength: 1, noise_scale: 3, wind: {1.5, 0, 0.5}, edge_noise: 1
+  }
+}

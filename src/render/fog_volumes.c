@@ -282,6 +282,10 @@ static void box_fog_record(
     out->light_inscatter = glm_max(fog->light_inscatter, 0.0f);
     out->noise_strength = glm_clamp(fog->noise_strength, 0.0f, 1.0f);
     out->noise_scale = glm_max(fog->noise_scale, BOX_RENDER_FOG_NOISE_SCALE_MIN);
+    out->shape = fog->shape == FogVolumeEllipsoid ? (uint32_t)FogVolumeEllipsoid :
+        (uint32_t)FogVolumeBox;
+    out->height_falloff = glm_max(fog->height_falloff, 0.0f);
+    out->edge_noise = glm_clamp(fog->edge_noise, 0.0f, 1.0f);
     box_render_fog_offset(fog, time, out->offset);
     if (origin[0] != 0.0 || origin[1] != 0.0 || origin[2] != 0.0) {
         double period = BOX_RENDER_FOG_NOISE_PERIOD * (double)out->noise_scale;
