@@ -2,6 +2,7 @@
 // floor, with the HUD sliders of the library. Nothing of the clearing, the brook or the layout
 // of the forest scene.
 include ui/widgets
+include trees/textures
 include forest/library
 
 using flecs.script

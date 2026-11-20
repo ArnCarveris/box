@@ -1,0 +1,309 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using box.mesh
+using trees
+
+// The Tree template: one tree as two MeshGraph shapes, its bark and its foliage, grown from one
+// graph. A trunk (Stem) sprouts up to four levels of branches (Branches), each level along the
+// curves of the last, which an envelope of the crown shortens (Prune). The bark sweeps a circle
+// along every curve (Tube), fluted at the foot; the foliage places leaf cards along the twigs
+// (Leaves) or needle fronds along the shoots (Needles), turns them into cards (Cards), bends
+// their normals toward the crown (CrownNormals) and darkens the cards deep inside it
+// (CrownOcclusion). Both shapes build levels of detail: fewer sides and rings, thin twigs
+// without bark and fewer, larger cards.
+//
+// The bark and the leaves are materials (materials.flecs) the shapes inherit, so a scene can
+// recolor or thin every tree of a species through its leaf prefab. The Tree sets the WindSway
+// of both shapes from its height and stiffness, swaying as a hierarchy from the pivots the
+// graph writes in the per vertex data.
+trees {
+  // Whether a level of branches grows, by its count or density
+  fn tree_grows(count: f64, density: f64) -> bool {
+    count > 0 || density > 0
+  }
+
+  // The length_curve of a level whose length goes from start to end over its range: the factor
+  // of the length at t of the range
+  fn tree_length(start: f64, end: f64, t: f64) -> f64 {
+    1 + (end / max(start, 0.001) - 1) * t
+  }
+
+  // A level of branches. The children of a level spread over start..end of their parent (end 0
+  // for its tip), count per parent or density per meter of it, turned around it by
+  // distribution (whorl children per whorl, 0 for 3) and phyllotaxis (radians, 0 for the golden
+  // angle); they leave it at down radians at the start to down_end at the end of the range (0
+  // for down), length long (a fraction of the parent) at the start to length_end at the end (0
+  // for length); they bend down by gravity and toward the light by light (radians per meter),
+  // wander by noise and share the radius of their parent by the pipe model with exponent (0
+  // for 2). Members a Tree leaves out are 0.
+  struct TreeBranches(
+    count: i32, density: f32, start: f32, end: f32, distribution: BranchDistribution,
+    whorl: i32, phyllotaxis: f32, down: f32, down_end: f32, length: f32, length_end: f32,
+    gravity: f32, light: f32, noise: f32, exponent: f32
+  )
+
+  template Tree {
+    // Variation: the same props and seed give the same tree
+    prop seed: i32 = 1
+
+    // Trunk
+    prop height: f32 = 16          // Meters from the foot to the top of the trunk
+    prop radius: f32 = 0.3         // Meters at the foot
+    prop taper: f32 = 0.85         // Fraction of the radius the top loses
+    prop bend: f32 = 0.04          // Bend of the trunk's noise, radians per meter
+    prop lean: f32 = 0             // Lean of the trunk off vertical, radians, to a seeded side
+    prop twist: f32 = 0            // Turn of the bark around the trunk, radians per meter
+    prop flutes: i32 = 0           // Buttress flutes around the foot, 0 for none
+    prop flare: f32 = 0.3          // Radius a flute adds at its crest, a fraction of the radius
+    prop flare_height: f32 = 0     // Meters up the trunk the flutes fade over, 0 for 3 radii
+    prop bark_material: entity = TreeBarkBeech
+
+    // Branch levels 1 to 4 (TreeBranches): level n grows along the curves of level n - 1 (1
+    // along the trunk), when its count or density is above 0 and the level before it grows
+    prop b1: TreeBranches = {count: 24, density: 0, start: 0.3, end: 0.95, distribution: Spiral,
+      whorl: 3, phyllotaxis: 0, down: 1.0, down_end: 0.6, length: 0.45, length_end: 0.2,
+      gravity: 0.02, light: 0.03, noise: 0.1, exponent: 2.2}
+    prop b2: TreeBranches = {count: 7, density: 0, start: 0.2, end: 0.95, distribution: Alternate,
+      whorl: 3, phyllotaxis: 0, down: 0.8, down_end: 0.6, length: 0.45, length_end: 0.3,
+      gravity: 0.03, light: 0.05, noise: 0.25, exponent: 2}
+    prop b3: TreeBranches = {count: 5, density: 0, start: 0.15, end: 0.95,
+      distribution: Alternate, whorl: 3, phyllotaxis: 0, down: 0.7, down_end: 0.5, length: 0.45,
+      length_end: 0.3, gravity: 0.05, light: 0.1, noise: 0.4, exponent: 1.8}
+    prop b4: TreeBranches = {count: 0, density: 0, start: 0.15, end: 0.95,
+      distribution: Alternate, whorl: 3, phyllotaxis: 0, down: 0.7, down_end: 0.5, length: 0.4,
+      length_end: 0.3, gravity: 0.05, light: 0.1, noise: 0.5, exponent: 1.6}
+
+    // Crown: the envelope that shortens (prune) or removes the branches that leave it, from
+    // crown_base to crown_top of the height (an ellipsoid between them, a cone or cylinder from
+    // crown_base up), crown_width of the height in radius; None for no envelope
+    prop crown: EnvelopeShape = Ellipsoid
+    prop crown_base: f32 = 0.3
+    prop crown_top: f32 = 1.05
+    prop crown_width: f32 = 0.35
+    prop prune: bool = true
+    // Branches thinner than bark_drop of the trunk's radius get no bark (the needles or leaves
+    // hide them), 0 for bark on all
+    prop bark_drop: f32 = 0
+
+    // Foliage: leaf cards, or needle fronds with needles, along the highest leaf_levels levels
+    // of branches (or by leaf_placement along the twigs or at the tips), in the leaf material
+    // (its card texture); leaves leaf_size meters long, leaf_density nodes per
+    // meter (leaf_count per twig without it) of per_node leaves from leaf_start of each twig,
+    // leaf_angle off it and faced by leaf_orientation; fronds needle_cards per shoot,
+    // needle_width of their length wide, drooping by needle_droop. The normals bend toward the
+    // crown by crown_normals, its depth darkens them by occlusion, both on crown_shape
+    prop needles: bool = false
+    prop leaf_material: entity = TreeLeafBeech
+    prop leaf_size: f32 = 0.7
+    prop leaf_density: f32 = 0
+    prop leaf_placement: LeafPlacement = Levels
+    prop leaf_count: i32 = 4
+    prop leaf_per_node: i32 = 1
+    prop leaf_start: f32 = 0.2
+    prop leaf_levels: i32 = 1
+    prop leaf_angle: f32 = 0.7
+    prop leaf_orientation: LeafOrientation = FaceOut
+    prop leaf_tilt: f32 = 0.4
+    prop leaf_bank: f32 = 0.5
+    prop card: CardShape = Bent
+    prop card_bend: f32 = 0.15
+    prop needle_style: NeedleStyle = Spruce
+    prop needle_cards: i32 = 2
+    prop needle_width: f32 = 0.7
+    prop needle_droop: f32 = 0.15
+    prop crown_shape: CrownShape = Ellipsoid
+    prop crown_normals: f32 = 0.7
+    prop occlusion: f32 = 0.7
+
+    // Season: the fraction of the cards a VertexReveal hides, one by one by their seed (0 shows
+    // all and keeps the reveal of the leaf material), and the meters of growth from the root the
+    // bark shows (0 for all)
+    prop thin: f32 = 0
+    prop growth: f32 = 0
+
+    // Wind: 0 a tree that bends freely to 1 a stiff one; meters the leaves flutter at full
+    // wind; radians the branches swing about their pivots (0 for none); world Y of the ground
+    prop stiffness: f32 = 0.5
+    prop flutter: f32 = 0.07
+    prop sway_branch: f32 = 0
+    prop ground: f32 = 0
+
+    // Levels of detail of both shapes, 1 to 4
+    prop lods: i32 = 4
+
+    const rng: flecs.script.math.Rng = {seed: seed}
+    const yaw = rng.f(6.28)
+    const s = seed * 16
+
+    // The levels that grow, each only after the one before it
+    const g1 = tree_grows(b1.count, b1.density)
+    const g2 = g1 && tree_grows(b2.count, b2.density)
+    const g3 = g2 && tree_grows(b3.count, b3.density)
+    const g4 = g3 && tree_grows(b4.count, b4.density)
+    const top = g4 ? 4 : (g3 ? 3 : (g2 ? 2 : (g1 ? 1 : 0)))
+    const leaf_level = max(top - leaf_levels + 1, 0)
+
+    // The members of the levels left at 0
+    const e1 = b1.end > b1.start ? b1.end : 1
+    const w1 = b1.whorl > 0 ? b1.whorl : 3
+    const de1 = b1.down_end != 0 ? b1.down_end : b1.down
+    const le1 = b1.length_end != 0 ? b1.length_end : b1.length
+    const x1 = b1.exponent > 0 ? b1.exponent : 2
+    const e2 = b2.end > b2.start ? b2.end : 1
+    const w2 = b2.whorl > 0 ? b2.whorl : 3
+    const de2 = b2.down_end != 0 ? b2.down_end : b2.down
+    const le2 = b2.length_end != 0 ? b2.length_end : b2.length
+    const x2 = b2.exponent > 0 ? b2.exponent : 2
+    const e3 = b3.end > b3.start ? b3.end : 1
+    const w3 = b3.whorl > 0 ? b3.whorl : 3
+    const de3 = b3.down_end != 0 ? b3.down_end : b3.down
+    const le3 = b3.length_end != 0 ? b3.length_end : b3.length
+    const x3 = b3.exponent > 0 ? b3.exponent : 2
+    const e4 = b4.end > b4.start ? b4.end : 1
+    const w4 = b4.whorl > 0 ? b4.whorl : 3
+    const de4 = b4.down_end != 0 ? b4.down_end : b4.down
+    const le4 = b4.length_end != 0 ? b4.length_end : b4.length
+    const x4 = b4.exponent > 0 ? b4.exponent : 2
+
+    // The envelope of the crown
+    const crown_bottom = height * crown_base
+    const crown_span = height * (crown_top - crown_base)
+    const crown_r = height * crown_width
+    const ellipsoid = crown == Ellipsoid
+    const crown_y = ellipsoid ? crown_bottom + crown_span * 0.5 : crown_bottom
+    const crown_h = ellipsoid ? crown_span * 0.5 : crown_span
+
+    // Wind: the bend of the top of the tree per unit of wind
+    const sway = height * 0.0028 * (1.4 - stiffness)
+
+    trunk {
+      nodes.Stem: {
+        direction: {sin(lean) * cos(yaw), cos(lean), sin(lean) * sin(yaw)},
+        length: height,
+        segments: 10 + height * 0.5,
+        radius: radius,
+        taper: taper,
+        noise: bend,
+        noise_frequency: 0.25,
+        twist: twist,
+        seed: s
+      }
+    }
+
+    // A level that does not grow has no children and passes the curves on unchanged
+    level1 {
+      nodes.Branches: {
+        curves: trunk, count: g1 ? b1.count : 0, density: g1 ? b1.density : 0, start: b1.start,
+          end: e1,
+        distribution: b1.distribution, whorl: w1, phyllotaxis: b1.phyllotaxis,
+        down_angle: b1.down, down_angle_change: de1 - b1.down, length: b1.length,
+        length_curve: [1, tree_length(b1.length, le1, 0.25), tree_length(b1.length, le1, 0.5), tree_length(b1.length, le1, 0.75), tree_length(b1.length, le1, 1)],
+        radius_exponent: x1, taper: 0.85, segments: 9, gravity: b1.gravity,
+        phototropism: b1.light, noise: b1.noise, angle_variation: 0.15, roll_variation: 0.4,
+        length_variation: 0.2, radius_variation: 0.1, seed: s + 1
+      }
+    }
+
+    level2 {
+      nodes.Branches: {
+        curves: level1, count: g2 ? b2.count : 0, density: g2 ? b2.density : 0, start: b2.start,
+          end: e2,
+        distribution: b2.distribution, whorl: w2, phyllotaxis: b2.phyllotaxis,
+        down_angle: b2.down, down_angle_change: de2 - b2.down, length: b2.length,
+        length_curve: [1, tree_length(b2.length, le2, 0.25), tree_length(b2.length, le2, 0.5), tree_length(b2.length, le2, 0.75), tree_length(b2.length, le2, 1)],
+        radius_exponent: x2, taper: 0.8, segments: 6, gravity: b2.gravity,
+        phototropism: b2.light, noise: b2.noise, angle_variation: 0.2, roll_variation: 0.5,
+        length_variation: 0.25, radius_variation: 0.1, seed: s + 2
+      }
+    }
+
+    level3 {
+      nodes.Branches: {
+        curves: level2, count: g3 ? b3.count : 0, density: g3 ? b3.density : 0, start: b3.start,
+          end: e3,
+        distribution: b3.distribution, whorl: w3, phyllotaxis: b3.phyllotaxis,
+        down_angle: b3.down, down_angle_change: de3 - b3.down, length: b3.length,
+        length_curve: [1, tree_length(b3.length, le3, 0.25), tree_length(b3.length, le3, 0.5), tree_length(b3.length, le3, 0.75), tree_length(b3.length, le3, 1)],
+        radius_exponent: x3, taper: 0.75, segments: 4, gravity: b3.gravity,
+        phototropism: b3.light, noise: b3.noise, angle_variation: 0.25, roll_variation: 0.6,
+        length_variation: 0.3, radius_variation: 0.1, seed: s + 3
+      }
+    }
+
+    level4 {
+      nodes.Branches: {
+        curves: level3, count: g4 ? b4.count : 0, density: g4 ? b4.density : 0, start: b4.start,
+          end: e4,
+        distribution: b4.distribution, whorl: w4, phyllotaxis: b4.phyllotaxis,
+        down_angle: b4.down, down_angle_change: de4 - b4.down, length: b4.length,
+        length_curve: [1, tree_length(b4.length, le4, 0.25), tree_length(b4.length, le4, 0.5), tree_length(b4.length, le4, 0.75), tree_length(b4.length, le4, 1)],
+        radius_exponent: x4, taper: 0.7, segments: 3, gravity: b4.gravity,
+        phototropism: b4.light, noise: b4.noise, angle_variation: 0.3, roll_variation: 0.6,
+        length_variation: 0.3, radius_variation: 0.1, seed: s + 4
+      }
+    }
+
+    pruned {
+      nodes.Prune: {
+        curves: level4, shape: crown, center: {0, crown_y, 0}, size: {crown_r, crown_h, crown_r},
+        level: 1, shorten: prune, drop: bark_drop
+      }
+    }
+
+    // Bark: fewer sides on the thin twigs
+    bark_mesh {
+      nodes.Tube: {
+        curves: pruned, sides: 10, flutes: flutes, flute_depth: flare,
+        flute_height: flare_height, thin: 0.12
+      }
+    }
+
+    // Foliage along the highest leaf_levels levels
+    leaf_points {
+      nodes.Leaves: {
+        curves: pruned, placement: leaf_placement, level: leaf_level, count: leaf_count,
+        density: leaf_density, per_node: leaf_per_node, start: leaf_start, angle: leaf_angle,
+        orientation: leaf_orientation, tilt: leaf_tilt, bank: leaf_bank, size: leaf_size,
+        size_tip: 0.8, size_level: 1.2, size_variation: 0.25, seed: s + 9
+      }
+    }
+
+    needle_points {
+      nodes.Needles: {
+        curves: pruned, placement: leaf_placement, level: leaf_level, style: needle_style,
+        cards: needle_cards, start: leaf_start, width: needle_width, bank: 0.6,
+        droop: needle_droop, tilt: 0.2, seed: s + 9
+      }
+    }
+
+    cards { nodes.Cards: {points: needles ? needle_points : leaf_points, shape: card, width: 1, bend: card_bend, double_sided: true, flutter: 1} }
+    normals { nodes.CrownNormals: {mesh: cards, shape: crown_shape, strength: crown_normals} }
+    occluded { nodes.CrownOcclusion: {mesh: normals, shape: crown_shape, strength: occlusion} }
+
+    bark {
+      (IsA, $bark_material)
+      Position: {0, 0, 0}
+      Graph: {output: bark_mesh, levels: lods}
+      WindSway: {bend: sway, height: height, base: ground, pivots: true, branch: sway_branch}
+      if growth > 0 {
+        VertexReveal: {channel: TREE_CHANNEL_GROWTH, threshold: growth, softness: 0.05, invert: true}
+      }
+    }
+
+    foliage {
+      (IsA, $leaf_material)
+      Position: {0, 0, 0}
+      Graph: {output: occluded, levels: lods}
+      WindSway: {
+        bend: sway, height: height, base: ground, flutter: flutter, flutter_frequency: 3.2,
+        pivots: true, branch: sway_branch
+      }
+      if thin > 0 {
+        VertexReveal: {channel: TREE_CHANNEL_SEED, threshold: thin, softness: 0}
+      }
+    }
+  }
+}

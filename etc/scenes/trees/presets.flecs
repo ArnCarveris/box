@@ -1,0 +1,235 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using box.mesh
+using trees
+
+// The presets of the tree generator: the props of a Tree for a species at maturity, with a seed
+// to vary it and an age to grow it young. Age is the fraction of the mature height: 1 a mature
+// tree, about 0.4 a young tree, 0.1 a sapling. A younger tree has a thinner trunk for its
+// height, its crown reaching further down, fewer branches, the finest level of a sapling left
+// out, and smaller leaf cards.
+trees {
+  // Radius of the trunk of a tree of an age over that of a mature one: trunks thicken faster
+  // than they grow tall
+  fn tree_age_radius(age: f64) -> f64 {
+    pow(age, 1.3)
+  }
+
+  // Branches of a level at an age, from count at maturity
+  fn tree_age_count(count: f64, age: f64) -> f64 {
+    round(count * (0.35 + 0.65 * age))
+  }
+
+  // Branches of the finest level at an age: none on a sapling
+  fn tree_age_fine(count: f64, age: f64) -> f64 {
+    age < 0.25 ? 0 : tree_age_count(count, age)
+  }
+
+  // The size of a leaf card at an age, from size at maturity
+  fn tree_age_leaf(size: f64, age: f64) -> f64 {
+    size * (0.5 + 0.5 * age)
+  }
+
+  // The crown base at an age: a young tree keeps its lower branches
+  fn tree_age_base(base: f64, age: f64) -> f64 {
+    base * (0.25 + 0.75 * age)
+  }
+
+  // European beech: a tall, smooth grey bole with a fluted foot under a dense dome of
+  // ascending limbs, the twigs in flat, layered sprays
+  template TreeBeech {
+    prop seed: i32 = 1
+    prop age: f32 = 1
+
+    Tree tree(
+      seed: seed, height: 24 * age, radius: 0.42 * tree_age_radius(age), taper: 0.85, bend: 0.02,
+      flutes: 7, flare: 0.18, bark_material: TreeBarkBeech,
+      b1: {count: tree_age_count(30, age), start: 0.3, end: 0.96, distribution: Spiral,
+        down: 0.95, down_end: 0.45, length: 0.48, length_end: 0.2, gravity: 0.015, light: 0.02,
+        noise: 0.1, exponent: 2.2},
+      b2: {count: tree_age_count(8, age), start: 0.2, distribution: Alternate, down: 0.8,
+        down_end: 0.6, length: 0.5, length_end: 0.3, gravity: 0.06, light: 0.04, noise: 0.2,
+        exponent: 2},
+      b3: {count: tree_age_fine(6, age), start: 0.15, distribution: Alternate, down: 0.8,
+        down_end: 0.6, length: 0.45, length_end: 0.3, gravity: 0.05, light: 0.15, noise: 0.3,
+        exponent: 1.8},
+      crown: Ellipsoid, crown_base: tree_age_base(0.26, age), crown_top: 1.04, crown_width: 0.36,
+      leaf_material: TreeLeafBeech, leaf_size: tree_age_leaf(0.9, age), leaf_count: 4,
+      leaf_start: 0.2, leaf_angle: 0.6, leaf_orientation: FaceUp, leaf_tilt: 0.35,
+      crown_shape: Ellipsoid, crown_normals: 0.7, occlusion: 0.75, stiffness: 0.5
+    ) { Position: {0, 0, 0} }
+  }
+
+  // Pedunculate oak: a short, massive trunk that splits into heavy, crooked limbs spreading in
+  // a broad, irregular crown of lobed leaves
+  template TreeOak {
+    prop seed: i32 = 1
+    prop age: f32 = 1
+
+    Tree tree(
+      seed: seed, height: 21 * age, radius: 0.6 * tree_age_radius(age), taper: 0.88, bend: 0.06,
+      flutes: 5, flare: 0.22, bark_material: TreeBarkOak,
+      b1: {count: tree_age_count(16, age), start: 0.22, end: 0.9, distribution: Spiral,
+        down: 1.2, down_end: 0.7, length: 0.66, length_end: 0.3, gravity: 0.01, light: 0.02,
+        noise: 0.35, exponent: 2.4},
+      b2: {count: tree_age_count(8, age), start: 0.15, distribution: Alternate, down: 0.9,
+        down_end: 0.7, length: 0.5, length_end: 0.3, gravity: 0.03, light: 0.05, noise: 0.5,
+        exponent: 2},
+      b3: {count: tree_age_fine(6, age), start: 0.15, distribution: Alternate, down: 0.8,
+        down_end: 0.6, length: 0.45, length_end: 0.3, gravity: 0.04, light: 0.1, noise: 0.6,
+        exponent: 1.8},
+      crown: Ellipsoid, crown_base: tree_age_base(0.2, age), crown_top: 1.06, crown_width: 0.48,
+      leaf_material: TreeLeafOak, leaf_size: tree_age_leaf(0.8, age), leaf_count: 4,
+      leaf_start: 0.25, leaf_angle: 0.7, leaf_orientation: FaceOut, leaf_tilt: 0.5,
+      crown_shape: Ellipsoid, crown_normals: 0.65, occlusion: 0.75, stiffness: 0.65
+    ) { Position: {0, 0, 0} }
+  }
+
+  // Silver birch: a slender white trunk, a light, narrow crown of thin ascending limbs and
+  // twigs that hang in long tresses of small leaves
+  template TreeBirch {
+    prop seed: i32 = 1
+    prop age: f32 = 1
+
+    Tree tree(
+      seed: seed, height: 19 * age, radius: 0.2 * tree_age_radius(age), taper: 0.88, bend: 0.03,
+      lean: 0.04, bark_material: TreeBarkBirch,
+      b1: {count: tree_age_count(30, age), start: 0.35, end: 0.97, distribution: Spiral,
+        down: 0.8, down_end: 0.45, length: 0.34, length_end: 0.14, gravity: 0.02, light: 0.02,
+        noise: 0.15, exponent: 2},
+      b2: {count: tree_age_count(8, age), start: 0.15, distribution: Alternate, down: 0.9,
+        down_end: 0.7, length: 0.5, length_end: 0.35, gravity: 0.15, light: 0, noise: 0.3,
+        exponent: 2},
+      b3: {count: tree_age_fine(6, age), start: 0.1, distribution: Alternate, down: 0.6,
+        down_end: 0.5, length: 0.6, length_end: 0.45, gravity: 0.5, light: 0, noise: 0.3,
+        exponent: 1.6},
+      crown: Ellipsoid, crown_base: tree_age_base(0.32, age), crown_top: 1.04, crown_width: 0.22,
+      leaf_material: TreeLeafBirch, leaf_size: tree_age_leaf(0.6, age), leaf_count: 5,
+      leaf_start: 0.1, leaf_angle: 0.4, leaf_orientation: Along, leaf_tilt: 0.3,
+      crown_shape: Ellipsoid, crown_normals: 0.6, occlusion: 0.6, stiffness: 0.3, flutter: 0.1
+    ) { Position: {0, 0, 0} }
+  }
+
+  // Norway spruce: a straight trunk under a narrow, pointed cone of whorled branches that sweep
+  // down and turn up at their ends, their side shoots hanging in curtains of short needles
+  template TreeSpruce {
+    prop seed: i32 = 1
+    prop age: f32 = 1
+
+    Tree tree(
+      seed: seed, height: 28 * age, radius: 0.36 * tree_age_radius(age), taper: 0.95, bend: 0.01,
+      flutes: 5, flare: 0.12, bark_material: TreeBarkSpruce,
+      b1: {count: tree_age_count(170, age), start: 0.06, end: 0.98, distribution: Whorled,
+        whorl: 5, down: 1.75, down_end: 1.0, length: 0.27, length_end: 0.05, gravity: 0.08,
+        light: 0.06, noise: 0.05, exponent: 1.1},
+      b2: {count: tree_age_count(10, age), start: 0.15, distribution: Alternate, down: 1.1,
+        down_end: 0.8, length: 0.4, length_end: 0.25, gravity: 0.35, light: 0, noise: 0.15,
+        exponent: 2},
+      b3: {count: 0},
+      crown: Cone, crown_base: 0.03, crown_top: 1.02, bark_drop: 0.05,
+      crown_width: tree_age_base(0.15, age) + 0.04, needles: true,
+      leaf_material: TreeNeedleSpruce, leaf_levels: 2, leaf_start: 0.05, needle_style: Spruce,
+      needle_cards: 3, needle_width: 0.7, needle_droop: 0.25, crown_shape: Density,
+      crown_normals: 0.6, occlusion: 0.75, stiffness: 0.7, flutter: 0.03
+    ) { Position: {0, 0, 0} }
+  }
+
+  // Silver fir: a tall column of level, flat sprays of branches with flat needles in two rows,
+  // its crown blunter at the top than a spruce's, on smooth grey bark
+  template TreeFir {
+    prop seed: i32 = 1
+    prop age: f32 = 1
+
+    Tree tree(
+      seed: seed, height: 30 * age, radius: 0.4 * tree_age_radius(age), taper: 0.95, bend: 0.01,
+      flutes: 5, flare: 0.12, bark_material: TreeBarkFir,
+      b1: {count: tree_age_count(190, age), start: 0.08, end: 0.98, distribution: Whorled,
+        whorl: 4, down: 1.6, down_end: 1.2, length: 0.24, length_end: 0.07, gravity: 0.03,
+        light: 0.03, noise: 0.05, exponent: 1.0},
+      b2: {count: tree_age_count(16, age), start: 0.08, distribution: Opposite, down: 1.1,
+        down_end: 0.85, length: 0.48, length_end: 0.3, gravity: 0.03, light: 0, noise: 0.1,
+        exponent: 2},
+      b3: {count: 0},
+      crown: Cylinder, crown_base: 0.05, crown_top: 1.02, bark_drop: 0.05,
+      crown_width: tree_age_base(0.13, age) + 0.04, needles: true, leaf_material: TreeNeedleFir,
+      leaf_levels: 2, leaf_start: 0.05, needle_style: Fir, needle_cards: 4, needle_width: 0.9,
+      needle_droop: 0.05, crown_shape: Density, crown_normals: 0.6, occlusion: 0.75,
+      stiffness: 0.75, flutter: 0.03
+    ) { Position: {0, 0, 0} }
+  }
+
+  // Scots pine: a long, leaning, bare bole, orange toward the top, under a flat, open crown of
+  // crooked, upturned limbs with brushes of long needles at the ends of the shoots
+  template TreePine {
+    prop seed: i32 = 1
+    prop age: f32 = 1
+
+    Tree tree(
+      seed: seed, height: 24 * age, radius: 0.32 * tree_age_radius(age), taper: 0.88, bend: 0.04,
+      lean: 0.06, bark_material: TreeBarkPine,
+      b1: {count: tree_age_count(30, age), start: tree_age_base(0.55, age), end: 0.98,
+        distribution: Whorled, whorl: 4, down: 1.3, down_end: 0.8, length: 0.5,
+        length_end: 0.24, gravity: 0.01, light: 0.06, noise: 0.4, exponent: 2.2},
+      b2: {count: tree_age_count(9, age), start: 0.2, distribution: Alternate, down: 0.9,
+        down_end: 0.7, length: 0.45, length_end: 0.3, gravity: 0.01, light: 0.15, noise: 0.4,
+        exponent: 2},
+      b3: {count: tree_age_fine(5, age), start: 0.2, distribution: Alternate, down: 0.7,
+        down_end: 0.6, length: 0.45, length_end: 0.35, gravity: 0, light: 0.2, noise: 0.4,
+        exponent: 1.8},
+      crown: Ellipsoid, crown_base: tree_age_base(0.5, age), crown_top: 1.02, crown_width: 0.32,
+      leaf_material: TreeNeedlePine, leaf_size: tree_age_leaf(0.55, age), leaf_count: 7,
+      leaf_per_node: 3, leaf_start: 0.4, leaf_angle: 0.55, leaf_orientation: Along,
+      leaf_tilt: 0.4, card: Cross, crown_shape: Ellipsoid, crown_normals: 0.6, occlusion: 0.65,
+      stiffness: 0.6, flutter: 0.03
+    ) { Position: {0, 0, 0} }
+  }
+
+  // Weeping willow: a short, stout trunk with ascending limbs, from which long, thin whips of
+  // narrow leaves hang straight down to the ground
+  template TreeWillow {
+    prop seed: i32 = 1
+    prop age: f32 = 1
+
+    Tree tree(
+      seed: seed, height: 13 * age, radius: 0.45 * tree_age_radius(age), taper: 0.8, bend: 0.06,
+      lean: 0.05, flutes: 4, flare: 0.2, bark_material: TreeBarkWillow,
+      b1: {count: tree_age_count(12, age), start: 0.25, end: 0.95, distribution: Spiral,
+        down: 0.85, down_end: 0.5, length: 0.62, length_end: 0.35, gravity: 0.03, light: 0.02,
+        noise: 0.25, exponent: 2.2},
+      b2: {count: tree_age_count(8, age), start: 0.15, distribution: Alternate, down: 0.8,
+        down_end: 0.6, length: 0.5, length_end: 0.4, gravity: 0.2, light: 0, noise: 0.3,
+        exponent: 2},
+      b3: {count: tree_age_fine(8, age), start: 0.15, distribution: Alternate, down: 0.5,
+        down_end: 0.4, length: 1.3, length_end: 1.0, gravity: 1.2, light: 0, noise: 0.15,
+        exponent: 1.5},
+      crown: None, leaf_material: TreeLeafWillow, leaf_size: tree_age_leaf(0.7, age),
+      leaf_count: 6, leaf_start: 0.05, leaf_angle: 0.25, leaf_orientation: Along, leaf_tilt: 0.2,
+      crown_shape: Density, crown_normals: 0.5, occlusion: 0.6, stiffness: 0.25, flutter: 0.12
+    ) { Position: {0, 0, 0} }
+  }
+
+  // A dead snag: a broken, leaning trunk of grey wood without bark, with short stubs of dead
+  // limbs and a few bare twigs left on them
+  template TreeSnag {
+    prop seed: i32 = 1
+    prop age: f32 = 1
+
+    Tree tree(
+      seed: seed, height: 11 * age, radius: 0.36 * tree_age_radius(age), taper: 0.55, bend: 0.03,
+      lean: 0.05, flutes: 5, flare: 0.15, bark_material: TreeBarkDead,
+      b1: {count: tree_age_count(12, age), start: 0.2, end: 0.95, distribution: Spiral,
+        down: 1.3, down_end: 0.9, length: 0.3, length_end: 0.12, gravity: 0, light: 0,
+        noise: 0.3, exponent: 2.6},
+      b2: {count: tree_age_count(4, age), start: 0.3, distribution: Alternate, down: 0.9,
+        down_end: 0.8, length: 0.45, length_end: 0.35, gravity: 0.05, light: 0, noise: 0.4,
+        exponent: 2},
+      b3: {count: 0},
+      crown: None, leaf_material: TreeTwigDead, leaf_size: tree_age_leaf(1.1, age), leaf_count: 2,
+      leaf_start: 0.5, leaf_angle: 0.4, leaf_orientation: Along, leaf_tilt: 0.2, card: Quad,
+      crown_shape: Density, crown_normals: 0.3, occlusion: 0.4, stiffness: 1, flutter: 0.01
+    ) { Position: {0, 0, 0} }
+  }
+}

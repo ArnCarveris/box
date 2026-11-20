@@ -1,6 +1,7 @@
 using flecs.script
 using flecs.script.math
 using box.input
+using trees
 
 // The state of the forest that the HUD writes and the other parts of the scene read. The season,
 // precipitation, wind and hour are set by the sliders (or over REST); temperature and
@@ -104,10 +105,10 @@ state {
     a + (b - a) * ease
   }
 
-  // The cutoffs of a broadleaf card (ForestLeafAlbedo): at LEAF_FULL all its leaves show, from
+  // The cutoffs of a broadleaf card (TreeLeafAlbedo): at LEAF_FULL all its leaves show, from
   // LEAF_KEEP_MIN up they drop one by one, at LEAF_BARE none is left
   export const LEAF_FULL: f32 = 0.3
-  export const LEAF_KEEP_MIN: f32 = 0.75
+  export const LEAF_KEEP_MIN: f32 = TREE_LEAF_KEEP_MIN
   export const LEAF_BARE: f32 = 1.02
 
   // The color of deciduous leaves through the year: sp, su and au in the middle of spring,

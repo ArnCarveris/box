@@ -7,6 +7,7 @@ using box.light
 using box.texture
 using state
 using assets
+using trees
 
 // The undergrowth of the forest floor: alpha cut grass clumps and sedge, ferns, wildflowers,
 // reeds, shrubs, moss cushions, mushrooms, fallen logs, stumps, rocks, twigs and leaf litter, as
@@ -97,8 +98,8 @@ assets {
     dome_h { nodes.Multiply: {a: dome, b_value: {0.25, 0, 0, 0}} }
     height { nodes.Add: {a: dome_h, b_value: {0.42, 0, 0, 0}} }
     data { nodes.Combine: {r: cover, g: vein, b: tone, a: height} }
-    ForestFrame framed(input: data)
-    Graph: {output: framed, width: SPRAY_RES, format: GraphLinear}
+    TreeFrame framed(input: data)
+    Graph: {output: framed, width: TREE_SPRAY_RES, format: GraphLinear}
   }
 
   // A tuft: 11 blades of tex from near the middle of the bottom edge, fanned within spread
@@ -112,18 +113,18 @@ assets {
     prop len_min: f32 = 0.5
     prop tone_min: f32 = 0.5
 
-    ForestStamp b0(tex: tex, x: forest_tuft_x(0, seed), y: 0.995, angle: forest_tuft_angle(0, seed, spread), len: forest_tuft_len(0, seed, len_min), tone: forest_pinnate_tone(0, seed, tone_min))
-    ForestStamp b1(prev: b0, tex: tex, x: forest_tuft_x(1, seed), y: 0.995, angle: forest_tuft_angle(1, seed, spread), len: forest_tuft_len(1, seed, len_min), tone: forest_pinnate_tone(1, seed, tone_min))
-    ForestStamp b2(prev: b1, tex: tex, x: forest_tuft_x(2, seed), y: 0.995, angle: forest_tuft_angle(2, seed, spread), len: forest_tuft_len(2, seed, len_min), tone: forest_pinnate_tone(2, seed, tone_min))
-    ForestStamp b3(prev: b2, tex: tex, x: forest_tuft_x(3, seed), y: 0.995, angle: forest_tuft_angle(3, seed, spread), len: forest_tuft_len(3, seed, len_min), tone: forest_pinnate_tone(3, seed, tone_min))
-    ForestStamp b4(prev: b3, tex: tex, x: forest_tuft_x(4, seed), y: 0.995, angle: forest_tuft_angle(4, seed, spread), len: forest_tuft_len(4, seed, len_min), tone: forest_pinnate_tone(4, seed, tone_min))
-    ForestStamp b5(prev: b4, tex: tex, x: forest_tuft_x(5, seed), y: 0.995, angle: forest_tuft_angle(5, seed, spread), len: forest_tuft_len(5, seed, len_min), tone: forest_pinnate_tone(5, seed, tone_min))
-    ForestStamp b6(prev: b5, tex: tex, x: forest_tuft_x(6, seed), y: 0.995, angle: forest_tuft_angle(6, seed, spread), len: forest_tuft_len(6, seed, len_min), tone: forest_pinnate_tone(6, seed, tone_min))
-    ForestStamp b7(prev: b6, tex: tex, x: forest_tuft_x(7, seed), y: 0.995, angle: forest_tuft_angle(7, seed, spread), len: forest_tuft_len(7, seed, len_min), tone: forest_pinnate_tone(7, seed, tone_min))
-    ForestStamp b8(prev: b7, tex: tex, x: forest_tuft_x(8, seed), y: 0.995, angle: forest_tuft_angle(8, seed, spread), len: forest_tuft_len(8, seed, len_min), tone: forest_pinnate_tone(8, seed, tone_min))
-    ForestStamp b9(prev: b8, tex: tex, x: forest_tuft_x(9, seed), y: 0.995, angle: forest_tuft_angle(9, seed, spread), len: forest_tuft_len(9, seed, len_min), tone: forest_pinnate_tone(9, seed, tone_min))
-    ForestStamp b10(prev: b9, tex: tex, x: forest_tuft_x(10, seed), y: 0.995, angle: forest_tuft_angle(10, seed, spread), len: forest_tuft_len(10, seed, len_min), tone: forest_pinnate_tone(10, seed, tone_min))
-    Graph: {output: b10, width: LEAF_RES, format: GraphLinear}
+    TreeStamp b0(tex: tex, x: forest_tuft_x(0, seed), y: 0.995, angle: forest_tuft_angle(0, seed, spread), len: forest_tuft_len(0, seed, len_min), tone: tree_pinnate_tone(0, seed, tone_min))
+    TreeStamp b1(prev: b0, tex: tex, x: forest_tuft_x(1, seed), y: 0.995, angle: forest_tuft_angle(1, seed, spread), len: forest_tuft_len(1, seed, len_min), tone: tree_pinnate_tone(1, seed, tone_min))
+    TreeStamp b2(prev: b1, tex: tex, x: forest_tuft_x(2, seed), y: 0.995, angle: forest_tuft_angle(2, seed, spread), len: forest_tuft_len(2, seed, len_min), tone: tree_pinnate_tone(2, seed, tone_min))
+    TreeStamp b3(prev: b2, tex: tex, x: forest_tuft_x(3, seed), y: 0.995, angle: forest_tuft_angle(3, seed, spread), len: forest_tuft_len(3, seed, len_min), tone: tree_pinnate_tone(3, seed, tone_min))
+    TreeStamp b4(prev: b3, tex: tex, x: forest_tuft_x(4, seed), y: 0.995, angle: forest_tuft_angle(4, seed, spread), len: forest_tuft_len(4, seed, len_min), tone: tree_pinnate_tone(4, seed, tone_min))
+    TreeStamp b5(prev: b4, tex: tex, x: forest_tuft_x(5, seed), y: 0.995, angle: forest_tuft_angle(5, seed, spread), len: forest_tuft_len(5, seed, len_min), tone: tree_pinnate_tone(5, seed, tone_min))
+    TreeStamp b6(prev: b5, tex: tex, x: forest_tuft_x(6, seed), y: 0.995, angle: forest_tuft_angle(6, seed, spread), len: forest_tuft_len(6, seed, len_min), tone: tree_pinnate_tone(6, seed, tone_min))
+    TreeStamp b7(prev: b6, tex: tex, x: forest_tuft_x(7, seed), y: 0.995, angle: forest_tuft_angle(7, seed, spread), len: forest_tuft_len(7, seed, len_min), tone: tree_pinnate_tone(7, seed, tone_min))
+    TreeStamp b8(prev: b7, tex: tex, x: forest_tuft_x(8, seed), y: 0.995, angle: forest_tuft_angle(8, seed, spread), len: forest_tuft_len(8, seed, len_min), tone: tree_pinnate_tone(8, seed, tone_min))
+    TreeStamp b9(prev: b8, tex: tex, x: forest_tuft_x(9, seed), y: 0.995, angle: forest_tuft_angle(9, seed, spread), len: forest_tuft_len(9, seed, len_min), tone: tree_pinnate_tone(9, seed, tone_min))
+    TreeStamp b10(prev: b9, tex: tex, x: forest_tuft_x(10, seed), y: 0.995, angle: forest_tuft_angle(10, seed, spread), len: forest_tuft_len(10, seed, len_min), tone: tree_pinnate_tone(10, seed, tone_min))
+    Graph: {output: b10, width: TREE_LEAF_RES, format: GraphLinear}
   }
 
   // 11 more blades of tex over the tuft base_tex, as ForestTuftMap
@@ -136,18 +137,18 @@ assets {
     prop tone_min: f32 = 0.5
 
     base { nodes.Image: {texture: base_tex, linear: true} }
-    ForestStamp b0(prev: base, tex: tex, x: forest_tuft_x(0, seed + 13), y: 0.995, angle: forest_tuft_angle(0, seed + 13, spread), len: forest_tuft_len(0, seed + 13, len_min), tone: forest_pinnate_tone(0, seed + 13, tone_min))
-    ForestStamp b1(prev: b0, tex: tex, x: forest_tuft_x(1, seed + 13), y: 0.995, angle: forest_tuft_angle(1, seed + 13, spread), len: forest_tuft_len(1, seed + 13, len_min), tone: forest_pinnate_tone(1, seed + 13, tone_min))
-    ForestStamp b2(prev: b1, tex: tex, x: forest_tuft_x(2, seed + 13), y: 0.995, angle: forest_tuft_angle(2, seed + 13, spread), len: forest_tuft_len(2, seed + 13, len_min), tone: forest_pinnate_tone(2, seed + 13, tone_min))
-    ForestStamp b3(prev: b2, tex: tex, x: forest_tuft_x(3, seed + 13), y: 0.995, angle: forest_tuft_angle(3, seed + 13, spread), len: forest_tuft_len(3, seed + 13, len_min), tone: forest_pinnate_tone(3, seed + 13, tone_min))
-    ForestStamp b4(prev: b3, tex: tex, x: forest_tuft_x(4, seed + 13), y: 0.995, angle: forest_tuft_angle(4, seed + 13, spread), len: forest_tuft_len(4, seed + 13, len_min), tone: forest_pinnate_tone(4, seed + 13, tone_min))
-    ForestStamp b5(prev: b4, tex: tex, x: forest_tuft_x(5, seed + 13), y: 0.995, angle: forest_tuft_angle(5, seed + 13, spread), len: forest_tuft_len(5, seed + 13, len_min), tone: forest_pinnate_tone(5, seed + 13, tone_min))
-    ForestStamp b6(prev: b5, tex: tex, x: forest_tuft_x(6, seed + 13), y: 0.995, angle: forest_tuft_angle(6, seed + 13, spread), len: forest_tuft_len(6, seed + 13, len_min), tone: forest_pinnate_tone(6, seed + 13, tone_min))
-    ForestStamp b7(prev: b6, tex: tex, x: forest_tuft_x(7, seed + 13), y: 0.995, angle: forest_tuft_angle(7, seed + 13, spread), len: forest_tuft_len(7, seed + 13, len_min), tone: forest_pinnate_tone(7, seed + 13, tone_min))
-    ForestStamp b8(prev: b7, tex: tex, x: forest_tuft_x(8, seed + 13), y: 0.995, angle: forest_tuft_angle(8, seed + 13, spread), len: forest_tuft_len(8, seed + 13, len_min), tone: forest_pinnate_tone(8, seed + 13, tone_min))
-    ForestStamp b9(prev: b8, tex: tex, x: forest_tuft_x(9, seed + 13), y: 0.995, angle: forest_tuft_angle(9, seed + 13, spread), len: forest_tuft_len(9, seed + 13, len_min), tone: forest_pinnate_tone(9, seed + 13, tone_min))
-    ForestStamp b10(prev: b9, tex: tex, x: forest_tuft_x(10, seed + 13), y: 0.995, angle: forest_tuft_angle(10, seed + 13, spread), len: forest_tuft_len(10, seed + 13, len_min), tone: forest_pinnate_tone(10, seed + 13, tone_min))
-    Graph: {output: b10, width: LEAF_RES, format: GraphLinear}
+    TreeStamp b0(prev: base, tex: tex, x: forest_tuft_x(0, seed + 13), y: 0.995, angle: forest_tuft_angle(0, seed + 13, spread), len: forest_tuft_len(0, seed + 13, len_min), tone: tree_pinnate_tone(0, seed + 13, tone_min))
+    TreeStamp b1(prev: b0, tex: tex, x: forest_tuft_x(1, seed + 13), y: 0.995, angle: forest_tuft_angle(1, seed + 13, spread), len: forest_tuft_len(1, seed + 13, len_min), tone: tree_pinnate_tone(1, seed + 13, tone_min))
+    TreeStamp b2(prev: b1, tex: tex, x: forest_tuft_x(2, seed + 13), y: 0.995, angle: forest_tuft_angle(2, seed + 13, spread), len: forest_tuft_len(2, seed + 13, len_min), tone: tree_pinnate_tone(2, seed + 13, tone_min))
+    TreeStamp b3(prev: b2, tex: tex, x: forest_tuft_x(3, seed + 13), y: 0.995, angle: forest_tuft_angle(3, seed + 13, spread), len: forest_tuft_len(3, seed + 13, len_min), tone: tree_pinnate_tone(3, seed + 13, tone_min))
+    TreeStamp b4(prev: b3, tex: tex, x: forest_tuft_x(4, seed + 13), y: 0.995, angle: forest_tuft_angle(4, seed + 13, spread), len: forest_tuft_len(4, seed + 13, len_min), tone: tree_pinnate_tone(4, seed + 13, tone_min))
+    TreeStamp b5(prev: b4, tex: tex, x: forest_tuft_x(5, seed + 13), y: 0.995, angle: forest_tuft_angle(5, seed + 13, spread), len: forest_tuft_len(5, seed + 13, len_min), tone: tree_pinnate_tone(5, seed + 13, tone_min))
+    TreeStamp b6(prev: b5, tex: tex, x: forest_tuft_x(6, seed + 13), y: 0.995, angle: forest_tuft_angle(6, seed + 13, spread), len: forest_tuft_len(6, seed + 13, len_min), tone: tree_pinnate_tone(6, seed + 13, tone_min))
+    TreeStamp b7(prev: b6, tex: tex, x: forest_tuft_x(7, seed + 13), y: 0.995, angle: forest_tuft_angle(7, seed + 13, spread), len: forest_tuft_len(7, seed + 13, len_min), tone: tree_pinnate_tone(7, seed + 13, tone_min))
+    TreeStamp b8(prev: b7, tex: tex, x: forest_tuft_x(8, seed + 13), y: 0.995, angle: forest_tuft_angle(8, seed + 13, spread), len: forest_tuft_len(8, seed + 13, len_min), tone: tree_pinnate_tone(8, seed + 13, tone_min))
+    TreeStamp b9(prev: b8, tex: tex, x: forest_tuft_x(9, seed + 13), y: 0.995, angle: forest_tuft_angle(9, seed + 13, spread), len: forest_tuft_len(9, seed + 13, len_min), tone: tree_pinnate_tone(9, seed + 13, tone_min))
+    TreeStamp b10(prev: b9, tex: tex, x: forest_tuft_x(10, seed + 13), y: 0.995, angle: forest_tuft_angle(10, seed + 13, spread), len: forest_tuft_len(10, seed + 13, len_min), tone: tree_pinnate_tone(10, seed + 13, tone_min))
+    Graph: {output: b10, width: TREE_LEAF_RES, format: GraphLinear}
   }
 
   // A flower on its stalk, or a reed head: a stalk from the middle of the bottom edge up to a
@@ -189,8 +190,8 @@ assets {
     dome_h { nodes.Multiply: {a: dome, b_value: {0.2, 0, 0, 0}} }
     height { nodes.Add: {a: dome_h, b_value: {0.42, 0, 0, 0}} }
     data { nodes.Combine: {r: cover, g: petal, b: tone, a: height} }
-    ForestFrame framed(input: data)
-    Graph: {output: framed, width: SPRAY_RES, format: GraphLinear}
+    TreeFrame framed(input: data)
+    Graph: {output: framed, width: TREE_SPRAY_RES, format: GraphLinear}
   }
 
   // A tuft with flowers: 7 stalks of tex over the tuft base, fanned within spread degrees
@@ -202,14 +203,14 @@ assets {
     prop len_min: f32 = 0.6
 
     base { nodes.Image: {texture: base_tex, linear: true} }
-    ForestStamp f0(prev: base, tex: tex, x: forest_tuft_x(0, seed + 7), y: 0.995, angle: forest_tuft_angle(0, seed + 7, spread), len: forest_tuft_len(0, seed + 7, len_min), tone: 1)
-    ForestStamp f1(prev: f0, tex: tex, x: forest_tuft_x(1, seed + 7), y: 0.995, angle: forest_tuft_angle(1, seed + 7, spread), len: forest_tuft_len(1, seed + 7, len_min), tone: 1)
-    ForestStamp f2(prev: f1, tex: tex, x: forest_tuft_x(2, seed + 7), y: 0.995, angle: forest_tuft_angle(2, seed + 7, spread), len: forest_tuft_len(2, seed + 7, len_min), tone: 1)
-    ForestStamp f3(prev: f2, tex: tex, x: forest_tuft_x(3, seed + 7), y: 0.995, angle: forest_tuft_angle(3, seed + 7, spread), len: forest_tuft_len(3, seed + 7, len_min), tone: 1)
-    ForestStamp f4(prev: f3, tex: tex, x: forest_tuft_x(4, seed + 7), y: 0.995, angle: forest_tuft_angle(4, seed + 7, spread), len: forest_tuft_len(4, seed + 7, len_min), tone: 1)
-    ForestStamp f5(prev: f4, tex: tex, x: forest_tuft_x(5, seed + 7), y: 0.995, angle: forest_tuft_angle(5, seed + 7, spread), len: forest_tuft_len(5, seed + 7, len_min), tone: 1)
-    ForestStamp f6(prev: f5, tex: tex, x: forest_tuft_x(6, seed + 7), y: 0.995, angle: forest_tuft_angle(6, seed + 7, spread), len: forest_tuft_len(6, seed + 7, len_min), tone: 1)
-    Graph: {output: f6, width: LEAF_RES, format: GraphLinear}
+    TreeStamp f0(prev: base, tex: tex, x: forest_tuft_x(0, seed + 7), y: 0.995, angle: forest_tuft_angle(0, seed + 7, spread), len: forest_tuft_len(0, seed + 7, len_min), tone: 1)
+    TreeStamp f1(prev: f0, tex: tex, x: forest_tuft_x(1, seed + 7), y: 0.995, angle: forest_tuft_angle(1, seed + 7, spread), len: forest_tuft_len(1, seed + 7, len_min), tone: 1)
+    TreeStamp f2(prev: f1, tex: tex, x: forest_tuft_x(2, seed + 7), y: 0.995, angle: forest_tuft_angle(2, seed + 7, spread), len: forest_tuft_len(2, seed + 7, len_min), tone: 1)
+    TreeStamp f3(prev: f2, tex: tex, x: forest_tuft_x(3, seed + 7), y: 0.995, angle: forest_tuft_angle(3, seed + 7, spread), len: forest_tuft_len(3, seed + 7, len_min), tone: 1)
+    TreeStamp f4(prev: f3, tex: tex, x: forest_tuft_x(4, seed + 7), y: 0.995, angle: forest_tuft_angle(4, seed + 7, spread), len: forest_tuft_len(4, seed + 7, len_min), tone: 1)
+    TreeStamp f5(prev: f4, tex: tex, x: forest_tuft_x(5, seed + 7), y: 0.995, angle: forest_tuft_angle(5, seed + 7, spread), len: forest_tuft_len(5, seed + 7, len_min), tone: 1)
+    TreeStamp f6(prev: f5, tex: tex, x: forest_tuft_x(6, seed + 7), y: 0.995, angle: forest_tuft_angle(6, seed + 7, spread), len: forest_tuft_len(6, seed + 7, len_min), tone: 1)
+    Graph: {output: f6, width: TREE_LEAF_RES, format: GraphLinear}
   }
 
   // The albedo of a tuft with flowers: greens by the tone, the petals (pr, pg, pb) and the eye
@@ -253,7 +254,7 @@ assets {
     keep { nodes.Mix: {a: blade_keep, b_value: {BLOOM_KEEP, BLOOM_KEEP, BLOOM_KEEP, BLOOM_KEEP}, factor: is_flower} }
     alpha { nodes.Multiply: {a: cover, b: keep} }
     color { nodes.Combine: {r: r, g: g, b: b, a: alpha} }
-    Graph: {output: color, width: LEAF_RES}
+    Graph: {output: color, width: TREE_LEAF_RES}
   }
 
   // A patch of leaf litter: 11 fallen leaves of tex_a and tex_b strewn over the map, turned any
@@ -263,19 +264,19 @@ assets {
     prop tex_b: entity = 0
     prop seed: f32 = 1
 
-    ForestStamp l0(tex: tex_a, x: forest_litter_x(0, seed), y: forest_litter_y(0, seed), angle: forest_hash(0 + 60, seed) * 360, len: 0.15 + 0.08 * forest_hash(0 + 80, seed), tone: forest_hash(0 + 100, seed))
-    ForestStamp l1(prev: l0, tex: tex_a, x: forest_litter_x(1, seed), y: forest_litter_y(1, seed), angle: forest_hash(1 + 60, seed) * 360, len: 0.15 + 0.08 * forest_hash(1 + 80, seed), tone: forest_hash(1 + 100, seed))
-    ForestStamp l2(prev: l1, tex: tex_b, x: forest_litter_x(2, seed), y: forest_litter_y(2, seed), angle: forest_hash(2 + 60, seed) * 360, len: 0.15 + 0.08 * forest_hash(2 + 80, seed), tone: forest_hash(2 + 100, seed))
-    ForestStamp l3(prev: l2, tex: tex_a, x: forest_litter_x(3, seed), y: forest_litter_y(3, seed), angle: forest_hash(3 + 60, seed) * 360, len: 0.15 + 0.08 * forest_hash(3 + 80, seed), tone: forest_hash(3 + 100, seed))
-    ForestStamp l4(prev: l3, tex: tex_a, x: forest_litter_x(4, seed), y: forest_litter_y(4, seed), angle: forest_hash(4 + 60, seed) * 360, len: 0.15 + 0.08 * forest_hash(4 + 80, seed), tone: forest_hash(4 + 100, seed))
-    ForestStamp l5(prev: l4, tex: tex_b, x: forest_litter_x(5, seed), y: forest_litter_y(5, seed), angle: forest_hash(5 + 60, seed) * 360, len: 0.15 + 0.08 * forest_hash(5 + 80, seed), tone: forest_hash(5 + 100, seed))
-    ForestStamp l6(prev: l5, tex: tex_a, x: forest_litter_x(6, seed), y: forest_litter_y(6, seed), angle: forest_hash(6 + 60, seed) * 360, len: 0.15 + 0.08 * forest_hash(6 + 80, seed), tone: forest_hash(6 + 100, seed))
-    ForestStamp l7(prev: l6, tex: tex_a, x: forest_litter_x(7, seed), y: forest_litter_y(7, seed), angle: forest_hash(7 + 60, seed) * 360, len: 0.15 + 0.08 * forest_hash(7 + 80, seed), tone: forest_hash(7 + 100, seed))
-    ForestStamp l8(prev: l7, tex: tex_b, x: forest_litter_x(8, seed), y: forest_litter_y(8, seed), angle: forest_hash(8 + 60, seed) * 360, len: 0.15 + 0.08 * forest_hash(8 + 80, seed), tone: forest_hash(8 + 100, seed))
-    ForestStamp l9(prev: l8, tex: tex_a, x: forest_litter_x(9, seed), y: forest_litter_y(9, seed), angle: forest_hash(9 + 60, seed) * 360, len: 0.15 + 0.08 * forest_hash(9 + 80, seed), tone: forest_hash(9 + 100, seed))
-    ForestStamp l10(prev: l9, tex: tex_a, x: forest_litter_x(10, seed), y: forest_litter_y(10, seed), angle: forest_hash(10 + 60, seed) * 360, len: 0.15 + 0.08 * forest_hash(10 + 80, seed), tone: forest_hash(10 + 100, seed))
-    ForestFrame framed(input: l10)
-    Graph: {output: framed, width: LEAF_RES, format: GraphLinear}
+    TreeStamp l0(tex: tex_a, x: forest_litter_x(0, seed), y: forest_litter_y(0, seed), angle: forest_hash(0 + 60, seed) * 360, len: 0.15 + 0.08 * forest_hash(0 + 80, seed), tone: forest_hash(0 + 100, seed))
+    TreeStamp l1(prev: l0, tex: tex_a, x: forest_litter_x(1, seed), y: forest_litter_y(1, seed), angle: forest_hash(1 + 60, seed) * 360, len: 0.15 + 0.08 * forest_hash(1 + 80, seed), tone: forest_hash(1 + 100, seed))
+    TreeStamp l2(prev: l1, tex: tex_b, x: forest_litter_x(2, seed), y: forest_litter_y(2, seed), angle: forest_hash(2 + 60, seed) * 360, len: 0.15 + 0.08 * forest_hash(2 + 80, seed), tone: forest_hash(2 + 100, seed))
+    TreeStamp l3(prev: l2, tex: tex_a, x: forest_litter_x(3, seed), y: forest_litter_y(3, seed), angle: forest_hash(3 + 60, seed) * 360, len: 0.15 + 0.08 * forest_hash(3 + 80, seed), tone: forest_hash(3 + 100, seed))
+    TreeStamp l4(prev: l3, tex: tex_a, x: forest_litter_x(4, seed), y: forest_litter_y(4, seed), angle: forest_hash(4 + 60, seed) * 360, len: 0.15 + 0.08 * forest_hash(4 + 80, seed), tone: forest_hash(4 + 100, seed))
+    TreeStamp l5(prev: l4, tex: tex_b, x: forest_litter_x(5, seed), y: forest_litter_y(5, seed), angle: forest_hash(5 + 60, seed) * 360, len: 0.15 + 0.08 * forest_hash(5 + 80, seed), tone: forest_hash(5 + 100, seed))
+    TreeStamp l6(prev: l5, tex: tex_a, x: forest_litter_x(6, seed), y: forest_litter_y(6, seed), angle: forest_hash(6 + 60, seed) * 360, len: 0.15 + 0.08 * forest_hash(6 + 80, seed), tone: forest_hash(6 + 100, seed))
+    TreeStamp l7(prev: l6, tex: tex_a, x: forest_litter_x(7, seed), y: forest_litter_y(7, seed), angle: forest_hash(7 + 60, seed) * 360, len: 0.15 + 0.08 * forest_hash(7 + 80, seed), tone: forest_hash(7 + 100, seed))
+    TreeStamp l8(prev: l7, tex: tex_b, x: forest_litter_x(8, seed), y: forest_litter_y(8, seed), angle: forest_hash(8 + 60, seed) * 360, len: 0.15 + 0.08 * forest_hash(8 + 80, seed), tone: forest_hash(8 + 100, seed))
+    TreeStamp l9(prev: l8, tex: tex_a, x: forest_litter_x(9, seed), y: forest_litter_y(9, seed), angle: forest_hash(9 + 60, seed) * 360, len: 0.15 + 0.08 * forest_hash(9 + 80, seed), tone: forest_hash(9 + 100, seed))
+    TreeStamp l10(prev: l9, tex: tex_a, x: forest_litter_x(10, seed), y: forest_litter_y(10, seed), angle: forest_hash(10 + 60, seed) * 360, len: 0.15 + 0.08 * forest_hash(10 + 80, seed), tone: forest_hash(10 + 100, seed))
+    TreeFrame framed(input: l10)
+    Graph: {output: framed, width: TREE_LEAF_RES, format: GraphLinear}
   }
 
   template ForestLitterMoreMap {
@@ -285,19 +286,19 @@ assets {
     prop seed: f32 = 1
 
     base { nodes.Image: {texture: base_tex, linear: true} }
-    ForestStamp l0(prev: base, tex: tex_a, x: forest_litter_x(0, seed + 13), y: forest_litter_y(0, seed + 13), angle: forest_hash(0 + 60, seed + 13) * 360, len: 0.15 + 0.08 * forest_hash(0 + 80, seed + 13), tone: forest_hash(0 + 100, seed + 13))
-    ForestStamp l1(prev: l0, tex: tex_a, x: forest_litter_x(1, seed + 13), y: forest_litter_y(1, seed + 13), angle: forest_hash(1 + 60, seed + 13) * 360, len: 0.15 + 0.08 * forest_hash(1 + 80, seed + 13), tone: forest_hash(1 + 100, seed + 13))
-    ForestStamp l2(prev: l1, tex: tex_b, x: forest_litter_x(2, seed + 13), y: forest_litter_y(2, seed + 13), angle: forest_hash(2 + 60, seed + 13) * 360, len: 0.15 + 0.08 * forest_hash(2 + 80, seed + 13), tone: forest_hash(2 + 100, seed + 13))
-    ForestStamp l3(prev: l2, tex: tex_a, x: forest_litter_x(3, seed + 13), y: forest_litter_y(3, seed + 13), angle: forest_hash(3 + 60, seed + 13) * 360, len: 0.15 + 0.08 * forest_hash(3 + 80, seed + 13), tone: forest_hash(3 + 100, seed + 13))
-    ForestStamp l4(prev: l3, tex: tex_a, x: forest_litter_x(4, seed + 13), y: forest_litter_y(4, seed + 13), angle: forest_hash(4 + 60, seed + 13) * 360, len: 0.15 + 0.08 * forest_hash(4 + 80, seed + 13), tone: forest_hash(4 + 100, seed + 13))
-    ForestStamp l5(prev: l4, tex: tex_b, x: forest_litter_x(5, seed + 13), y: forest_litter_y(5, seed + 13), angle: forest_hash(5 + 60, seed + 13) * 360, len: 0.15 + 0.08 * forest_hash(5 + 80, seed + 13), tone: forest_hash(5 + 100, seed + 13))
-    ForestStamp l6(prev: l5, tex: tex_a, x: forest_litter_x(6, seed + 13), y: forest_litter_y(6, seed + 13), angle: forest_hash(6 + 60, seed + 13) * 360, len: 0.15 + 0.08 * forest_hash(6 + 80, seed + 13), tone: forest_hash(6 + 100, seed + 13))
-    ForestStamp l7(prev: l6, tex: tex_a, x: forest_litter_x(7, seed + 13), y: forest_litter_y(7, seed + 13), angle: forest_hash(7 + 60, seed + 13) * 360, len: 0.15 + 0.08 * forest_hash(7 + 80, seed + 13), tone: forest_hash(7 + 100, seed + 13))
-    ForestStamp l8(prev: l7, tex: tex_b, x: forest_litter_x(8, seed + 13), y: forest_litter_y(8, seed + 13), angle: forest_hash(8 + 60, seed + 13) * 360, len: 0.15 + 0.08 * forest_hash(8 + 80, seed + 13), tone: forest_hash(8 + 100, seed + 13))
-    ForestStamp l9(prev: l8, tex: tex_a, x: forest_litter_x(9, seed + 13), y: forest_litter_y(9, seed + 13), angle: forest_hash(9 + 60, seed + 13) * 360, len: 0.15 + 0.08 * forest_hash(9 + 80, seed + 13), tone: forest_hash(9 + 100, seed + 13))
-    ForestStamp l10(prev: l9, tex: tex_a, x: forest_litter_x(10, seed + 13), y: forest_litter_y(10, seed + 13), angle: forest_hash(10 + 60, seed + 13) * 360, len: 0.15 + 0.08 * forest_hash(10 + 80, seed + 13), tone: forest_hash(10 + 100, seed + 13))
-    ForestFrame framed(input: l10)
-    Graph: {output: framed, width: LEAF_RES, format: GraphLinear}
+    TreeStamp l0(prev: base, tex: tex_a, x: forest_litter_x(0, seed + 13), y: forest_litter_y(0, seed + 13), angle: forest_hash(0 + 60, seed + 13) * 360, len: 0.15 + 0.08 * forest_hash(0 + 80, seed + 13), tone: forest_hash(0 + 100, seed + 13))
+    TreeStamp l1(prev: l0, tex: tex_a, x: forest_litter_x(1, seed + 13), y: forest_litter_y(1, seed + 13), angle: forest_hash(1 + 60, seed + 13) * 360, len: 0.15 + 0.08 * forest_hash(1 + 80, seed + 13), tone: forest_hash(1 + 100, seed + 13))
+    TreeStamp l2(prev: l1, tex: tex_b, x: forest_litter_x(2, seed + 13), y: forest_litter_y(2, seed + 13), angle: forest_hash(2 + 60, seed + 13) * 360, len: 0.15 + 0.08 * forest_hash(2 + 80, seed + 13), tone: forest_hash(2 + 100, seed + 13))
+    TreeStamp l3(prev: l2, tex: tex_a, x: forest_litter_x(3, seed + 13), y: forest_litter_y(3, seed + 13), angle: forest_hash(3 + 60, seed + 13) * 360, len: 0.15 + 0.08 * forest_hash(3 + 80, seed + 13), tone: forest_hash(3 + 100, seed + 13))
+    TreeStamp l4(prev: l3, tex: tex_a, x: forest_litter_x(4, seed + 13), y: forest_litter_y(4, seed + 13), angle: forest_hash(4 + 60, seed + 13) * 360, len: 0.15 + 0.08 * forest_hash(4 + 80, seed + 13), tone: forest_hash(4 + 100, seed + 13))
+    TreeStamp l5(prev: l4, tex: tex_b, x: forest_litter_x(5, seed + 13), y: forest_litter_y(5, seed + 13), angle: forest_hash(5 + 60, seed + 13) * 360, len: 0.15 + 0.08 * forest_hash(5 + 80, seed + 13), tone: forest_hash(5 + 100, seed + 13))
+    TreeStamp l6(prev: l5, tex: tex_a, x: forest_litter_x(6, seed + 13), y: forest_litter_y(6, seed + 13), angle: forest_hash(6 + 60, seed + 13) * 360, len: 0.15 + 0.08 * forest_hash(6 + 80, seed + 13), tone: forest_hash(6 + 100, seed + 13))
+    TreeStamp l7(prev: l6, tex: tex_a, x: forest_litter_x(7, seed + 13), y: forest_litter_y(7, seed + 13), angle: forest_hash(7 + 60, seed + 13) * 360, len: 0.15 + 0.08 * forest_hash(7 + 80, seed + 13), tone: forest_hash(7 + 100, seed + 13))
+    TreeStamp l8(prev: l7, tex: tex_b, x: forest_litter_x(8, seed + 13), y: forest_litter_y(8, seed + 13), angle: forest_hash(8 + 60, seed + 13) * 360, len: 0.15 + 0.08 * forest_hash(8 + 80, seed + 13), tone: forest_hash(8 + 100, seed + 13))
+    TreeStamp l9(prev: l8, tex: tex_a, x: forest_litter_x(9, seed + 13), y: forest_litter_y(9, seed + 13), angle: forest_hash(9 + 60, seed + 13) * 360, len: 0.15 + 0.08 * forest_hash(9 + 80, seed + 13), tone: forest_hash(9 + 100, seed + 13))
+    TreeStamp l10(prev: l9, tex: tex_a, x: forest_litter_x(10, seed + 13), y: forest_litter_y(10, seed + 13), angle: forest_hash(10 + 60, seed + 13) * 360, len: 0.15 + 0.08 * forest_hash(10 + 80, seed + 13), tone: forest_hash(10 + 100, seed + 13))
+    TreeFrame framed(input: l10)
+    Graph: {output: framed, width: TREE_LEAF_RES, format: GraphLinear}
   }
 
   // The albedo of the litter: browns from dark and old to fresh and orange by the tone, darker
@@ -327,7 +328,7 @@ assets {
     keep { nodes.Remap: {input: tone, from_min: 0, from_max: 1, to_min: LEAF_KEEP_MIN, to_max: 1, clamp: true} }
     alpha { nodes.Multiply: {a: cover, b: keep} }
     color { nodes.Combine: {r: r, g: g, b: b, a: alpha} }
-    Graph: {output: color, width: LEAF_RES}
+    Graph: {output: color, width: TREE_LEAF_RES}
   }
 
   // Grass: a short lush tuft in the sun, and the longer, looser sedge of the shade
@@ -336,10 +337,10 @@ assets {
   ForestTuftMoreMap grass_data(base_tex: grass_half, tex: grass_blade, seed: 31, spread: 26, len_min: 0.45, tone_min: 0.45)
   ForestTuftMap sedge_half(tex: grass_blade, seed: 32, spread: 38, len_min: 0.6, tone_min: 0.35)
   ForestTuftMoreMap sedge_data(base_tex: sedge_half, tex: grass_blade, seed: 32, spread: 38, len_min: 0.6, tone_min: 0.35)
-  ForestLeafAlbedo grass_albedo(data: grass_data)
-  ForestLeafNormal grass_normal(data: grass_data)
-  ForestLeafAlbedo sedge_albedo(data: sedge_data)
-  ForestLeafNormal sedge_normal(data: sedge_data)
+  TreeLeafAlbedo grass_albedo(data: grass_data)
+  TreeLeafNormal grass_normal(data: grass_data)
+  TreeLeafAlbedo sedge_albedo(data: sedge_data)
+  TreeLeafNormal sedge_normal(data: sedge_data)
 
   // Wildflowers: a low tuft with seven flowers on stalks over it, in yellow (buttercups), white
   // (wood anemones and daisies) and violet (campanula)
@@ -349,7 +350,7 @@ assets {
   ForestBloomAlbedo bloom_yellow_albedo(data: bloom_data, pr: 0.98, pg: 0.82, pb: 0.12, er: 0.85, eg: 0.6, eb: 0.1)
   ForestBloomAlbedo bloom_white_albedo(data: bloom_data, pr: 0.97, pg: 0.96, pb: 0.92, er: 0.95, eg: 0.78, eb: 0.15)
   ForestBloomAlbedo bloom_violet_albedo(data: bloom_data, pr: 0.55, pg: 0.4, pb: 0.9, er: 0.4, eg: 0.3, eb: 0.75)
-  ForestLeafNormal bloom_normal(data: bloom_data)
+  TreeLeafNormal bloom_normal(data: bloom_data)
 
   // Reeds: tall, narrow, nearly upright leaves and a few brown cattail heads
   ForestGrassBladeMap reed_blade(width: 0.02)
@@ -357,20 +358,20 @@ assets {
   ForestStalkMap reed_stalk(head_w: 0.024, head_h: 0.075, head_y: 0.14, eye: 0.01, stalk: 0.009)
   ForestBloomMap reed_data(base_tex: reed_tuft, tex: reed_stalk, seed: 36, spread: 10, len_min: 0.75)
   ForestBloomAlbedo reed_albedo(data: reed_data, pr: 0.24, pg: 0.15, pb: 0.08, er: 0.24, eg: 0.15, eb: 0.08)
-  ForestLeafNormal reed_normal(data: reed_data)
+  TreeLeafNormal reed_normal(data: reed_data)
 
   // Fern: a frond of pinnae, each a row of small toothed pinnules
-  ForestBladeMap fern_pinnule(width: 0.42, shape: 0.75, teeth: 0.1, tooth_count: 5, veins: 4, stem: 0.02)
-  ForestPinnateMap fern_pinna(tex: fern_pinnule, stem_tex: forest_stem, seed: 37, start: 0.03, end: 0.9, spread: 68, spread_tip: 48, len: 0.34, len_tip: 0.2, tone_min: 0.55, res: SPRAY_RES)
-  ForestPinnateMap fern_data(tex: fern_pinna, stem_tex: forest_stem, seed: 38, start: 0.06, end: 0.86, spread: 72, spread_tip: 56, len: 0.6, len_tip: 0.3, tone_min: 0.65, res: LEAF_RES)
-  ForestLeafAlbedo fern_albedo(data: fern_data)
-  ForestLeafNormal fern_normal(data: fern_data)
+  TreeBladeMap fern_pinnule(width: 0.42, shape: 0.75, teeth: 0.1, tooth_count: 5, veins: 4, stem: 0.02)
+  TreePinnateMap fern_pinna(tex: fern_pinnule, stem_tex: tree_stem, seed: 37, start: 0.03, end: 0.9, spread: 68, spread_tip: 48, len: 0.34, len_tip: 0.2, tone_min: 0.55, res: TREE_SPRAY_RES)
+  TreePinnateMap fern_data(tex: fern_pinna, stem_tex: tree_stem, seed: 38, start: 0.06, end: 0.86, spread: 72, spread_tip: 56, len: 0.6, len_tip: 0.3, tone_min: 0.65, res: TREE_LEAF_RES)
+  TreeLeafAlbedo fern_albedo(data: fern_data)
+  TreeLeafNormal fern_normal(data: fern_data)
 
   // Leaf litter of beech and oak leaves
   ForestLitterPatchMap litter_patch_half(tex_a: leaf_beech_blade, tex_b: leaf_oak_blade, seed: 39)
   ForestLitterMoreMap litter_patch_data(base_tex: litter_patch_half, tex_a: leaf_beech_blade, tex_b: leaf_oak_blade, seed: 39)
   ForestLitterAlbedo litter_patch_albedo(data: litter_patch_data)
-  ForestLeafNormal litter_patch_normal(data: litter_patch_data)
+  TreeLeafNormal litter_patch_normal(data: litter_patch_data)
 
   // Spots of the fly agaric: white flecks on red
   forest_agaric_albedo {

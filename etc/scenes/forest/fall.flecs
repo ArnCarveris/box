@@ -5,6 +5,7 @@ using box.texture
 using box.particle
 using state
 using assets
+using trees
 
 // Falling cards: the wind strips the trees and the shrubs. Card particles of a leaf, a petal, a
 // needle and a winged seed fall and tumble from the crowns, carried by the gusts of the Wind
@@ -77,13 +78,13 @@ assets {
     vein { nodes.Split: {input: img, channel: ChannelG} }
     tone { nodes.Remap: {input: vein, from_min: 0, from_max: 1, to_min: 0.84, to_max: 1, clamp: true} }
     color { nodes.Combine: {r: tone, g: tone, b: tone, a: cover} }
-    Graph: {output: color, width: BLADE_RES}
+    Graph: {output: color, width: TREE_BLADE_RES}
   }
 
   // A rounded petal, a needle and the wing of a seed, as blades
-  ForestBladeMap fall_petal_blade(width: 0.46, shape: 0.75, veins: 3, stem: 0.02)
-  ForestBladeMap fall_needle_blade(width: 0.05, shape: 0.35, veins: 0, stem: 0.02)
-  ForestBladeMap fall_seed_blade(width: 0.2, shape: 0.45, veins: 9, stem: 0.12)
+  TreeBladeMap fall_petal_blade(width: 0.46, shape: 0.75, veins: 3, stem: 0.02)
+  TreeBladeMap fall_needle_blade(width: 0.05, shape: 0.35, veins: 0, stem: 0.02)
+  TreeBladeMap fall_seed_blade(width: 0.2, shape: 0.45, veins: 9, stem: 0.12)
 
   ForestFallMap fall_beech_albedo(data: leaf_beech_blade)
   ForestFallMap fall_oak_albedo(data: leaf_oak_blade)
