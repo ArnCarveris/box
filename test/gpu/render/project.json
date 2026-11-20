@@ -1659,7 +1659,14 @@
                     "ellipsoid_corner",
                     "ellipsoid_camera_inside",
                     "height_falloff",
-                    "edge_noise"
+                    "edge_noise",
+                    "unbounded_sky",
+                    "unbounded_geometry",
+                    "unbounded_height_falloff",
+                    "unbounded_shadow_shaft",
+                    "unbounded_with_bounded",
+                    "unbounded_orthographic",
+                    "unbounded_transmissive_pass_count"
                 ]
             },
             {

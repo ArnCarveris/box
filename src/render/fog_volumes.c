@@ -2,9 +2,9 @@
  * @file render/fog_volumes.c
  * @brief Gives every lit view the FogVolumes of its scene in its frustum, for the light extract.
  *
- * The volumes are collected once per frame; a lit view gets those of its scene that may be in
- * its frustum, back to front, at most BOX_RENDER_FOG_VOLUMES_MAX of the nearest, and its fog
- * distance. The size and slices of the froxel grid of a view (froxel.wgsl) are computed here.
+ * A lit view gets the volumes of its scene in its frustum and its unbounded ones, back to front,
+ * at most BOX_RENDER_FOG_VOLUMES_MAX, unbounded ones before the nearest bounded ones, and its
+ * fog distance. The size and slices of its froxel grid (froxel.wgsl) are computed here.
  *
  * The offset the wind moves the noise by is computed from the time of the packet in double
  * precision and wrapped to the period of the noise, so drifting fog stays smooth after hours.
@@ -26,6 +26,7 @@ typedef struct box_fog_volume_t {
 
 /** A fog volume a view sees, by its distance from the camera */
 typedef struct box_fog_order_t {
+    bool unbounded;         /**< Whether it fills all space, kept before every bounded one */
     float distance;         /**< Distance of its center from the camera */
     int32_t index;          /**< Index of the volume in the volumes of the frame */
 } box_fog_order_t;
@@ -282,8 +283,8 @@ static void box_fog_record(
     out->light_inscatter = glm_max(fog->light_inscatter, 0.0f);
     out->noise_strength = glm_clamp(fog->noise_strength, 0.0f, 1.0f);
     out->noise_scale = glm_max(fog->noise_scale, BOX_RENDER_FOG_NOISE_SCALE_MIN);
-    out->shape = fog->shape == FogVolumeEllipsoid ? (uint32_t)FogVolumeEllipsoid :
-        (uint32_t)FogVolumeBox;
+    out->shape = fog->shape == FogVolumeEllipsoid || fog->shape == FogVolumeUnbounded
+        ? (uint32_t)fog->shape : (uint32_t)FogVolumeBox;
     out->height_falloff = glm_max(fog->height_falloff, 0.0f);
     out->edge_noise = glm_clamp(fog->edge_noise, 0.0f, 1.0f);
     box_render_fog_offset(fog, time, out->offset);
@@ -329,7 +330,8 @@ static void box_fog_collect(
     }
 }
 
-/** Order fog volumes by their distance from the camera, nearest first, then by index.
+/** Order fog volumes the unbounded ones first, then by their distance from the camera, nearest
+ * first, then by index.
  *
  * @param a The first volume
  * @param b The second volume
@@ -340,7 +342,11 @@ static int box_fog_cmp(
     const void *b)
 {
     const box_fog_order_t *x = a, *y = b;
-    int result = (x->distance > y->distance) - (x->distance < y->distance);
+    int result = (int)y->unbounded - (int)x->unbounded;
+    if (!result) {
+        result = (x->distance > y->distance) - (x->distance < y->distance);
+    }
+
     if (!result) {
         result = (x->index > y->index) - (x->index < y->index);
     }
@@ -452,14 +458,16 @@ void box_render_fog_views(
         ecs_vec_clear(&l->fog_order);
         for (j = 0; j < fog_count; j ++) {
             const box_fog_volume_t *f = &fogs[j];
-            if (f->scene != v->scene || !box_view_sees(v, f->record.center, 0,
-                ECS_CONST_CAST(vec4*, f->record.axes), f->record.extent))
+            bool unbounded = f->record.shape == (uint32_t)FogVolumeUnbounded;
+            if (f->scene != v->scene || (!unbounded && !box_view_sees(v, f->record.center, 0,
+                ECS_CONST_CAST(vec4*, f->record.axes), f->record.extent)))
             {
                 continue;
             }
 
             box_fog_order_t *o = ecs_vec_append_t(
                 NULL, &l->fog_order, box_fog_order_t);
+            o->unbounded = unbounded;
             o->distance = glm_vec3_distance(ECS_CONST_CAST(float*, eye),
                 ECS_CONST_CAST(float*, f->record.center));
             o->index = j;

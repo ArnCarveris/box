@@ -7,6 +7,7 @@
  * frame; the volumes cover the whole image, the camera stands inside each of them. The light
  * cases add 16 point and spot lights over the boxes, 4 of them shadowed, to one volume. The
  * screen case renders 1920x1080 inside one volume with noise, as the light shafts of a forest.
+ * The unbounded case renders one FogVolumeUnbounded volume instead of the box of the one case.
  */
 
 #include <box.h>
@@ -25,6 +26,7 @@
  * @param width Width of the surface
  * @param height Height of the surface
  * @param noise FogVolume.noise_strength of the volumes
+ * @param shape FogVolume.shape of the volumes
  */
 static void bench_fog_volumes(
     bench_t *b,
@@ -33,7 +35,8 @@ static void bench_fog_volumes(
     float light_inscatter,
     int32_t width,
     int32_t height,
-    float noise)
+    float noise,
+    FogVolumeShape shape)
 {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
@@ -83,6 +86,7 @@ static void bench_fog_volumes(
         f->light_inscatter = light_inscatter;
         f->noise_strength = noise;
         f->noise_scale = 6;
+        f->shape = shape;
         ecs_modified(world, e, FogVolume);
     }
 
@@ -124,40 +128,47 @@ void FogVolume_none(
     bench_t *b)
 {
     // lighting/fog_volume
-    bench_fog_volumes(b, 0, 0, 1, 1280, 720, 0);
+    bench_fog_volumes(b, 0, 0, 1, 1280, 720, 0, FogVolumeBox);
 }
 
 void FogVolume_one(
     bench_t *b)
 {
     // lighting/fog_volume
-    bench_fog_volumes(b, 1, 0, 1, 1280, 720, 0);
+    bench_fog_volumes(b, 1, 0, 1, 1280, 720, 0, FogVolumeBox);
 }
 
 void FogVolume_sixteen(
     bench_t *b)
 {
     // lighting/fog_volume
-    bench_fog_volumes(b, 16, 0, 1, 1280, 720, 0);
+    bench_fog_volumes(b, 16, 0, 1, 1280, 720, 0, FogVolumeBox);
 }
 
 void FogVolume_lights_off(
     bench_t *b)
 {
     // lighting/fog_volume
-    bench_fog_volumes(b, 1, BENCH_FOG_LIGHTS, 0, 1280, 720, 0);
+    bench_fog_volumes(b, 1, BENCH_FOG_LIGHTS, 0, 1280, 720, 0, FogVolumeBox);
 }
 
 void FogVolume_lights(
     bench_t *b)
 {
     // lighting/fog_volume
-    bench_fog_volumes(b, 1, BENCH_FOG_LIGHTS, 1, 1280, 720, 0);
+    bench_fog_volumes(b, 1, BENCH_FOG_LIGHTS, 1, 1280, 720, 0, FogVolumeBox);
 }
 
 void FogVolume_screen(
     bench_t *b)
 {
     // lighting/fog_volume
-    bench_fog_volumes(b, 1, 0, 1, 1920, 1080, 0.45f);
+    bench_fog_volumes(b, 1, 0, 1, 1920, 1080, 0.45f, FogVolumeBox);
+}
+
+void FogVolume_unbounded(
+    bench_t *b)
+{
+    // lighting/fog_volume
+    bench_fog_volumes(b, 1, 0, 1, 1280, 720, 0, FogVolumeUnbounded);
 }

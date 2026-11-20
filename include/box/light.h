@@ -351,11 +351,14 @@ ECS_STRUCT(PlanarReflection, {
 
 /** Shape of the fog of a FogVolume in its box */
 ECS_ENUM(FogVolumeShape, {
-    FogVolumeBox = 0,      /**< The box: edge_fade fades the density by the distance to its
-                            *   nearest face */
-    FogVolumeEllipsoid = 1 /**< The ellipsoid inscribed in the box, with semi-axes extent:
-                            *   edge_fade fades the density by an approximate distance inside
-                            *   its surface, so the outline is round */
+    FogVolumeBox = 0,       /**< The box: edge_fade fades the density by the distance to its
+                             *   nearest face */
+    FogVolumeEllipsoid = 1, /**< The ellipsoid inscribed in the box, with semi-axes extent:
+                             *   edge_fade fades the density by an approximate distance inside
+                             *   its surface, so the outline is round */
+    FogVolumeUnbounded = 2  /**< All space of its scene, out to the fog_distance of each view,
+                             *   wherever the camera is: extent, edge_fade and edge_noise are
+                             *   ignored and the volume is never culled */
 });
 
 /** A box of fog the lit views of its scene with LightSettings.fog_volumes render, placed by the
@@ -365,11 +368,18 @@ ECS_ENUM(FogVolumeShape, {
  * inside its surface; height_falloff thins it out toward the top of the box, and edge_noise lets
  * the noise erode the faded border into billows instead of an outline of the shape.
  *
- * The nearest 32 volumes a view sees render through a froxel grid of the view: a grid aligned
- * with its frustum, one cell per tile of about 8x8 pixels (larger tiles above 1920 pixels, so a
- * grid has at most 240 cells along its larger edge) by 64 depth slices from the near plane to
- * LightSettings.fog_distance, thickening exponentially with the distance (evenly for an
- * orthographic camera). Each cell sums the density of every volume at its center and is lit
+ * A FogVolumeUnbounded volume has no box: it fills all space of its scene, out to the
+ * fog_distance of each lit view, wherever the camera is, and is in every lit view of its scene.
+ * Its height_falloff is measured from the position of the entity along its local +Y, as the
+ * base_height of a HeightFog, so the same density and falloff give fog like a HeightFog, with
+ * shadows, shafts, noise and local lights. In the fog the sun's shadow fades out over the last
+ * part of the shadow distance, so the shafts end without a ring.
+ *
+ * The unbounded volumes and the nearest bounded ones a view sees, 32 in all, render through a
+ * froxel grid of the view: a grid aligned with its frustum, one cell per tile of about 8x8
+ * pixels (larger tiles above 1920 pixels, so a grid has at most 240 cells along its larger
+ * edge) by 64 depth slices from the near plane to LightSettings.fog_distance, thickening
+ * exponentially with the distance (evenly for an orthographic camera). Each cell sums the density of every volume at its center and is lit
  * once, so the cost follows the grid, not the image size, the screen coverage or the number of
  * overlapping volumes. The grid is applied after the opaque meshes and the sky, one lookup per
  * pixel at its depth; fog beyond fog_distance is not drawn, and the sky takes the fog up to it.
@@ -414,11 +424,13 @@ ECS_STRUCT(FogVolume, {
                               *   so a fixed --delta-time renders the same frames every run,
                               *   default {0, 0, 0} */
     FogVolumeShape shape;    /**< Shape of the fog in the box, default FogVolumeBox. The box
-                              *   bounds every shape and is what views cull it by */
+                              *   bounds every shape and is what views cull it by, except
+                              *   FogVolumeUnbounded, which has no box and is never culled */
     float height_falloff;    /**< The density times exp(-height_falloff * h), h the height
                               *   above the bottom of the box along its local +Y, as
                               *   HeightFog.falloff, so ground mist thins out toward its top;
-                              *   at least 0, default 0 for uniform density */
+                              *   for FogVolumeUnbounded h is the height above the entity,
+                              *   denser below it; at least 0, default 0 for uniform density */
     float edge_noise;        /**< How much the noise erodes the faded border, 0 to 1, default 0:
                               *   at 0 the fade of edge_fade scales the density, at 1 it is a
                               *   threshold on the noise, so the fog reaches further out where

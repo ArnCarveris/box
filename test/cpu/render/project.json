@@ -161,7 +161,13 @@
                     "froxel_slices",
                     "falloff_script_keeps_others",
                     "falloff_record",
-                    "falloff_clamped"
+                    "falloff_clamped",
+                    "unbounded_script",
+                    "unbounded_not_culled",
+                    "unbounded_kept_over_limit",
+                    "unbounded_other_scene_none",
+                    "unbounded_unlit_view_none",
+                    "unbounded_view_disabled_none"
                 ]
             },
             {

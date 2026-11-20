@@ -52,9 +52,22 @@ const SEGMENT_FULL: u32 = 0u;
 const SEGMENT_BEHIND: u32 = 1u;
 const SEGMENT_FRONT: u32 = 2u;
 
-// Shapes of the fog of a volume in its box (FogVolumeShape).
+// Shapes of the fog of a volume in its box (FogVolumeShape). An unbounded volume has no box: it
+// fills all space, its height measured from its center.
 const FOG_SHAPE_BOX: u32 = 0u;
 const FOG_SHAPE_ELLIPSOID: u32 = 1u;
+const FOG_SHAPE_UNBOUNDED: u32 = 2u;
+
+// Distance inside an unbounded volume, deeper than any edge_fade.
+const FOG_UNBOUNDED_INSIDE: f32 = 1e30;
+
+// Share of the shadow distance over which the sun's shadow of the fog fades out, at least, so
+// the shafts end without a ring where shadow_point stops at shadow_params.y.
+const FOG_SHADOW_FADE: f32 = 0.25;
+
+// Largest value a cell stores, below the largest half float, so the height falloff of an
+// unbounded volume far below its base does not overflow the grid.
+const FOG_CELL_MAX: f32 = 60000.0;
 
 // Width of the noise values over which edge_noise lets the fog of a border in: the threshold of
 // the noise moves from 0 deep inside to 1 + this at the surface.
@@ -76,7 +89,7 @@ struct FogVolume {
     offset: vec3f,
     noise_strength: f32,
     noise_scale: f32,
-    // FOG_SHAPE_BOX or FOG_SHAPE_ELLIPSOID
+    // FOG_SHAPE_BOX, FOG_SHAPE_ELLIPSOID or FOG_SHAPE_UNBOUNDED
     shape: u32,
     height_falloff: f32,
     edge_noise: f32,
@@ -121,6 +134,10 @@ fn inside(fog: FogVolume, q: vec3f) -> f32 {
 // outside, at most the true distance and concave along a segment for every shape. The ellipsoid
 // takes the distance in the unit sphere scaled by its smallest semi-axis.
 fn shape_inside(fog: FogVolume, q: vec3f) -> f32 {
+    if (fog.shape == FOG_SHAPE_UNBOUNDED) {
+        return FOG_UNBOUNDED_INSIDE;
+    }
+
     if (fog.shape == FOG_SHAPE_ELLIPSOID) {
         let e = max(fog.extent, vec3f(1e-6));
         return (1.0 - length(q / e)) * min(min(e.x, e.y), e.z);
@@ -148,10 +165,16 @@ fn volume_local(fog: FogVolume, p: vec3f) -> vec3f {
 }
 
 // Share of the density of a volume left at a height q.y of its local frame by its
-// height_falloff: 1 at the bottom of the box, thinning out exponentially above it.
+// height_falloff: 1 at the bottom of the box, thinning out exponentially above it. An unbounded
+// volume measures it from its center as HeightFog does from its base height, growing below it,
+// the exponent clamped as fog.wgsl does.
 fn height_share(fog: FogVolume, q: vec3f) -> f32 {
     if (fog.height_falloff <= 0.0) {
         return 1.0;
+    }
+
+    if (fog.shape == FOG_SHAPE_UNBOUNDED) {
+        return exp(clamp(-fog.height_falloff * q.y, -80.0, 80.0));
     }
 
     return exp(-fog.height_falloff * max(q.y + fog.extent.y, 0.0));
@@ -210,6 +233,22 @@ fn light_cell(p: vec3f) {
     }
 }
 
+// Shadow of the sun at a point of the fog: shadow_point faded toward 1 over the last part of the
+// shadow distance, from the fade start of the surfaces or FOG_SHADOW_FADE of the distance before
+// its end, whichever is earlier, so fog that goes on past the shadows shows no ring or wall
+// where they end.
+fn fog_shadow(p: vec3f) -> f32 {
+    let end = view.shadow_params.y;
+    let start = min(view.shadow_params.x, end * (1.0 - FOG_SHADOW_FADE));
+    let depth = -(view.view * vec4f(p, 1.0)).z;
+    let fade = clamp((depth - start) / max(end - start, 1e-4), 0.0, 1.0);
+    if (fade >= 1.0) {
+        return 1.0;
+    }
+
+    return mix(shadow_point(p), 1.0, fade);
+}
+
 // Share of the sun the cell sees through the cascades: its shadow at the BOX_FROXEL_SAMPLES
 // points of the cell from a to b, offset inside their strata by offset, weighed by the density
 // there (cell_weights), so where a face of a volume meets a wall the light outside the wall does
@@ -220,7 +259,7 @@ fn sun_visible(a: vec3f, b: vec3f, offset: f32) -> f32 {
     for (var j = 0u; j < BOX_FROXEL_SAMPLES; j++) {
         let w = cell_weights[j];
         if (w > 0.0) {
-            visible += w * shadow_point(mix(a, b, froxel_sample(j, offset)));
+            visible += w * fog_shadow(mix(a, b, froxel_sample(j, offset)));
             total += w;
         }
     }
@@ -371,8 +410,9 @@ fn inject(@builtin(global_invocation_id) id: vec3u) {
 
     for (var i = 0u; i < froxel.grid.w; i++) {
         let fog = volumes[i];
-        // The box bounds every shape.
-        occupied = occupied || inside(fog, volume_local(fog, center)) > -reach;
+        // The box bounds every shape but the unbounded one, which reaches every cell.
+        occupied = occupied || fog.shape == FOG_SHAPE_UNBOUNDED ||
+            inside(fog, volume_local(fog, center)) > -reach;
         let qa = volume_local(fog, a);
         let qb = volume_local(fog, b);
         var h = 1.0;
@@ -433,7 +473,7 @@ fn inject(@builtin(global_invocation_id) id: vec3u) {
         scatter *= aerial_sample(vec4f(uv * view.viewport.xy, 0.0, 1.0), p).a;
     }
 
-    var result = vec4f(scatter, extinction);
+    var result = min(vec4f(scatter, extinction), vec4f(FOG_CELL_MAX));
     if (occupied && history_blends()) {
         // The previous cells are kept at their centers: the unjittered center of this cell
         // lands between them in the previous grid.
@@ -480,8 +520,13 @@ fn integrate(@builtin(global_invocation_id) id: vec3u) {
     }
 }
 
-// Whether the segment of the local frame of a volume from qa to qb meets its box.
+// Whether the segment of the local frame of a volume from qa to qb meets its box, always for an
+// unbounded volume.
 fn segment_meets(fog: FogVolume, qa: vec3f, qb: vec3f) -> bool {
+    if (fog.shape == FOG_SHAPE_UNBOUNDED) {
+        return true;
+    }
+
     let d = qb - qa;
     let inv = 1.0 / select(d, vec3f(1e-6), abs(d) < vec3f(1e-6));
     let t0 = (-fog.extent - qa) * inv;

@@ -367,10 +367,12 @@ void box_render_fog_noise(
     uint8_t *out);
 
 /** Give every lit view with LightSettings.fog_volumes the FogVolumes of the scene of its camera
- * that may be in its frustum, back to front by the distance of their centers from the camera,
- * and its LightSettings.fog_distance.
+ * that may be in its frustum and the FogVolumeUnbounded ones, which are never culled, back to
+ * front by the distance of their centers from the camera, the unbounded ones last, and its
+ * LightSettings.fog_distance.
  *
- * A view that sees more than BOX_RENDER_FOG_VOLUMES_MAX keeps the nearest and warns once.
+ * A view that sees more than BOX_RENDER_FOG_VOLUMES_MAX keeps the unbounded ones, then the
+ * nearest, and warns once.
  * Views without a view entity, unlit views and cameras without a depth range get none. The
  * records go after those of the views before, with the noise offsets at the time of the packet.
  *

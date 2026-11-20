@@ -2916,3 +2916,263 @@ void FogVolume_edge_noise(void) {
     stbi_image_free(px[0]);
     stbi_image_free(px[1]);
 }
+
+/** Length of the rays of the unbounded cases beyond any fog distance, the far face of the
+ * fv_grid_transmittance of a volume that fills all space */
+#define FV_ALL (1e6f)
+
+/** Add a white unbounded fog volume at a height.
+ *
+ * @param world The world
+ * @param y Height of the entity, the base of its height falloff
+ * @param density Extinction per unit at that height
+ * @param absorption Share of the extinction that is absorbed
+ * @param falloff Its height_falloff
+ * @return The volume
+ */
+static ecs_entity_t fv_unbounded(
+    ecs_world_t *world,
+    float y,
+    float density,
+    float absorption,
+    float falloff)
+{
+    ecs_entity_t e = fv_volume(world, (float[]){0, y, 0}, (float[]){1, 1, 1}, density,
+        absorption);
+    FogVolume *f = ecs_get_mut(world, e, FogVolume);
+    f->shape = FogVolumeUnbounded;
+    f->height_falloff = falloff;
+    f->asymmetry = 0;
+    ecs_modified(world, e, FogVolume);
+
+    return e;
+}
+
+/** Add a perspective camera at a position, turned about +X.
+ *
+ * @param world The world
+ * @param pos Position of the camera
+ * @param pitch Rotation about +X, 0 looks down -Z, -pi/2 looks down -Y
+ * @return The camera
+ */
+static ecs_entity_t fv_camera_at(
+    ecs_world_t *world,
+    const float pos[3],
+    float pitch)
+{
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {pos[0], pos[1], pos[2]});
+    ecs_set(world, camera, Rotation, {pitch, 0, 0});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = FV_NEAR, .far_ = 1000});
+
+    return camera;
+}
+
+/** The sky through an unbounded volume of uniform density takes the fog up to the fog distance
+ * of the view, exp(-density * fog_distance), from a camera far from the entity. */
+void FogVolume_unbounded_sky(void) {
+    // fog_volume/unbounded
+    ecs_world_t *world = fv_world(0);
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = fv_camera_at(world, (float[]){500, 0, 800}, 0),
+        .clear = {.enabled = true, .color = {FV_WALL, FV_WALL, FV_WALL, 255}},
+        .lighting = {.enabled = true, .fog_volumes = true, .fog_distance = 50}});
+    fv_unbounded(world, 0, 0.02f, 1, 0);
+    unsigned char *px = fv_render_still(world, "fog_unbounded_sky.png");
+    int32_t want = fv_srgb(fv_lin(FV_WALL) *
+        fv_grid_transmittance(0.02f, -1, FV_ALL, 0, false, 50));
+    printf("unbounded sky: got %d, want %d, analytic %d\n", fv_px(px, 32, 32)[1], want,
+        fv_srgb(fv_lin(FV_WALL) * expf(-0.02f * 50.0f)));
+    test_assert(abs(want - fv_srgb(fv_lin(FV_WALL) * expf(-0.02f * 50.0f))) <= 6);
+    fv_expect(fv_px(px, 32, 32), want, 4);
+    test_assert(fv_px(px, 32, 32)[1] < FV_WALL - 40);
+    stbi_image_free(px);
+
+    ecs_fini(world);
+}
+
+/** Geometry closer than the fog distance is fogged over its distance from the camera, wherever
+ * the camera is. */
+void FogVolume_unbounded_geometry(void) {
+    // fog_volume/unbounded
+    ecs_world_t *world = fv_world(0);
+    fv_view(world, fv_camera(world, 3000, 0), true);
+    fv_wall(world, 0, 2980, 40, FV_WALL);
+    fv_unbounded(world, 0, 0.05f, 1, 0);
+    unsigned char *px = fv_render_still(world, "fog_unbounded_geometry.png");
+    int32_t want = fv_srgb(fv_lin(FV_WALL) * fv_grid(0.05f, -1, FV_ALL, 19.9f));
+    test_assert(abs(want - fv_srgb(fv_lin(FV_WALL) * expf(-0.05f * 19.9f))) <= 8);
+    fv_expect(fv_px(px, 32, 32), want, 5);
+    stbi_image_free(px);
+    box_render_gpu_stats_t before = fv_frames(world, 0);
+    box_render_gpu_stats_t after = fv_frames(world, 2);
+    test_int(after.fog_volumes - before.fog_volumes, 2);
+    test_int(after.errors, before.errors);
+
+    ecs_fini(world);
+}
+
+/** With a height falloff, a view looking down at the ground from 40 units above the base is less
+ * fogged than a view at the base looking at a wall as far away, by the density integrated over
+ * the heights of the ray. */
+void FogVolume_unbounded_height_falloff(void) {
+    // fog_volume/unbounded
+    const float density = 0.05f, falloff = 0.1f, distance = 40;
+    int32_t got[2], k;
+    for (k = 0; k < 2; k ++) {
+        ecs_world_t *world = fv_world(0);
+        if (k) {
+            fv_view(world, fv_camera_at(world, (float[]){0, distance, 0},
+                -(float)GLM_PI_2), true);
+            ecs_entity_t ground = ecs_new(world);
+            ecs_set(world, ground, Position, {0, -0.1f, 0});
+            ecs_set(world, ground, Box, {200, 0.2f, 200});
+            ecs_set(world, ground, Rgb, {0, 0, 0});
+            ecs_set(world, ground, PbrMaterial, {.metallic = 1, .roughness = 1});
+            ecs_set(world, ground, Emissive, {.strength = 1,
+                .color = {FV_WALL, FV_WALL, FV_WALL}});
+        } else {
+            fv_view(world, fv_camera(world, 0, 0), true);
+            fv_wall(world, 0, -distance - 0.1f, 200, FV_WALL);
+        }
+
+        fv_unbounded(world, 0, density, 1, falloff);
+        unsigned char *px = fv_render_still(world,
+            k ? "fog_unbounded_high.png" : "fog_unbounded_base.png");
+        got[k] = fv_px(px, 32, 32)[1];
+        stbi_image_free(px);
+        ecs_fini(world);
+    }
+
+    int32_t base = fv_srgb(fv_lin(FV_WALL) * fv_grid(density, -1, FV_ALL, distance - 0.1f));
+    int32_t high = fv_srgb(fv_lin(FV_WALL) *
+        expf(-density * (1.0f - expf(-falloff * distance)) / falloff));
+    printf("unbounded falloff: base got %d want %d, high got %d want %d\n", got[0], base,
+        got[1], high);
+    test_assert(abs(got[0] - base) <= 6);
+    test_assert(abs(got[1] - high) <= 12);
+    test_assert(got[1] > got[0] + 40);
+}
+
+/** Render an unbounded scattering volume lit by an overhead sun, with or without a roof over
+ * the left half of the view, and get the pixels left and right of the center.
+ *
+ * @param caster Whether the roof is there
+ * @param file Name of the PNG
+ * @param out Receives the green of the left and the right pixel
+ */
+static void fv_unbounded_shaft(
+    bool caster,
+    const char *file,
+    int32_t out[2])
+{
+    ecs_world_t *world = fv_world(0);
+    ecs_entity_t view = fv_view(world, fv_camera(world, 0, 0), true);
+    View *v = ecs_get_mut(world, view, View);
+    v->shadows = fv_shadows;
+    ecs_modified(world, view, View);
+    ecs_entity_t sun = ecs_new(world);
+    ecs_set(world, sun, Rotation, {(float)GLM_PI_2, 0, 0});
+    ecs_set(world, sun, DirectionalLight, {.intensity = GLM_PIf});
+    fv_unbounded(world, 0, 0.05f, 0, 0);
+    if (caster) {
+        ecs_entity_t roof = ecs_new(world);
+        ecs_set(world, roof, Position, {-20, 8, -25});
+        ecs_set(world, roof, Box, {40, 0.5f, 70});
+    }
+
+    unsigned char *px = fv_render_still(world, file);
+    out[0] = fv_px(px, 16, 32)[1];
+    out[1] = fv_px(px, 48, 32)[1];
+    stbi_image_free(px);
+    ecs_fini(world);
+}
+
+/** A caster between the sun and an unbounded volume leaves a dark shape in the fog under it,
+ * out to where the shadows end. */
+void FogVolume_unbounded_shadow_shaft(void) {
+    // fog_volume/unbounded
+    int32_t open[2], shaded[2];
+    fv_unbounded_shaft(false, "fog_unbounded_open.png", open);
+    fv_unbounded_shaft(true, "fog_unbounded_shaft.png", shaded);
+    printf("unbounded shaft: open %d %d, shaded %d %d\n", open[0], open[1], shaded[0],
+        shaded[1]);
+    test_assert(open[0] > 100);
+    test_assert(abs(open[0] - open[1]) <= 6);
+    test_assert(shaded[0] * 2 < open[0]);
+    test_assert(abs(shaded[1] - open[1]) <= 8);
+}
+
+/** A bounded volume in the view of an unbounded one adds its own fog: the wall through the box
+ * is fogged by both, the wall beside it by the unbounded volume alone. */
+void FogVolume_unbounded_with_bounded(void) {
+    // fog_volume/unbounded
+    ecs_world_t *world = fv_world(0);
+    fv_view(world, fv_camera(world, 0, 0), true);
+    fv_wall(world, 0, -20, 60, FV_WALL);
+    fv_unbounded(world, 0, 0.01f, 1, 0);
+    fv_volume(world, (float[]){0, 0, -10}, (float[]){3, 3, 2}, 0.3f, 1);
+    unsigned char *px = fv_render_still(world, "fog_unbounded_bounded.png");
+    float t = fv_grid(0.01f, -1, FV_ALL, 19.9f);
+    int32_t center = fv_px(px, 32, 32)[1], side = fv_px(px, 4, 32)[1];
+    int32_t want_center = fv_srgb(fv_lin(FV_WALL) * t * fv_grid(0.3f, 8, 12, 19.9f));
+    /* The ray of column 4 is longer than the view depth by about 1.116 */
+    int32_t want_side = fv_srgb(fv_lin(FV_WALL) * fv_grid(0.01f * 1.116f, -1, FV_ALL, 19.9f));
+    printf("unbounded with bounded: center %d want %d, side %d want %d\n", center, want_center,
+        side, want_side);
+    test_assert(abs(center - want_center) <= 6);
+    test_assert(abs(side - want_side) <= 6);
+    test_assert(center < side - 40);
+    stbi_image_free(px);
+    box_render_gpu_stats_t before = fv_frames(world, 0);
+    box_render_gpu_stats_t after = fv_frames(world, 2);
+    test_int(after.fog_volumes - before.fog_volumes, 4);
+
+    ecs_fini(world);
+}
+
+/** An orthographic camera sees the unbounded volume fog the wall evenly over its depth. */
+void FogVolume_unbounded_orthographic(void) {
+    // fog_volume/unbounded
+    ecs_world_t *world = fv_world(0);
+    fv_view(world, fv_ortho(world), true);
+    fv_wall(world, 0, -10, 40, FV_WALL);
+    fv_unbounded(world, 0, 0.04f, 1, 0);
+    unsigned char *px = fv_render_still(world, "fog_unbounded_ortho.png");
+    int32_t want = fv_srgb(fv_lin(FV_WALL) *
+        fv_grid_transmittance(0.04f, -1, FV_ALL, 19.9f, true, 100));
+    fv_expect(fv_px(px, 32, 32), want, 4);
+    fv_expect(fv_px(px, 4, 4), want, 4);
+    fv_expect(fv_px(px, 60, 52), want, 4);
+    test_assert(want < FV_WALL - 40);
+    stbi_image_free(px);
+
+    ecs_fini(world);
+}
+
+/** With a transmissive panel in view an unbounded volume adds the same passes and dispatches as
+ * a bounded one (FogVolume_transmissive_pass_count). */
+void FogVolume_unbounded_transmissive_pass_count(void) {
+    // fog_volume/unbounded
+    ecs_world_t *world = fv_world(0);
+    fv_view(world, fv_camera(world, 0, 0), true);
+    fv_wall(world, 0, -20, 40, FV_WALL);
+    fv_glass_panel(world, -10, 3, 0);
+    unsigned char *px = fv_render(world, "fog_unbounded_glass_passes.png");
+    stbi_image_free(px);
+    box_render_gpu_stats_t before = fv_frames(world, 0);
+    box_render_gpu_stats_t after = fv_frames(world, 2);
+    test_int(after.forward_passes - before.forward_passes, 4);
+    test_int(after.fog_volumes - before.fog_volumes, 0);
+
+    fv_unbounded(world, 0, 0.05f, 1, 0);
+    fv_frames(world, 2);
+    before = fv_frames(world, 0);
+    after = fv_frames(world, 2);
+    test_int(after.forward_passes - before.forward_passes, 12);
+    test_int(after.fog_volumes - before.fog_volumes, 2);
+    test_int(after.fog_dispatches - before.fog_dispatches, 4);
+    test_int(after.errors, before.errors);
+
+    ecs_fini(world);
+}
