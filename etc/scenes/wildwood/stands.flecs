@@ -61,9 +61,68 @@ state {
   fn wild_stand(x: f64, z: f64, seed: f64) -> f64 {
     wild_noise(x, z, 340, seed) * 0.65 + wild_noise(x, z, 120, seed + 17) * 0.35
   }
+
+  // The stands at a point, 0..1 each, which the weights of the species follow: oak rather than
+  // beech, patches of spruce and fir among the broadleaves, birch groves, fir rather than spruce.
+  // undergrowth.flecs reads them too
+  fn wild_oakness(x: f64, z: f64) -> f64 {
+    forest_smooth(0.36, 0.64, wild_stand(x, z, 101))
+  }
+
+  fn wild_mixed(x: f64, z: f64) -> f64 {
+    forest_smooth(0.56, 0.74, wild_stand(x, z, 202))
+  }
+
+  fn wild_grove(x: f64, z: f64) -> f64 {
+    forest_smooth(0.58, 0.78, wild_stand(x, z, 303))
+  }
+
+  fn wild_firness(x: f64, z: f64) -> f64 {
+    forest_smooth(0.32, 0.68, wild_stand(x, z, 404))
+  }
 }
 
 assets {
+  // The placement of the mature trees of broad, slopes, highland and edges in WildCell without
+  // their trees, which the undergrowth (undergrowth.flecs) keeps clear of with Scatter avoid:
+  // prefabs, so they place nothing themselves. Keep them in step with the scatters of WildCell
+  prefab WildBroadTrunks {
+    Scatter: {
+      items: [{wild_trees.beech_0.tree, 1}],
+      density: WILD_DENSITY, spacing: WILD_SPACING, mode: ScatterPoisson, seed: 7101,
+      ground: wildwood.land, mask_channel: 0, mask_min: 0.6, mask_max: 1, mask_edge: 0.25,
+      height_min: GROUND_MIN, height_max: WILD_BROAD_HEIGHT, slope_max: WILD_BROAD_SLOPE
+    }
+  }
+
+  prefab WildSlopeTrunks {
+    Scatter: {
+      items: [{wild_trees.spruce_0.tree, 1}],
+      density: WILD_DENSITY, spacing: WILD_SPACING - 1, mode: ScatterPoisson, seed: 7202,
+      ground: wildwood.land, mask_channel: 0, mask_min: 0.55, mask_max: 1, mask_edge: 0.3,
+      height_min: GROUND_MIN, height_max: WILD_TREE_LINE,
+      slope_min: WILD_BROAD_SLOPE, slope_max: WILD_STEEP
+    }
+  }
+
+  prefab WildHighlandTrunks {
+    Scatter: {
+      items: [{wild_trees.spruce_0.tree, 1}],
+      density: WILD_DENSITY, spacing: WILD_SPACING - 1, mode: ScatterPoisson, seed: 7303,
+      ground: wildwood.land, mask_channel: 0, mask_min: 0.55, mask_max: 1, mask_edge: 0.3,
+      height_min: WILD_BROAD_HEIGHT, height_max: WILD_TREE_LINE, slope_max: WILD_BROAD_SLOPE
+    }
+  }
+
+  prefab WildEdgeTrunks {
+    Scatter: {
+      items: [{wild_trees.birch_0.tree, 1}],
+      density: 1.6, spacing: 4.5, mode: ScatterPoisson, seed: 7404,
+      ground: wildwood.land, mask_channel: 1, mask_min: 0.1, mask_max: 0.45, mask_edge: 0.1,
+      height_min: GROUND_MIN, height_max: WILD_BROAD_HEIGHT + 60, slope_max: WILD_STEEP
+    }
+  }
+
   // A cell of the stands, its corner at cell_x cell_z cells
   template WildCell {
     prop cell_x: i32 = 0
@@ -74,10 +133,10 @@ assets {
     // Stand noise at the middle of the cell
     const cx = (cell_x + 0.5) * size
     const cz = (cell_z + 0.5) * size
-    const oakness = forest_smooth(0.36, 0.64, wild_stand(cx, cz, 101))
-    const mixed = forest_smooth(0.56, 0.74, wild_stand(cx, cz, 202))
-    const grove = forest_smooth(0.58, 0.78, wild_stand(cx, cz, 303))
-    const firness = forest_smooth(0.32, 0.68, wild_stand(cx, cz, 404))
+    const oakness = wild_oakness(cx, cz)
+    const mixed = wild_mixed(cx, cz)
+    const grove = wild_grove(cx, cz)
+    const firness = wild_firness(cx, cz)
 
     // Weights of a variant per species: the broadleaf stands with their conifer patches and
     // birch groves, and the conifers of the slopes and the highland
