@@ -2,8 +2,9 @@
 // params of a Grass in a view, a blade, the levels of detail and the hash of the cells.
 //
 // A blade belongs to a cell of a grid of absolute world cells and takes its place, size, facing
-// and shade from a hash of the cell and the seed, so it stays where it is as the camera moves and
-// across shifts of the WorldOrigin. The blades are drawn as triangle strips of
+// and shade from a hash of the cell and the seed, and of the clump of a voronoi pattern over the
+// world it is in, so it stays where it is as the camera moves and across shifts of the
+// WorldOrigin. The blades are drawn as triangle strips of
 // 2 * segments + 1 vertices built from the vertex index, the level of a draw in its first vertex.
 #pragma once
 
@@ -37,9 +38,13 @@ struct GrassParams {
     tip: vec4f,             // Linear color at the tip
     config: vec4u,          // Mask channel plus one, 0 for none; 1 on a terrain; seed; blades
                             // a level holds at most
+    shape: vec4f,           // Edge of a clump, how strongly blades follow their clump, variation
+                            // over the world
+    pixel: vec4f,           // Size of a pixel per meter of distance (perspective) and at any
+                            // distance (orthographic), one of them 0
 };
 
-// A blade (box_gpu_grass_blade_t), 32 bytes
+// A blade (box_gpu_grass_blade_t), 48 bytes
 struct GrassBlade {
     position: vec3f,        // Local position of its base
     yaw: f32,               // Angle of its facing around the vertical
@@ -47,7 +52,17 @@ struct GrassBlade {
     width: f32,             // Width at the base
     lean: f32,              // How far its tip leans along its facing, 0 to 1
     shade: f32,             // Brightness of its color
+    bend: f32,              // How far it bends over toward its tip, 0 to 1
+    curl: f32,              // Curl around its length, -1 to 1
+    tint: u32,              // Factor of its color from the variation over the world, halved,
+                            // in RGBA8 (pack4x8unorm)
+    clump: f32,             // Distance from the center of its clump in clump edges
 };
+
+// Size in meters of a pixel at a distance from the camera.
+fn grass_pixel(d: f32) -> f32 {
+    return params.pixel.x * d + params.pixel.y;
+}
 
 // Segments of a blade of a level: 7, 3 and a single triangle.
 fn grass_segments(lod: u32) -> u32 {

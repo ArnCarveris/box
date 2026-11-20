@@ -50,8 +50,22 @@ extern "C" {
  * from lod[0] and level 2 a single triangle from lod[1]; the blades end at lod[2], beyond which
  * the terrain itself shows the grass from afar.
  *
+ * Each blade is a cubic bezier that leans along its facing, bends over toward its tip and curls
+ * a little around its length. The blades gather in clumps, the cells of a voronoi pattern of
+ * clump_size meters over the world: with clump_follow 1 the blades of a clump share its facing,
+ * height and lean, with 0 every blade takes its own. Over tens of meters the color and the height
+ * of the field vary with the absolute world position (grass_field_variation of
+ * etc/shaders/include/grass_field.wgsl, which the far field of a terrain shares), as much as
+ * variation says. Blades seen edge on widen in view space so they do not vanish, and no blade
+ * draws thinner than about a pixel: the place pass widens thinner ones and drops as many of them
+ * as it widens.
+ *
  * The blades are opaque and lit as the scene is: the sun with its shadows, the ambient light,
- * the aerial perspective and the fog. They neither cast shadows nor take part in picking.
+ * the aerial perspective and the fog. Their normals round across their width, their roots are
+ * darker and occluded, they reflect a soft specular and the light behind them shines through, as
+ * a DiffuseTransmission does for meshes. Normals and specular flatten with distance, so a field
+ * does not shimmer without temporal anti-aliasing. They neither cast shadows nor take part in
+ * picking.
  *
  * @code
  * meadow {
@@ -72,6 +86,12 @@ ECS_STRUCT(Grass, {
     float max_width;        /**< Widest blade at its base in meters, default 0.06 */
     rgb base_color;         /**< Display encoded color at the base, default {38, 66, 18} */
     rgb tip_color;          /**< Display encoded color at the tip, default {150, 175, 70} */
+    float clump_size;       /**< Distance in meters between the centers of the clumps the blades
+                             *   gather in, default 1.2 */
+    float clump_follow;     /**< How strongly the blades take the facing, height and lean of
+                             *   their clump, 0 to 1, default 0.7 */
+    float variation;        /**< How much the color and height vary over the world, 0 to 1,
+                             *   default 0.5 */
     float lod[3];           /**< Distances in meters where levels 0 and 1 end and the blades
                              *   end, default {20, 60, 200}; each at least the one before */
     uint32_t seed;          /**< Seed of the hash of the cells, another field of blades */

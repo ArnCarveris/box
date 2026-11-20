@@ -1009,7 +1009,9 @@ typedef struct box_render_grass_blade_t {
                                  *   placed it */
     float yaw;                  /**< Angle of its facing around the vertical in radians */
     float height;               /**< Height in meters, shrunk where it fades out */
-    float width;                /**< Width at its base in meters, widened with distance */
+    float width;                /**< Width at its base in meters, widened with distance and
+                                 *   to about a pixel */
+    float tint[3];              /**< Factor of its color from the variation over the world */
     int32_t level;              /**< Level of detail it is drawn with */
 } box_render_grass_blade_t;
 

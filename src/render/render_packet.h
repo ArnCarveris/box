@@ -2273,6 +2273,9 @@ typedef struct box_render_grass_t {
     float width[2];         /**< Narrowest and widest blade */
     float base[3];          /**< Linear color at the base */
     float tip[3];           /**< Linear color at the tip */
+    float clump[2];         /**< Distance between the clumps and how strongly blades follow
+                             *   their clump */
+    float variation;        /**< How much color and height vary over the world */
     float lod[3];           /**< Distances where levels 0 and 1 end and the blades end */
     uint32_t seed;          /**< Seed of the hash of the cells */
 } box_render_grass_t;

@@ -73,9 +73,13 @@ typedef struct box_gpu_grass_params_t {
     float base[4];                  /**< Linear color at the base */
     float tip[4];                   /**< Linear color at the tip */
     uint32_t config[4];             /**< Mask channel plus one, terrain, seed, capacity */
+    float shape[4];                 /**< Edge of a clump, how strongly blades follow their
+                                     *   clump, variation over the world, unused */
+    float pixel[4];                 /**< Size of a pixel per meter of distance and its size at
+                                     *   any distance, one of them 0 */
 } box_gpu_grass_params_t;
 
-_Static_assert(sizeof(box_gpu_grass_params_t) == 208, "GrassParams of grass.wgsl");
+_Static_assert(sizeof(box_gpu_grass_params_t) == 240, "GrassParams of grass.wgsl");
 _Static_assert(sizeof(box_gpu_grass_params_t) <= BOX_GPU_GRASS_PARAMS_STRIDE,
     "the params of a Grass must fit in their stride");
 
@@ -87,9 +91,13 @@ typedef struct box_gpu_grass_blade_t {
     float width;                    /**< Width at the base */
     float lean;                     /**< Lean of the tip, 0 to 1 */
     float shade;                    /**< Brightness */
+    float bend;                     /**< How far it bends over toward its tip, 0 to 1 */
+    float curl;                     /**< Curl around its length, -1 to 1 */
+    uint32_t tint;                  /**< Color variation over the world, half of it in RGBA8 */
+    float clump;                    /**< Distance from the center of its clump in clump edges */
 } box_gpu_grass_blade_t;
 
-_Static_assert(sizeof(box_gpu_grass_blade_t) == 32, "GrassBlade of grass.wgsl");
+_Static_assert(sizeof(box_gpu_grass_blade_t) == 48, "GrassBlade of grass.wgsl");
 
 /** State of a readback of the counts and timestamps of a packet */
 typedef enum box_gpu_grass_read_state_t {
@@ -1045,6 +1053,14 @@ static uint32_t box_gpu_grass_params(
     out->config[1] = g->terrain ? 1u : 0u;
     out->config[2] = g->seed;
     out->config[3] = e->capacity;
+    out->shape[0] = g->clump[0];
+    out->shape[1] = g->clump[1];
+    out->shape[2] = g->variation;
+    if (u->lights[3]) {
+        out->pixel[1] = 2.0f * u->cluster[1] * u->viewport[3];
+    } else {
+        out->pixel[0] = 2.0f * u->cluster[1] * u->viewport[3];
+    }
 
     return (uint32_t)n;
 }
@@ -1242,6 +1258,9 @@ static bool box_gpu_grass_read_level(
         b->yaw = blades[i].yaw;
         b->height = blades[i].height;
         b->width = blades[i].width;
+        b->tint[0] = 2.0f * (float)(blades[i].tint & 255u) / 255.0f;
+        b->tint[1] = 2.0f * (float)((blades[i].tint >> 8) & 255u) / 255.0f;
+        b->tint[2] = 2.0f * (float)((blades[i].tint >> 16) & 255u) / 255.0f;
         b->level = (int32_t)level;
     }
 

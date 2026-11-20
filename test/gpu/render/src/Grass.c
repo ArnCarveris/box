@@ -3,8 +3,9 @@
  * @brief Tests for the grass blades the GPU places and draws around the camera (box.grass,
  * gpu_grass.c): the blades stand on the plane or the terrain, take their level of detail from
  * their distance, thin out and widen further away, stay where they are as the camera moves and
- * across a shift of the WorldOrigin, follow the mask of the terrain, render lit and show in the
- * GPU stats.
+ * across a shift of the WorldOrigin, follow the mask of the terrain, gather in clumps that share
+ * their facing, never draw thinner than about a pixel, vary in color over the world, render lit
+ * and show in the GPU stats.
  *
  * The scenes are test/assets/grass/plane.flecs and test/assets/grass/terrain.flecs.
  */
@@ -23,9 +24,15 @@
 /** Seconds of a frame */
 #define GR_DELTA (1.0f / 60.0f)
 
-/** Width and height of the captured image */
-#define GR_WIDTH (128)
-#define GR_HEIGHT (96)
+/** Width and height of the captured image, large enough that the blades near the camera are
+ * wider than a pixel and none of them thin out for it */
+#define GR_WIDTH (640)
+#define GR_HEIGHT (480)
+
+/** Width and height of a small image, where the blades near the camera are thinner than a
+ * pixel */
+#define GR_SMALL_WIDTH (64)
+#define GR_SMALL_HEIGHT (48)
 
 /** Frames a test waits at most for the tiles of the terrain */
 #define GR_FRAMES (360)
@@ -618,5 +625,203 @@ void Grass_renders_lit_blades(void) {
     test_assert(bright > 45);
     test_assert(bare * 20 < GR_WIDTH * GR_HEIGHT / 2);
     gr_expect_no_errors(world);
+    ecs_fini(world);
+}
+
+/** Set values of the Grass of an entity.
+ *
+ * @param world The world
+ * @param e The Grass entity
+ * @param clump_follow How strongly the blades follow their clump
+ * @param variation How much the color varies over the world
+ */
+static void gr_shape(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    float clump_follow,
+    float variation)
+{
+    Grass *g = ecs_ensure(world, e, Grass);
+    g->clump_size = 1.5f;
+    g->clump_follow = clump_follow;
+    g->variation = variation;
+    ecs_modified(world, e, Grass);
+}
+
+/** Get the mean cosine of the angle between the facings of close blades of level 0 in a
+ * rectangle ahead of the camera.
+ *
+ * @param blades The blades
+ * @param eye The camera
+ * @param pairs Receives the pairs of close blades
+ * @return The mean cosine
+ */
+static double gr_facing_agreement(
+    const ecs_vec_t *blades,
+    const float eye[3],
+    int32_t *pairs)
+{
+    ecs_vec_t near_;
+    double sum = 0;
+    int32_t i, j, count;
+    *pairs = 0;
+    ecs_vec_init_t(NULL, &near_, box_render_grass_blade_t, 0);
+    for (i = 0; i < ecs_vec_count(blades); i ++) {
+        const box_render_grass_blade_t *b = ecs_vec_get_t(blades, box_render_grass_blade_t, i);
+        float dx = b->position[0] - eye[0], dz = b->position[2] - eye[2];
+        if (b->level == 0 && dx > -2.0f && dx < 2.0f && dz > -8.0f && dz < -3.0f) {
+            *ecs_vec_append_t(NULL, &near_, box_render_grass_blade_t) = *b;
+        }
+    }
+
+    count = ecs_vec_count(&near_);
+    for (i = 0; i < count; i ++) {
+        const box_render_grass_blade_t *a = ecs_vec_get_t(&near_, box_render_grass_blade_t, i);
+        for (j = i + 1; j < count; j ++) {
+            const box_render_grass_blade_t *b = ecs_vec_get_t(&near_,
+                box_render_grass_blade_t, j);
+            if (gr_flat_distance(a, b->position) < 0.2f) {
+                sum += cos((double)a->yaw - (double)b->yaw);
+                (*pairs) ++;
+            }
+        }
+    }
+
+    ecs_vec_fini_t(NULL, &near_, box_render_grass_blade_t);
+
+    return *pairs ? sum / *pairs : 0;
+}
+
+void Grass_clumps_share_facing(void) {
+    ecs_world_t *world = gr_world("test/assets/grass/plane.flecs");
+    ecs_entity_t meadow = gr_lookup(world, "meadow");
+    ecs_entity_t camera = gr_lookup(world, "grass_camera");
+    ecs_vec_t blades;
+    float eye[3];
+    int32_t pairs_free, pairs_clumped;
+    ecs_vec_init_t(NULL, &blades, box_render_grass_blade_t, 0);
+    gr_position(world, camera, eye);
+
+    gr_shape(world, meadow, 0, 0);
+    gr_frames(world, 10);
+    gr_blades(world, meadow, &blades);
+    double free_ = gr_facing_agreement(&blades, eye, &pairs_free);
+
+    gr_shape(world, meadow, 1, 0);
+    gr_frames(world, 3);
+    gr_blades(world, meadow, &blades);
+    double clumped = gr_facing_agreement(&blades, eye, &pairs_clumped);
+
+    printf("facing agreement %.3f of %d pairs free, %.3f of %d pairs clumped\n", free_,
+        pairs_free, clumped, pairs_clumped);
+    test_assert(pairs_free > 50);
+    test_assert(pairs_clumped > 50);
+    test_assert(fabs(free_) < 0.25);
+    test_assert(clumped > 0.5);
+    gr_expect_no_errors(world);
+    ecs_vec_fini_t(NULL, &blades, box_render_grass_blade_t);
+    ecs_fini(world);
+}
+
+/** Count the blades of level 0 of a Grass.
+ *
+ * @param blades The blades
+ * @return Those of level 0
+ */
+static int32_t gr_level0(
+    const ecs_vec_t *blades)
+{
+    int32_t i, result = 0;
+    for (i = 0; i < ecs_vec_count(blades); i ++) {
+        result += ecs_vec_get_t(blades, box_render_grass_blade_t, i)->level == 0;
+    }
+
+    return result;
+}
+
+void Grass_never_thinner_than_a_pixel(void) {
+    ecs_world_t *world = gr_world("test/assets/grass/plane.flecs");
+    ecs_entity_t meadow = gr_lookup(world, "meadow");
+    ecs_entity_t camera = gr_lookup(world, "grass_camera");
+    ecs_vec_t blades;
+    float eye[3];
+    int32_t i, large, small;
+    ecs_vec_init_t(NULL, &blades, box_render_grass_blade_t, 0);
+    gr_frames(world, 10);
+    gr_position(world, camera, eye);
+    gr_blades(world, meadow, &blades);
+    large = gr_level0(&blades);
+
+    // In a small image the blades near the camera are thinner than a pixel
+    ecs_set(world, ecs_lookup(world, "capture"), Surface, {.width = GR_SMALL_WIDTH,
+        .height = GR_SMALL_HEIGHT, .resolution_scale = 1});
+    gr_frames(world, 3);
+    gr_blades(world, meadow, &blades);
+    small = gr_level0(&blades);
+    double pixel = 2.0 * tan(30.0 * GLM_PI / 180.0) / GR_SMALL_HEIGHT;
+    for (i = 0; i < ecs_vec_count(&blades); i ++) {
+        const box_render_grass_blade_t *b = ecs_vec_get_t(&blades,
+            box_render_grass_blade_t, i);
+        double d[3] = {
+            b->position[0] - eye[0], b->position[1] - eye[1], b->position[2] - eye[2]
+        };
+        double distance = sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
+        test_assert((double)b->width >= pixel * distance * 0.995);
+    }
+
+    // As many fewer blades as they widen
+    printf("level 0 blades %d at %dx%d, %d at %dx%d\n", large, GR_WIDTH, GR_HEIGHT, small,
+        GR_SMALL_WIDTH, GR_SMALL_HEIGHT);
+    test_assert(small > 0);
+    test_assert(small * 10 < large * 6);
+    gr_expect_no_errors(world);
+    ecs_vec_fini_t(NULL, &blades, box_render_grass_blade_t);
+    ecs_fini(world);
+}
+
+/** Get the range of the red factor of the tint of the blades.
+ *
+ * @param blades The blades
+ * @param lo Receives the smallest
+ * @param hi Receives the largest
+ */
+static void gr_tint_range(
+    const ecs_vec_t *blades,
+    float *lo,
+    float *hi)
+{
+    int32_t i;
+    *lo = INFINITY;
+    *hi = -INFINITY;
+    for (i = 0; i < ecs_vec_count(blades); i ++) {
+        const box_render_grass_blade_t *b = ecs_vec_get_t(blades, box_render_grass_blade_t, i);
+        *lo = b->tint[0] < *lo ? b->tint[0] : *lo;
+        *hi = b->tint[0] > *hi ? b->tint[0] : *hi;
+    }
+}
+
+void Grass_varies_over_world(void) {
+    ecs_world_t *world = gr_world("test/assets/grass/plane.flecs");
+    ecs_entity_t meadow = gr_lookup(world, "meadow");
+    ecs_vec_t blades;
+    float lo, hi;
+    ecs_vec_init_t(NULL, &blades, box_render_grass_blade_t, 0);
+
+    gr_shape(world, meadow, 0.7f, 0);
+    gr_frames(world, 10);
+    gr_blades(world, meadow, &blades);
+    test_assert(ecs_vec_count(&blades) > 1000);
+    gr_tint_range(&blades, &lo, &hi);
+    printf("tint without variation %.3f to %.3f\n", lo, hi);
+    test_assert(lo > 0.99f && hi < 1.01f);
+
+    gr_shape(world, meadow, 0.7f, 1);
+    gr_frames(world, 3);
+    gr_blades(world, meadow, &blades);
+    gr_tint_range(&blades, &lo, &hi);
+    printf("tint with variation %.3f to %.3f\n", lo, hi);
+    test_assert(hi - lo > 0.2f);
+    gr_expect_no_errors(world);
+    ecs_vec_fini_t(NULL, &blades, box_render_grass_blade_t);
     ecs_fini(world);
 }

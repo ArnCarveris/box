@@ -36,6 +36,9 @@ static void box_grass_ctor(
             .max_width = 0.06f,
             .base_color = {38, 66, 18},
             .tip_color = {150, 175, 70},
+            .clump_size = BOX_GRASS_CLUMP_SIZE,
+            .clump_follow = BOX_GRASS_CLUMP_FOLLOW,
+            .variation = BOX_GRASS_VARIATION,
             .lod = { box_grass_lod[0], box_grass_lod[1], box_grass_lod[2] }
         };
     }
@@ -54,6 +57,19 @@ static float box_grass_positive(
     return isfinite(v) && v > 0.0f ? v : fallback;
 }
 
+/** Get a finite value clamped to 0 to 1, or a default.
+ *
+ * @param v The value
+ * @param fallback The default
+ * @return v clamped to 0 to 1 when it is finite, else fallback
+ */
+static float box_grass_unit(
+    float v,
+    float fallback)
+{
+    return !isfinite(v) ? fallback : v < 0.0f ? 0.0f : v > 1.0f ? 1.0f : v;
+}
+
 void box_grass_resolve(
     const Grass *value,
     Grass *out)
@@ -68,6 +84,9 @@ void box_grass_resolve(
     out->min_width = box_grass_positive(value->min_width, 0.03f);
     out->max_width = box_grass_positive(value->max_width, 0.06f);
     out->max_width = out->max_width < out->min_width ? out->min_width : out->max_width;
+    out->clump_size = box_grass_positive(value->clump_size, BOX_GRASS_CLUMP_SIZE);
+    out->clump_follow = box_grass_unit(value->clump_follow, BOX_GRASS_CLUMP_FOLLOW);
+    out->variation = box_grass_unit(value->variation, BOX_GRASS_VARIATION);
     out->mask = value->mask >= 0 && value->mask < 4 ? value->mask : -1;
     for (i = 0; i < BOX_GRASS_LODS; i ++) {
         float d = box_grass_positive(value->lod[i], box_grass_lod[i]);

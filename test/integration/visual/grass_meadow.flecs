@@ -1,0 +1,42 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.grass
+
+// A meadow of Grass on a plane at eye height, the sun behind the camera on the right: clumps of
+// curved blades that share their facing, darker roots and lighter tips, and patches of drier and
+// lusher grass over the world toward the horizon.
+camera {
+  Position: {0, 1.6, 0}
+  Rotation: {-0.12, 0, 0}
+  Camera: {fov: 60, near_: 0.05, far_: 2000}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {120, 160, 210, 255}},
+    shadows: {enabled: true}}
+}
+
+sun {
+  Rotation: {0.7, 2.6, 0}
+  DirectionalLight: {intensity: 3 * flecs.script.math.PI}
+  Rgb: {255, 245, 225}
+}
+
+sky {
+  AmbientLight: {intensity: 0.5}
+}
+
+ground {
+  Position: {0, -0.05, 0}
+  Box: {2000, 0.1, 2000}
+  Rgb: {70, 55, 35}
+}
+
+meadow {
+  Grass: {density: 64, min_height: 0.3, max_height: 0.7, lod: [20, 60, 200],
+    clump_size: 1.2, clump_follow: 0.8, variation: 0.8}
+}

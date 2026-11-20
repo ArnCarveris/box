@@ -105,6 +105,9 @@ static void box_render_grass(
     out.tip[0] = box_render_grass_linear(g.tip_color.r);
     out.tip[1] = box_render_grass_linear(g.tip_color.g);
     out.tip[2] = box_render_grass_linear(g.tip_color.b);
+    out.clump[0] = g.clump_size;
+    out.clump[1] = g.clump_follow;
+    out.variation = g.variation;
     for (i = 0; i < BOX_GRASS_LODS; i ++) {
         out.lod[i] = g.lod[i];
     }

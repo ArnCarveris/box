@@ -9,10 +9,16 @@
 // away as the thinning passes its level, while every blade widens by the share of blades the
 // thinning dropped, so the coverage holds. Its ground is the height of the terrain
 // (terrain_sample.wgsl) or the plane, and a mask channel of the terrain weighs whether it grows.
+// A blade takes the facing, height and lean of the clump it is in, the nearest center of a
+// voronoi pattern of absolute cells of a clump edge, as much as the clump follow says, and the
+// color and height of the variation over the world at its absolute place (grass_field.wgsl). A
+// blade thinner than a pixel at its distance widens to the pixel and stays only with the share
+// of blades that keeps the coverage, chosen by its hash.
 // Blades outside the frustum are dropped, the others appended to the range of their level of
-// detail, a workgroup reserving its blades of a round at once.
+// detail.
 #include "include/terrain_sample.wgsl"
 #include "include/grass.wgsl"
+#include "include/grass_field.wgsl"
 
 // The indirect draw arguments of each level, vertex count, instance count, first vertex and
 // first instance, then the blades placed per level (box_gpu_grass_counters_t)
@@ -40,12 +46,18 @@ const GROUP: u32 = 64u;
 // Salts of the hashes of a cell
 const SALT_PICK: u32 = 0x51a7u;
 const SALT_PLACE: u32 = 0x3c6eu;
+const SALT_CLUMP: u32 = 0x9e37u;
+
+// Narrowest a blade draws, in pixels
+const MIN_PIXELS: f32 = 1.0;
+
+// Share of the turn toward the facing of its clump a blade of a fully following clump takes
+const CLUMP_FACING: f32 = 0.85;
+
+// Largest factor of the height of the blades of a clump
+const CLUMP_HEIGHT: f32 = 0.35;
 
 const TAU: f32 = 6.283185307179586;
-
-var<workgroup> round_count: array<atomic<u32>, 3>;
-var<workgroup> round_base: array<u32, 3>;
-var<workgroup> placed: array<atomic<u32>, 3>;
 
 // The cell the block of 2^k cells along each edge whose first cell is base picks for its blade.
 fn grass_pick(base: vec2i, k: u32) -> vec2i {
@@ -125,6 +137,39 @@ fn grass_align_up(a: vec2i, k: u32) -> vec2i {
     return ((a + vec2i(s)) >> vec2u(k)) << vec2u(k);
 }
 
+// The clump of a blade: the hash of the nearest center of a voronoi pattern over the world and
+// the distance to it in clump edges.
+struct GrassClump {
+    hash: u32,
+    distance: f32,
+};
+
+// The clump of an absolute world x and z.
+fn grass_clump(xz: vec2f) -> GrassClump {
+    let size = max(params.shape.x, 1e-3);
+    let q = xz / size;
+    let cell = vec2i(floor(q));
+    var out = GrassClump(0u, 1e9);
+    for (var y = -1; y <= 1; y++) {
+        for (var x = -1; x <= 1; x++) {
+            let n = cell + vec2i(x, y);
+            let h = grass_cell_hash(n, SALT_CLUMP, params.config.z);
+            let center = vec2f(n) + vec2f(grass_unit(h), grass_unit(grass_hash(h)));
+            let d = length(q - center);
+            if (d < out.distance) {
+                out = GrassClump(h, d);
+            }
+        }
+    }
+    return out;
+}
+
+// The angle from a to b, -PI to PI.
+fn grass_turn(a: f32, b: f32) -> f32 {
+    let d = b - a;
+    return d - TAU * round(d / TAU);
+}
+
 // A blade the place dispatch made of a cell.
 struct GrassPlaced {
     generated: bool,    // It stands on the ground within the distance and the mask grows it
@@ -148,6 +193,9 @@ fn grass_blade(at_patch: vec2i, lo: vec2f, c: vec2i, first: vec2i, k: u32,
     let h5 = grass_hash(h4);
     let h6 = grass_hash(h5);
     let h7 = grass_hash(h6);
+    let h8 = grass_hash(h7);
+    let h9 = grass_hash(h8);
+    let h10 = grass_hash(h9);
     let offset = (vec2f(c - first) + vec2f(grass_unit(h0), grass_unit(h1))) * params.corner.w;
     var y = params.ground.z;
     var weight = 1.0;
@@ -183,10 +231,33 @@ fn grass_blade(at_patch: vec2i, lo: vec2f, c: vec2i, first: vec2i, k: u32,
         fade *= clamp((f32(level) + 1.0 - t) * 2.0, 0.0, 1.0);
     }
 
-    let height = mix(params.blade.x, params.blade.y, grass_unit(h3)) * mix(0.7, 1.0, weight) *
-        fade;
+    // The clump and the variation over the world at the absolute place of the blade
+    let world = (vec2f(c) + vec2f(grass_unit(h0), grass_unit(h1))) * params.corner.w;
+    let clump = grass_clump(world);
+    let follow = saturate(params.shape.y);
+    let ch1 = grass_hash(clump.hash ^ SALT_CLUMP);
+    let ch2 = grass_hash(ch1);
+    let ch3 = grass_hash(ch2);
+    let ch4 = grass_hash(ch3);
+    let variation = grass_field_variation(world, params.shape.z);
+
+    // Taller blades toward the center of a clump, all of them as tall as their clump
+    let tall = mix(grass_unit(h3), grass_unit(ch1), follow) *
+        mix(1.0, 1.0 - CLUMP_HEIGHT * saturate(clump.distance), follow);
+    var height = mix(params.blade.x, params.blade.y, tall) * variation.w *
+        mix(0.7, 1.0, weight) * fade;
     let widen = min(exp2(2.0 * t), GRASS_WIDEN_MAX);
-    let width = mix(params.blade.z, params.blade.w, grass_unit(h4)) * widen;
+    var width = mix(params.blade.z, params.blade.w, grass_unit(h4)) * widen;
+
+    // A blade thinner than a pixel widens to it, and only the share of blades that keeps the
+    // coverage stays, the others shrinking away over a short band of the share
+    let pixel = MIN_PIXELS * grass_pixel(d);
+    if (width < pixel) {
+        let share = width / pixel;
+        height *= saturate((share - grass_unit(h10)) * 8.0);
+        width = pixel;
+    }
+
     if (height < 0.05 * params.blade.x) {
         return out;
     }
@@ -196,9 +267,17 @@ fn grass_blade(at_patch: vec2i, lo: vec2f, c: vec2i, first: vec2i, k: u32,
         return out;
     }
 
+    // The facing, lean and shade of the clump
+    let clump_yaw = grass_unit(ch2) * TAU;
+    let own_yaw = grass_unit(h5) * TAU;
+    let yaw = own_yaw + grass_turn(own_yaw, clump_yaw) * follow * CLUMP_FACING;
+    let lean = mix(grass_unit(h6), grass_unit(ch3), follow);
+    let shade = mix(0.75, 1.1, mix(grass_unit(h7), grass_unit(ch4), 0.5 * follow));
+    let tint = pack4x8unorm(vec4f(saturate(0.5 * variation.rgb), 0.0));
+
     out.keep = true;
-    out.blade = GrassBlade(base, grass_unit(h5) * TAU, height, width, grass_unit(h6),
-        mix(0.75, 1.1, grass_unit(h7)));
+    out.blade = GrassBlade(base, yaw, height, width, lean, shade, grass_unit(h8),
+        grass_unit(h9) * 2.0 - 1.0, tint, clump.distance);
     return out;
 }
 
@@ -253,51 +332,18 @@ fn place(@builtin(workgroup_id) wg: vec3u, @builtin(local_invocation_index) loca
     let total = u32(span.x * span.y);
     let columns = u32(max(span.x, 1));
     let capacity = params.config.w;
-    for (var at = 0u; at < total; at += GROUP) {
-        if (local < GRASS_LODS) {
-            atomicStore(&round_count[local], 0u);
+    for (var i = local; i < total; i += GROUP) {
+        let b = start + vec2i(i32(i % columns), i32(i / columns)) * s;
+        let c = grass_pick(b, k);
+        let made = grass_blade(at_patch, lo, c, first, k, planes);
+        if (made.generated) {
+            atomicAdd(&counters.generated[made.lod], 1u);
         }
-        workgroupBarrier();
-
-        let i = at + local;
-        var made: GrassPlaced;
-        var slot = 0u;
-        if (i < total) {
-            let b = start + vec2i(i32(i % columns), i32(i / columns)) * s;
-            let c = grass_pick(b, k);
-            made = grass_blade(at_patch, lo, c, first, k, planes);
-            if (made.generated) {
-                atomicAdd(&placed[made.lod], 1u);
-            }
-            if (made.keep) {
-                slot = atomicAdd(&round_count[made.lod], 1u);
-            }
-        }
-        workgroupBarrier();
-
-        if (local < GRASS_LODS) {
-            let count = atomicLoad(&round_count[local]);
-            var base = 0u;
-            if (count > 0u) {
-                base = atomicAdd(&counters.args[local * 4u + 1u], count);
-            }
-            round_base[local] = base;
-        }
-        workgroupBarrier();
-
         if (made.keep) {
-            let at_level = round_base[made.lod] + slot;
+            let at_level = atomicAdd(&counters.args[made.lod * 4u + 1u], 1u);
             if (at_level < capacity) {
                 blades[made.lod * capacity + at_level] = made.blade;
             }
-        }
-    }
-
-    workgroupBarrier();
-    if (local < GRASS_LODS) {
-        let count = atomicLoad(&placed[local]);
-        if (count > 0u) {
-            atomicAdd(&counters.generated[local], count);
         }
     }
 }

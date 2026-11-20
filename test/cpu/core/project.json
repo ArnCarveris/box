@@ -363,6 +363,7 @@
                     "defaults",
                     "script",
                     "resolve",
+                    "resolve_clumps",
                     "terrain_sampled",
                     "extract_plane",
                     "extract_terrain",

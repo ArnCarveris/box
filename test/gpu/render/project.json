@@ -2125,7 +2125,10 @@
                     "follows_terrain_height",
                     "mask_weighs_density",
                     "stats_show_counts_and_time",
-                    "renders_lit_blades"
+                    "renders_lit_blades",
+                    "clumps_share_facing",
+                    "never_thinner_than_a_pixel",
+                    "varies_over_world"
                 ]
             },
             {

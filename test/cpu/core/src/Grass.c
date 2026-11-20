@@ -123,6 +123,9 @@ void Grass_defaults(void) {
     test_flt(g->lod[0], 20);
     test_flt(g->lod[1], 60);
     test_flt(g->lod[2], 200);
+    test_flt(g->clump_size, BOX_GRASS_CLUMP_SIZE);
+    test_flt(g->clump_follow, BOX_GRASS_CLUMP_FOLLOW);
+    test_flt(g->variation, BOX_GRASS_VARIATION);
     test_uint(g->seed, 0);
     ecs_fini(world);
 }
@@ -132,7 +135,8 @@ void Grass_script(void) {
     ECS_IMPORT(world, Box);
     test_int(ecs_script_run(world, "grass",
         "using box.grass\n"
-        "meadow { Grass: {density: 20, mask: 2, lod: [10, 30, 90], seed: 7} }\n", NULL), 0);
+        "meadow { Grass: {density: 20, mask: 2, lod: [10, 30, 90], seed: 7, clump_size: 2.5,\n"
+        "  clump_follow: 0.9, variation: 0.25} }\n", NULL), 0);
     ecs_entity_t meadow = ecs_lookup(world, "meadow");
     test_assert(meadow != 0);
     const Grass *g = ecs_get(world, meadow, Grass);
@@ -143,6 +147,9 @@ void Grass_script(void) {
     test_flt(g->lod[1], 30);
     test_flt(g->lod[2], 90);
     test_uint(g->seed, 7);
+    test_flt(g->clump_size, 2.5f);
+    test_flt(g->clump_follow, 0.9f);
+    test_flt(g->variation, 0.25f);
     test_flt(g->min_height, 0.25f);
     test_int(g->base_color.g, 66);
     ecs_fini(world);
@@ -179,6 +186,33 @@ void Grass_resolve(void) {
     test_flt(out.lod[2], 200);
 }
 
+void Grass_resolve_clumps(void) {
+    Grass in = { .clump_size = 0, .clump_follow = 0, .variation = 0 };
+    Grass out;
+    box_grass_resolve(&in, &out);
+    test_flt(out.clump_size, BOX_GRASS_CLUMP_SIZE);
+    test_flt(out.clump_follow, 0);
+    test_flt(out.variation, 0);
+
+    in = (Grass){ .clump_size = -3, .clump_follow = 1.5f, .variation = -0.5f };
+    box_grass_resolve(&in, &out);
+    test_flt(out.clump_size, BOX_GRASS_CLUMP_SIZE);
+    test_flt(out.clump_follow, 1);
+    test_flt(out.variation, 0);
+
+    in = (Grass){ .clump_size = INFINITY, .clump_follow = NAN, .variation = NAN };
+    box_grass_resolve(&in, &out);
+    test_flt(out.clump_size, BOX_GRASS_CLUMP_SIZE);
+    test_flt(out.clump_follow, BOX_GRASS_CLUMP_FOLLOW);
+    test_flt(out.variation, BOX_GRASS_VARIATION);
+
+    in = (Grass){ .clump_size = 3.5f, .clump_follow = 0.4f, .variation = 2 };
+    box_grass_resolve(&in, &out);
+    test_flt(out.clump_size, 3.5f);
+    test_flt(out.clump_follow, 0.4f);
+    test_flt(out.variation, 1);
+}
+
 void Grass_terrain_sampled(void) {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
@@ -209,8 +243,8 @@ void Grass_extract_plane(void) {
     ecs_set(world, e, Position, {3, 2, -4});
     ecs_set(world, e, Grass, {.mask = 1, .density = 30, .min_height = 0.2f,
         .max_height = 0.5f, .min_width = 0.02f, .max_width = 0.04f,
-        .base_color = {40, 70, 20}, .tip_color = {140, 170, 70}, .lod = {15, 45, 150},
-        .seed = 9});
+        .base_color = {40, 70, 20}, .tip_color = {140, 170, 70}, .clump_size = 2,
+        .clump_follow = 0.6f, .variation = 0.8f, .lod = {15, 45, 150}, .seed = 9});
     grass_frame(world);
     grass_frame(world);
 
@@ -230,6 +264,9 @@ void Grass_extract_plane(void) {
     test_flt(g->base[0], grass_linear(40));
     test_flt(g->base[1], grass_linear(70));
     test_flt(g->tip[2], grass_linear(70));
+    test_flt(g->clump[0], 2);
+    test_flt(g->clump[1], 0.6f);
+    test_flt(g->variation, 0.8f);
     test_flt(g->lod[0], 15);
     test_flt(g->lod[1], 45);
     test_flt(g->lod[2], 150);
