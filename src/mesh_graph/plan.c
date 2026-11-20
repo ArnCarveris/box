@@ -22,6 +22,7 @@ typedef struct box_mg_walk_ctx_t {
     ecs_map_t visit;             /**< Node entity to 0 while visited, index + 1 after */
     ecs_vec_t *reached;          /**< ecs_entity_t, the entities reached, NULL for none */
     bool wait;                   /**< Wait for a node without a node component */
+    int32_t level;               /**< Level of detail the nodes are snapshot for */
     int32_t count;               /**< Nodes visited */
     box_mg_walk_t state;         /**< Outcome so far */
     char *error;                 /**< Why the walk failed, NULL while it did not */
@@ -332,6 +333,45 @@ static int32_t box_mg_walk_add(
     return result;
 }
 
+/** Visit the input of a Detail node that its level of detail picks, which stands for the node.
+ *
+ * @param w The walk
+ * @param e The node entity
+ * @param kind The kind, whose first input is the list of the levels
+ * @param name Name of the node, freed
+ * @return The index of the input in the plan, -1 when it is incomplete or the walk failed
+ */
+static int32_t box_mg_walk_detail(
+    box_mg_walk_ctx_t *w,
+    ecs_entity_t e,
+    const box_mg_kind_t *kind,
+    char *name)
+{
+    const void *ptr = ecs_get_id(w->world, e, kind->component);
+    const box_mesh_node_input_t *input = &kind->inputs[0];
+    const ecs_entity_t *entities = NULL;
+    int32_t count = 0, result = -1;
+    if (input->list) {
+        const ecs_vec_t *list = ECS_OFFSET(ptr, input->offset);
+        entities = ecs_vec_first_t(list, ecs_entity_t);
+        count = ecs_vec_count(list);
+    } else {
+        entities = ECS_OFFSET(ptr, input->offset);
+        count = entities[0] ? 1 : 0;
+    }
+
+    if (!count) {
+        box_mg_walk_error(w, "input '%s' of '%s' has no node", input->name, name);
+    } else {
+        int32_t pick = w->level < count ? w->level : count - 1;
+        result = box_mg_walk_visit(w, entities[pick], e, input->name);
+    }
+
+    ecs_os_free(name);
+
+    return result;
+}
+
 /** Visit a node entity with its kind: its inputs, its snapshot and its hash.
  *
  * @param w The walk
@@ -372,6 +412,10 @@ static int32_t box_mg_walk_node(
     }
 
     node.params = box_mg_walk_params(kind, ptr);
+    if (kind->lod && w->level > 0) {
+        kind->lod(node.params, w->level);
+    }
+
     node.hash = box_mg_hash(BOX_MG_HASH_SEED, &kind->id, ECS_SIZEOF(int32_t));
     node.hash = box_mg_hash(node.hash, node.params, kind->size);
     node.hash = box_mg_hash(node.hash, node.counts, ECS_SIZEOF(node.counts));
@@ -452,7 +496,9 @@ static int32_t box_mg_walk_visit(
     ecs_map_insert(&w->visit, e, 0);
     char *name = ecs_get_path(w->world, e);
     box_mg_kind_t *kind = box_mg_walk_kind(w, e, name);
-    if (kind) {
+    if (kind && (kind->flags & BOX_MESH_NODE_DETAIL) && kind->input_count) {
+        result = box_mg_walk_detail(w, e, kind, name);
+    } else if (kind) {
         result = box_mg_walk_node(w, e, kind, name);
     } else {
         if (w->state != BOX_MG_WALK_ERROR && w->wait) {
@@ -480,13 +526,14 @@ box_mg_walk_t box_mg_plan_walk(
     const char *graph,
     ecs_entity_t output,
     bool wait,
+    int32_t level,
     ecs_vec_t *reached,
     int32_t *node,
     char **error)
 {
     box_mg_walk_ctx_t w = {
         .world = world, .g = g, .plan = plan, .graph = graph, .reached = reached,
-        .wait = wait
+        .wait = wait, .level = level
     };
     ecs_map_init(&w.visit, NULL);
     *node = box_mg_walk_visit(&w, output, 0, NULL);

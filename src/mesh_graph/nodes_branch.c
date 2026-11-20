@@ -428,6 +428,109 @@ static void box_mg_branch_node(
     }
 }
 
+/** Drop the curves with a parent of a level or higher whose base radius is under a fraction
+ * of the largest base radius of the curves without a parent, and the children of dropped
+ * curves: give their points the attribute dropped 1, added when there is room.
+ *
+ * @param c The curves
+ * @param drop The fraction
+ * @param level Lowest level of the dropped curves
+ */
+static void box_mg_curves_drop(
+    box_mg_curves_t *c,
+    float drop,
+    int32_t level)
+{
+    const float *lv = box_mg_attr_find(c->attrs, c->attr_count, "level");
+    float largest = 0.0f;
+    int32_t i, j, rounds = 0;
+    bool changed = true;
+    for (i = 0; i < c->curve_count; i ++) {
+        if (c->parents[i] < 0 && c->offsets[i + 1] > c->offsets[i]) {
+            largest = glm_max(largest, c->radii[c->offsets[i]]);
+        }
+    }
+
+    float *d = box_mg_attr_add(c->attrs, &c->attr_count, "dropped", c->point_count);
+    float limit = drop * largest;
+    for (i = 0; d && i < c->curve_count; i ++) {
+        int32_t first = c->offsets[i], last = c->offsets[i + 1];
+        int32_t p = c->parents[i];
+        if (first >= last || d[first] > 0.5f || p < 0 || p >= c->curve_count ||
+            (lv ? (int32_t)lv[first] : 1) < level || c->radii[first] >= limit)
+        {
+            continue;
+        }
+
+        for (j = first; j < last; j ++) {
+            d[j] = 1.0f;
+        }
+    }
+
+    while (d && changed && rounds < c->curve_count + 1) {
+        changed = false;
+        for (i = 0; i < c->curve_count; i ++) {
+            int32_t first = c->offsets[i], last = c->offsets[i + 1], p = c->parents[i];
+            if (first >= last || d[first] > 0.5f || p < 0 || p >= c->curve_count ||
+                c->offsets[p + 1] <= c->offsets[p] || d[c->offsets[p]] <= 0.5f)
+            {
+                continue;
+            }
+
+            for (j = first; j < last; j ++) {
+                d[j] = 1.0f;
+            }
+
+            changed = true;
+        }
+
+        rounds ++;
+    }
+}
+
+/** Grow the drop of a node by its lod_drop per level of detail.
+ *
+ * @param drop The drop of the node
+ * @param lod_drop The lod_drop of the node
+ * @param level The level
+ */
+static void box_mg_drop_lod(
+    float *drop,
+    float lod_drop,
+    int32_t level)
+{
+    float grow = lod_drop > 0.0f ? lod_drop : (lod_drop < 0.0f ? 0.0f : 0.08f);
+    if (grow > 0.0f) {
+        *drop = glm_max(*drop, 0.0f) + grow * (float)level;
+    }
+}
+
+/** Reduce a MeshBranches for a level of detail: its drop grows by lod_drop per level.
+ *
+ * @param node The snapshot of the MeshBranches
+ * @param level The level
+ */
+static void box_mesh_branches_lod(
+    void *node,
+    int32_t level)
+{
+    MeshBranches *n = node;
+    box_mg_drop_lod(&n->drop, n->lod_drop, level);
+}
+
+/** Reduce a MeshPrune for a level of detail: its drop grows by lod_drop per level.
+ *
+ * @param node The snapshot of the MeshPrune
+ * @param level The level
+ */
+static void box_mesh_prune_lod(
+    void *node,
+    int32_t level)
+{
+    MeshPrune *n = node;
+    box_mg_drop_lod(&n->drop, n->lod_drop, level);
+}
+
 /** Resolve the settings of a Branches and find the level of its parents.
  *
  * @param n The node
@@ -541,6 +644,10 @@ static int box_mesh_branches_eval(
 
     box_mg_curves_frames_range(c, in->curve_count, c->curve_count);
     box_mg_curves_tips(c);
+    if (b.n->drop > 0.0f) {
+        box_mg_curves_drop(c, b.n->drop, 1);
+    }
+
     ecs_os_free(lengths);
 
     return 0;
@@ -864,6 +971,10 @@ static int box_mesh_prune_eval(
 
     box_mg_prune_taper(in, keep, map, c);
     box_mg_curves_tips(c);
+    if (n->drop > 0.0f) {
+        box_mg_curves_drop(c, n->drop, n->level);
+    }
+
     ecs_os_free(map);
     ecs_os_free(keep);
 
@@ -970,9 +1081,11 @@ void box_mesh_nodes_branch_register(
             BOX_MG_PARAM(MeshBranches, noise), BOX_MG_PARAM(MeshBranches, angle_variation),
             BOX_MG_PARAM(MeshBranches, roll_variation),
             BOX_MG_PARAM(MeshBranches, length_variation),
-            BOX_MG_PARAM(MeshBranches, radius_variation), BOX_MG_PARAM(MeshBranches, seed)
+            BOX_MG_PARAM(MeshBranches, radius_variation), BOX_MG_PARAM(MeshBranches, seed),
+            BOX_MG_PARAM(MeshBranches, drop), BOX_MG_PARAM(MeshBranches, lod_drop)
         },
         .eval = box_mesh_branches_eval,
+        .lod = box_mesh_branches_lod,
         .flags = BOX_MESH_NODE_RANDOM
     });
     box_mesh_node_register(world, &(box_mesh_node_desc_t){
@@ -985,8 +1098,10 @@ void box_mesh_nodes_branch_register(
         .params = {
             BOX_MG_PARAM(MeshPrune, shape), BOX_MG_PARAM(MeshPrune, center),
             BOX_MG_PARAM(MeshPrune, size), BOX_MG_PARAM(MeshPrune, min_radius),
-            BOX_MG_PARAM(MeshPrune, level), BOX_MG_PARAM(MeshPrune, shorten)
+            BOX_MG_PARAM(MeshPrune, level), BOX_MG_PARAM(MeshPrune, shorten),
+            BOX_MG_PARAM(MeshPrune, drop), BOX_MG_PARAM(MeshPrune, lod_drop)
         },
-        .eval = box_mesh_prune_eval
+        .eval = box_mesh_prune_eval,
+        .lod = box_mesh_prune_lod
     });
 }

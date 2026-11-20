@@ -114,6 +114,21 @@
                 ]
             },
             {
+                "id": "MeshLod",
+                "testcases": [
+                    "tube_levels",
+                    "reductions_off",
+                    "detail_node",
+                    "drop",
+                    "leaf_coverage",
+                    "shared_nodes",
+                    "tree_levels",
+                    "shape_variants",
+                    "node_kinds",
+                    "displace_points"
+                ]
+            },
+            {
                 "id": "MeshFoliage",
                 "testcases": [
                     "leaves_count",

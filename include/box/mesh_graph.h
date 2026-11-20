@@ -84,6 +84,10 @@ extern "C" {
  * Cards writes 1 */
 #define BOX_MESH_DATA_OCCLUSION (7)
 
+/** Flag of a node kind whose value is the value of one of its inputs chosen by the level of
+ * detail, as Detail: the walk of a graph visits only that input and the node adds no value */
+#define BOX_MESH_NODE_DETAIL (1u << 1)
+
 /** A capture got its value */
 #define BOX_MESH_CAPTURE_OK (0)
 
@@ -122,6 +126,12 @@ ECS_ENUM(MeshGraphState, {
  * Shapes that name different outputs of one graph, such as bark and leaves with two materials,
  * evaluate the nodes they share once. Prefab instances inherit it and share the prefab's mesh.
  *
+ * With levels the graph makes its own levels of detail, which the views draw by their
+ * View.lod: it is evaluated once per level with the level as its detail, so Detail nodes pick
+ * their input of the level and the kinds that reduce (Tube, Branches, Prune, Leaves, Needles,
+ * Cards, Displace, PointsOnMesh) drop detail by the level. The nodes a level does not change
+ * have the hash of the level before and are evaluated once.
+ *
  * @code
  * using box.mesh
  * prefab ball { IcoSphere: {segments: 2, smooth: true, radius: 0.2} }
@@ -139,6 +149,8 @@ ECS_ENUM(MeshGraphState, {
  */
 ECS_STRUCT(MeshGraph, {
     ecs_entity_t output; /**< Node whose value, a Mesh, is the mesh of the shape */
+    int32_t levels;      /**< Levels of detail the graph builds, level 0 included; 0 or 1 for
+                          *   none, at most BOX_LOD_LEVELS_MAX */
 });
 
 /** Outcome of the evaluations of a MeshGraph, written by the engine on the entity that owns
@@ -156,6 +168,11 @@ ECS_STRUCT(MeshGraphStatus, {
     int32_t triangles;    /**< Triangles of the current mesh */
     float time;           /**< Seconds the evaluation of the current mesh took on its worker,
                            *   0 when every value came from the cache */
+    int32_t levels;       /**< Levels of detail of the current mesh, 1 without levels */
+    int32_t level_vertices[4];  /**< Vertices of the mesh of each level of detail, the first
+                                 *   levels entries */
+    int32_t level_triangles[4]; /**< Triangles of the mesh of each level of detail, the
+                                 *   first levels entries */
 });
 
 /** Settings of the cache of the node values of the mesh graphs, a singleton.
@@ -199,6 +216,7 @@ ECS_STRUCT(MeshNodeKind, {
     MeshNodeParam params[32]; /**< The BOX_MESH_NODE_PARAMS parameters, in order */
     bool source;            /**< The node reads entities of the world on the main thread */
     bool random;            /**< The node has a seed, see BOX_MESH_NODE_RANDOM */
+    bool detail;            /**< The node reduces with the level of detail */
 });
 
 /** Node of a MeshGraph whose Mesh is the mesh of the shape of an entity, through the mesh
@@ -225,6 +243,19 @@ ECS_STRUCT(MeshPath, {
     int32_t steps;      /**< Points per curved segment, 0 for 16, at most 64 */
     float radius;       /**< Radius at the start, 0 for 0.1 */
     float radius_end;   /**< Radius at the end, 0 for radius; linear along the length */
+});
+
+/** Node of a MeshGraph whose value is the value of one of its inputs by the level of detail
+ * being built: levels[0] at full detail, levels[i] at level i and the last input at the levels
+ * after it. Only the input of the level is evaluated, so a level can swap a costly subgraph
+ * for a cheaper one, such as a crown of cards for a few large ones.
+ *
+ * @code
+ * crown { nodes.Detail: {levels: [cards_full, cards_full, cards_far]} }
+ * @endcode
+ */
+ECS_STRUCT(MeshDetail, {
+    ecs_vec(ecs_entity_t) levels; /**< Input node of each level, at least one */
 });
 
 /** Node of a MeshGraph that moves, turns and scales a Mesh, Curves or Points. Normals and
@@ -273,6 +304,17 @@ ECS_STRUCT(MeshTube, {
     float flute_depth;    /**< Radius a flute adds at its crest, a fraction of the radius */
     float flute_height;   /**< Length from the base over which the flutes fade out, 0 for three
                            *   base radii */
+    float rings;          /**< Fraction of the points of each curve that get a ring, spread
+                           *   along it, the first and last always; 0 for all */
+    float thin;           /**< Curves whose base radius is under this fraction of the largest
+                           *   base radius of the curves get half the sides, at least 3; 0 for
+                           *   none */
+    float lod_sides;      /**< Factor of the sides per level of detail, 0 for 0.6, negative
+                           *   keeps them */
+    float lod_rings;      /**< Factor of the rings per level of detail, 0 for 0.6, negative
+                           *   keeps them */
+    float lod_thin;       /**< What thin grows by per level of detail, 0 for 0.15, negative
+                           *   for nothing */
 });
 
 /** How Branches spreads the children of a parent around it */
@@ -326,6 +368,10 @@ ECS_STRUCT(MeshStem, {
  * A child starts on the axis of its parent, so a Tube sinks it into the parent; its radius
  * is the parent radius there split by the pipe model among the children of its node and the
  * parent. Children get level, parent_t, tip, root_distance and phase like a Stem.
+ *
+ * With drop, the curves thinner than a fraction of the stems are dropped: they keep their
+ * place, so their children and leaves still grow, but get the attribute dropped 1, and a Tube
+ * gives them no bark. Their children are dropped with them.
  */
 ECS_STRUCT(MeshBranches, {
     ecs_entity_t curves;     /**< Curves input node: parents and their ancestors */
@@ -360,6 +406,11 @@ ECS_STRUCT(MeshBranches, {
     float length_variation;  /**< Random change of the length, a fraction of it */
     float radius_variation;  /**< Random change of the radius, a fraction of it */
     int32_t seed;            /**< Seed of the variations, the noise and the phases */
+    float drop;              /**< Curves with a parent whose base radius is under this
+                              *   fraction of the largest base radius of the stems are
+                              *   dropped, 0 for none */
+    float lod_drop;          /**< What drop grows by per level of detail, 0 for 0.08,
+                              *   negative for nothing */
 });
 
 /** Node of a MeshGraph that removes or shortens the curves of a Curves outside an envelope
@@ -367,6 +418,9 @@ ECS_STRUCT(MeshBranches, {
  *
  * The envelope is the profile when it has one: its x is the radius around the vertical axis
  * through center at the height y above center, as a Lathe turns a Path2D.
+ *
+ * Curves of level or a higher level thinner than drop are dropped as Branches drops them: kept
+ * with the attribute dropped 1, without bark from a Tube.
  */
 ECS_STRUCT(MeshPrune, {
     ecs_entity_t curves;     /**< Curves input node */
@@ -381,6 +435,10 @@ ECS_STRUCT(MeshPrune, {
     bool shorten;            /**< Cut a curve where it leaves the envelope instead of removing
                               *   it; it tapers to the radius of its old tip, its children
                               *   beyond the cut are removed and the others thinned to fit */
+    float drop;              /**< Curves whose base radius is under this fraction of the
+                              *   largest base radius of the stems are dropped, 0 for none */
+    float lod_drop;          /**< What drop grows by per level of detail, 0 for 0.08,
+                              *   negative for nothing */
 });
 
 /** Node of a MeshGraph that places Points along every curve of a Curves.
@@ -415,6 +473,8 @@ ECS_STRUCT(MeshPointsOnMesh, {
     float min_spacing;  /**< Least distance between two points, 0 for none */
     int32_t seed;       /**< Seed of the placement */
     bool vertical;      /**< Keep the points upright instead of turning them to the normal */
+    float lod_keep;     /**< Factor of the count per level of detail, 0 for 0.5, negative
+                         *   keeps it */
 });
 
 /** Node of a MeshGraph whose Mesh holds a copy of a Mesh at every point of a Points, turned
@@ -435,6 +495,8 @@ ECS_STRUCT(MeshDisplace, {
     float frequency;   /**< Noise cells per unit of length, 0 for 1 */
     int32_t octaves;   /**< Octaves of the noise, 0 for 1, at most 8 */
     int32_t seed;      /**< Seed of the noise */
+    int32_t lod_octaves; /**< Octaves dropped per level of detail, at least 1 kept; 0 for 1,
+                          *   negative for none */
 });
 
 /** Node of a MeshGraph that computes the normals of a Mesh again.
@@ -551,6 +613,10 @@ ECS_ENUM(MeshNeedleStyle, {
  * pivot_x, pivot_y and pivot_z (the root of its twig, the pivot of the twig for the wind),
  * root_distance (from the root of the plant), seed and hue (0..1, random per leaf) and index.
  * Defaults are set when the component is added.
+ *
+ * With keep below 1 only the leaves whose seed is under keep stay, and every other leaf merges
+ * into the nearest kept one, which grows to their summed area and centers on them: fewer and
+ * larger leaves that cover the crown as the leaves did. Each level keeps lod_keep of the last.
  */
 ECS_STRUCT(MeshLeaves, {
     ecs_entity_t curves;           /**< Curves input node */
@@ -575,6 +641,10 @@ ECS_STRUCT(MeshLeaves, {
     float size_level;              /**< Factor of the size per level below the highest, 0 for 1 */
     float size_variation;          /**< Random change of the size, a fraction of it */
     int32_t seed;                  /**< Seed of the variations, seeds and hues */
+    float keep;                    /**< Fraction of the leaves kept, the others' area spread
+                                    *   over them; 0 for all */
+    float lod_keep;                /**< Factor of keep per level of detail, 0 for 0.5,
+                                    *   negative keeps it */
 });
 
 /** Node of a MeshGraph that places the Points of the fronds of a conifer along its twigs: each
@@ -583,7 +653,8 @@ ECS_STRUCT(MeshLeaves, {
  *
  * A point turns +Y along the frond and +Z to its face, scaled by the length of the frond in Y
  * and Z and by width times it in X, so a Cards of width 1 covers it. Points have the
- * attributes of Leaves. Defaults are set when the component is added.
+ * attributes of Leaves. Defaults are set when the component is added. keep and lod_keep thin
+ * the cards as they thin the leaves of Leaves.
  */
 ECS_STRUCT(MeshNeedles, {
     ecs_entity_t curves;         /**< Curves input node */
@@ -601,6 +672,10 @@ ECS_STRUCT(MeshNeedles, {
     float droop;                 /**< Turn of a frond down toward -Y, radians */
     float tilt;                  /**< Largest random tilt of a frond about its side, radians */
     int32_t seed;                /**< Seed of the tilts, seeds and hues */
+    float keep;                  /**< Fraction of the cards kept, the others' area spread over
+                                  *   them; 0 for all */
+    float lod_keep;              /**< Factor of keep per level of detail, 0 for 0.5, negative
+                                  *   keeps it */
 });
 
 /** Node of a MeshGraph whose Mesh holds a card at every point of a Points, as Leaves and
@@ -627,6 +702,8 @@ ECS_STRUCT(MeshCards, {
     bool double_sided;     /**< Give the cards a back, true when added; a mesh input is kept
                             *   as it is */
     float flutter;         /**< Flutter weight at the tip of the card, 0..1, 1 when added */
+    float lod_segments;    /**< Factor of the segments per level of detail, at least 1 kept; 0
+                            *   for 0.5, negative keeps them */
 });
 
 /** Node of a MeshGraph that bends the normals of foliage toward the normals of the envelope of
@@ -774,6 +851,18 @@ typedef int (*box_mesh_node_eval_t)(
     box_mg_value_t *out,
     char **error);
 
+/** Reduce the parameters of a node for a level of detail, on the main thread.
+ *
+ * Called on the snapshot of the node before it is hashed, for every level from 1; a snapshot
+ * it does not change has the hash of the full detail node, which the levels then share.
+ *
+ * @param node Snapshot of the node component: its parameters, other members zeroed
+ * @param level The level of detail, from 1
+ */
+typedef void (*box_mesh_node_lod_t)(
+    void *node,
+    int32_t level);
+
 /** Description of a node kind for box_mesh_node_register, with capture or eval */
 typedef struct box_mesh_node_desc_t {
     ecs_entity_t component;       /**< Component of the nodes of the kind */
@@ -783,7 +872,9 @@ typedef struct box_mesh_node_desc_t {
     box_mesh_node_param_t params[BOX_MESH_NODE_PARAMS]; /**< Parameters in order */
     box_mesh_node_capture_t capture; /**< Reads a source node, NULL for a computed kind */
     box_mesh_node_eval_t eval;    /**< Computes the value, NULL for a source kind */
-    uint32_t flags;               /**< BOX_MESH_NODE_RANDOM */
+    box_mesh_node_lod_t lod;      /**< Reduces the node for a level of detail, NULL for a kind
+                                   *   that is the same at every level */
+    uint32_t flags;               /**< BOX_MESH_NODE_RANDOM, BOX_MESH_NODE_DETAIL */
 } box_mesh_node_desc_t;
 
 /** Counters of the evaluations and the value cache of the mesh graphs of a world */
@@ -819,6 +910,22 @@ int32_t box_mesh_node_register(
 box_mg_value_t* box_mesh_graph_evaluate(
     ecs_world_t *world,
     ecs_entity_t node,
+    char **error);
+
+/** Evaluate the value of a node at a level of detail on the calling thread, through the value
+ * cache, as box_mesh_graph_evaluate does for level 0.
+ *
+ * @param world The world
+ * @param node The node entity
+ * @param level The level of detail, 0 for full detail
+ * @param error Receives why it failed, freed with ecs_os_free, may be NULL
+ * @return The value with a reference for the caller, released with box_mg_value_release, NULL
+ * when the evaluation failed
+ */
+box_mg_value_t* box_mesh_graph_evaluate_level(
+    ecs_world_t *world,
+    ecs_entity_t node,
+    int32_t level,
     char **error);
 
 /** Read the counters of the mesh graphs of a world.

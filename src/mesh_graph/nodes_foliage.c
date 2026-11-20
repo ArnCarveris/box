@@ -490,6 +490,316 @@ static int32_t box_mg_leaves_curve(
     return nodes * per_node;
 }
 
+/** Cells per axis of the grid that finds the nearest kept point of a thinned point, at most */
+#define BOX_MG_THIN_GRID (32)
+
+/** Grid of the kept points of a thinning, by the cell of their middle. */
+typedef struct box_mg_thin_grid_t {
+    vec3 min;          /**< Corner of the grid */
+    float cell;        /**< Size of a cell */
+    int32_t dim[3];    /**< Cells per axis */
+    int32_t *start;    /**< First entry of a cell in points, one more than the cells */
+    int32_t *points;   /**< Kept points by cell */
+} box_mg_thin_grid_t;
+
+/** Get the cell of a position, clamped to the grid.
+ *
+ * @param g The grid
+ * @param v The position
+ * @param out Receives the cell coordinates
+ */
+static void box_mg_thin_cell(
+    const box_mg_thin_grid_t *g,
+    const vec3 v,
+    int32_t out[3])
+{
+    int32_t a;
+    for (a = 0; a < 3; a ++) {
+        int32_t c = (int32_t)floorf((v[a] - g->min[a]) / g->cell);
+        out[a] = c < 0 ? 0 : c >= g->dim[a] ? g->dim[a] - 1 : c;
+    }
+}
+
+/** Put the kept points in a grid over the middles of all points, with about one kept point
+ * per cell.
+ *
+ * @param g The grid to fill
+ * @param mid Middles of all points
+ * @param kept Whether a point is kept
+ * @param count Number of points
+ * @param kept_count Number of kept points
+ */
+static void box_mg_thin_grid_init(
+    box_mg_thin_grid_t *g,
+    vec3 *mid,
+    const bool *kept,
+    int32_t count,
+    int32_t kept_count)
+{
+    vec3 max;
+    int32_t k, a, cells;
+    glm_vec3_copy(mid[0], g->min);
+    glm_vec3_copy(mid[0], max);
+    for (k = 1; k < count; k ++) {
+        glm_vec3_minv(g->min, mid[k], g->min);
+        glm_vec3_maxv(max, mid[k], max);
+    }
+
+    float ext = 0.0f;
+    double volume = 1.0;
+    for (a = 0; a < 3; a ++) {
+        ext = glm_max(ext, max[a] - g->min[a]);
+    }
+
+    ext = glm_max(ext, 1e-6f);
+    for (a = 0; a < 3; a ++) {
+        volume *= (double)glm_max(max[a] - g->min[a], ext * 0.01f);
+    }
+
+    g->cell = glm_max((float)cbrt(volume / (double)kept_count), ext / BOX_MG_THIN_GRID);
+    cells = 1;
+    for (a = 0; a < 3; a ++) {
+        int32_t dim = (int32_t)((max[a] - g->min[a]) / g->cell) + 1;
+        g->dim[a] = dim < 1 ? 1 : dim > BOX_MG_THIN_GRID ? BOX_MG_THIN_GRID : dim;
+        cells *= g->dim[a];
+    }
+
+    g->start = ecs_os_calloc_n(int32_t, cells + 1);
+    g->points = ecs_os_malloc_n(int32_t, kept_count);
+    int32_t *cell_of = ecs_os_malloc_n(int32_t, count);
+    for (k = 0; k < count; k ++) {
+        int32_t c[3];
+        if (!kept[k]) {
+            continue;
+        }
+
+        box_mg_thin_cell(g, mid[k], c);
+        cell_of[k] = (c[2] * g->dim[1] + c[1]) * g->dim[0] + c[0];
+        g->start[cell_of[k] + 1] ++;
+    }
+
+    for (k = 0; k < cells; k ++) {
+        g->start[k + 1] += g->start[k];
+    }
+
+    int32_t *fill = ecs_os_malloc_n(int32_t, cells);
+    ecs_os_memcpy_n(fill, g->start, int32_t, cells);
+    for (k = 0; k < count; k ++) {
+        if (kept[k]) {
+            g->points[fill[cell_of[k]] ++] = k;
+        }
+    }
+
+    ecs_os_free(fill);
+    ecs_os_free(cell_of);
+}
+
+/** Find the kept point whose middle is nearest to a position, searching shells of cells
+ * outward until no nearer one can be found: a point in shell r is at least r - 1 cells away.
+ *
+ * @param g The grid
+ * @param mid Middles of all points
+ * @param v The position
+ * @return The nearest kept point
+ */
+static int32_t box_mg_thin_nearest(
+    const box_mg_thin_grid_t *g,
+    vec3 *mid,
+    vec3 v)
+{
+    int32_t c[3], r, x, y, z, i, best = -1;
+    int32_t reach = g->dim[0] > g->dim[1] ? g->dim[0] : g->dim[1];
+    reach = reach > g->dim[2] ? reach : g->dim[2];
+    float best_d = 0.0f;
+    box_mg_thin_cell(g, v, c);
+    for (r = 0; r <= reach; r ++) {
+        if (best >= 0 && (float)(r - 1) * g->cell > sqrtf(best_d)) {
+            break;
+        }
+
+        for (z = c[2] - r; z <= c[2] + r; z ++) {
+            for (y = c[1] - r; y <= c[1] + r; y ++) {
+                for (x = c[0] - r; x <= c[0] + r; x ++) {
+                    if (x < 0 || y < 0 || z < 0 || x >= g->dim[0] || y >= g->dim[1] ||
+                        z >= g->dim[2])
+                    {
+                        continue;
+                    }
+
+                    if (abs(x - c[0]) != r && abs(y - c[1]) != r && abs(z - c[2]) != r) {
+                        continue;
+                    }
+
+                    int32_t cell = (z * g->dim[1] + y) * g->dim[0] + x;
+                    for (i = g->start[cell]; i < g->start[cell + 1]; i ++) {
+                        int32_t k = g->points[i];
+                        float d = glm_vec3_distance2(mid[k], v);
+                        if (best < 0 || d < best_d) {
+                            best = k;
+                            best_d = d;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    return best;
+}
+
+/** Free a grid of kept points.
+ *
+ * @param g The grid
+ */
+static void box_mg_thin_grid_fini(
+    box_mg_thin_grid_t *g)
+{
+    ecs_os_free(g->start);
+    ecs_os_free(g->points);
+}
+
+/** Thin the points of leaves or cards to the ones whose seed is under keep, the one with the
+ * lowest seed when none is, and merge each other point into the kept point nearest to it.
+ *
+ * A kept point grows to the summed area of its points and moves its middle to their area
+ * weighted middle, so the cards cover the crown where the dropped ones did.
+ *
+ * @param p The points, with the attributes of Leaves
+ * @param keep Fraction of the points kept, no thinning outside 0..1
+ */
+static void box_mg_points_thin(
+    box_mg_points_t *p,
+    float keep)
+{
+    const float *seed = box_mg_attr_find(p->attrs, p->attr_count, "seed");
+    bool *kept = NULL;
+    vec3 *mid = NULL, *sum = NULL;
+    double *area = NULL;
+    int32_t k, a, lowest = 0, count = 0;
+    if (keep <= 0.0f || keep >= 1.0f || !p->count) {
+        goto done;
+    }
+
+    kept = ecs_os_calloc_n(bool, p->count);
+    mid = ecs_os_malloc_n(vec3, p->count);
+    sum = ecs_os_calloc_n(vec3, p->count);
+    area = ecs_os_calloc_n(double, p->count);
+    for (k = 0; k < p->count; k ++) {
+        float s;
+        if (seed) {
+            s = seed[k];
+        } else {
+            box_mg_rand_t rand;
+            box_mg_rand_seed(&rand, 0, (uint32_t)k);
+            s = box_mg_rand_float(&rand);
+        }
+
+        vec3 up = { 0.0f, 1.0f, 0.0f }, along;
+        glm_quat_rotatev(p->rotations[k], up, along);
+        glm_vec3_scale(along, 0.5f * p->scales[k][1], along);
+        glm_vec3_add(p->positions[k], along, mid[k]);
+        kept[k] = s < keep;
+        count += kept[k];
+        if (seed && seed[k] < seed[lowest]) {
+            lowest = k;
+        }
+    }
+
+    if (!count) {
+        kept[lowest] = true;
+        count = 1;
+    }
+
+    box_mg_thin_grid_t grid;
+    box_mg_thin_grid_init(&grid, mid, kept, p->count, count);
+    for (k = 0; k < p->count; k ++) {
+        double size = fabs((double)p->scales[k][0] * (double)p->scales[k][1]);
+        int32_t to = kept[k] ? k : box_mg_thin_nearest(&grid, mid, mid[k]);
+        area[to] += size;
+        glm_vec3_muladds(mid[k], (float)size, sum[to]);
+    }
+
+    box_mg_thin_grid_fini(&grid);
+
+    int32_t to = 0;
+    for (k = 0; k < p->count; k ++) {
+        if (!kept[k]) {
+            continue;
+        }
+
+        double own = fabs((double)p->scales[k][0] * (double)p->scales[k][1]);
+        float grow = own > 0.0 ? (float)sqrt(area[k] / own) : 1.0f;
+        vec3 up = { 0.0f, 1.0f, 0.0f }, along, middle;
+        if (area[k] > 0.0) {
+            glm_vec3_scale(sum[k], (float)(1.0 / area[k]), middle);
+        } else {
+            glm_vec3_copy(mid[k], middle);
+        }
+
+        glm_quat_rotatev(p->rotations[k], up, along);
+        glm_vec3_scale(along, -0.5f * p->scales[k][1] * grow, along);
+        glm_vec3_add(middle, along, p->positions[to]);
+        glm_vec4_copy(p->rotations[k], p->rotations[to]);
+        glm_vec3_scale(p->scales[k], grow, p->scales[to]);
+        for (a = 0; a < p->attr_count; a ++) {
+            p->attrs[a].values[to] = p->attrs[a].values[k];
+        }
+
+        to ++;
+    }
+
+    box_mg_points_resize(p, to);
+done:
+    ecs_os_free(kept);
+    ecs_os_free(mid);
+    ecs_os_free(sum);
+    ecs_os_free(area);
+}
+
+/** The keep of a Leaves or a Needles at a level of detail: lod_keep to the power of the level
+ * times its keep.
+ *
+ * @param keep The keep of the node
+ * @param lod_keep The lod_keep of the node
+ * @param level The level
+ */
+static void box_mg_keep_lod(
+    float *keep,
+    float lod_keep,
+    int32_t level)
+{
+    float f = box_mg_lod_factor(lod_keep, 0.5f, level);
+    if (f < 1.0f) {
+        *keep = (*keep > 0.0f ? glm_min(*keep, 1.0f) : 1.0f) * f;
+    }
+}
+
+/** Reduce a MeshLeaves for a level of detail: fewer, larger leaves.
+ *
+ * @param node The snapshot of the MeshLeaves
+ * @param level The level
+ */
+static void box_mesh_leaves_lod(
+    void *node,
+    int32_t level)
+{
+    MeshLeaves *n = node;
+    box_mg_keep_lod(&n->keep, n->lod_keep, level);
+}
+
+/** Reduce a MeshNeedles for a level of detail: fewer, larger cards.
+ *
+ * @param node The snapshot of the MeshNeedles
+ * @param level The level
+ */
+static void box_mesh_needles_lod(
+    void *node,
+    int32_t level)
+{
+    MeshNeedles *n = node;
+    box_mg_keep_lod(&n->keep, n->lod_keep, level);
+}
+
 /** Place the leaves of a MeshLeaves on branching curves.
  *
  * @param node The MeshLeaves
@@ -530,6 +840,7 @@ static int box_mesh_leaves_eval(
         }
     }
 
+    box_mg_points_thin(p, n->keep);
     box_mg_foliage_fini(&f);
 
     return 0;
@@ -662,6 +973,7 @@ static int box_mesh_needles_eval(
         }
     }
 
+    box_mg_points_thin(p, n->keep);
     box_mg_foliage_fini(&f);
 
     return 0;
@@ -780,6 +1092,27 @@ static void box_mg_card_template(
 
     if (!mesh && n->double_sided) {
         box_mg_card_back(&out->mesh);
+    }
+}
+
+/** Reduce a MeshCards for a level of detail: lod_segments to the power of the level of its
+ * segments, at least one kept.
+ *
+ * @param node The snapshot of the MeshCards
+ * @param level The level
+ */
+static void box_mesh_cards_lod(
+    void *node,
+    int32_t level)
+{
+    MeshCards *n = node;
+    int32_t rows = n->segments > 0 ? n->segments : 2;
+    rows = rows > BOX_MG_CARD_SEGMENTS ? BOX_MG_CARD_SEGMENTS : rows;
+    int32_t reduced = (int32_t)((float)rows * box_mg_lod_factor(n->lod_segments, 0.5f, level) +
+        0.5f);
+    reduced = reduced < 1 ? 1 : reduced;
+    if (reduced != rows) {
+        n->segments = reduced;
     }
 }
 
@@ -1433,9 +1766,11 @@ void box_mesh_nodes_foliage_register(
             BOX_MG_PARAM(MeshLeaves, center), BOX_MG_PARAM(MeshLeaves, tilt),
             BOX_MG_PARAM(MeshLeaves, bank), BOX_MG_PARAM(MeshLeaves, size),
             BOX_MG_PARAM(MeshLeaves, size_tip), BOX_MG_PARAM(MeshLeaves, size_level),
-            BOX_MG_PARAM(MeshLeaves, size_variation), BOX_MG_PARAM(MeshLeaves, seed)
+            BOX_MG_PARAM(MeshLeaves, size_variation), BOX_MG_PARAM(MeshLeaves, seed),
+            BOX_MG_PARAM(MeshLeaves, keep), BOX_MG_PARAM(MeshLeaves, lod_keep)
         },
         .eval = box_mesh_leaves_eval,
+        .lod = box_mesh_leaves_lod,
         .flags = BOX_MESH_NODE_RANDOM
     });
     box_mesh_node_register(world, &(box_mesh_node_desc_t){
@@ -1448,9 +1783,11 @@ void box_mesh_nodes_foliage_register(
             BOX_MG_PARAM(MeshNeedles, start), BOX_MG_PARAM(MeshNeedles, end),
             BOX_MG_PARAM(MeshNeedles, width), BOX_MG_PARAM(MeshNeedles, bank),
             BOX_MG_PARAM(MeshNeedles, droop), BOX_MG_PARAM(MeshNeedles, tilt),
-            BOX_MG_PARAM(MeshNeedles, seed)
+            BOX_MG_PARAM(MeshNeedles, seed), BOX_MG_PARAM(MeshNeedles, keep),
+            BOX_MG_PARAM(MeshNeedles, lod_keep)
         },
         .eval = box_mesh_needles_eval,
+        .lod = box_mesh_needles_lod,
         .flags = BOX_MESH_NODE_RANDOM
     });
     box_mesh_node_register(world, &(box_mesh_node_desc_t){
@@ -1463,9 +1800,11 @@ void box_mesh_nodes_foliage_register(
         .params = {
             BOX_MG_PARAM(MeshCards, shape), BOX_MG_PARAM(MeshCards, width),
             BOX_MG_PARAM(MeshCards, bend), BOX_MG_PARAM(MeshCards, segments),
-            BOX_MG_PARAM(MeshCards, double_sided), BOX_MG_PARAM(MeshCards, flutter)
+            BOX_MG_PARAM(MeshCards, double_sided), BOX_MG_PARAM(MeshCards, flutter),
+            BOX_MG_PARAM(MeshCards, lod_segments)
         },
-        .eval = box_mesh_cards_eval
+        .eval = box_mesh_cards_eval,
+        .lod = box_mesh_cards_lod
     });
     box_mesh_node_register(world, &(box_mesh_node_desc_t){
         .component = ecs_id(MeshCrownNormals),

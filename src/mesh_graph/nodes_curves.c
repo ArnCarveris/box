@@ -559,6 +559,88 @@ static void box_mg_tube_curve(
     ecs_os_free(lengths);
 }
 
+/** Copy curves keeping a fraction of the points of each curve, spread along it, the first and
+ * the last always.
+ *
+ * @param in The curves
+ * @param keep Fraction of the points kept, below 1
+ * @param out The empty curves that receive the copy
+ */
+static void box_mg_curves_decimate(
+    const box_mg_curves_t *in,
+    float keep,
+    box_mg_curves_t *out)
+{
+    int32_t i, j, a, points = 0;
+    int32_t *kept = ecs_os_malloc_n(int32_t, in->curve_count + 1);
+    for (i = 0; i < in->curve_count; i ++) {
+        int32_t segments = in->offsets[i + 1] - in->offsets[i] - 1;
+        int32_t n = (int32_t)((float)segments * keep + 0.5f);
+        kept[i] = segments < 1 ? segments + 1 : (n < 1 ? 1 : n) + 1;
+        points += kept[i];
+    }
+
+    for (a = 0; a < in->attr_count; a ++) {
+        box_mg_attr_add(out->attrs, &out->attr_count, in->attrs[a].name, 0);
+    }
+
+    box_mg_curves_resize(out, in->curve_count, points);
+    out->offsets[0] = 0;
+    for (i = 0; i < in->curve_count; i ++) {
+        int32_t first = in->offsets[i], segments = in->offsets[i + 1] - first - 1;
+        int32_t to = out->offsets[i];
+        out->offsets[i + 1] = to + kept[i];
+        out->parents[i] = in->parents ? in->parents[i] : -1;
+        for (j = 0; j < kept[i]; j ++) {
+            int32_t k = kept[i] > 1 ? first + (j * segments + (kept[i] - 1) / 2) /
+                (kept[i] - 1) : first;
+            k = j == kept[i] - 1 ? first + (segments > 0 ? segments : 0) : k;
+            glm_vec3_copy(in->positions[k], out->positions[to + j]);
+            glm_vec3_copy(in->tangents[k], out->tangents[to + j]);
+            glm_vec3_copy(in->normals[k], out->normals[to + j]);
+            out->radii[to + j] = in->radii[k];
+            for (a = 0; a < in->attr_count; a ++) {
+                float *w = box_mg_attr_find(out->attrs, out->attr_count, in->attrs[a].name);
+                if (w) {
+                    w[to + j] = in->attrs[a].values[k];
+                }
+            }
+        }
+    }
+
+    ecs_os_free(kept);
+}
+
+/** Reduce a MeshTube for a level of detail: lod_sides and lod_rings to the power of the level
+ * of its sides and rings, and thin grown by lod_thin per level.
+ *
+ * @param node The snapshot of the MeshTube
+ * @param level The level
+ */
+static void box_mesh_tube_lod(
+    void *node,
+    int32_t level)
+{
+    MeshTube *t = node;
+    int32_t sides = t->sides >= 3 ? t->sides : (t->sides > 0 ? 3 : 8);
+    int32_t reduced = (int32_t)((float)sides * box_mg_lod_factor(t->lod_sides, 0.6f, level) +
+        0.5f);
+    reduced = reduced < 3 ? 3 : reduced;
+    if (reduced != sides) {
+        t->sides = reduced;
+    }
+
+    float rings = box_mg_lod_factor(t->lod_rings, 0.6f, level);
+    if (rings < 1.0f) {
+        t->rings = (t->rings > 0.0f ? glm_min(t->rings, 1.0f) : 1.0f) * rings;
+    }
+
+    float thin = t->lod_thin > 0.0f ? t->lod_thin : (t->lod_thin < 0.0f ? 0.0f : 0.15f);
+    if (thin > 0.0f) {
+        t->thin = glm_max(t->thin, 0.0f) + thin * (float)level;
+    }
+}
+
 /** Sweep a profile along every curve of a Curves. The stems of a fluted circle get four sides
  * or more per flute, a whole number per flute.
  *
@@ -579,7 +661,14 @@ static int box_mesh_tube_eval(
     const MeshTube *t = node;
     const box_mg_curves_t *c = &inputs[0]->curves;
     int32_t sides = t->sides >= 3 ? t->sides : (t->sides > 0 ? 3 : 8), i;
-    box_mg_profile_t pr = {0}, fluted = {0};
+    box_mg_profile_t pr = {0}, fluted = {0}, slim = {0};
+    box_mg_value_t *decimated = NULL;
+    if (t->rings > 0.0f && t->rings < 1.0f) {
+        decimated = box_mg_value_new(MeshValueCurves);
+        box_mg_curves_decimate(c, t->rings, &decimated->curves);
+        c = &decimated->curves;
+    }
+
     box_mg_tube_t tb = {
         .t = t, .c = c, .pr = &pr,
         .scale = t->radius > 0.0f ? t->radius : 1.0f,
@@ -603,6 +692,22 @@ static int box_mesh_tube_eval(
         root.pr = &fluted;
     }
 
+    box_mg_tube_t thin = tb;
+    float thin_radius = 0.0f;
+    if (t->thin > 0.0f && circle && sides > 3) {
+        float largest = 0.0f;
+        for (i = 0; i < c->curve_count; i ++) {
+            if (c->offsets[i + 1] > c->offsets[i]) {
+                largest = glm_max(largest, c->radii[c->offsets[i]]);
+            }
+        }
+
+        thin_radius = t->thin * largest;
+        box_mg_profile_build(NULL, sides / 2 > 3 ? sides / 2 : 3, &slim);
+        thin.pr = &slim;
+    }
+
+    const float *dropped = box_mg_attr_find(c->attrs, c->attr_count, "dropped");
     for (i = 0; tb.level && i < 8; i ++) {
         char name[BOX_MESH_ATTR_NAME];
         ecs_os_snprintf(name, ECS_SIZEOF(name), "%s%d", BOX_MESH_DATA_ATTR, i);
@@ -610,15 +715,31 @@ static int box_mesh_tube_eval(
     }
 
     for (i = 0; i < c->curve_count; i ++) {
-        if (c->offsets[i + 1] - c->offsets[i] >= 2) {
-            box_mg_tube_curve(box_mg_tube_parent(c, i) < 0 ? &root : &tb, i, &out->mesh);
+        int32_t first = c->offsets[i];
+        if (c->offsets[i + 1] - first < 2 || (dropped && dropped[first] > 0.5f)) {
+            continue;
         }
+
+        const box_mg_tube_t *with = &tb;
+        if (box_mg_tube_parent(c, i) < 0) {
+            with = &root;
+        } else if (thin.pr == &slim && c->radii[first] < thin_radius) {
+            with = &thin;
+        }
+
+        box_mg_tube_curve(with, i, &out->mesh);
     }
 
     box_mg_profile_fini(&pr);
     if (root.pr == &fluted) {
         box_mg_profile_fini(&fluted);
     }
+
+    if (thin.pr == &slim) {
+        box_mg_profile_fini(&slim);
+    }
+
+    box_mg_value_release(decimated);
 
     return 0;
 }
@@ -969,6 +1090,26 @@ static void box_mg_mesh_spot(
     glm_vec3_normalize(normal);
 }
 
+/** Reduce a MeshPointsOnMesh for a level of detail: lod_keep to the power of the level of its
+ * count, at least one point kept.
+ *
+ * @param node The snapshot of the MeshPointsOnMesh
+ * @param level The level
+ */
+static void box_mesh_points_on_mesh_lod(
+    void *node,
+    int32_t level)
+{
+    MeshPointsOnMesh *n = node;
+    int32_t count = n->count > 0 ? n->count : 32;
+    int32_t reduced = (int32_t)((float)count * box_mg_lod_factor(n->lod_keep, 0.5f, level) +
+        0.5f);
+    reduced = reduced < 1 ? 1 : reduced;
+    if (reduced != count) {
+        n->count = reduced;
+    }
+}
+
 /** Scatter points over the triangles of a mesh, area weighted.
  *
  * @param node The MeshPointsOnMesh
@@ -1185,9 +1326,15 @@ void box_mesh_nodes_curves_register(
             { "square_uv", offsetof(MeshTube, square_uv), ECS_SIZEOF(bool) },
             { "flutes", offsetof(MeshTube, flutes), ECS_SIZEOF(int32_t) },
             { "flute_depth", offsetof(MeshTube, flute_depth), ECS_SIZEOF(float) },
-            { "flute_height", offsetof(MeshTube, flute_height), ECS_SIZEOF(float) }
+            { "flute_height", offsetof(MeshTube, flute_height), ECS_SIZEOF(float) },
+            { "rings", offsetof(MeshTube, rings), ECS_SIZEOF(float) },
+            { "thin", offsetof(MeshTube, thin), ECS_SIZEOF(float) },
+            { "lod_sides", offsetof(MeshTube, lod_sides), ECS_SIZEOF(float) },
+            { "lod_rings", offsetof(MeshTube, lod_rings), ECS_SIZEOF(float) },
+            { "lod_thin", offsetof(MeshTube, lod_thin), ECS_SIZEOF(float) }
         },
-        .eval = box_mesh_tube_eval
+        .eval = box_mesh_tube_eval,
+        .lod = box_mesh_tube_lod
     });
     box_mesh_node_register(world, &(box_mesh_node_desc_t){
         .component = ecs_id(MeshPointsOnCurves),
@@ -1212,9 +1359,11 @@ void box_mesh_nodes_curves_register(
             { "count", offsetof(MeshPointsOnMesh, count), ECS_SIZEOF(int32_t) },
             { "min_spacing", offsetof(MeshPointsOnMesh, min_spacing), ECS_SIZEOF(float) },
             { "seed", offsetof(MeshPointsOnMesh, seed), ECS_SIZEOF(int32_t) },
-            { "vertical", offsetof(MeshPointsOnMesh, vertical), ECS_SIZEOF(bool) }
+            { "vertical", offsetof(MeshPointsOnMesh, vertical), ECS_SIZEOF(bool) },
+            { "lod_keep", offsetof(MeshPointsOnMesh, lod_keep), ECS_SIZEOF(float) }
         },
         .eval = box_mesh_points_on_mesh_eval,
+        .lod = box_mesh_points_on_mesh_lod,
         .flags = BOX_MESH_NODE_RANDOM
     });
     box_mesh_node_register(world, &(box_mesh_node_desc_t){

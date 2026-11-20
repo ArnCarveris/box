@@ -828,7 +828,7 @@ void MeshFoliage_node_kinds(void) {
     test_assert(leaves != NULL);
     test_int(leaves->output, MeshValuePoints);
     test_assert(leaves->random);
-    test_int(leaves->param_count, 18);
+    test_int(leaves->param_count, 20);
     test_int(ecs_get(world, ecs_id(MeshNeedles), MeshNodeKind)->output, MeshValuePoints);
     const MeshNodeKind *cards = ecs_get(world, ecs_id(MeshCards), MeshNodeKind);
     test_int(cards->output, MeshValueMesh);

@@ -414,6 +414,21 @@ const char* box_mg_type_name(
     return result;
 }
 
+float box_mg_lod_factor(
+    float factor,
+    float fallback,
+    int32_t level)
+{
+    float f = factor > 0.0f ? glm_min(factor, 1.0f) : (factor < 0.0f ? 1.0f : fallback);
+    float result = 1.0f;
+    int32_t i;
+    for (i = 0; i < level; i ++) {
+        result *= f;
+    }
+
+    return result;
+}
+
 /** Mix the bits of a 64 bit number, the SplitMix64 finalizer.
  *
  * @param x The number

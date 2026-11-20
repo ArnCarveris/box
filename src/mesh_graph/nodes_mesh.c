@@ -369,6 +369,55 @@ static int box_mesh_displace_eval(
     return 0;
 }
 
+/** Reduce a MeshDisplace for a level of detail: lod_octaves fewer octaves per level, at least
+ * one kept.
+ *
+ * @param node The snapshot of the MeshDisplace
+ * @param level The level
+ */
+static void box_mesh_displace_lod(
+    void *node,
+    int32_t level)
+{
+    MeshDisplace *d = node;
+    int32_t octaves = d->octaves < 1 ? 1 : (d->octaves > 8 ? 8 : d->octaves);
+    int32_t drop = d->lod_octaves > 0 ? d->lod_octaves : (d->lod_octaves < 0 ? 0 : 1);
+    octaves -= drop * level;
+    octaves = octaves < 1 ? 1 : octaves;
+    if (octaves != (d->octaves < 1 ? 1 : d->octaves)) {
+        d->octaves = octaves;
+    }
+}
+
+/** Value of a Detail node, which a walk never evaluates as it visits the input of its level
+ * instead: a copy of its first input.
+ *
+ * @param node The MeshDetail
+ * @param inputs The input of the level
+ * @param counts Values per port
+ * @param out The copy
+ * @param error Receives why it failed
+ * @return 0 on success
+ */
+static int box_mesh_detail_eval(
+    const void *node,
+    const box_mg_value_t *const *inputs,
+    const int32_t *counts,
+    box_mg_value_t *out,
+    char **error)
+{
+    int result = 0;
+    (void)node;
+    if (!counts[0] || !inputs[0]) {
+        *error = ecs_os_strdup("no input");
+        result = -1;
+    } else {
+        box_mg_value_copy(out, inputs[0]);
+    }
+
+    return result;
+}
+
 /** Unit direction of a vector, +Y for a zero vector.
  *
  * @param in The vector
@@ -882,6 +931,13 @@ void box_mesh_nodes_mesh_register(
         .eval = box_mesh_merge_eval
     });
     box_mesh_node_register(world, &(box_mesh_node_desc_t){
+        .component = ecs_id(MeshDetail),
+        .output = MeshValueAny,
+        .inputs = {{ "levels", offsetof(MeshDetail, levels), MeshValueAny, .list = true }},
+        .eval = box_mesh_detail_eval,
+        .flags = BOX_MESH_NODE_DETAIL
+    });
+    box_mesh_node_register(world, &(box_mesh_node_desc_t){
         .component = ecs_id(MeshDisplace),
         .output = MeshValueMesh,
         .inputs = {{ "mesh", offsetof(MeshDisplace, mesh), MeshValueMesh }},
@@ -889,9 +945,11 @@ void box_mesh_nodes_mesh_register(
             { "amount", offsetof(MeshDisplace, amount), ECS_SIZEOF(float) },
             { "frequency", offsetof(MeshDisplace, frequency), ECS_SIZEOF(float) },
             { "octaves", offsetof(MeshDisplace, octaves), ECS_SIZEOF(int32_t) },
-            { "seed", offsetof(MeshDisplace, seed), ECS_SIZEOF(int32_t) }
+            { "seed", offsetof(MeshDisplace, seed), ECS_SIZEOF(int32_t) },
+            { "lod_octaves", offsetof(MeshDisplace, lod_octaves), ECS_SIZEOF(int32_t) }
         },
         .eval = box_mesh_displace_eval,
+        .lod = box_mesh_displace_lod,
         .flags = BOX_MESH_NODE_RANDOM
     });
     box_mesh_node_register(world, &(box_mesh_node_desc_t){

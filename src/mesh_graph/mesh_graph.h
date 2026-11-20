@@ -41,7 +41,8 @@ typedef struct box_mg_kind_t {
     box_mesh_node_param_t params[BOX_MESH_NODE_PARAMS]; /**< Parameters, names owned */
     box_mesh_node_capture_t capture; /**< Reads a source node on the main thread */
     box_mesh_node_eval_t eval;   /**< Computes the value on a worker */
-    uint32_t flags;              /**< BOX_MESH_NODE_RANDOM */
+    box_mesh_node_lod_t lod;     /**< Reduces a snapshot for a level of detail, NULL for none */
+    uint32_t flags;              /**< BOX_MESH_NODE_RANDOM, BOX_MESH_NODE_DETAIL */
 } box_mg_kind_t;
 
 /** Counter of the evaluations in flight, shared by the registry and its jobs */
@@ -62,8 +63,14 @@ typedef struct box_mg_entry_t {
 /** The value delivered for an output node, which the MeshGraph shapes naming it draw */
 typedef struct box_mg_output_t {
     ecs_entity_t node;           /**< The output node */
-    box_mg_value_t *value;       /**< The delivered Mesh, NULL before the first */
-    uint64_t hash;               /**< Content hash of the delivered value, 0 without one */
+    box_mg_value_t *value;       /**< The delivered Mesh of level 0, NULL before the first */
+    uint64_t hash;               /**< Content hash of the delivered levels, of the value alone
+                                  *   without levels of detail, 0 without one */
+    int32_t levels;              /**< Levels of detail delivered, 1 without levels */
+    box_mg_value_t *lods[BOX_LOD_LEVELS_MAX]; /**< The Mesh of each level after 0, NULL for
+                                  *   the first entry and the levels not delivered */
+    uint64_t lod_hashes[BOX_LOD_LEVELS_MAX]; /**< Content hash of the node of each level,
+                                  *   the first of level 0 */
     int32_t users;               /**< Graphs naming the node as their output */
 } box_mg_output_t;
 
@@ -71,6 +78,7 @@ typedef struct box_mg_output_t {
 typedef struct box_mg_record_t {
     ecs_entity_t entity;         /**< The shape entity */
     ecs_entity_t output;         /**< Output node of the record, whose box_mg_output_t it uses */
+    int32_t levels;              /**< Levels of detail it builds, 1 to BOX_LOD_LEVELS_MAX */
     ecs_vec_t reached;           /**< ecs_entity_t, the entities the last build reached */
     bool dirty;                  /**< The graph builds at the next build */
     bool waiting;                /**< The last build waited for a node without a node
@@ -82,6 +90,9 @@ typedef struct box_mg_record_t {
     int32_t vertices;            /**< Vertices of the delivered mesh */
     int32_t triangles;           /**< Triangles of the delivered mesh */
     float time;                  /**< Seconds the evaluation of the delivered mesh took */
+    int32_t delivered_levels;    /**< Levels of detail of the delivered mesh */
+    int32_t level_vertices[BOX_LOD_LEVELS_MAX];  /**< Vertices of each delivered level */
+    int32_t level_triangles[BOX_LOD_LEVELS_MAX]; /**< Triangles of each delivered level */
 } box_mg_record_t;
 
 /** The state of the mesh graphs of a world */
@@ -120,7 +131,8 @@ typedef struct box_mg_node_t {
 typedef struct box_mg_target_t {
     ecs_entity_t entity;         /**< The shape entity */
     ecs_entity_t output;         /**< The output node it requested */
-    int32_t node;                /**< Index of its output node in the plan */
+    int32_t nodes[BOX_LOD_LEVELS_MAX]; /**< Index of its output node in the plan per level */
+    int32_t levels;              /**< Levels of detail it requested */
     int32_t generation;          /**< Generation of the request */
 } box_mg_target_t;
 
@@ -202,6 +214,7 @@ typedef enum box_mg_walk_t {
  * @param graph Name of the graph in errors
  * @param output The output node
  * @param wait Wait for a node without a node component instead of failing
+ * @param level The level of detail the nodes are snapshot for, 0 for full detail
  * @param reached Receives the entities the walk reached, NULL for none
  * @param node Receives the index of the output in the plan
  * @param error Receives why it failed, freed with ecs_os_free
@@ -214,6 +227,7 @@ box_mg_walk_t box_mg_plan_walk(
     const char *graph,
     ecs_entity_t output,
     bool wait,
+    int32_t level,
     ecs_vec_t *reached,
     int32_t *node,
     char **error);
@@ -303,21 +317,50 @@ void box_mesh_graph_unreach(
     box_mesh_graphs_t *g,
     box_mg_record_t *r);
 
-/** Give the shapes that name an output its new value: the delivered value of the output, and
- * a MeshGraph set on each shape so the shape resolves it.
+/** Give the shapes that name an output its new values: the delivered values of the output,
+ * and a MeshGraph set on each shape so the shape resolves them.
  *
  * @param world The world
  * @param g The state
  * @param output The output node
- * @param value The value, a reference is taken
- * @param hash The content hash of the value
+ * @param values The value of each level of detail, a reference is taken
+ * @param hashes The content hash of each value
+ * @param levels Number of levels, 1 without levels of detail
  */
 void box_mesh_graph_deliver(
     ecs_world_t *world,
     box_mesh_graphs_t *g,
     ecs_entity_t output,
-    box_mg_value_t *value,
-    uint64_t hash);
+    box_mg_value_t *const *values,
+    const uint64_t *hashes,
+    int32_t levels);
+
+/** Copy the delivered values of an output into another, taking references.
+ *
+ * @param dst The output that receives them, without values
+ * @param src The output
+ */
+void box_mesh_graph_output_copy(
+    box_mg_output_t *dst,
+    const box_mg_output_t *src);
+
+/** Drop the delivered values of an output.
+ *
+ * @param out The output
+ */
+void box_mesh_graph_output_clear(
+    box_mg_output_t *out);
+
+/** Combine the hashes of the levels of detail of an output into the hash of the output: the
+ * hash of level 0 alone without levels.
+ *
+ * @param hashes The hash of each level
+ * @param levels Number of levels
+ * @return The hash
+ */
+uint64_t box_mesh_graph_levels_hash(
+    const uint64_t *hashes,
+    int32_t levels);
 
 /** Add bytes to a 64 bit hash.
  *
@@ -357,6 +400,19 @@ int64_t box_mg_value_bytes(
 void box_mg_value_copy(
     box_mg_value_t *dst,
     const box_mg_value_t *src);
+
+/** The factor of a reduction per level of detail: a factor of a node, which 0 gives the
+ * default of and a negative keeps at 1, to the power of the level.
+ *
+ * @param factor The factor of the node
+ * @param fallback The factor for 0
+ * @param level The level of detail
+ * @return The factor of the level
+ */
+float box_mg_lod_factor(
+    float factor,
+    float fallback,
+    int32_t level);
 
 /** Name of a value type for errors.
  *
@@ -502,7 +558,7 @@ void box_mg_mesh_facet(
 void box_mesh_nodes_source_register(
     ecs_world_t *world);
 
-/** Register the node kinds that change meshes: Transform, Merge, Displace and Normals.
+/** Register the node kinds that change meshes: Transform, Merge, Detail, Displace and Normals.
  *
  * @param world The world
  */

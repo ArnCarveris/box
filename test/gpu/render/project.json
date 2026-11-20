@@ -642,6 +642,14 @@
                 ]
             },
             {
+                "id": "MeshGraphLod",
+                "testcases": [
+                    "levels_by_distance",
+                    "far_tree_small_fraction",
+                    "adjacent_silhouettes"
+                ]
+            },
+            {
                 "id": "MeshGraph",
                 "testcases": [
                     "tube_with_spheres",

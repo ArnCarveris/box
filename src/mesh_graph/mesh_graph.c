@@ -135,6 +135,7 @@ static int box_mesh_kind_fill(
     kind->output = desc->output;
     kind->capture = desc->capture;
     kind->eval = desc->eval;
+    kind->lod = desc->lod;
     kind->flags = desc->flags;
     for (i = 0; i < BOX_MESH_NODE_INPUTS && desc->inputs[i].name; i ++) {
         kind->inputs[i] = desc->inputs[i];
@@ -181,7 +182,8 @@ static void box_mesh_kind_reflect(
         .input_count = kind->input_count,
         .param_count = kind->param_count,
         .source = kind->capture != NULL,
-        .random = (kind->flags & BOX_MESH_NODE_RANDOM) != 0
+        .random = (kind->flags & BOX_MESH_NODE_RANDOM) != 0,
+        .detail = kind->lod != NULL || (kind->flags & BOX_MESH_NODE_DETAIL) != 0
     };
     int32_t i;
     for (i = 0; i < kind->input_count; i ++) {
@@ -260,7 +262,7 @@ static void box_mesh_graph_output_release(
 {
     box_mg_output_t *out = ecs_map_get_deref(&g->outputs, box_mg_output_t, node);
     if (out && -- out->users <= 0) {
-        box_mg_value_release(out->value);
+        box_mesh_graph_output_clear(out);
         ecs_map_remove_free(&g->outputs, node);
     }
 }
@@ -292,18 +294,22 @@ static void BoxMeshGraphOnSet(
             ecs_vec_init_t(NULL, &r->reached, ecs_entity_t, 0);
         }
 
+        int32_t levels = graphs[i].levels > 1 ? graphs[i].levels : 1;
+        levels = levels < BOX_LOD_LEVELS_MAX ? levels : BOX_LOD_LEVELS_MAX;
         if (!added && r->output == graphs[i].output) {
+            r->dirty = r->dirty || r->levels != levels;
+            r->levels = levels;
             continue;
         }
 
+        r->levels = levels;
         box_mg_output_t *out = box_mesh_graph_output(g, graphs[i].output);
         out->users ++;
         const box_mg_output_t *old = r->output
             ? ecs_map_get_deref(&g->outputs, box_mg_output_t, r->output)
             : NULL;
         if (old && old->value && !out->value) {
-            out->value = box_mg_value_keep(old->value);
-            out->hash = old->hash;
+            box_mesh_graph_output_copy(out, old);
         }
 
         if (r->output) {
@@ -355,8 +361,26 @@ done:
     return;
 }
 
-/** Key of a MeshGraph: the content hash and the size of the mesh delivered for its output, all
- * zero before the first.
+/** Find the output a MeshGraph names.
+ *
+ * @param world The world
+ * @param graph The MeshGraph
+ * @return The output, NULL for none
+ */
+static const box_mg_output_t* box_mesh_graph_output_of(
+    const ecs_world_t *world,
+    const MeshGraph *graph)
+{
+    const box_mesh_graphs_t *g = box_mesh_graphs_get(world);
+
+    return g && graph->output
+        ? ecs_map_get_deref(&g->outputs, box_mg_output_t, graph->output)
+        : NULL;
+}
+
+/** Key of a MeshGraph: the content hash of the levels delivered for its output and the size of
+ * the mesh of level 0, all zero before the first, and the levels of detail of the graph in f[1],
+ * as the mesh cache keeps the MeshGraph of the first shape of a key to make its levels from.
  *
  * @param world The world
  * @param value The MeshGraph
@@ -368,16 +392,56 @@ static void box_mesh_graph_key(
     box_shape_key_t *key)
 {
     const MeshGraph *graph = value;
-    const box_mesh_graphs_t *g = box_mesh_graphs_get(world);
-    const box_mg_output_t *out = g && graph->output
-        ? ecs_map_get_deref(&g->outputs, box_mg_output_t, graph->output)
-        : NULL;
+    const box_mg_output_t *out = box_mesh_graph_output_of(world, graph);
     if (out && out->value) {
+        int32_t levels = graph->levels > 1 ? graph->levels : 1;
         key->i[0] = (int32_t)(uint32_t)(out->hash & 0xFFFFFFFFu);
         key->i[1] = (int32_t)(uint32_t)(out->hash >> 32);
         key->i[2] = out->value->mesh.vertex_count;
         key->i[3] = out->value->mesh.index_count;
+        key->f[1] = (float)(levels < BOX_LOD_LEVELS_MAX ? levels : BOX_LOD_LEVELS_MAX);
     }
+}
+
+/** Key of a level of detail of a MeshGraph: the content hash and the size of the mesh of the
+ * level, and the level in f[0]. A level the output does not have, or whose mesh is the mesh of
+ * the level before, has the key of the level before.
+ *
+ * @param world The world
+ * @param value The MeshGraph
+ * @param level The level, from 1
+ * @param key The key
+ */
+static void box_mesh_graph_lod(
+    const ecs_world_t *world,
+    const void *value,
+    int32_t level,
+    box_shape_key_t *key)
+{
+    const MeshGraph *graph = value;
+    const box_mg_output_t *out = box_mesh_graph_output_of(world, graph);
+    int32_t levels = graph->levels > 1 ? graph->levels : 1;
+    levels = out && out->levels < levels ? out->levels : levels;
+    level = level < levels ? level : levels - 1;
+    while (out && level > 0 && (!out->lods[level] ||
+        out->lod_hashes[level] == out->lod_hashes[level - 1]))
+    {
+        level --;
+    }
+
+    if (!out || level <= 0) {
+        box_mesh_graph_key(world, value, key);
+        goto done;
+    }
+
+    uint64_t hash = out->lod_hashes[level];
+    key->i[0] = (int32_t)(uint32_t)(hash & 0xFFFFFFFFu);
+    key->i[1] = (int32_t)(uint32_t)(hash >> 32);
+    key->i[2] = out->lods[level]->mesh.vertex_count;
+    key->i[3] = out->lods[level]->mesh.index_count;
+    key->f[0] = (float)level;
+done:
+    return;
 }
 
 /** Give a generated mesh the per vertex data of the data.0 to data.7 attributes of a Mesh
@@ -423,15 +487,14 @@ static void box_mesh_graph_generate(
     const box_shape_key_t *key,
     box_mesh_t *mesh)
 {
-    const MeshGraph *graph = value;
-    const box_mesh_graphs_t *g = box_mesh_graphs_get(world);
-    const box_mg_output_t *out = g && graph->output
-        ? ecs_map_get_deref(&g->outputs, box_mg_output_t, graph->output)
-        : NULL;
-    const box_mg_mesh_t *m = out && out->value ? &out->value->mesh : NULL;
-    int32_t i;
-    if (!m || key->i[0] != (int32_t)(uint32_t)(out->hash & 0xFFFFFFFFu) ||
-        key->i[1] != (int32_t)(uint32_t)(out->hash >> 32) || !m->vertex_count ||
+    const box_mg_output_t *out = box_mesh_graph_output_of(world, value);
+    int32_t level = (int32_t)key->f[0], i;
+    level = level > 0 && level < BOX_LOD_LEVELS_MAX ? level : 0;
+    const box_mg_value_t *v = out ? (level ? out->lods[level] : out->value) : NULL;
+    uint64_t hash = out ? (level ? out->lod_hashes[level] : out->hash) : 0;
+    const box_mg_mesh_t *m = v ? &v->mesh : NULL;
+    if (!m || key->i[0] != (int32_t)(uint32_t)(hash & 0xFFFFFFFFu) ||
+        key->i[1] != (int32_t)(uint32_t)(hash >> 32) || !m->vertex_count ||
         !m->index_count)
     {
         goto done;
@@ -559,7 +622,7 @@ static void box_mesh_graphs_fini(
     it = ecs_map_iter(&g->outputs);
     while (ecs_map_next(&it)) {
         box_mg_output_t *out = ecs_map_ptr(&it);
-        box_mg_value_release(out->value);
+        box_mesh_graph_output_clear(out);
         ecs_os_free(out);
     }
 
@@ -623,6 +686,7 @@ static void box_mesh_register(
     ECS_META_COMPONENT(world, MeshPath);
     ECS_META_COMPONENT(world, MeshTransform);
     ECS_META_COMPONENT(world, MeshMerge);
+    ECS_META_COMPONENT(world, MeshDetail);
     ECS_META_COMPONENT(world, MeshTube);
     ECS_META_COMPONENT(world, MeshPointsOnCurves);
     ECS_META_COMPONENT(world, MeshPointsOnMesh);
@@ -645,6 +709,7 @@ static void box_mesh_register(
 
     box_owned_hooks(world, MeshGraphStatus, BOX_OWNED_STR(MeshGraphStatus, error));
     box_owned_hooks(world, MeshMerge, BOX_OWNED_VEC(MeshMerge, inputs, ecs_entity_t));
+    box_owned_hooks(world, MeshDetail, BOX_OWNED_VEC(MeshDetail, levels, ecs_entity_t));
     box_owned_hooks(world, MeshNodePort, BOX_OWNED_STR(MeshNodePort, name));
     box_owned_hooks(world, MeshNodeParam, BOX_OWNED_STR(MeshNodeParam, name));
     box_owned_hooks(world, MeshNodeKind,
@@ -711,7 +776,8 @@ void box_mesh_graph_shape_init(
         .component = ecs_id(MeshGraph),
         .key_world = box_mesh_graph_key,
         .generate_world = box_mesh_graph_generate,
-        .surface_world = box_mesh_graph_surface
+        .surface_world = box_mesh_graph_surface,
+        .lod_world = box_mesh_graph_lod
     });
 
     ecs_entity_t sources[] = {
