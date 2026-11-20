@@ -444,8 +444,9 @@ done:
     return;
 }
 
-/** Give a generated mesh the per vertex data of the data.0 to data.7 attributes of a Mesh
- * value, when it has one of them.
+/** Give a generated mesh the per vertex data of the data.0 to data.15 attributes of a Mesh
+ * value, when it has one of them: data.8 to data.15 as its upper data, when it has one of
+ * those.
  *
  * @param m The Mesh value
  * @param mesh The generated mesh, with its vertices
@@ -454,23 +455,27 @@ static void box_mesh_graph_data(
     const box_mg_mesh_t *m,
     box_mesh_t *mesh)
 {
-    const float *channels[8];
-    bool any = false;
+    const float *channels[16];
+    bool any = false, upper = false;
     int32_t i, k;
-    for (k = 0; k < 8; k ++) {
+    for (k = 0; k < 16; k ++) {
         char name[BOX_MESH_ATTR_NAME];
         ecs_os_snprintf(name, ECS_SIZEOF(name), "%s%d", BOX_MESH_DATA_ATTR, k);
         channels[k] = box_mg_attr_find(m->attrs, m->attr_count, name);
         any = any || channels[k];
+        upper = upper || (k >= 8 && channels[k]);
     }
 
     for (i = 0; any && i < m->vertex_count; i ++) {
-        vec4 d[2];
-        for (k = 0; k < 8; k ++) {
+        vec4 d[4];
+        for (k = 0; k < 16; k ++) {
             d[k / 4][k % 4] = channels[k] ? channels[k][i] : 0.0f;
         }
 
         box_mesh_vertex_data(mesh, i, d[0], d[1]);
+        if (upper) {
+            box_mesh_vertex_data_upper(mesh, i, d[2], d[3]);
+        }
     }
 }
 

@@ -21,11 +21,21 @@ int32_t box_mesh_vertex(
         if (mesh->data) {
             mesh->data = ecs_os_realloc_n(mesh->data, vec4, mesh->vertex_capacity * 2);
         }
+
+        if (mesh->data_upper) {
+            mesh->data_upper = ecs_os_realloc_n(
+                mesh->data_upper, vec4, mesh->vertex_capacity * 2);
+        }
     }
 
     if (mesh->data) {
         glm_vec4_zero(mesh->data[mesh->vertex_count * 2]);
         glm_vec4_zero(mesh->data[mesh->vertex_count * 2 + 1]);
+    }
+
+    if (mesh->data_upper) {
+        glm_vec4_zero(mesh->data_upper[mesh->vertex_count * 2]);
+        glm_vec4_zero(mesh->data_upper[mesh->vertex_count * 2 + 1]);
     }
 
     box_vertex_t *vert = &mesh->vertices[mesh->vertex_count];
@@ -51,6 +61,26 @@ void box_mesh_vertex_data(
 
     glm_vec4_copy(ECS_CONST_CAST(float*, data0), mesh->data[index * 2]);
     glm_vec4_copy(ECS_CONST_CAST(float*, data1), mesh->data[index * 2 + 1]);
+}
+
+void box_mesh_vertex_data_upper(
+    box_mesh_t *mesh,
+    int32_t index,
+    const vec4 data2,
+    const vec4 data3)
+{
+    ecs_assert(index >= 0 && index < mesh->vertex_count, ECS_INVALID_PARAMETER, NULL);
+    int32_t capacity = mesh->vertex_capacity ? mesh->vertex_capacity : 1;
+    if (!mesh->data) {
+        mesh->data = ecs_os_calloc_n(vec4, capacity * 2);
+    }
+
+    if (!mesh->data_upper) {
+        mesh->data_upper = ecs_os_calloc_n(vec4, capacity * 2);
+    }
+
+    glm_vec4_copy(ECS_CONST_CAST(float*, data2), mesh->data_upper[index * 2]);
+    glm_vec4_copy(ECS_CONST_CAST(float*, data3), mesh->data_upper[index * 2 + 1]);
 }
 
 /** Append one index to a mesh.
@@ -125,6 +155,7 @@ void box_mesh_fini(
     ecs_os_free(mesh->indices);
     ecs_os_free(mesh->colors);
     ecs_os_free(mesh->data);
+    ecs_os_free(mesh->data_upper);
     ecs_os_free(mesh->surface_assets);
     ecs_os_memset_t(mesh, 0, box_mesh_t);
 }
@@ -158,6 +189,9 @@ void box_mesh_facet(
         flat.vertex_capacity = count ? count : 1;
         flat.vertices = ecs_os_malloc_n(box_vertex_t, flat.vertex_capacity);
         flat.data = ecs_os_malloc_n(vec4, flat.vertex_capacity * 2);
+        if (mesh->data_upper) {
+            flat.data_upper = ecs_os_malloc_n(vec4, flat.vertex_capacity * 2);
+        }
     }
 
     for (int32_t t = 0; t < count; t += 3) {
@@ -188,6 +222,11 @@ void box_mesh_facet(
             if (flat.data) {
                 box_mesh_vertex_data(&flat, v, mesh->data[idx[k] * 2],
                     mesh->data[idx[k] * 2 + 1]);
+            }
+
+            if (flat.data_upper) {
+                box_mesh_vertex_data_upper(&flat, v, mesh->data_upper[idx[k] * 2],
+                    mesh->data_upper[idx[k] * 2 + 1]);
             }
 
             box_mesh_index(&flat, v);

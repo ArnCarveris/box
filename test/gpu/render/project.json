@@ -503,6 +503,9 @@
                     "stiff_branches_still",
                     "without_data_unchanged",
                     "shadow_follows_branch",
+                    "deep_levels_attached",
+                    "deep_levels_shadow",
+                    "deep_levels_wireframe",
                     "card_stems_pinned_tips_flutter",
                     "card_stems_turn_with_twig"
                 ]

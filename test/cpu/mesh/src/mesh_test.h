@@ -208,6 +208,18 @@ static void test_near(
     test_assert(fabsf(value - expect) <= eps);
 }
 
+/** Snap a pivot coordinate down to the grid of BOX_MATERIAL_SWAY_GRID, as the WindSway data of
+ * branches stores it.
+ *
+ * @param value The coordinate
+ * @return The snapped coordinate
+ */
+static float sway_snap(
+    float value)
+{
+    return floorf(value * BOX_MATERIAL_SWAY_GRID) / BOX_MATERIAL_SWAY_GRID;
+}
+
 /** Check that two vec3 are within a tolerance.
  *
  * @param a The value

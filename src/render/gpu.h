@@ -610,9 +610,9 @@ bool box_gpu_vertex_data(
     const box_render_batch_t *b);
 
 /** Vertex buffer layout of the per vertex data stream of the _data entry points of the mesh
- * and shadow shaders: data0 at location 4 and data1 at location 5 (VertexData).
+ * and shadow shaders: data0 to data3 at locations 4 to 7 (VertexData).
  *
- * @param attrs Receives the two attributes the layout points to
+ * @param attrs Receives the BOX_RENDER_DATA_VECS attributes the layout points to
  * @return The layout
  */
 WGPUVertexBufferLayout box_gpu_vertex_data_layout(
@@ -2351,13 +2351,14 @@ bool box_gpu_debug_enabled(
 
 /** Upload the edge adjacency of a mesh that can be wired (box_gpu_mesh_t.wireable) for its
  * wire draws (debug_wire.wgsl): for each index, the vertex of the neighbor triangle across the
- * edge opposite that corner which is not on the edge, or BOX_GPU_WIRE_NONE on a border.
+ * edge opposite that corner which is not on the edge, or BOX_GPU_WIRE_NONE on a border. It
+ * follows a copy of the indices in one buffer, so the wire draws read both from one binding.
  *
  * Edges are matched by the positions of their vertices, welded within a tiny distance, so the
  * vertices a face or a uv seam duplicates still join, in linear time.
  *
- * The backend keeps no CPU copy of a mesh, so it is built at the upload; it has one uint32_t
- * per index, the size of the indices.
+ * The backend keeps no CPU copy of a mesh, so it is built at the upload; the buffer has two
+ * uint32_t per index, twice the size of the indices.
  *
  * @param gpu The backend
  * @param m The mesh, with its index count

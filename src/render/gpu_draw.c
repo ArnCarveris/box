@@ -659,7 +659,8 @@ void box_gpu_mesh_apply(
     const uint8_t *vertices = (const uint8_t*)(desc + 1);
     uint64_t vertex_span = (vertex_size + BOX_GPU_MESH_ALIGN - 1) &
         ~(uint64_t)(BOX_GPU_MESH_ALIGN - 1);
-    uint64_t data_size = desc->data ? (uint64_t)desc->vertex_count * 2 * sizeof(vec4) : 0;
+    uint64_t data_size = desc->data
+        ? (uint64_t)desc->vertex_count * BOX_RENDER_DATA_VECS * sizeof(vec4) : 0;
     uint64_t data_span = (data_size + BOX_GPU_MESH_ALIGN - 1) &
         ~(uint64_t)(BOX_GPU_MESH_ALIGN - 1);
     uint64_t alloc_size = vertex_span + data_span + index_size;
@@ -684,7 +685,8 @@ void box_gpu_mesh_apply(
     m->index_size = index_size;
     m->id = ++ gpu->mesh_ids;
     m->wireable = vertex_size <= limits.maxStorageBufferBindingSize &&
-        index_size <= limits.maxStorageBufferBindingSize;
+        index_size * 2 <= limits.maxStorageBufferBindingSize &&
+        data_size <= limits.maxStorageBufferBindingSize;
     m->surface_asset_size = desc->surface_asset_count ?
         (uint64_t)desc->surface_asset_count * sizeof(vec4) : sizeof(vec4);
     m->assets = desc->surface_asset_count != 0;

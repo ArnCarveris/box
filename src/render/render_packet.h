@@ -1192,6 +1192,10 @@ typedef struct box_render_target_desc_t {
     bool texture;           /**< Materials sample the image, so it renders before other targets */
 } box_render_target_desc_t;
 
+/** vec4 of per vertex data per vertex of the data stream of a mesh with data: data0 to data3
+ * (box_mesh_t.data then data_upper, zero without it) */
+#define BOX_RENDER_DATA_VECS (4)
+
 /** Description of a BOX_RENDER_MESH create, followed by its vertices and its indices.
  *
  * The vertices are box_vertex_t, the indices uint32_t with three per counter-clockwise
@@ -1201,9 +1205,10 @@ typedef struct box_render_mesh_desc_t {
     uint32_t surface_asset_count; /**< Surface asset vec4s after the indices */
     uint32_t vertex_count;  /**< Vertices after the description */
     uint32_t index_count;   /**< Indices after the vertices */
-    uint32_t data;          /**< 1 when two vec4 of per vertex data per vertex (box_mesh_t.data)
-                             *   follow the surface assets, uploaded as a vertex stream of its
-                             *   own; 0 for a mesh without data, which uploads and binds none */
+    uint32_t data;          /**< 1 when BOX_RENDER_DATA_VECS vec4 of per vertex data per vertex
+                             *   (box_mesh_t.data and data_upper) follow the surface assets,
+                             *   uploaded as a vertex stream of its own; 0 for a mesh without
+                             *   data, which uploads and binds none */
 } box_render_mesh_desc_t;
 
 /** Description of a BOX_RENDER_TEXTURE create, followed by its RGBA8 pixels row by row, or its

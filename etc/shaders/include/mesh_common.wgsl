@@ -774,7 +774,7 @@ fn vertex_occlusion_out(o: ptr<function, VertexOut>, material: Material, d: Vert
 // The vertex stages of the meshes with per vertex data (box_gpu_vertex_data): the reveal edge
 // of the data is passed on in VertexOut.object_normal.w, the occlusion in object.w.
 @vertex fn vs_data(v: VertexIn, d: VertexData) -> VertexOut {
-    wind_vertex_data(d.data0, d.data1);
+    wind_vertex_data(d.data0, d.data2, d.data3);
     var o = mesh_vertex(v);
     let material = material_fetch(shading_material(shadings[slot_of(v.slot)]));
     o.object_normal.w = reveal_edge(material, d.data0, d.data1);
@@ -783,7 +783,7 @@ fn vertex_occlusion_out(o: ptr<function, VertexOut>, material: Material, d: Vert
 }
 
 @vertex fn vs_surface_data(v: VertexIn, d: VertexData) -> VertexOut {
-    wind_vertex_data(d.data0, d.data1);
+    wind_vertex_data(d.data0, d.data2, d.data3);
     var o = mesh_vertex_surface(v);
     let material = material_fetch(shading_material(shadings[slot_of(v.slot)]));
     o.object_normal.w = reveal_edge(material, d.data0, d.data1);
@@ -802,12 +802,12 @@ fn vertex_occlusion_out(o: ptr<function, VertexOut>, material: Material, d: Vert
 // The depth prepass of the swaying meshes with per vertex data, which a WindSway with pivots
 // reads.
 @vertex fn vs_depth_data(v: VertexIn, d: VertexData) -> DepthOut {
-    wind_vertex_data(d.data0, d.data1);
+    wind_vertex_data(d.data0, d.data2, d.data3);
     return depth_out(v.slot, placed_wind(v, place_mesh(v)));
 }
 
 @vertex fn vs_depth_surface_data(v: VertexIn, d: VertexData) -> DepthOut {
-    wind_vertex_data(d.data0, d.data1);
+    wind_vertex_data(d.data0, d.data2, d.data3);
     return depth_out(v.slot, placed_wind(v, place(v)));
 }
 
@@ -841,7 +841,7 @@ fn cutout_vertex_surface(v: VertexIn) -> CutoutOut {
 
 // The alpha tested depth prepass of the meshes with per vertex data, with its reveal edge.
 @vertex fn vs_cutout_data(v: VertexIn, d: VertexData) -> CutoutOut {
-    wind_vertex_data(d.data0, d.data1);
+    wind_vertex_data(d.data0, d.data2, d.data3);
     var o = cutout_vertex(v);
     let material = material_fetch(shading_material(shadings[slot_of(v.slot)]));
     o.reveal = reveal_edge(material, d.data0, d.data1);
@@ -849,7 +849,7 @@ fn cutout_vertex_surface(v: VertexIn) -> CutoutOut {
 }
 
 @vertex fn vs_cutout_surface_data(v: VertexIn, d: VertexData) -> CutoutOut {
-    wind_vertex_data(d.data0, d.data1);
+    wind_vertex_data(d.data0, d.data2, d.data3);
     var o = cutout_vertex_surface(v);
     let material = material_fetch(shading_material(shadings[slot_of(v.slot)]));
     o.reveal = reveal_edge(material, d.data0, d.data1);

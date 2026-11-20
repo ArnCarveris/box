@@ -71,7 +71,11 @@ typedef enum box_gpu_debug_kind_t {
     BOX_GPU_DEBUG_OVERDRAW_CUTOUT = 5, /**< Heat map of the alpha tested overdraw */
     BOX_GPU_DEBUG_BVH = 6,          /**< Boxes of the spatial index trees */
     BOX_GPU_DEBUG_WIRE_OVERLAY_WIND = 7, /**< WireframeOverlay of the batches with a WindSway */
-    BOX_GPU_DEBUG_WIRE_ONLY_WIND = 8 /**< WireframeOnly of the batches with a WindSway */
+    BOX_GPU_DEBUG_WIRE_ONLY_WIND = 8, /**< WireframeOnly of the batches with a WindSway */
+    BOX_GPU_DEBUG_WIRE_OVERLAY_WIND_DATA = 9, /**< WireframeOverlay of the batches with a
+                                     *   WindSway whose mesh has per vertex data */
+    BOX_GPU_DEBUG_WIRE_ONLY_WIND_DATA = 10 /**< WireframeOnly of the batches with a WindSway
+                                     *   whose mesh has per vertex data */
 } box_gpu_debug_kind_t;
 
 /** Format of the texture the overdraw pass counts the fragments of a pixel in: the plain meshes
@@ -95,6 +99,11 @@ struct box_gpu_debug_t {
     WGPUBindGroupLayout wire_view_layout; /**< View uniform alone, group 0 of wire_wind_layout */
     WGPUPipelineLayout wire_wind_layout; /**< View uniform, mesh, material_instance_layout and
                                      *   wire groups, of the wire draws of WindSway batches */
+    WGPUBindGroupLayout wire_data_layout; /**< Vertices, indices and per vertex data of a mesh,
+                                     *   group 1 of a wire draw of vs_wind_data */
+    WGPUPipelineLayout wire_wind_data_layout; /**< wire_wind_layout with wire_data_layout as
+                                     *   group 1, of the wire draws of WindSway batches whose mesh
+                                     *   has per vertex data */
     ecs_map_t pipelines;            /**< Kind << 32 | color format to the WGPURenderPipeline */
     int32_t grid_revision;          /**< Revision of the grid shader of the pipelines */
     int32_t wire_revision;          /**< Revision of the wire shader of the pipelines */
@@ -196,6 +205,8 @@ void box_gpu_debug_init(
         .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
     }};
     d->wire_mesh_layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
+        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 2, .entries = mesh_entries });
+    d->wire_data_layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
         &(WGPUBindGroupLayoutDescriptor){ .entryCount = 3, .entries = mesh_entries });
     WGPUBindGroupLayoutEntry wire_entry = {
         .binding = 0,
@@ -223,6 +234,12 @@ void box_gpu_debug_init(
     wire_groups[0] = d->wire_view_layout;
     wire_groups[2] = gpu->material_instance_layout;
     d->wire_wind_layout = wgpuDeviceCreatePipelineLayout(gpu->device,
+        &(WGPUPipelineLayoutDescriptor){
+            .bindGroupLayoutCount = 4,
+            .bindGroupLayouts = wire_groups
+        });
+    wire_groups[1] = d->wire_data_layout;
+    d->wire_wind_data_layout = wgpuDeviceCreatePipelineLayout(gpu->device,
         &(WGPUPipelineLayoutDescriptor){
             .bindGroupLayoutCount = 4,
             .bindGroupLayouts = wire_groups
@@ -360,9 +377,11 @@ void box_gpu_debug_fini(
 
     wgpuPipelineLayoutRelease(d->wire_pipeline_layout);
     wgpuPipelineLayoutRelease(d->wire_wind_layout);
+    wgpuPipelineLayoutRelease(d->wire_wind_data_layout);
     wgpuBindGroupLayoutRelease(d->wire_view_layout);
     wgpuBindGroupLayoutRelease(d->wire_layout);
     wgpuBindGroupLayoutRelease(d->wire_mesh_layout);
+    wgpuBindGroupLayoutRelease(d->wire_data_layout);
 
     box_gpu_debug_probe_pipelines_free(d);
     ecs_map_fini(&d->probe_pipelines);
@@ -563,20 +582,24 @@ done:
  * is in front hides the lines; WireframeOnly compares Always and shows every line. Neither
  * writes the depth or culls faces; the premultiplied color and alpha blend over the target.
  *
- * The pipeline of the batches with a WindSway places the vertices with vs_wind, which moves
- * them as the mesh shaders do, with the instance group with the shading stream.
+ * The batches with a WindSway place the vertices with vs_wind as the mesh shaders do, with the
+ * shading stream, or with vs_wind_data, which reads the pivots from the per vertex data in the
+ * mesh group, when their mesh has it.
  *
  * @param gpu The backend
  * @param mode The mode, WireframeOverlay or WireframeOnly
  * @param format The format of the color target
  * @param wind Whether to get the pipeline of the batches with a WindSway
+ * @param data Whether to get the pipeline of the batches with a WindSway whose mesh has per
+ * vertex data; ignored without wind
  * @return The pipeline, NULL until the shader exists
  */
 static WGPURenderPipeline box_gpu_debug_wire_pipeline(
     box_gpu_t *gpu,
     WireframeMode mode,
     WGPUTextureFormat format,
-    bool wind)
+    bool wind,
+    bool data)
 {
     box_gpu_debug_t *d = gpu->debug;
     box_gpu_shader_t *shader = ecs_map_get_deref(
@@ -592,11 +615,16 @@ static WGPURenderPipeline box_gpu_debug_wire_pipeline(
     if (d->wire_revision != shader->revision) {
         box_gpu_debug_pipelines_free(d,
             (1u << BOX_GPU_DEBUG_WIRE_OVERLAY) | (1u << BOX_GPU_DEBUG_WIRE_ONLY) |
-            (1u << BOX_GPU_DEBUG_WIRE_OVERLAY_WIND) | (1u << BOX_GPU_DEBUG_WIRE_ONLY_WIND));
+            (1u << BOX_GPU_DEBUG_WIRE_OVERLAY_WIND) | (1u << BOX_GPU_DEBUG_WIRE_ONLY_WIND) |
+            (1u << BOX_GPU_DEBUG_WIRE_OVERLAY_WIND_DATA) |
+            (1u << BOX_GPU_DEBUG_WIRE_ONLY_WIND_DATA));
         d->wire_revision = shader->revision;
     }
 
-    key = box_gpu_debug_key(wind
+    data = wind && data;
+    key = box_gpu_debug_key(data
+        ? (overlay ? BOX_GPU_DEBUG_WIRE_OVERLAY_WIND_DATA : BOX_GPU_DEBUG_WIRE_ONLY_WIND_DATA)
+        : wind
         ? (overlay ? BOX_GPU_DEBUG_WIRE_OVERLAY_WIND : BOX_GPU_DEBUG_WIRE_ONLY_WIND)
         : (overlay ? BOX_GPU_DEBUG_WIRE_OVERLAY : BOX_GPU_DEBUG_WIRE_ONLY), format);
     cached = ecs_map_get(&d->pipelines, key);
@@ -648,10 +676,14 @@ static WGPURenderPipeline box_gpu_debug_wire_pipeline(
         .depthBiasSlopeScale = overlay ? BOX_GPU_DEBUG_WIRE_SLOPE_BIAS : 0.0f
     };
     result = box_gpu_render_pipeline(gpu, &(WGPURenderPipelineDescriptor){
-        .layout = wind ? d->wire_wind_layout : d->wire_pipeline_layout,
+        .layout = data ? d->wire_wind_data_layout
+            : wind ? d->wire_wind_layout : d->wire_pipeline_layout,
         .vertex = {
             .module = shader->module,
-            .entryPoint = { .data = wind ? "vs_wind" : "vs", .length = WGPU_STRLEN },
+            .entryPoint = {
+                .data = data ? "vs_wind_data" : wind ? "vs_wind" : "vs",
+                .length = WGPU_STRLEN
+            },
             .bufferCount = 1,
             .buffers = &slots
         },
@@ -1239,267 +1271,28 @@ static WGPUBindGroup box_gpu_debug_wire_group(
     });
 }
 
-/** Distance up to which the vertices of a mesh weld, relative to its largest coordinate: wider
- * than the rounding of the positions a seam computes twice (the sine of 0 and of 2 pi), far
- * below the size of a triangle. */
-#define BOX_GPU_DEBUG_WELD (1e-5f)
-
-/** Get the cell of a weld grid a coordinate is in.
+/** Get the group of a mesh with its vertices, and its indices with their edge adjacency, as the
+ * storage buffers of its wire draws, created on first use and kept with the mesh, which
+ * releases it.
  *
- * @param x The coordinate
- * @param cell The size of a cell
- * @return The cell
- */
-static int32_t box_gpu_debug_cell(
-    float x,
-    float cell)
-{
-    return (int32_t)floorf(x / cell);
-}
-
-/** Hash of a cell of the weld grid.
- *
- * @param c The cell
- * @return The hash
- */
-static uint64_t box_gpu_debug_cell_hash(
-    const int32_t *c)
-{
-    uint64_t h = 1469598103934665603ull;
-    int32_t i;
-    for (i = 0; i < 3; i ++) {
-        h = (h ^ (uint32_t)c[i]) * 1099511628211ull;
-        h ^= h >> 29;
-    }
-
-    return h;
-}
-
-/** Find a vertex within the weld distance of a position in a cell of the weld grid.
- *
- * @param vertices The vertices
- * @param table The open addressing hash table of the vertices by cell, vertex + 1, 0 when empty
- * @param size The number of slots of the table, a power of two
- * @param p The position
- * @param c The cell
- * @param cell The size of a cell
- * @param eps The weld distance
- * @return The slot of the vertex, or the empty slot that ends the probe when there is none
- */
-static uint32_t box_gpu_debug_weld_find(
-    const box_vertex_t *vertices,
-    const uint32_t *table,
-    uint32_t size,
-    const float *p,
-    const int32_t *c,
-    float cell,
-    float eps)
-{
-    uint32_t slot = (uint32_t)box_gpu_debug_cell_hash(c) & (size - 1);
-    while (table[slot]) {
-        const float *q = vertices[table[slot] - 1].position;
-        if (box_gpu_debug_cell(q[0], cell) == c[0] &&
-            box_gpu_debug_cell(q[1], cell) == c[1] &&
-            box_gpu_debug_cell(q[2], cell) == c[2] &&
-            fabsf(p[0] - q[0]) <= eps && fabsf(p[1] - q[1]) <= eps &&
-            fabsf(p[2] - q[2]) <= eps)
-        {
-            break;
-        }
-
-        slot = (slot + 1) & (size - 1);
-    }
-
-    return slot;
-}
-
-/** Weld the vertices of a mesh by position: for each, the first vertex within the weld distance
- * (BOX_GPU_DEBUG_WELD), found in a grid of cells twice that size hashed by cell, in the cell of
- * the vertex and those its weld distance reaches.
- *
- * @param vertices The vertices
- * @param vertex_count Number of vertices
- * @return The vertex each vertex welds to, freed with ecs_os_free
- */
-static uint32_t* box_gpu_debug_weld(
-    const box_vertex_t *vertices,
-    uint32_t vertex_count)
-{
-    uint32_t *weld = ecs_os_malloc_n(uint32_t, vertex_count);
-    uint32_t size = 1, i, k;
-    float largest = 0.0f;
-    while (size < vertex_count * 2u) {
-        size <<= 1;
-    }
-
-    for (i = 0; i < vertex_count; i ++) {
-        for (k = 0; k < 3; k ++) {
-            float x = fabsf(vertices[i].position[k]);
-            largest = isfinite(x) && x > largest ? x : largest;
-        }
-    }
-
-    float eps = BOX_GPU_DEBUG_WELD * (largest > 1e-30f ? largest : 1e-30f);
-    float cell = eps * 2.0f;
-    uint32_t *table = ecs_os_calloc_n(uint32_t, size);
-    for (i = 0; i < vertex_count; i ++) {
-        const float *p = vertices[i].position;
-        weld[i] = i;
-        if (!isfinite(p[0]) || !isfinite(p[1]) || !isfinite(p[2])) {
-            continue;
-        }
-
-        int32_t lo[3], hi[3], c[3];
-        for (k = 0; k < 3; k ++) {
-            lo[k] = box_gpu_debug_cell(p[k] - eps, cell);
-            hi[k] = box_gpu_debug_cell(p[k] + eps, cell);
-        }
-
-        uint32_t slot = 0;
-        bool found = false;
-        for (k = 0; k < 8 && !found; k ++) {
-            c[0] = k & 1 ? hi[0] : lo[0];
-            c[1] = k & 2 ? hi[1] : lo[1];
-            c[2] = k & 4 ? hi[2] : lo[2];
-            if (((k & 1) && hi[0] == lo[0]) || ((k & 2) && hi[1] == lo[1]) ||
-                ((k & 4) && hi[2] == lo[2]))
-            {
-                continue;
-            }
-
-            slot = box_gpu_debug_weld_find(vertices, table, size, p, c, cell, eps);
-            found = table[slot] != 0;
-        }
-
-        if (found) {
-            weld[i] = table[slot] - 1;
-            continue;
-        }
-
-        for (k = 0; k < 3; k ++) {
-            c[k] = box_gpu_debug_cell(p[k], cell);
-        }
-
-        slot = (uint32_t)box_gpu_debug_cell_hash(c) & (size - 1);
-        while (table[slot]) {
-            slot = (slot + 1) & (size - 1);
-        }
-
-        table[slot] = i + 1;
-    }
-
-    ecs_os_free(table);
-
-    return weld;
-}
-
-/** Compute the edge adjacency of a mesh by matching the edges of its welded vertices with a
- * map of their sorted pairs.
- *
- * The edge opposite corner k of a triangle is the one between its corners k + 1 and k + 2, so
- * the neighbor across the edge e gets the vertex indices[e]. An edge of more than two triangles
- * keeps the first one as the neighbor of the others.
- *
- * A triangle with two vertices at one position draws nothing and is no neighbor, so the
- * triangles around the pole of a sphere or the center of a cap join each other.
- *
- * @param vertices The vertices
- * @param vertex_count Number of vertices
- * @param indices The indices, three per triangle
- * @param index_count Number of indices
- * @return One neighbor per index, freed with ecs_os_free
- */
-static uint32_t* box_gpu_debug_adjacency(
-    const box_vertex_t *vertices,
-    uint32_t vertex_count,
-    const uint32_t *indices,
-    uint32_t index_count)
-{
-    uint32_t *result = ecs_os_malloc_n(uint32_t, index_count);
-    uint32_t *weld = box_gpu_debug_weld(vertices, vertex_count);
-    uint32_t i, k;
-    ecs_map_t edges;
-    ecs_map_init(&edges, NULL);
-    for (i = 0; i < index_count; i ++) {
-        result[i] = BOX_GPU_WIRE_NONE;
-    }
-
-    for (i = 0; i + 2 < index_count; i += 3) {
-        if (indices[i] >= vertex_count || indices[i + 1] >= vertex_count ||
-            indices[i + 2] >= vertex_count)
-        {
-            continue;
-        }
-
-        uint32_t w[3] = {weld[indices[i]], weld[indices[i + 1]], weld[indices[i + 2]]};
-        if (w[0] == w[1] || w[1] == w[2] || w[2] == w[0]) {
-            continue;
-        }
-
-        for (k = 0; k < 3; k ++) {
-            uint32_t a = w[(k + 1) % 3];
-            uint32_t b = w[(k + 2) % 3];
-            uint64_t key = a < b ? ((uint64_t)a << 32) | b : ((uint64_t)b << 32) | a;
-            uint32_t e = i + k;
-            ecs_map_val_t *other = ecs_map_get(&edges, key);
-            if (!other) {
-                ecs_map_insert(&edges, key, e);
-                continue;
-            }
-
-            uint32_t o = (uint32_t)*other;
-            result[e] = indices[o];
-            if (result[o] == BOX_GPU_WIRE_NONE) {
-                result[o] = indices[e];
-            }
-        }
-    }
-
-    ecs_map_fini(&edges);
-    ecs_os_free(weld);
-
-    return result;
-}
-
-void box_gpu_debug_mesh_adjacency(
-    box_gpu_t *gpu,
-    box_gpu_mesh_t *m,
-    const box_vertex_t *vertices,
-    uint32_t vertex_count,
-    const uint32_t *indices)
-{
-    if (!m->wireable) {
-        goto done;
-    }
-
-    uint64_t size = (uint64_t)m->index_count * sizeof(uint32_t);
-    uint32_t *adjacency = box_gpu_debug_adjacency(vertices, vertex_count, indices,
-        m->index_count);
-    m->adjacency = wgpuDeviceCreateBuffer(gpu->device, &(WGPUBufferDescriptor){
-        .usage = WGPUBufferUsage_Storage | WGPUBufferUsage_CopyDst,
-        .size = size
-    });
-    wgpuQueueWriteBuffer(gpu->queue, m->adjacency, 0, adjacency, (size_t)size);
-    ecs_os_free(adjacency);
-done:
-    return;
-}
-
-/** Get the group of a mesh with its vertices, indices and edge adjacency as the storage buffers
- * of its wire draws, created on first use and kept with the mesh, which releases it.
+ * With data it is the group of the wire draws of vs_wind_data, which binds the per vertex data
+ * of the mesh too (wire_data_layout); a mesh without data has none.
  *
  * A mesh whose vertices exceed the storage buffer binding size of the device is not wired; it
  * logs one error.
  *
  * @param gpu The backend
  * @param m The mesh
+ * @param data Whether to get the group with the per vertex data
  * @return The bind group, NULL when the mesh cannot be wired
  */
 static WGPUBindGroup box_gpu_debug_mesh_group(
     box_gpu_t *gpu,
-    box_gpu_mesh_t *m)
+    box_gpu_mesh_t *m,
+    bool data)
 {
-    if (m->wire || !m->wireable) {
+    WGPUBindGroup *group = data ? &m->wire_data : &m->wire;
+    if (*group || !m->wireable || (data && !m->data_size)) {
         if (!m->wireable && !m->wire_reported) {
             ecs_err("mesh exceeds the storage buffer binding size, it is not wired");
             m->wire_reported = true;
@@ -1517,23 +1310,23 @@ static WGPUBindGroup box_gpu_debug_mesh_group(
         },
         {
             .binding = 1,
-            .buffer = m->buffer,
-            .offset = m->index_offset,
-            .size = m->index_size
+            .buffer = m->adjacency,
+            .size = wgpuBufferGetSize(m->adjacency)
         },
         {
             .binding = 2,
-            .buffer = m->adjacency,
-            .size = wgpuBufferGetSize(m->adjacency)
+            .buffer = m->buffer,
+            .offset = m->data_offset,
+            .size = m->data_size
         }
     };
-    m->wire = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
-        .layout = gpu->debug->wire_mesh_layout,
-        .entryCount = 3,
+    *group = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
+        .layout = data ? gpu->debug->wire_data_layout : gpu->debug->wire_mesh_layout,
+        .entryCount = data ? 3 : 2,
         .entries = entries
     });
 done:
-    return m->wire;
+    return *group;
 }
 
 void box_gpu_debug_mesh_free(
@@ -1542,6 +1335,11 @@ void box_gpu_debug_mesh_free(
     if (m->wire) {
         wgpuBindGroupRelease(m->wire);
         m->wire = NULL;
+    }
+
+    if (m->wire_data) {
+        wgpuBindGroupRelease(m->wire_data);
+        m->wire_data = NULL;
     }
 
     if (m->adjacency) {
@@ -1653,7 +1451,8 @@ static bool box_gpu_debug_view_sequence(
  * box_gpu_draw_batches draws them.
  *
  * The batches with a WindSway draw with the wind pipeline of the mode, once it exists, with
- * the view uniform alone at group 0.
+ * the view uniform alone at group 0; those whose mesh has per vertex data with its data variant
+ * and the mesh group with the data.
  *
  * @param gpu The backend
  * @param pass The debug pass, with the view group bound
@@ -1696,9 +1495,11 @@ static void box_gpu_debug_wire_draws(
         }
 
         box_gpu_mesh_t *m = ecs_map_get_deref(&gpu->meshes, box_gpu_mesh_t, b->mesh);
-        WGPUBindGroup mesh_group = m ? box_gpu_debug_mesh_group(gpu, m) : NULL;
+        bool data = b->wind && m && m->data_size;
+        WGPUBindGroup mesh_group = m ? box_gpu_debug_mesh_group(gpu, m, data) : NULL;
         WGPURenderPipeline drawn = b->wind
-            ? box_gpu_debug_wire_pipeline(gpu, v->debug.wireframe, format, true) : pipeline;
+            ? box_gpu_debug_wire_pipeline(gpu, v->debug.wireframe, format, true, data)
+            : pipeline;
         if (b->wind && drawn && !view) {
             view = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
                 .layout = gpu->debug->wire_view_layout, .entryCount = 1,
@@ -1873,7 +1674,7 @@ void box_gpu_debug_record(
     }
 
     if (v->debug.wireframe == WireframeOverlay || v->debug.wireframe == WireframeOnly) {
-        wire = box_gpu_debug_wire_pipeline(gpu, v->debug.wireframe, t->format, false);
+        wire = box_gpu_debug_wire_pipeline(gpu, v->debug.wireframe, t->format, false, false);
     }
 
     if (v->debug.light_probes || v->debug.reflection_probes) {

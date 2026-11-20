@@ -47,10 +47,13 @@ fn instance_framed(frame: InstanceTransform, transform: InstanceTransform) -> bo
     return placed && !own;
 }
 
-// Per vertex data of a mesh that has it (Mesh3.data0 and data1, box_mesh_vertex_data), a vertex
-// stream of its own that only the _data entry points read: the pipelines of the batches whose
-// mesh has data (box_gpu_vertex_data) bind it as the third vertex buffer.
+// Per vertex data of a mesh that has it (Mesh3.data0 to data3, box_mesh_vertex_data and
+// box_mesh_vertex_data_upper), a vertex stream of its own that only the _data entry points read:
+// the pipelines of the batches whose mesh has data (box_gpu_vertex_data) bind it as the third
+// vertex buffer.
 struct VertexData {
     @location(4) data0: vec4f,
     @location(5) data1: vec4f,
+    @location(6) data2: vec4f,
+    @location(7) data3: vec4f,
 };

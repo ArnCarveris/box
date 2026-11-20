@@ -24,12 +24,17 @@
 #define BOX_MG_CROWN_MAX_CELLS (64)
 
 /** Attributes of the points of Leaves and Needles, in the order of box_mg_leaf_t.values */
-#define BOX_MG_LEAF_ATTRS (10)
+#define BOX_MG_LEAF_ATTRS (18)
+
+/** First attribute of the points of Leaves and Needles with the WindSway data of the ancestors
+ * of their twig, the data channels BOX_MG_SWAY_CHANNEL and after that Cards writes */
+#define BOX_MG_LEAF_SWAY (10)
 
 /** Names of the attributes of the points of Leaves and Needles */
 static const char *box_mg_leaf_names[BOX_MG_LEAF_ATTRS] = {
     "t", "curve", "level", "pivot_x", "pivot_y", "pivot_z", "root_distance", "seed", "hue",
-    "index"
+    "index", "data.8", "data.9", "data.10", "data.11", "data.12", "data.13", "data.14",
+    "data.15"
 };
 
 /** The branching curves that foliage grows on */
@@ -237,7 +242,8 @@ static bool box_mg_foliage_carries(
     return result;
 }
 
-/** Write the common attributes of a leaf on a curve: t, curve, level, pivot, root distance.
+/** Write the common attributes of a leaf on a curve: t, curve, level, pivot, root distance and
+ * the WindSway data of the ancestors of the curve.
  *
  * @param f The foliage
  * @param curve The curve
@@ -255,7 +261,10 @@ static void box_mg_leaf_on_curve(
     box_mg_leaf_t *leaf)
 {
     const box_mg_curves_t *c = f->c;
-    const float *pivot = c->positions[c->offsets[curve]];
+    vec4 sway[3];
+    int32_t k;
+    box_mg_curve_sway(c, f->level, curve, sway[0], sway[1], sway[2]);
+    const float *pivot = sway[0];
     glm_vec3_copy((float*)s->position, leaf->position);
     leaf->values[0] = length > 0.0f ? distance / length : 0.0f;
     leaf->values[1] = (float)curve;
@@ -264,6 +273,9 @@ static void box_mg_leaf_on_curve(
     leaf->values[4] = pivot[1];
     leaf->values[5] = pivot[2];
     leaf->values[6] = f->root ? box_mg_sample_attr(f->root, s) : distance;
+    for (k = 0; k < 8; k ++) {
+        leaf->values[BOX_MG_LEAF_SWAY + k] = sway[1 + k / 4][k % 4];
+    }
 }
 
 /** Add the attributes of the points of Leaves and Needles.
@@ -1147,7 +1159,9 @@ static int box_mesh_cards_eval(
     box_mg_value_t *tmpl = box_mg_value_new(MeshValueMesh);
     const box_mg_mesh_t *src = &tmpl->mesh;
     float flutter = glm_clamp(n->flutter, 0.0f, 1.0f), reach = 1e-6f;
-    float *data[8];
+    float *data[16] = {0};
+    const float *sway[8];
+    bool swaying = false;
     int32_t vc, ic, k, i;
     (void)error;
     box_mg_card_template(n, counts[1] ? inputs[1] : NULL, tmpl);
@@ -1167,9 +1181,17 @@ static int box_mesh_cards_eval(
     const float *hue = box_mg_attr_find(p->attrs, p->attr_count, "hue");
     const float *root = box_mg_attr_find(p->attrs, p->attr_count, "root_distance");
     bool pivots = pivot[0] && pivot[1] && pivot[2];
+    for (i = 0; i < 8; i ++) {
+        char name[BOX_MESH_ATTR_NAME];
+        ecs_os_snprintf(name, ECS_SIZEOF(name), "%s%d", BOX_MESH_DATA_ATTR,
+            BOX_MG_SWAY_CHANNEL + i);
+        sway[i] = box_mg_attr_find(p->attrs, p->attr_count, name);
+        swaying = swaying || sway[i];
+    }
+
     box_mg_mesh_resize(m, p->count * vc, p->count * ic);
     float *card = box_mg_attr_add(m->attrs, &m->attr_count, "card", m->vertex_count);
-    for (i = 0; i < 8; i ++) {
+    for (i = 0; i < (swaying ? 16 : 8); i ++) {
         char name[BOX_MESH_ATTR_NAME];
         ecs_os_snprintf(name, ECS_SIZEOF(name), "%s%d", BOX_MESH_DATA_ATTR, i);
         data[i] = box_mg_attr_add(m->attrs, &m->attr_count, name, m->vertex_count);
@@ -1184,11 +1206,15 @@ static int box_mesh_cards_eval(
         float fallback_seed = box_mg_rand_float(&rand);
         float fallback_hue = box_mg_rand_float(&rand);
         float lv = level ? floorf(level[k] + 0.5f) : 0.0f;
-        float d[8] = {
+        float d[16] = {
             0.0f, 0.0f, 0.0f, 0.0f,
             seed ? seed[k] : fallback_seed, hue ? hue[k] : fallback_hue,
             root ? root[k] : 0.0f, 1.0f
         };
+        for (i = 0; i < 8; i ++) {
+            d[BOX_MG_SWAY_CHANNEL + i] = sway[i] ? sway[i][k] : 0.0f;
+        }
+
         glm_quat_mat3(p->rotations[k], r);
         for (i = 0; i < 3; i ++) {
             s[i] = p->scales[k][i] != 0.0f ? p->scales[k][i] : 1.0f;
@@ -1209,7 +1235,7 @@ static int box_mesh_cards_eval(
             float weight = flutter * glm_clamp(src->positions[i][1] / reach, 0.0f, 1.0f);
             d[BOX_MESH_DATA_FLUTTER] = lv + 0.5f * weight;
             card[v] = (float)k;
-            for (ch = 0; ch < 8; ch ++) {
+            for (ch = 0; ch < 16; ch ++) {
                 if (data[ch]) {
                     data[ch][v] = d[ch];
                 }

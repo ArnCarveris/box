@@ -187,11 +187,17 @@ WGPUVertexBufferLayout box_gpu_vertex_data_layout(
     attrs[1] = (WGPUVertexAttribute){
         .format = WGPUVertexFormat_Float32x4, .offset = sizeof(vec4), .shaderLocation = 5
     };
+    attrs[2] = (WGPUVertexAttribute){
+        .format = WGPUVertexFormat_Float32x4, .offset = 2 * sizeof(vec4), .shaderLocation = 6
+    };
+    attrs[3] = (WGPUVertexAttribute){
+        .format = WGPUVertexFormat_Float32x4, .offset = 3 * sizeof(vec4), .shaderLocation = 7
+    };
 
     return (WGPUVertexBufferLayout){
         .stepMode = WGPUVertexStepMode_Vertex,
-        .arrayStride = 2 * sizeof(vec4),
-        .attributeCount = 2,
+        .arrayStride = BOX_RENDER_DATA_VECS * sizeof(vec4),
+        .attributeCount = BOX_RENDER_DATA_VECS,
         .attributes = attrs
     };
 }

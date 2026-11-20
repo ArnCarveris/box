@@ -366,13 +366,13 @@ fn caster_reveal(v: VertexIn, d: VertexData) -> f32 {
 // The plain swaying casters with per vertex data (box_gpu_vertex_data), which a WindSway with
 // pivots reads.
 @vertex fn vs_data(v: VertexIn, d: VertexData) -> ShadowOut {
-    wind_vertex_data(d.data0, d.data1);
+    wind_vertex_data(d.data0, d.data2, d.data3);
     return ShadowOut(cascade.matrix * vec4f(caster_world_mesh(slot_of(v.slot), v.position), 1.0),
         caster_range(v.slot));
 }
 
 @vertex fn vs_surface_data(v: VertexIn, d: VertexData) -> ShadowOut {
-    wind_vertex_data(d.data0, d.data1);
+    wind_vertex_data(d.data0, d.data2, d.data3);
     return ShadowOut(caster_position(slot_of(v.slot), v.position), caster_range(v.slot));
 }
 
@@ -387,14 +387,14 @@ fn caster_reveal(v: VertexIn, d: VertexData) -> f32 {
 // The alpha tested casters with per vertex data (box_gpu_vertex_data), which a VertexReveal
 // hides parts of.
 @vertex fn vs_cutout_data(v: VertexIn, d: VertexData) -> CasterOut {
-    wind_vertex_data(d.data0, d.data1);
+    wind_vertex_data(d.data0, d.data2, d.data3);
     var o = caster_cutout(v);
     o.reveal = caster_reveal(v, d);
     return o;
 }
 
 @vertex fn vs_cutout_surface_data(v: VertexIn, d: VertexData) -> CasterOut {
-    wind_vertex_data(d.data0, d.data1);
+    wind_vertex_data(d.data0, d.data2, d.data3);
     var o = caster_cutout_surface(v);
     o.reveal = caster_reveal(v, d);
     return o;
@@ -500,13 +500,13 @@ fn point_cutout_surface(v: VertexIn) -> PointOut {
 }
 
 @vertex fn vs_point_data(v: VertexIn, d: VertexData) -> PointShadowOut {
-    wind_vertex_data(d.data0, d.data1);
+    wind_vertex_data(d.data0, d.data2, d.data3);
     let world = caster_world_mesh(slot_of(v.slot), v.position);
     return PointShadowOut(octant_position(world), octant_clip(world));
 }
 
 @vertex fn vs_point_surface_data(v: VertexIn, d: VertexData) -> PointShadowOut {
-    wind_vertex_data(d.data0, d.data1);
+    wind_vertex_data(d.data0, d.data2, d.data3);
     let world = caster_world(slot_of(v.slot), v.position);
     return PointShadowOut(octant_position(world), octant_clip(world));
 }
@@ -520,14 +520,14 @@ fn point_cutout_surface(v: VertexIn) -> PointOut {
 }
 
 @vertex fn vs_point_cutout_data(v: VertexIn, d: VertexData) -> PointOut {
-    wind_vertex_data(d.data0, d.data1);
+    wind_vertex_data(d.data0, d.data2, d.data3);
     var o = point_cutout(v);
     o.reveal = caster_reveal(v, d);
     return o;
 }
 
 @vertex fn vs_point_cutout_surface_data(v: VertexIn, d: VertexData) -> PointOut {
-    wind_vertex_data(d.data0, d.data1);
+    wind_vertex_data(d.data0, d.data2, d.data3);
     var o = point_cutout_surface(v);
     o.reveal = caster_reveal(v, d);
     return o;

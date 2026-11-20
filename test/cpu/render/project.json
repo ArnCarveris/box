@@ -1274,6 +1274,7 @@
                     "pack_pivots",
                     "reach_pivots",
                     "sway_vertex",
+                    "sway_ancestors",
                     "scene_feature",
                     "batches",
                     "calm_and_removed",

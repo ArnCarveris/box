@@ -478,6 +478,31 @@ float box_mg_noise(
     int32_t octaves,
     int32_t seed);
 
+/** First data channel of the WindSway data of the ancestors of a branch (data2 and data3, see
+ * box_wind_sway_vertex), which Tube writes and Leaves and Needles pass on to Cards */
+#define BOX_MG_SWAY_CHANNEL (8)
+
+/** Pack the WindSway data of the branch of a curve as box_wind_sway_vertex does: its pivot (the
+ * first point of the curve), its level (the level attribute at that point, 0 without one), the
+ * pivots of its ancestors (the first points of its parent curves) and the stiffnesses of it and
+ * of its ancestors (the radius at the base of each over that at the base of the stem it grows
+ * from, 1 for a stem), with a flutter weight of 0.
+ *
+ * @param c The curves
+ * @param level The level attribute of the curves, NULL for none
+ * @param curve The curve
+ * @param data0 Receives the pivot and level
+ * @param data2 Receives the parent pivot and stiffnesses
+ * @param data3 Receives the grandparent and great grandparent pivots
+ */
+void box_mg_curve_sway(
+    const box_mg_curves_t *c,
+    const float *level,
+    int32_t curve,
+    vec4 data0,
+    vec4 data2,
+    vec4 data3);
+
 /** Compute the per point tangents and rotation minimizing normals of the curves of a value
  * from their positions.
  *

@@ -109,6 +109,8 @@
                     "bark_data",
                     "no_data_without_level",
                     "shape_data",
+                    "sway_chain",
+                    "sway_chain_transformed",
                     "points_attrs",
                     "script_tree"
                 ]
@@ -140,6 +142,7 @@
                     "needles",
                     "cards_shapes",
                     "cards_data",
+                    "cards_sway",
                     "cards_shared_back",
                     "crown_normals",
                     "crown_occlusion",

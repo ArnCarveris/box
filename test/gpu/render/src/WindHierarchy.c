@@ -14,10 +14,16 @@
  * The shadow case looks straight down from 12 units above a white floor, a sun at 45 degrees
  * casting shadows along +z, at a 3 unit pole of level 1 with its pivot at its foot.
  *
+ * The deep cases add to the tree a sprig of level 3 on the branch of level 2 and a shoot of
+ * level 4 on the sprig, or stack four unit poles of levels 1 to 4 under the sun, and compare
+ * them with the turns of every ancestor chained on the CPU (hier_deep_move), with a smaller
+ * branch angle and the phases the pivots hash to.
+ *
  * The wind blows along +x without gusts at full speed. The branches swing with a frequency of 0.
  * Their phases are hashed from their pivots (wind_branch_phase of wind.wgsl, hier_phase), which
- * are picked so the phases are about HIER_PHASE, at which the swing about the wind axis is 0, so
- * the branches lean downwind by about HIER_TURN radians every frame and every run.
+ * are on the grid the pivots snap to and picked so the phases are about HIER_PHASE, at which the
+ * swing about the wind axis is 0, so the branches lean downwind by about HIER_TURN radians every
+ * frame and every run.
  */
 
 #include <box.h>
@@ -56,13 +62,14 @@
  * 0.6 + 0.4 sin(phase 2 pi) */
 #define HIER_TURN (HIER_BRANCH * (0.6f + 0.4f * sinf(2.0f * GLM_PIf * HIER_PHASE)))
 
-/** Pivots of the branch, the twig and the pole, whose hashed phases are about HIER_PHASE */
-static const vec3 hier_branch_pivot = { 0, 1.50998f, 0 };
-static const vec3 hier_twig_pivot = { 2, 1.60404f, 0 };
-static const vec3 hier_pole_pivot = { 0, -0.01103f, 0 };
+/** Pivots of the branch, the twig and the pole, on the grid of BOX_MATERIAL_SWAY_GRID, whose
+ * hashed phases are about HIER_PHASE */
+static const vec3 hier_branch_pivot = { 0, 1.50390625f, -0.04296875f };
+static const vec3 hier_twig_pivot = { 2, 1.58203125f, 0.0703125f };
+static const vec3 hier_pole_pivot = { 0, -0.0234375f, 0.01953125f };
 
-/** Phase of a branch hashed from the bits of its object space pivot, as wind_branch_phase of
- * wind.wgsl hashes it.
+/** Phase of a branch hashed from the bits of its object space pivot snapped to the grid, as
+ * wind_branch_phase of wind.wgsl hashes it.
  *
  * @param pivot The pivot
  * @return The phase, 0..1
@@ -71,7 +78,13 @@ static float hier_phase(
     const vec3 pivot)
 {
     uint32_t b[3];
-    memcpy(b, pivot, sizeof(b));
+    vec3 snapped;
+    int32_t k;
+    for (k = 0; k < 3; k ++) {
+        snapped[k] = floorf(pivot[k] * BOX_MATERIAL_SWAY_GRID) / BOX_MATERIAL_SWAY_GRID;
+    }
+
+    memcpy(b, snapped, sizeof(b));
     uint32_t h = b[0] * 0x8da6b343u + b[1] * 0xd8163841u + b[2] * 0xcb1ab31fu;
     h = (h ^ (h >> 16)) * 0x7feb352du;
     h = (h ^ (h >> 15)) * 0x846ca68bu;
@@ -113,10 +126,12 @@ static void hier_rotate(
  *
  * @param side Whether the camera looks along -z at the tree in front of a black background,
  * else straight down at a white floor with shadows
+ * @param view_out Receives the view, NULL for none
  * @return The world
  */
-static ecs_world_t* hier_world(
-    bool side)
+static ecs_world_t* hier_world_view(
+    bool side,
+    ecs_entity_t *view_out)
 {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
@@ -155,7 +170,23 @@ static ecs_world_t* hier_world(
         ecs_set(world, floor, PbrMaterial, {.roughness = 1});
     }
 
+    if (view_out) {
+        *view_out = view;
+    }
+
     return world;
+}
+
+/** Create the world of the cases, in a scene with Scene.wind.
+ *
+ * @param side Whether the camera looks along -z at the tree in front of a black background,
+ * else straight down at a white floor with shadows
+ * @return The world
+ */
+static ecs_world_t* hier_world(
+    bool side)
+{
+    return hier_world_view(side, NULL);
 }
 
 /** Set the wind of the cases: along +x without gusts.
@@ -177,15 +208,14 @@ static void hier_wind(
  * @param m The mesh
  * @param lo Minimum corner
  * @param hi Maximum corner
- * @param data0 Pivot, level and flutter weight of the box, NULL for a mesh without data
- * @param data1 Parent pivot and stiffnesses of the box
+ * @param sway data0, data2 and data3 of the box (box_wind_sway_vertex), data1 is zero; NULL
+ * for a mesh without data
  */
 static void hier_box(
     Mesh3 *m,
     const float lo[3],
     const float hi[3],
-    const float data0[4],
-    const float data1[4])
+    const vec4 *sway)
 {
     static const float corners[4][2] = { { 0, 0 }, { 1, 0 }, { 1, 1 }, { 0, 1 } };
     static const uint32_t quad[6] = { 0, 1, 2, 0, 2, 3 };
@@ -204,11 +234,14 @@ static void hier_box(
                 p[w] = corners[k][1] ? hi[w] : lo[w];
                 glm_vec3_zero(n);
                 n[axis] = side ? 1.0f : -1.0f;
-                if (data0) {
-                    glm_vec4_copy(ECS_CONST_CAST(float*, data0),
+                if (sway) {
+                    glm_vec4_copy(ECS_CONST_CAST(float*, sway[0]),
                         *ecs_vec_append_t(NULL, &m->data0, vec4));
-                    glm_vec4_copy(ECS_CONST_CAST(float*, data1),
-                        *ecs_vec_append_t(NULL, &m->data1, vec4));
+                    glm_vec4_zero(*ecs_vec_append_t(NULL, &m->data1, vec4));
+                    glm_vec4_copy(ECS_CONST_CAST(float*, sway[1]),
+                        *ecs_vec_append_t(NULL, &m->data2, vec4));
+                    glm_vec4_copy(ECS_CONST_CAST(float*, sway[2]),
+                        *ecs_vec_append_t(NULL, &m->data3, vec4));
                 }
             }
 
@@ -217,6 +250,22 @@ static void hier_box(
             }
         }
     }
+}
+
+/** Free the vectors of a Mesh3.
+ *
+ * @param m The mesh
+ */
+static void hier_mesh_fini(
+    Mesh3 *m)
+{
+    ecs_vec_fini_t(NULL, &m->vertices, vec3);
+    ecs_vec_fini_t(NULL, &m->normals, vec3);
+    ecs_vec_fini_t(NULL, &m->indices, uint32_t);
+    ecs_vec_fini_t(NULL, &m->data0, vec4);
+    ecs_vec_fini_t(NULL, &m->data1, vec4);
+    ecs_vec_fini_t(NULL, &m->data2, vec4);
+    ecs_vec_fini_t(NULL, &m->data3, vec4);
 }
 
 /** Set the Mesh3 of the tree of the side cases on an entity.
@@ -233,23 +282,21 @@ static void hier_tree_set(
     float stiffness)
 {
     Mesh3 m = {0};
-    vec4 trunk0, trunk1, branch0, branch1, twig0, twig1;
-    box_wind_sway_vertex(trunk0, trunk1, (vec3){ 0, 0, 0 }, 0, 1, 0, NULL, 0);
-    box_wind_sway_vertex(branch0, branch1, hier_branch_pivot, 1, stiffness, 0, NULL, 0);
-    box_wind_sway_vertex(twig0, twig1, hier_twig_pivot, 2, stiffness, 1, hier_branch_pivot,
-        stiffness);
+    vec4 trunk[3], branch[3], twig[3];
+    const float stiff[2] = { stiffness, stiffness };
+    box_wind_sway_vertex(trunk[0], trunk[1], trunk[2], (vec3){ 0, 0, 0 }, 0, 0, NULL, NULL);
+    box_wind_sway_vertex(branch[0], branch[1], branch[2], hier_branch_pivot, 1, 0, NULL,
+        stiff);
+    box_wind_sway_vertex(twig[0], twig[1], twig[2], hier_twig_pivot, 2, 1,
+        &hier_branch_pivot, stiff);
     hier_box(&m, (float[3]){ -0.1f, 0, -0.1f }, (float[3]){ 0.1f, 3, 0.1f },
-        data ? trunk0 : NULL, trunk1);
+        data ? (const vec4*)trunk : NULL);
     hier_box(&m, (float[3]){ 0.1f, 1.4f, -0.1f }, (float[3]){ 2.5f, 1.6f, 0.1f },
-        data ? branch0 : NULL, branch1);
+        data ? (const vec4*)branch : NULL);
     hier_box(&m, (float[3]){ 1.9f, 1.6f, -0.1f }, (float[3]){ 2.1f, 3, 0.1f },
-        data ? twig0 : NULL, twig1);
+        data ? (const vec4*)twig : NULL);
     ecs_set_ptr(world, e, Mesh3, &m);
-    ecs_vec_fini_t(NULL, &m.vertices, vec3);
-    ecs_vec_fini_t(NULL, &m.normals, vec3);
-    ecs_vec_fini_t(NULL, &m.indices, uint32_t);
-    ecs_vec_fini_t(NULL, &m.data0, vec4);
-    ecs_vec_fini_t(NULL, &m.data1, vec4);
+    hier_mesh_fini(&m);
 }
 
 /** Add the tree of the side cases at the origin with a WindSway with pivots, no bend and no
@@ -587,19 +634,16 @@ static ecs_entity_t hier_pole(
     ecs_world_t *world)
 {
     Mesh3 m = {0};
-    vec4 data0, data1;
+    vec4 sway[3];
     test_assert(fabsf(hier_phase(hier_pole_pivot) - HIER_PHASE) < 1e-3f);
-    box_wind_sway_vertex(data0, data1, hier_pole_pivot, 1, 0, 0, NULL, 0);
-    hier_box(&m, (float[3]){ -0.15f, 0, -0.15f }, (float[3]){ 0.15f, 3, 0.15f }, data0, data1);
+    box_wind_sway_vertex(sway[0], sway[1], sway[2], hier_pole_pivot, 1, 0, NULL, NULL);
+    hier_box(&m, (float[3]){ -0.15f, 0, -0.15f }, (float[3]){ 0.15f, 3, 0.15f },
+        (const vec4*)sway);
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Position, {0, 0, 0});
     ecs_set(world, e, Rgb, {200, 60, 40});
     ecs_set_ptr(world, e, Mesh3, &m);
-    ecs_vec_fini_t(NULL, &m.vertices, vec3);
-    ecs_vec_fini_t(NULL, &m.normals, vec3);
-    ecs_vec_fini_t(NULL, &m.indices, uint32_t);
-    ecs_vec_fini_t(NULL, &m.data0, vec4);
-    ecs_vec_fini_t(NULL, &m.data1, vec4);
+    hier_mesh_fini(&m);
     ecs_set(world, e, WindSway, {.bend = 0, .height = 3, .base = 0,
         .flutter_frequency = 2, .flutter_reach = 0.3f, .pivots = true,
         .branch = HIER_BRANCH, .branch_frequency = 0});
@@ -640,6 +684,182 @@ void WindHierarchy_shadow_follows_branch(void) {
     stbi_image_free(calm);
     stbi_image_free(windy);
     ecs_fini(world);
+}
+
+/** Radians the branches of the deep cases turn about their pivots at full wind */
+#define HIER_DEEP_BRANCH (0.25f)
+
+/** A box of the deep cases with the pivot and level of its branch; the parent of a branch is
+ * the box of its set one level lower */
+typedef struct hier_deep_t {
+    vec3 lo;                     /**< Minimum corner */
+    vec3 hi;                     /**< Maximum corner */
+    vec3 pivot;                  /**< Pivot, on the grid of BOX_MATERIAL_SWAY_GRID */
+    int32_t level;               /**< Level, 0 for the trunk */
+} hier_deep_t;
+
+/** The tree of the deep side cases: the trunk, branch and twig of the side tree, a sprig of
+ * level 3 along +x from near the top of the twig and a shoot of level 4 standing up from near
+ * the tip of the sprig */
+static const hier_deep_t hier_deep[5] = {
+    { { -0.1f, 0, -0.1f }, { 0.1f, 3, 0.1f }, { 0, 0, 0 }, 0 },
+    { { 0.1f, 1.4f, -0.1f }, { 2.5f, 1.6f, 0.1f }, { 0, 1.50390625f, -0.04296875f }, 1 },
+    { { 1.9f, 1.6f, -0.1f }, { 2.1f, 3, 0.1f }, { 2, 1.58203125f, 0.0703125f }, 2 },
+    { { 2.1f, 2.55f, -0.1f }, { 3.0f, 2.65f, 0.1f }, { 2, 2.6015625f, 0 }, 3 },
+    { { 2.75f, 2.65f, -0.1f }, { 2.85f, 3.3f, 0.1f }, { 2.80078125f, 2.6484375f, 0 }, 4 }
+};
+
+/** The stack of the deep shadow case: four unit poles of levels 1 to 4, each standing on the
+ * top of the one before with its pivot at its foot */
+static const hier_deep_t hier_stack[4] = {
+    { { -0.15f, 0, -0.15f }, { 0.15f, 1, 0.15f }, { 0, 0, 0 }, 1 },
+    { { -0.15f, 1, -0.15f }, { 0.15f, 2, 0.15f }, { 0, 1, 0 }, 2 },
+    { { -0.15f, 2, -0.15f }, { 0.15f, 3, 0.15f }, { 0, 2, 0 }, 3 },
+    { { -0.15f, 3, -0.15f }, { 0.15f, 4, 0.15f }, { 0, 3, 0 }, 4 }
+};
+
+/** Find the box of a level in a set.
+ *
+ * @param set The boxes
+ * @param count Number of boxes
+ * @param level The level
+ * @return The box, NULL for none
+ */
+static const hier_deep_t* hier_deep_level(
+    const hier_deep_t *set,
+    int32_t count,
+    int32_t level)
+{
+    const hier_deep_t *result = NULL;
+    int32_t i;
+    for (i = 0; i < count && !result; i ++) {
+        if (set[i].level == level) {
+            result = &set[i];
+        }
+    }
+
+    return result;
+}
+
+/** The turn of a branch with a stiffness of 0 at full wind along +x without gusts and a branch
+ * frequency of 0, as wind_turn of wind.wgsl turns it: about the axis across the wind by its
+ * lean and about the wind axis by its cross swing, from its hashed phase and the travel of the
+ * sway along the wind.
+ *
+ * @param pivot The pivot
+ * @param branch Radians of the branch at full wind
+ * @param q Receives the turn
+ */
+static void hier_deep_turn(
+    const vec3 pivot,
+    float branch,
+    versor q)
+{
+    float phase = 2.0f * GLM_PIf * hier_phase(pivot) - 0.5f * pivot[0] / HIER_GUST_SCALE;
+    float along = 0.6f + 0.4f * sinf(phase);
+    float cross = 0.3f * sinf(2.0f * phase + 1.3f);
+    vec3 r = { branch * cross, 0, -branch * along };
+    float angle = glm_vec3_norm(r);
+    glm_quat_identity(q);
+    if (angle > 0.0f) {
+        glm_quatv(q, angle, r);
+    }
+}
+
+/** Move a point of a box of a set by the turns of its branch and its ancestors chained on the
+ * CPU: about the pivot of the branch, then about the pivot of each ancestor, its parent first.
+ *
+ * @param set The boxes
+ * @param count Number of boxes
+ * @param box The box of the point
+ * @param p The point at rest
+ * @param turns Most turns to chain: 4 for every ancestor, 2 for the branch and its parent alone
+ * @param branch Radians of the branches at full wind
+ * @param out Receives the moved point
+ */
+static void hier_deep_move(
+    const hier_deep_t *set,
+    int32_t count,
+    const hier_deep_t *box,
+    const vec3 p,
+    int32_t turns,
+    float branch,
+    vec3 out)
+{
+    int32_t t;
+    glm_vec3_copy(ECS_CONST_CAST(float*, p), out);
+    for (t = 0; t < turns && box->level - t >= 1; t ++) {
+        const hier_deep_t *b = hier_deep_level(set, count, box->level - t);
+        versor q;
+        vec3 d;
+        test_assert(b != NULL);
+        hier_deep_turn(b->pivot, branch, q);
+        glm_vec3_sub(out, ECS_CONST_CAST(float*, b->pivot), d);
+        glm_quat_rotatev(q, d, d);
+        glm_vec3_add(ECS_CONST_CAST(float*, b->pivot), d, out);
+    }
+}
+
+/** The center of a box.
+ *
+ * @param box The box
+ * @param out Receives the center
+ */
+static void hier_deep_center(
+    const hier_deep_t *box,
+    vec3 out)
+{
+    glm_vec3_center(ECS_CONST_CAST(float*, box->lo), ECS_CONST_CAST(float*, box->hi), out);
+}
+
+/** Add an entity with the boxes from..to - 1 of a set as one mesh, each with the WindSway data
+ * of its branch and its ancestors, and a WindSway with pivots, no bend and no flutter.
+ *
+ * @param world The world
+ * @param set The boxes
+ * @param count Number of boxes
+ * @param from First box
+ * @param to Box after the last
+ * @param color Color of the entity
+ * @param branch Radians of the branches at full wind
+ * @return The entity
+ */
+static ecs_entity_t hier_deep_add(
+    ecs_world_t *world,
+    const hier_deep_t *set,
+    int32_t count,
+    int32_t from,
+    int32_t to,
+    Rgb color,
+    float branch)
+{
+    Mesh3 m = {0};
+    int32_t i, k;
+    for (i = from; i < to; i ++) {
+        vec3 ancestors[3] = {{0}};
+        vec4 sway[3];
+        for (k = 0; k < 3; k ++) {
+            const hier_deep_t *a = hier_deep_level(set, count, set[i].level - 1 - k);
+            if (a) {
+                glm_vec3_copy(ECS_CONST_CAST(float*, a->pivot), ancestors[k]);
+            }
+        }
+
+        box_wind_sway_vertex(sway[0], sway[1], sway[2], set[i].pivot, set[i].level, 0,
+            (const vec3*)ancestors, NULL);
+        hier_box(&m, set[i].lo, set[i].hi, (const vec4*)sway);
+    }
+
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Position, {0, 0, 0});
+    ecs_set_ptr(world, e, Rgb, &color);
+    ecs_set_ptr(world, e, Mesh3, &m);
+    hier_mesh_fini(&m);
+    ecs_set(world, e, WindSway, {.bend = 0, .height = 3, .base = 0,
+        .flutter_frequency = 2, .flutter_reach = 0.3f, .pivots = true,
+        .branch = branch, .branch_frequency = 0});
+
+    return e;
 }
 
 /** A small broadleaf whose twigs of level 2 carry leaf cards (Cards), as a script */
@@ -794,6 +1014,102 @@ static ecs_entity_t hier_cards(
     return e;
 }
 
+/** Color of a pixel of a side capture of the deep tree: 0 black, 1 red, 2 green, 3 blue, -1 any
+ * other lit color.
+ *
+ * @param px The pixels
+ * @param x Column
+ * @param y Row
+ * @return The color
+ */
+static int hier_deep_color(
+    const unsigned char *px,
+    int x,
+    int y)
+{
+    const unsigned char *p = &px[(y * HIER_SIZE + x) * 4];
+    int result = -1, k;
+    if (p[0] < 30 && p[1] < 30 && p[2] < 30) {
+        result = 0;
+    }
+
+    for (k = 0; k < 3 && result; k ++) {
+        if (p[k] > 60 && 2 * p[k] > 3 * p[(k + 1) % 3] && 2 * p[k] > 3 * p[(k + 2) % 3]) {
+            result = k + 1;
+        }
+    }
+
+    return result;
+}
+
+/** Mean column and row of the pixels of a color in a capture.
+ *
+ * @param px The pixels
+ * @param color The color of hier_deep_color, -2 for every lit pixel
+ * @param column Receives the mean column
+ * @param row Receives the mean row
+ * @return The number of pixels of the color
+ */
+static int hier_deep_mean(
+    const unsigned char *px,
+    int color,
+    float *column,
+    float *row)
+{
+    int x, y, count = 0;
+    float cx = 0.0f, cy = 0.0f;
+    for (y = 0; y < HIER_SIZE; y ++) {
+        for (x = 0; x < HIER_SIZE; x ++) {
+            int c = hier_deep_color(px, x, y);
+            if (color == -2 ? c != 0 : c == color) {
+                cx += (float)x;
+                cy += (float)y;
+                count ++;
+            }
+        }
+    }
+
+    *column = count ? cx / (float)count : -1.0f;
+    *row = count ? cy / (float)count : -1.0f;
+
+    return count;
+}
+
+/** Count the pixels of a color with a pixel of another color at most 2 pixels away.
+ *
+ * @param px The pixels
+ * @param color The color of hier_deep_color
+ * @param other The other color
+ * @return The count
+ */
+static int hier_deep_touching(
+    const unsigned char *px,
+    int color,
+    int other)
+{
+    int x, y, dx, dy, count = 0;
+    for (y = 0; y < HIER_SIZE; y ++) {
+        for (x = 0; x < HIER_SIZE; x ++) {
+            bool near = false;
+            if (hier_deep_color(px, x, y) != color) {
+                continue;
+            }
+
+            for (dy = -2; dy <= 2 && !near; dy ++) {
+                for (dx = -2; dx <= 2 && !near; dx ++) {
+                    int nx = x + dx, ny = y + dy;
+                    near = nx >= 0 && ny >= 0 && nx < HIER_SIZE && ny < HIER_SIZE &&
+                        hier_deep_color(px, nx, ny) == other;
+                }
+            }
+
+            count += near ? 1 : 0;
+        }
+    }
+
+    return count;
+}
+
 /** Render the markers of the cards in a fresh world after frames of a wind, under the WindSway
  * of a crown with pivots, no bend and a flutter of HIER_FLUTTER.
  *
@@ -842,6 +1158,155 @@ static int hier_red_count(
     }
 
     return count;
+}
+
+/** Check that the mean column and row of a color of a side capture is where a moved point
+ * projects, within a quarter unit.
+ *
+ * @param px The pixels
+ * @param color The color of hier_deep_color, -2 for every lit pixel
+ * @param p The moved point
+ */
+static void hier_deep_at(
+    const unsigned char *px,
+    int color,
+    const vec3 p)
+{
+    float column, row;
+    test_assert(hier_deep_mean(px, color, &column, &row) > 0);
+    test_assert(fabsf(column + 0.5f - ((float)HIER_SIZE * 0.5f + p[0] * HIER_UNIT)) <
+        0.25f * HIER_UNIT);
+    test_assert(fabsf(row + 0.5f - ((float)HIER_SIZE * 0.5f - (p[1] - HIER_EYE) * HIER_UNIT)) <
+        0.25f * HIER_UNIT);
+}
+
+/** A sprig of level 3 and a shoot of level 4 turn with every ancestor: the sprig (green) and the
+ * shoot (blue) of separate shapes with the same WindSway are where their turns chained on the
+ * CPU move them, far from where the turns of the branch and its parent alone would, touching
+ * their moved parents; one merged mesh of the whole tree covers the same pixels */
+void WindHierarchy_deep_levels_attached(void) {
+    // materials/wind_sway
+    vec3 c3, c4, full3, full4, old4, j3, j4;
+    hier_deep_center(&hier_deep[3], c3);
+    hier_deep_center(&hier_deep[4], c4);
+    hier_deep_move(hier_deep, 5, &hier_deep[3], c3, 4, HIER_DEEP_BRANCH, full3);
+    hier_deep_move(hier_deep, 5, &hier_deep[4], c4, 4, HIER_DEEP_BRANCH, full4);
+    hier_deep_move(hier_deep, 5, &hier_deep[4], c4, 2, HIER_DEEP_BRANCH, old4);
+    test_assert(glm_vec3_distance(full4, old4) > 0.6f);
+
+    /* The joint of the shoot moves with the sprig as with the shoot */
+    hier_deep_move(hier_deep, 5, &hier_deep[3], hier_deep[4].pivot, 4, HIER_DEEP_BRANCH, j3);
+    hier_deep_move(hier_deep, 5, &hier_deep[4], hier_deep[4].pivot, 4, HIER_DEEP_BRANCH, j4);
+    test_assert(glm_vec3_distance(j3, j4) < 1e-4f);
+
+    ecs_world_t *world = hier_world(true);
+    hier_wind(world, 10);
+    hier_deep_add(world, hier_deep, 5, 0, 3, (Rgb){200, 60, 40}, HIER_DEEP_BRANCH);
+    hier_deep_add(world, hier_deep, 5, 3, 4, (Rgb){40, 200, 60}, HIER_DEEP_BRANCH);
+    hier_deep_add(world, hier_deep, 5, 4, 5, (Rgb){40, 60, 200}, HIER_DEEP_BRANCH);
+    hier_frames(world, 30);
+    unsigned char *parts = hier_render(world, "hier_deep_parts.png");
+    ecs_fini(world);
+
+    hier_deep_at(parts, 2, full3);
+    hier_deep_at(parts, 3, full4);
+    test_assert(hier_deep_touching(parts, 3, 2) > 0);
+    test_assert(hier_deep_touching(parts, 2, 1) > 0);
+
+    /* Nothing is left where the turns of the shoot and the sprig alone would put the shoot */
+    float column, row;
+    hier_deep_mean(parts, 3, &column, &row);
+    test_assert(fabsf(column + 0.5f - ((float)HIER_SIZE * 0.5f + old4[0] * HIER_UNIT)) +
+        fabsf(row + 0.5f - ((float)HIER_SIZE * 0.5f - (old4[1] - HIER_EYE) * HIER_UNIT)) >
+        0.5f * HIER_UNIT);
+
+    /* One merged mesh of the tree covers what the three shapes cover */
+    world = hier_world(true);
+    hier_wind(world, 10);
+    hier_deep_add(world, hier_deep, 5, 0, 5, (Rgb){200, 60, 40}, HIER_DEEP_BRANCH);
+    hier_frames(world, 30);
+    unsigned char *merged = hier_render(world, "hier_deep_merged.png");
+    ecs_fini(world);
+
+    int x, y, differ = 0;
+    for (y = 0; y < HIER_SIZE; y ++) {
+        for (x = 0; x < HIER_SIZE; x ++) {
+            differ += (hier_deep_color(parts, x, y) != 0) !=
+                (hier_deep_color(merged, x, y) != 0);
+        }
+    }
+
+    test_assert(differ <= 4);
+
+    stbi_image_free(parts);
+    stbi_image_free(merged);
+}
+
+/** The shadow pass chains the turns of every ancestor as the color pass does: the shadow of the
+ * top of a stack of four poles of levels 1 to 4 falls where the turns chained on the CPU move
+ * it, far from where the turns of the top pole and the one below alone would */
+void WindHierarchy_deep_levels_shadow(void) {
+    // materials/wind_sway
+    vec3 q = { 0, 3.75f, 0 }, full, old;
+    hier_deep_move(hier_stack, 4, &hier_stack[3], q, 4, HIER_DEEP_BRANCH, full);
+    hier_deep_move(hier_stack, 4, &hier_stack[3], q, 2, HIER_DEEP_BRANCH, old);
+    test_assert(fabsf(full[0] - old[0]) > 0.5f);
+
+    ecs_world_t *world = hier_world(false);
+    hier_wind(world, 10);
+    hier_deep_add(world, hier_stack, 4, 0, 4, (Rgb){200, 60, 40}, HIER_DEEP_BRANCH);
+    hier_frames(world, 30);
+    unsigned char *px = hier_render(world, "hier_deep_shadow.png");
+
+    /* The sun at 45 degrees casts a point at height y onto the floor y units along +z */
+    float at = full[2] + full[1];
+    int top = HIER_SIZE / 2 + (int)((at - 0.12f) * HIER_UNIT);
+    int bottom = HIER_SIZE / 2 + (int)((at + 0.12f) * HIER_UNIT);
+    float moved = hier_dark_column(px, top, bottom);
+    test_assert(moved > 0.0f);
+    test_assert(fabsf(moved + 0.5f - ((float)HIER_SIZE * 0.5f + full[0] * HIER_UNIT)) <
+        0.3f * HIER_UNIT);
+
+    stbi_image_free(px);
+    ecs_fini(world);
+}
+
+/** The wireframe moves the vertices of a swaying mesh with pivots as the mesh passes do: the
+ * lines of a lone shoot of level 4 lie where the shaded shoot is, moved by the turns of every
+ * ancestor, not at rest */
+void WindHierarchy_deep_levels_wireframe(void) {
+    // materials/wind_sway
+    vec3 c4, full;
+    hier_deep_center(&hier_deep[4], c4);
+    hier_deep_move(hier_deep, 5, &hier_deep[4], c4, 4, HIER_DEEP_BRANCH, full);
+    test_assert(glm_vec3_distance(c4, full) > 0.6f);
+
+    unsigned char *px[2];
+    int k;
+    for (k = 0; k < 2; k ++) {
+        ecs_entity_t view;
+        ecs_world_t *world = hier_world_view(true, &view);
+        if (k) {
+            View *v = ecs_get_mut(world, view, View);
+            v->debug.wireframe = WireframeOnly;
+            v->debug.wireframe_color = (rgba){255, 255, 255, 255};
+            v->debug.wireframe_width = 2;
+            ecs_modified(world, view, View);
+        }
+
+        hier_wind(world, 10);
+        hier_deep_add(world, hier_deep, 5, 4, 5, (Rgb){40, 60, 200}, HIER_DEEP_BRANCH);
+        hier_frames(world, 30);
+        px[k] = hier_render(world, k ? "hier_deep_wire.png" : "hier_deep_shaded.png");
+        ecs_fini(world);
+    }
+
+    /* The shaded shoot and its lines, which are white */
+    hier_deep_at(px[0], 3, full);
+    hier_deep_at(px[1], -2, full);
+
+    stbi_image_free(px[0]);
+    stbi_image_free(px[1]);
 }
 
 /** Number of the pixels red in one capture and not in the other.

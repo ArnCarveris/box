@@ -557,7 +557,7 @@ static const char* box_validate_mesh3_member(
     return result;
 }
 
-/** Validate hook for Mesh3: the colors, data0 and data1 are empty or have one value per vertex.
+/** Validate hook for Mesh3: the colors and data0 to data3 are empty or have one value per vertex.
  *
  * @param world The world
  * @param entity The entity being validated
@@ -584,6 +584,14 @@ static bool box_validate_mesh3_hook(
 
     if (!reason) {
         reason = box_validate_mesh3_member(&mesh->data1, vertices, "data1", buf, sizeof(buf));
+    }
+
+    if (!reason) {
+        reason = box_validate_mesh3_member(&mesh->data2, vertices, "data2", buf, sizeof(buf));
+    }
+
+    if (!reason) {
+        reason = box_validate_mesh3_member(&mesh->data3, vertices, "data3", buf, sizeof(buf));
     }
 
     box_validate_report(world, entity, "Mesh3", reason);

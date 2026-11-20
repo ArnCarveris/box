@@ -773,40 +773,91 @@ void Wind_reach_pivots(void) {
     test_assert(fabsf(box_render_wind_reach(&sway, &wind, NAN) - plain) < 1e-6f);
 }
 
-/** box_wind_sway_vertex packs the level with the flutter weight and the two stiffnesses so the
- * shaders unpack them, clamped */
+/** box_wind_sway_vertex packs the level with the flutter weight, the parent pivot and the
+ * stiffnesses of the branch and its ancestors so the shaders unpack them, clamped */
 void Wind_sway_vertex(void) {
     // materials/wind_sway
-    vec4 data0, data1;
-    box_wind_sway_vertex(data0, data1, (vec3){1, 2, 3}, 2, 0.4f, 1.0f, (vec3){4, 5, 6}, 0.8f);
+    vec4 data0, data2, data3;
+    const vec3 ancestors[3] = { {4, 5, 6}, {7, 8, 9}, {10, 11, 12} };
+    const float stiffness[4] = { 0.4f, 0.8f, 0.2f, 1.0f };
+    box_wind_sway_vertex(data0, data2, data3, (vec3){1, 2, 3}, 2, 1.0f, ancestors, stiffness);
     test_flt(data0[0], 1);
     test_flt(data0[1], 2);
     test_flt(data0[2], 3);
     test_flt(data0[3], 2.5f);
-    test_flt(data1[0], 4);
-    test_flt(data1[1], 5);
-    test_flt(data1[2], 6);
-    test_flt(data1[3], 102.0f + 256.0f * 204.0f);
+    test_flt(data2[0], 4);
+    test_flt(data2[1], 5);
+    test_flt(data2[2], 6);
+    /* Two levels read two stiffnesses */
+    test_flt(data2[3], 25.0f + 64.0f * 50.0f);
 
     /* Unpacked as wind.wgsl does */
     float level = floorf(data0[3]);
     float weight = 2.0f * (data0[3] - level);
-    float parent = floorf(data1[3] / 256.0f);
+    uint32_t packed = (uint32_t)data2[3];
     test_flt(level, 2);
     test_flt(weight, 1);
-    test_assert(fabsf((data1[3] - 256.0f * parent) / 255.0f - 0.4f) < 0.5f / 255.0f);
-    test_assert(fabsf(parent / 255.0f - 0.8f) < 0.5f / 255.0f);
+    test_assert(fabsf((float)(packed & 63u) / 63.0f - 0.4f) < 0.5f / 63.0f);
+    test_assert(fabsf((float)((packed >> 6) & 63u) / 63.0f - 0.8f) < 0.5f / 63.0f);
 
-    /* Without a parent, out of range or broken values */
-    box_wind_sway_vertex(data0, data1, (vec3){1, 2, 3}, 9, 2.0f, NAN, NULL, -1.0f);
+    /* Every level reads its ancestors and stiffnesses */
+    box_wind_sway_vertex(data0, data2, data3, (vec3){1, 2, 3}, 4, 0.0f, ancestors, stiffness);
+    test_flt(data2[3], 25.0f + 64.0f * 50.0f + 4096.0f * 13.0f + 262144.0f * 63.0f);
+    for (int32_t i = 0; i < 4; i ++) {
+        test_flt(data3[i], floorf(data3[i]));
+        test_assert(data3[i] >= 0.0f && data3[i] < 16777216.0f);
+    }
+
+    /* Without ancestors, out of range or broken values */
+    box_wind_sway_vertex(data0, data2, data3, (vec3){1, 2, 3}, 9, NAN, NULL,
+        (const float[4]){ 2.0f, -1.0f, NAN, 0.5f });
     test_flt(data0[3], (float)BOX_MATERIAL_SWAY_LEVELS);
-    test_flt(data1[0], 0);
-    test_flt(data1[1], 0);
-    test_flt(data1[2], 0);
-    test_flt(data1[3], 255);
-    box_wind_sway_vertex(data0, data1, (vec3){1, 2, 3}, -1, 0, 0.5f, NULL, 0);
+    test_flt(data2[0], 0);
+    test_flt(data2[1], 0);
+    test_flt(data2[2], 0);
+    test_flt(data2[3], 63.0f + 262144.0f * 32.0f);
+    box_wind_sway_vertex(data0, data2, data3, (vec3){1, 2, 3}, -1, 0.5f, ancestors, NULL);
     test_flt(data0[3], 0.25f);
-    test_flt(data1[3], 0);
+    test_flt(data2[0], 0);
+    test_flt(data2[3], 0);
+}
+
+/** box_wind_sway_ancestors unpacks the pivots of the parent, grandparent and great grandparent
+ * that box_wind_sway_vertex packs, snapped down to the grid of BOX_MATERIAL_SWAY_GRID, as the
+ * shaders unpack them */
+void Wind_sway_ancestors(void) {
+    // materials/wind_sway
+    vec4 data0, data2, data3;
+    vec3 out[3];
+    const vec3 ancestors[3] = {
+        {0.3f, 2.71f, -1.05f}, {-0.6f, 1.2f, 0.33f}, {0.01f, 0.25f, 0.0f}
+    };
+    int32_t i, k;
+    box_wind_sway_vertex(data0, data2, data3, (vec3){1, 3, 0.5f}, 4, 0.5f, ancestors, NULL);
+    box_wind_sway_ancestors(data2, data3, out);
+    for (i = 0; i < 3; i ++) {
+        for (k = 0; k < 3; k ++) {
+            float snapped = floorf(ancestors[i][k] * BOX_MATERIAL_SWAY_GRID) /
+                BOX_MATERIAL_SWAY_GRID;
+            test_flt(out[i][k], snapped);
+        }
+    }
+
+    /* A level 3 branch has no great grandparent: it unpacks as the parent */
+    box_wind_sway_vertex(data0, data2, data3, (vec3){1, 3, 0.5f}, 3, 0.5f, ancestors, NULL);
+    box_wind_sway_ancestors(data2, data3, out);
+    for (k = 0; k < 3; k ++) {
+        test_flt(out[1][k], floorf(ancestors[1][k] * BOX_MATERIAL_SWAY_GRID) /
+            BOX_MATERIAL_SWAY_GRID);
+        test_flt(out[2][k], out[0][k]);
+    }
+
+    /* Offsets beyond the range of the grid clamp to it */
+    const vec3 far[3] = { {0, 0, 0}, {500, 0, 0}, {-500, 0, 0} };
+    box_wind_sway_vertex(data0, data2, data3, (vec3){0, 0, 0}, 4, 0, far, NULL);
+    box_wind_sway_ancestors(data2, data3, out);
+    test_flt(out[1][0], (65535.0f - (float)BOX_MATERIAL_SWAY_BIAS) / BOX_MATERIAL_SWAY_GRID);
+    test_flt(out[2][0], -(float)BOX_MATERIAL_SWAY_BIAS / BOX_MATERIAL_SWAY_GRID);
 }
 
 /** Scene.wind is a feature of the scene that turns on no override of the mesh shaders: the
