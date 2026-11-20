@@ -2649,8 +2649,8 @@ void FogVolume_no_fog_blended_unchanged(void) {
     test_assert(!memcmp(px[0], px[2], FV_SIZE * FV_SIZE * 4));
     for (k = 0; k < 3; k ++) {
         stbi_image_free(px[k]);
+    }
 }
-
 
 /** A box volume with its shape, height_falloff and edge_noise at their defaults renders the
  * transmittance of its constant density, and an edge_noise that has nothing to erode, without
