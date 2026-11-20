@@ -67,7 +67,8 @@ extern "C" {
 /** Data channel of foliage (Cards): the level of the twig a card grows on in its integer part,
  * plus 0.5 times the flutter weight of the vertex, 0..1 from the stem of the card to its tip,
  * as WindSway packs data0.w; the same channel as BOX_MESH_DATA_LEVEL of the bark, whose flutter
- * weight is 0. Its pivot is the pivot of the twig, in BOX_MESH_DATA_PIVOT */
+ * weight is 0. Its pivot is the pivot of the twig, in BOX_MESH_DATA_PIVOT; a WindSway with
+ * pivots and foliage reads only these channels */
 #define BOX_MESH_DATA_FLUTTER (3)
 
 /** Data channel of foliage: the seed of the card in 0..1, the same for every vertex of a card

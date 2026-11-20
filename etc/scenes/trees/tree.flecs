@@ -322,7 +322,7 @@ trees {
       Graph: {output: occluded, levels: lods}
       WindSway: {
         bend: sway, height: height, base: ground, flutter: flutter, flutter_frequency: 3.2,
-        pivots: true, branch: sway_branch
+        pivots: true, branch: sway_branch, foliage: true
       }
       if thin > 0 {
         VertexReveal: {channel: TREE_CHANNEL_SEED, threshold: thin, softness: 0}

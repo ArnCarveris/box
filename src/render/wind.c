@@ -224,6 +224,10 @@ void box_render_wind_pack(
         double branch = isfinite(sway->branch_frequency)
             ? (double)sway->branch_frequency : 0.0;
         out->flags |= BOX_RENDER_WIND_PIVOTS;
+        if (sway->foliage) {
+            out->flags |= BOX_RENDER_WIND_FOLIAGE;
+        }
+
         out->wind_branch = isfinite(sway->branch) ? sway->branch : 0.0f;
         out->wind_branch_phase = box_wind_wrap_float(branch * wind->clock, 1.0);
     }

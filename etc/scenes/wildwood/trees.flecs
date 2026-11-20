@@ -153,7 +153,7 @@ assets {
         Scale: {kx, k, kx}
         WindSway: {
           bend: 0, height: hr, base: 0, flutter: flutter,
-          flutter_frequency: flutter_frequency, pivots: true, branch: swing
+          flutter_frequency: flutter_frequency, pivots: true, branch: swing, foliage: true
         }
       }
     }

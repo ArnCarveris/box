@@ -502,7 +502,9 @@
                     "branches_turn_about_pivots",
                     "stiff_branches_still",
                     "without_data_unchanged",
-                    "shadow_follows_branch"
+                    "shadow_follows_branch",
+                    "card_stems_pinned_tips_flutter",
+                    "card_stems_turn_with_twig"
                 ]
             },
             {

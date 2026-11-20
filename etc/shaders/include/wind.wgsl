@@ -22,6 +22,8 @@
 // The level and the flutter weight of the vertex are packed in data0.w, the stiffness of the
 // branch and of its parent in data1.w (WindSway and box_wind_sway_vertex in material.h). It then
 // bends the vertex by its rest position as above; the flutter is weighted by the flutter weight.
+// A material with WIND_FOLIAGE does not read data1: a vertex turns about the pivot of its twig
+// with a stiffness of 0 and without its parent, like the twig, so a leaf stays on it.
 #pragma once
 
 #include "wind_gust.wgsl"
@@ -41,6 +43,10 @@ const WIND_TAU: f32 = 6.283185307179586;
 
 // Flag of a record with pivots (BOX_RENDER_WIND_PIVOTS).
 const WIND_PIVOTS: u32 = 64u;
+
+// Flag of a record with pivots that reads only data0, the foliage of a MeshGraph whose data1
+// holds the seed, hue, growth and occlusion of its cards (BOX_RENDER_WIND_FOLIAGE).
+const WIND_FOLIAGE: u32 = 2048u;
 
 // Deepest branch level a record with pivots tells apart (BOX_MATERIAL_SWAY_LEVELS).
 const WIND_LEVELS: f32 = 4.0;
@@ -180,11 +186,12 @@ fn wind_move(world: vec3f, model: mat4x4f, m: Material, absolute: WorldOrigin) -
     if (pivots) {
         // A branch turns about its pivot, then with its parent about the pivot of the parent
         let level = min(floor(packed), WIND_LEVELS);
-        let stiffness = wind_stiffness();
+        let foliage = (m.flags & WIND_FOLIAGE) != 0u;
+        let stiffness = select(wind_stiffness(), vec2f(0.0), foliage);
         let pivot = (model * vec4f(wind_data0.xyz, 1.0)).xyz;
         o.turn = wind_turn(pivot, level, stiffness.x, wind_branch_phase(wind_data0.xyz), m);
         var moved = pivot + wind_rotate(world - pivot, o.turn);
-        if (level >= 2.0) {
+        if (level >= 2.0 && !foliage) {
             let parent = (model * vec4f(wind_data1.xyz, 1.0)).xyz;
             let turn = wind_turn(parent, level - 1.0, stiffness.y,
                 wind_branch_phase(wind_data1.xyz), m);

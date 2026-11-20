@@ -641,3 +641,298 @@ void WindHierarchy_shadow_follows_branch(void) {
     stbi_image_free(windy);
     ecs_fini(world);
 }
+
+/** A small broadleaf whose twigs of level 2 carry leaf cards (Cards), as a script */
+#define HIER_BROADLEAF "test/assets/mesh/broadleaf.flecs"
+
+/** Half edge of the marker boxes at the vertices of the cards */
+#define HIER_MARK (0.08f)
+
+/** Flutter of the cases of the cards: world units at full wind */
+#define HIER_FLUTTER (0.3f)
+
+/** Which vertex of every card a marker box stands at */
+typedef enum hier_mark_t {
+    HierStems,  /**< The stem of the card, its vertex of the lowest flutter weight, 0 */
+    HierTips,   /**< The tip of the card, its vertex of the highest flutter weight */
+    HierPivots  /**< The pivot of the twig of the card, with the data of its stem */
+} hier_mark_t;
+
+/** Flutter weight of a vertex of foliage, from its data channel BOX_MESH_DATA_FLUTTER.
+ *
+ * @param packed The level plus 0.5 times the flutter weight
+ * @return The flutter weight, 0..1
+ */
+static float hier_weight(
+    float packed)
+{
+    return 2.0f * (packed - floorf(packed));
+}
+
+/** Append the marker box of one vertex of the cards to a mesh, with the data of the vertex.
+ *
+ * @param m The mesh
+ * @param data The data channels of the cards
+ * @param v The vertex whose data the box carries
+ * @param at Center of the box
+ * @param scramble Whether data1 is replaced by values that are no pivot or stiffness
+ */
+static void hier_mark_box(
+    Mesh3 *m,
+    float *const *data,
+    int32_t v,
+    const vec3 at,
+    bool scramble)
+{
+    vec4 d0 = { data[0][v], data[1][v], data[2][v], data[3][v] };
+    vec4 d1 = { data[4][v], data[5][v], data[6][v], data[7][v] };
+    if (scramble) {
+        glm_vec4_copy((vec4){ -3.7f, 5.2f, 0.4f, 40000.0f + (float)v }, d1);
+    }
+
+    hier_box(m, (float[3]){ at[0] - HIER_MARK, at[1] - HIER_MARK, at[2] - HIER_MARK },
+        (float[3]){ at[0] + HIER_MARK, at[1] + HIER_MARK, at[2] + HIER_MARK }, d0, d1);
+}
+
+/** Add a red Mesh3 at the origin of marker boxes at a vertex of every leaf card of the
+ * broadleaf, each box with the per vertex data Cards wrote for that vertex, so it sways as that
+ * vertex of the card does. Checks that the cards grow on twigs of level 2, that every card has
+ * a stem of flutter weight 0 and a tip of flutter weight 1.
+ *
+ * @param world The world
+ * @param mark Which vertex of every card
+ * @param scramble Whether data1 is replaced by values that are no pivot or stiffness
+ * @return The entity
+ */
+static ecs_entity_t hier_cards(
+    ecs_world_t *world,
+    hier_mark_t mark,
+    bool scramble)
+{
+    char *path = box_app_locate(HIER_BROADLEAF);
+    test_assert(path != NULL);
+    test_assert(ecs_script_run_file(world, path) == 0);
+    ecs_os_free(path);
+    ecs_entity_t plant = ecs_lookup(world, "broadleaf");
+    test_assert(plant != 0);
+    ecs_entity_t cards = ecs_lookup_child(world, plant, "cards");
+    test_assert(cards != 0);
+    char *error = NULL;
+    box_mg_value_t *value = box_mesh_graph_evaluate(world, cards, &error);
+    if (error) {
+        printf("%s\n", error);
+        ecs_os_free(error);
+    }
+
+    test_assert(value != NULL);
+    const box_mg_mesh_t *cm = &value->mesh;
+    const float *card = box_mg_attr_find(cm->attrs, cm->attr_count, "card");
+    float *data[8];
+    int32_t i, v;
+    test_assert(card != NULL);
+    for (i = 0; i < 8; i ++) {
+        char name[BOX_MESH_ATTR_NAME];
+        ecs_os_snprintf(name, ECS_SIZEOF(name), "%s%d", BOX_MESH_DATA_ATTR, i);
+        data[i] = box_mg_attr_find(cm->attrs, cm->attr_count, name);
+        test_assert(data[i] != NULL);
+    }
+
+    Mesh3 m = {0};
+    int32_t first = 0, cards_count = 0, deep = 0;
+    for (v = 1; v <= cm->vertex_count; v ++) {
+        if (v < cm->vertex_count && card[v] == card[first]) {
+            continue;
+        }
+
+        /* The vertices first..v-1 are one card */
+        int32_t stem = first, tip = first;
+        for (i = first; i < v; i ++) {
+            float w = hier_weight(data[BOX_MESH_DATA_FLUTTER][i]);
+            if (w < hier_weight(data[BOX_MESH_DATA_FLUTTER][stem])) {
+                stem = i;
+            }
+            if (w > hier_weight(data[BOX_MESH_DATA_FLUTTER][tip])) {
+                tip = i;
+            }
+        }
+
+        test_assert(hier_weight(data[BOX_MESH_DATA_FLUTTER][stem]) < 1e-3f);
+        test_assert(hier_weight(data[BOX_MESH_DATA_FLUTTER][tip]) > 0.95f);
+        if (floorf(data[BOX_MESH_DATA_FLUTTER][stem]) >= 2.0f) {
+            deep ++;
+        }
+
+        if (mark == HierStems) {
+            hier_mark_box(&m, data, stem, cm->positions[stem], scramble);
+        } else if (mark == HierTips) {
+            hier_mark_box(&m, data, tip, cm->positions[tip], scramble);
+        } else {
+            vec3 pivot = { data[BOX_MESH_DATA_PIVOT][stem],
+                data[BOX_MESH_DATA_PIVOT + 1][stem], data[BOX_MESH_DATA_PIVOT + 2][stem] };
+            hier_mark_box(&m, data, stem, pivot, scramble);
+        }
+
+        cards_count ++;
+        first = v;
+    }
+
+    test_assert(cards_count > 20);
+    test_int(deep, cards_count);
+    box_mg_value_release(value);
+    ecs_delete(world, plant);
+
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Position, {0, 0, 0});
+    ecs_set(world, e, Rgb, {200, 60, 40});
+    ecs_set_ptr(world, e, Mesh3, &m);
+    ecs_vec_fini_t(NULL, &m.vertices, vec3);
+    ecs_vec_fini_t(NULL, &m.normals, vec3);
+    ecs_vec_fini_t(NULL, &m.indices, uint32_t);
+    ecs_vec_fini_t(NULL, &m.data0, vec4);
+    ecs_vec_fini_t(NULL, &m.data1, vec4);
+
+    return e;
+}
+
+/** Render the markers of the cards in a fresh world after frames of a wind, under the WindSway
+ * of a crown with pivots, no bend and a flutter of HIER_FLUTTER.
+ *
+ * @param mark Which vertex of every card
+ * @param scramble Whether data1 is replaced by values that are no pivot or stiffness
+ * @param foliage Whether the WindSway reads the data as foliage
+ * @param branch Radians the twigs turn about their pivots at full wind
+ * @param speed Speed of the wind, 0 for a calm
+ * @param name File name of the capture
+ * @return The pixels, RGBA, freed with stbi_image_free
+ */
+static unsigned char* hier_cards_render(
+    hier_mark_t mark,
+    bool scramble,
+    bool foliage,
+    float branch,
+    float speed,
+    const char *name)
+{
+    ecs_world_t *world = hier_world(true);
+    hier_wind(world, speed);
+    ecs_entity_t e = hier_cards(world, mark, scramble);
+    ecs_set(world, e, WindSway, {.bend = 0, .height = 3, .base = 0,
+        .flutter = HIER_FLUTTER, .flutter_frequency = 2, .flutter_reach = 0.3f,
+        .pivots = true, .branch = branch, .branch_frequency = 0, .foliage = foliage});
+    hier_frames(world, 30);
+    unsigned char *px = hier_render(world, name);
+    ecs_fini(world);
+
+    return px;
+}
+
+/** Number of the red pixels of a capture.
+ *
+ * @param px The pixels
+ * @return The count
+ */
+static int hier_red_count(
+    const unsigned char *px)
+{
+    int x, y, count = 0;
+    for (y = 0; y < HIER_SIZE; y ++) {
+        for (x = 0; x < HIER_SIZE; x ++) {
+            count += hier_red(px, x, y);
+        }
+    }
+
+    return count;
+}
+
+/** Number of the pixels red in one capture and not in the other.
+ *
+ * @param a A capture
+ * @param b The other capture
+ * @return The count
+ */
+static int hier_red_diff(
+    const unsigned char *a,
+    const unsigned char *b)
+{
+    int x, y, count = 0;
+    for (y = 0; y < HIER_SIZE; y ++) {
+        for (x = 0; x < HIER_SIZE; x ++) {
+            count += hier_red(a, x, y) != hier_red(b, x, y);
+        }
+    }
+
+    return count;
+}
+
+/** The leaf cards of a Cards crown under a WindSway with pivots and foliage and twigs that do
+ * not turn: the stems of the cards, of flutter weight 0, stay where they are, the tips flutter */
+void WindHierarchy_card_stems_pinned_tips_flutter(void) {
+    // materials/wind_sway
+    unsigned char *stems_calm = hier_cards_render(HierStems, false, true, 0, 0,
+        "hier_card_stems_calm.png");
+    unsigned char *stems_windy = hier_cards_render(HierStems, false, true, 0, 10,
+        "hier_card_stems_windy.png");
+    int stems = hier_red_count(stems_calm);
+    test_assert(stems > 50);
+    test_assert(hier_red_diff(stems_calm, stems_windy) * 50 <= stems);
+
+    unsigned char *tips_calm = hier_cards_render(HierTips, false, true, 0, 0,
+        "hier_card_tips_calm.png");
+    unsigned char *tips_windy = hier_cards_render(HierTips, false, true, 0, 10,
+        "hier_card_tips_windy.png");
+    int tips = hier_red_count(tips_calm);
+    test_assert(tips > 50);
+    test_assert(hier_red_diff(tips_calm, tips_windy) * 5 > tips);
+
+    stbi_image_free(stems_calm);
+    stbi_image_free(stems_windy);
+    stbi_image_free(tips_calm);
+    stbi_image_free(tips_windy);
+}
+
+/** With turning twigs every card of a Cards crown under a WindSway with pivots and foliage
+ * turns about the pivot of its twig only: the pivots stay, the stems move with the twig, and
+ * the seed, hue, growth and occlusion of the cards in data1 are not read as the pivot or the
+ * stiffness of a parent, which a WindSway without foliage does read on the twigs of level 2 */
+void WindHierarchy_card_stems_turn_with_twig(void) {
+    // materials/wind_sway
+    unsigned char *pivots_calm = hier_cards_render(HierPivots, false, true, HIER_BRANCH, 0,
+        "hier_card_pivots_calm.png");
+    unsigned char *pivots_windy = hier_cards_render(HierPivots, false, true, HIER_BRANCH, 10,
+        "hier_card_pivots_windy.png");
+    float row_rest = hier_mean_row(pivots_calm, 0, HIER_SIZE - 1);
+    float row_moved = hier_mean_row(pivots_windy, 0, HIER_SIZE - 1);
+    float col_rest = hier_mean_column(pivots_calm, 0, HIER_SIZE - 1, 0, HIER_SIZE - 1);
+    float col_moved = hier_mean_column(pivots_windy, 0, HIER_SIZE - 1, 0, HIER_SIZE - 1);
+    test_assert(row_rest > 0.0f && row_moved > 0.0f);
+    test_assert(fabsf(row_moved - row_rest) < 0.3f);
+    test_assert(fabsf(col_moved - col_rest) < 0.3f);
+
+    unsigned char *stems_calm = hier_cards_render(HierStems, false, true, HIER_BRANCH, 0,
+        "hier_card_turn_calm.png");
+    unsigned char *stems_windy = hier_cards_render(HierStems, false, true, HIER_BRANCH, 10,
+        "hier_card_turn_windy.png");
+    int stems = hier_red_count(stems_calm);
+    test_assert(stems > 50);
+    test_assert(hier_red_diff(stems_calm, stems_windy) * 10 > stems);
+
+    /* Other values in data1 change nothing with foliage */
+    unsigned char *scrambled = hier_cards_render(HierStems, true, true, HIER_BRANCH, 10,
+        "hier_card_turn_scrambled.png");
+    test_assert(!memcmp(stems_windy, scrambled, HIER_SIZE * HIER_SIZE * 4));
+
+    /* Without foliage data1 is read as the parent of the twigs of level 2 */
+    unsigned char *parent = hier_cards_render(HierStems, false, false, HIER_BRANCH, 10,
+        "hier_card_parent.png");
+    unsigned char *parent_scrambled = hier_cards_render(HierStems, true, false, HIER_BRANCH,
+        10, "hier_card_parent_scrambled.png");
+    test_assert(memcmp(parent, parent_scrambled, HIER_SIZE * HIER_SIZE * 4) != 0);
+
+    stbi_image_free(pivots_calm);
+    stbi_image_free(pivots_windy);
+    stbi_image_free(stems_calm);
+    stbi_image_free(stems_windy);
+    stbi_image_free(scrambled);
+    stbi_image_free(parent);
+    stbi_image_free(parent_scrambled);
+}

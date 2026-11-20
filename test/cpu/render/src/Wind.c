@@ -243,6 +243,7 @@ void Wind_sway_defaults(void) {
     test_flt(s->branch, 0);
     test_flt(s->branch_frequency, BOX_MATERIAL_SWAY_BRANCH_FREQUENCY);
     test_flt(s->branch_frequency, 0.5f);
+    test_bool(s->foliage, false);
     test_bool(ecs_owns(world, added, MaterialId), true);
 
     test_assert(ecs_script_run(world, "sway",
@@ -250,7 +251,8 @@ void Wind_sway_defaults(void) {
         "tree { WindSway: {bend: 0.05, height: 4, base: -1, flutter: 0.1, "
             "flutter_frequency: 3, flutter_reach: 0.5} }\n"
         "grass { WindSway: {bend: 0.02} }\n"
-        "oak { WindSway: {bend: 0.03, pivots: true, branch: 0.2, branch_frequency: 0.7} }\n",
+        "oak { WindSway: {bend: 0.03, pivots: true, branch: 0.2, branch_frequency: 0.7} }\n"
+        "crown { WindSway: {pivots: true, flutter: 0.1, foliage: true} }\n",
         NULL) == 0);
     s = ecs_get(world, ecs_lookup(world, "tree"), WindSway);
     test_assert(s != NULL);
@@ -272,6 +274,12 @@ void Wind_sway_defaults(void) {
     test_flt(s->branch, 0.2f);
     test_flt(s->branch_frequency, 0.7f);
     test_flt(s->height, 1);
+    test_bool(s->foliage, false);
+    s = ecs_get(world, ecs_lookup(world, "crown"), WindSway);
+    test_assert(s != NULL);
+    test_bool(s->pivots, true);
+    test_bool(s->foliage, true);
+    test_flt(s->flutter, 0.1f);
 
     /* Inherited by instances */
     ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
@@ -681,7 +689,25 @@ void Wind_pack_pivots(void) {
     record.wind_branch_phase = 0;
     test_assert(!ecs_os_memcmp_t(&record, &plain, box_render_material_t));
 
-    /* The flag does not collide with the VertexReveal bits */
+    /* Foliage adds its flag with pivots, and nothing without */
+    sway.foliage = true;
+    box_render_wind_pack(&record, &sway, &wind);
+    test_uint(record.flags, BOX_RENDER_WIND_PRESENT | BOX_RENDER_WIND_PIVOTS |
+        BOX_RENDER_WIND_FOLIAGE);
+    test_flt(record.wind_branch, 0.3f);
+    sway.pivots = false;
+    box_render_wind_pack(&record, &sway, &wind);
+    test_uint(record.flags, BOX_RENDER_WIND_PRESENT);
+    test_assert(!ecs_os_memcmp_t(&record, &plain, box_render_material_t));
+    sway.pivots = true;
+    sway.foliage = false;
+
+    /* The flags do not collide with the VertexReveal and VertexOcclusion bits */
+    test_uint(BOX_RENDER_WIND_FOLIAGE & (BOX_RENDER_WIND_PRESENT | BOX_RENDER_WIND_PIVOTS |
+        BOX_RENDER_REVEAL_PRESENT | BOX_RENDER_REVEAL_INVERT |
+        (7u << BOX_RENDER_REVEAL_CHANNEL_SHIFT) | BOX_RENDER_OCCLUSION_PRESENT |
+        (7u << BOX_RENDER_OCCLUSION_CHANNEL_SHIFT) |
+        (0xFFFFu << BOX_RENDER_REVEAL_SOFTNESS_SHIFT)), 0);
     test_uint(BOX_RENDER_WIND_PIVOTS & (BOX_RENDER_WIND_PRESENT | BOX_RENDER_REVEAL_PRESENT |
         BOX_RENDER_REVEAL_INVERT | (7u << BOX_RENDER_REVEAL_CHANNEL_SHIFT) |
         (0xFFFFu << BOX_RENDER_REVEAL_SOFTNESS_SHIFT)), 0);

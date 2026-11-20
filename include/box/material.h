@@ -1033,7 +1033,8 @@ ECS_STRUCT(VertexOcclusion, {
  * grandparent, so leaves best take the pivot and level of the twig they grow on with a flutter
  * weight. The main bend then moves the vertex by its rest position as without pivots, and the
  * flutter is weighted by the flutter weight instead of the distance from the origin. Normals turn
- * with the branch. A mesh without data sways as without pivots.
+ * with the branch. A mesh without data sways as without pivots. With foliage, data1 is not read:
+ * every vertex turns about the pivot in data0 with a stiffness of 0 and without its parent.
  *
  * Its record is packed every frame, like that of a TextureScroll. Needs Scene.wind: a scene
  * without it draws the shape as if it had no WindSway, with the shaders it has without it. Only
@@ -1057,6 +1058,12 @@ ECS_STRUCT(WindSway, {
                              *   its pivot at full wind, 0 for rigid branches */
     float branch_frequency; /**< Hz of the swing of the branches of level 1 at full wind,
                              *   slower in a light wind; level n swings n times as fast */
+    bool foliage;           /**< With pivots, read only data0 of the per vertex data, the pivot
+                             *   of the twig, its level and the flutter weight, as the foliage
+                             *   of a MeshGraph (Cards) holds it: data1, the seed, hue, growth
+                             *   and occlusion of the cards, is not read as a parent pivot or
+                             *   stiffness; every vertex turns with a stiffness of 0 about the
+                             *   pivot of its twig only, like the twig, so the stems stay on it */
 });
 
 /** Pack the per vertex data a WindSway with pivots reads for a vertex of a branch.

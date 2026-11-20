@@ -1776,7 +1776,8 @@ typedef struct box_render_material_t {
     float wind_flutter_phase; /**< WindSway.flutter_frequency times the wind clock wrapped
                              *   to 0..1, 0 without one */
     uint32_t flags;         /**< BOX_RENDER_WIND_PRESENT with a WindSway, and
-                             *   BOX_RENDER_WIND_PIVOTS with WindSway.pivots; with a VertexReveal
+                             *   BOX_RENDER_WIND_PIVOTS with WindSway.pivots (and
+                             *   BOX_RENDER_WIND_FOLIAGE with WindSway.foliage); with a VertexReveal
                              *   whose channel is 0..7 BOX_RENDER_REVEAL_PRESENT, maybe
                              *   BOX_RENDER_REVEAL_INVERT, the channel at
                              *   BOX_RENDER_REVEAL_CHANNEL_SHIFT and its softness (0 when
@@ -1829,6 +1830,10 @@ typedef struct box_render_material_t {
 /** Flag of a WindSway record with pivots (WindSway.pivots): a mesh with per vertex data sways
  * about the pivots in its data */
 #define BOX_RENDER_WIND_PIVOTS (1u << 6)
+
+/** Flag of a WindSway record with pivots and foliage (WindSway.foliage): the pivots read only
+ * data0, a vertex turns about its pivot with a stiffness of 0 and without its parent */
+#define BOX_RENDER_WIND_FOLIAGE (1u << 11)
 
 /** Smallest Distortion.scale of a record */
 #define BOX_RENDER_DISTORTION_MIN (1e-3f)
