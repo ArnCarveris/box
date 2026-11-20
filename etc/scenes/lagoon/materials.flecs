@@ -159,8 +159,11 @@ assets {
   // play.flecs scrolls the waves toward the camera with the world
   //
   // A light breeze over a sheltered lagoon: a long low swell runs up the lagoon, two shorter wind
-  // waves cross it at angles and a faint ripple runs down it. The normal map adds the fine chop.
-  // play.flecs carries them past the canoe with a WaterFlow at the speed of the world
+  // waves cross it at angles and a faint ripple runs down it. The fine chop is a spectrum of the
+  // breeze blowing up the lagoon, whose waves each travel at their own speed, so the surface keeps
+  // changing shape; its cascades are sized so their tiles do not line up. A faint normal map
+  // breaks up what is left of the smallest tile. play.flecs carries the waves past the canoe with
+  // a WaterFlow at the speed of the world
   //
   // The swell glows turquoise where it is backlit by the low sun, and the slightly rough surface
   // spreads the sun into a glitter path that widens toward the horizon. Small waves lap at the
@@ -183,8 +186,6 @@ assets {
       foam_width: 0.15,
       foam_texture: lg_foam_m,
       foam_scale: 2,
-      ripple_scale: 1.7,
-      ripple_velocity: {0.015, 0.024},
       scatter_color: {46, 214, 178},
       scatter: 0.9,
       shore_period: 5,
@@ -202,7 +203,17 @@ assets {
         {direction: {-0.55, -0.85}, wavelength: 2.1, amplitude: 0.026, steepness: 0.3},
         {direction: {0.3, 0.95}, wavelength: 1.6, amplitude: 0.012, steepness: 0.2}
       ]
-      detail: 0.35
+    }
+    WaterSpectrum: {
+      wind_speed: 3.5,
+      wind_direction: {0.2, -1},
+      size: 37,
+      cascades: 3,
+      resolution: 128,
+      directionality: 0.75,
+      amplitude: 1,
+      seed: 7,
+      detail: 0.2
     }
   }
 
