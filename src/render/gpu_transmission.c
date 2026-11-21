@@ -392,7 +392,9 @@ box_gpu_snapshot_t* box_gpu_transmission_begin(
     box_gpu_snapshot_t *result = NULL, **slot_of_format;
     uint32_t width = (uint32_t)(t->desc.render_width > 0 ? t->desc.render_width : 1);
     uint32_t height = (uint32_t)(t->desc.render_height > 0 ? t->desc.render_height : 1);
-    if (!tr || !box_gpu_transmission_draws(gpu, packet, slot)) {
+    if (!tr || !box_gpu_transmission_draws(gpu, packet, slot) ||
+        box_gpu_cull_glass_hidden(gpu, packet, slot))
+    {
         goto done;
     }
 

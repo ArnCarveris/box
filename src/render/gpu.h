@@ -469,6 +469,11 @@ void box_gpu_texture_graph_compiled(
  * due an update at the time of the packet, deliver their outcomes and readbacks and evict cached
  * values over the budget.
  *
+ * A packet that does not wait for its loads (box_render_packet_t.spread) evaluates the graphs
+ * out of date up to BOX_GPU_TG_SPREAD_TEXELS texels of nodes per sixtieth of a second, or one
+ * BOX_GPU_TG_SPREAD_SHARE of those waiting if that is more, and leaves the rest to the next
+ * packets, so a burst of streamed graphs does not land in one frame.
+ *
  * It runs after the resources of a packet applied and before the mip levels are generated, so
  * the passes of the packet sample the new images.
  *

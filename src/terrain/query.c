@@ -15,7 +15,7 @@
 #include <math.h>
 #include <float.h>
 
-/** Frames a request holds the tiles it asked for */
+/** Frames a request holds the tiles it asked for by default (Terrain.query_hold) */
 #define BOX_TERRAIN_QUERY_HOLD (8)
 
 /** Query tiles a terrain wants per frame at most */
@@ -43,7 +43,7 @@ typedef struct box_terrain_query_settings_t {
     float min_height;       /**< Bottom of the heights */
     float max_height;       /**< Top of the heights */
     int32_t budget;         /**< Tiles made per frame */
-    int32_t pad;            /**< Zero */
+    int32_t hold;           /**< Frames a request holds the tiles it asked for */
 } box_terrain_query_settings_t;
 
 /** A query tile a terrain wants this frame */
@@ -121,6 +121,7 @@ static void box_terrain_query_settings(
     }
 
     out->budget = t->budget > 0 ? t->budget : 8;
+    out->hold = t->query_hold > 0 ? t->query_hold : BOX_TERRAIN_QUERY_HOLD;
 }
 
 /** Get the meters between the texels of a level.
@@ -1173,7 +1174,7 @@ static void box_terrain_query_select(
     ecs_map_iter_t it = ecs_map_iter(&q->requests);
     while (ecs_map_next(&it)) {
         uint64_t key = ecs_map_key(&it), when = ecs_map_value(&it);
-        if (frame > when + BOX_TERRAIN_QUERY_HOLD) {
+        if (frame > when + (uint64_t)s->hold) {
             *ecs_vec_append_t(NULL, &ctx->expired, uint64_t) = key;
             continue;
         }

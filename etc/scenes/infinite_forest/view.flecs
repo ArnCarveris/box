@@ -6,15 +6,14 @@ using box.light
 using box.world
 using state
 
-// The view of the player, set up like the forest's (forest/view.flecs): ambient occlusion, the
-// height fog of the sky, bloom, auto exposure into the Tony McMapface tone map, the grade of the
-// season and the weather, a vignette and SMAA. The aerial perspective of the sky hazes the
-// terrain over the kilometers so it fades into the sky instead of ending. The trees draw at
-// coarser levels of detail with the distance, two shadow cascades reach over the near forest
-// and the small casters stay out of them; the mountains need none.
+// The view of the player, set up like the forest's (forest/view.flecs) without its ambient
+// occlusion and bloom, which cost more of a 4K frame than they show here: the height fog of the
+// sky, auto exposure into the Tony McMapface tone map, the grade of the season and the weather,
+// a vignette and FXAA. The aerial perspective of the sky hazes the terrain over the kilometers
+// so it fades into the sky instead of ending. The trees draw at coarser levels of detail with
+// the distance, two shadow cascades reach over the near forest, each rendered every fourth
+// frame, and the small casters stay out of them; the mountains need none.
 view {
-  occlusion { Gtao: {radius: 0.7, final_value_power: 1.8, quality: GtaoMedium} }
-  bloom { Bloom: {intensity: 0.12, threshold: 1.2, threshold_softness: 0.5} }
   exposure {
     AutoExposure: {min_log_luma: -10.8, exposure_compensation: 0.35, max_exposure: 20}
   }
@@ -31,7 +30,7 @@ view {
     }
   }
   vignette { Vignette: {intensity: 0.2, radius: 0.8, smoothness: 0.5} }
-  edges { Smaa: {} }
+  edges { Fxaa: {} }
 
   View: {
     camera: player,
@@ -47,20 +46,18 @@ view {
     shadows: {
       enabled: true,
       cascades: 2,
-      resolution: 1536,
-      interval: [2, 2],
-      sway_interval: 2,
+      resolution: 1024,
+      interval: [4, 4],
+      sway_interval: 4,
       max_distance: 120,
       split_lambda: 0.85,
-      filter_size: 5,
+      filter_size: 3,
       fade: 0.2,
       blend: 0.15,
       min_caster_texels: 12
     },
     effects: [
-      {effect: occlusion},
       {effect: sky},
-      {effect: bloom},
       {effect: film},
       {effect: grade},
       {effect: vignette},

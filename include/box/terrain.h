@@ -155,6 +155,10 @@ ECS_STRUCT(Terrain, {
                              *   on the CPU at query_spacing, 0 for 64; coarser heights reach
                              *   BOX_TERRAIN_QUERY_SCALE times as far */
     bool query_only;        /**< Keep only the query tiles and draw no tiles */
+    int32_t query_hold;     /**< Frames the heights box_terrain_request asked for beyond
+                             *   query_radius stay after the last request, 0 for 8: longer
+                             *   keeps what neighboring requests share instead of making it
+                             *   again for each */
 });
 
 /** Makes the height, normal and mask channels of a Terrain readable by world position from the
@@ -325,8 +329,8 @@ bool box_terrain_resident(
     double z1);
 
 /** Ask a Terrain to make the query tiles of a rectangle resident at query_spacing, also beyond
- * query_radius. The terrain keeps them while it is asked every few frames, so ask again each
- * frame until box_terrain_resident is true.
+ * query_radius. The terrain keeps them for Terrain.query_hold frames after it was last asked,
+ * so ask again each frame until box_terrain_resident is true.
  *
  * @param world The world
  * @param terrain The terrain entity

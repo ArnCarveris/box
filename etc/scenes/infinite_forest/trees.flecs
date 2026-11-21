@@ -3,6 +3,7 @@ using flecs.script.math
 using box.transform
 using box.render
 using box.material
+using box.texture
 using box.light
 using trees
 using state
@@ -47,6 +48,47 @@ state {
 }
 
 assets {
+  // The barks of the trees of the stands: the bark of the species alone, without the moss the
+  // trunks of the forest library blend over their foot, projected on the planes of the object
+  // with V running up from the foot. One set of maps on one projection, so the many trunks,
+  // limbs and twigs of the stands shade with the plain mesh shader
+  prefab WildBark {
+    PbrMaterial: {roughness: 1}
+    texture.Mapping: {mode: MappingObject, size: BARK_MASK_SIZE / BARK_TILES}
+    texture.Transform: {scale_x: 1, scale_y: -1}
+    texture.Layers: {layers: [layer_wet, layer_snow]}
+  }
+
+  prefab WildBarkBeech : WildBark {
+    Rgb: {255, 255, 255}
+    WindSway: {bend: SWAY_BROADLEAF_BEND, height: SWAY_BROADLEAF_HEIGHT, base: 0}
+    PbrTextures: {albedo: bark_beech_albedo, normal: bark_beech_normal, orm: bark_beech_orm}
+  }
+
+  prefab WildBarkOak : WildBark {
+    Rgb: {255, 255, 255}
+    WindSway: {bend: SWAY_BROADLEAF_BEND, height: SWAY_BROADLEAF_HEIGHT, base: 0}
+    PbrTextures: {albedo: bark_oak_albedo, normal: bark_oak_normal, orm: bark_oak_orm}
+  }
+
+  prefab WildBarkBirch : WildBark {
+    Rgb: {255, 255, 255}
+    WindSway: {bend: SWAY_BIRCH_BEND, height: SWAY_BIRCH_HEIGHT, base: 0}
+    PbrTextures: {albedo: bark_birch_albedo, normal: bark_birch_normal, orm: bark_birch_orm}
+  }
+
+  prefab WildBarkSpruce : WildBark {
+    Rgb: {255, 255, 255}
+    WindSway: {bend: SWAY_CONIFER_BEND, height: SWAY_CONIFER_HEIGHT, base: 0}
+    PbrTextures: {albedo: bark_spruce_albedo, normal: bark_spruce_normal, orm: bark_spruce_orm}
+    texture.Mapping: {mode: MappingObject, size: BARK_MASK_SIZE / (BARK_TILES * 1.5)}
+  }
+
+  prefab WildBarkFir : WildBarkBeech {
+    Rgb: {170, 172, 178}
+    WindSway: {bend: SWAY_CONIFER_BEND, height: SWAY_CONIFER_HEIGHT, base: 0}
+  }
+
   // A variant of a species, height meters tall and slender times as thick as usual, from seed:
   // the preset at the age of forest_tree_age, scaled to height. late picks the leaves that turn
   // later in the year. A snag (SPECIES_SNAG) is a ForestSnag, fallen or standing. With impostor
@@ -83,23 +125,23 @@ assets {
     // does not grow under a prefab, so source and its shapes turn into prefabs once grown
     source {
       if species == SPECIES_BEECH {
-        TreeBeech tree(seed: seed, age: age, bark_material: ForestTreeBarkBeech, leaf_material: late ? ForestLeafBeechB : ForestLeafBeech, stiffness: broad_stiff, flutter: SWAY_LEAF_FLUTTER, lods: WILD_LODS, leaf_lod_skip: 1, leaf_lod_flat: 2) {
+        TreeBeech tree(seed: seed, age: age, bark_material: WildBarkBeech, leaf_material: late ? ForestLeafBeechB : ForestLeafBeech, stiffness: broad_stiff, flutter: SWAY_LEAF_FLUTTER, lods: WILD_LODS, leaf_lod_skip: 1, leaf_lod_flat: 2) {
           Position: {0, 0, 0}
         }
       } else if species == SPECIES_OAK {
-        TreeOak tree(seed: seed, age: age, bark_material: ForestTreeBarkOak, leaf_material: late ? ForestLeafOakB : ForestLeafOak, stiffness: broad_stiff, flutter: SWAY_LEAF_FLUTTER, lods: WILD_LODS, leaf_lod_skip: 1, leaf_lod_flat: 2) {
+        TreeOak tree(seed: seed, age: age, bark_material: WildBarkOak, leaf_material: late ? ForestLeafOakB : ForestLeafOak, stiffness: broad_stiff, flutter: SWAY_LEAF_FLUTTER, lods: WILD_LODS, leaf_lod_skip: 1, leaf_lod_flat: 2) {
           Position: {0, 0, 0}
         }
       } else if species == SPECIES_BIRCH {
-        TreeBirch tree(seed: seed, age: age, bark_material: ForestTreeBarkBirch, leaf_material: late ? ForestLeafBirchB : ForestLeafBirch, stiffness: birch_stiff, flutter: SWAY_LEAF_FLUTTER, lods: WILD_LODS, leaf_lod_skip: 1, leaf_lod_flat: 2) {
+        TreeBirch tree(seed: seed, age: age, bark_material: WildBarkBirch, leaf_material: late ? ForestLeafBirchB : ForestLeafBirch, stiffness: birch_stiff, flutter: SWAY_LEAF_FLUTTER, lods: WILD_LODS, leaf_lod_skip: 1, leaf_lod_flat: 2) {
           Position: {0, 0, 0}
         }
       } else if species == SPECIES_SPRUCE {
-        TreeSpruce tree(seed: seed, age: age, bark_material: ForestTreeBarkSpruce, leaf_material: ForestNeedleSpruce, stiffness: conifer_stiff, flutter: SWAY_NEEDLE_FLUTTER, lods: WILD_LODS, leaf_lod_skip: 1, leaf_lod_flat: 2) {
+        TreeSpruce tree(seed: seed, age: age, bark_material: WildBarkSpruce, leaf_material: ForestNeedleSpruce, stiffness: conifer_stiff, flutter: SWAY_NEEDLE_FLUTTER, lods: WILD_LODS, leaf_lod_skip: 1, leaf_lod_flat: 2) {
           Position: {0, 0, 0}
         }
       } else if species == SPECIES_FIR {
-        TreeFir tree(seed: seed, age: age, bark_material: ForestTreeBarkFir, leaf_material: ForestNeedleFir, stiffness: conifer_stiff, flutter: SWAY_NEEDLE_FLUTTER, lods: WILD_LODS, leaf_lod_skip: 1, leaf_lod_flat: 2) {
+        TreeFir tree(seed: seed, age: age, bark_material: WildBarkFir, leaf_material: ForestNeedleFir, stiffness: conifer_stiff, flutter: SWAY_NEEDLE_FLUTTER, lods: WILD_LODS, leaf_lod_skip: 1, leaf_lod_flat: 2) {
           Position: {0, 0, 0}
         }
       } else {

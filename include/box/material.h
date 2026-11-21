@@ -1193,7 +1193,8 @@ ECS_STRUCT(PbrTextures, {
  *
  * With a contrast above 0 layers meet at their heights instead of cross fading, the larger the
  * contrast the sharper the border; 0 is the linear blend. The alpha is the weighted alpha of the
- * layers, which AlphaCutoff tests. 2D shapes ignore it.
+ * layers, which AlphaCutoff tests. 2D shapes ignore it. A Terrain with a variation above 0
+ * varies the brightness of its layers over the world.
  */
 ECS_STRUCT(TextureBlend, {
     ecs_entity_t mask;      /**< Texture entity whose red, green, blue and alpha weigh layers
@@ -1204,6 +1205,10 @@ ECS_STRUCT(TextureBlend, {
                              *   0 for a flat height of 0.5; unused with a contrast of 0 */
     float contrast;         /**< Sharpness of the height based transitions, 0 (the default)
                              *   for the linear blend; not finite or negative is 0 */
+    float variation;        /**< On a Terrain, how far the albedo of the layers varies in
+                             *   brightness over patches of meters to tens of meters, from the
+                             *   height of layer 0, so the ground does not look the same
+                             *   everywhere: 0 (the default) for none, clamped to 0..1 */
 });
 
 /** How a TextureLayer changes one property of the surface beneath it where it covers it */

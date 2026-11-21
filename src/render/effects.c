@@ -25,6 +25,11 @@
 #define BOX_EFFECTS_SMAA_THRESHOLD_MIN (0.01f)
 #define BOX_EFFECTS_SMAA_THRESHOLD_MAX (0.5f)
 
+/** Range of the edge threshold of FXAA and the most of its least threshold */
+#define BOX_EFFECTS_FXAA_THRESHOLD_MIN (0.03f)
+#define BOX_EFFECTS_FXAA_THRESHOLD_MAX (0.5f)
+#define BOX_EFFECTS_FXAA_FLOOR_MAX (0.25f)
+
 /** Most search steps of SMAA, orthogonal and diagonal */
 #define BOX_EFFECTS_SMAA_STEPS_MAX (112)
 #define BOX_EFFECTS_SMAA_DIAG_STEPS_MAX (20)
@@ -154,6 +159,16 @@ void box_render_grading_settings(
     }
 
     out->lut_strength = glm_clamp(in->lut_strength, 0.0f, 1.0f);
+}
+
+void box_render_fxaa_settings(
+    const Fxaa *in,
+    Fxaa *out)
+{
+    out->threshold = glm_clamp(in->threshold, BOX_EFFECTS_FXAA_THRESHOLD_MIN,
+        BOX_EFFECTS_FXAA_THRESHOLD_MAX);
+    out->threshold_min = glm_clamp(in->threshold_min, 0.0f, BOX_EFFECTS_FXAA_FLOOR_MAX);
+    out->subpixel = glm_clamp(in->subpixel, 0.0f, 1.0f);
 }
 
 void box_render_vignette_settings(
@@ -289,6 +304,7 @@ static void box_effects_entity(
     const ChromaticAberration *ca = ecs_get(world, e, ChromaticAberration);
     const Vignette *vignette = ecs_get(world, e, Vignette);
     const Smaa *smaa = ecs_get(world, e, Smaa);
+    const Fxaa *fxaa = ecs_get(world, e, Fxaa);
     if (fog) {
         HeightFog *out = &box_effects_append(p, v, BOX_RENDER_EFFECT_FOG, e)->fog;
         double origin[3];
@@ -352,6 +368,11 @@ static void box_effects_entity(
     if (smaa) {
         box_render_smaa_settings(smaa, &box_effects_append(
             p, v, BOX_RENDER_EFFECT_SMAA, e)->smaa);
+    }
+
+    if (fxaa) {
+        box_render_fxaa_settings(fxaa, &box_effects_append(
+            p, v, BOX_RENDER_EFFECT_FXAA, e)->fxaa);
     }
 }
 
@@ -460,6 +481,9 @@ bool box_render_effects_use(
             break;
         case BOX_RENDER_SHADER_SMAA:
             result = e->kind == BOX_RENDER_EFFECT_SMAA;
+            break;
+        case BOX_RENDER_SHADER_FXAA:
+            result = e->kind == BOX_RENDER_EFFECT_FXAA;
             break;
         case BOX_RENDER_SHADER_GRADING:
             result = e->kind == BOX_RENDER_EFFECT_GRADING;

@@ -43,8 +43,6 @@ $ {
         texture_blend: true,
         water: true,
         texture_layers: true,
-        triplanar: true,
-        diffuse_transmission: true,
         wind: true
       },
       Terrain: {

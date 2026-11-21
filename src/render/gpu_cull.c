@@ -130,8 +130,11 @@ void box_gpu_cull_init(
         ecs_vec_init_t(NULL, &c->readbacks[i].records, box_gpu_cull_record_t, 0);
         ecs_vec_init_t(NULL, &c->readbacks[i].view_args, uint32_t, 0);
         ecs_vec_init_t(NULL, &c->readbacks[i].shadow_args, uint32_t, 0);
+        ecs_vec_init_t(NULL, &c->readbacks[i].glass, box_gpu_cull_glass_t, 0);
+        ecs_vec_init_t(NULL, &c->readbacks[i].glass_args, uint32_t, 0);
     }
 
+    ecs_vec_init_t(NULL, &c->glass, box_gpu_cull_glass_t, 0);
     ecs_vec_init_t(NULL, &c->status, box_render_cull_status_t, 0);
     ecs_vec_init_t(NULL, &c->views, box_gpu_cull_view_t, 0);
     ecs_vec_init_t(NULL, &c->draws, box_gpu_cull_draw_t, 0);
@@ -229,7 +232,11 @@ void box_gpu_cull_fini(
         ecs_vec_fini_t(NULL, &r->records, box_gpu_cull_record_t);
         ecs_vec_fini_t(NULL, &r->view_args, uint32_t);
         ecs_vec_fini_t(NULL, &r->shadow_args, uint32_t);
+        ecs_vec_fini_t(NULL, &r->glass, box_gpu_cull_glass_t);
+        ecs_vec_fini_t(NULL, &r->glass_args, uint32_t);
     }
+
+    ecs_vec_fini_t(NULL, &c->glass, box_gpu_cull_glass_t);
 
     ecs_os_mutex_lock(gpu->lock);
     ecs_vec_fini_t(NULL, &c->status, box_render_cull_status_t);
@@ -460,10 +467,13 @@ static void box_gpu_cull_publish(
     ecs_os_mutex_unlock(gpu->lock);
     if (counters && r->args_words) {
         const uint32_t *args = (const uint32_t*)ECS_OFFSET(counters, r->args_offset);
-        gpu->pending.view_triangles += box_gpu_cull_triangles(args, &r->view_args);
-        gpu->pending.shadow_triangles += box_gpu_cull_triangles(args, &r->shadow_args);
-        gpu->pending.triangle_reads += r->frame != c->triangle_frame;
-        c->triangle_frame = r->frame;
+        box_gpu_cull_glass_publish(c, r, args);
+        if (ecs_vec_count(&r->view_args) || ecs_vec_count(&r->shadow_args)) {
+            gpu->pending.view_triangles += box_gpu_cull_triangles(args, &r->view_args);
+            gpu->pending.shadow_triangles += box_gpu_cull_triangles(args, &r->shadow_args);
+            gpu->pending.triangle_reads += r->frame != c->triangle_frame;
+            c->triangle_frame = r->frame;
+        }
     }
 
     if (counters && r->stamps) {
@@ -1422,7 +1432,8 @@ static void box_gpu_cull_args_list(
 
 void box_gpu_cull_finish(
     box_gpu_t *gpu,
-    WGPUCommandEncoder encoder)
+    WGPUCommandEncoder encoder,
+    const box_render_packet_t *packet)
 {
     box_gpu_cull_t *c = &gpu->cull;
     int32_t i, d, count = ecs_vec_count(&c->views);
@@ -1434,7 +1445,9 @@ void box_gpu_cull_finish(
 
     uint64_t stamp_offset = (size + 7) & ~(uint64_t)7;
     uint64_t args_offset = stamp_offset + c->stamp_count * sizeof(uint64_t);
-    uint32_t args_words = c->detail && c->args ? (uint32_t)ecs_vec_count(&c->arg_data) : 0;
+    bool glass = box_gpu_cull_glass_list(c, packet, NULL) != 0;
+    uint32_t args_words = (c->detail || glass) && c->args
+        ? (uint32_t)ecs_vec_count(&c->arg_data) : 0;
     r = box_gpu_cull_readback(gpu, args_offset + args_words * sizeof(uint32_t));
     if (!r) {
         goto done;
@@ -1444,9 +1457,11 @@ void box_gpu_cull_finish(
     ecs_vec_clear(&r->view_args);
     ecs_vec_clear(&r->shadow_args);
     r->args_words = 0;
-    if (args_words) {
+    if (args_words && c->detail) {
         box_gpu_cull_args_list(c, r);
     }
+
+    box_gpu_cull_glass_list(c, packet, r);
 
     for (i = 0; i < count; i ++) {
         const box_gpu_cull_view_t *cv = ecs_vec_get_t(&c->views, box_gpu_cull_view_t, i);
@@ -1496,7 +1511,9 @@ void box_gpu_cull_finish(
         r->used = stamp_offset + c->stamp_count * sizeof(uint64_t);
     }
 
-    if (args_words && (ecs_vec_count(&r->view_args) || ecs_vec_count(&r->shadow_args))) {
+    if (args_words && (ecs_vec_count(&r->view_args) || ecs_vec_count(&r->shadow_args) ||
+        ecs_vec_count(&r->glass_args)))
+    {
         wgpuCommandEncoderCopyBufferToBuffer(encoder, c->args, 0, r->buffer, args_offset,
             (uint64_t)args_words * sizeof(uint32_t));
         r->args_offset = args_offset;

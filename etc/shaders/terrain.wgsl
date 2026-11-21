@@ -386,6 +386,44 @@ fn terrain_biplanar(w: vec3f, dominant: u32) -> vec3f {
     return o / max(o.x + o.y + o.z, 1e-6);
 }
 
+// Meters the height of layer 0 repeats over for the two scales of the variation of the albedo
+// of a terrain (TextureBlend.variation), the share of the smaller scale, what the difference of
+// a height from the mean height is scaled by, and how the brightness of red, green and blue
+// follows it: a brighter patch is warmer.
+const TERRAIN_VARIATION_PERIODS: vec2f = vec2f(307.0, 67.0);
+const TERRAIN_VARIATION_FINE: f32 = 0.6;
+const TERRAIN_VARIATION_GAIN: f32 = 3.0;
+const TERRAIN_VARIATION_TINT: vec3f = vec3f(1.0, 0.85, 0.6);
+
+// What the albedo of the layers of a terrain fragment is multiplied by for the variation of the
+// blend: the height of layer 0 stretched over TERRAIN_VARIATION_PERIODS of the absolute world,
+// so it stays in place across shifts of the local origin, less its mean, the last level of its
+// mips. 1 without a variation or a height.
+@diagnostic(off, derivative_uniformity)
+fn terrain_variation(f: TerrainOut) -> vec3f {
+    let gx = dpdx(f.world.xz);
+    let gy = dpdy(f.world.xz);
+    if (!(blending.variation > 0.0) || (blending.flags & BLEND_HEIGHT) == 0u ||
+        !(blending.contrast > 0.0)) {
+        return vec3f(1.0);
+    }
+
+    let o = world_origin(view.origin);
+    let wide = TERRAIN_VARIATION_PERIODS.x;
+    let fine = TERRAIN_VARIATION_PERIODS.y;
+    let at_wide = (f.world.xz + vec2f(o.whole.xz % i32(wide)) + o.rest.xz) / wide;
+    let at_fine = (f.world.xz + vec2f(o.whole.xz % i32(fine)) + o.rest.xz) / fine;
+    let a = textureSampleGrad(blend_heights, material_sampler, at_wide, 0u, gx / wide,
+        gy / wide).r;
+    let b = textureSampleGrad(blend_heights, material_sampler, at_fine.yx, 0u, gx.yx / fine,
+        gy.yx / fine).r;
+    let mean = textureSampleLevel(blend_heights, material_sampler, vec2f(0.5), 0u,
+        f32(textureNumLevels(blend_heights))).r;
+    let k = clamp(TERRAIN_VARIATION_GAIN * ((a - mean) + TERRAIN_VARIATION_FINE * (b - mean)),
+        -1.0, 1.0);
+    return max(vec3f(1.0) + blending.variation * k * TERRAIN_VARIATION_TINT, vec3f(0.0));
+}
+
 // The layers of a fragment of a TextureBlend and how low it lies in their heights.
 struct TerrainLayers {
     layers: Layers,
@@ -400,6 +438,7 @@ struct TerrainLayers {
 fn terrain_blend_layers(f: TerrainOut, geometric: vec3f) -> TerrainLayers {
     let mapped = tf_mapped(f);
     let pair = terrain_pair(blend_weights(terrain_mask(f), blending));
+    let variation = terrain_variation(f);
     var o: TerrainLayers;
     o.low = 0.0;
     o.layers.albedo = vec4f(0.0);
@@ -433,6 +472,7 @@ fn terrain_blend_layers(f: TerrainOut, geometric: vec3f) -> TerrainLayers {
             let m = b.normal;
             normal += w[k] * (tangent * m.x + bitangent * m.y + geometric * m.z);
         }
+        o.layers.albedo = vec4f(o.layers.albedo.rgb * variation, o.layers.albedo.a);
         o.layers.normal = select(geometric, normalize(normal), dot(normal, normal) > 1e-12);
         return o;
     }
@@ -445,7 +485,7 @@ fn terrain_blend_layers(f: TerrainOut, geometric: vec3f) -> TerrainLayers {
     let gy = dpdy(uv);
     let lw = terrain_pair_heights(pair, uv, gx, gy);
     let b = terrain_pair_sample(pair, lw, uv, gx, gy);
-    o.layers.albedo = b.albedo;
+    o.layers.albedo = vec4f(b.albedo.rgb * variation, b.albedo.a);
     o.layers.orm = b.orm;
     o.layers.frame = cotangent_frame_grad(geometric, dpdx(f.world), dpdy(f.world), gx, gy);
     o.layers.normal = perturb(geometric, o.layers.frame, b.normal);
@@ -573,6 +613,28 @@ fn light_lobes(s: Surface, v: vec3f, l: vec3f, radiance: vec3f, side: u32) -> Li
     return Lit(diffuse * radiance * shaded, specular * radiance * shaded);
 }
 
+// Roughness from which a terrain fragment starts to take its indirect specular light from the
+// ambient light toward its normal, and from which it takes all of it: so rough a surface
+// reflects its whole hemisphere, which the reflection probes and the environment add little to.
+const TERRAIN_ROUGH_START: f32 = 0.75;
+const TERRAIN_ROUGH_END: f32 = 0.9;
+
+// The indirect light of a terrain fragment (indirect_light), with the specular light of a rough
+// one faded into its diffuse light (TERRAIN_ROUGH_START), which a fragment that takes all of it
+// reads no probe for.
+fn terrain_indirect(world: vec3f, n: vec3f, spec: vec3f, roughness: f32, cluster: u32)
+    -> Indirect {
+    let rough = smoothstep(TERRAIN_ROUGH_START, TERRAIN_ROUGH_END, roughness);
+    if (rough >= 1.0 && !view_samples_volume()) {
+        let ambient = view_ambient(n);
+        return Indirect(ambient, ambient);
+    }
+
+    var e = indirect_light(world, n, spec, roughness, cluster);
+    e.specular = mix(e.specular, e.diffuse, rough);
+    return e;
+}
+
 // An unlit view shows the albedo as the diffuse part and the emission as the specular one, a
 // view of an impostor frame its channel (impostor_channel).
 fn shade(s: Surface, v: vec3f, world: vec3f) -> Lit {
@@ -592,7 +654,7 @@ fn shade(s: Surface, v: vec3f, world: vec3f) -> Lit {
     let ab = env_brdf(s.roughness, ndv);
     let spec = mix(reflect(-v, n), n, a);
     let cluster = fragment_cluster(world);
-    let e = indirect_light(world, n, spec, s.roughness, cluster);
+    let e = terrain_indirect(world, n, spec, s.roughness, cluster);
     let specular_albedo = f0 * ab.x + ab.y;
     let indirect_specular = specular_albedo * e.specular *
         specular_occlusion(ndv, s.occlusion, a);
@@ -785,7 +847,9 @@ fn terrain_lit(f: TerrainOut, shaded: Surface) -> vec4f {
         let b = terrain_blend_layers(f, geometric);
         s = surface_of(f, geometric, b.layers);
 #ifdef BOX_TEXTURE_LAYERS
-        s = layered(f, s, blend_heights, blending.count, b.low);
+        if (layers_reach(f.world.y)) {
+            s = layered(f, s, blend_heights, blending.count, b.low);
+        }
 #endif
     }
     return terrain_lit(f, terrain_grass(f,

@@ -71,7 +71,7 @@ ECS_ENUM(DepthOfFieldMode, {
  *
  * Belongs before the Tonemap, in HDR, so bright highlights make bokeh discs, and before Bloom.
  * An entity with several effects runs HeightFog, DepthOfField, Bloom, AutoExposure, Tonemap,
- * ColorGrading, ChromaticAberration, Vignette and Smaa.
+ * ColorGrading, ChromaticAberration, Vignette, Smaa and Fxaa.
  */
 ECS_STRUCT(DepthOfField, {
     float focus_distance;  /**< View depth of the focus plane, default 10, at least 0 */
@@ -238,6 +238,22 @@ ECS_STRUCT(Smaa, {
                                     *   0 turns the diagonal detection off */
     int32_t corner_rounding;       /**< Percentage of the corners that is rounded, default 25,
                                     *   clamped to 0..100 */
+});
+
+/** Fast approximate anti aliasing (FXAA 3.11) of the image of a view: one pass that finds the
+ * edges in the luminance of the image and blends each edge pixel along its edge.
+ *
+ * Cheaper and a little softer than Smaa, whose place in the chain it takes: last, after the
+ * Tonemap, where it finds the edges in display range values. It only touches the image of its
+ * own view. Alpha passes through.
+ */
+ECS_STRUCT(Fxaa, {
+    float threshold;     /**< Contrast of an edge relative to the brightest of its pixels,
+                          *   default 0.125, clamped to 0.03..0.5 */
+    float threshold_min; /**< Least contrast of an edge, which keeps the dark areas out, default
+                          *   0.05, clamped to 0..0.25 */
+    float subpixel;      /**< How far a pixel that stands out from its neighbors is blended into
+                          *   them, default 0.5, clamped to 0..1 */
 });
 
 /** Lateral color fringing that grows toward the edges of the image, as in a cheap lens.

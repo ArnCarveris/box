@@ -117,6 +117,7 @@ box_render_packet_t* box_render_packet(
         result->delta = info->delta_time;
         result->fps = ecs_id(App) ? box_app_fps(real) : 0;
         result->headless = app && app->headless;
+        result->spread = !app || !app->headless || app->async_loads;
     }
 
     return result;

@@ -1619,6 +1619,19 @@ static void box_gpu_tg_record(
     }
 }
 
+/** Texels of the nodes a graph evaluates, what its evaluation costs.
+ *
+ * @param graph The graph
+ * @return Its texels times its nodes
+ */
+static int64_t box_gpu_tg_texels(
+    const box_gpu_tg_graph_t *graph)
+{
+    int64_t nodes = graph->desc.node_count > 0 ? (int64_t)graph->desc.node_count : 1;
+
+    return (int64_t)graph->desc.width * (int64_t)graph->desc.height * nodes;
+}
+
 void box_gpu_texture_graphs_evaluate(
     box_gpu_t *gpu,
     const box_render_packet_t *packet)
@@ -1627,6 +1640,7 @@ void box_gpu_texture_graphs_evaluate(
     ecs_vec_t evals, order;
     WGPUCommandEncoder encoder = NULL;
     int32_t i, count, stamp = -1, passes = 0, pass;
+    int64_t waiting = 0, allowed, spent = 0;
     bool requested;
     ecs_os_mutex_lock(gpu->lock);
     requested = ecs_vec_count(&gpu->graph_requests) > 0;
@@ -1658,11 +1672,26 @@ void box_gpu_texture_graphs_evaluate(
         box_gpu_tg_propagate(tg, graphs[i]);
     }
 
+    for (i = 0; packet->spread && i < ecs_vec_count(&order); i ++) {
+        waiting += graphs[i]->dirty ? box_gpu_tg_texels(graphs[i]) : 0;
+    }
+
+    allowed = (int64_t)(BOX_GPU_TG_SPREAD_TEXELS *
+        glm_clamp(packet->delta * 60.0f, 0.25f, 2.0f));
+    allowed = glm_max(allowed, waiting / BOX_GPU_TG_SPREAD_SHARE);
     for (i = 0; i < ecs_vec_count(&order); i ++) {
         box_gpu_tg_graph_t *graph = graphs[i];
         bool reads = box_gpu_tg_node_reads(tg, graph), update;
         if (!box_gpu_tg_graph_ready(gpu, tg, graph)) {
             continue;
+        }
+
+        if (packet->spread && graph->dirty && !reads && !box_gpu_tg_interpolated(graph)) {
+            if (spent && spent + box_gpu_tg_texels(graph) > allowed) {
+                continue;
+            }
+
+            spent += box_gpu_tg_texels(graph);
         }
 
         if (box_gpu_tg_interpolated(graph)) {

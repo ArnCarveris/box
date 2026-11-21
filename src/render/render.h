@@ -2198,6 +2198,15 @@ void box_render_smaa_settings(
     const Smaa *in,
     Smaa *out);
 
+/** Resolve the settings of a fast anti aliasing pass.
+ *
+ * @param in The settings of an effect entity
+ * @param out Receives the resolved settings
+ */
+void box_render_fxaa_settings(
+    const Fxaa *in,
+    Fxaa *out);
+
 /** Resolve the settings of a color grading pass.
  *
  * @param in The settings of an effect entity

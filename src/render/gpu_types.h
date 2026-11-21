@@ -1010,6 +1010,16 @@ typedef struct box_gpu_cull_record_t {
     uint32_t counter;               /**< Index of its counters */
 } box_gpu_cull_record_t;
 
+/** The transmissive instances of a view in a frame and how many of them its cull pass kept */
+typedef struct box_gpu_cull_glass_t {
+    ecs_entity_t view;              /**< Entity of the view */
+    int64_t frame;                  /**< Frame of the packet */
+    int32_t tested;                 /**< Transmissive instances the view tested */
+    int32_t visible;                /**< Those its cull pass drew */
+    int32_t first;                  /**< First of its draw arguments in glass_args of a copy */
+    int32_t count;                  /**< Its draw arguments there */
+} box_gpu_cull_glass_t;
+
 /** A copy of the cull counters of a target on its way back to the main thread */
 typedef struct box_gpu_cull_readback_t {
     WGPUBuffer buffer;              /**< Mappable copy of the counters */
@@ -1022,6 +1032,9 @@ typedef struct box_gpu_cull_readback_t {
     uint32_t stamps;                /**< Timestamp pairs of its cull passes, 0 for none */
     ecs_vec_t view_args;            /**< uint32_t, draw arguments the views drew with */
     ecs_vec_t shadow_args;          /**< uint32_t, draw arguments the cascades drew with */
+    ecs_vec_t glass;                /**< box_gpu_cull_glass_t of the views with transmissive
+                                     *   draws, visible not yet counted */
+    ecs_vec_t glass_args;           /**< uint32_t, draw arguments of those draws, by view */
     uint64_t args_offset;           /**< Byte offset of the draw arguments after the timestamps */
     uint32_t args_words;            /**< Words of draw arguments copied, 0 for none */
 } box_gpu_cull_readback_t;
@@ -1119,6 +1132,8 @@ typedef struct box_gpu_cull_t {
                                      *   and cascades, gpu->stats_detail at the begin */
     int64_t triangle_frame;         /**< Frame of the last read back whose triangles counted */
     ecs_vec_t status;               /**< box_render_cull_status_t, under the lock of the gpu */
+    ecs_vec_t glass;                /**< box_gpu_cull_glass_t, the last counts read back of each
+                                     *   view with transmissive draws (box_gpu_cull_glass_hidden) */
     int64_t frame;                  /**< Frame of the packet of the target being rendered */
     ecs_vec_t views;                /**< box_gpu_cull_view_t of the target */
     ecs_vec_t draws;                /**< box_gpu_cull_draw_t of the target */

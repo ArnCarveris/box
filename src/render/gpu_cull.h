@@ -296,10 +296,56 @@ void box_gpu_cull_record_late(
  *
  * @param gpu The backend
  * @param encoder The encoder of the target, after its views
+ * @param packet The packet
  */
 void box_gpu_cull_finish(
     box_gpu_t *gpu,
-    WGPUCommandEncoder encoder);
+    WGPUCommandEncoder encoder,
+    const box_render_packet_t *packet);
+
+/** List the draw arguments of the transmissive draws of the views that report their counts,
+ * which a copy of the counters then also reads back.
+ *
+ * @param c The cull state
+ * @param packet The packet
+ * @param r The copy whose lists it fills, NULL to only count
+ * @return The transmissive draws listed
+ */
+int32_t box_gpu_cull_glass_list(
+    const box_gpu_cull_t *c,
+    const box_render_packet_t *packet,
+    box_gpu_cull_readback_t *r);
+
+/** Count the transmissive instances the cull pass of each view of a mapped copy kept and keep
+ * them as the last counts of the view, unless it has counts of a newer frame.
+ *
+ * @param c The cull state
+ * @param r The copy, mapped
+ * @param args The draw arguments read back
+ */
+void box_gpu_cull_glass_publish(
+    box_gpu_cull_t *c,
+    const box_gpu_cull_readback_t *r,
+    const uint32_t *args);
+
+/** Check whether the cull pass of a view kept none of its transmissive instances: the last
+ * counts read back are of a frame at most BOX_GPU_CULL_GLASS_FRAMES ago, of as many transmissive
+ * instances as the view tests now, and none of them was visible.
+ *
+ * A view whose counts are not known draws its transmissive instances: the first frames of a
+ * view, a view that just got or lost some of them and a view the GPU is far behind on. So a
+ * transmissive surface that comes into view shows as many frames late as the counts take to
+ * arrive, and a view that never shows one takes no snapshot.
+ *
+ * @param gpu The backend
+ * @param packet The packet
+ * @param slot Slot of the view in the view buffer
+ * @return Whether the view has transmissive draws and none of their instances is visible
+ */
+bool box_gpu_cull_glass_hidden(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet,
+    int32_t slot);
 
 /** Create the layouts, pipelines layouts and empty bindings of the depth pyramid.
  *

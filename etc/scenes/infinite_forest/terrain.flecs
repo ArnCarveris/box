@@ -369,17 +369,19 @@ infinite_forest {
       max_height: GROUND_MAX,
       budget: TERRAIN_BUDGET,
       query_spacing: TERRAIN_QUERY_SPACING,
-      query_radius: TERRAIN_QUERY_RADIUS
+      query_radius: TERRAIN_QUERY_RADIUS,
+      query_hold: TERRAIN_QUERY_HOLD
     }
 
     texture.Blend: {
       layers: [infinite_forest_floor, infinite_forest_grass, infinite_forest_dirt, infinite_forest_rock],
       heights: [litter_height, infinite_forest_grass_height, path_height, rock_height],
-      contrast: 6
+      contrast: 6,
+      variation: 0.4
     }
 
-    texture.Mapping: {mode: MappingWorld, size: GROUND_MAP_SIZE, blend: 0.4}
-    texture.Layers: {layers: [infinite_forest_moss, infinite_forest_peak_snow, layer_wet, layer_snow]}
+    texture.Mapping: {mode: MappingWorld, size: GROUND_MAP_SIZE, blend: 0.15}
+    texture.Layers: {layers: [infinite_forest_peak_snow, layer_wet, layer_snow]}
     Rgb: {212, 206, 196}
     PbrMaterial: {roughness: 0.95}
 
@@ -405,7 +407,8 @@ infinite_forest {
       budget: TERRAIN_BUDGET,
       query_spacing: TERRAIN_QUERY_SPACING,
       query_radius: BROOK_QUERY_RADIUS,
-      query_only: true
+      query_only: true,
+      query_hold: TERRAIN_QUERY_HOLD
     }
   }
 }

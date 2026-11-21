@@ -1015,6 +1015,9 @@ typedef struct box_gpu_view_pass_t {
                                      *   the depth instead of writing it */
     bool planets;                   /**< The planet atmosphere shells draw in a pass of their own
                                      *   that reads the depth instead of writing it */
+    bool hidden;                    /**< None of the transmissive instances of the view is
+                                     *   visible: they do not draw, without a snapshot
+                                     *   (box_gpu_cull_glass_hidden) */
     box_gpu_snapshot_t *snapshot;   /**< Snapshot the image is copied into before transmissive
                                      *   draws (box_gpu_draw_snapshot), NULL without them */
     int32_t snapshots;              /**< Snapshots the pass took, at most
@@ -1418,7 +1421,7 @@ static void box_gpu_draw_batches(
             continue;
         }
 
-        if (d->skip) {
+        if (d->skip || (vp->hidden && b->transmissive)) {
             continue;
         }
 
@@ -1526,7 +1529,8 @@ static void box_gpu_draw_pass(
         .planets = planets,
         .snapshot = phase != 1 ? snapshot : NULL,
         .source = source,
-        .depth_texture = t->depth
+        .depth_texture = t->depth,
+        .hidden = box_gpu_cull_glass_hidden(gpu, packet, slot)
     };
     WGPURenderPassDepthStencilAttachment depth = {
         .view = t->depth_view,
@@ -1833,7 +1837,7 @@ void box_gpu_draw_views(
         slot ++;
     }
 
-    box_gpu_cull_finish(gpu, encoder);
+    box_gpu_cull_finish(gpu, encoder, packet);
 done:
     return;
 }

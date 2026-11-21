@@ -9,9 +9,9 @@ using assets
 // of terrain.flecs: the forest floor (the leaf litter of the forest library), the grass of the
 // clearings and the alpine meadows, the dirt of the trails and the rock of the walls, mapped
 // triplanar so steep faces do not stretch. Scree is rock half buried in dirt, which the height
-// based contrast of the blend breaks into stones. Over them lie four TextureLayers: moss on what
-// faces up, the rock tops among it, snow on the high peaks, more of it in winter, and the wet
-// and the snow of the weather of the forest library.
+// based contrast of the blend breaks into stones. Over them lie three TextureLayers: snow on the
+// high peaks, more of it in winter, and the wet and the snow of the weather of the forest
+// library.
 assets {
   // Grass: tufts of blades in greens from shade to sun, drier straw in patches and soil showing
   // between the tufts
@@ -81,30 +81,6 @@ assets {
   infinite_forest_rock {
     PbrTextures: {albedo: rock_albedo, normal: rock_normal, orm: rock_orm}
     texture.Transform: {scale_x: 16, scale_y: 16}
-  }
-
-  // Moss in patches on what faces up: the rock tops, the flats and the forest floor
-  infinite_forest_moss_patches {
-    n { nodes.Noise: {frequency: 6, octaves: 4, seed: 81} }
-    Graph: {output: n, width: 512, format: GraphSingle}
-  }
-
-  infinite_forest_moss {
-    texture.Layer: {
-      amount: forest_seasonal(season, 0.42, 0.36, 0.4, 0.3),
-      direction: {0, 1, 0},
-      facing: 0.78,
-      mask: infinite_forest_moss_patches,
-      cavity: -0.2,
-      contrast: 5,
-      albedo: LayerMix,
-      roughness: LayerMix,
-      normal: 0.6
-    }
-    PbrMaterial: {roughness: 0.95}
-    PbrTextures: {albedo: moss_albedo, normal: moss_normal, orm: moss_orm}
-    texture.Mapping: {mode: MappingWorld, size: GROUND_MAP_SIZE}
-    texture.Transform: {scale_x: 20, scale_y: 20}
   }
 
   // Snow on the peaks above SNOW_LINE on what faces up, drifting in patches: on the summits in

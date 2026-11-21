@@ -44,6 +44,13 @@
 /** Bytes of the cached values no graph uses kept by default (TextureGraphCache.budget) */
 #define BOX_GPU_TG_CACHE_BUDGET (256ll * 1024 * 1024)
 
+/** Texels of graph nodes a frame that spreads its evaluations (box_render_packet_t.spread)
+ * computes per sixtieth of a second, about the heights and masks of a terrain tile */
+#define BOX_GPU_TG_SPREAD_TEXELS (700000.0f)
+
+/** Share of the texels waiting such a frame computes at least, so a backlog still drains */
+#define BOX_GPU_TG_SPREAD_SHARE (16)
+
 /** Packets a pooled intermediate that no graph used stays in the pool */
 #define BOX_GPU_TG_POOL_KEEP (120)
 

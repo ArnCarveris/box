@@ -2,11 +2,22 @@
 // maps it to the display range by the operator in flags.y: 1 the Khronos PBR Neutral curve, 2
 // Tony McMapface. With neither it copies the image, which is how a view writes its HDR image
 // into its target. The output is linear; the target encodes it.
+//
+// A color grading pass and a vignette pass that follow the tone map are applied here, in that
+// order, instead of in passes of their own: flags.z has TONEMAP_GRADING and TONEMAP_VIGNETTE
+// set for them, and the LUT of the grading is at binding 4.
 #include "include/effect.wgsl"
+#include "include/grading.wgsl"
+#include "include/vignette.wgsl"
 
 struct Tonemap {
     flags: vec4u,
+    grading: Grading,
+    vignette: Vignette,
 };
+
+const TONEMAP_GRADING: u32 = 1u;
+const TONEMAP_VIGNETTE: u32 = 2u;
 
 // Adapted exposure: x is the exposure in stops, y the scale 2^x.
 struct Exposure {
@@ -71,6 +82,14 @@ fn tony_mc_mapface(color: vec3f, pixel: vec2f) -> vec3f {
         c = pbr_neutral(c);
     } else if (tonemap.flags.y == 2u) {
         c = tony_mc_mapface(c, v.pos.xy);
+    }
+
+    if ((tonemap.flags.z & TONEMAP_GRADING) != 0u) {
+        c = grade(tonemap.grading, c);
+    }
+
+    if ((tonemap.flags.z & TONEMAP_VIGNETTE) != 0u) {
+        c = vignette_apply(tonemap.vignette, c, v.uv);
     }
 
     return vec4f(c, src.a);

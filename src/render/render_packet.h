@@ -68,6 +68,9 @@
 /** Shader handle of the engine shader of the SMAA passes */
 #define BOX_RENDER_SHADER_SMAA (49)
 
+/** Shader handle of the engine shader of the FXAA pass */
+#define BOX_RENDER_SHADER_FXAA (22)
+
 /** Shader handle of the engine shader that blurs the opaque snapshot of transmission */
 #define BOX_RENDER_SHADER_TRANSMISSION (50)
 
@@ -1177,6 +1180,7 @@ typedef enum box_render_effect_kind_t {
     BOX_RENDER_EFFECT_BLOOM,    /**< Bloom */
     BOX_RENDER_EFFECT_FOG,      /**< HeightFog */
     BOX_RENDER_EFFECT_SMAA,     /**< Smaa */
+    BOX_RENDER_EFFECT_FXAA,     /**< Fxaa */
     BOX_RENDER_EFFECT_GRADING,  /**< ColorGrading */
     BOX_RENDER_EFFECT_VIGNETTE, /**< Vignette */
     BOX_RENDER_EFFECT_CHROMATIC_ABERRATION, /**< ChromaticAberration */
@@ -1203,6 +1207,7 @@ typedef struct box_render_effect_t {
     HeightFog fog;              /**< Resolved settings of a fog pass */
     DepthOfField depth_of_field; /**< Resolved settings of a depth of field pass */
     Smaa smaa;                  /**< Resolved settings of an anti aliasing pass */
+    Fxaa fxaa;                  /**< Resolved settings of a fast anti aliasing pass */
     box_render_grading_t grading; /**< Resolved settings of a color grading pass */
     Vignette vignette;          /**< Resolved settings of a vignette pass */
     ChromaticAberration chromatic_aberration; /**< Resolved settings of a chromatic aberration
@@ -2425,6 +2430,7 @@ typedef struct box_render_texture_blend_t {
                          *   the arrays */
     uint32_t quality;   /**< Largest dimension of a slice, the texture quality of the surfaces */
     float contrast;     /**< TextureBlend.contrast, 0 for the linear blend without heights */
+    float variation;    /**< TextureBlend.variation, 0 for none */
     uint32_t tiles;     /**< 1 for a TileTerrain, whose mask is its grid of kind indices */
     uint32_t terrain;   /**< Handle of the grid mesh of the tiles of a Terrain with masks, whose
                          *   mask is the mask atlas of the mesh, else 0 */
@@ -2749,6 +2755,9 @@ typedef struct box_render_packet_t {
     float fps;              /**< Frame rate cap of the frame, box_app_fps, 0 uncapped */
     bool headless;          /**< App.headless: the frame waits for the pipelines it draws
                              *   with, so its output does not depend on how long they take */
+    bool spread;            /**< The frame does not wait for its loads (a window, or
+                             *   App.async_loads): the texture graphs to evaluate are spread
+                             *   over the frames (box_gpu_texture_graphs_evaluate) */
     bool vsync;             /**< A window target of the frame presents with vsync */
     float refresh;          /**< Refresh rate in Hz of the display of that window, 0 unknown */
     uint32_t anisotropy;    /**< Anisotropic samples of the texture samplers, 1 to 16 */

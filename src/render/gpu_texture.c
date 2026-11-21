@@ -1485,6 +1485,7 @@ static void box_gpu_blend_group_bind(
         (g->blend.terrain ? BOX_GPU_BLEND_TERRAIN : 0) |
         (terrain ? BOX_GPU_BLEND_MASKED : 0);
     u.contrast = g->blend.contrast;
+    u.variation = g->blend.variation;
     u.grass = g->grass;
     u.terrain = terrain
         ? terrain->terrain_mask_texels | (terrain->terrain_mask_columns << 16) : 0;
