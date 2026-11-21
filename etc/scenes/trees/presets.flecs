@@ -50,6 +50,9 @@ trees {
     prop leaf_material: entity = TreeLeafBeech
     prop stiffness: f32 = 0.5
     prop flutter: f32 = 0.07
+    prop flutter_frequency: f32 = 2.6
+    prop sway_branch: f32 = 0.14
+    prop branch_frequency: f32 = 0.4
     prop lods: i32 = 4
     prop leaf_lod_skip: i32 = 0
     prop leaf_lod_flat: i32 = 0
@@ -70,7 +73,8 @@ trees {
       leaf_material: leaf_material, leaf_size: tree_age_leaf(0.9, age), leaf_count: 4,
       leaf_start: 0.2, leaf_angle: 0.6, leaf_orientation: FaceUp, leaf_tilt: 0.35,
       crown_shape: Ellipsoid, crown_normals: 0.7, occlusion: 0.75, stiffness: stiffness,
-      flutter: flutter, lods: lods,
+      flutter: flutter, flutter_frequency: flutter_frequency, sway_branch: sway_branch,
+      branch_frequency: branch_frequency, lods: lods,
       leaf_lod_skip: leaf_lod_skip, leaf_lod_flat: leaf_lod_flat
     ) { Position: {0, 0, 0} }
   }
@@ -84,6 +88,9 @@ trees {
     prop leaf_material: entity = TreeLeafOak
     prop stiffness: f32 = 0.65
     prop flutter: f32 = 0.07
+    prop flutter_frequency: f32 = 2.4
+    prop sway_branch: f32 = 0.11
+    prop branch_frequency: f32 = 0.35
     prop lods: i32 = 4
     prop leaf_lod_skip: i32 = 0
     prop leaf_lod_flat: i32 = 0
@@ -104,7 +111,8 @@ trees {
       leaf_material: leaf_material, leaf_size: tree_age_leaf(0.8, age), leaf_count: 4,
       leaf_start: 0.25, leaf_angle: 0.7, leaf_orientation: FaceOut, leaf_tilt: 0.5,
       crown_shape: Ellipsoid, crown_normals: 0.65, occlusion: 0.75, stiffness: stiffness,
-      flutter: flutter, lods: lods,
+      flutter: flutter, flutter_frequency: flutter_frequency, sway_branch: sway_branch,
+      branch_frequency: branch_frequency, lods: lods,
       leaf_lod_skip: leaf_lod_skip, leaf_lod_flat: leaf_lod_flat
     ) { Position: {0, 0, 0} }
   }
@@ -118,6 +126,9 @@ trees {
     prop leaf_material: entity = TreeLeafBirch
     prop stiffness: f32 = 0.3
     prop flutter: f32 = 0.1
+    prop flutter_frequency: f32 = 3
+    prop sway_branch: f32 = 0.2
+    prop branch_frequency: f32 = 0.5
     prop lods: i32 = 4
     prop leaf_lod_skip: i32 = 0
     prop leaf_lod_flat: i32 = 0
@@ -138,7 +149,8 @@ trees {
       leaf_material: leaf_material, leaf_size: tree_age_leaf(0.6, age), leaf_count: 5,
       leaf_start: 0.1, leaf_angle: 0.4, leaf_orientation: Along, leaf_tilt: 0.3,
       crown_shape: Ellipsoid, crown_normals: 0.6, occlusion: 0.6, stiffness: stiffness,
-      flutter: flutter, lods: lods,
+      flutter: flutter, flutter_frequency: flutter_frequency, sway_branch: sway_branch,
+      branch_frequency: branch_frequency, lods: lods,
       leaf_lod_skip: leaf_lod_skip, leaf_lod_flat: leaf_lod_flat
     ) { Position: {0, 0, 0} }
   }
@@ -152,6 +164,9 @@ trees {
     prop leaf_material: entity = TreeNeedleSpruce
     prop stiffness: f32 = 0.7
     prop flutter: f32 = 0.03
+    prop flutter_frequency: f32 = 2
+    prop sway_branch: f32 = 0.08
+    prop branch_frequency: f32 = 0.3
     prop lods: i32 = 4
     prop leaf_lod_skip: i32 = 0
     prop leaf_lod_flat: i32 = 0
@@ -171,7 +186,8 @@ trees {
       leaf_material: leaf_material, leaf_levels: 2, leaf_start: 0.05, needle_style: Spruce,
       needle_cards: 3, needle_width: 0.7, needle_droop: 0.25, crown_shape: Density,
       crown_normals: 0.6, occlusion: 0.75, stiffness: stiffness,
-      flutter: flutter, lods: lods,
+      flutter: flutter, flutter_frequency: flutter_frequency, sway_branch: sway_branch,
+      branch_frequency: branch_frequency, lods: lods,
       leaf_lod_skip: leaf_lod_skip, leaf_lod_flat: leaf_lod_flat
     ) { Position: {0, 0, 0} }
   }
@@ -185,6 +201,9 @@ trees {
     prop leaf_material: entity = TreeNeedleFir
     prop stiffness: f32 = 0.75
     prop flutter: f32 = 0.03
+    prop flutter_frequency: f32 = 2
+    prop sway_branch: f32 = 0.07
+    prop branch_frequency: f32 = 0.3
     prop lods: i32 = 4
     prop leaf_lod_skip: i32 = 0
     prop leaf_lod_flat: i32 = 0
@@ -204,7 +223,8 @@ trees {
       leaf_levels: 2, leaf_start: 0.05, needle_style: Fir, needle_cards: 4, needle_width: 0.9,
       needle_droop: 0.05, crown_shape: Density, crown_normals: 0.6, occlusion: 0.75,
       stiffness: stiffness,
-      flutter: flutter, lods: lods,
+      flutter: flutter, flutter_frequency: flutter_frequency, sway_branch: sway_branch,
+      branch_frequency: branch_frequency, lods: lods,
       leaf_lod_skip: leaf_lod_skip, leaf_lod_flat: leaf_lod_flat
     ) { Position: {0, 0, 0} }
   }
@@ -218,6 +238,9 @@ trees {
     prop leaf_material: entity = TreeNeedlePine
     prop stiffness: f32 = 0.6
     prop flutter: f32 = 0.03
+    prop flutter_frequency: f32 = 2
+    prop sway_branch: f32 = 0.09
+    prop branch_frequency: f32 = 0.32
     prop lods: i32 = 4
     prop leaf_lod_skip: i32 = 0
     prop leaf_lod_flat: i32 = 0
@@ -239,7 +262,8 @@ trees {
       leaf_per_node: 3, leaf_start: 0.4, leaf_angle: 0.55, leaf_orientation: Along,
       leaf_tilt: 0.4, card: Cross, crown_shape: Ellipsoid, crown_normals: 0.6, occlusion: 0.65,
       stiffness: stiffness,
-      flutter: flutter, lods: lods,
+      flutter: flutter, flutter_frequency: flutter_frequency, sway_branch: sway_branch,
+      branch_frequency: branch_frequency, lods: lods,
       leaf_lod_skip: leaf_lod_skip, leaf_lod_flat: leaf_lod_flat
     ) { Position: {0, 0, 0} }
   }
@@ -253,6 +277,9 @@ trees {
     prop leaf_material: entity = TreeLeafWillow
     prop stiffness: f32 = 0.25
     prop flutter: f32 = 0.12
+    prop flutter_frequency: f32 = 2.8
+    prop sway_branch: f32 = 0.22
+    prop branch_frequency: f32 = 0.45
     prop lods: i32 = 4
     prop leaf_lod_skip: i32 = 0
     prop leaf_lod_flat: i32 = 0
@@ -272,7 +299,8 @@ trees {
       crown: None, leaf_material: leaf_material, leaf_size: tree_age_leaf(0.7, age),
       leaf_count: 6, leaf_start: 0.05, leaf_angle: 0.25, leaf_orientation: Along, leaf_tilt: 0.2,
       crown_shape: Density, crown_normals: 0.5, occlusion: 0.6, stiffness: stiffness,
-      flutter: flutter, lods: lods,
+      flutter: flutter, flutter_frequency: flutter_frequency, sway_branch: sway_branch,
+      branch_frequency: branch_frequency, lods: lods,
       leaf_lod_skip: leaf_lod_skip, leaf_lod_flat: leaf_lod_flat
     ) { Position: {0, 0, 0} }
   }
@@ -292,6 +320,9 @@ trees {
     prop leaf_material: entity = TreeTwigDead
     prop stiffness: f32 = 1
     prop flutter: f32 = 0.01
+    prop flutter_frequency: f32 = 2
+    prop sway_branch: f32 = 0
+    prop branch_frequency: f32 = 0.4
     prop lods: i32 = 4
     prop leaf_lod_skip: i32 = 0
     prop leaf_lod_flat: i32 = 0
@@ -310,7 +341,8 @@ trees {
       crown: None, leaf_material: leaf_material, leaf_size: tree_age_leaf(1.1, age), leaf_count: 2,
       leaf_start: 0.5, leaf_angle: 0.4, leaf_orientation: Along, leaf_tilt: 0.2, card: Quad,
       crown_shape: Density, crown_normals: 0.3, occlusion: 0.4, stiffness: stiffness,
-      flutter: flutter, lods: lods,
+      flutter: flutter, flutter_frequency: flutter_frequency, sway_branch: sway_branch,
+      branch_frequency: branch_frequency, lods: lods,
       leaf_lod_skip: leaf_lod_skip, leaf_lod_flat: leaf_lod_flat
     ) { Position: {0, 0, 0} }
   }

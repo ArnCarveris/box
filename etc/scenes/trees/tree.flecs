@@ -127,10 +127,13 @@ trees {
     prop growth: f32 = 0
 
     // Wind: 0 a tree that bends freely to 1 a stiff one; meters the leaves flutter at full
-    // wind; radians the branches swing about their pivots (0 for none); world Y of the ground
+    // wind and how fast (Hz); radians the branches swing about their pivots (0 for none) and how
+    // fast the limbs swing (Hz, twigs faster by their level); world Y of the ground
     prop stiffness: f32 = 0.5
     prop flutter: f32 = 0.07
-    prop sway_branch: f32 = 0
+    prop flutter_frequency: f32 = 2.6
+    prop sway_branch: f32 = 0.12
+    prop branch_frequency: f32 = 0.4
     prop ground: f32 = 0
 
     // Levels of detail of both shapes, 1 to 4
@@ -310,7 +313,10 @@ trees {
       } else {
         Graph: {output: bark_all, levels: lods}
       }
-      WindSway: {bend: sway, height: height, base: ground, pivots: true, branch: sway_branch}
+      WindSway: {
+        bend: sway, height: height, base: ground, pivots: true, branch: sway_branch,
+        branch_frequency: branch_frequency
+      }
       if growth > 0 {
         VertexReveal: {channel: TREE_CHANNEL_GROWTH, threshold: growth, softness: 0.05, invert: true}
       }
@@ -321,8 +327,9 @@ trees {
       Position: {0, 0, 0}
       Graph: {output: occluded, levels: lods}
       WindSway: {
-        bend: sway, height: height, base: ground, flutter: flutter, flutter_frequency: 3.2,
-        pivots: true, branch: sway_branch, foliage: true
+        bend: sway, height: height, base: ground, flutter: flutter,
+        flutter_frequency: flutter_frequency, pivots: true, branch: sway_branch,
+        branch_frequency: branch_frequency, foliage: true
       }
       if thin > 0 {
         VertexReveal: {channel: TREE_CHANNEL_SEED, threshold: thin, softness: 0}

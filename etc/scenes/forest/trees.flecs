@@ -242,27 +242,27 @@ assets {
     const conifer_stiff = forest_tree_stiffness(hr, SWAY_CONIFER_BEND, SWAY_CONIFER_HEIGHT)
 
     if species == SPECIES_BEECH {
-      TreeBeech tree(seed: ts, age: age, bark_material: ForestTreeBarkBeech, leaf_material: late ? ForestLeafBeechB : ForestLeafBeech, stiffness: broad_stiff, flutter: SWAY_LEAF_FLUTTER) {
+      TreeBeech tree(seed: ts, age: age, bark_material: ForestTreeBarkBeech, leaf_material: late ? ForestLeafBeechB : ForestLeafBeech, stiffness: broad_stiff, flutter: SWAY_LEAF_FLUTTER, flutter_frequency: SWAY_LEAF_FREQUENCY, sway_branch: SWAY_BROADLEAF_BRANCH, branch_frequency: SWAY_BROADLEAF_BRANCH_FREQUENCY) {
         Position: {0, 0 - TRUNK_SINK, 0}
         Scale: {kx, k, kx}
       }
     } else if species == SPECIES_OAK {
-      TreeOak tree(seed: ts, age: age, bark_material: ForestTreeBarkOak, leaf_material: late ? ForestLeafOakB : ForestLeafOak, stiffness: broad_stiff, flutter: SWAY_LEAF_FLUTTER) {
+      TreeOak tree(seed: ts, age: age, bark_material: ForestTreeBarkOak, leaf_material: late ? ForestLeafOakB : ForestLeafOak, stiffness: broad_stiff, flutter: SWAY_LEAF_FLUTTER, flutter_frequency: SWAY_LEAF_FREQUENCY, sway_branch: SWAY_BROADLEAF_BRANCH, branch_frequency: SWAY_BROADLEAF_BRANCH_FREQUENCY) {
         Position: {0, 0 - TRUNK_SINK, 0}
         Scale: {kx, k, kx}
       }
     } else if species == SPECIES_BIRCH {
-      TreeBirch tree(seed: ts, age: age, bark_material: ForestTreeBarkBirch, leaf_material: late ? ForestLeafBirchB : ForestLeafBirch, stiffness: forest_tree_stiffness(hr, SWAY_BIRCH_BEND, SWAY_BIRCH_HEIGHT), flutter: SWAY_LEAF_FLUTTER) {
+      TreeBirch tree(seed: ts, age: age, bark_material: ForestTreeBarkBirch, leaf_material: late ? ForestLeafBirchB : ForestLeafBirch, stiffness: forest_tree_stiffness(hr, SWAY_BIRCH_BEND, SWAY_BIRCH_HEIGHT), flutter: SWAY_LEAF_FLUTTER, flutter_frequency: SWAY_LEAF_FREQUENCY, sway_branch: SWAY_BIRCH_BRANCH, branch_frequency: SWAY_BIRCH_BRANCH_FREQUENCY) {
         Position: {0, 0 - TRUNK_SINK, 0}
         Scale: {kx, k, kx}
       }
     } else if species == SPECIES_SPRUCE {
-      TreeSpruce tree(seed: ts, age: age, bark_material: ForestTreeBarkSpruce, leaf_material: ForestNeedleSpruce, stiffness: conifer_stiff, flutter: SWAY_NEEDLE_FLUTTER) {
+      TreeSpruce tree(seed: ts, age: age, bark_material: ForestTreeBarkSpruce, leaf_material: ForestNeedleSpruce, stiffness: conifer_stiff, flutter: SWAY_NEEDLE_FLUTTER, flutter_frequency: SWAY_NEEDLE_FREQUENCY, sway_branch: SWAY_CONIFER_BRANCH, branch_frequency: SWAY_CONIFER_BRANCH_FREQUENCY) {
         Position: {0, 0 - TRUNK_SINK, 0}
         Scale: {kx, k, kx}
       }
     } else {
-      TreeFir tree(seed: ts, age: age, bark_material: ForestTreeBarkFir, leaf_material: ForestNeedleFir, stiffness: conifer_stiff, flutter: SWAY_NEEDLE_FLUTTER) {
+      TreeFir tree(seed: ts, age: age, bark_material: ForestTreeBarkFir, leaf_material: ForestNeedleFir, stiffness: conifer_stiff, flutter: SWAY_NEEDLE_FLUTTER, flutter_frequency: SWAY_NEEDLE_FREQUENCY, sway_branch: SWAY_CONIFER_BRANCH, branch_frequency: SWAY_CONIFER_BRANCH_FREQUENCY) {
         Position: {0, 0 - TRUNK_SINK, 0}
         Scale: {kx, k, kx}
       }
@@ -341,7 +341,7 @@ assets {
       }
     }
 
-    TreeSnag tree(seed: seed, age: forest_snag_age(seed), height: height, bend: 0, lean: 0, bark_extra: fallen ? extra : top_mesh, bark_material: ForestTreeBarkDead, leaf_material: ForestTwigDead, stiffness: 1.4) {
+    TreeSnag tree(seed: seed, age: forest_snag_age(seed), height: height, bend: 0, lean: 0, bark_extra: fallen ? extra : top_mesh, bark_material: ForestTreeBarkDead, leaf_material: ForestTwigDead, stiffness: 1.4, sway_branch: 0) {
       Position: {0, 0, 0}
     }
   }

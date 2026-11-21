@@ -544,7 +544,7 @@ assets {
   prefab ForestCanopyFar {
     Rgb: {forest_seasonal(season, 86, 70, 124, 80), forest_seasonal(season, 116, 96, 80, 70), forest_seasonal(season, 40, 37, 32, 66)}
     PbrMaterial: {roughness: 0.92}
-    WindSway: {bend: SWAY_FAR_BEND, height: SWAY_BROADLEAF_HEIGHT, base: 0}
+    WindSway: {bend: SWAY_FAR_BEND, height: SWAY_BROADLEAF_HEIGHT, base: 0, flutter: SWAY_FAR_FLUTTER, flutter_frequency: SWAY_FAR_FREQUENCY, flutter_reach: 1}
     PbrTextures: {albedo: canopy_leaf_albedo, normal: canopy_normal}
     texture.Mapping: {mode: MappingWorld, size: 14, blend: 0.5}
     texture.Layers: {layers: [layer_wet_foliage, layer_snow_foliage]}
@@ -554,7 +554,7 @@ assets {
   prefab ForestUnderstoryFar {
     Rgb: {forest_seasonal(season, 42, 36, 54, 42), forest_seasonal(season, 58, 51, 40, 38), forest_seasonal(season, 20, 18, 18, 36)}
     PbrMaterial: {roughness: 0.95}
-    WindSway: {bend: SWAY_FAR_BEND * 0.5, height: 7, base: 0}
+    WindSway: {bend: SWAY_FAR_BEND * 0.5, height: 7, base: 0, flutter: SWAY_FAR_FLUTTER * 0.5, flutter_frequency: SWAY_FAR_FREQUENCY, flutter_reach: 1}
     PbrTextures: {albedo: canopy_leaf_albedo, normal: canopy_normal}
     texture.Mapping: {mode: MappingWorld, size: 8, blend: 0.5}
     texture.Layers: {layers: [layer_wet_foliage, layer_snow_foliage]}
@@ -564,7 +564,7 @@ assets {
   prefab ForestConiferFar {
     Rgb: {150, 172, 160}
     PbrMaterial: {roughness: 0.9}
-    WindSway: {bend: SWAY_FAR_BEND * 0.6, height: SWAY_CONIFER_HEIGHT, base: 0}
+    WindSway: {bend: SWAY_FAR_BEND * 0.6, height: SWAY_CONIFER_HEIGHT, base: 0, flutter: SWAY_FAR_FLUTTER * 0.4, flutter_frequency: SWAY_FAR_FREQUENCY, flutter_reach: 1}
     PbrTextures: {albedo: canopy_albedo, normal: canopy_normal}
     texture.Mapping: {mode: MappingWorld, size: 10, blend: 0.5}
     texture.Layers: {layers: [layer_wet_foliage, layer_snow_foliage]}
