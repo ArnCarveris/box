@@ -1629,36 +1629,38 @@ static void box_gpu_draw_prepass_draws(
     WGPURenderPipeline bound = NULL;
     WGPUBindGroup material = NULL, instances = NULL;
     uint32_t offset = (uint32_t)(slot * BOX_GPU_VIEW_STRIDE);
-    int32_t i;
+    int32_t i, sweep;
     wgpuRenderPassEncoderSetBindGroup(pass, 0, group, 1, &offset);
     wgpuRenderPassEncoderSetBindGroup(pass, 3, box_gpu_volume_group(gpu, v), 0, NULL);
-    for (i = 0; cv && i < cv->draw_count; i ++) {
-        const box_gpu_cull_draw_t *d = ecs_vec_get_t(
-            &gpu->cull.draws, box_gpu_cull_draw_t, cv->first_draw + i);
-        const box_render_batch_t *b = ecs_vec_get_t(
-            &packet->batches, box_render_batch_t, d->batch);
-        if (!box_gpu_prepass_draws(b)) {
-            continue;
-        }
+    for (sweep = 0; cv && sweep < BOX_GPU_DEPTH_SWEEPS; sweep ++) {
+        for (i = 0; i < cv->draw_count; i ++) {
+            const box_gpu_cull_draw_t *d = ecs_vec_get_t(
+                &gpu->cull.draws, box_gpu_cull_draw_t, cv->first_draw + i);
+            const box_render_batch_t *b = ecs_vec_get_t(
+                &packet->batches, box_render_batch_t, d->batch);
+            if (!box_gpu_prepass_draws(b) || box_gpu_depth_sweep(b) != sweep) {
+                continue;
+            }
 
-        WGPURenderPipeline pipeline = box_gpu_prepass_pipeline(gpu, b, count);
-        if (!pipeline || d->skip) {
-            continue;
-        }
+            WGPURenderPipeline pipeline = box_gpu_prepass_pipeline(gpu, b, count);
+            if (!pipeline || d->skip) {
+                continue;
+            }
 
-        if (pipeline != bound) {
-            wgpuRenderPassEncoderSetPipeline(pass, pipeline);
-            bound = pipeline;
-        }
+            if (pipeline != bound) {
+                wgpuRenderPassEncoderSetPipeline(pass, pipeline);
+                bound = pipeline;
+            }
 
-        WGPUBindGroup layers = box_gpu_forward_group(gpu, packet, b);
-        if (layers != material) {
-            wgpuRenderPassEncoderSetBindGroup(pass, 1, layers, 1, &(uint32_t){0});
-            material = layers;
-        }
+            WGPUBindGroup layers = box_gpu_forward_group(gpu, packet, b);
+            if (layers != material) {
+                wgpuRenderPassEncoderSetBindGroup(pass, 1, layers, 1, &(uint32_t){0});
+                material = layers;
+            }
 
-        if (box_gpu_cull_draw(gpu, pass, packet, d, 2, late, true, &instances)) {
-            box_gpu_count(gpu, stat);
+            if (box_gpu_cull_draw(gpu, pass, packet, d, 2, late, true, &instances)) {
+                box_gpu_count(gpu, stat);
+            }
         }
     }
 }

@@ -167,8 +167,8 @@ static size_t box_gpu_terrain_constants(
  * @param range Whether the instances have a DrawRange (the draw_range constant of both stages
  * of the mesh shaders), which dithers their fades; ignored by the 2D shape shader
  * @param impostor Whether the instances are impostor cards: vs_impostor and fs_impostor of the
- * mesh shader with the per vertex data, no face culling and compare GreaterEqual, as their
- * depth comes from the depth atlas in the prepass and in this pass
+ * mesh shader (fs_impostor_equal after a depth prepass) with the per vertex data and no face
+ * culling
  * @return The pipeline
  */
 static WGPURenderPipeline box_gpu_forward_create(
@@ -226,9 +226,8 @@ static WGPURenderPipeline box_gpu_forward_create(
 
     impostor = impostor && handle == BOX_RENDER_SHADER_MESH && !layers;
     if (impostor) {
-        entry = "fs_impostor";
+        entry = equal ? "fs_impostor_equal" : "fs_impostor";
         data = true;
-        equal = false;
         back_face = BackFacePlain;
     }
 
@@ -238,7 +237,7 @@ static WGPURenderPipeline box_gpu_forward_create(
     }
 
     WGPUCompareFunction compare = WGPUCompareFunction_Greater;
-    if (shape2d || impostor) {
+    if (shape2d) {
         compare = WGPUCompareFunction_GreaterEqual;
     } else if (equal) {
         compare = WGPUCompareFunction_Equal;
@@ -419,7 +418,7 @@ static WGPURenderPipeline box_gpu_forward_create(
  * @param range Whether the instances have a DrawRange: both stages have the draw_range override
  * and a plain batch discards with fs_depth_range (fs_count_range)
  * @param impostor Whether the instances are impostor cards, drawn with vs_impostor and
- * fs_impostor_depth (fs_impostor_count), which write the depth of the depth atlas
+ * fs_impostor_depth (fs_impostor_count), which write the depth of their plane where they cover
  * @param terrain Whether the instances are terrain tiles of the terrain shader, placed by
  * vs_terrain_depth as vs_terrain places them
  * @return The pipeline
@@ -648,6 +647,12 @@ bool box_gpu_prepass_draws(
     return b->view == -1 && box_render_is_mesh(b->pipeline) && b->blend == Opaque;
 }
 
+int32_t box_gpu_depth_sweep(
+    const box_render_batch_t *b)
+{
+    return b->impostor ? 2 : (b->cutout ? 1 : 0);
+}
+
 /** Keep a requested forward pipeline in the cache. Until it exists, a draw of its key uses the
  * pipeline of the module a recompile replaced, which it then releases.
  *
@@ -738,7 +743,6 @@ WGPURenderPipeline box_gpu_forward_pipeline_mirrored(
     data = mesh && box_gpu_vertex_data(gpu, b);
     range = mesh && box_render_batch_ranged(b);
     impostor = b->impostor && b->pipeline == BOX_RENDER_SHADER_MESH && !layers;
-    equal = equal && !impostor;
 
     key = box_gpu_forward_key(b->pipeline, format, b->blend, b->back_face,
         shape2d ? b->box_shadow : cutout,

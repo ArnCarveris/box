@@ -13,7 +13,7 @@ using state
 // coarser levels of detail with the distance, two shadow cascades reach over the near forest
 // and the small casters stay out of them; the mountains need none.
 view {
-  occlusion { Gtao: {radius: 0.7, final_value_power: 1.8, quality: GtaoHigh} }
+  occlusion { Gtao: {radius: 0.7, final_value_power: 1.8, quality: GtaoMedium} }
   bloom { Bloom: {intensity: 0.12, threshold: 1.2, threshold_softness: 0.5} }
   exposure {
     AutoExposure: {min_log_luma: -10.8, exposure_compensation: 0.35, max_exposure: 20}
@@ -48,7 +48,8 @@ view {
       enabled: true,
       cascades: 2,
       resolution: 1536,
-      interval: [1, 2],
+      interval: [2, 2],
+      sway_interval: 2,
       max_distance: 120,
       split_lambda: 0.85,
       filter_size: 5,

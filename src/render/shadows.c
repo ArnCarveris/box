@@ -68,6 +68,8 @@ void box_render_shadow_settings(
     for (int32_t i = 0; i < BOX_RENDER_SHADOW_CASCADES; i ++) {
         out->interval[i] = settings->interval[i] > 1 ? settings->interval[i] : 1;
     }
+
+    out->sway_interval = settings->sway_interval > 1 ? settings->sway_interval : 1;
 }
 
 void box_render_shadow_splits(
@@ -274,7 +276,10 @@ static bool box_shadows_key_equal(
  *
  * Each cascade renders when the extracts since every cascade last rendered, plus its index,
  * are a multiple of its interval; every cascade renders when the view is new to the extract or
- * what its cascades are fitted to changed, and while casters with a WindSway sway in its scene.
+ * what its cascades are fitted to changed.
+ *
+ * While casters with a WindSway sway in its scene the interval of a cascade is at most
+ * ShadowSettings.sway_interval, 1 by default: every frame.
  *
  * @param state The state of the extract
  * @param v The view, with its shadows resolved
@@ -317,13 +322,15 @@ static void box_shadows_schedule(
         h->key = key;
         h->count = 0;
         out->render = all;
-    } else if (swaying) {
-        h->count ++;
-        out->render = all;
     } else {
         h->count ++;
         for (i = 0; i < out->cascades; i ++) {
-            if ((h->count + i) % s->interval[i] == 0) {
+            int32_t interval = s->interval[i];
+            if (swaying && interval > s->sway_interval) {
+                interval = s->sway_interval;
+            }
+
+            if ((h->count + i) % interval == 0) {
                 out->render |= 1u << i;
             }
         }

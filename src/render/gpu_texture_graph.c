@@ -515,6 +515,27 @@ static void box_gpu_tg_cache_hold(
     graph->entry_count = entries ? count : 0;
 }
 
+/** Check whether a graph whose image was written lets go of the cached values of its nodes: it
+ * is on DomainWorld, its output does not depend on time and no node of it on a sampled texture.
+ *
+ * The values of such a graph are those of its place in the world, which no other graph shares,
+ * and a streamed world has thousands of them: they stay in the cache while its budget has room.
+ *
+ * @param graph The graph
+ * @return Whether the graph holds none of its values until it is edited
+ */
+static bool box_gpu_tg_settled(
+    const box_gpu_tg_graph_t *graph)
+{
+    bool result = graph->desc.domain == DomainWorld && !graph->is_animated && graph->current;
+    int32_t i;
+    for (i = 0; result && graph->sampling && i < graph->current->node_count; i ++) {
+        result = !graph->sampling[i];
+    }
+
+    return result;
+}
+
 void box_gpu_texture_graph_sampled(
     box_gpu_t *gpu,
     uint32_t handle)
@@ -1757,6 +1778,9 @@ void box_gpu_texture_graphs_evaluate(
         graph->written = true;
         gpu->pending.texture_graph_updates += ev->update;
         box_gpu_tg_report(gpu, graph, NULL, -1);
+        if (box_gpu_tg_settled(graph)) {
+            box_gpu_tg_cache_hold(gpu, tg, graph, NULL, 0);
+        }
     }
 
 sweep:

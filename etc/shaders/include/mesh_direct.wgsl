@@ -76,6 +76,14 @@ fn shadow_terminator(ng: vec3f, ns: vec3f, l: vec3f) -> f32 {
     return g * (1.0 + g * (1.0 - g));
 }
 
+// Whether a light toward l reaches a side of a surface of geometric normal ng: the front lobes
+// of side 0 and the back lobe of side 1 fade by the shadow terminator, which is 0 with the light
+// behind the geometric surface of the side, so its shadows and cookie need not be read.
+fn light_reaches(ng: vec3f, l: vec3f, side: u32) -> bool {
+    let g = dot(ng, l);
+    return select(g > 0.0, g < 0.0, side == 1u);
+}
+
 // Direct light: the directional lights, then the lights of the cluster. With
 // scene_planet_light the sun of the planet of the fragment (fragment_planet) is attenuated by
 // the transmittance of its atmosphere at world, and its sky lights the diffuse term
@@ -128,8 +136,15 @@ fn lights_direct(s: Surface, v: vec3f, world: vec3f, cluster: u32, sides: u32,
                     }
                     radiance *= planet_light_factor(planet, l);
                 }
+                if (!light_reaches(s.geometric, l, side)) {
+                    continue;
+                }
                 if (i == 0u) {
-                    visible = shadow_factor(at, n) * (1.0 - s.shade);
+                    if (side == 1u) {
+                        visible = shadow_factor_back(at, n) * (1.0 - s.shade);
+                    } else {
+                        visible = shadow_factor(at, n) * (1.0 - s.shade);
+                    }
                     if (scene_cookies) {
                         visible *= light_cookie(at, l, n);
                     }
@@ -138,6 +153,9 @@ fn lights_direct(s: Surface, v: vec3f, world: vec3f, cluster: u32, sides: u32,
                 let delta = light.position - at;
                 let dist = length(delta);
                 l = delta / max(dist, 1e-4);
+                if (!light_reaches(s.geometric, l, side)) {
+                    continue;
+                }
                 radiance *= attenuation(light, l, dist);
                 if (scene_punctual_shadows && light.shadow < view.spot_config.x) {
                     visible = punctual_shadow(light, at, n);

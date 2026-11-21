@@ -12,6 +12,7 @@
  */
 
 #include "gpu.h"
+#include "gpu_forward.h"
 #include <math.h>
 
 #ifdef BOX_RENDER_WGPU
@@ -1101,50 +1102,52 @@ static bool box_gpu_shadow_draw(
     WGPURenderPipeline bound = NULL;
     WGPUBindGroup instances = NULL, material = NULL;
     bool result = true;
-    int32_t i;
-    for (i = 0; i < cv->draw_count; i ++) {
-        const box_gpu_cull_draw_t *d = ecs_vec_get_t(
-            &gpu->cull.draws, box_gpu_cull_draw_t, cv->first_draw + i);
-        const box_render_batch_t *b = ecs_vec_get_t(
-            &packet->batches, box_render_batch_t, d->batch);
-        bool cutout = b->cutout && alpha;
-        bool blend = cutout && box_gpu_texture_blends(b);
-        bool data = (cutout || b->wind) && box_gpu_vertex_data(gpu, b);
-        bool range = !point && box_render_batch_ranged(b);
-        WGPURenderPipeline pipeline = cutout ? alpha : plain;
-        if (b->impostor && (point || !alpha)) {
-            continue;
-        }
+    int32_t i, sweep;
+    for (sweep = 0; sweep < BOX_GPU_DEPTH_SWEEPS; sweep ++) {
+        for (i = 0; i < cv->draw_count; i ++) {
+            const box_gpu_cull_draw_t *d = ecs_vec_get_t(
+                &gpu->cull.draws, box_gpu_cull_draw_t, cv->first_draw + i);
+            const box_render_batch_t *b = ecs_vec_get_t(
+                &packet->batches, box_render_batch_t, d->batch);
+            bool cutout = b->cutout && alpha;
+            bool blend = cutout && box_gpu_texture_blends(b);
+            bool data = (cutout || b->wind) && box_gpu_vertex_data(gpu, b);
+            bool range = !point && box_render_batch_ranged(b);
+            WGPURenderPipeline pipeline = cutout ? alpha : plain;
+            if (box_gpu_depth_sweep(b) != sweep || (b->impostor && (point || !alpha))) {
+                continue;
+            }
 
-        if (blend || b->surface || b->wind || data || range || b->impostor) {
-            pipeline = box_gpu_shadow_variant(gpu, point, cutout, blend, b->surface, b->wind,
-                data, range, b->impostor);
-            result = result && pipeline != NULL;
-        }
+            if (blend || b->surface || b->wind || data || range || b->impostor) {
+                pipeline = box_gpu_shadow_variant(gpu, point, cutout, blend, b->surface, b->wind,
+                    data, range, b->impostor);
+                result = result && pipeline != NULL;
+            }
 
-        if (!pipeline && !b->surface && !b->wind && !range && !b->impostor) {
-            cutout = false;
-            pipeline = plain;
-        }
+            if (!pipeline && !b->surface && !b->wind && !range && !b->impostor) {
+                cutout = false;
+                pipeline = plain;
+            }
 
-        if (!pipeline || d->skip) {
-            continue;
-        }
+            if (!pipeline || d->skip) {
+                continue;
+            }
 
-        if (pipeline != bound) {
-            wgpuRenderPassEncoderSetPipeline(pass, pipeline);
-            bound = pipeline;
-        }
+            if (pipeline != bound) {
+                wgpuRenderPassEncoderSetPipeline(pass, pipeline);
+                bound = pipeline;
+            }
 
-        WGPUBindGroup group = box_gpu_material_group(gpu, packet,
-            cutout ? b : &(box_render_batch_t){0});
-        if (group != material) {
-            wgpuRenderPassEncoderSetBindGroup(pass, 2, group, 1, &(uint32_t){0});
-            material = group;
-        }
+            WGPUBindGroup group = box_gpu_material_group(gpu, packet,
+                cutout ? b : &(box_render_batch_t){0});
+            if (group != material) {
+                wgpuRenderPassEncoderSetBindGroup(pass, 2, group, 1, &(uint32_t){0});
+                material = group;
+            }
 
-        if (box_gpu_cull_draw(gpu, pass, packet, d, 1, false, true, &instances) && counted) {
-            box_gpu_count(gpu, BOX_GPU_STAT_SHADOW_DRAW);
+            if (box_gpu_cull_draw(gpu, pass, packet, d, 1, false, true, &instances) && counted) {
+                box_gpu_count(gpu, BOX_GPU_STAT_SHADOW_DRAW);
+            }
         }
     }
 

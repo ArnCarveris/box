@@ -1,7 +1,9 @@
 // The impostor cards of the forward pass and the depth prepass (box_render_batch_t.impostor):
 // each instance is one card that blends the three views of the atlases nearest the direction of
-// the camera, lit as the other meshes from the normal atlas and placed at the depth of the depth
-// atlas, so it intersects the ground. Included at the end of mesh.wgsl, after shade().
+// the camera, lit as the other meshes from the normal atlas at the point of the depth atlas. The
+// card itself is flat: it draws at the depth of its plane, so the depth test drops the fragments
+// of a card behind another before they are shaded. Included at the end of mesh.wgsl, after
+// shade().
 //
 // The batch binds the albedo atlas as albedo_map, the depth atlas as orm_map and the normal
 // atlas as normal_map; the vertex stage reads the grid from the per vertex data of the card mesh.
@@ -125,29 +127,50 @@ fn impostor_surface(f: ImpostorOut) -> ImpostorSurface {
     return o;
 }
 
+// The coverage of a card at a fragment, as impostor_surface blends it, from the depth and the
+// alpha of its views alone. The views left are not read once the coverage is on one side of
+// IMPOSTOR_CUTOFF whatever they hold: the result is exact only as far as that side.
+fn impostor_coverage(f: ImpostorOut) -> f32 {
+    let frames = f.cells.w & 0xFFFFu;
+    let hemisphere = (f.cells.w >> 16u) != 0u;
+    let half = f.weights.w;
+    let res = f32(textureDimensions(albedo_map).x) / f32(frames);
+    let lod = impostor_lod(f.plane01.xy, res);
+    var planes = array<vec2f, 3>(f.plane01.xy, f.plane01.zw, f.plane2);
+    var alpha = 0.0;
+    var left = max(f.weights.x, 0.0) + max(f.weights.y, 0.0) + max(f.weights.z, 0.0);
+    for (var k = 0u; k < 3u; k++) {
+        let w = f.weights[k];
+        if (w <= 0.0) {
+            continue;
+        }
+        if (alpha >= IMPOSTOR_CUTOFF || alpha + left < IMPOSTOR_CUTOFF) {
+            break;
+        }
+        left -= w;
+        let cell = impostor_unpack(f.cells[k]);
+        let d = impostor_frame_direction(frames, hemisphere, cell);
+        let first = textureSampleLevel(orm_map, material_sampler,
+            impostor_uv(frames, cell, planes[k]), lod).r;
+        let a = impostor_parallax(planes[k], f.eye.xyz, d,
+            impostor_height(first, half, f.eye.w), half);
+        if (all(abs(a) <= vec2f(1.0))) {
+            alpha += textureSampleLevel(albedo_map, material_sampler,
+                impostor_uv(frames, cell, a), lod).a * w;
+        }
+    }
+    return alpha;
+}
+
 // The world position of the surface of a card at a fragment.
 fn impostor_world(f: ImpostorOut, s: ImpostorSurface) -> vec3f {
     let model = impostor_model(f.row0, f.row1, f.row2);
     return (model * vec4f(f.center.xyz + s.point, 1.0)).xyz;
 }
 
-// The depth of a world position in the view.
-fn impostor_depth(world: vec3f) -> f32 {
-    let clip = view.view_proj * vec4f(world, 1.0);
-    return clip.z / clip.w;
-}
-
-// The surface of a fragment of a card, discarding where the dither of its DrawRange or its
-// coverage drops it.
-fn impostor_fragment(f: ImpostorOut) -> ImpostorSurface {
-    let s = impostor_surface(f);
-    if (draw_range && !range_keeps(f.misc.x, f.pos.xy)) {
-        discard;
-    }
-    if (s.alpha < IMPOSTOR_CUTOFF) {
-        discard;
-    }
-    return s;
+// Whether the dither of the DrawRange of a card or its coverage drops a fragment.
+fn impostor_dropped(f: ImpostorOut, alpha: f32) -> bool {
+    return (draw_range && !range_keeps(f.misc.x, f.pos.xy)) || alpha < IMPOSTOR_CUTOFF;
 }
 
 // Distance toward the sun, in radii of the bounding sphere, of the point a card is lit at from
@@ -165,13 +188,8 @@ fn impostor_lit_at(model: mat4x4f, world: vec3f, radius: f32) -> vec3f {
     return world + normalize(lights[0].position) * IMPOSTOR_SHADOW_OFFSET * radius * scale;
 }
 
-struct ImpostorLit {
-    @location(0) color: vec4f,
-    @builtin(frag_depth) depth: f32,
-};
-
-@fragment fn fs_impostor(f: ImpostorOut) -> ImpostorLit {
-    let c = impostor_fragment(f);
+// A fragment of a card lit at the point of its surface.
+fn impostor_lit(f: ImpostorOut, c: ImpostorSurface) -> vec4f {
     let model = impostor_model(f.row0, f.row1, f.row2);
     let world = impostor_world(f, c);
     let n = impostor_world_normal(model, c.normal);
@@ -196,29 +214,35 @@ struct ImpostorLit {
         color = aerial_perspective(color, 1.0, f.pos, world);
     }
 
-    return ImpostorLit(output(color, 1.0), impostor_depth(world));
+    return output(color, 1.0);
 }
 
-// Scale of the depth the prepass writes for a card: a tenth of a percent of the distance farther
-// than the depth fs_impostor computes again for the same fragment from the filtered depth atlas,
-// which another program need not round the same way (a few ulps left holes of the clear color),
-// so its GreaterEqual test keeps the fragment.
-const IMPOSTOR_PREPASS_SCALE: f32 = 0.999;
-
-// The depth prepass of the cards writes the depth fs_impostor writes, which tests it with
-// GreaterEqual.
-@fragment fn fs_impostor_depth(f: ImpostorOut) -> @builtin(frag_depth) f32 {
-    let c = impostor_fragment(f);
-    return impostor_depth(impostor_world(f, c)) * IMPOSTOR_PREPASS_SCALE;
+// The cards of a view without a depth prepass, which drop the fragments they do not cover.
+@fragment fn fs_impostor(f: ImpostorOut) -> @location(0) vec4f {
+    let c = impostor_surface(f);
+    if (impostor_dropped(f, c.alpha)) {
+        discard;
+    }
+    return impostor_lit(f, c);
 }
 
-struct ImpostorCount {
-    @location(0) color: vec4f,
-    @builtin(frag_depth) depth: f32,
-};
+// The cards of a view after its depth prepass, which test the depth their prepass wrote with
+// Equal: only the fragments the prepass kept are shaded.
+@fragment fn fs_impostor_equal(f: ImpostorOut) -> @location(0) vec4f {
+    return impostor_lit(f, impostor_surface(f));
+}
+
+// The depth prepass of the cards writes the depth of their plane where they cover.
+@fragment fn fs_impostor_depth(f: ImpostorOut) {
+    if (impostor_dropped(f, impostor_coverage(f))) {
+        discard;
+    }
+}
 
 // The overdraw count of the cards, as the alpha tested meshes in green.
-@fragment fn fs_impostor_count(f: ImpostorOut) -> ImpostorCount {
-    let c = impostor_fragment(f);
-    return ImpostorCount(vec4f(0.0, 1.0, 0.0, 0.0), impostor_depth(impostor_world(f, c)));
+@fragment fn fs_impostor_count(f: ImpostorOut) -> @location(0) vec4f {
+    if (impostor_dropped(f, impostor_coverage(f))) {
+        discard;
+    }
+    return vec4f(0.0, 1.0, 0.0, 0.0);
 }

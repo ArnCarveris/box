@@ -3035,6 +3035,9 @@ WGPUTextureView box_gpu_transmission_depth_view(
  * runs that do not overlap share one. The particles, drawn at the first blended draw that is
  * not a layer around a planet, cover the view.
  *
+ * A draw of water takes none for the draws of water before it: the water surfaces of a scene
+ * share the snapshot of the first, and water seen through water refracts what is under both.
+ *
  * Past BOX_GPU_TRANSMISSION_SNAPSHOTS the first one is taken and the others go to the draws
  * that cover most of the image, the later of equal ones, so a large shape that encloses the
  * others never samples a stale image; the draws in between sample an older snapshot.
