@@ -60,8 +60,9 @@ static ecs_world_t* tm_world(
     app->headless = true;
     ecs_singleton_modified(world, App);
     ecs_singleton_set(world, RenderSettings, {.in_flight = 2, .main_thread = true});
-    ecs_singleton_set(world, Scene, {.texture_blend = true, .triplanar = true,
-        .texture_layers = true});
+    ecs_singleton_set(world, Scene, {.shader_features.Terrain.texture_blend = true,
+        .shader_features.Terrain.triplanar = true,
+        .shader_features.Terrain.texture_layers = true});
     ecs_singleton_set(world, AmbientLight, {.intensity = 0.5f});
     *camera = ecs_entity(world, { .name = "camera" });
     ecs_set(world, *camera, Camera, {.fov = 60, .near_ = 0.5f, .far_ = 4000});

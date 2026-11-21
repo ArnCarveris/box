@@ -13,7 +13,7 @@ using box.light
 //
 // frames: 10
 $ {
-  Scene: {texture_layers: true}
+  Scene: {shader_features: {Extended: {texture_layers: true}}}
 }
 
 camera {

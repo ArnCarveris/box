@@ -16,7 +16,7 @@ using box.surface
 using box.perf
 
 $ {
-  Scene: {water: true, texture_scroll: true}
+  Scene: {shader_features: {Extended: {water: true, texture_scroll: true}}}
 }
 
 $ {

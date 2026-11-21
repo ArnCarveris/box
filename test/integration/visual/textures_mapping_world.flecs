@@ -7,7 +7,7 @@ using box.view
 using box.light
 
 $ {
-  Scene: {triplanar: true}
+  Scene: {shader_features: {Extended: {triplanar: true}}}
 }
 
 // World space and triplanar texture mapping (texture.Mapping MappingWorld and blend).

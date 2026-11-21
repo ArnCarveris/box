@@ -199,39 +199,56 @@
 /** Shader handle of the extended mesh shader compiled with BOX_TEXTURE_LAYERS */
 #define BOX_RENDER_SHADER_MESH_EXTENDED_LAYERS (14)
 
-/** Check whether a shader handle is one of the two mesh shaders.
+/** Shader handle of the engine shader of the forward pass and the depth prepass that draws the
+ * tiles of a Terrain (etc/shaders/terrain.wgsl), with the Terrain shader features of their
+ * scene; the tiles always draw with it */
+#define BOX_RENDER_SHADER_TERRAIN (20)
+
+/** Shader handle of the terrain shader compiled with BOX_TEXTURE_LAYERS */
+#define BOX_RENDER_SHADER_TERRAIN_LAYERS (21)
+
+/** Check whether a shader handle is one of the mesh shaders: the mesh shader, the extended mesh
+ * shader or the terrain shader.
  *
  * @param pipeline The shader handle of a batch
- * @return Whether it is BOX_RENDER_SHADER_MESH or BOX_RENDER_SHADER_MESH_EXTENDED
+ * @return Whether it is BOX_RENDER_SHADER_MESH, BOX_RENDER_SHADER_MESH_EXTENDED or
+ * BOX_RENDER_SHADER_TERRAIN
  */
 static inline bool box_render_is_mesh(
     uint32_t pipeline)
 {
-    return pipeline == BOX_RENDER_SHADER_MESH || pipeline == BOX_RENDER_SHADER_MESH_EXTENDED;
+    return pipeline == BOX_RENDER_SHADER_MESH || pipeline == BOX_RENDER_SHADER_MESH_EXTENDED ||
+        pipeline == BOX_RENDER_SHADER_TERRAIN;
 }
 
 /** Get the layers module of a mesh shader, which its batches with TextureLayers draw with.
  *
- * @param pipeline BOX_RENDER_SHADER_MESH or BOX_RENDER_SHADER_MESH_EXTENDED
- * @return BOX_RENDER_SHADER_MESH_LAYERS or BOX_RENDER_SHADER_MESH_EXTENDED_LAYERS
+ * @param pipeline BOX_RENDER_SHADER_MESH, BOX_RENDER_SHADER_MESH_EXTENDED or
+ * BOX_RENDER_SHADER_TERRAIN
+ * @return BOX_RENDER_SHADER_MESH_LAYERS, BOX_RENDER_SHADER_MESH_EXTENDED_LAYERS or
+ * BOX_RENDER_SHADER_TERRAIN_LAYERS
  */
 static inline uint32_t box_render_mesh_layers(
     uint32_t pipeline)
 {
     return pipeline == BOX_RENDER_SHADER_MESH_EXTENDED
-        ? BOX_RENDER_SHADER_MESH_EXTENDED_LAYERS : BOX_RENDER_SHADER_MESH_LAYERS;
+        ? BOX_RENDER_SHADER_MESH_EXTENDED_LAYERS
+        : pipeline == BOX_RENDER_SHADER_TERRAIN
+        ? BOX_RENDER_SHADER_TERRAIN_LAYERS : BOX_RENDER_SHADER_MESH_LAYERS;
 }
 
 /** Check whether a shader handle is the layers module of a mesh shader.
  *
  * @param handle The shader handle
- * @return Whether it is BOX_RENDER_SHADER_MESH_LAYERS or BOX_RENDER_SHADER_MESH_EXTENDED_LAYERS
+ * @return Whether it is BOX_RENDER_SHADER_MESH_LAYERS, BOX_RENDER_SHADER_MESH_EXTENDED_LAYERS or
+ * BOX_RENDER_SHADER_TERRAIN_LAYERS
  */
 static inline bool box_render_is_mesh_layers(
     uint32_t handle)
 {
     return handle == BOX_RENDER_SHADER_MESH_LAYERS ||
-        handle == BOX_RENDER_SHADER_MESH_EXTENDED_LAYERS;
+        handle == BOX_RENDER_SHADER_MESH_EXTENDED_LAYERS ||
+        handle == BOX_RENDER_SHADER_TERRAIN_LAYERS;
 }
 
 /** Buffer handle of the change buffer the scatter pass reads changed instances from */
@@ -956,6 +973,9 @@ typedef struct box_render_view_gtao_t {
 /** Bit of the scene_planet_light override */
 #define BOX_RENDER_OVERRIDE_PLANET_LIGHT (1u << 7)
 
+/** Bit of the material_triplanar override */
+#define BOX_RENDER_OVERRIDE_TRIPLANAR (1u << 12)
+
 /** Bit of the material_fresnel override */
 #define BOX_RENDER_OVERRIDE_FRESNEL (1u << 13)
 
@@ -998,7 +1018,8 @@ static inline const char* box_render_mesh_override_key(
  * compiles out its code.
  *
  * The mesh shader takes the lighting features, the TextureScroll and the planet light ones,
- * the extended mesh shader all of them, transmissive for the pipelines of transmissive shapes,
+ * the terrain shader those and material_triplanar (box_render_terrain_override_count), the
+ * extended mesh shader all of them, transmissive for the pipelines of transmissive shapes,
  * water for those of transmissive Water shapes and material_distortion for the transmissive
  * ones of a scene with Scene.distortion.
  *
@@ -1022,6 +1043,10 @@ static inline uint32_t box_render_mesh_overrides(
     result = (features & BOX_RENDER_FEATURE_LIGHTING) |
         (features & BOX_RENDER_FEATURE_TEXTURE_SCROLL ? BOX_RENDER_OVERRIDE_TEXTURE_SCROLL : 0u) |
         (features & BOX_RENDER_FEATURE_PLANET_LIGHT ? BOX_RENDER_OVERRIDE_PLANET_LIGHT : 0u);
+    if (shader == BOX_RENDER_SHADER_TERRAIN) {
+        result |= features & BOX_RENDER_FEATURE_TRIPLANAR ? BOX_RENDER_OVERRIDE_TRIPLANAR : 0u;
+    }
+
     if (shader != BOX_RENDER_SHADER_MESH_EXTENDED) {
         goto done;
     }

@@ -8,7 +8,7 @@ using box.light
 using box.movement
 
 $ {
-  Scene: {water: true}
+  Scene: {shader_features: {Extended: {water: true}}}
 }
 
 // A pond (Water) with WaterRipples and foam in a sandy terrain bowl, seen from above at an angle.
@@ -18,7 +18,7 @@ $ {
 // of foam when the scene loads, and crest_foam whitens the steep crests of the bow wave.
 // frames: 90
 water_wake_foam {
-  Scene: {water: true}
+  Scene: {shader_features: {Extended: {water: true}}}
   AmbientLight: {sky: {140, 165, 205}, ground: {70, 64, 52}, intensity: 0.6}
 
   sun {

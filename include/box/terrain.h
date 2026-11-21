@@ -103,6 +103,8 @@ ECS_STRUCT(TileTerrain, {
  * leaves. The material
  * components of the terrain entity (Rgb, PbrMaterial, PbrTextures, TextureMapping, TextureLayers,
  * ...) apply to its tiles; TextureMapping MappingWorld with a triplanar blend suits steep slopes.
+ * The tiles always draw with the terrain shader, with the texture_blend, triplanar and
+ * texture_layers of Scene.shader_features.Terrain of their scene.
  *
  * @par Masks
  * masks is a second node of the graph, a Vector whose four channels weigh the layers of a

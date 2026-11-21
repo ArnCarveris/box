@@ -12,7 +12,7 @@ using box.light
 //
 // frames: 10
 $ {
-  Scene: {alpha_cutout: true, texture_layers: true}
+  Scene: {shader_features: {Extended: {alpha_cutout: true, texture_layers: true}}}
 }
 
 camera {

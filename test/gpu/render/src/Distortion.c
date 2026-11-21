@@ -54,8 +54,10 @@ static ecs_world_t* dist_world(
 {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
-    ecs_singleton_set(world, Scene, {.alpha_cutout = true, .blend_modes = true,
-        .transmission = true, .fresnel = true, .distortion = distortion});
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.alpha_cutout = true,
+        .shader_features.Extended.blend_modes = true, .shader_features.Extended.transmission = true,
+        .shader_features.Extended.fresnel = true,
+        .shader_features.Extended.distortion = distortion});
     App *app = ecs_singleton_get_mut(world, App);
     app->headless = true;
     ecs_singleton_modified(world, App);
@@ -336,8 +338,9 @@ void Distortion_moves_stripes(void) {
 
 void Distortion_without_scene_transmission(void) {
     ecs_world_t *world = dist_scene(true, DIST_ALONE, &dist_haze, NULL);
-    ecs_singleton_set(world, Scene, {.alpha_cutout = true, .blend_modes = true,
-        .fresnel = true, .distortion = true});
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.alpha_cutout = true,
+        .shader_features.Extended.blend_modes = true, .shader_features.Extended.fresnel = true,
+        .shader_features.Extended.distortion = true});
     unsigned char *haze = dist_render(world, "distortion_alone.png");
     ecs_fini(world);
     unsigned char *stripes = dist_capture(true, DIST_NONE, NULL, "distortion_stripes.png");

@@ -38,7 +38,8 @@ static ecs_world_t* world_new(
     App *app = ecs_singleton_get_mut(world, App);
     app->headless = true;
     ecs_singleton_modified(world, App);
-    ecs_singleton_set(world, Scene, {.texture_blend = true, .texture_layers = layers});
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.texture_blend = true,
+        .shader_features.Extended.texture_layers = layers});
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 6});
@@ -355,7 +356,8 @@ static ecs_world_t* water_world_new(
     App *app = ecs_singleton_get_mut(world, App);
     app->headless = true;
     ecs_singleton_modified(world, App);
-    ecs_singleton_set(world, Scene, {.texture_layers = true, .water = true});
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.texture_layers = true,
+        .shader_features.Extended.water = true});
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 5, 3});

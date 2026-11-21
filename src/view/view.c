@@ -132,6 +132,8 @@ void BoxViewImport(
     ECS_META_COMPONENT(world, View);
     box_owned_hooks(world, View, BOX_OWNED_VEC(View, effects, ViewEffect));
     ecs_set_hooks(world, View, { .ctor = box_view_ctor });
+    ECS_META_COMPONENT(world, ShaderFeatures);
+    ECS_META_COMPONENT(world, SceneShaderFeatures);
     ECS_META_COMPONENT(world, Scene);
     ECS_TAG_DEFINE(world, HistoryReset);
 }

@@ -10,7 +10,7 @@ using box.light
 // Scene.texture_layers, so the shapes on the right draw as if they had no layers. Its left half
 // must match the left half of textures_layers_isolation pixel for pixel.
 $ {
-  Scene: {alpha_cutout: true, texture_blend: true}
+  Scene: {shader_features: {Extended: {alpha_cutout: true, texture_blend: true}}}
 }
 
 camera {

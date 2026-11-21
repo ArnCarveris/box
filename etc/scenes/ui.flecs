@@ -17,7 +17,7 @@ using flecs.script.math
 
 $ {
   box.app.FpsTarget: {60}
-  Scene: {blend_modes: true}
+  Scene: {shader_features: {Extended: {blend_modes: true}}}
   AmbientLight: {sky: {90, 110, 140}, ground: {40, 36, 30}, intensity: 0.6}
 }
 
@@ -141,7 +141,7 @@ ui {
   // slices of a curved screen sample that texture
 
   screen_ui {
-    Scene: {blend_modes: true}
+    Scene: {shader_features: {Extended: {blend_modes: true}}}
 
     camera {
       Position: {0, 0, 100}
@@ -202,7 +202,7 @@ ui {
 // pixel is one point, drawn by a view after the 3D view without clear, lighting or culling
 
 hud {
-  Scene: {blend_modes: true}
+  Scene: {shader_features: {Extended: {blend_modes: true}}}
 
   camera {
     Position: {0, 0, 100}
@@ -266,7 +266,7 @@ hud {
   // A menu is another UI scene, stacked over the HUD because its view comes later
 
   menu {
-    Scene: {blend_modes: true}
+    Scene: {shader_features: {Extended: {blend_modes: true}}}
 
     camera {
       Position: {0, 0, 100}

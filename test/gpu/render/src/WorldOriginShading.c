@@ -59,7 +59,8 @@ static ecs_world_t* wos_world(void)
     app->headless = true;
     ecs_singleton_modified(world, App);
     ecs_singleton_set(world, RenderSettings, {.in_flight = 2, .main_thread = true});
-    ecs_singleton_set(world, Scene, {.triplanar = true, .wind = true, .texture_layers = true});
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.triplanar = true,
+        .shader_features.Extended.wind = true, .shader_features.Extended.texture_layers = true});
     ecs_singleton_set(world, AmbientLight, {.sky = {255, 255, 255}, .ground = {255, 255, 255},
         .intensity = 1});
 

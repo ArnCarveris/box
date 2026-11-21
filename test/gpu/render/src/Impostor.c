@@ -47,7 +47,7 @@ static ecs_world_t* impostor_world(
 {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
-    ecs_singleton_set(world, Scene, {.alpha_cutout = true});
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.alpha_cutout = true});
     App *app = ecs_singleton_get_mut(world, App);
     app->headless = true;
     ecs_singleton_modified(world, App);

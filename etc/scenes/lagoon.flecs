@@ -19,8 +19,9 @@ using state
 
 $ {
   box.app.FpsTarget: {60}
-  Scene: {environment: true, aerial_perspective: true, blend_modes: true, sheen: true,
-    diffuse_transmission: true, texture_scroll: true, water: true, planar_reflections: true}
+  Scene: {environment: true, aerial_perspective: true, planar_reflections: true,
+    shader_features: {Extended: {blend_modes: true, sheen: true, diffuse_transmission: true,
+    texture_scroll: true, water: true}}}
 }
 
 window { Surface: {width: 1280, height: 800, vsync: true} }

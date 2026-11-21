@@ -48,7 +48,8 @@ static void bench_layers_frame(
     app->unpaced = true;
     ecs_singleton_modified(world, App);
     ecs_singleton_set(world, RenderSettings, {.in_flight = 2, .main_thread = true});
-    ecs_singleton_set(world, Scene, {.texture_layers = which != BENCH_LAYERS_OFF});
+    ecs_singleton_set(world, Scene, {
+        .shader_features.Extended.texture_layers = which != BENCH_LAYERS_OFF});
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 60, 70});

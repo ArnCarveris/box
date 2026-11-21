@@ -747,8 +747,43 @@ static bool box_cmd_ablate_lit_member(
     return result;
 }
 
+/** Plan the bool members of a struct at an offset in the Scene that are on, each toggled off.
+ *
+ * @param world The world
+ * @param abl The state
+ * @param type The struct type
+ * @param base Offset of the struct in Scene
+ * @param prefix Prefix of the labels
+ */
+static void box_cmd_ablate_plan_bools(
+    ecs_world_t *world,
+    box_cmd_ablate_t *abl,
+    ecs_entity_t type,
+    size_t base,
+    const char *prefix)
+{
+    const Scene *s = abl->orig[1].ptr;
+    const EcsStruct *st = ecs_get(world, type, EcsStruct);
+    const ecs_member_t *members = st ? ecs_vec_first_t(&st->members, ecs_member_t) : NULL;
+    int32_t i, count = st ? ecs_vec_count(&st->members) : 0;
+    char label[48];
+    for (i = 0; s && i < count; i ++) {
+        const ecs_member_t *m = &members[i];
+        size_t offset = base + (size_t)m->offset;
+        if (m->type != ecs_id(ecs_bool_t) || (!base && box_cmd_ablate_lit_member(m->name)) ||
+            !*(const bool*)ECS_OFFSET(s, offset))
+        {
+            continue;
+        }
+
+        ecs_os_snprintf(label, ECS_SIZEOF(label), "%s.%s off", prefix, m->name);
+        box_cmd_ablate_add(abl, 4, 0, BoxCmdAblateScene, BoxCmdAblateBool, offset, 0, label,
+            NULL);
+    }
+}
+
 /** Plan the shader features of the Scene of the camera that do not depend on the lighting:
- * every bool member that is on.
+ * every bool member that is on, and those of the material features of each shader.
  *
  * @param world The world
  * @param abl The state
@@ -757,24 +792,11 @@ static void box_cmd_ablate_plan_scene(
     ecs_world_t *world,
     box_cmd_ablate_t *abl)
 {
-    const Scene *s = abl->orig[1].ptr;
-    const EcsStruct *st = ecs_get(world, ecs_id(Scene), EcsStruct);
-    const ecs_member_t *members = st ? ecs_vec_first_t(&st->members, ecs_member_t) : NULL;
-    int32_t i, count = st ? ecs_vec_count(&st->members) : 0;
-    char label[48];
-    for (i = 0; s && i < count; i ++) {
-        const ecs_member_t *m = &members[i];
-        if (m->type != ecs_id(ecs_bool_t) || box_cmd_ablate_lit_member(m->name) ||
-            !*(const bool*)ECS_OFFSET(s, m->offset))
-        {
-            continue;
-        }
-
-        ecs_os_snprintf(label, ECS_SIZEOF(label), "Scene.%s off", m->name);
-        box_cmd_ablate_add(abl, 4, 0, BoxCmdAblateScene, BoxCmdAblateBool,
-            (size_t)m->offset, 0, label, NULL);
-    }
-
+    box_cmd_ablate_plan_bools(world, abl, ecs_id(Scene), 0, "Scene");
+    box_cmd_ablate_plan_bools(world, abl, ecs_id(ShaderFeatures),
+        offsetof(Scene, shader_features.Extended), "Extended");
+    box_cmd_ablate_plan_bools(world, abl, ecs_id(ShaderFeatures),
+        offsetof(Scene, shader_features.Terrain), "Terrain");
     box_cmd_ablate_baseline(abl);
 }
 

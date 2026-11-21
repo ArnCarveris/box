@@ -16,8 +16,9 @@ using assets
 
 $ {
   box.app.FpsTarget: {60}
-  Scene: {baked: true, reflections: true, environment: true, alpha_cutout: true,
-    transmission: true, triplanar: true, sheen: true, clear_coat: true, anisotropy: true}
+  Scene: {baked: true, reflections: true, environment: true,
+    shader_features: {Extended: {alpha_cutout: true, transmission: true, triplanar: true,
+    sheen: true, clear_coat: true, anisotropy: true}}}
   AmbientLight: {sky: {130, 165, 195}, ground: {45, 65, 88}, intensity: 0.65}
   Bake: {probe_spacing: 16, bounds_padding: 2, bounces: 1, capture_size: 16, budget_ms: 6}
   ReflectionBake: {resolution: 128, budget_ms: 2, scene_probe: true, scene_probe_height: 25}

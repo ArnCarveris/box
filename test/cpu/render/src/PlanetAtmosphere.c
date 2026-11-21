@@ -672,7 +672,7 @@ void PlanetAtmosphere_blended_inside_drawn_first(void) {
     box_render_null_t *null;
     ecs_world_t *world = world_new(&null);
     ecs_entity_t scene = ecs_new(world);
-    ecs_set(world, scene, Scene, {.blend_modes = true});
+    ecs_set(world, scene, Scene, {.shader_features.Extended.blend_modes = true});
     ecs_entity_t planet = planet_new(world, scene, 0);
     ecs_set(world, planet, Sphere, {.radius = 1, .segments = 16});
     ecs_entity_t clouds = ecs_new_w_pair(world, EcsChildOf, planet);

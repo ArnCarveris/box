@@ -985,6 +985,10 @@ void BoxShaderImport(
     box_shader_builtin_defines(world, state, builtin, "mesh_extended_layers",
         "etc/shaders/mesh_extended.wgsl", "BOX_TEXTURE_LAYERS",
         BOX_RENDER_SHADER_MESH_EXTENDED_LAYERS, true);
+    box_shader_builtin(world, state, builtin, "terrain", "etc/shaders/terrain.wgsl",
+        BOX_RENDER_SHADER_TERRAIN, true);
+    box_shader_builtin_defines(world, state, builtin, "terrain_layers",
+        "etc/shaders/terrain.wgsl", "BOX_TEXTURE_LAYERS", BOX_RENDER_SHADER_TERRAIN_LAYERS, true);
     box_shader_builtin(world, state, builtin, "scatter", "etc/shaders/scatter.wgsl",
         BOX_RENDER_SHADER_SCATTER, true);
     box_shader_builtin(world, state, builtin, "compose", "etc/shaders/compose.wgsl",

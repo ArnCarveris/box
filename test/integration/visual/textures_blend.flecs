@@ -7,7 +7,7 @@ using box.view
 using box.light
 
 $ {
-  Scene: {texture_blend: true}
+  Scene: {shader_features: {Extended: {texture_blend: true}}}
 }
 
 // texture.Blend: the large plane blends four layers under a mask of four quadrants with soft

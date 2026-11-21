@@ -282,7 +282,7 @@ void TextureLayers_scene_feature(void) {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
     test_uint(box_render_scene_features(world, 0) & BOX_RENDER_FEATURE_TEXTURE_LAYERS, 0);
-    ecs_singleton_set(world, Scene, {.texture_layers = true});
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.texture_layers = true});
     test_uint(box_render_scene_features(world, 0), BOX_RENDER_FEATURE_TEXTURE_LAYERS);
 
     /* The feature compiles no override: the pipelines of the shapes without layers are those
@@ -428,7 +428,7 @@ void TextureLayers_batches(void) {
     // materials/texture_layers
     box_render_null_t *null;
     ecs_world_t *world = layers_world(&null);
-    ecs_singleton_set(world, Scene, {.texture_layers = true});
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.texture_layers = true});
     ecs_entity_t snow = ecs_new(world);
     ecs_add(world, snow, TextureLayer);
     ecs_entity_t wet = ecs_new(world);
@@ -498,7 +498,7 @@ void TextureLayers_add_remove(void) {
     // materials/texture_layers
     box_render_null_t *null;
     ecs_world_t *world = layers_world(&null);
-    ecs_singleton_set(world, Scene, {.texture_layers = true});
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.texture_layers = true});
     ecs_entity_t snow = ecs_new(world);
     ecs_add(world, snow, TextureLayer);
     ecs_entity_t plain = layers_box(world, 0);
@@ -536,7 +536,7 @@ void TextureLayers_amount_animates(void) {
     // materials/texture_layers
     box_render_null_t *null;
     ecs_world_t *world = layers_world(&null);
-    ecs_singleton_set(world, Scene, {.texture_layers = true});
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.texture_layers = true});
     ecs_entity_t snow = ecs_new(world);
     ecs_set(world, snow, TextureLayer, {.amount = 0.2f, .direction = {0, 1, 0},
         .contrast = 8, .albedo = LayerMix, .roughness = LayerMix});
@@ -585,7 +585,7 @@ void TextureLayers_record_maps(void) {
     // materials/texture_layers
     box_render_null_t *null;
     ecs_world_t *world = layers_world(&null);
-    ecs_singleton_set(world, Scene, {.texture_layers = true});
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.texture_layers = true});
     ecs_entity_t rgb = layers_texture(world, LAYERS_RGB_PNG);
     ecs_entity_t gray = layers_texture(world, LAYERS_GRAY_PNG);
     ecs_entity_t snow = ecs_new(world);
@@ -629,7 +629,8 @@ void TextureLayers_ignored(void) {
     // materials/texture_layers
     box_render_null_t *null;
     ecs_world_t *world = layers_world(&null);
-    ecs_singleton_set(world, Scene, {.texture_layers = true, .transmission = true});
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.texture_layers = true,
+        .shader_features.Extended.transmission = true});
     ecs_entity_t snow = ecs_new(world);
     ecs_add(world, snow, TextureLayer);
     ecs_entity_t glass = layers_box(world, 0);
@@ -680,7 +681,8 @@ void TextureLayers_water(void) {
     // materials/texture_layers
     box_render_null_t *null;
     ecs_world_t *world = layers_world(&null);
-    ecs_singleton_set(world, Scene, {.texture_layers = true, .water = true});
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.texture_layers = true,
+        .shader_features.Extended.water = true});
     ecs_entity_t rain = ecs_new(world);
     ecs_set(world, rain, TextureLayer, {.amount = 1, .normal = 1});
     ecs_entity_t brook = layers_box(world, 0);
@@ -715,7 +717,7 @@ void TextureLayers_water(void) {
     test_assert(draw != NULL);
     test_uint(draw->layers, 0);
 
-    ecs_singleton_set(world, Scene, {.texture_layers = true});
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.texture_layers = true});
     layers_frame(world);
     layers_frame(world);
     bb = layers_batch(world, brook);

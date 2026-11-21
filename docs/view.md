@@ -94,14 +94,19 @@ Enum constants are written in full in scripts (`WireframeOverlay`, not `Overlay`
 renders only its camera's scene, lit by that scene's lights.
 
 All fields are false by default (smallest shaders); a shape needing a disabled feature draws as if it
-did not have it: `baked, reflections, punctual_shadows, cookies, environment, aerial_perspective,
-alpha_cutout, blend_modes, transmission, texture_blend, triplanar, sheen, clear_coat, anisotropy,
-diffuse_transmission, fresnel, water, distortion, planar_reflections, texture_scroll, planet_light,
-wind`.
+did not have it. The lighting features apply to every mesh shader: `baked, reflections,
+punctual_shadows, cookies, environment, aerial_perspective, planar_reflections, planet_light`.
+The material features are per shader in `shader_features`: `Extended` for the mesh shaders that draw
+every 3D shape but the terrain tiles, `Terrain` for the terrain shader, which always draws the tiles
+of a `Terrain` (`docs/terrain.md`): `alpha_cutout, blend_modes, transmission, texture_blend,
+triplanar, sheen, clear_coat, anisotropy, diffuse_transmission, fresnel, water, distortion,
+texture_scroll, wind, texture_layers`. The terrain shader reads `texture_blend`, `triplanar` and
+`texture_layers` only.
 
 ```flecs
 $ { Scene: {baked: true, reflections: true, environment: true} }
-hud { Scene: {blend_modes: true} }   // BlendMode and Opacity < 1 draw opaque without it
+// BlendMode and Opacity < 1 draw opaque without blend_modes
+hud { Scene: {shader_features: {Extended: {blend_modes: true}}} }
 ```
 
 Gotcha: a 3D feature that "does nothing" (alpha cutout, transparency, reflections) is usually a

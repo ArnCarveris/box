@@ -7,7 +7,7 @@ using box.view
 using box.light
 
 $ {
-  Scene: {texture_blend: true}
+  Scene: {shader_features: {Extended: {texture_blend: true}}}
 }
 
 // Height based texture.Blend transitions: two quads blend a cobble layer (top half of the mask)

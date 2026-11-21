@@ -928,7 +928,7 @@ void Wind_scene_feature(void) {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
     test_uint(box_render_scene_features(world, 0) & BOX_RENDER_FEATURE_WIND, 0);
-    ecs_singleton_set(world, Scene, {.wind = true});
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.wind = true});
     test_uint(box_render_scene_features(world, 0), BOX_RENDER_FEATURE_WIND);
 
     uint32_t shaders[2] = { BOX_RENDER_SHADER_MESH, BOX_RENDER_SHADER_MESH_EXTENDED };
@@ -952,7 +952,7 @@ void Wind_batches(void) {
     box_render_null_t *null;
     ecs_entity_t view;
     ecs_world_t *world = wind_world(&null, &view);
-    ecs_singleton_set(world, Scene, {.wind = true});
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.wind = true});
     ecs_singleton_set(world, Wind, {.direction = {1, 0}, .speed = 8, .gust = 0.5f,
         .gust_scale = 20});
     ecs_entity_t plain = wind_box(world, 0, 0);
@@ -1022,7 +1022,7 @@ void Wind_batches(void) {
     ecs_fini(ref);
     box_render_null_free(ref_null);
 
-    ecs_singleton_set(world, Scene, {.wind = false});
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.wind = false});
     wind_frame(world, null);
     wind_frame(world, null);
 
@@ -1048,7 +1048,7 @@ void Wind_calm_and_removed(void) {
     box_render_null_t *null;
     ecs_entity_t view;
     ecs_world_t *world = wind_world(&null, &view);
-    ecs_singleton_set(world, Scene, {.wind = true});
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.wind = true});
     ecs_singleton_set(world, Wind, {.direction = {1, 0}, .speed = 0});
     ecs_entity_t plain = wind_box(world, 0, 0);
     ecs_entity_t tree = wind_box(world, 3, 0);
@@ -1133,7 +1133,8 @@ static void wind_shadows(
     View *v = ecs_get_mut(world, view, View);
     v->shadows.enabled = true;
     ecs_modified(world, view, View);
-    ecs_singleton_set(world, Scene, {.punctual_shadows = true, .wind = true});
+    ecs_singleton_set(world, Scene, {.punctual_shadows = true,
+        .shader_features.Extended.wind = true});
 }
 
 /** A cached spot shadow tile whose casters do not sway is not rendered again while a strong
@@ -1220,7 +1221,7 @@ void Wind_cascades_render_with_sway(void) {
     v->shadows.interval[2] = 2;
     v->shadows.interval[3] = 2;
     ecs_modified(world, view, View);
-    ecs_singleton_set(world, Scene, {.wind = true});
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.wind = true});
     ecs_singleton_set(world, Wind, {.direction = {1, 0}, .speed = 5});
     wind_box(world, 0, 0);
     int32_t f;

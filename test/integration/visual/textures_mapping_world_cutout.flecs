@@ -7,7 +7,7 @@ using box.view
 using box.light
 
 $ {
-  Scene: {alpha_cutout: true, triplanar: true}
+  Scene: {shader_features: {Extended: {alpha_cutout: true, triplanar: true}}}
 }
 
 // An alpha tested shape with a world mapped texture (texture.Mapping MappingWorld, AlphaCutoff)

@@ -19,8 +19,8 @@ using box.surface
 $ {
   box.app.FpsTarget: {60}
   Scene: {baked: true, reflections: true, punctual_shadows: true, environment: true,
-    aerial_perspective: true, sheen: true, clear_coat: true, water: true, texture_scroll: true,
-    blend_modes: true, planar_reflections: true}
+    aerial_perspective: true, planar_reflections: true, shader_features: {Extended: {sheen: true,
+    clear_coat: true, water: true, texture_scroll: true, blend_modes: true}}}
 }
 
 window { Surface: {width: 1600, height: 1000, vsync: true} }

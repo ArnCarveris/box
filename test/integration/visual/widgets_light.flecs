@@ -11,7 +11,7 @@ using box.ui
 using box.widgets
 
 $ {
-  box.view.Scene: {blend_modes: true}
+  box.view.Scene: {shader_features: {Extended: {blend_modes: true}}}
 }
 
 window {

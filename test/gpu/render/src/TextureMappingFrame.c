@@ -393,7 +393,7 @@ void TextureMappingFrame_surface_moved_frame_matches(void) {
 void TextureMappingFrame_cutout_shadow_follows_frame(void) {
     // materials/texture_mapping_frame
     const char *scene =
-        "$ { Scene: {alpha_cutout: true} }\n"
+        "$ { Scene: {shader_features: {Extended: {alpha_cutout: true}}} }\n"
         "sun {\n"
         "  Rotation: {0.7, -0.4, 0}\n"
         "  DirectionalLight: {intensity: 1.5 * flecs.script.math.PI}\n"

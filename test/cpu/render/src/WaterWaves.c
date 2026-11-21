@@ -478,7 +478,7 @@ void WaterWaves_pack(void) {
 void WaterWaves_moving_record(void) {
     box_render_null_t *null;
     ecs_world_t *world = world_new(&null);
-    ecs_singleton_set(world, Scene, {.water = true});
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.water = true});
     ecs_entity_t a = pond_new(world, 0);
     ecs_entity_t b = pond_new(world, 2);
     frame_dt(world, 1.0f / 60.0f);
@@ -552,7 +552,7 @@ void WaterWaves_moving_record(void) {
 void WaterWaves_without_water(void) {
     box_render_null_t *null;
     ecs_world_t *world = world_new(&null);
-    ecs_singleton_set(world, Scene, {.water = true});
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.water = true});
     WaterWaves waves = swell();
 
     /* WaterWaves and WaterFlow on a shape without Water do nothing */
@@ -610,7 +610,7 @@ void WaterWaves_water_off(void) {
 void WaterWaves_prefab_instances(void) {
     box_render_null_t *null;
     ecs_world_t *world = world_new(&null);
-    ecs_singleton_set(world, Scene, {.water = true});
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.water = true});
     ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
     ecs_set(world, prefab, Box, {1, 1, 1});
     ecs_add(world, prefab, Water);
@@ -747,7 +747,7 @@ void WaterWaves_flow_textures_pack(void) {
 void WaterWaves_flow_textures_record(void) {
     box_render_null_t *null;
     ecs_world_t *world = world_new(&null);
-    ecs_singleton_set(world, Scene, {.water = true});
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.water = true});
     ecs_entity_t a = pond_new(world, 0);
     ecs_entity_t b = pond_new(world, 2);
 

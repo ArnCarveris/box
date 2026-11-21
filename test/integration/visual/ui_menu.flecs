@@ -8,7 +8,7 @@ using box.layout
 using box.text
 
 $ {
-  Scene: {blend_modes: true}
+  Scene: {shader_features: {Extended: {blend_modes: true}}}
 }
 
 world_camera {
@@ -47,7 +47,7 @@ ball {
 }
 
 hud {
-  Scene: {blend_modes: true}
+  Scene: {shader_features: {Extended: {blend_modes: true}}}
 
   camera {
     Position: {0, 0, 100}
@@ -110,7 +110,7 @@ template Button {
 }
 
 menu {
-  Scene: {blend_modes: true}
+  Scene: {shader_features: {Extended: {blend_modes: true}}}
 
   camera {
     Position: {0, 0, 100}

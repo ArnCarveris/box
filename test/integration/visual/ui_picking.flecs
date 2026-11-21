@@ -9,7 +9,7 @@ using box.text
 using box.picking
 
 $ {
-  Scene: {blend_modes: true}
+  Scene: {shader_features: {Extended: {blend_modes: true}}}
 }
 
 const wait = box.command.commands.mouse_sweep("[220, 295]", "[220, 295]", 1, 1)
@@ -117,7 +117,7 @@ template PickCheck {
 }
 
 menu {
-  Scene: {blend_modes: true}
+  Scene: {shader_features: {Extended: {blend_modes: true}}}
 
   camera {
     Position: {0, 0, 100}

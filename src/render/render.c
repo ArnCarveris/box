@@ -237,44 +237,79 @@ static int box_render_view_compare(
     return box_view_compare(x->order, x->view, y->order, y->view);
 }
 
-uint32_t box_render_scene_features(
-    const ecs_world_t *world,
-    ecs_entity_t scene)
+/** Get the BOX_RENDER_FEATURE_* bits of the lighting features of a Scene and of the material
+ * features of one of its shaders.
+ *
+ * @param f The Scene
+ * @param m The material features of the shader
+ * @return The features
+ */
+static uint32_t box_render_features_of(
+    const Scene *f,
+    const ShaderFeatures *m)
 {
-    const Scene *f = scene && ecs_is_alive(world, scene)
-        ? ecs_get(world, scene, Scene)
-        : ecs_singleton_get(world, Scene);
-
     uint32_t result = 0;
-    if (!f) {
-        goto done;
-    }
-
     result |= f->baked ? BOX_RENDER_FEATURE_BAKED : 0u;
     result |= f->reflections ? BOX_RENDER_FEATURE_REFLECTIONS : 0u;
     result |= f->punctual_shadows ? BOX_RENDER_FEATURE_PUNCTUAL_SHADOWS : 0u;
     result |= f->cookies ? BOX_RENDER_FEATURE_COOKIES : 0u;
     result |= f->environment ? BOX_RENDER_FEATURE_ENVIRONMENT : 0u;
     result |= f->aerial_perspective ? BOX_RENDER_FEATURE_AERIAL : 0u;
-    result |= f->sheen ? BOX_RENDER_FEATURE_SHEEN : 0u;
-    result |= f->clear_coat ? BOX_RENDER_FEATURE_CLEAR_COAT : 0u;
-    result |= f->anisotropy ? BOX_RENDER_FEATURE_ANISOTROPY : 0u;
-    result |= f->diffuse_transmission ? BOX_RENDER_FEATURE_DIFFUSE_TRANSMISSION : 0u;
-    result |= f->triplanar ? BOX_RENDER_FEATURE_TRIPLANAR : 0u;
-    result |= f->fresnel ? BOX_RENDER_FEATURE_FRESNEL : 0u;
-    result |= f->transmission ? BOX_RENDER_FEATURE_TRANSMISSION : 0u;
-    result |= f->texture_blend ? BOX_RENDER_FEATURE_TEXTURE_BLEND : 0u;
-    result |= f->alpha_cutout ? BOX_RENDER_FEATURE_ALPHA_CUTOUT : 0u;
-    result |= f->blend_modes ? BOX_RENDER_FEATURE_BLEND_MODES : 0u;
-    result |= f->water ? BOX_RENDER_FEATURE_WATER : 0u;
     result |= f->planar_reflections ? BOX_RENDER_FEATURE_PLANAR : 0u;
-    result |= f->texture_scroll ? BOX_RENDER_FEATURE_TEXTURE_SCROLL : 0u;
     result |= f->planet_light ? BOX_RENDER_FEATURE_PLANET_LIGHT : 0u;
-    result |= f->distortion ? BOX_RENDER_FEATURE_DISTORTION : 0u;
-    result |= f->wind ? BOX_RENDER_FEATURE_WIND : 0u;
-    result |= f->texture_layers ? BOX_RENDER_FEATURE_TEXTURE_LAYERS : 0u;
-done:
+    result |= m->sheen ? BOX_RENDER_FEATURE_SHEEN : 0u;
+    result |= m->clear_coat ? BOX_RENDER_FEATURE_CLEAR_COAT : 0u;
+    result |= m->anisotropy ? BOX_RENDER_FEATURE_ANISOTROPY : 0u;
+    result |= m->diffuse_transmission ? BOX_RENDER_FEATURE_DIFFUSE_TRANSMISSION : 0u;
+    result |= m->triplanar ? BOX_RENDER_FEATURE_TRIPLANAR : 0u;
+    result |= m->fresnel ? BOX_RENDER_FEATURE_FRESNEL : 0u;
+    result |= m->transmission ? BOX_RENDER_FEATURE_TRANSMISSION : 0u;
+    result |= m->texture_blend ? BOX_RENDER_FEATURE_TEXTURE_BLEND : 0u;
+    result |= m->alpha_cutout ? BOX_RENDER_FEATURE_ALPHA_CUTOUT : 0u;
+    result |= m->blend_modes ? BOX_RENDER_FEATURE_BLEND_MODES : 0u;
+    result |= m->water ? BOX_RENDER_FEATURE_WATER : 0u;
+    result |= m->texture_scroll ? BOX_RENDER_FEATURE_TEXTURE_SCROLL : 0u;
+    result |= m->distortion ? BOX_RENDER_FEATURE_DISTORTION : 0u;
+    result |= m->wind ? BOX_RENDER_FEATURE_WIND : 0u;
+    result |= m->texture_layers ? BOX_RENDER_FEATURE_TEXTURE_LAYERS : 0u;
+
     return result;
+}
+
+/** Get the Scene of a scene root, the singleton for the default scene.
+ *
+ * @param world The world
+ * @param scene The scene root, 0 for the default scene
+ * @return The Scene, NULL without one
+ */
+static const Scene* box_render_scene_get(
+    const ecs_world_t *world,
+    ecs_entity_t scene)
+{
+    return scene && ecs_is_alive(world, scene)
+        ? ecs_get(world, scene, Scene)
+        : ecs_singleton_get(world, Scene);
+}
+
+uint32_t box_render_scene_features(
+    const ecs_world_t *world,
+    ecs_entity_t scene)
+{
+    const Scene *f = box_render_scene_get(world, scene);
+
+    return f ? box_render_features_of(f, &f->shader_features.Extended) : 0u;
+}
+
+uint32_t box_render_terrain_features(
+    const ecs_world_t *world,
+    ecs_entity_t scene)
+{
+    const uint32_t terrain = BOX_RENDER_FEATURE_TEXTURE_BLEND | BOX_RENDER_FEATURE_TRIPLANAR |
+        BOX_RENDER_FEATURE_TEXTURE_LAYERS;
+    const Scene *f = box_render_scene_get(world, scene);
+    uint32_t result = f ? box_render_features_of(f, &f->shader_features.Terrain) : 0u;
+
+    return result & (BOX_RENDER_FEATURE_LIGHTING | BOX_RENDER_FEATURE_PLANET_LIGHT | terrain);
 }
 
 uint32_t box_render_view_features(

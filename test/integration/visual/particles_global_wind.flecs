@@ -17,7 +17,7 @@ using box.atmosphere
 using box.particle
 
 $ {
-  Scene: {wind: true}
+  Scene: {shader_features: {Extended: {wind: true}}}
   Wind: {direction: {1, 0}, speed: 2.5, gust: 0.85, gust_scale: 3}
 }
 

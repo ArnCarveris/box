@@ -598,15 +598,17 @@ static ecs_entity_t box_impostor_scene(
     const Scene *from = scene ? ecs_get(world, scene, Scene) : ecs_singleton_get(world, Scene);
     Scene features = {0};
     if (from) {
-        features.alpha_cutout = from->alpha_cutout;
-        features.blend_modes = from->blend_modes;
-        features.texture_blend = from->texture_blend;
-        features.triplanar = from->triplanar;
-        features.texture_layers = from->texture_layers;
-        features.sheen = from->sheen;
-        features.clear_coat = from->clear_coat;
-        features.anisotropy = from->anisotropy;
-        features.diffuse_transmission = from->diffuse_transmission;
+        const ShaderFeatures *m = &from->shader_features.Extended;
+        ShaderFeatures *to = &features.shader_features.Extended;
+        to->alpha_cutout = m->alpha_cutout;
+        to->blend_modes = m->blend_modes;
+        to->texture_blend = m->texture_blend;
+        to->triplanar = m->triplanar;
+        to->texture_layers = m->texture_layers;
+        to->sheen = m->sheen;
+        to->clear_coat = m->clear_coat;
+        to->anisotropy = m->anisotropy;
+        to->diffuse_transmission = m->diffuse_transmission;
     }
 
     ecs_entity_t result = ecs_new(world);

@@ -20,7 +20,7 @@ static ecs_world_t* world_new(
 {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
-    ecs_singleton_set(world, Scene, {.water = true});
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.water = true});
     *null = box_render_null_new();
     box_render_backend_t backend = box_render_null_backend(*null);
     box_render_set_backend(world, &backend);
@@ -546,11 +546,11 @@ void WaterRipples_no_field(void) {
 
     /* Without Scene.water the Water does nothing */
     ecs_enable(world, disabled, true);
-    ecs_singleton_set(world, Scene, {.water = false});
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.water = false});
     frame_dt(world, 1.0f / 60);
     test_int(ecs_vec_count(&null->last.water_ripples), 0);
 
-    ecs_singleton_set(world, Scene, {.water = true});
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.water = true});
     frame_dt(world, 1.0f / 60);
     test_int(ecs_vec_count(&null->last.water_ripples), 1);
     test_assert(field_of(null, disabled) != NULL);

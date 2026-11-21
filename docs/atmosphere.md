@@ -18,7 +18,7 @@ Atmosphere distances are in km.
 | `CloudLayer` | `texture` (red channel read), `size` 4000, `altitude` 1500 (world Y), `offset`, `velocity` (vec2, X/Z), `threshold` 0.55, `softness` 0.15, `density` 1, `tint` | Horizontal cloud plane in the sky of the scene's Atmosphere |
 | `TimeOfDay` | `hour` 12, `day_of_year` 80, `latitude` 45, `north` 0 (deg yaw; 0 = north +Z, east -X), `time_scale` 0 (sim hours per real second), `moon_offset` 0, `sun`, `moon` | Drives sun and moon Rotation |
 | `TimeOfDayStatus` | `hour`, `day_of_year`, `sun_altitude`/`sun_azimuth`, `moon_altitude`/`moon_azimuth`, `moon_illumination`, `daylight` (0..1) | Engine written |
-| `Wind` (singleton) | `direction` {1, 0} (world X/Z, normalized by the engine), `speed` 0 (world units/s), `gust` 0.5 (0..1), `gust_scale` 20 (world size of a gust patch) | Bends and flutters the shapes with a `WindSway` in scenes with `Scene.wind` |
+| `Wind` (singleton) | `direction` {1, 0} (world X/Z, normalized by the engine), `speed` 0 (world units/s), `gust` 0.5 (0..1), `gust_scale` 20 (world size of a gust patch) | Bends and flutters the shapes with a `WindSway` in scenes with `Scene.shader_features.Extended.wind` |
 | `WindStatus` | `offset_x`, `offset_z` (gust field offset), `sway` (phase 0..1), `time` (s) | Engine written next to `Wind`, doubles |
 
 ## Script
@@ -50,7 +50,7 @@ cloud_h { Gen: {width: 256, seed: 17,
 cloud_high { CloudLayer: {texture: cloud_h, size: 9000, altitude: 1600, threshold: 0.7,
   softness: 0.16, density: 0.5, velocity: {6, 3}} }
 
-$ { Scene: {environment: true, aerial_perspective: true, wind: true}
+$ { Scene: {environment: true, aerial_perspective: true, shader_features: {Extended: {wind: true}}}
   Wind: {direction: {1, 0.3}, speed: 6, gust: 0.6, gust_scale: 12} }
 
 view {
@@ -109,11 +109,11 @@ axis {
   attenuated per fragment (terminator reddening, planet shadow penumbra by `sun_radius`) plus
   sky irradiance in the twilight band. Max 63 planets per world.
 - `radius` uses the uniform world scale (geometric mean); non-uniform scale is unsupported.
-- `Wind`: one singleton for every scene with `Scene.wind`; adding it adds `WindStatus`. The
-  strength at a point is `speed` times a gust factor in `1 - gust .. 1 + gust` read from a smooth
-  noise field of `gust_scale` patches that travels along `direction` at `speed`, so gusts sweep
-  across a forest as patches. Plants also sway around their lean in a slow wave along the wind,
-  faster as the speed grows (0.25 Hz plus 0.05 Hz per unit/s, at most 1.5 Hz).
+- `Wind`: one singleton for every scene with `Scene.shader_features.Extended.wind`; adding it adds
+  `WindStatus`. The strength at a point is `speed` times a gust factor in `1 - gust .. 1 + gust`
+  read from a smooth noise field of `gust_scale` patches that travels along `direction` at `speed`,
+  so gusts sweep across a forest as patches. Plants also sway around their lean in a slow wave along
+  the wind, faster as the speed grows (0.25 Hz plus 0.05 Hz per unit/s, at most 1.5 Hz).
 - The engine integrates the gust offset (wrapped to 32 gust patches) and the sway phase (wrapped
   to 0..1) every frame in double precision from the frame delta: smooth after hours, the same
   frames every run with a fixed `--delta-time`, and a change of `speed` changes how fast they

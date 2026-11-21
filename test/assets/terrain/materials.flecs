@@ -16,7 +16,7 @@ using box.light
 using box.world
 
 terrain_materials {
-  Scene: {texture_blend: true, triplanar: true, texture_layers: true}
+  Scene: {shader_features: {Terrain: {texture_blend: true, triplanar: true, texture_layers: true}}}
 
   camera {
     Position: {0, 230, 420}

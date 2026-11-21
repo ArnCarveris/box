@@ -291,14 +291,49 @@ ECS_STRUCT(View, {
  */
 extern ECS_TAG_DECLARE(HistoryReset);
 
+/** Material features of a mesh shader of a scene (SceneShaderFeatures), all false by default
+ * for the smallest shaders. A shape that needs a feature that is off draws as if it did not have
+ * it. */
+ECS_STRUCT(ShaderFeatures, {
+    bool alpha_cutout;      /**< AlphaCutoff, else alpha tested shapes draw opaque */
+    bool blend_modes;       /**< BlendMode and Opacity below 1, else the shapes draw opaque */
+    bool transmission;      /**< Transmission */
+    bool texture_blend;     /**< TextureBlend, else the shapes draw with their PbrTextures */
+    bool triplanar;         /**< A TextureMapping blend above 0, else the hard projection */
+    bool sheen;             /**< Sheen */
+    bool clear_coat;        /**< ClearCoat */
+    bool anisotropy;        /**< SpecularAnisotropy */
+    bool diffuse_transmission; /**< DiffuseTransmission */
+    bool fresnel;           /**< Fresnel */
+    bool water;             /**< Water, else the shapes draw as without it */
+    bool distortion;        /**< Distortion, else the shapes draw as without it */
+    bool texture_scroll;    /**< TextureScroll, else the shapes draw as without it */
+    bool wind;              /**< WindSway moved by the Wind, else the shapes draw as without it
+                             *   with the shaders of a scene without it */
+    bool texture_layers;    /**< TextureLayers, drawn with their own variants of the mesh
+                             *   shaders, else the shapes draw as without them; the shapes
+                             *   without TextureLayers draw the same either way */
+});
+
+/** The material features of each mesh shader of a scene, by the name of the shader. In script
+ * {Extended: {triplanar: true}, Terrain: {texture_blend: true}}. */
+ECS_STRUCT(SceneShaderFeatures, {
+    ShaderFeatures Extended; /**< The mesh shaders that draw every 3D shape but the tiles of a
+                             *   Terrain */
+    ShaderFeatures Terrain; /**< The terrain shader, which always draws the tiles of a Terrain
+                             *   (box/terrain.h); it reads texture_blend, triplanar and
+                             *   texture_layers only */
+});
+
 /** Component added to scene root.
  * A view renders only the scene of its camera, lit by the lights of that scene.
  *
  * An entity belongs to its nearest ancestor with Scene (itself included), so scenes nest;
  * entities outside any Scene belong to the default scene, whose features the singleton holds.
  *
- * Its members are the features the mesh shaders of the scene support, all false by default for
- * the smallest shaders. A shape that needs a feature that is off draws as if it did not have it.
+ * Its members are the lighting features of every mesh shader of the scene and the material
+ * features of each of them, all false by default for the smallest shaders. A shape that needs a
+ * feature that is off draws as if it did not have it.
  */
 ECS_STRUCT(Scene, {
     bool baked;             /**< Probe volume irradiance with the visibility of the probes, for
@@ -312,30 +347,13 @@ ECS_STRUCT(Scene, {
                              *   view (LightSettings.environment), else the hemisphere ambient */
     bool aerial_perspective; /**< Aerial perspective of the Atmosphere on the 3D meshes, for the
                              *   views with LightSettings.atmosphere */
-    bool alpha_cutout;      /**< AlphaCutoff, else alpha tested shapes draw opaque */
-    bool blend_modes;       /**< BlendMode and Opacity below 1, else the shapes draw opaque */
-    bool transmission;      /**< Transmission */
-    bool texture_blend;     /**< TextureBlend, else the shapes draw with their PbrTextures */
-    bool triplanar;         /**< A TextureMapping blend above 0, else the hard projection */
-    bool sheen;             /**< Sheen */
-    bool clear_coat;        /**< ClearCoat */
-    bool anisotropy;        /**< SpecularAnisotropy */
-    bool diffuse_transmission; /**< DiffuseTransmission */
-    bool fresnel;           /**< Fresnel */
-    bool water;             /**< Water, else the shapes draw as without it */
-    bool distortion;        /**< Distortion, else the shapes draw as without it */
     bool planar_reflections; /**< PlanarReflection: the views render the mirrored images and the
                              *   shapes of the planes reflect them, else no reflection pass runs
                              *   and the shapes draw as without it */
-    bool texture_scroll;    /**< TextureScroll, else the shapes draw as without it */
     bool planet_light;      /**< The sun of a PlanetAtmosphere attenuated by its transmittance on
                              *   the meshes at or below its entity, else they are lit as
                              *   without it */
-    bool wind;              /**< WindSway moved by the Wind, else the shapes draw as without it
-                             *   with the shaders of a scene without it */
-    bool texture_layers;    /**< TextureLayers, drawn with their own variants of the mesh
-                             *   shaders, else the shapes draw as without them; the shapes
-                             *   without TextureLayers draw the same either way */
+    SceneShaderFeatures shader_features; /**< Material features of each mesh shader */
 });
 
 /** Compare the render order of two views: by order, then by entity id.

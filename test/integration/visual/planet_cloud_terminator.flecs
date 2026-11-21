@@ -12,7 +12,7 @@ using box.atmosphere
 // clouds turn away from the sun. Without ambient light the night side is dark.
 
 $ {
-  Scene: {blend_modes: true, planet_light: true}
+  Scene: {planet_light: true, shader_features: {Extended: {blend_modes: true}}}
   AmbientLight: {sky: {0, 0, 0}, ground: {0, 0, 0}, intensity: 0}
 }
 

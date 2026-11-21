@@ -7,7 +7,7 @@ using box.view
 using box.light
 
 $ {
-  Scene: {alpha_cutout: true, blend_modes: true, texture_blend: true}
+  Scene: {shader_features: {Extended: {alpha_cutout: true, blend_modes: true, texture_blend: true}}}
 }
 
 // texture.Blend on alpha tested and blended shapes. On the left a blended fence panel, a Quad with

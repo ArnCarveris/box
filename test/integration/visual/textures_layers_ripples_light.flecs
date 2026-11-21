@@ -20,7 +20,7 @@ using box.view
 using box.light
 
 $ {
-  Scene: {texture_layers: true, water: true}
+  Scene: {shader_features: {Extended: {texture_layers: true, water: true}}}
   AmbientLight: {sky: {150, 165, 190}, ground: {60, 56, 50}, intensity: 0.6}
 }
 

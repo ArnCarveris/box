@@ -7,7 +7,7 @@ using box.view
 using box.light
 
 $ {
-  Scene: {water: true, texture_scroll: true}
+  Scene: {shader_features: {Extended: {water: true, texture_scroll: true}}}
 }
 
 // Deep open water (Water over nothing, so the body is fully deep) under a swell, seen toward a
@@ -17,7 +17,7 @@ $ {
 // generated normal map scrolled by texture.Scroll adds detail on top at half weight.
 // frames: 60
 water_scatter {
-  Scene: {water: true, texture_scroll: true}
+  Scene: {shader_features: {Extended: {water: true, texture_scroll: true}}}
   AmbientLight: {sky: {120, 140, 180}, ground: {40, 46, 52}, intensity: 0.4}
 
   sun {

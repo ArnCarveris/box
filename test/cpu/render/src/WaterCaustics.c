@@ -365,7 +365,7 @@ void WaterCaustics_pack(void) {
 void WaterCaustics_record_flag(void) {
     box_render_null_t *null;
     ecs_world_t *world = world_new(&null);
-    ecs_singleton_set(world, Scene, {.water = true});
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.water = true});
     ecs_entity_t a = pond_new(world, 0);
     ecs_entity_t b = pond_new(world, 2);
     ecs_entity_t c = pond_new(world, 4);
@@ -428,7 +428,7 @@ void WaterCaustics_record_flag(void) {
 void WaterCaustics_frame_follows_flow(void) {
     box_render_null_t *null;
     ecs_world_t *world = world_new(&null);
-    ecs_singleton_set(world, Scene, {.water = true});
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.water = true});
     ecs_entity_t a = pond_new(world, 0);
     ecs_entity_t b = pond_new(world, 2);
     ecs_set(world, a, WaterCaustics, {.strength = 1, .scale = 2, .speed = 0, .depth = 2});
@@ -499,7 +499,7 @@ void WaterCaustics_frame_follows_flow(void) {
 void WaterCaustics_without_water(void) {
     box_render_null_t *null;
     ecs_world_t *world = world_new(&null);
-    ecs_singleton_set(world, Scene, {.water = true});
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.water = true});
 
     /* WaterCaustics and WaterFlow on a shape without Water do nothing */
     ecs_entity_t a = ecs_new(world);
@@ -549,7 +549,7 @@ void WaterCaustics_water_off(void) {
 void WaterCaustics_prefab_instances(void) {
     box_render_null_t *null;
     ecs_world_t *world = world_new(&null);
-    ecs_singleton_set(world, Scene, {.water = true});
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.water = true});
     ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
     ecs_set(world, prefab, Box, {1, 1, 1});
     ecs_add(world, prefab, Water);

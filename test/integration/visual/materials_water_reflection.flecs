@@ -7,7 +7,8 @@ using box.view
 using box.light
 
 $ {
-  Scene: {water: true, planar_reflections: true, texture_scroll: true}
+  Scene: {planar_reflections: true, shader_features: {Extended: {water: true,
+    texture_scroll: true}}}
 }
 
 // The pond of materials_water (Water) with a PlanarReflection, in a sandy terrain bowl turned on
@@ -19,7 +20,8 @@ $ {
 // where the bowl meets the water and around the rocks.
 // frames: 60
 water {
-  Scene: {water: true, planar_reflections: true, texture_scroll: true}
+  Scene: {planar_reflections: true, shader_features: {Extended: {water: true,
+    texture_scroll: true}}}
   AmbientLight: {sky: {150, 175, 210}, ground: {70, 64, 52}, intensity: 0.7}
 
   sun {

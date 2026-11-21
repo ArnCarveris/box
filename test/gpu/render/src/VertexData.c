@@ -52,7 +52,7 @@ static ecs_world_t* data_world(void)
     ecs_singleton_modified(world, App);
     ecs_singleton_set(world, RenderSettings, {.in_flight = 2, .main_thread = true});
     ecs_singleton_set(world, AmbientLight, {.intensity = 0.2f});
-    ecs_singleton_set(world, Scene, {.alpha_cutout = true});
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.alpha_cutout = true});
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 12, 0});

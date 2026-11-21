@@ -45,7 +45,8 @@ static ecs_world_t* flow_world(void)
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
     ecs_singleton_set(world, Scene, {.reflections = true, .environment = true,
-        .transmission = true, .triplanar = true, .texture_scroll = true, .water = true});
+        .shader_features.Extended.transmission = true, .shader_features.Extended.triplanar = true,
+        .shader_features.Extended.texture_scroll = true, .shader_features.Extended.water = true});
     App *app = ecs_singleton_get_mut(world, App);
     app->headless = true;
     ecs_singleton_modified(world, App);

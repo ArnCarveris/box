@@ -470,8 +470,8 @@ void PlanarReflection_sky_mirrored(void) {
 
 void PlanarReflection_water_hidden(void) {
     ecs_world_t *world = pr_world();
-    ecs_singleton_set(world, Scene, {.transmission = true, .water = true,
-        .planar_reflections = true});
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.transmission = true,
+        .shader_features.Extended.water = true, .planar_reflections = true});
     ecs_entity_t view = pr_view(world, 2);
     pr_mirror(world);
 
@@ -762,8 +762,8 @@ static ecs_entity_t pr_tilt(
 
 void PlanarReflection_shading_water(void) {
     ecs_world_t *world = pr_world();
-    ecs_singleton_set(world, Scene, {.transmission = true, .water = true,
-        .planar_reflections = true});
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.transmission = true,
+        .shader_features.Extended.water = true, .planar_reflections = true});
     pr_view(world, 2);
 
     // A black, opaque bodied Water plane that reflects a bright red box above it, turned about

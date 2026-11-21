@@ -6,7 +6,7 @@ using box.view
 using box.light
 
 $ {
-  Scene: {blend_modes: true, fresnel: true}
+  Scene: {shader_features: {Extended: {blend_modes: true, fresnel: true}}}
 }
 
 // The artistic rim of Fresnel, lit by a sun from above and a dim ambient, over a dark
@@ -17,7 +17,7 @@ $ {
 // strength 2, power 4), next to the same ball without a Fresnel on the right. In front, a green
 // selection glow on an opaque torus (power 2, bias 0.1), whose rim follows the tube.
 field {
-  Scene: {blend_modes: true, fresnel: true}
+  Scene: {shader_features: {Extended: {blend_modes: true, fresnel: true}}}
   AmbientLight: {sky: {120, 130, 150}, ground: {30, 30, 30}, intensity: 0.4}
 
   sun {

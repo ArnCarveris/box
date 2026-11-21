@@ -10,7 +10,8 @@ using box.light
 // snow layer, the shapes on the left have none. The left half must match the left half of
 // textures_layers_isolation_off, which renders the same shapes with the feature off.
 $ {
-  Scene: {alpha_cutout: true, texture_blend: true, texture_layers: true}
+  Scene: {shader_features: {Extended: {alpha_cutout: true, texture_blend: true,
+    texture_layers: true}}}
 }
 
 camera {

@@ -443,7 +443,7 @@ void TextureGraphCache_undrawn_skips_update(void) {
 
 void TextureGraphCache_layer_amount_zero_skips_update(void) {
     ecs_world_t *world = tg_world();
-    ecs_singleton_set(world, Scene, {.texture_layers = true});
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.texture_layers = true});
     tg_run_file(world, GRAPH_ANIMATED);
     ecs_entity_t tex = ecs_lookup(world, "graph_animated.image");
     ecs_entity_t quad = ecs_lookup(world, "graph_animated.quad");
@@ -475,7 +475,7 @@ void TextureGraphCache_layer_amount_zero_skips_update(void) {
 
 void TextureGraphCache_layer_normal_zero_skips_update(void) {
     ecs_world_t *world = tg_world();
-    ecs_singleton_set(world, Scene, {.texture_layers = true});
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.texture_layers = true});
     tg_run_file(world, GRAPH_ANIMATED);
     ecs_entity_t tex = ecs_lookup(world, "graph_animated.image");
     ecs_entity_t quad = ecs_lookup(world, "graph_animated.quad");

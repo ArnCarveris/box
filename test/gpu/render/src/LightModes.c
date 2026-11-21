@@ -64,9 +64,14 @@ void LightModes_realtime_light_left_out_of_bake(void) {
         ECS_IMPORT(world, Box);
         ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
             .punctual_shadows = true, .cookies = true, .environment = true,
-            .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
-            .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
-            .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
+            .aerial_perspective = true, .shader_features.Extended.alpha_cutout = true,
+            .shader_features.Extended.blend_modes = true,
+            .shader_features.Extended.transmission = true,
+            .shader_features.Extended.texture_blend = true,
+            .shader_features.Extended.triplanar = true, .shader_features.Extended.sheen = true,
+            .shader_features.Extended.clear_coat = true,
+            .shader_features.Extended.anisotropy = true,
+            .shader_features.Extended.diffuse_transmission = true});
         App *app = ecs_singleton_get_mut(world, App);
         app->headless = true;
         ecs_singleton_modified(world, App);
@@ -174,9 +179,14 @@ void LightModes_baked_light_only_in_probes(void) {
         ECS_IMPORT(world, Box);
         ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
             .punctual_shadows = true, .cookies = true, .environment = true,
-            .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
-            .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
-            .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
+            .aerial_perspective = true, .shader_features.Extended.alpha_cutout = true,
+            .shader_features.Extended.blend_modes = true,
+            .shader_features.Extended.transmission = true,
+            .shader_features.Extended.texture_blend = true,
+            .shader_features.Extended.triplanar = true, .shader_features.Extended.sheen = true,
+            .shader_features.Extended.clear_coat = true,
+            .shader_features.Extended.anisotropy = true,
+            .shader_features.Extended.diffuse_transmission = true});
         App *app = ecs_singleton_get_mut(world, App);
         app->headless = true;
         ecs_singleton_modified(world, App);
@@ -532,9 +542,14 @@ void LightModes_baked_light_lights_probes_like_mixed(void) {
         ECS_IMPORT(world, Box);
         ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
             .punctual_shadows = true, .cookies = true, .environment = true,
-            .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
-            .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
-            .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
+            .aerial_perspective = true, .shader_features.Extended.alpha_cutout = true,
+            .shader_features.Extended.blend_modes = true,
+            .shader_features.Extended.transmission = true,
+            .shader_features.Extended.texture_blend = true,
+            .shader_features.Extended.triplanar = true, .shader_features.Extended.sheen = true,
+            .shader_features.Extended.clear_coat = true,
+            .shader_features.Extended.anisotropy = true,
+            .shader_features.Extended.diffuse_transmission = true});
         App *app = ecs_singleton_get_mut(world, App);
         app->headless = true;
         ecs_singleton_modified(world, App);
@@ -621,9 +636,14 @@ void LightModes_captures_follow_first_non_realtime_sun(void) {
         ECS_IMPORT(world, Box);
         ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
             .punctual_shadows = true, .cookies = true, .environment = true,
-            .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
-            .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
-            .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
+            .aerial_perspective = true, .shader_features.Extended.alpha_cutout = true,
+            .shader_features.Extended.blend_modes = true,
+            .shader_features.Extended.transmission = true,
+            .shader_features.Extended.texture_blend = true,
+            .shader_features.Extended.triplanar = true, .shader_features.Extended.sheen = true,
+            .shader_features.Extended.clear_coat = true,
+            .shader_features.Extended.anisotropy = true,
+            .shader_features.Extended.diffuse_transmission = true});
         App *app = ecs_singleton_get_mut(world, App);
         app->headless = true;
         ecs_singleton_modified(world, App);

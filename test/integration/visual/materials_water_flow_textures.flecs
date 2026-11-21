@@ -8,7 +8,7 @@ using box.light
 using box.movement
 
 $ {
-  Scene: {water: true}
+  Scene: {shader_features: {Extended: {water: true}}}
 }
 
 // A brook that bends a quarter turn, seen from above at an angle: five Water lengths over a
@@ -21,7 +21,7 @@ $ {
 // water (RippleSources with foam) leave foaming trails that drift around the bend.
 // frames: 240
 water_flow_textures {
-  Scene: {water: true}
+  Scene: {shader_features: {Extended: {water: true}}}
   AmbientLight: {sky: {140, 165, 205}, ground: {70, 64, 52}, intensity: 0.6}
 
   sun {

@@ -16,7 +16,8 @@ static const char *ablate_scene =
     "  bloom { Bloom: {intensity: 0.2} }\n"
     "  View: {camera: camera, shadows: {enabled: true}, effects: [{effect: bloom}]}\n"
     "}\n"
-    "$ { Scene: {alpha_cutout: true, wind: true, reflections: true} }\n";
+    "$ { Scene: {reflections: true,\n"
+    "  shader_features: {Extended: {alpha_cutout: true, wind: true}}} }\n";
 
 void Ablate_report(void) {
     ecs_world_t *world = ecs_init();
@@ -58,9 +59,9 @@ void Ablate_report(void) {
     test_assert(strstr(out, "  bloom off ") != NULL);
     test_assert(strstr(out, "(Bloom)") != NULL);
     test_assert(strstr(out, "\nScene features ") != NULL);
-    test_assert(strstr(out, "  Scene.alpha_cutout off ") != NULL);
-    test_assert(strstr(out, "  Scene.wind off ") != NULL);
-    test_assert(strstr(out, "Scene.water") == NULL);
+    test_assert(strstr(out, "  Extended.alpha_cutout off ") != NULL);
+    test_assert(strstr(out, "  Extended.wind off ") != NULL);
+    test_assert(strstr(out, "Extended.water") == NULL);
     test_assert(strstr(out, "atmosphere off") == NULL);
     test_assert(strstr(out, "fog_volumes off") == NULL);
     test_assert(strstr(out, "baked off") == NULL);
@@ -79,8 +80,8 @@ void Ablate_report(void) {
     test_bool(ecs_vec_first_t(&v->effects, ViewEffect)->enabled, true);
 
     const Scene *scene = ecs_singleton_get(world, Scene);
-    test_bool(scene->alpha_cutout, true);
-    test_bool(scene->wind, true);
+    test_bool(scene->shader_features.Extended.alpha_cutout, true);
+    test_bool(scene->shader_features.Extended.wind, true);
     test_bool(scene->reflections, true);
 
     test_flt(ecs_singleton_get(world, App)->fps, 0);
@@ -121,7 +122,7 @@ void Ablate_skips_lighting_when_unlit(void) {
     test_assert(strstr(out, "shadows off") == NULL);
     test_assert(strstr(out, "Scene.reflections off") == NULL);
     test_assert(strstr(out, "  bloom off ") != NULL);
-    test_assert(strstr(out, "  Scene.alpha_cutout off ") != NULL);
+    test_assert(strstr(out, "  Extended.alpha_cutout off ") != NULL);
     ecs_os_free(out);
 
     test_bool(ecs_get(world, view, View)->lighting.enabled, false);

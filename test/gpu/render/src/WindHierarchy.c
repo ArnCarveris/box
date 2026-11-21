@@ -140,7 +140,7 @@ static ecs_world_t* hier_world_view(
     ecs_singleton_modified(world, App);
     ecs_singleton_set(world, RenderSettings, {.in_flight = 2, .main_thread = true});
     ecs_singleton_set(world, AmbientLight, {.intensity = side ? 1.0f : 0.2f});
-    ecs_singleton_set(world, Scene, {.wind = true});
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.wind = true});
 
     ecs_entity_t camera = ecs_new(world);
     if (side) {

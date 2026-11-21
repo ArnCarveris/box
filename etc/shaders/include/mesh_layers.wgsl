@@ -160,8 +160,9 @@ fn layer_taps(maps: texture_2d_array<f32>, first: u32, flags: u32, want: u32, uv
 // Box), the three projections blended above a blend of 0. dx and dy are the screen derivatives
 // of the world position, uv and the gradients those of the mesh UVs. want selects the maps read
 // (LAYER_HAS_* bits).
-fn layer_sample(maps: texture_2d_array<f32>, first: u32, l: TextureLayer, f: VertexOut,
-    s: LayerSurface, dx: vec3f, dy: vec3f, ux: vec2f, uy: vec2f, want: u32) -> LayerSample {
+fn layer_sample(maps: texture_2d_array<f32>, first: u32, l: TextureLayer, world: vec3f,
+    uv: vec2f, s: LayerSurface, dx: vec3f, dy: vec3f, ux: vec2f, uy: vec2f, want: u32)
+    -> LayerSample {
     var o: LayerSample;
     o.albedo = vec3f(0.0);
     o.orm = vec3f(0.0);
@@ -174,11 +175,11 @@ fn layer_sample(maps: texture_2d_array<f32>, first: u32, l: TextureLayer, f: Ver
         let frame = cotangent_frame_grad(n, dx, dy, ux * t.xy, uy * t.xy);
         let tangent = select(frame.tangent, layer_along(vec3f(1.0, 0.0, 0.0), n), frame.degenerate);
         let bitangent = select(frame.bitangent, cross(n, tangent), frame.degenerate);
-        layer_taps(maps, first, flags, want, f.uv.xy * t.xy + t.zw, ux * t.xy, uy * t.xy,
+        layer_taps(maps, first, flags, want, uv * t.xy + t.zw, ux * t.xy, uy * t.xy,
             tangent, bitangent, n, 1.0, &o);
     } else {
         let size = max(l.material.z, 1e-6);
-        let p = f.world / size;
+        let p = world / size;
         let px = dx / size;
         let py = dy / size;
         let sg = mapping_signs(n);
@@ -276,27 +277,34 @@ fn layer_blend3(mode: u32, v: vec3f, layer: vec3f, k: f32) -> vec3f {
 @diagnostic(off, derivative_uniformity)
 fn apply_layers(maps: texture_2d_array<f32>, first: u32, f: VertexOut, surface: LayerSurface)
     -> LayerSurface {
+    return apply_layers_at(maps, first, f.world, f.uv.xy, surface);
+}
+
+// apply_layers of a fragment at a world position with mesh UVs uv.
+@diagnostic(off, derivative_uniformity)
+fn apply_layers_at(maps: texture_2d_array<f32>, first: u32, world: vec3f, uv: vec2f,
+    surface: LayerSurface) -> LayerSurface {
     var s = surface;
-    let dx = dpdx(f.world);
-    let dy = dpdy(f.world);
-    let ux = dpdx(f.uv.xy);
-    let uy = dpdy(f.uv.xy);
+    let dx = dpdx(world);
+    let dy = dpdy(world);
+    let ux = dpdx(uv);
+    let uy = dpdy(uv);
     for (var k = 0u; k < 4u; k++) {
         let l = texture_layer(k);
         if (l.color.a <= 0.0) {
             continue;
         }
-        let altitude = layer_altitude(l, f.world.y);
+        let altitude = layer_altitude(l, world.y);
         if (layer_coverage(l, s, 1.0, altitude) <= 0.0) {
             continue;
         }
         let slice = first + k * LAYER_MAPS;
-        let masked = layer_sample(maps, slice, l, f, s, dx, dy, ux, uy, LAYER_HAS_MASK);
+        let masked = layer_sample(maps, slice, l, world, uv, s, dx, dy, ux, uy, LAYER_HAS_MASK);
         let covered = layer_coverage(l, s, masked.mask, altitude);
         if (covered <= 0.0) {
             continue;
         }
-        let m = layer_sample(maps, slice, l, f, s, dx, dy, ux, uy,
+        let m = layer_sample(maps, slice, l, world, uv, s, dx, dy, ux, uy,
             LAYER_HAS_ALBEDO | LAYER_HAS_ORM | LAYER_HAS_NORMAL);
         let porous = (1.0 - s.metallic) * s.roughness;
         let soaked = covered * mix(1.0, porous, l.coverage.w);

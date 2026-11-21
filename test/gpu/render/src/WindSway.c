@@ -55,7 +55,7 @@ static ecs_world_t* sway_world_at(
     ecs_singleton_modified(world, App);
     ecs_singleton_set(world, RenderSettings, {.in_flight = 2, .main_thread = true});
     ecs_singleton_set(world, AmbientLight, {.intensity = 0.2f});
-    ecs_singleton_set(world, Scene, {.wind = wind});
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.wind = wind});
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 12 + lift, 0});
@@ -353,7 +353,7 @@ void WindSway_plain_mesh_unchanged(void) {
     sway_frames(world, 30);
     unsigned char *wind = sway_render(world, "wind_plain_on.png");
 
-    ecs_singleton_set(world, Scene, {.wind = false});
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.wind = false});
     sway_frames(world, 3);
     unsigned char *still = sway_render(world, "wind_plain_off.png");
     test_assert(!memcmp(wind, still, SWAY_SIZE * SWAY_SIZE * 4));

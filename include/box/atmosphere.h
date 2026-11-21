@@ -285,8 +285,9 @@ ECS_STRUCT(TimeOfDayStatus, {
  * WindStatus wraps to this many times the gust scale */
 #define BOX_WIND_GUST_PERIOD (32.0)
 
-/** Wind that bends and flutters the vertices of the shapes with a WindSway, a singleton for
- * every scene with Scene.wind. Adding it adds WindStatus, which the engine advances.
+/** Wind that bends and flutters the vertices of the shapes with a WindSway, a singleton for every
+  * scene with Scene.shader_features.Extended.wind. Adding it adds WindStatus, which the engine
+  * advances.
  *
  * The strength of the wind at a point is its speed times a gust factor between 1 - gust and
  * 1 + gust, read from a field of broad bands stretched across the wind, a few gust_scale world

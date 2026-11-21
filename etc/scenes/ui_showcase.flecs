@@ -22,7 +22,7 @@ using box.transition
 
 $ {
   box.app.FpsTarget: {60}
-  Scene: {punctual_shadows: true, blend_modes: true}
+  Scene: {punctual_shadows: true, shader_features: {Extended: {blend_modes: true}}}
   AmbientLight: {sky: {90, 110, 140}, ground: {40, 36, 30}, intensity: 0.6}
 }
 
@@ -474,7 +474,7 @@ ui_showcase {
   // which the curved screen below samples. Its buttons sit at opposite ends of the texture, so
   // they are on different slices of the screen
   screen_ui {
-    Scene: {punctual_shadows: true, blend_modes: true}
+    Scene: {punctual_shadows: true, shader_features: {Extended: {blend_modes: true}}}
 
     camera {
       Position: {0, 0, 100}
@@ -562,7 +562,7 @@ ui_showcase {
 // pixel is one point. Its root fills the window, so the panel anchors to the left edge
 // and stays there when the window is resized.
 hud {
-  Scene: {punctual_shadows: true, blend_modes: true}
+  Scene: {punctual_shadows: true, shader_features: {Extended: {blend_modes: true}}}
 
   camera {
     Position: {0, 0, 100}

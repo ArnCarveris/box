@@ -85,13 +85,17 @@ $ {
     cookies: false,
     environment: false,
     aerial_perspective: false,
-    alpha_cutout: true,
-    blend_modes: false,
-    transmission: true,
-    texture_blend: false,
-    triplanar: false,
-    clear_coat: false,
-    diffuse_transmission: false
+    shader_features: {
+      Extended: {
+        alpha_cutout: true,
+        blend_modes: false,
+        transmission: true,
+        texture_blend: false,
+        triplanar: false,
+        clear_coat: false,
+        diffuse_transmission: false
+      }
+    }
   }
   ReflectionBake: {
     resolution: 128,

@@ -24,8 +24,17 @@ using tree_editor
 $ {
   box.app.FpsTarget: {60}
   Scene: {
-    reflections: true, environment: true, aerial_perspective: true, alpha_cutout: true,
-    triplanar: true, diffuse_transmission: true, wind: true
+    reflections: true,
+    environment: true,
+    aerial_perspective: true,
+    shader_features: {
+      Extended: {
+        alpha_cutout: true,
+        triplanar: true,
+        diffuse_transmission: true,
+        wind: true
+      }
+    }
   }
   AmbientLight: {sky: {120, 140, 170}, ground: {60, 64, 44}, intensity: 0.2}
   Wind: {direction: {1, 0.3}, speed: wind, gust: 0.5, gust_scale: 30}

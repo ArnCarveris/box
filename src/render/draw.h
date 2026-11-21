@@ -1240,6 +1240,46 @@ bool box_draws_extended(
     ecs_entity_t e,
     const box_draw_key_t *key);
 
+/** Check whether a shape is a tile of a Terrain, which draws with the terrain shader.
+ *
+ * @param world The world
+ * @param e The entity
+ * @return Whether it has a TerrainTile
+ */
+bool box_draws_terrain(
+    const ecs_world_t *world,
+    ecs_entity_t e);
+
+/** Get the BOX_RENDER_FEATURE_* features a 3D shape draws with: the Terrain shader features of
+ * its scene for a terrain tile (box_render_terrain_features), else the Extended ones
+ * (box_render_scene_features).
+ *
+ * @param world The world
+ * @param e The entity
+ * @param scene The scene of the shape
+ * @return The features
+ */
+uint32_t box_draws_features(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    ecs_entity_t scene);
+
+/** Get the mesh shader a 3D shape draws with: BOX_RENDER_SHADER_TERRAIN for a terrain tile,
+ * BOX_RENDER_SHADER_MESH_EXTENDED when box_draws_extended says so, else
+ * BOX_RENDER_SHADER_MESH.
+ *
+ * @param world The world
+ * @param d The state
+ * @param e The entity
+ * @param key Its key, with every field but the pipeline set
+ * @return The shader handle
+ */
+uint32_t box_draws_shader(
+    const ecs_world_t *world,
+    const box_render_draws_t *d,
+    ecs_entity_t e,
+    const box_draw_key_t *key);
+
 /** Look up the texture frame and the mapping mode of a shape, which its frame record is written
  * from until the shape or its ancestors change.
  *

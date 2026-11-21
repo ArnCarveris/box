@@ -7,7 +7,7 @@ using box.view
 using box.light
 
 $ {
-  Scene: {alpha_cutout: true, blend_modes: true}
+  Scene: {shader_features: {Extended: {alpha_cutout: true, blend_modes: true}}}
 }
 
 // Alpha tested materials (AlphaCutoff) on a floor lit by a sun from behind on the right, whose

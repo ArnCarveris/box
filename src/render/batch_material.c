@@ -1330,6 +1330,38 @@ done:
     return result;
 }
 
+bool box_draws_terrain(
+    const ecs_world_t *world,
+    ecs_entity_t e)
+{
+    return ecs_id(TerrainTile) && ecs_has(world, e, TerrainTile);
+}
+
+uint32_t box_draws_features(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    ecs_entity_t scene)
+{
+    return box_draws_terrain(world, e) ? box_render_terrain_features(world, scene)
+        : box_render_scene_features(world, scene);
+}
+
+uint32_t box_draws_shader(
+    const ecs_world_t *world,
+    const box_render_draws_t *d,
+    ecs_entity_t e,
+    const box_draw_key_t *key)
+{
+    uint32_t result = BOX_RENDER_SHADER_MESH;
+    if (box_draws_terrain(world, e)) {
+        result = BOX_RENDER_SHADER_TERRAIN;
+    } else if (box_draws_extended(world, d, e, key)) {
+        result = BOX_RENDER_SHADER_MESH_EXTENDED;
+    }
+
+    return result;
+}
+
 /** Clamp a float to a range, a value that is not finite to a fallback.
  *
  * @param v The value

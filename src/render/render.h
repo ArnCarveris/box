@@ -2465,13 +2465,26 @@ box_render_transition_record_t* box_render_packet_transition(
 box_render_packet_t* box_render_packet(
     ecs_world_t *world);
 
-/** Get the BOX_RENDER_FEATURE_* features of a scene from its Scene.
+/** Get the BOX_RENDER_FEATURE_* features of a scene from its Scene: its lighting features and
+ * the material features of its Extended mesh shaders (SceneShaderFeatures).
  *
  * @param world The world
  * @param scene The scene root, 0 for the default scene, whose features are the Scene singleton
  * @return The features, 0 without a Scene
  */
 uint32_t box_render_scene_features(
+    const ecs_world_t *world,
+    ecs_entity_t scene);
+
+/** Get the BOX_RENDER_FEATURE_* features of the terrain shader of a scene: its lighting and
+ * planet light features and the texture_blend, triplanar and texture_layers of its Terrain
+ * shader features (SceneShaderFeatures).
+ *
+ * @param world The world
+ * @param scene The scene root, 0 for the default scene, whose features are the Scene singleton
+ * @return The features, 0 without a Scene
+ */
+uint32_t box_render_terrain_features(
     const ecs_world_t *world,
     ecs_entity_t scene);
 

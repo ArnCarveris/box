@@ -7,7 +7,7 @@ using box.view
 using box.layout
 
 $ {
-  Scene: {blend_modes: true}
+  Scene: {shader_features: {Extended: {blend_modes: true}}}
 }
 
 // Soft shadows (BoxShadow) of cards with different offsets, blurs, spreads, radii and colors, over a
@@ -122,7 +122,7 @@ board {
 }
 
 hud {
-  Scene: {blend_modes: true}
+  Scene: {shader_features: {Extended: {blend_modes: true}}}
 
   camera {
     Position: {0, 0, 100}

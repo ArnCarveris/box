@@ -17,7 +17,7 @@ using box.app
 using box.surface
 
 $ {
-  Scene: {transmission: true}
+  Scene: {shader_features: {Extended: {transmission: true}}}
 }
 
 window {

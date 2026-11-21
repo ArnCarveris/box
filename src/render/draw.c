@@ -834,8 +834,8 @@ done:
 /** Compute the batch key of a shape.
  *
  * A shape under an active Opacity transition (TransitionOpacity) is keyed as if its alpha were
- * below 1. A 3D shape draws with the extended mesh shader when box_draws_extended says so; the
- * Scene features that are off are ignored.
+ * below 1. A 3D shape draws with the mesh shader box_draws_shader picks, with the features
+ * box_draws_features gives; the Scene features that are off are ignored.
  *
  * A 3D shape that has or inherits Transmission, Distortion (box_draws_distorted), or Water
  * with Scene.water (without its TextureBlend), is transmissive: it draws in the sorted blended
@@ -863,7 +863,7 @@ static void box_draws_key(
     bool fading = ecs_has_id(world, e, TransitionOpacity);
     ecs_os_memset_t(key, 0, box_draw_key_t);
     key->scene = box_draws_scene(world, d, e);
-    key->features = shape2d ? 0u : box_render_scene_features(world, key->scene);
+    key->features = shape2d ? 0u : box_draws_features(world, e, key->scene);
     key->cutout = box_draws_scene_cutout(ecs_get(world, e, AlphaCutoff),
         ecs_get(world, e, VertexReveal), shape2d, key->features);
     key->blend = box_draws_scene_blend(ecs_get(world, e, BlendMode), fading ? 0.0f : alpha,
@@ -941,8 +941,8 @@ static void box_draws_key(
         key->textures[3] = 0;
     }
 
-    if (!shape2d && box_draws_extended(world, d, e, key)) {
-        key->pipeline = BOX_RENDER_SHADER_MESH_EXTENDED;
+    if (!shape2d) {
+        key->pipeline = box_draws_shader(world, d, e, key);
     }
 
     const TextureLayers *layers = shape2d || (key->transmissive && !key->water) ||

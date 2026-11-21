@@ -14,11 +14,11 @@ coat, sheen, anisotropy, transmission, water, ...), texture layers and UV mappin
 |---|---|---|
 | `Rgb` | `r, g, b` (display encoded bytes) | Base color. Without Rgb a shape is {204,204,204} |
 | `Opacity` | `value` 1 | Multiplies into every shape below the entity (no shape needed on it). < 1 = sorted blended pass, no shadow. In a UI tree it composites the subtree instead |
-| `AlphaCutoff` | `value` 0.5 | Alpha test (opacity x albedo alpha). Opaque/no BlendMode: drawn in the opaque pass with holes in depth and shadows. Needs `Scene.alpha_cutout` |
+| `AlphaCutoff` | `value` 0.5 | Alpha test (opacity x albedo alpha). Opaque/no BlendMode: drawn in the opaque pass with holes in depth and shadows. Needs `Scene.shader_features.Extended.alpha_cutout` |
 | `Tint` | `r, g, b, a` (a = strength, 0 none, 255 replace) | Mixes base color before lighting; composes down ChildOf/Parent. Not emission; bakes ignore it |
 | `PbrMaterial` | `metallic` 0, `roughness` 1 | Unset fields keep the default: a PbrMaterial with only metallic is fully rough |
 | `Emissive` | `strength` 0, `color` | Not tinted |
-| `BlendMode` (enum) | `Opaque`, `AlphaBlend`, `PremultipliedAlpha`, `Additive`, `Multiply`, `Screen`, `Subtractive`, `Min`, `Max` | Needs `Scene.blend_modes` |
+| `BlendMode` (enum) | `Opaque`, `AlphaBlend`, `PremultipliedAlpha`, `Additive`, `Multiply`, `Screen`, `Subtractive`, `Min`, `Max` | Needs `Scene.shader_features.Extended.blend_modes` |
 | `BackFaceMode` (enum) | `BackFaceCull` (default), `BackFacePlain` | Plain: back faces show material constants, no textures |
 
 ## Extension layers (3D meshes only; 2D shapes and text ignore them)
@@ -45,11 +45,11 @@ unset fields.
 | `PbrTextures` | `albedo`, `emissive`, `orm`, `normal` (texture entities, 0 none) | Albedo display encoded, multiplies Rgb and opacity. ORM stored: R occlusion, G x roughness, B x metallic. Normal: tangent space, green up |
 | `texture.Transform` | `scale_x` 1, `scale_y` 1, `offset_x` 0, `offset_y` 0 | UV scale then offset; UV 0,0 = top left |
 | `texture.Wrap` (enum) | `Repeat` (default), `Clamp`, `Mirror` | Sampler addressing |
-| `texture.Mapping` | `mode` MappingUv / MappingObject / MappingWorld / MappingFrame, `size` 1, `blend` 0 | Planar projection on the dominant normal axis; `blend` > 0 = triplanar (needs `Scene.triplanar`) |
+| `texture.Mapping` | `mode` MappingUv / MappingObject / MappingWorld / MappingFrame, `size` 1, `blend` 0 | Planar projection on the dominant normal axis; `blend` > 0 = triplanar (needs `Scene.shader_features.Extended.triplanar`) |
 | `texture.Frame` (tag) | | Frame for MappingFrame (and the scale reference of MappingObject) for its subtree |
-| `texture.Scroll` | `velocity`, `normal_velocity` (texture widths/s) | Endless UV scroll; needs `Scene.texture_scroll` |
-| `texture.Blend` | `mask`, `layers[4]` (entities with PbrTextures + optional texture.Transform), `heights[4]`, `contrast` 0 | Mask RGBA weighs layers 0..3; needs `Scene.texture_blend`. Shape's PbrTextures ignored except emissive |
-| `texture.Layers` | `layers[4]` (entities with `texture.Layer`, 0 unused) | Applied in order over the resolved surface (after PbrTextures, texture.Blend or TileTerrain, before lighting); needs `Scene.texture_layers`. Part of the batch like PbrTextures |
+| `texture.Scroll` | `velocity`, `normal_velocity` (texture widths/s) | Endless UV scroll; needs `Scene.shader_features.Extended.texture_scroll` |
+| `texture.Blend` | `mask`, `layers[4]` (entities with PbrTextures + optional texture.Transform), `heights[4]`, `contrast` 0 | Mask RGBA weighs layers 0..3; needs `Scene.shader_features.Extended.texture_blend`. Shape's PbrTextures ignored except emissive |
+| `texture.Layers` | `layers[4]` (entities with `texture.Layer`, 0 unused) | Applied in order over the resolved surface (after PbrTextures, texture.Blend or TileTerrain, before lighting); needs `Scene.shader_features.Extended.texture_layers`. Part of the batch like PbrTextures |
 | `texture.Layer` | `amount` 1, `direction` {0,1,0}, `facing` 0, `mask` 0, `cavity` 0, `contrast` 8, `albedo` LayerMix, `roughness` LayerMix, `metallic` LayerKeep, `occlusion` LayerKeep, `normal` 0, `porosity` 0 | On a layer entity, with its own Rgb, PbrMaterial, PbrTextures, texture.Mapping (default world), texture.Transform, texture.Scroll |
 
 ## Texture layers
@@ -82,13 +82,14 @@ TileTerrain. Weather (snow, wet, puddles) is a set of layer entities a scene ani
   Lagarde's wet surfaces model).
 - Alpha never changes; alpha tested shapes keep their holes. Transmission and Distortion shapes,
   2D shapes and text ignore layers. Probe and reflection captures see them.
-- `Water` (in a scene with `Scene.water`) uses only the normals of its layers: they blend into
-  its ripple normal by their coverage (`normal` times the coverage, the cavity ignored), before
-  the waves. Their albedo, roughness, metallic and occlusion do nothing on Water. Rain on a
-  brook is the puddle layer with a `Ripples` graph as its normal (texture.md).
+- `Water` (in a scene with `Scene.shader_features.Extended.water`) uses only the normals of its
+  layers: they blend into its ripple normal by their coverage (`normal` times the coverage, the
+  cavity ignored), before the waves. Their albedo, roughness, metallic and occlusion do nothing on
+  Water. Rain on a brook is the puddle layer with a `Ripples` graph as its normal (texture.md).
 
 ```flecs
-$ { Scene: {texture_layers: true, texture_blend: true, alpha_cutout: true} }
+$ { Scene: {shader_features: {Extended: {texture_layers: true, texture_blend: true,
+  alpha_cutout: true}}} }
 
 snow_noise { n { nodes.Noise: {frequency: 6, octaves: 4} }
   Graph: {output: n, width: 256, format: GraphSingle} }
@@ -145,8 +146,8 @@ assets {
   prefab Leaf { Rgb: {111, 145, 100}; BackFaceMode: {BackFacePlain}; PbrMaterial: {roughness: 0.85} }
 }
 
-$ { Scene: {transmission: true, clear_coat: true, triplanar: true, texture_blend: true,
-  water: true, texture_scroll: true, alpha_cutout: true, wind: true}
+$ { Scene: {shader_features: {Extended: {transmission: true, clear_coat: true, triplanar: true,
+  texture_blend: true, water: true, texture_scroll: true, alpha_cutout: true, wind: true}}}
   Wind: {direction: {1, 0}, speed: 5} }
 
 ground { Box: {30, 0.2, 30}; Rgb: {255, 255, 255}; PbrMaterial: {roughness: 1}
@@ -208,13 +209,14 @@ prefab Grass { Quad: {0.3, 0.8}; PbrTextures: {albedo: blade}; AlphaCutoff: {}
   change every frame.
 - `PbrTextures` and `texture.Blend` are part of the batch, not the material table: every distinct
   texture set is a separate batch.
-- `texture.Layers` is part of the batch: shapes with the same layers share a batch drawn with
-  the layers entry points of separate modules of the mesh shaders (compiled with
-  `BOX_TEXTURE_LAYERS`, only in scenes with `Scene.texture_layers`) and their own bind group
-  layouts. Shapes without it keep their shader modules, pipelines, bind groups, material records
-  and batches unchanged, with `Scene.texture_layers` on or off; a Water batch with layers
-  draws with the `fs_water_layers` entry point, Water without layers keeps its pipeline. The values of a layer live in one small uniform buffer per
-  layer entity, written only when they change, so animating `amount` touches no shape and no
-  batch. The maps of the layers (and their masks) are blitted into one texture array per layer
-  set, built again when an image changes (every update of an animated graph).
+- `texture.Layers` is part of the batch: shapes with the same layers share a batch drawn with the
+  layers entry points of separate modules of the mesh shaders (compiled with `BOX_TEXTURE_LAYERS`,
+  only in scenes with `Scene.shader_features.Extended.texture_layers`) and their own bind group
+  layouts. Shapes without it keep their shader modules, pipelines, bind groups, material records and
+  batches unchanged, with `Scene.shader_features.Extended.texture_layers` on or off; a Water batch
+  with layers draws with the `fs_water_layers` entry point, Water without layers keeps its pipeline.
+  The values of a layer live in one small uniform buffer per layer entity, written only when they
+  change, so animating `amount` touches no shape and no batch. The maps of the layers (and their
+  masks) are blitted into one texture array per layer set, built again when an image changes (every
+  update of an animated graph).
 - Each Scene feature compiles a larger shader; enable only what the scene uses.

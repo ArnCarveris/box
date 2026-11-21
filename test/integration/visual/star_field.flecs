@@ -7,7 +7,7 @@ using box.light
 using box.effects
 
 $ {
-  Scene: {blend_modes: true}
+  Scene: {shader_features: {Extended: {blend_modes: true}}}
 }
 
 // A procedural star field behind a dark moon seen through a narrow camera: sharp stars of

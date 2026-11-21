@@ -7,7 +7,7 @@ using box.light
 using box.particle
 
 $ {
-  Scene: {blend_modes: true}
+  Scene: {shader_features: {Extended: {blend_modes: true}}}
 }
 
 // Particles and translucent shapes fogged at their own depth: on the left a gray smoke column

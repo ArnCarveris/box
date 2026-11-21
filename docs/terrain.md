@@ -24,7 +24,7 @@ grass_n { Path: {path: "etc/scenes/mossvale/textures/tiles/grass_normal.jpg"} }
 grass { PbrTextures: {albedo: grass_a, normal: grass_n} }
 road { PbrTextures: {albedo: road_atlas, normal: road_atlas_n} }
 
-$ { Scene: {texture_blend: true} }
+$ { Scene: {shader_features: {Extended: {texture_blend: true}}} }
 
 terrain {
   Position: {0, 0, 0}
@@ -51,8 +51,8 @@ Full example: `etc/scenes/mossvale/tiles.flecs` (10 kinds, 128 columns).
 
 ## Drawing and atlases
 
-- Needs `Scene.texture_blend: true` (the texture_blend variant of the mesh pipeline). Without it
-  the shape draws as a plain plane with its own `PbrTextures`.
+- Needs `texture_blend` in `Scene.shader_features.Extended` (the texture_blend variant of the mesh
+  pipeline). Without it the shape draws as a plain plane with its own `PbrTextures`.
 - `Rgb`, `PbrMaterial`, `Tint` and `Emissive` apply as with a `TextureBlend`.
 - Kinds draw in list order, each over the ones before it, on the dual grid: the cell between
   four tile centers draws the lowest of their kinds whole, then each higher kind through the

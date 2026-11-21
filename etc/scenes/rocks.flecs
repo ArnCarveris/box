@@ -21,7 +21,8 @@ using rocks
 
 $ {
   box.app.FpsTarget: {60}
-  Scene: {reflections: true, environment: true, texture_layers: true, triplanar: true}
+  Scene: {reflections: true, environment: true, shader_features: {Extended: {texture_layers: true,
+    triplanar: true}}}
   AmbientLight: {sky: {120, 140, 170}, ground: {60, 54, 44}, intensity: 0.2}
 }
 

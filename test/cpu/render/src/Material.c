@@ -167,11 +167,14 @@ void Material_alpha_cutoff_batches(void) {
     // materials/cutout
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
-    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
-        .punctual_shadows = true, .cookies = true, .environment = true,
-        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
-        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
-        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true, .punctual_shadows = true,
+        .cookies = true, .environment = true, .aerial_perspective = true,
+        .shader_features.Extended.alpha_cutout = true, .shader_features.Extended.blend_modes = true,
+        .shader_features.Extended.transmission = true,
+        .shader_features.Extended.texture_blend = true, .shader_features.Extended.triplanar = true,
+        .shader_features.Extended.sheen = true, .shader_features.Extended.clear_coat = true,
+        .shader_features.Extended.anisotropy = true,
+        .shader_features.Extended.diffuse_transmission = true});
     box_render_null_t *null = box_render_null_new();
     box_render_backend_t backend = box_render_null_backend(null);
     box_render_set_backend(world, &backend);
@@ -232,11 +235,14 @@ void Material_alpha_cutoff_prefab_and_dynamic(void) {
     // materials/cutout
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
-    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
-        .punctual_shadows = true, .cookies = true, .environment = true,
-        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
-        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
-        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true, .punctual_shadows = true,
+        .cookies = true, .environment = true, .aerial_perspective = true,
+        .shader_features.Extended.alpha_cutout = true, .shader_features.Extended.blend_modes = true,
+        .shader_features.Extended.transmission = true,
+        .shader_features.Extended.texture_blend = true, .shader_features.Extended.triplanar = true,
+        .shader_features.Extended.sheen = true, .shader_features.Extended.clear_coat = true,
+        .shader_features.Extended.anisotropy = true,
+        .shader_features.Extended.diffuse_transmission = true});
     box_render_null_t *null = box_render_null_new();
     box_render_backend_t backend = box_render_null_backend(null);
     box_render_set_backend(world, &backend);
@@ -330,7 +336,7 @@ static void oreelse_cutout(
 {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
-    ecs_singleton_set(world, Scene, {.alpha_cutout = true});
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.alpha_cutout = true});
     box_render_null_t *null = box_render_null_new();
     box_render_backend_t backend = box_render_null_backend(null);
     box_render_set_backend(world, &backend);
@@ -542,11 +548,14 @@ void Material_transmission_override_permutations(void) {
     // materials/transmission
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
-    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
-        .punctual_shadows = true, .cookies = true, .environment = true,
-        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
-        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
-        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true, .punctual_shadows = true,
+        .cookies = true, .environment = true, .aerial_perspective = true,
+        .shader_features.Extended.alpha_cutout = true, .shader_features.Extended.blend_modes = true,
+        .shader_features.Extended.transmission = true,
+        .shader_features.Extended.texture_blend = true, .shader_features.Extended.triplanar = true,
+        .shader_features.Extended.sheen = true, .shader_features.Extended.clear_coat = true,
+        .shader_features.Extended.anisotropy = true,
+        .shader_features.Extended.diffuse_transmission = true});
     box_render_null_t *null = box_render_null_new();
     box_render_backend_t backend = box_render_null_backend(null);
     box_render_set_backend(world, &backend);
@@ -641,11 +650,14 @@ void Material_transmission_dynamic_material_keeps_batch(void) {
     // materials/transmission
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
-    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
-        .punctual_shadows = true, .cookies = true, .environment = true,
-        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
-        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
-        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true, .punctual_shadows = true,
+        .cookies = true, .environment = true, .aerial_perspective = true,
+        .shader_features.Extended.alpha_cutout = true, .shader_features.Extended.blend_modes = true,
+        .shader_features.Extended.transmission = true,
+        .shader_features.Extended.texture_blend = true, .shader_features.Extended.triplanar = true,
+        .shader_features.Extended.sheen = true, .shader_features.Extended.clear_coat = true,
+        .shader_features.Extended.anisotropy = true,
+        .shader_features.Extended.diffuse_transmission = true});
     box_render_null_t *null = box_render_null_new();
     box_render_backend_t backend = box_render_null_backend(null);
     box_render_set_backend(world, &backend);
@@ -2317,11 +2329,14 @@ void Material_texture_blend_batches(void) {
     // materials/texture_blend
     box_render_null_t *null;
     ecs_world_t *world = blend_world(&null);
-    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
-        .punctual_shadows = true, .cookies = true, .environment = true,
-        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
-        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
-        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true, .punctual_shadows = true,
+        .cookies = true, .environment = true, .aerial_perspective = true,
+        .shader_features.Extended.alpha_cutout = true, .shader_features.Extended.blend_modes = true,
+        .shader_features.Extended.transmission = true,
+        .shader_features.Extended.texture_blend = true, .shader_features.Extended.triplanar = true,
+        .shader_features.Extended.sheen = true, .shader_features.Extended.clear_coat = true,
+        .shader_features.Extended.anisotropy = true,
+        .shader_features.Extended.diffuse_transmission = true});
     ecs_entity_t a = blend_texture(world, BLEND_RGB_PNG);
     ecs_entity_t g = blend_texture(world, BLEND_GRAY_PNG);
     ecs_entity_t grass = ecs_new(world);
@@ -2393,11 +2408,14 @@ void Material_texture_blend_prefab(void) {
     // materials/texture_blend
     box_render_null_t *null;
     ecs_world_t *world = blend_world(&null);
-    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
-        .punctual_shadows = true, .cookies = true, .environment = true,
-        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
-        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
-        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true, .punctual_shadows = true,
+        .cookies = true, .environment = true, .aerial_perspective = true,
+        .shader_features.Extended.alpha_cutout = true, .shader_features.Extended.blend_modes = true,
+        .shader_features.Extended.transmission = true,
+        .shader_features.Extended.texture_blend = true, .shader_features.Extended.triplanar = true,
+        .shader_features.Extended.sheen = true, .shader_features.Extended.clear_coat = true,
+        .shader_features.Extended.anisotropy = true,
+        .shader_features.Extended.diffuse_transmission = true});
     ecs_entity_t a = blend_texture(world, BLEND_RGB_PNG);
     ecs_entity_t mask = blend_texture(world, BLEND_MASK_PNG);
     ecs_entity_t grass = ecs_new(world);
@@ -2446,11 +2464,14 @@ void Material_texture_blend_layer_changes(void) {
     // materials/texture_blend
     box_render_null_t *null;
     ecs_world_t *world = blend_world(&null);
-    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
-        .punctual_shadows = true, .cookies = true, .environment = true,
-        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
-        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
-        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true, .punctual_shadows = true,
+        .cookies = true, .environment = true, .aerial_perspective = true,
+        .shader_features.Extended.alpha_cutout = true, .shader_features.Extended.blend_modes = true,
+        .shader_features.Extended.transmission = true,
+        .shader_features.Extended.texture_blend = true, .shader_features.Extended.triplanar = true,
+        .shader_features.Extended.sheen = true, .shader_features.Extended.clear_coat = true,
+        .shader_features.Extended.anisotropy = true,
+        .shader_features.Extended.diffuse_transmission = true});
     ecs_entity_t a = blend_texture(world, BLEND_RGB_PNG);
     ecs_entity_t g = blend_texture(world, BLEND_GRAY_PNG);
     ecs_entity_t layer = ecs_new(world);
@@ -2503,11 +2524,14 @@ void Material_texture_blend_layer_deleted(void) {
     // materials/texture_blend
     box_render_null_t *null;
     ecs_world_t *world = blend_world(&null);
-    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
-        .punctual_shadows = true, .cookies = true, .environment = true,
-        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
-        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
-        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true, .punctual_shadows = true,
+        .cookies = true, .environment = true, .aerial_perspective = true,
+        .shader_features.Extended.alpha_cutout = true, .shader_features.Extended.blend_modes = true,
+        .shader_features.Extended.transmission = true,
+        .shader_features.Extended.texture_blend = true, .shader_features.Extended.triplanar = true,
+        .shader_features.Extended.sheen = true, .shader_features.Extended.clear_coat = true,
+        .shader_features.Extended.anisotropy = true,
+        .shader_features.Extended.diffuse_transmission = true});
     ecs_entity_t a = blend_texture(world, BLEND_RGB_PNG);
     ecs_entity_t g = blend_texture(world, BLEND_GRAY_PNG);
     ecs_entity_t grass = ecs_new(world);
@@ -2553,11 +2577,14 @@ void Material_texture_blend_height_record(void) {
     // materials/texture_blend
     box_render_null_t *null;
     ecs_world_t *world = blend_world(&null);
-    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
-        .punctual_shadows = true, .cookies = true, .environment = true,
-        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
-        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
-        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true, .punctual_shadows = true,
+        .cookies = true, .environment = true, .aerial_perspective = true,
+        .shader_features.Extended.alpha_cutout = true, .shader_features.Extended.blend_modes = true,
+        .shader_features.Extended.transmission = true,
+        .shader_features.Extended.texture_blend = true, .shader_features.Extended.triplanar = true,
+        .shader_features.Extended.sheen = true, .shader_features.Extended.clear_coat = true,
+        .shader_features.Extended.anisotropy = true,
+        .shader_features.Extended.diffuse_transmission = true});
     ecs_entity_t a = blend_texture(world, BLEND_RGB_PNG);
     ecs_entity_t g = blend_texture(world, BLEND_GRAY_PNG);
     ecs_entity_t h = blend_texture(world, BLEND_GRAY_PNG);
@@ -2638,11 +2665,14 @@ void Material_texture_blend_height_key(void) {
     // materials/texture_blend
     box_render_null_t *null;
     ecs_world_t *world = blend_world(&null);
-    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
-        .punctual_shadows = true, .cookies = true, .environment = true,
-        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
-        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
-        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true, .punctual_shadows = true,
+        .cookies = true, .environment = true, .aerial_perspective = true,
+        .shader_features.Extended.alpha_cutout = true, .shader_features.Extended.blend_modes = true,
+        .shader_features.Extended.transmission = true,
+        .shader_features.Extended.texture_blend = true, .shader_features.Extended.triplanar = true,
+        .shader_features.Extended.sheen = true, .shader_features.Extended.clear_coat = true,
+        .shader_features.Extended.anisotropy = true,
+        .shader_features.Extended.diffuse_transmission = true});
     ecs_entity_t a = blend_texture(world, BLEND_RGB_PNG);
     ecs_entity_t g = blend_texture(world, BLEND_GRAY_PNG);
     ecs_entity_t grass = ecs_new(world);
@@ -2738,11 +2768,14 @@ void Material_texture_blend_every_shape(void) {
     // materials/texture_blend
     box_render_null_t *null;
     ecs_world_t *world = blend_world(&null);
-    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
-        .punctual_shadows = true, .cookies = true, .environment = true,
-        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
-        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
-        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true, .punctual_shadows = true,
+        .cookies = true, .environment = true, .aerial_perspective = true,
+        .shader_features.Extended.alpha_cutout = true, .shader_features.Extended.blend_modes = true,
+        .shader_features.Extended.transmission = true,
+        .shader_features.Extended.texture_blend = true, .shader_features.Extended.triplanar = true,
+        .shader_features.Extended.sheen = true, .shader_features.Extended.clear_coat = true,
+        .shader_features.Extended.anisotropy = true,
+        .shader_features.Extended.diffuse_transmission = true});
     ecs_entity_t a = blend_texture(world, BLEND_RGB_PNG);
     ecs_entity_t g = blend_texture(world, BLEND_GRAY_PNG);
     ecs_entity_t layer = ecs_new(world);
@@ -3515,13 +3548,14 @@ void Material_distortion_defaults(void) {
     test_flt(ecs_get(world, instance, Distortion)->scale, 4);
     test_bool(ecs_owns(world, instance, MaterialId), false);
 
-    /* Scene.distortion is a member of Scene, off by default */
+    /* distortion is a member of the shader features of Scene, off by default */
     ecs_singleton_add(world, Scene);
-    test_bool(ecs_singleton_get(world, Scene)->distortion, false);
+    test_bool(ecs_singleton_get(world, Scene)->shader_features.Extended.distortion, false);
     test_assert(ecs_script_run(world, "scene",
         "using box.view\n"
-        "world_scene { Scene: {distortion: true} }\n", NULL) == 0);
-    test_bool(ecs_get(world, ecs_lookup(world, "world_scene"), Scene)->distortion, true);
+        "world_scene { Scene: {shader_features: {Extended: {distortion: true}}} }\n", NULL) == 0);
+    test_bool(ecs_get(world, ecs_lookup(world, "world_scene"), Scene)->
+        shader_features.Extended.distortion, true);
 
     ecs_fini(world);
 }

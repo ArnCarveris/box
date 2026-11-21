@@ -7,7 +7,7 @@ using box.view
 using box.light
 
 $ {
-  Scene: {water: true}
+  Scene: {shader_features: {Extended: {water: true}}}
 }
 
 // Open water under a breeze of 6 m/s whose waves come from a WaterSpectrum: hundreds of waves of
@@ -20,7 +20,7 @@ $ {
 // middle), so the two views share the image.
 // frames: 60
 toward {
-  Scene: {water: true}
+  Scene: {shader_features: {Extended: {water: true}}}
   AmbientLight: {sky: {120, 140, 180}, ground: {40, 46, 52}, intensity: 0.4}
 
   sun {
@@ -57,7 +57,7 @@ toward {
 }
 
 away {
-  Scene: {water: true}
+  Scene: {shader_features: {Extended: {water: true}}}
   AmbientLight: {sky: {120, 140, 180}, ground: {40, 46, 52}, intensity: 0.4}
 
   sun {

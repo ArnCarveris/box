@@ -7,7 +7,7 @@ using box.view
 using box.layout
 
 $ {
-  Scene: {blend_modes: true}
+  Scene: {shader_features: {Extended: {blend_modes: true}}}
 }
 
 // Nine slice images (ImageSlice) of test/integration/visual/assets/frame.png, a 48 texel frame

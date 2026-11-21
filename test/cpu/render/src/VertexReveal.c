@@ -381,7 +381,7 @@ void VertexReveal_batches(void) {
     // materials/vertex_reveal
     box_render_null_t *null;
     ecs_world_t *world = reveal_world(&null);
-    ecs_singleton_set(world, Scene, {.alpha_cutout = true});
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.alpha_cutout = true});
     ecs_entity_t plain = reveal_shape(world, -2, true);
     ecs_entity_t revealed = reveal_shape(world, 2, true);
     ecs_set(world, revealed, VertexReveal, {.channel = 0, .threshold = 0.5f});
@@ -404,7 +404,7 @@ void VertexReveal_batches(void) {
 
     /* Without Scene.alpha_cutout it draws as without it */
     ecs_set(world, revealed, VertexReveal, {.channel = 0, .threshold = 0.5f});
-    ecs_singleton_set(world, Scene, {.alpha_cutout = false});
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.alpha_cutout = false});
     reveal_frame(world, null);
     reveal_frame(world, null);
     test_bool(reveal_batch(world, revealed)->key.cutout, false);
@@ -419,7 +419,7 @@ void VertexReveal_threshold_animates(void) {
     // materials/vertex_reveal
     box_render_null_t *null;
     ecs_world_t *world = reveal_world(&null);
-    ecs_singleton_set(world, Scene, {.alpha_cutout = true});
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.alpha_cutout = true});
     ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
     reveal_mesh_set(world, prefab, true);
     ecs_set(world, prefab, VertexReveal, {.channel = 0, .threshold = 0.1f});

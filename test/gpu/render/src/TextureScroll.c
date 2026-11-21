@@ -60,7 +60,7 @@ static ecs_world_t* scroll_world(
     ecs_set(world, view, View, {.camera = camera, .clear = {.enabled = true,
         .color = {0, 0, 0, 255}}, .lighting.enabled = lit});
     ecs_singleton_set(world, AmbientLight, {.intensity = 0});
-    ecs_singleton_set(world, Scene, {.texture_scroll = true});
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.texture_scroll = true});
     ecs_entity_t sun = ecs_new(world);
     ecs_set(world, sun, DirectionalLight, {.intensity = 0});
 
@@ -398,7 +398,7 @@ void TextureScroll_ignored_by_2d(void) {
 void TextureScroll_flag_off_draws_without(void) {
     // materials/texture_scroll
     ecs_world_t *world = scroll_world(true);
-    ecs_singleton_set(world, Scene, {.texture_scroll = false});
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.texture_scroll = false});
     ecs_entity_t halves = scroll_halves(world);
     ecs_entity_t bumps = scroll_bumps(world);
     ecs_entity_t quad = scroll_quad(world);

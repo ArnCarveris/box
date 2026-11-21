@@ -6,7 +6,7 @@ using box.view
 using box.light
 
 $ {
-  Scene: {environment: true, sheen: true}
+  Scene: {environment: true, shader_features: {Extended: {sheen: true}}}
 }
 
 // Sheen (Sheen) over dark rough cloth like bases, lit by a low sun from the side and behind the
@@ -18,7 +18,7 @@ $ {
 // tipped toward the camera, with a pale blue sheen, next to the same cushion without one, which
 // stays a flat matte blue.
 velvet {
-  Scene: {environment: true, sheen: true}
+  Scene: {environment: true, shader_features: {Extended: {sheen: true}}}
   AmbientLight: {sky: {0, 0, 0}, ground: {0, 0, 0}, intensity: 0}
 
   sky {

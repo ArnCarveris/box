@@ -7,7 +7,7 @@ using box.light
 using box.movement
 
 $ {
-  Scene: {water: true}
+  Scene: {shader_features: {Extended: {water: true}}}
 }
 
 // A pond (Water) with WaterRipples in a sandy terrain bowl turned on a Lathe, seen from above at
@@ -17,7 +17,7 @@ $ {
 // a V shaped wake. The sun glints and the refraction of the bowl floor show the ripple normals.
 // frames: 90
 water_ripples {
-  Scene: {water: true}
+  Scene: {shader_features: {Extended: {water: true}}}
   AmbientLight: {sky: {140, 165, 205}, ground: {70, 64, 52}, intensity: 0.6}
 
   sun {

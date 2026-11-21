@@ -21,13 +21,17 @@ $ {
     reflections: true,
     environment: true,
     aerial_perspective: true,
-    alpha_cutout: true,
-    blend_modes: true,
-    texture_blend: true,
-    texture_layers: true,
-    triplanar: true,
-    diffuse_transmission: true,
-    wind: true
+    shader_features: {
+      Extended: {
+        alpha_cutout: true,
+        blend_modes: true,
+        texture_blend: true,
+        texture_layers: true,
+        triplanar: true,
+        diffuse_transmission: true,
+        wind: true
+      }
+    }
   }
 }
 

@@ -501,11 +501,14 @@ void TransitionMaterial_transmission_prefab(void) {
     // engine_core/transition
     box_render_null_t *null;
     ecs_world_t *world = tr_scene(&null);
-    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
-        .punctual_shadows = true, .cookies = true, .environment = true,
-        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
-        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
-        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true, .punctual_shadows = true,
+        .cookies = true, .environment = true, .aerial_perspective = true,
+        .shader_features.Extended.alpha_cutout = true, .shader_features.Extended.blend_modes = true,
+        .shader_features.Extended.transmission = true,
+        .shader_features.Extended.texture_blend = true, .shader_features.Extended.triplanar = true,
+        .shader_features.Extended.sheen = true, .shader_features.Extended.clear_coat = true,
+        .shader_features.Extended.anisotropy = true,
+        .shader_features.Extended.diffuse_transmission = true});
     box_render_transitions_t *s = box_render_transitions_get(world);
     ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
     ecs_entity_t instances[8];
@@ -582,11 +585,14 @@ void TransitionMaterial_transmission_keeps_batch(void) {
     // engine_core/transition
     box_render_null_t *null;
     ecs_world_t *world = tr_scene(&null);
-    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
-        .punctual_shadows = true, .cookies = true, .environment = true,
-        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
-        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
-        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true, .punctual_shadows = true,
+        .cookies = true, .environment = true, .aerial_perspective = true,
+        .shader_features.Extended.alpha_cutout = true, .shader_features.Extended.blend_modes = true,
+        .shader_features.Extended.transmission = true,
+        .shader_features.Extended.texture_blend = true, .shader_features.Extended.triplanar = true,
+        .shader_features.Extended.sheen = true, .shader_features.Extended.clear_coat = true,
+        .shader_features.Extended.anisotropy = true,
+        .shader_features.Extended.diffuse_transmission = true});
     ecs_entity_t e = tr_shape(world, 0, 0);
     box_render_material_t rendered;
     int32_t i;
@@ -862,11 +868,14 @@ void TransitionMaterial_cutoff_batch(void) {
     // engine_core/transition
     box_render_null_t *null;
     ecs_world_t *world = tr_scene(&null);
-    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
-        .punctual_shadows = true, .cookies = true, .environment = true,
-        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
-        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
-        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true, .punctual_shadows = true,
+        .cookies = true, .environment = true, .aerial_perspective = true,
+        .shader_features.Extended.alpha_cutout = true, .shader_features.Extended.blend_modes = true,
+        .shader_features.Extended.transmission = true,
+        .shader_features.Extended.texture_blend = true, .shader_features.Extended.triplanar = true,
+        .shader_features.Extended.sheen = true, .shader_features.Extended.clear_coat = true,
+        .shader_features.Extended.anisotropy = true,
+        .shader_features.Extended.diffuse_transmission = true});
     ecs_entity_t e = tr_shape(world, 0, 0);
     box_render_material_t rendered;
     int32_t i;
@@ -1861,7 +1870,7 @@ void TransitionMaterial_fresnel_keeps_batch(void) {
     // engine_core/transition
     box_render_null_t *null;
     ecs_world_t *world = tr_scene(&null);
-    ecs_singleton_set(world, Scene, {.fresnel = true});
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.fresnel = true});
     ecs_entity_t e = tr_shape(world, 0, 0);
     box_render_material_t rendered;
     int32_t i;
@@ -1970,7 +1979,7 @@ void TransitionMaterial_distortion_mesh(void) {
     // engine_core/transition
     box_render_null_t *null;
     ecs_world_t *world = tr_scene(&null);
-    ecs_singleton_set(world, Scene, {.distortion = true});
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.distortion = true});
     ecs_entity_t e = tr_shape(world, 0, 0);
     box_render_material_t rendered, expected;
     box_draw_material_t m;

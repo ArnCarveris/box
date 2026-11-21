@@ -78,8 +78,8 @@ sky {
 $ {
   box.app.FpsTarget: {60}
   Scene: {baked: false, reflections: false, punctual_shadows: false, environment: false,
-    aerial_perspective: false, transmission: false, texture_blend: true, sheen: true,
-    clear_coat: false, diffuse_transmission: false}
+    aerial_perspective: false, shader_features: {Extended: {transmission: false,
+    texture_blend: true, sheen: true, clear_coat: false, diffuse_transmission: false}}}
   ReflectionBake: {resolution: 64, budget_ms: 2, scene_probe: true, scene_probe_height: 2}
   Bake: {
     environment: sky,

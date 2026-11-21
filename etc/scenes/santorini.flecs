@@ -30,8 +30,8 @@ using assets
 
 $ {
   box.app.FpsTarget: {60}
-  Scene: {baked: true, reflections: true, cookies: true, transmission: true, sheen: true,
-    diffuse_transmission: true}
+  Scene: {baked: true, reflections: true, cookies: true,
+    shader_features: {Extended: {transmission: true, sheen: true, diffuse_transmission: true}}}
 }
 
 $ {

@@ -53,7 +53,8 @@ static ecs_world_t* caustics_world(
 {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
-    ecs_singleton_set(world, Scene, {.transmission = true, .water = true});
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.transmission = true,
+        .shader_features.Extended.water = true});
     App *app = ecs_singleton_get_mut(world, App);
     app->headless = true;
     ecs_singleton_modified(world, App);

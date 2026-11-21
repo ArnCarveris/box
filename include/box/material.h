@@ -235,8 +235,8 @@ ECS_STRUCT(Emissive, {
  * opaque shape ignores it. It is separate from the physical Fresnel of the specular lobes, which
  * it does not change.
  *
- * Needs Scene.fresnel: a scene without it draws the shape as if it had no Fresnel. Only 3D
- * meshes have it, 2D shapes and text ignore it.
+ * Needs Scene.shader_features.Extended.fresnel: a scene without it draws the shape as if it had no
+ * Fresnel. Only 3D meshes have it, 2D shapes and text ignore it.
  */
 ECS_STRUCT(Fresnel, {
     Rgb color;      /**< Color of the rim, display encoded */
@@ -301,9 +301,9 @@ ECS_STRUCT(Transmission, {
  * Water ignores it.
  *
  * Its record is packed every frame while speed is not 0, like that of a TextureScroll.
- * Transitionable: the three floats interpolate linearly, on_add and on_remove start from and
- * end at a strength of 0. Needs Scene.distortion: a scene without it draws the shape as if it
- * had no Distortion. Only 3D meshes have it, 2D shapes and text ignore it.
+ * Transitionable: the three floats interpolate linearly, on_add and on_remove start from and end at
+ * a strength of 0. Needs Scene.shader_features.Extended.distortion: a scene without it draws the
+ * shape as if it had no Distortion. Only 3D meshes have it, 2D shapes and text ignore it.
  */
 ECS_STRUCT(Distortion, {
     float strength; /**< Largest screen space offset of the scene behind, a fraction of the
@@ -426,8 +426,8 @@ ECS_STRUCT(Distortion, {
  * the water.
  *
  * Underwater views and the back faces are not supported: the surface is seen from above. Needs
- * Scene.water: a scene without it draws the shape as if it had no Water. Only 3D meshes have it,
- * 2D shapes and text ignore it.
+ * Scene.shader_features.Extended.water: a scene without it draws the shape as if it had no Water.
+ * Only 3D meshes have it, 2D shapes and text ignore it.
  */
 ECS_STRUCT(Water, {
     Rgb shallow_color;      /**< Color of the body where it is shallow, display encoded */
@@ -504,8 +504,8 @@ ECS_STRUCT(WaterWave, {
  * on smoothly, and the record of the shape is packed every frame like that of a TextureScroll.
  * At most BOX_RENDER_WATER_WAVE_SETS - 1 materials show their waves; later ones are flat.
  *
- * Needs Water and Scene.water: without them the component does nothing. Its fields have no
- * transition.
+ * Needs Water and Scene.shader_features.Extended.water: without them the component does nothing.
+ * Its fields have no transition.
  */
 ECS_STRUCT(WaterWaves, {
     WaterWave waves[4]; /**< The waves, BOX_MATERIAL_WATER_WAVES; a wavelength of 0 skips one */
@@ -573,8 +573,8 @@ ECS_STRUCT(WaterWaves, {
  * A view binds the spectrum of the first WaterSpectrum of its scene: the shapes that inherit the
  * one component share it, a scene with WaterSpectrum components of more than one entity logs an
  * error once and shades all its WaterSpectrum shapes with the first. Needs Water and
- * Scene.water: without them the component does nothing. A disabled entity costs nothing. Its
- * fields have no transition.
+ * Scene.shader_features.Extended.water: without them the component does nothing. A disabled entity
+ * costs nothing. Its fields have no transition.
  */
 ECS_STRUCT(WaterSpectrum, {
     float wind_speed;       /**< Wind speed at 10 m above the water, m/s; 0 or less (or not
@@ -665,8 +665,8 @@ ECS_STRUCT(WaterFlow, {
  * or a speed other than 0 the record of the shape is packed every frame, like that of a
  * TextureScroll.
  *
- * Needs Water and Scene.water: without them the component does nothing. A strength of 0 (or
- * negative or not finite) draws as without one. Its fields have no transition.
+ * Needs Water and Scene.shader_features.Extended.water: without them the component does nothing. A
+ * strength of 0 (or negative or not finite) draws as without one. Its fields have no transition.
  */
 ECS_STRUCT(WaterCaustics, {
     float strength;   /**< How strongly the pattern brightens and darkens the floor, 0 for none */
@@ -756,8 +756,8 @@ ECS_STRUCT(WaterCaustics, {
  * the reflections and the specular follow. A view binds the field of the first WaterRipples of
  * its scene, a scene with more logs an error once and simulates only that one.
  *
- * Needs Water and Scene.water: without them the component does nothing. A disabled entity, a size
- * of 0 or less (or not finite) has no field and costs nothing.
+ * Needs Water and Scene.shader_features.Extended.water: without them the component does nothing. A
+ * disabled entity, a size of 0 or less (or not finite) has no field and costs nothing.
  */
 ECS_STRUCT(WaterRipples, {
     float size;             /**< World units of the side of the square field */
@@ -910,8 +910,8 @@ ECS_STRUCT(TextureTransform, {
  * the motion. TextureBlend layers keep their TextureTransform and do not scroll; the velocity of
  * the shape moves its mask and layers like its offset does, normal_velocity does not.
  *
- * Needs Scene.texture_scroll: a scene without it draws the shape as if it had no TextureScroll
- * and does not pack its record every frame.
+ * Needs Scene.shader_features.Extended.texture_scroll: a scene without it draws the shape as if it
+ * had no TextureScroll and does not pack its record every frame.
  */
 ECS_STRUCT(TextureScroll, {
     vec2 velocity;        /**< Texture widths per second added to the UV offset of every layer */
@@ -931,10 +931,10 @@ ECS_STRUCT(TextureScroll, {
  * below the threshold is not drawn at all; a value equal to the threshold is on the edge.
  *
  * The shapes draw in the alpha tested path (as with an AlphaCutoff, so a scene needs
- * Scene.alpha_cutout), in the depth prepass, the forward pass, the shadows of every light,
- * planar reflections and captures alike. The threshold is in the material record: writing it
- * animates every shape that shares the material without rebuilding meshes or moving shapes
- * between batches. A mesh without per vertex data, a 2D shape and text ignore it.
+ * Scene.shader_features.Extended.alpha_cutout), in the depth prepass, the forward pass, the shadows
+ * of every light, planar reflections and captures alike. The threshold is in the material record:
+ * writing it animates every shape that shares the material without rebuilding meshes or moving
+ * shapes between batches. A mesh without per vertex data, a 2D shape and text ignore it.
  */
 ECS_STRUCT(VertexReveal, {
     int32_t channel;        /**< Data channel 0 to 7: data0.x to data0.w, then data1.x to
@@ -1058,9 +1058,9 @@ ECS_STRUCT(VertexOcclusion, {
  * wherever it stands, on terrain at any height. The shapes of one plant that share their origin
  * (the bark and the foliage of a tree) still move together.
  *
- * Its record is packed every frame, like that of a TextureScroll. Needs Scene.wind: a scene
- * without it draws the shape as if it had no WindSway, with the shaders it has without it. Only
- * 3D meshes sway, 2D shapes and text ignore it.
+ * Its record is packed every frame, like that of a TextureScroll. Needs
+ * Scene.shader_features.Extended.wind: a scene without it draws the shape as if it had no WindSway,
+ * with the shaders it has without it. Only 3D meshes sway, 2D shapes and text ignore it.
  */
 ECS_STRUCT(WindSway, {
     float bend;             /**< World units a vertex at height moves per unit of wind speed,
@@ -1257,12 +1257,13 @@ ECS_ENUM(TextureLayerBlend, {
  * fully, a glossy one little and a metal not at all, so one wet layer suits every material. The
  * alpha is never changed.
  *
- * The values are read every frame into a small buffer of the layer entity shared by every
- * batch that uses it, so writing amount (or any field) animates every shape with the layer
- * without moving them between batches. Only 3D meshes of a scene with Scene.texture_layers have
- * layers; Transmission and Distortion shapes, 2D shapes and texts ignore them. A Water shape
- * uses only their normals: they blend into its ripple normal by their coverage, before its
- * waves, the cavity ignored; their other channels do not change Water.
+ * The values are read every frame into a small buffer of the layer entity shared by every batch
+ * that uses it, so writing amount (or any field) animates every shape with the layer without moving
+ * them between batches. Only 3D meshes of a scene with
+ * Scene.shader_features.Extended.texture_layers have layers; Transmission and Distortion shapes, 2D
+ * shapes and texts ignore them. A Water shape uses only their normals: they blend into its ripple
+ * normal by their coverage, before its waves, the cavity ignored; their other channels do not
+ * change Water.
  */
 ECS_STRUCT(TextureLayer, {
     float amount;           /**< Coverage, 0 none to 1 everything the rules allow */
@@ -1296,11 +1297,12 @@ ECS_STRUCT(TextureLayer, {
  * surface of a 3D shape, after its PbrTextures, TextureBlend or TileTerrain and before lighting,
  * inherited by instances and part of the batch of a shape like PbrTextures.
  *
- * Shapes with the same layers share a batch; they draw with their own variants of the mesh
- * shaders. A shape without TextureLayers, or of a scene without Scene.texture_layers, draws with
- * the pipelines, bind groups and records it has without the feature; so does a Water shape
- * without TextureLayers, while one with them draws with the water layers variant. A layer
- * entity of 0, a deleted one or one without TextureLayer does nothing.
+ * Shapes with the same layers share a batch; they draw with their own variants of the mesh shaders.
+ * A shape without TextureLayers, or of a scene without
+ * Scene.shader_features.Extended.texture_layers, draws with the pipelines, bind groups and records
+ * it has without the feature; so does a Water shape without TextureLayers, while one with them
+ * draws with the water layers variant. A layer entity of 0, a deleted one or one without
+ * TextureLayer does nothing.
  */
 ECS_STRUCT(TextureLayers, {
     ecs_entity_t layers[4]; /**< Entities with TextureLayer, 0 for an unused slot */

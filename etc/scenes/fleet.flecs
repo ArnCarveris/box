@@ -36,7 +36,8 @@ assets {
 
 $ {
   box.app.FpsTarget: {60}
-  Scene: {environment: true, blend_modes: true, transmission: true, fresnel: true, distortion: true}
+  Scene: {environment: true, shader_features: {Extended: {blend_modes: true, transmission: true,
+    fresnel: true, distortion: true}}}
   AmbientLight: {sky: {120, 140, 180}, ground: {50, 60, 84}, intensity: 0.4}
 }
 

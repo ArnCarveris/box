@@ -91,6 +91,25 @@ static void box_gpu_feature_constants(
     }
 }
 
+/** Fill the override constants of the fragment stage of the terrain shader: those of the mesh
+ * shader and material_triplanar.
+ *
+ * @param overrides The overrides that are true (box_render_mesh_overrides)
+ * @param out Receives the constants, at least BOX_RENDER_MESH_OVERRIDES_PLAIN + 1
+ * @return The number of constants
+ */
+static size_t box_gpu_terrain_constants(
+    uint32_t overrides,
+    WGPUConstantEntry *out)
+{
+    WGPUConstantEntry all[BOX_RENDER_MESH_OVERRIDES];
+    box_gpu_feature_constants(overrides, all);
+    ecs_os_memcpy_n(out, all, WGPUConstantEntry, BOX_RENDER_MESH_OVERRIDES_PLAIN);
+    out[BOX_RENDER_MESH_OVERRIDES_PLAIN] = all[12];
+
+    return BOX_RENDER_MESH_OVERRIDES_PLAIN + 1;
+}
+
 /** Create the forward pipeline of a shader, color format, blend mode, back face mode, alpha
  * test and depth mode.
  *
@@ -179,6 +198,7 @@ static WGPURenderPipeline box_gpu_forward_create(
 {
     bool shape2d = handle == BOX_RENDER_SHADER_SHAPE2D;
     bool extended = handle == BOX_RENDER_SHADER_MESH_EXTENDED;
+    bool terrain = handle == BOX_RENDER_SHADER_TERRAIN;
     water = water && extended && transmissive;
     distortion = distortion && extended && transmissive;
     texture_blend = texture_blend && !water;
@@ -210,6 +230,11 @@ static WGPURenderPipeline box_gpu_forward_create(
         data = true;
         equal = false;
         back_face = BackFacePlain;
+    }
+
+    if (terrain) {
+        entry = texture_blend ? "fs_terrain" : "fs_terrain_plain";
+        data = false;
     }
 
     WGPUCompareFunction compare = WGPUCompareFunction_Greater;
@@ -311,6 +336,11 @@ static WGPURenderPipeline box_gpu_forward_create(
         (distortion ? BOX_RENDER_OVERRIDE_DISTORTION : 0u), constants);
     size_t fragment_count = shape2d ? 1 : extended ? BOX_RENDER_MESH_OVERRIDES :
         mesh ? BOX_RENDER_MESH_OVERRIDES_PLAIN : 0;
+    if (terrain) {
+        fragment_count = box_gpu_terrain_constants(features & BOX_RENDER_OVERRIDE_SCENE,
+            constants);
+    }
+
     if (range) {
         constants[fragment_count ++] = range_constant;
     }
@@ -337,7 +367,7 @@ static WGPURenderPipeline box_gpu_forward_create(
         .vertex = {
             .module = shader,
             .entryPoint = {
-                .data = impostor ? "vs_impostor" : surface
+                .data = terrain ? "vs_terrain" : impostor ? "vs_impostor" : surface
                     ? (data ? "vs_surface_data" : "vs_surface")
                     : (data ? "vs_data" : "vs"),
                 .length = WGPU_STRLEN
@@ -390,6 +420,8 @@ static WGPURenderPipeline box_gpu_forward_create(
  * and a plain batch discards with fs_depth_range (fs_count_range)
  * @param impostor Whether the instances are impostor cards, drawn with vs_impostor and
  * fs_impostor_depth (fs_impostor_count), which write the depth of the depth atlas
+ * @param terrain Whether the instances are terrain tiles of the terrain shader, placed by
+ * vs_terrain_depth as vs_terrain places them
  * @return The pipeline
  */
 static WGPURenderPipeline box_gpu_prepass_create(
@@ -404,7 +436,8 @@ static WGPURenderPipeline box_gpu_prepass_create(
     bool layers,
     bool data,
     bool range,
-    bool impostor)
+    bool impostor,
+    bool terrain)
 {
     WGPUConstantEntry vertex_constants[2];
     WGPUConstantEntry range_constant = {
@@ -441,6 +474,11 @@ static WGPURenderPipeline box_gpu_prepass_create(
         entry = counts ? "fs_impostor_count" : "fs_impostor_depth";
         data = true;
         back_face = BackFacePlain;
+    }
+
+    if (terrain) {
+        vertex = "vs_terrain_depth";
+        data = false;
     }
 
     WGPUVertexAttribute vertex_attrs[3] = {
@@ -738,7 +776,7 @@ WGPURenderPipeline box_gpu_terrain_bake_pipeline(
     ecs_map_val_t *cached;
     uint64_t key;
     int32_t i;
-    if (b->pipeline != BOX_RENDER_SHADER_MESH_EXTENDED || !box_gpu_texture_blends(b) ||
+    if (b->pipeline != BOX_RENDER_SHADER_TERRAIN || !box_gpu_texture_blends(b) ||
         !b->surface || !layout)
     {
         goto done;
@@ -797,8 +835,9 @@ WGPURenderPipeline box_gpu_terrain_bake_pipeline(
         };
     }
 
-    WGPUConstantEntry constants[BOX_RENDER_MESH_OVERRIDES];
-    box_gpu_feature_constants(features & BOX_RENDER_OVERRIDE_SCENE, constants);
+    WGPUConstantEntry constants[BOX_RENDER_MESH_OVERRIDES_PLAIN + 1];
+    size_t constant_count = box_gpu_terrain_constants(features & BOX_RENDER_OVERRIDE_SCENE,
+        constants);
     WGPUColorTargetState targets[BOX_GPU_TERRAIN_BAKE_LAYERS];
     for (i = 0; i < BOX_GPU_TERRAIN_BAKE_LAYERS; i ++) {
         targets[i] = (WGPUColorTargetState){
@@ -810,7 +849,7 @@ WGPURenderPipeline box_gpu_terrain_bake_pipeline(
     WGPUFragmentState fragment = {
         .module = shader,
         .entryPoint = { .data = "fs_terrain_bake", .length = WGPU_STRLEN },
-        .constantCount = BOX_RENDER_MESH_OVERRIDES,
+        .constantCount = constant_count,
         .constants = constants,
         .targetCount = BOX_GPU_TERRAIN_BAKE_LAYERS,
         .targets = targets
@@ -879,7 +918,8 @@ WGPURenderPipeline box_gpu_prepass_pipeline(
 
     result = box_gpu_forward_cache(gpu, key,
         box_gpu_prepass_create(gpu, shader, b->back_face, b->cutout, texture_blend, b->surface,
-            count, b->wind, layers, data, range, impostor));
+            count, b->wind, layers, data, range, impostor,
+            b->pipeline == BOX_RENDER_SHADER_TERRAIN));
 done:
     return result;
 }

@@ -104,9 +104,9 @@ cloud_high {
 $ {
   box.app.FpsTarget: {60}
   Scene: {reflections: true, punctual_shadows: true, environment: true, aerial_perspective: true,
-    blend_modes: true, transmission: true, triplanar: true, clear_coat: true, sheen: true,
-    diffuse_transmission: true, texture_scroll: true, water: true, fresnel: true,
-    alpha_cutout: true, cookies: true}
+    cookies: true, shader_features: {Extended: {blend_modes: true, transmission: true,
+    triplanar: true, clear_coat: true, sheen: true, diffuse_transmission: true,
+    texture_scroll: true, water: true, fresnel: true, alpha_cutout: true}}}
 }
 
 rig {

@@ -17,10 +17,16 @@ $ {
     environment: true,
     aerial_perspective: true,
     cookies: true,
-    blend_modes: true,
-    texture_blend: true,
-    water: true,
-    texture_layers: true,
-    triplanar: true
+    shader_features: {
+      Extended: {
+        blend_modes: true,
+        water: true
+      },
+      Terrain: {
+        texture_blend: true,
+        texture_layers: true,
+        triplanar: true
+      }
+    }
   }
 }
