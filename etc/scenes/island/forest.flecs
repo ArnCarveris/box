@@ -1,0 +1,29 @@
+using flecs.script
+using box.world
+using state
+using assets
+
+island {
+  stands {
+    ChunkGrid: {
+      template: IslandStandCell,
+      cell_size: {STAND_CELL, 0, STAND_CELL},
+      levels: [STAND_NEAR, STAND_FAR],
+      hysteresis: 8,
+      budget: STAND_BUDGET,
+      budget_ms: STAND_BUDGET_MS
+    }
+  }
+
+  canopy {
+    ChunkGrid: {
+      template: IslandFarCell,
+      cell_size: {FAR_CELL, 0, FAR_CELL},
+      levels: [FAR_RANGE],
+      hysteresis: 64,
+      budget: FAR_BUDGET,
+      budget_ms: STAND_BUDGET_MS,
+      ground: island.far
+    }
+  }
+}

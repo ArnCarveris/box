@@ -1,0 +1,367 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+using box.render
+using box.particle
+using box.world
+using box.terrain
+using state
+using assets
+
+state {
+  export const STREAM_CELL: f32 = 32
+  export const STREAM_DETAIL_RANGE: f32 = 90
+  export const STREAM_RANGE: f32 = 420
+  export const STREAM_BUDGET: i32 = 6
+  export const STREAM_BUDGET_MS: f32 = 4
+
+  export const STREAM_BLOCK: f32 = 8
+  export const STREAM_BLOCK_NEAR: f32 = 11.5
+  export const STREAM_TILE: f32 = 2
+  export const STREAM_TILE_NEAR: f32 = 5.5
+  export const STREAM_WET: f32 = 3.1
+  export const STREAM_HALF: f32 = 1.42
+  export const STREAM_HELD: f32 = 0.1
+
+  export const STREAM_FLOW_MIN: f32 = 0.12
+  export const STREAM_FLOW_SLOPE: f32 = 4
+  export const STREAM_FLOW_MAX: f32 = 0.9
+
+  export const STREAM_FALL_NEAR: f32 = 2.2
+  export const STREAM_RUN: f32 = 0.32
+  export const STREAM_MIST_SLOPE: f32 = 1.4
+  export const STREAM_FALL_SLOPE: f32 = 0.95
+
+  fn island_stream_d(x: f64, z: f64) -> f64 {
+    box.terrain.mask(island.streams, x, z, 0)
+  }
+
+  fn island_stream_bed(x: f64, z: f64) -> f64 {
+    box.terrain.mask(island.streams, x, z, 1)
+  }
+
+  fn island_stream_land(x: f64, z: f64) -> f64 {
+    box.terrain.height(island.streams, x, z) + STREAM_DATA_DROP
+  }
+
+  fn island_stream_k(bed: f64) -> f64 {
+    floor(bed / STREAM_STEP)
+  }
+
+  fn island_stream_level(k: f64) -> f64 {
+    k * STREAM_STEP + STREAM_DEPTH
+  }
+
+  fn island_stream_held(x: f64, z: f64) -> bool {
+    island_stream_land(x, z) >= island_stream_k(island_stream_bed(x, z)) * STREAM_STEP - STREAM_HELD
+  }
+
+  fn island_stream_mod3(v: f64) -> f64 {
+    v - 3 * floor(v / 3)
+  }
+
+  fn island_stream_t0(p: f64, v: f64) -> f64 {
+    abs(v) < 0.000001 ? (abs(p) <= 1 ? -100 : 100) : min((-1 - p) / v, (1 - p) / v)
+  }
+
+  fn island_stream_t1(p: f64, v: f64) -> f64 {
+    abs(v) < 0.000001 ? (abs(p) <= 1 ? 100 : -100) : max((-1 - p) / v, (1 - p) / v)
+  }
+}
+
+assets {
+  island_stream_ripple_h {
+    Gen: {
+      width: 256,
+      height: 256,
+      seed: 61,
+      layers: [
+        {kind: GenNoise, frequency: 6, octaves: 4, amount: 1},
+        {kind: GenNoise, frequency: 24, octaves: 2, amount: 0.25, seed: 1}
+      ]
+    }
+  }
+
+  island_stream_ripple_n { Gen: {source: island_stream_ripple_h, output: GenNormal, strength: 1.4} }
+
+  island_stream_foam_h {
+    Gen: {
+      width: 512,
+      height: 512,
+      seed: 64,
+      layers: [
+        {kind: GenCells, count: 26, amount: 0.5},
+        {kind: GenCells, count: 380, distance: GenEdge, edge: 0.45, amount: -0.45, seed: 1},
+        {kind: GenCells, count: 1500, distance: GenEdge, edge: 0.5, amount: -0.15, seed: 2},
+        {kind: GenNoise, frequency: 6, octaves: 3, amount: 0.4, seed: 3}
+      ]
+    }
+  }
+
+  prefab IslandStreamWater {
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 0.04}
+    Water: {
+      shallow_color: {92, 122, 96},
+      deep_color: {28, 52, 44},
+      depth: 0.7,
+      visibility: 3.2,
+      absorption: {150, 162, 118},
+      refraction: 0.012,
+      foam_color: {204, 210, 202},
+      foam_width: 0.018,
+      foam_texture: island_stream_foam_h,
+      foam_scale: 1.5,
+      ripple_scale: 2.6,
+      ripple_velocity: {0.02, 0.08}
+    }
+    WaterCaustics: {strength: 1.3, scale: 0.3, speed: 0.6, depth: 0.7}
+    PbrTextures: {normal: island_stream_ripple_n}
+    texture.Mapping: {mode: MappingWorld, size: 1}
+    NoShadow
+  }
+
+  prefab IslandRapidWater : IslandStreamWater {
+    PbrMaterial: {roughness: 0.12}
+    Water: {
+      shallow_color: {150, 178, 160},
+      deep_color: {70, 110, 100},
+      depth: 0.5,
+      visibility: 1.6,
+      absorption: {170, 182, 150},
+      refraction: 0.016,
+      foam_color: {232, 238, 234},
+      foam_width: 0.11,
+      foam_texture: island_stream_foam_h,
+      foam_scale: 1.2,
+      ripple_scale: 3.4,
+      ripple_velocity: {0.05, 0.3}
+    }
+  }
+
+  island_stream_streaks {
+    Gen: {
+      source: island_stream_ripple_h,
+      output: GenAlbedo,
+      colors: [
+        {0, {120, 150, 140}}, {0.4, {170, 196, 188}}, {0.6, {236, 242, 240}}, {1, {252, 252, 250}}
+      ]
+    }
+  }
+
+  prefab IslandFallWater {
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 0.3}
+    PbrTextures: {albedo: island_stream_streaks, normal: island_stream_ripple_n}
+    texture.Mapping: {mode: MappingObject, size: 1}
+    texture.Transform: {scale_x: 3, scale_y: 0.35}
+    texture.Scroll: {velocity: {0, 1.6}}
+    Opacity: {0.6}
+    NoShadow
+  }
+
+  prefab IslandFallMist {
+    Emitter: {
+      max: 48, rate: 14, shape: EmitterBox, extents: {0.8, 0.3, 1},
+      direction: {1, 0.5, 0}, spread: 70, speed: {0.3, 1.1},
+      lifetime: {1.2, 2.6}, size: {0.5, 1.5}, opacity: {0.12, 0.34},
+      acceleration: {0, -0.5, 0}, color: {240, 246, 248}, seed: 23
+    }
+    Appearance: {softness: 0.5, lit: 1}
+    Curves: {
+      opacity: {keys: [{0, 0}, {0.15, 1}, {0.6, 0.6}, {1, 0}]}
+      size: {keys: [{0, 0.5}, {1, 1.8}]}
+    }
+  }
+
+  template IslandStreamFall {
+    prop width: f32 = 1
+    prop churn: bool = false
+
+    const tilt = atan2(STREAM_STEP, STREAM_RUN)
+
+    sheet : IslandFallWater {
+      Position: {STREAM_RUN / 2, 0.01 - STREAM_STEP / 2, 0}
+      Rotation: {0, 0, 0 - tilt}
+      Box: {sqrt(STREAM_RUN * STREAM_RUN + STREAM_STEP * STREAM_STEP) + 0.04, 0.01, width}
+    }
+
+    if churn {
+      foot {
+        Position: {STREAM_RUN + 0.12, 0 - STREAM_STEP, 0}
+        RippleSource: {extents: {0.25, width * 0.4}, strength: 0.4, foam: 0.5}
+      }
+
+      foam {
+        Position: {STREAM_RUN + 0.05, 0.02 - STREAM_STEP, 0}
+        Emitter: {
+          max: 70, rate: 36, shape: EmitterBox, extents: {0.12, 0.02, width * 0.35},
+          direction: {1, 0.7, 0}, spread: 55, speed: {0.15, 0.5},
+          lifetime: {0.5, 1}, size: {0.05, 0.14}, opacity: {0.5, 0.9},
+          acceleration: {0, -2.5, 0}, color: {236, 242, 240}, seed: 21
+        }
+        Appearance: {softness: 0.06, lit: 1}
+        Curves: {
+          opacity: {keys: [{0, 0}, {0.1, 1}, {0.6, 0.7}, {1, 0}]}
+          size: {keys: [{0, 0.6}, {1, 1.6}]}
+        }
+      }
+    }
+  }
+
+  template IslandStreamCell {
+    prop cell_x: i32 = 0
+    prop cell_z: i32 = 0
+    prop level: i32 = 0
+    prop size: f32 = 32
+
+    const x0 = cell_x * size
+    const z0 = cell_z * size
+    const tiles = floor(size / STREAM_TILE + 0.5)
+    const blocks = floor(STREAM_BLOCK / STREAM_TILE + 0.5)
+
+    for bi in 0..4 {
+      for bj in 0..4 {
+        const bx = x0 + (bi + 0.5) * STREAM_BLOCK
+        const bz = z0 + (bj + 0.5) * STREAM_BLOCK
+
+        if island_stream_d(bx, bz) < STREAM_BLOCK_NEAR {
+          for ti in 0..4 {
+            for tj in 0..4 {
+              const ix = bi * blocks + ti
+              const iz = bj * blocks + tj
+              const gi = cell_x * tiles + ix
+              const gj = cell_z * tiles + iz
+              const tx = x0 + ix * STREAM_TILE
+              const tz = z0 + iz * STREAM_TILE
+              const cx = tx + STREAM_TILE / 2
+              const cz = tz + STREAM_TILE / 2
+              const dc = island_stream_d(cx, cz)
+
+              if dc < STREAM_TILE_NEAR {
+                const b00 = island_stream_bed(tx, tz)
+                const b10 = island_stream_bed(tx + STREAM_TILE, tz)
+                const b01 = island_stream_bed(tx, tz + STREAM_TILE)
+                const b11 = island_stream_bed(tx + STREAM_TILE, tz + STREAM_TILE)
+                const bc = island_stream_bed(cx, cz)
+                const gx = (b10 + b11 - b00 - b01) / (2 * STREAM_TILE)
+                const gz = (b01 + b11 - b00 - b10) / (2 * STREAM_TILE)
+                const g = max(sqrt(gx * gx + gz * gz), 0.0005)
+                const ux = 0 - gx / g
+                const uz = 0 - gz / g
+                const yaw = atan2(0 - uz, ux)
+                const speed = clamp(STREAM_FLOW_MIN + STREAM_FLOW_SLOPE * g, STREAM_FLOW_MIN,
+                  STREAM_FLOW_MAX)
+
+                const kc = island_stream_k(bc)
+                const kmin = min(min(min(island_stream_k(b00), island_stream_k(b10)),
+                  min(island_stream_k(b01), island_stream_k(b11))), kc)
+                const kmax = max(max(max(island_stream_k(b00), island_stream_k(b10)),
+                  max(island_stream_k(b01), island_stream_k(b11))), kc)
+
+                const lift = (island_stream_mod3(gi) + 3 * island_stream_mod3(gj)) * 0.001 - 0.005
+
+                const soaked = dc < STREAM_WET && island_stream_level(kmin) > 0.04
+                const steep = kmax - kmin >= 2
+                const wet = soaked && !steep && island_stream_held(cx, cz) &&
+                  island_stream_held(tx, tz) && island_stream_held(tx + STREAM_TILE, tz) &&
+                  island_stream_held(tx, tz + STREAM_TILE) &&
+                  island_stream_held(tx + STREAM_TILE, tz + STREAM_TILE)
+
+                if soaked && steep {
+                  const pitch = atan(g)
+                  const bmax = max(max(b00, b10), max(b01, b11))
+                  const bmin = min(min(b00, b10), min(b01, b11))
+                  "chute_{bi}_{bj}_{ti}_{tj}" {
+                    Position: {cx - x0, bc + 0.14 + lift, cz - z0}
+                    Rotation: {0, yaw, 0}
+
+                    if g > STREAM_FALL_SLOPE {
+                      if dc < STREAM_FALL_NEAR {
+                        sheet : IslandFallWater {
+                          Position: {STREAM_TILE / 2, (bmax + bmin) / 2 - bc, 0}
+                          Box: {0.4, bmax - bmin + 0.9, STREAM_TILE + 0.4}
+                        }
+                      }
+                    } else {
+                      sheet : IslandRapidWater {
+                        Rotation: {0, 0, 0 - pitch}
+                        Box: {STREAM_TILE / cos(pitch) + 0.3, 0.01, STREAM_TILE + 0.3}
+                        WaterFlow: {
+                          velocity: {ux * STREAM_FLOW_MAX, uz * STREAM_FLOW_MAX}, textures: true
+                        }
+                      }
+                    }
+
+                    if level == 0 && g > STREAM_MIST_SLOPE && dc < 1.6 {
+                      mist : IslandFallMist {
+                        Position: {0.6, 0.4, 0}
+                      }
+                    }
+                  }
+                }
+
+                if wet && kmin == kmax {
+                  "water_{bi}_{bj}_{ti}_{tj}" : IslandStreamWater {
+                    Position: {cx - x0, island_stream_level(kc) + lift, cz - z0}
+                    Box: {STREAM_TILE + 0.02, 0.01, STREAM_TILE + 0.02}
+                    WaterFlow: {velocity: {ux * speed, uz * speed}, textures: true}
+                  }
+                }
+
+                if wet && kmin < kmax {
+                  for n in 0..4 {
+                    const k = kmax - n
+                    const sa = (bc - (k + 1) * STREAM_STEP) / g
+                    const sb = (bc - k * STREAM_STEP) / g
+                    const lo = sa > 0 - STREAM_HALF ? sa - 0.06 : 0 - STREAM_HALF
+                    const hi = min(sb, STREAM_HALF)
+                    const mid = (lo + hi) / 2
+
+                    if k >= kmin && hi > lo + 0.08 {
+                      "run_{bi}_{bj}_{ti}_{tj}_{n}" : IslandStreamWater {
+                        Position: {
+                          cx + ux * mid - x0,
+                          island_stream_level(k) + lift,
+                          cz + uz * mid - z0
+                        }
+                        Rotation: {0, yaw, 0}
+                        Box: {hi - lo, 0.01, 2 * STREAM_HALF}
+                        WaterFlow: {velocity: {ux * speed, uz * speed}, textures: true}
+                      }
+                    }
+
+                    const sf = (bc - k * STREAM_STEP) / g
+                    const px = ux * sf * 2 / STREAM_TILE
+                    const pz = uz * sf * 2 / STREAM_TILE
+                    const t0 = max(island_stream_t0(px, 0 - uz), island_stream_t0(pz, ux))
+                    const t1 = min(island_stream_t1(px, 0 - uz), island_stream_t1(pz, ux))
+                    const tm = (t0 + t1) / 2 * STREAM_TILE / 2
+                    const fx = cx + ux * sf - uz * tm
+                    const fz = cz + uz * sf + ux * tm
+
+                    if k > kmin && k <= kmax && t1 > t0 + 0.05 {
+                      if island_stream_d(fx, fz) < STREAM_FALL_NEAR {
+                        "fall_{bi}_{bj}_{ti}_{tj}_{n}" {
+                          Position: {fx - x0, island_stream_level(k), fz - z0}
+                          Rotation: {0, yaw, 0}
+                          IslandStreamFall: {
+                            width: (t1 - t0) * STREAM_TILE / 2 + 0.04,
+                            churn: level == 0 && island_stream_d(fx, fz) < 1.2
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

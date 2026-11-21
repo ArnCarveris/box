@@ -1955,6 +1955,16 @@
                 ]
             },
             {
+                "id": "TextureErosion",
+                "testcases": [
+                    "defaults",
+                    "flat_is_zero",
+                    "gullies_run_down_slope",
+                    "adjacent_windows_match",
+                    "center_from_point"
+                ]
+            },
+            {
                 "id": "TextureGraphWorld",
                 "testcases": [
                     "adjacent_windows_match",

@@ -513,6 +513,13 @@ void box_texture_noise_register(
 void box_texture_flow_register(
     ecs_world_t *world);
 
+/** Register the TexErosion node kind.
+ *
+ * @param world The world
+ */
+void box_texture_erosion_register(
+    ecs_world_t *world);
+
 /** Register the built in node kinds.
  *
  * @param world The world

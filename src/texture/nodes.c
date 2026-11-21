@@ -25,6 +25,18 @@ static const char *box_texture_coords_wgsl =
     "    return v;\n"
     "}\n";
 
+/** WGSL of the TexCenter node: on the world the coordinates plus the origin of the window less
+ * the point, its window element, else the coordinates */
+static const char *box_texture_center_wgsl =
+    "fn box_tex_center(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f, window: u32)\n"
+    "    -> vec4f {\n"
+    "    if (box_texgraph_stage.domain == 2u) {\n"
+    "        let o = bitcast<vec2f>(box_texgraph_params[window].xy);\n"
+    "        return vec4f(coords.xy + o, 0.0, 0.0);\n"
+    "    }\n"
+    "    return coords;\n"
+    "}\n";
+
 /** WGSL of the TexBlur node: a gaussian along x in pass 0, along y in pass 1, normalized by
  * the sum of its weights. At most BOX_TEX_BLUR_TAPS taps on each side; a larger reach spaces
  * them further apart, between texels. */
@@ -829,6 +841,23 @@ static void box_texture_coords_window(
     ecs_os_memcpy(out, o, ECS_SIZEOF(o));
 }
 
+/** Write the window element of a TexCenter node: the origin of the window less the point of
+ * the node in x and z, subtracted in double precision.
+ *
+ * @param node The TexCenter
+ * @param origin World x and z of the origin of the window
+ * @param out Receives one vec4
+ */
+static void box_texture_center_window(
+    const void *node,
+    const double origin[2],
+    uint32_t *out)
+{
+    const TexCenter *center = node;
+    float o[2] = { (float)(origin[0] - center->x), (float)(origin[1] - center->z) };
+    ecs_os_memcpy(out, o, ECS_SIZEOF(o));
+}
+
 /** Write the window element of a TexTransform node: rotate(origin * scale) - origin in x and z,
  * so its scale and rotation by angle_value are about the origin of the world.
  *
@@ -951,6 +980,19 @@ static void box_texture_nodes_register_math(
         .function = "box_tex_coords",
         .source = box_texture_coords_wgsl,
         .window = box_texture_coords_window,
+        .window_size = 1
+    });
+
+    box_texture_node_register(world, &(box_texture_node_desc_t){
+        .component = ecs_id(TexCenter),
+        .output = TexVector,
+        .params = {
+            { "x", offsetof(TexCenter, x), 8, BOX_TEXTURE_PARAM_F32 },
+            { "z", offsetof(TexCenter, z), 8, BOX_TEXTURE_PARAM_F32 }
+        },
+        .function = "box_tex_center",
+        .source = box_texture_center_wgsl,
+        .window = box_texture_center_window,
         .window_size = 1
     });
 
@@ -1242,6 +1284,7 @@ static void box_texture_nodes_register_relief(
     });
 
     box_texture_flow_register(world);
+    box_texture_erosion_register(world);
 }
 
 void box_texture_nodes_register(

@@ -1,0 +1,199 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using box.render
+using box.light
+using box.world
+using trees
+using state
+using assets
+
+state {
+  export const UNDER_CELL: f32 = 16
+  export const UNDER_NEAR: f32 = 36
+  export const UNDER_FAR: f32 = 64
+  export const UNDER_BUDGET: i32 = 12
+  export const UNDER_BUDGET_MS: f32 = 3
+  export const UNDER_FLOWER_RANGE: f32 = 28
+  export const UNDER_FLOWER_FADE: f32 = 7
+  export const UNDER_FERN_RANGE: f32 = 44
+  export const UNDER_FERN_FADE: f32 = 9
+  export const UNDER_LARGE_RANGE: f32 = 54
+  export const UNDER_LARGE_FADE: f32 = 9
+}
+
+assets {
+  prefab IslandFlower : ForestFlower {
+    DrawRange: {far_: UNDER_FLOWER_RANGE, fade: UNDER_FLOWER_FADE}
+    WindSway: {
+      bend: SWAY_FLOWER_BEND, height: SWAY_FLOWER_HEIGHT, base: 0, flutter: SWAY_FLOWER_FLUTTER,
+      flutter_frequency: SWAY_FLOWER_FREQUENCY, flutter_reach: 0.2, local_base: true
+    }
+    NoBake
+  }
+
+  prefab IslandFlowerWhite : ForestFlowerWhite {
+    DrawRange: {far_: UNDER_FLOWER_RANGE, fade: UNDER_FLOWER_FADE}
+    WindSway: {
+      bend: SWAY_FLOWER_BEND, height: SWAY_FLOWER_HEIGHT, base: 0, flutter: SWAY_FLOWER_FLUTTER,
+      flutter_frequency: SWAY_FLOWER_FREQUENCY, flutter_reach: 0.2, local_base: true
+    }
+    NoBake
+  }
+
+  prefab IslandFlowerViolet : ForestFlowerViolet {
+    DrawRange: {far_: UNDER_FLOWER_RANGE, fade: UNDER_FLOWER_FADE}
+    WindSway: {
+      bend: SWAY_FLOWER_BEND, height: SWAY_FLOWER_HEIGHT, base: 0, flutter: SWAY_FLOWER_FLUTTER,
+      flutter_frequency: SWAY_FLOWER_FREQUENCY, flutter_reach: 0.2, local_base: true
+    }
+    NoBake
+  }
+
+  prefab IslandFern : ForestFern {
+    Rgb: {
+      forest_seasonal(season, 118, 84, 124, 104),
+      forest_seasonal(season, 176, 146, 138, 124),
+      forest_seasonal(season, 56, 46, 52, 58)
+    }
+    AlphaCutoff: {LEAF_FULL}
+    DrawRange: {far_: UNDER_FERN_RANGE, fade: UNDER_FERN_FADE}
+    WindSway: {
+      bend: SWAY_FERN_BEND, height: SWAY_FERN_HEIGHT, base: 0, flutter: SWAY_FERN_FLUTTER,
+      flutter_frequency: SWAY_FERN_FREQUENCY, flutter_reach: 0.4, local_base: true
+    }
+    texture.Layers: {layers: [layer_wet_foliage]}
+    NoBake
+  }
+
+  prefab IslandShrubCard : ForestCardTripleMesh {
+    Rgb: {island_leaf_r(season) * 1.15, island_leaf_g(season) * 1.1, island_leaf_b(season)}
+    PbrMaterial: {roughness: 0.78}
+    WindSway: {
+      bend: SWAY_SHRUB_BEND, height: SWAY_SHRUB_HEIGHT, base: 0, flutter: SWAY_SHRUB_FLUTTER,
+      flutter_frequency: SWAY_SHRUB_FREQUENCY, flutter_reach: 0.3, local_base: true
+    }
+    AlphaCutoff: {LEAF_FULL}
+    DiffuseTransmission: {factor: 0.6, color: {214, 255, 140}}
+    PbrTextures: {albedo: leaf_oak_albedo, normal: leaf_oak_normal}
+    texture.Layers: {layers: [layer_wet_foliage]}
+    NoBake
+  }
+
+  prefab IslandShrub {
+    DrawRange: {far_: UNDER_LARGE_RANGE, fade: UNDER_LARGE_FADE}
+    const seed = 0.31
+    const size = 1.6
+
+    for c in 0..15 {
+      const a = c * 2.39996 + seed * 6.2832
+      const e = 0.15 + 1.25 * forest_hash(c + 1, seed * 31)
+      const ox = cos(e) * sin(a)
+      const oy = sin(e)
+      const oz = cos(e) * cos(a)
+      const jx = ox + (forest_hash(c + 2, seed * 31) - 0.5) * 0.6
+      const jy = oy + 0.35
+      const jz = oz + (forest_hash(c + 3, seed * 31) - 0.5) * 0.6
+      const jl = sqrt(jx * jx + jy * jy + jz * jz)
+      const b = (forest_hash(c + 4, seed * 31) - 0.5) * 1.8
+      const card = size * (0.62 + 0.3 * forest_hash(c + 5, seed * 31))
+      const py = 0.08 + oy * size * 0.45
+      "card_{c}" : IslandShrubCard {
+        Position: {ox * size * 0.28, py, oz * size * 0.28}
+        WindSway: {
+          bend: SWAY_SHRUB_BEND, height: SWAY_SHRUB_HEIGHT, base: 0 - py,
+          flutter: SWAY_SHRUB_FLUTTER, flutter_frequency: SWAY_SHRUB_FREQUENCY,
+          flutter_reach: 0.3, local_base: true
+        }
+        Rotation: {
+          forest_card_pitch(jy / jl, b),
+          forest_card_yaw(jx / jl, jy / jl, jz / jl, b),
+          forest_card_roll(jy / jl, b)
+        }
+        Scale: {card, card, card}
+      }
+    }
+  }
+
+  prefab IslandStone {
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 0.92}
+    PbrTextures: {
+      albedo: island_basalt_albedo, normal: island_basalt_normal, orm: island_basalt_orm
+    }
+    texture.Mapping: {mode: MappingObject, size: 2.5, blend: 0.4}
+    texture.Layers: {layers: [layer_wet]}
+  }
+
+  prefab IslandRock {
+    DrawRange: {far_: UNDER_LARGE_RANGE + 40, fade: UNDER_LARGE_FADE}
+
+    stone : IslandStone {
+      Position: {0, 0.08, 0}
+      Scale: {1, 0.6, 0.82}
+      IcoSphere: {radius: 1, segments: 1, smooth: true}
+    }
+  }
+
+  prefab IslandRockFlat {
+    DrawRange: {far_: UNDER_LARGE_RANGE + 40, fade: UNDER_LARGE_FADE}
+
+    stone : IslandStone {
+      Position: {0, 0.02, 0}
+      Rotation: {0.12, 0.7, 0.08}
+      Scale: {1.1, 0.4, 0.75}
+      IcoSphere: {radius: 1, segments: 1, smooth: true}
+    }
+  }
+
+  template IslandUnderCell {
+    prop cell_x: i32 = 0
+    prop cell_z: i32 = 0
+    prop level: i32 = 0
+    prop size: f32 = 16
+
+    ferns {
+      Scatter: {
+        items: [{IslandFern, 1}],
+        density: 14, spacing: 1.1, mode: ScatterPoisson, seed: 9101,
+        ground: island.land, mask_channel: 0, mask_min: 0.5, mask_max: 1, mask_edge: 0.3,
+        height_min: 1.5, height_max: TREE_LINE + 40 * ISLAND_H, slope_max: 46,
+        scale_min: 0.8, scale_max: 1.7, align: 0.4, spatial_ignore: true
+      }
+    }
+
+    shrubs {
+      Scatter: {
+        items: [{IslandShrub, 1}],
+        density: 2.2, spacing: 2.4, mode: ScatterPoisson, seed: 9202,
+        ground: island.land, mask_channel: 0, mask_min: 0.35, mask_max: 1, mask_edge: 0.3,
+        height_min: 1.5, height_max: TREE_LINE, slope_max: 42,
+        scale_min: 0.7, scale_max: 1.5, spatial_ignore: true
+      }
+    }
+
+    rocks {
+      Scatter: {
+        items: [{IslandRock, 1}, {IslandRockFlat, 1}],
+        density: 1.6, spacing: 2.2, mode: ScatterPoisson, seed: 9303,
+        ground: island.land, mask_channel: 3, mask_min: 0.25, mask_max: 1, mask_edge: 0.2,
+        height_min: GROUND_MIN, height_max: GROUND_MAX, slope_max: 50,
+        scale_min: 0.3, scale_max: 1.6, align: 0.7, sink: 0.1, spatial_ignore: true
+      }
+    }
+
+    if level == 0 {
+      flowers {
+        Scatter: {
+          items: [{IslandFlower, 1}, {IslandFlowerWhite, 1}, {IslandFlowerViolet, 1}],
+          density: 26, spacing: 0.7, mode: ScatterPoisson, seed: 9404,
+          ground: island.land, mask_channel: 1, mask_min: 0.5, mask_max: 1, mask_edge: 0.3,
+          height_min: 3, height_max: GROUND_MAX, slope_max: 35,
+          scale_min: 0.8, scale_max: 1.4, spatial_ignore: true
+        }
+      }
+    }
+  }
+}

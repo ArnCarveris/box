@@ -1,0 +1,47 @@
+include ui/widgets
+include trees/generator
+include forest/library
+include island/state
+include island/materials
+include island/rays
+include island/terrain
+include island/sea
+include island/ocean
+include island/stream_water
+include island/streams
+include island/player
+include island/fronds
+include island/tree_kinds
+include island/trees
+include island/stands
+include island/forest
+include island/plants
+include island/undergrowth
+include island/view
+
+using box.view
+
+$ {
+  box.app.FpsTarget: {120}
+  Scene: {
+    reflections: true,
+    environment: true,
+    aerial_perspective: true,
+    cookies: true,
+    shader_features: {
+      Extended: {
+        alpha_cutout: true,
+        blend_modes: true,
+        texture_blend: true,
+        water: true,
+        texture_layers: true,
+        wind: true
+      },
+      Terrain: {
+        texture_blend: true,
+        texture_layers: true,
+        triplanar: true
+      }
+    }
+  }
+}

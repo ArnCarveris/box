@@ -985,6 +985,32 @@ static void box_texture_flow_ctor(
     }
 }
 
+/** Construct TexErosion components with frequency 4, five octaves, lacunarity 2, gain 0.5,
+ * scale 1, branch 1 and the other members zero.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_texture_erosion_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    TexErosion *erosion = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        ecs_os_memset_t(&erosion[i], 0, TexErosion);
+        erosion[i].frequency = 4;
+        erosion[i].octaves = 5;
+        erosion[i].lacunarity = 2;
+        erosion[i].gain = 0.5f;
+        erosion[i].scale = 1;
+        erosion[i].branch = 1;
+    }
+}
+
 /** Construct TexTransmittance components with 64 steps and the other members zero.
  *
  * @param ptr The components
@@ -1452,6 +1478,7 @@ static void box_texture_register(
     ecs_set_name_prefix(world, "Tex");
     ECS_META_COMPONENT(world, TexConstant);
     ECS_META_COMPONENT(world, TexCoords);
+    ECS_META_COMPONENT(world, TexCenter);
     ECS_META_COMPONENT(world, TexAdd);
     ECS_META_COMPONENT(world, TexSubtract);
     ECS_META_COMPONENT(world, TexMultiply);
@@ -1500,6 +1527,7 @@ static void box_texture_register(
     ECS_META_COMPONENT(world, TexSlope);
     ECS_META_COMPONENT(world, TexGradient);
     ECS_META_COMPONENT(world, TexFlow);
+    ECS_META_COMPONENT(world, TexErosion);
     ECS_META_COMPONENT(world, TexTransmittance);
 
     ecs_set_scope(world, module);
@@ -1545,6 +1573,7 @@ void BoxTextureImport(
     ecs_set_hooks(world, TexSlope, { .ctor = box_texture_slope_ctor });
     ecs_set_hooks(world, TexGradient, { .ctor = box_texture_gradient_ctor });
     ecs_set_hooks(world, TexFlow, { .ctor = box_texture_flow_ctor });
+    ecs_set_hooks(world, TexErosion, { .ctor = box_texture_erosion_ctor });
     ecs_set_hooks(world, TexTransmittance, { .ctor = box_texture_transmittance_ctor });
     ecs_set_hooks(world, TexNoise, { .ctor = box_texture_noise_ctor });
     ecs_set_hooks(world, TexBlocks, { .ctor = box_texture_blocks_ctor });

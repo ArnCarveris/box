@@ -373,6 +373,18 @@ ECS_STRUCT(TexCoords, {
     float scale; /**< Factor of the coordinates, 1 when the component is added */
 });
 
+/** Node of a TextureGraph whose value on DomainWorld is the vector from a point of the world to
+ * the texel, (x, z, 0, 0) in meters: for shapes that have a place, such as the distance to the
+ * middle of an island (TexLength of it). The point is subtracted in double precision, so the
+ * vector is precise near the point wherever that is. On the other domains it is TexCoords.
+ *
+ * Unlike TexCoords it is not relative to the window, so it is no coords input for the nodes
+ * that hash absolute cells (TexNoise, TexCells, TexErosion): warp it and measure it instead. */
+ECS_STRUCT(TexCenter, {
+    double x; /**< Absolute world x of the point in meters */
+    double z; /**< Absolute world z of the point in meters */
+});
+
 /** Node of a TextureGraph whose scalar value is the world time: the seconds of the world clock
  * times scale plus offset, so a paused world shows the same image. Unless its scale is 0, it
  * makes the nodes after it and their graph animated, see TextureGraph.rate */
@@ -1080,6 +1092,54 @@ ECS_STRUCT(TexGradient, {
     float height_value;  /**< Value of height without a node */
     float strength;      /**< Factor of the differences, 1 when the component is added, 0 for
                           *   a zero vector, as TexSlope.strength */
+});
+
+/** Node of a TextureGraph whose Scalar value is the relief that running water wears into a
+ * slope, about -1 in the gullies to 1 on the ridges between them: multiply it by a depth and
+ * add it to the height whose gradient it was given.
+ *
+ * It is a function of the point, not a simulation, so it evaluates per texel like TexNoise and
+ * adjacent windows of DomainWorld agree. Every octave is a lattice of jittered points that each
+ * carry a wave whose crests run down the slope, blended over the lattice.
+ *
+ * The slope is the uphill gradient of the height, such as a TexGradient of it. The gullies are
+ * slope * scale to a lattice cell, so steep ground has finer gullies. Where that is below 0.5
+ * the value fades to 0, so flat ground stays flat. Each octave follows the gullies of the
+ * octaves before it by branch, so small gullies run into large ones.
+ *
+ * On DomainPlane the lattice repeats with a whole number of cells across the image in each
+ * octave, as TexNoise. On DomainWorld the frequency is in lattice cells per meter and the
+ * lattice is of the absolute position. On DomainSphere it reads the x and y of coords.
+ *
+ * @code
+ * relief {
+ *   base    { nodes.Noise: {frequency: 0.002, octaves: 3} }
+ *   base_h  { nodes.Multiply: {a: base, b_value: {400, 400, 400, 400}} }
+ *   slope   { nodes.Gradient: {height: base_h} }
+ *   erosion { nodes.Erosion: {slope: slope, frequency: 0.01, scale: 2} }
+ *   worn    { nodes.Multiply: {a: erosion, b_value: {30, 30, 30, 30}} }
+ *   height  { nodes.Add: {a: base_h, b: worn} }
+ * }
+ * @endcode
+ */
+ECS_STRUCT(TexErosion, {
+    ecs_entity_t coords; /**< Vector node of the point, 0 for the coordinates of the texel in
+                          *   the domain of the graph */
+    ecs_entity_t slope;  /**< Vector node of the uphill gradient of the height to wear, its x
+                          *   and y along those of coords, 0 for slope_value */
+    vec4 slope_value;    /**< Value of slope without a node */
+    float frequency;     /**< Lattice cells per unit of coords in the first octave, 4 when the
+                          *   component is added; on the plane rounded to whole cells across */
+    int32_t octaves;     /**< Octaves, 5 when the component is added, 1 to 8 */
+    float lacunarity;    /**< Frequency factor from one octave to the next, 2 when the
+                          *   component is added */
+    float gain;          /**< Amplitude factor from one octave to the next, 0.5 when the
+                          *   component is added */
+    int32_t seed;        /**< Seed of the lattice */
+    float scale;         /**< Gullies per lattice cell per unit of slope, 1 when the component
+                          *   is added */
+    float branch;        /**< How much an octave follows the gullies of the octaves before it,
+                          *   1 when the component is added, 0 for the slope alone */
 });
 
 /** Node of a TextureGraph that smears its input along the streamlines of a vector field (line
