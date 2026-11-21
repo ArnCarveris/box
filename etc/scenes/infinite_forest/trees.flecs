@@ -21,10 +21,12 @@ using assets
 // season rebakes. Young trees and saplings only grow near the player and fade out by distance
 // (WILD_YOUNG_RANGE) before their cells drop them.
 //
-// The trees stand on terrain at any height, so their WindSway does not bend the trunk from a
-// ground at Y 0, as the Tree does: the branches swing about their pivots and the leaves and
-// needles flutter, which follows each tree wherever it stands. The shapes are NoBake, so the
-// reflection probes that follow the player do not recapture the forest.
+// The trees stand on terrain at any height, so their WindSway bends the trunk from the foot of
+// the tree (local_base) rather than from a ground at Y 0, with the bend the Tree gives the
+// trees of the forest library: the crowns lean as the gusts roll over hills and valleys alike,
+// the branches swing about their pivots and the leaves and needles flutter. Snags are dead wood
+// and do not bend, impostors stay still. The shapes are NoBake, so the reflection probes that
+// follow the player do not recapture the forest.
 state {
   // Mature trees draw as impostors beyond WILD_IMPOSTOR_DISTANCE, crossfading over
   // WILD_IMPOSTOR_FADE on either side; the atlases have WILD_IMPOSTOR_FRAMES by
@@ -65,10 +67,17 @@ assets {
     const kx = k * (0.75 + 0.25 * slender)
     const broad_stiff = forest_tree_stiffness(hr, SWAY_BROADLEAF_BEND, SWAY_BROADLEAF_HEIGHT)
     const conifer_stiff = forest_tree_stiffness(hr, SWAY_CONIFER_BEND, SWAY_CONIFER_HEIGHT)
+    const birch_stiff = forest_tree_stiffness(hr, SWAY_BIRCH_BEND, SWAY_BIRCH_HEIGHT)
     const conifer = species == SPECIES_SPRUCE || species == SPECIES_FIR
     const flutter = snag ? 0 : (conifer ? SWAY_NEEDLE_FLUTTER : SWAY_LEAF_FLUTTER)
     const flutter_frequency = conifer ? SWAY_NEEDLE_FREQUENCY : SWAY_LEAF_FREQUENCY
     const swing = snag ? 0 : WILD_BRANCH_SWING
+
+    // The bend of the Tree (trees/tree.flecs) from the stiffness of the species as in the forest
+    // library, from the foot of the trunk TRUNK_SINK above the origin of its shapes
+    const stiff = snag ? 1.4 : (conifer ? conifer_stiff : (species == SPECIES_BIRCH ? birch_stiff : broad_stiff))
+    const bend = hr * 0.0028 * (1.4 - stiff)
+    const foot = snag ? 0 : TRUNK_SINK
 
     // The grown tree, never instanced: its shapes are the bases of those of tree. A template
     // does not grow under a prefab, so source and its shapes turn into prefabs once grown
@@ -82,7 +91,7 @@ assets {
           Position: {0, 0, 0}
         }
       } else if species == SPECIES_BIRCH {
-        TreeBirch tree(seed: seed, age: age, bark_material: ForestTreeBarkBirch, leaf_material: late ? ForestLeafBirchB : ForestLeafBirch, stiffness: forest_tree_stiffness(hr, SWAY_BIRCH_BEND, SWAY_BIRCH_HEIGHT), flutter: SWAY_LEAF_FLUTTER, lods: WILD_LODS, leaf_lod_skip: 1, leaf_lod_flat: 2) {
+        TreeBirch tree(seed: seed, age: age, bark_material: ForestTreeBarkBirch, leaf_material: late ? ForestLeafBirchB : ForestLeafBirch, stiffness: birch_stiff, flutter: SWAY_LEAF_FLUTTER, lods: WILD_LODS, leaf_lod_skip: 1, leaf_lod_flat: 2) {
           Position: {0, 0, 0}
         }
       } else if species == SPECIES_SPRUCE {
@@ -143,7 +152,7 @@ assets {
         NoBake
         Position: {0, y, 0}
         Scale: {kx, k, kx}
-        WindSway: {bend: 0, height: hr, base: 0, pivots: true, branch: swing}
+        WindSway: {bend: bend, height: hr, base: foot, pivots: true, branch: swing, local_base: true}
       }
 
       foliage {
@@ -152,8 +161,9 @@ assets {
         Position: {0, y, 0}
         Scale: {kx, k, kx}
         WindSway: {
-          bend: 0, height: hr, base: 0, flutter: flutter,
-          flutter_frequency: flutter_frequency, pivots: true, branch: swing, foliage: true
+          bend: bend, height: hr, base: foot, flutter: flutter,
+          flutter_frequency: flutter_frequency, pivots: true, branch: swing, foliage: true,
+          local_base: true
         }
       }
     }

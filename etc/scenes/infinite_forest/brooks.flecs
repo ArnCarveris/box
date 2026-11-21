@@ -250,9 +250,10 @@ assets {
     IcoSphere: {radius: 1, segments: 2, smooth: true}
   }
 
+  // The reeds bend with the sway of the forest library from the bank, 0.03 above their origin
   prefab WildReed : ForestReed {
     DrawRange: {far_: BROOK_DETAIL_RANGE, fade: 8}
-    WindSway: {bend: 0, flutter: 0.06, flutter_frequency: 3, flutter_reach: 0.6}
+    WindSway: {bend: SWAY_REED_BEND, height: SWAY_REED_HEIGHT, base: 0.03, flutter: SWAY_REED_FLUTTER, flutter_frequency: SWAY_REED_FREQUENCY, flutter_reach: 0.4, local_base: true}
     NoBake
   }
 

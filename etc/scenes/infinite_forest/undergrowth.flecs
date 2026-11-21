@@ -33,8 +33,9 @@ using assets
 // the edge of the undergrowth never shows as a ring.
 //
 // Plants have their origin on the ground, like the trees (trees.flecs) they stand on terrain at
-// any height: their WindSway does not bend them from a ground at Y 0, their blades, fronds and
-// leaves flutter more the further they are from the foot.
+// any height: their WindSway bends them from their own foot (local_base) rather than from a
+// ground at Y 0, with the sway of the forest library, so the gusts roll through the grass and
+// shrubs on hills as in valleys, and their blades, fronds and leaves flutter on top of that.
 state {
   // Cells of UNDER_CELL meters: level 0 within UNDER_NEAR of the focus, everything, level 1
   // within UNDER_FAR, the larger plants. UNDER_BUDGET cells load per frame, within
@@ -65,35 +66,35 @@ state {
 }
 
 assets {
-  // The plants of the library with the DrawRange of their class and a WindSway that does not
-  // bend them from Y 0, one entity an instance
+  // The plants of the library with the DrawRange of their class and the WindSway of the library
+  // bending from their foot, one entity an instance
   prefab WildGrass : ForestGrass {
     DrawRange: {far_: UNDER_GRASS_RANGE, fade: UNDER_GRASS_FADE}
-    WindSway: {bend: 0, flutter: 0.07, flutter_frequency: 3, flutter_reach: 0.5}
+    WindSway: {bend: SWAY_GRASS_BEND, height: SWAY_GRASS_HEIGHT, base: 0, flutter: SWAY_GRASS_FLUTTER, flutter_frequency: SWAY_GRASS_FREQUENCY, flutter_reach: 0.25, local_base: true}
     NoBake
   }
 
   prefab WildSedge : ForestSedge {
     DrawRange: {far_: UNDER_GRASS_RANGE, fade: UNDER_GRASS_FADE}
-    WindSway: {bend: 0, flutter: 0.07, flutter_frequency: 3, flutter_reach: 0.5}
+    WindSway: {bend: SWAY_GRASS_BEND, height: SWAY_GRASS_HEIGHT, base: 0, flutter: SWAY_GRASS_FLUTTER, flutter_frequency: SWAY_GRASS_FREQUENCY, flutter_reach: 0.25, local_base: true}
     NoBake
   }
 
   prefab WildFlower : ForestFlower {
     DrawRange: {far_: UNDER_GRASS_RANGE, fade: UNDER_GRASS_FADE}
-    WindSway: {bend: 0, flutter: 0.05, flutter_frequency: 3.5, flutter_reach: 0.4}
+    WindSway: {bend: SWAY_FLOWER_BEND, height: SWAY_FLOWER_HEIGHT, base: 0, flutter: SWAY_FLOWER_FLUTTER, flutter_frequency: SWAY_FLOWER_FREQUENCY, flutter_reach: 0.2, local_base: true}
     NoBake
   }
 
   prefab WildFlowerWhite : ForestFlowerWhite {
     DrawRange: {far_: UNDER_GRASS_RANGE, fade: UNDER_GRASS_FADE}
-    WindSway: {bend: 0, flutter: 0.05, flutter_frequency: 3.5, flutter_reach: 0.4}
+    WindSway: {bend: SWAY_FLOWER_BEND, height: SWAY_FLOWER_HEIGHT, base: 0, flutter: SWAY_FLOWER_FLUTTER, flutter_frequency: SWAY_FLOWER_FREQUENCY, flutter_reach: 0.2, local_base: true}
     NoBake
   }
 
   prefab WildFlowerViolet : ForestFlowerViolet {
     DrawRange: {far_: UNDER_GRASS_RANGE, fade: UNDER_GRASS_FADE}
-    WindSway: {bend: 0, flutter: 0.05, flutter_frequency: 3.5, flutter_reach: 0.4}
+    WindSway: {bend: SWAY_FLOWER_BEND, height: SWAY_FLOWER_HEIGHT, base: 0, flutter: SWAY_FLOWER_FLUTTER, flutter_frequency: SWAY_FLOWER_FREQUENCY, flutter_reach: 0.2, local_base: true}
     NoBake
   }
 
@@ -104,33 +105,34 @@ assets {
 
   prefab WildFern : ForestFern {
     DrawRange: {far_: UNDER_FERN_RANGE, fade: UNDER_FERN_FADE}
-    WindSway: {bend: 0, flutter: 0.06, flutter_frequency: 2.6, flutter_reach: 0.8}
+    WindSway: {bend: SWAY_FERN_BEND, height: SWAY_FERN_HEIGHT, base: 0, flutter: SWAY_FERN_FLUTTER, flutter_frequency: SWAY_FERN_FREQUENCY, flutter_reach: 0.4, local_base: true}
     NoBake
   }
 
-  // The parts of the larger plants, swaying without the bend
+  // The parts of the larger plants, bending from the foot of their plant: a part base meters
+  // above it sets base to 0 - its height (WildShrub, WildStump)
   prefab WildHazelCard : ForestShrubHazel {
-    WindSway: {bend: 0, flutter: 0.05, flutter_frequency: 3.5, flutter_reach: 0.3}
+    WindSway: {bend: SWAY_SHRUB_BEND, height: SWAY_SHRUB_HEIGHT, base: 0, flutter: SWAY_SHRUB_FLUTTER, flutter_frequency: SWAY_SHRUB_FREQUENCY, flutter_reach: 0.3, local_base: true}
     NoBake
   }
 
   prefab WildElderCard : ForestShrubElder {
-    WindSway: {bend: 0, flutter: 0.05, flutter_frequency: 3.5, flutter_reach: 0.3}
+    WindSway: {bend: SWAY_SHRUB_BEND, height: SWAY_SHRUB_HEIGHT, base: 0, flutter: SWAY_SHRUB_FLUTTER, flutter_frequency: SWAY_SHRUB_FREQUENCY, flutter_reach: 0.3, local_base: true}
     NoBake
   }
 
   prefab WildStumpBeech : ForestBarkBeech {
-    WindSway: {bend: 0}
+    WindSway: {bend: SWAY_BROADLEAF_BEND, height: SWAY_BROADLEAF_HEIGHT, base: 0, local_base: true}
     NoBake
   }
 
   prefab WildStumpOak : ForestBarkOak {
-    WindSway: {bend: 0}
+    WindSway: {bend: SWAY_BROADLEAF_BEND, height: SWAY_BROADLEAF_HEIGHT, base: 0, local_base: true}
     NoBake
   }
 
   prefab WildStumpSpruce : ForestBarkSpruce {
-    WindSway: {bend: 0}
+    WindSway: {bend: SWAY_CONIFER_BEND, height: SWAY_CONIFER_HEIGHT, base: 0, local_base: true}
     NoBake
   }
 
@@ -155,8 +157,10 @@ assets {
       const jl = sqrt(jx * jx + jy * jy + jz * jz)
       const b = (forest_hash(c + 4, seed * 31) - 0.5) * 1.8
       const card = size * (0.62 + 0.3 * forest_hash(c + 5, seed * 31))
+      const py = 0.08 + oy * size * 0.45
       "card_{c}" : WildHazelCard {
-        Position: {ox * size * 0.28, 0.08 + oy * size * 0.45, oz * size * 0.28}
+        Position: {ox * size * 0.28, py, oz * size * 0.28}
+        WindSway: {bend: SWAY_SHRUB_BEND, height: SWAY_SHRUB_HEIGHT, base: 0 - py, flutter: SWAY_SHRUB_FLUTTER, flutter_frequency: SWAY_SHRUB_FREQUENCY, flutter_reach: 0.3, local_base: true}
         Rotation: {forest_card_pitch(jy / jl, b), forest_card_yaw(jx / jl, jy / jl, jz / jl, b), forest_card_roll(jy / jl, b)}
         Scale: {card, card, card}
       }
@@ -181,8 +185,10 @@ assets {
       const jl = sqrt(jx * jx + jy * jy + jz * jz)
       const b = (forest_hash(c + 4, seed * 31) - 0.5) * 1.8
       const card = size * (0.62 + 0.3 * forest_hash(c + 5, seed * 31))
+      const py = 0.06 + oy * size * 0.36
       "card_{c}" : WildHazelCard {
-        Position: {ox * size * 0.34, 0.06 + oy * size * 0.36, oz * size * 0.34}
+        Position: {ox * size * 0.34, py, oz * size * 0.34}
+        WindSway: {bend: SWAY_SHRUB_BEND, height: SWAY_SHRUB_HEIGHT, base: 0 - py, flutter: SWAY_SHRUB_FLUTTER, flutter_frequency: SWAY_SHRUB_FREQUENCY, flutter_reach: 0.3, local_base: true}
         Rotation: {forest_card_pitch(jy / jl, b), forest_card_yaw(jx / jl, jy / jl, jz / jl, b), forest_card_roll(jy / jl, b)}
         Scale: {card, card, card}
       }
@@ -207,8 +213,10 @@ assets {
       const jl = sqrt(jx * jx + jy * jy + jz * jz)
       const b = (forest_hash(c + 4, seed * 31) - 0.5) * 1.8
       const card = size * (0.62 + 0.3 * forest_hash(c + 5, seed * 31))
+      const py = 0.08 + oy * size * 0.45
       "card_{c}" : WildElderCard {
-        Position: {ox * size * 0.28, 0.08 + oy * size * 0.45, oz * size * 0.28}
+        Position: {ox * size * 0.28, py, oz * size * 0.28}
+        WindSway: {bend: SWAY_SHRUB_BEND, height: SWAY_SHRUB_HEIGHT, base: 0 - py, flutter: SWAY_SHRUB_FLUTTER, flutter_frequency: SWAY_SHRUB_FREQUENCY, flutter_reach: 0.3, local_base: true}
         Rotation: {forest_card_pitch(jy / jl, b), forest_card_yaw(jx / jl, jy / jl, jz / jl, b), forest_card_roll(jy / jl, b)}
         Scale: {card, card, card}
       }
@@ -327,6 +335,7 @@ assets {
 
     wood : WildStumpBeech {
       Position: {0, height / 2 - 0.05, 0}
+      WindSway: {bend: SWAY_BROADLEAF_BEND, height: SWAY_BROADLEAF_HEIGHT, base: 0.05 - height / 2, local_base: true}
       Scale: {radius, height + 0.1, radius}
       Frustum: {segments: 12, smooth: true, length: 1, radius_bottom: 1.15, radius_top: 0.95}
     }
@@ -356,6 +365,7 @@ assets {
 
     wood : WildStumpOak {
       Position: {0, height / 2 - 0.05, 0}
+      WindSway: {bend: SWAY_BROADLEAF_BEND, height: SWAY_BROADLEAF_HEIGHT, base: 0.05 - height / 2, local_base: true}
       Scale: {radius, height + 0.1, radius}
       Frustum: {segments: 12, smooth: true, length: 1, radius_bottom: 1.2, radius_top: 0.95}
     }
@@ -385,6 +395,7 @@ assets {
 
     wood : WildStumpSpruce {
       Position: {0, height / 2 - 0.05, 0}
+      WindSway: {bend: SWAY_CONIFER_BEND, height: SWAY_CONIFER_HEIGHT, base: 0.05 - height / 2, local_base: true}
       Scale: {radius, height + 0.1, radius}
       Frustum: {segments: 12, smooth: true, length: 1, radius_bottom: 1.15, radius_top: 0.95}
     }
