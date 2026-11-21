@@ -868,6 +868,40 @@ void box_render_grass_far(
     const box_render_grass_t *g,
     box_render_grass_far_t *out);
 
+/** Get the cascades of the directional light of a view a Grass casts into: those that start
+ * within its shadow distance, none when the view renders no shadows or the Grass casts none.
+ *
+ * @param g The Grass of the packet
+ * @param s The shadows of the view
+ * @return Mask of the cascades, bit i for cascade i
+ */
+uint32_t box_render_grass_cascades(
+    const box_render_grass_t *g,
+    const box_render_view_shadows_t *s);
+
+/** Get the distance from the camera at which the blades of a Grass that cast shadows start to
+ * shrink away, so their shadows end without an edge: BOX_RENDER_GRASS_SHADOW_FADE of its shadow
+ * distance.
+ *
+ * @param g The Grass of the packet
+ * @return The distance, 0 for a Grass that casts no shadows
+ */
+float box_render_grass_shadow_fade(
+    const box_render_grass_t *g);
+
+/** Get how far along the light the shadow of a blade of a Grass reaches: BOX_RENDER_GRASS_SHADOW_SLACK
+ * times the length along the light at which the shadow of its tallest blade reaches the ground,
+ * longer the lower the light, at most its shadow distance. The pass that places the blades that
+ * cast keeps those whose shadow within that reach falls into the view.
+ *
+ * @param g The Grass of the packet
+ * @param direction Normalized direction toward the light
+ * @return The reach, 0 for a Grass that casts no shadows
+ */
+float box_render_grass_shadow_reach(
+    const box_render_grass_t *g,
+    const float direction[3]);
+
 /** Find the far field the tiles of a terrain draw with: of the first Grass of the packet on the
  * sampled Terrain whose tiles draw with a grid mesh.
  *

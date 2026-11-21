@@ -2321,6 +2321,9 @@ typedef struct box_render_grass_t {
     float wind_phase;       /**< WindStatus.clock times BOX_RENDER_GRASS_WIND_RATE wrapped to
                              *   0..1, the phase of the swing and the flutter of the blades, 0
                              *   without a Wind */
+    float shadow;           /**< Distance from the camera within which the blades cast shadows,
+                             *   0 for none */
+    bool shadow_lights;     /**< The blades cast into the spot and point light tiles too */
 } box_render_grass_t;
 
 /** The far field of a Grass as the fragments of the tiles of its Terrain shade it (the grass_*
@@ -2355,6 +2358,22 @@ typedef struct box_render_grass_far_t {
 /** Least and most share of the ground a far field covers from above */
 #define BOX_RENDER_GRASS_FAR_COVER_MIN (0.2f)
 #define BOX_RENDER_GRASS_FAR_COVER_MAX (0.97f)
+
+/** Share of the shadow distance of a Grass at which the blades that cast start to shrink away,
+ * while the darkening of the roots of the blades in the view grows back */
+#define BOX_RENDER_GRASS_SHADOW_FADE (0.4f)
+
+/** Share of the shadow distance of a Grass within which the blades cast with 3 segments, beyond
+ * it as a single triangle */
+#define BOX_RENDER_GRASS_SHADOW_LOD (0.5f)
+
+/** Factor of the length along the light at which the shadow of the tallest blade of a Grass
+ * reaches the ground, for the ground that falls away from the blades */
+#define BOX_RENDER_GRASS_SHADOW_SLACK (2.0f)
+
+/** Least height of the light over the horizon, the sine of its angle, the reach of the shadows
+ * of the blades is measured with */
+#define BOX_RENDER_GRASS_SHADOW_LOW (0.05f)
 
 /** Turns per second of the wind clock (WindStatus.clock) of the phase of the swing of the clumps
  * of a Grass, whose blades flutter at whole multiples of it (GrassWind.time of grass_wind.wgsl) */

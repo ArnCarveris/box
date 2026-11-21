@@ -927,7 +927,8 @@ static int32_t box_gpu_view_write(
         u->viewport[3] = 1.0f / (float)(t->desc.render_height > 0 ? t->desc.render_height : 1);
         box_gpu_history_uniforms(gpu, t, packet, v, proj, u);
         box_gpu_light_uniforms(gpu, v, proj, u);
-        box_gpu_shadow_uniforms(gpu, v, proj, result, packet->frame, u);
+        box_gpu_shadow_uniforms(gpu, v, proj, result, packet->frame,
+            box_gpu_grass_cascades(gpu, packet, v), u);
         box_gpu_atlas_uniforms(gpu, v, u);
         box_gpu_atmosphere_uniforms(gpu, v, u);
         box_gpu_environment_uniforms(gpu, v, u);

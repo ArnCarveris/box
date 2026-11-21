@@ -40,7 +40,8 @@ static void box_grass_ctor(
             .clump_size = BOX_GRASS_CLUMP_SIZE,
             .clump_follow = BOX_GRASS_CLUMP_FOLLOW,
             .variation = BOX_GRASS_VARIATION,
-            .lod = { box_grass_lod[0], box_grass_lod[1], box_grass_lod[2] }
+            .lod = { box_grass_lod[0], box_grass_lod[1], box_grass_lod[2] },
+            .shadow_distance = BOX_GRASS_SHADOW_DISTANCE
         };
     }
 }
@@ -97,6 +98,11 @@ void box_grass_resolve(
         d = d < before ? before : d;
         out->lod[i] = d > BOX_GRASS_DISTANCE_MAX ? BOX_GRASS_DISTANCE_MAX : d;
     }
+
+    out->shadow_distance = !isfinite(value->shadow_distance) ? BOX_GRASS_SHADOW_DISTANCE :
+        value->shadow_distance < 0.0f ? 0.0f : value->shadow_distance;
+    out->shadow_distance = out->shadow_distance > out->lod[2] ? out->lod[2] :
+        out->shadow_distance;
 }
 
 /** Make the terrain of a Grass sampled on the GPU, which its compute pass reads.

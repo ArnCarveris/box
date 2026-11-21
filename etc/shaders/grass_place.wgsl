@@ -18,6 +18,11 @@
 // in lockstep.
 // Blades outside the frustum are dropped, the others appended to the range of their level of
 // detail.
+//
+// The placement of the blades that cast shadows (cast.w) keeps the blades within the distance
+// they cast within whose shadow falls into the frustum: each side plane moves out along the
+// light by as far as the shadows reach (cast.z), and a view projection of zero keeps every blade.
+// Its counts do not add to those of the packet.
 #include "include/terrain_sample.wgsl"
 #include "include/grass.wgsl"
 #include "include/grass_field.wgsl"
@@ -108,6 +113,9 @@ fn grass_planes() -> array<vec4f, 4> {
     var planes = array<vec4f, 4>(r3 + r0, r3 - r0, r3 + r1, r3 - r1);
     for (var i = 0u; i < 4u; i++) {
         planes[i] = planes[i] / max(length(planes[i].xyz), 1e-12);
+        if (params.caster.w != 0.0) {
+            planes[i].w += max(-params.caster.z * dot(planes[i].xyz, params.light.xyz), 0.0);
+        }
     }
     return planes;
 }
@@ -363,14 +371,17 @@ fn place(@builtin(workgroup_id) wg: vec3u, @builtin(local_invocation_index) loca
     }
 }
 
-// Clamp the blades of the levels to what they hold and add the counts to those of the packet.
+// Clamp the blades of the levels to what they hold and add the counts of the view to those of the
+// packet.
 @compute @workgroup_size(1)
 fn finish() {
     let capacity = params.config.w;
     for (var l = 0u; l < GRASS_LODS; l++) {
         let drawn = min(atomicLoad(&counters.args[l * 4u + 1u]), capacity);
         atomicStore(&counters.args[l * 4u + 1u], drawn);
-        atomicAdd(&stats.drawn[l], drawn);
-        atomicAdd(&stats.generated[l], atomicLoad(&counters.generated[l]));
+        if (params.caster.w == 0.0) {
+            atomicAdd(&stats.drawn[l], drawn);
+            atomicAdd(&stats.generated[l], atomicLoad(&counters.generated[l]));
+        }
     }
 }

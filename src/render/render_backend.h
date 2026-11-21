@@ -106,10 +106,15 @@ typedef struct box_render_gpu_stats_t {
     int32_t atmosphere_passes[BOX_RENDER_ATMOS_PASSES]; /**< Passes whose GPU time
                                  *   atmosphere_ns holds */
     int32_t grass_passes;       /**< Compute passes that placed the grass blades of a view,
-                                 *   one per frame of a lit view whose scene has a Grass */
-    int64_t grass_ns;           /**< GPU time of the grass compute passes read back, 0 without
+                                 *   one per frame of a lit view whose scene has a Grass, and
+                                 *   those that placed the blades that cast into light tiles */
+    int64_t grass_ns;           /**< GPU time of the grass compute passes and of the passes that
+                                 *   draw the blades into the shadows read back, 0 without
                                  *   timestamp queries */
-    int32_t grass_timed;        /**< Grass compute passes whose GPU time grass_ns holds */
+    int32_t grass_timed;        /**< Grass passes whose GPU time grass_ns holds */
+    int32_t grass_cascades;     /**< Cascades of the directional light the grass blades cast
+                                 *   into, one per pass that drew them */
+    int32_t grass_tiles;        /**< Spot and point light tiles the grass blades cast into */
     int64_t grass_generated[BOX_GRASS_LODS]; /**< Blades the grass passes placed in the patches
                                  *   the views saw, per level of detail, read back */
     int64_t grass_drawn[BOX_GRASS_LODS]; /**< Blades of those the views drew per level of

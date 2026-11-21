@@ -1005,6 +1005,8 @@ void box_gpu_stats_publish(
     s->grass_passes += p->grass_passes;
     s->grass_ns += p->grass_ns;
     s->grass_timed += p->grass_timed;
+    s->grass_cascades += p->grass_cascades;
+    s->grass_tiles += p->grass_tiles;
     s->grass_reads += p->grass_reads;
     for (i = 0; i < BOX_GRASS_LODS; i ++) {
         s->grass_generated[i] += p->grass_generated[i];

@@ -1321,6 +1321,75 @@ void box_gpu_grass_record(
     const box_render_view_t *v,
     int32_t slot);
 
+/** Get the cascades of the directional light of a view the blades of the Grass entities of its
+ * scene cast into, which render in every packet instead of keeping their depth.
+ *
+ * @param gpu The backend
+ * @param packet The packet
+ * @param v The view
+ * @return Mask of the cascades, bit i for cascade i, 0 when the view draws no grass
+ */
+uint32_t box_gpu_grass_cascades(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet,
+    const box_render_view_t *v);
+
+/** Record the render pass that draws the blades the last box_gpu_grass_record placed for a view
+ * to cast shadows into a cascade of the view, after its casters: one indirect draw per Grass
+ * casting into the cascade and level, timed with the grass passes. No pass when no Grass casts
+ * into it.
+ *
+ * @param gpu The backend
+ * @param encoder The encoder of the frame
+ * @param v The view
+ * @param cascade Index of the cascade
+ * @param layer View of the layer of the cascade, which the pass loads
+ * @param matrix Local world to clip space of the cascade
+ */
+void box_gpu_grass_shadow(
+    box_gpu_t *gpu,
+    WGPUCommandEncoder encoder,
+    const box_render_view_t *v,
+    int32_t cascade,
+    WGPUTextureView layer,
+    const float *matrix);
+
+/** Check whether a Grass of a scene casts into the spot and point light tiles of its atlas
+ * (Grass.shadow_lights), so its tiles render in every packet.
+ *
+ * @param gpu The backend
+ * @param packet The packet
+ * @param scene The scene of the atlas
+ * @return Whether a Grass casts into them and the scene has a lit view to place its blades
+ * around
+ */
+bool box_gpu_grass_lights(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet,
+    ecs_entity_t scene);
+
+/** Place the blades of the Grass entities of the scene of an atlas that cast into its light
+ * tiles around the camera of the first lit view of the scene, and record the render pass that
+ * draws them into each tile that renders, after its casters; into each octant of a point light
+ * tile. Both passes are timed with the grass passes.
+ *
+ * @param gpu The backend
+ * @param encoder The encoder of the atlas
+ * @param packet The packet
+ * @param a The atlas of the packet
+ * @param renders Whether each of its tiles renders
+ * @param target View of the atlas, which the pass loads
+ * @param resolution Edge of the atlas in texels
+ */
+void box_gpu_grass_atlas(
+    box_gpu_t *gpu,
+    WGPUCommandEncoder encoder,
+    const box_render_packet_t *packet,
+    const box_render_shadow_atlas_t *a,
+    const bool *renders,
+    WGPUTextureView target,
+    int32_t resolution);
+
 /** Record the draws of the blades a view placed (box_gpu_grass_record) into one of its passes,
  * one indirect draw per Grass and level of detail. Replaces the pipeline and the bind group at 1.
  *
@@ -1594,6 +1663,8 @@ void box_gpu_shadow_begin(
  * @param proj Projection of the view for its target
  * @param slot Slot of the view in the view buffer
  * @param frame Frame of the packet
+ * @param live Mask of the cascades that render even when the view keeps them, those the grass
+ * casts into (box_gpu_grass_cascades)
  * @param u The uniforms
  */
 void box_gpu_shadow_uniforms(
@@ -1602,6 +1673,7 @@ void box_gpu_shadow_uniforms(
     mat4 proj,
     int32_t slot,
     int64_t frame,
+    uint32_t live,
     box_gpu_view_uniforms_t *u);
 
 /** Get the cascades of a view that render in the packet, after box_gpu_shadow_uniforms.

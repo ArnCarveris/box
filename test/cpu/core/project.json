@@ -365,15 +365,20 @@
                     "resolve",
                     "resolve_clumps",
                     "resolve_fold",
+                    "resolve_shadow",
                     "terrain_sampled",
                     "extract_plane",
                     "extract_terrain",
+                    "extract_shadow",
                     "extract_scene",
                     "extract_wind",
                     "far_range",
                     "far_cover",
                     "far_values",
-                    "far_of_terrain"
+                    "far_of_terrain",
+                    "shadow_cascades",
+                    "shadow_fade",
+                    "shadow_reach"
                 ]
             },
             {

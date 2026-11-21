@@ -89,8 +89,16 @@ extern "C" {
  * the aerial perspective and the fog. Their normals round across their width, their roots are
  * darker and occluded, they reflect a soft specular and the light behind them shines through, as
  * a DiffuseTransmission does for meshes. Normals and specular flatten with distance, so a field
- * does not shimmer without temporal anti-aliasing. They neither cast shadows nor take part in
- * picking.
+ * does not shimmer without temporal anti-aliasing. They take no part in picking.
+ *
+ * Within shadow_distance meters of the camera the blades cast shadows into the cascades of the
+ * directional light that start within that distance, at a coarser level of detail than the view
+ * draws them and bent by the same wind, so they shade each other and the ground near the camera.
+ * Toward shadow_distance the blades that cast shrink away while the darkening of the roots of
+ * the blades grows back, and further out that darkening and the shading of the far field stand
+ * in for the shadows, so the end of the shadows does not show. With shadow_lights the blades
+ * within shadow_distance cast into the spot and point light tiles of their scene as well, which
+ * then render every frame. The shadow work counts in the GPU time of the grass.
  *
  * @code
  * meadow {
@@ -122,6 +130,10 @@ ECS_STRUCT(Grass, {
     float lod[3];           /**< Distances in meters where levels 0 and 1 end and the blades
                              *   end, default {20, 60, 200}; each at least the one before */
     uint32_t seed;          /**< Seed of the hash of the cells, another field of blades */
+    float shadow_distance;  /**< Distance in meters from the camera within which the blades
+                             *   cast shadows, default 30, 0 for none; at most lod[2] */
+    bool shadow_lights;     /**< The blades cast into the spot and point light tiles too,
+                             *   default false */
 });
 
 /** Register the box.grass module.

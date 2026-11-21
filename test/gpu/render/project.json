@@ -2133,7 +2133,11 @@
                     "varies_over_world",
                     "wind_stiffness_and_phase",
                     "bends_in_wind",
-                    "gusts_roll_as_waves"
+                    "gusts_roll_as_waves",
+                    "casts_into_cascades",
+                    "shadow_counts_apart",
+                    "lights_only_when_enabled",
+                    "shadows_darken_meadow"
                 ]
             },
             {

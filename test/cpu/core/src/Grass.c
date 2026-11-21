@@ -128,6 +128,8 @@ void Grass_defaults(void) {
     test_flt(g->clump_follow, BOX_GRASS_CLUMP_FOLLOW);
     test_flt(g->variation, BOX_GRASS_VARIATION);
     test_uint(g->seed, 0);
+    test_flt(g->shadow_distance, BOX_GRASS_SHADOW_DISTANCE);
+    test_bool(g->shadow_lights, false);
     ecs_fini(world);
 }
 
@@ -137,7 +139,8 @@ void Grass_script(void) {
     test_int(ecs_script_run(world, "grass",
         "using box.grass\n"
         "meadow { Grass: {density: 20, mask: 2, lod: [10, 30, 90], seed: 7, clump_size: 2.5,\n"
-        "  clump_follow: 0.9, variation: 0.25, fold_height: 0.3} }\n", NULL), 0);
+        "  clump_follow: 0.9, variation: 0.25, fold_height: 0.3, shadow_distance: 45,\n"
+        "  shadow_lights: true} }\n", NULL), 0);
     ecs_entity_t meadow = ecs_lookup(world, "meadow");
     test_assert(meadow != 0);
     const Grass *g = ecs_get(world, meadow, Grass);
@@ -152,6 +155,8 @@ void Grass_script(void) {
     test_flt(g->clump_follow, 0.9f);
     test_flt(g->variation, 0.25f);
     test_flt(g->fold_height, 0.3f);
+    test_flt(g->shadow_distance, 45);
+    test_bool(g->shadow_lights, true);
     test_flt(g->min_height, 0.25f);
     test_int(g->base_color.g, 66);
     ecs_fini(world);
@@ -236,6 +241,34 @@ void Grass_resolve_fold(void) {
     in = (Grass){ .fold_height = 0.42f };
     box_grass_resolve(&in, &out);
     test_flt(out.fold_height, 0.42f);
+}
+
+void Grass_resolve_shadow(void) {
+    Grass in = { .shadow_distance = 0 };
+    Grass out;
+    box_grass_resolve(&in, &out);
+    test_flt(out.shadow_distance, 0);
+
+    in = (Grass){ .shadow_distance = -4 };
+    box_grass_resolve(&in, &out);
+    test_flt(out.shadow_distance, 0);
+
+    in = (Grass){ .shadow_distance = NAN };
+    box_grass_resolve(&in, &out);
+    test_flt(out.shadow_distance, BOX_GRASS_SHADOW_DISTANCE);
+
+    in = (Grass){ .shadow_distance = INFINITY };
+    box_grass_resolve(&in, &out);
+    test_flt(out.shadow_distance, BOX_GRASS_SHADOW_DISTANCE);
+
+    in = (Grass){ .shadow_distance = 25 };
+    box_grass_resolve(&in, &out);
+    test_flt(out.shadow_distance, 25);
+
+    // At most where the blades end
+    in = (Grass){ .shadow_distance = 300, .lod = { 10, 30, 90 } };
+    box_grass_resolve(&in, &out);
+    test_flt(out.shadow_distance, 90);
 }
 
 void Grass_terrain_sampled(void) {
@@ -337,6 +370,38 @@ void Grass_extract_terrain(void) {
 
     // A Grass whose terrain is not a Terrain grows nowhere
     test_assert(grass_find(lost) == NULL);
+
+    ecs_fini(world);
+    ecs_vec_fini_t(NULL, &grass_packet, box_render_grass_t);
+}
+
+void Grass_extract_shadow(void) {
+    ecs_world_t *world = grass_world();
+    ecs_entity_t a = ecs_new(world);
+    ecs_set(world, a, Grass, {.shadow_distance = 40, .shadow_lights = true});
+    ecs_entity_t b = ecs_new(world);
+    ecs_set(world, b, Grass, {.shadow_distance = 0, .shadow_lights = true});
+    ecs_entity_t c = ecs_new(world);
+    ecs_add(world, c, Grass);
+    grass_frame(world);
+    grass_frame(world);
+
+    const box_render_grass_t *ga = grass_find(a);
+    const box_render_grass_t *gb = grass_find(b);
+    const box_render_grass_t *gc = grass_find(c);
+    test_assert(ga != NULL);
+    test_assert(gb != NULL);
+    test_assert(gc != NULL);
+    test_flt(ga->shadow, 40);
+    test_bool(ga->shadow_lights, true);
+
+    // A Grass that casts no shadows casts none into the lights either
+    test_flt(gb->shadow, 0);
+    test_bool(gb->shadow_lights, false);
+
+    // By default the blades cast into the cascades only
+    test_flt(gc->shadow, BOX_GRASS_SHADOW_DISTANCE);
+    test_bool(gc->shadow_lights, false);
 
     ecs_fini(world);
     ecs_vec_fini_t(NULL, &grass_packet, box_render_grass_t);
@@ -588,4 +653,92 @@ void Grass_far_of_terrain(void) {
 
     ecs_vec_fini_t(NULL, &p.terrain_samples, box_render_terrain_sample_t);
     ecs_vec_fini_t(NULL, &p.grasses, box_render_grass_t);
+}
+
+/** Shadows of a view with 4 cascades.
+ *
+ * @return The shadows
+ */
+static box_render_view_shadows_t grass_shadows(void)
+{
+    box_render_view_shadows_t s = {0};
+    s.enabled = true;
+    s.cascades = 4;
+    s.resolution = 2048;
+    s.near_ = 0.1f;
+    s.splits[0] = 8;
+    s.splits[1] = 25;
+    s.splits[2] = 70;
+    s.splits[3] = 200;
+    s.direction[1] = 1;
+
+    return s;
+}
+
+void Grass_shadow_cascades(void) {
+    box_render_grass_t g = grass_record();
+    box_render_view_shadows_t s = grass_shadows();
+
+    // The cascades that start within the shadow distance
+    g.shadow = 30;
+    test_uint(box_render_grass_cascades(&g, &s), 0x7);
+    g.shadow = 25;
+    test_uint(box_render_grass_cascades(&g, &s), 0x3);
+    g.shadow = 5;
+    test_uint(box_render_grass_cascades(&g, &s), 0x1);
+    g.shadow = 500;
+    test_uint(box_render_grass_cascades(&g, &s), 0xF);
+
+    // None without shadows
+    g.shadow = 0;
+    test_uint(box_render_grass_cascades(&g, &s), 0);
+    g.shadow = 30;
+    s.enabled = false;
+    test_uint(box_render_grass_cascades(&g, &s), 0);
+    s = grass_shadows();
+    s.cascades = 0;
+    test_uint(box_render_grass_cascades(&g, &s), 0);
+
+    // A single cascade
+    s = grass_shadows();
+    s.cascades = 1;
+    test_uint(box_render_grass_cascades(&g, &s), 0x1);
+}
+
+void Grass_shadow_fade(void) {
+    box_render_grass_t g = grass_record();
+    g.shadow = 30;
+    test_flt(box_render_grass_shadow_fade(&g), 30 * BOX_RENDER_GRASS_SHADOW_FADE);
+    test_assert(box_render_grass_shadow_fade(&g) < g.shadow);
+    g.shadow = 0;
+    test_flt(box_render_grass_shadow_fade(&g), 0);
+}
+
+void Grass_shadow_reach(void) {
+    box_render_grass_t g = grass_record();
+    g.shadow = 30;
+
+    // The sun overhead: the tallest blade casts straight down
+    float high[3] = { 0, 1, 0 };
+    test_flt(box_render_grass_shadow_reach(&g, high),
+        BOX_RENDER_GRASS_SHADOW_SLACK * g.height[1]);
+
+    // A low sun casts further
+    float low[3] = { 0.995f, 0.1f, 0 };
+    test_flt(box_render_grass_shadow_reach(&g, low),
+        BOX_RENDER_GRASS_SHADOW_SLACK * g.height[1] / 0.1f);
+    test_assert(box_render_grass_shadow_reach(&g, low) > box_render_grass_shadow_reach(&g, high));
+
+    // At the horizon and below the reach is that of the lowest sun, at most the shadow distance
+    float flat[3] = { 1, 0, 0 };
+    float below[3] = { 0.9f, -0.4f, 0 };
+    float lowest = BOX_RENDER_GRASS_SHADOW_SLACK * g.height[1] / BOX_RENDER_GRASS_SHADOW_LOW;
+    test_flt(box_render_grass_shadow_reach(&g, flat), lowest < 30 ? lowest : 30);
+    test_flt(box_render_grass_shadow_reach(&g, below), lowest < 30 ? lowest : 30);
+    g.shadow = 10;
+    test_flt(box_render_grass_shadow_reach(&g, flat), 10);
+
+    // None without shadows
+    g.shadow = 0;
+    test_flt(box_render_grass_shadow_reach(&g, high), 0);
 }

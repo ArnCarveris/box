@@ -45,6 +45,15 @@ struct GrassParams {
     pixel: vec4f,           // Size of a pixel per meter of distance (perspective) and at any
                             // distance (orthographic), one of them 0
     wind: GrassWind,        // The Wind of the frame (grass_wind.wgsl)
+    light: vec4f,           // The light the blades cast shadows of: xyz the direction toward a
+                            // directional light or the local position of a spot or point
+                            // light; w 0 directional, 1 spot, 2 plus the octant of a point
+                            // light tile
+    planes: vec4f,          // Near and far plane of a point light tile, zw 0
+    caster: vec4f,          // Distance the blades cast shadows within, 0 for none; distance
+                            // their shadows start to fade at; how far along the light a
+                            // placement of the blades that cast sweeps the frustum; 1 for that
+                            // placement, 0 for the one of the view
 };
 
 // A blade (box_gpu_grass_blade_t), 48 bytes

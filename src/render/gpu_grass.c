@@ -10,180 +10,12 @@
  */
 
 #include "gpu.h"
+#include "gpu_grass.h"
 #include <math.h>
 
 #ifdef BOX_RENDER_WGPU
 
-/** Invocations of a workgroup of the place dispatch, as GROUP in grass_place.wgsl */
-#define BOX_GPU_GRASS_GROUP (64u)
-
-/** Vertex indices a level of detail takes, as GRASS_LOD_VERTICES in grass.wgsl */
-#define BOX_GPU_GRASS_LOD_VERTICES (64u)
-
-/** Edge of a patch of the grid in whole meters */
-#define BOX_GPU_GRASS_PATCH (8)
-
-/** Most cells along an edge of a patch */
-#define BOX_GPU_GRASS_CELLS_MAX (128)
-
-/** Most patches along an edge of the grid */
-#define BOX_GPU_GRASS_PATCHES_MAX (128)
-
-/** Bytes between the params of two Grass entities in a view, the uniform offset alignment */
-#define BOX_GPU_GRASS_PARAMS_STRIDE (512u)
-
-/** Fewest and most blades a level of a Grass holds */
-#define BOX_GPU_GRASS_CAPACITY_MIN (4096u)
-#define BOX_GPU_GRASS_CAPACITY_MAX (1u << 19)
-
-/** Bytes of the counters of a Grass: the indirect arguments of its levels and their blades */
-#define BOX_GPU_GRASS_COUNTERS (64u)
-
-/** Bytes of the counts of a packet: blades placed and drawn per level */
-#define BOX_GPU_GRASS_STATS (32u)
-
-/** Readbacks of the counts and timestamps in flight at most */
-#define BOX_GPU_GRASS_READBACKS (4)
-
-/** Timestamps of the grass passes of a packet at most, a begin and an end per pass */
-#define BOX_GPU_GRASS_STAMPS (64)
-
-/** Bytes of the resolved timestamps of a packet, a multiple of the resolve alignment */
-#define BOX_GPU_GRASS_STAMP_BYTES (BOX_GPU_GRASS_STAMPS * sizeof(uint64_t))
-
-/** Bytes of a readback: the counts, then the timestamps */
-#define BOX_GPU_GRASS_READBACK_BYTES (BOX_GPU_GRASS_STATS + BOX_GPU_GRASS_STAMP_BYTES)
-
-/** Nanoseconds above which a measured pass is dropped as a stale timestamp */
-#define BOX_GPU_GRASS_MEASURE_MAX (1e9)
-
-/** Draw pipelines, one per color format and depth mode */
-#define BOX_GPU_GRASS_DRAWS (BOX_GPU_BLIT_FORMATS * 2)
-
-/** The params of a Grass in a view (GrassParams of grass.wgsl) */
-typedef struct box_gpu_grass_params_t {
-    float view_proj[16];            /**< View projection of the view */
-    float camera[4];                /**< Local camera, the distance the blades end at */
-    int32_t patches[4];             /**< Absolute patch of the corner, patches and cells along
-                                     *   an edge */
-    float corner[4];                /**< Local x and z of the corner, edge of a patch and a cell */
-    float ground[4];                /**< Lowest and highest ground, plane, thinning start */
-    float lod[4];                   /**< Ends of levels 0 and 1, end and fade start of the blades */
-    float blade[4];                 /**< Shortest, tallest, narrowest and widest blade */
-    float base[4];                  /**< Linear color at the base */
-    float tip[4];                   /**< Linear color at the tip */
-    uint32_t config[4];             /**< Mask channel plus one, terrain, seed, capacity */
-    float shape[4];                 /**< Edge of a clump, how strongly blades follow their
-                                     *   clump, variation over the world, height
-                                     *   below which blades fold */
-    float pixel[4];                 /**< Size of a pixel per meter of distance and its size at
-                                     *   any distance, one of them 0 */
-    float wind_field[4];            /**< Direction the wind blows toward, local offset of its
-                                     *   gust field (GrassWind of grass_wind.wgsl) */
-    float wind_strength[4];         /**< Speed, gust, 1 over the gust scale, phase of the sway */
-    float wind_time[4];             /**< Phase of the swing and flutter of the blades, 0 */
-} box_gpu_grass_params_t;
-
-_Static_assert(sizeof(box_gpu_grass_params_t) == 288, "GrassParams of grass.wgsl");
-_Static_assert(sizeof(box_gpu_grass_params_t) <= BOX_GPU_GRASS_PARAMS_STRIDE,
-    "the params of a Grass must fit in their stride");
-
-/** A blade (GrassBlade of grass.wgsl) */
-typedef struct box_gpu_grass_blade_t {
-    float position[3];              /**< Local position of its base */
-    float yaw;                      /**< Facing around the vertical */
-    float height;                   /**< Height */
-    float width;                    /**< Width at the base */
-    float lean;                     /**< Lean of the tip, 0 to 1 */
-    float shade;                    /**< Brightness */
-    float bend;                     /**< How far it bends over toward its tip, 0 to 1 */
-    float curl;                     /**< Curl around its length, -1 to 1 */
-    uint32_t tint;                  /**< Color variation over the world, half of it in RGB8,
-                                     *   the phase of its clump in the high and its stiffness
-                                     *   in the low 4 bits of A */
-    float clump;                    /**< Distance from the center of its clump in clump edges */
-} box_gpu_grass_blade_t;
-
-_Static_assert(sizeof(box_gpu_grass_blade_t) == 48, "GrassBlade of grass.wgsl");
-
-/** State of a readback of the counts and timestamps of a packet */
-typedef enum box_gpu_grass_read_state_t {
-    BOX_GPU_GRASS_FREE,             /**< Unused */
-    BOX_GPU_GRASS_RECORDING,        /**< The passes of the packet being rendered write into it */
-    BOX_GPU_GRASS_WRITTEN,          /**< Its counts copied, its timestamps resolved a packet
-                                     *   later */
-    BOX_GPU_GRASS_COPIED,           /**< Resolved and copied, not yet mapping */
-    BOX_GPU_GRASS_MAPPING,          /**< Waiting for the map */
-    BOX_GPU_GRASS_MAPPED,           /**< Mapped, the counts can be read */
-    BOX_GPU_GRASS_FAILED            /**< The map failed */
-} box_gpu_grass_read_state_t;
-
-/** A readback of the counts and timestamps of a packet */
-typedef struct box_gpu_grass_readback_t {
-    WGPUBuffer buffer;              /**< Mappable copy of the counts and timestamps */
-    int32_t state;                  /**< box_gpu_grass_read_state_t */
-    uint32_t stamps;                /**< Timestamps the passes wrote */
-} box_gpu_grass_readback_t;
-
-/** The buffers of a Grass entity */
-typedef struct box_gpu_grass_entity_t {
-    box_render_grass_t grass;       /**< The Grass of the last packet */
-    int64_t frame;                  /**< Frame of the last packet that had it */
-    uint32_t capacity;              /**< Blades a level holds */
-    WGPUBuffer blades;              /**< Blades, a range of capacity per level */
-    WGPUBuffer counters;            /**< Indirect arguments of the levels and their blades */
-    WGPUBindGroup place_group;      /**< Binds them to the place pass */
-    WGPUBindGroup draw_group;       /**< Binds the blades to the draw */
-    WGPUBuffer group_params;        /**< Params ring the groups bind */
-    uint64_t recorded;              /**< Recording of the last view that placed its blades */
-    uint32_t offset;                /**< Offset of its params in that view */
-} box_gpu_grass_entity_t;
-
-/** A draw pipeline of a color format and depth mode */
-typedef struct box_gpu_grass_pipeline_t {
-    WGPUTextureFormat format;       /**< Format of the color target */
-    bool equal;                     /**< Tests the depth of the prepass without writing it */
-    WGPURenderPipeline pipeline;    /**< The pipeline */
-} box_gpu_grass_pipeline_t;
-
-/** The grass passes */
-typedef struct box_gpu_grass_t {
-    WGPUBindGroupLayout place_layout; /**< Params, blades, counters and counts of the packet */
-    WGPUBindGroupLayout draw_layout; /**< Params and blades */
-    WGPUPipelineLayout place_pipeline_layout; /**< Sampled terrain, then place_layout */
-    WGPUPipelineLayout draw_pipeline_layout; /**< View group, then draw_layout */
-    WGPUComputePipeline reset;      /**< Writes the vertex counts and zeroes the blades */
-    WGPUComputePipeline place;      /**< Places the blades of the patches */
-    WGPUComputePipeline finish;     /**< Clamps the blades and adds the counts */
-    int32_t place_revision;         /**< Revision of the shader of the compute pipelines */
-    box_gpu_grass_pipeline_t draws[BOX_GPU_GRASS_DRAWS]; /**< Draw pipelines */
-    int32_t draw_count;             /**< Draw pipelines created */
-    WGPURenderPipeline depth;       /**< Draw pipeline of the depth prepass */
-    int32_t draw_revision;          /**< Revision of the shader of the draw pipelines */
-    WGPUBuffer params;              /**< Ring of the params of the Grass entities in the views */
-    uint32_t params_capacity;       /**< Params the ring holds */
-    uint32_t params_used;           /**< Params the packet wrote */
-    WGPUBuffer stats;               /**< Counts of the packet */
-    WGPUBuffer no_params;           /**< Zero params of the sampled terrain of a Grass without */
-    WGPUBuffer no_grid;             /**< Empty grid of that terrain */
-    WGPUBindGroup no_terrain;       /**< Binds them, the terrain of the Grass on a plane */
-    ecs_map_t entities;             /**< Grass entity to box_gpu_grass_entity_t */
-    uint64_t recording;             /**< Views that placed blades so far */
-    bool active;                    /**< The packet has a Grass */
-    WGPUQuerySet queries;           /**< Timestamps per readback, NULL without the feature */
-    WGPUBuffer resolve;             /**< Resolved timestamps */
-    box_gpu_grass_readback_t readbacks[BOX_GPU_GRASS_READBACKS]; /**< Count copies */
-    int32_t current;                /**< Readback of the packet being rendered, -1 for none */
-} box_gpu_grass_t;
-
-/** Create a buffer.
- *
- * @param gpu The backend
- * @param size Bytes
- * @param usage Usage
- * @return The buffer
- */
-static WGPUBuffer box_gpu_grass_buffer(
+WGPUBuffer box_gpu_grass_buffer(
     box_gpu_t *gpu,
     uint64_t size,
     WGPUBufferUsage usage)
@@ -261,6 +93,18 @@ static void box_gpu_grass_layouts(
             .bindGroupLayoutCount = 2,
             .bindGroupLayouts = draw_groups
         });
+    s->empty_layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
+        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 0 });
+    s->empty_group = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
+        .layout = s->empty_layout,
+        .entryCount = 0
+    });
+    WGPUBindGroupLayout shadow_groups[2] = { s->empty_layout, s->draw_layout };
+    s->shadow_pipeline_layout = wgpuDeviceCreatePipelineLayout(gpu->device,
+        &(WGPUPipelineLayoutDescriptor){
+            .bindGroupLayoutCount = 2,
+            .bindGroupLayouts = shadow_groups
+        });
 }
 
 /** Create the timestamp queries and their resolve buffer when the device has the feature, and
@@ -306,17 +150,6 @@ void box_gpu_grass_init(
     gpu->grass = s;
 }
 
-/** Release a webgpu object when it exists.
- *
- * @param obj The object
- * @param release The release function of its type
- */
-#define BOX_GPU_GRASS_RELEASE(obj, release) \
-    if (obj) { \
-        release(obj); \
-        obj = NULL; \
-    }
-
 /** Release the buffers and groups of a Grass entity and the entity.
  *
  * @param e The entity
@@ -328,14 +161,14 @@ static void box_gpu_grass_entity_free(
     BOX_GPU_GRASS_RELEASE(e->draw_group, wgpuBindGroupRelease);
     BOX_GPU_GRASS_RELEASE(e->blades, wgpuBufferRelease);
     BOX_GPU_GRASS_RELEASE(e->counters, wgpuBufferRelease);
+    BOX_GPU_GRASS_RELEASE(e->shadow_place_group, wgpuBindGroupRelease);
+    BOX_GPU_GRASS_RELEASE(e->shadow_draw_group, wgpuBindGroupRelease);
+    BOX_GPU_GRASS_RELEASE(e->shadow_blades, wgpuBufferRelease);
+    BOX_GPU_GRASS_RELEASE(e->shadow_counters, wgpuBufferRelease);
     ecs_os_free(e);
 }
 
-/** Release the draw pipelines, which are created again with the current draw shader.
- *
- * @param s The grass passes
- */
-static void box_gpu_grass_draw_reset(
+void box_gpu_grass_draw_reset(
     box_gpu_grass_t *s)
 {
     int32_t i;
@@ -345,6 +178,8 @@ static void box_gpu_grass_draw_reset(
 
     s->draw_count = 0;
     BOX_GPU_GRASS_RELEASE(s->depth, wgpuRenderPipelineRelease);
+    BOX_GPU_GRASS_RELEASE(s->shadow, wgpuRenderPipelineRelease);
+    BOX_GPU_GRASS_RELEASE(s->shadow_point, wgpuRenderPipelineRelease);
 }
 
 /** Release the compute pipelines, which are created again with the current place shader.
@@ -389,6 +224,9 @@ void box_gpu_grass_fini(
     BOX_GPU_GRASS_RELEASE(s->stats, wgpuBufferRelease);
     BOX_GPU_GRASS_RELEASE(s->place_pipeline_layout, wgpuPipelineLayoutRelease);
     BOX_GPU_GRASS_RELEASE(s->draw_pipeline_layout, wgpuPipelineLayoutRelease);
+    BOX_GPU_GRASS_RELEASE(s->shadow_pipeline_layout, wgpuPipelineLayoutRelease);
+    BOX_GPU_GRASS_RELEASE(s->empty_group, wgpuBindGroupRelease);
+    BOX_GPU_GRASS_RELEASE(s->empty_layout, wgpuBindGroupLayoutRelease);
     BOX_GPU_GRASS_RELEASE(s->place_layout, wgpuBindGroupLayoutRelease);
     BOX_GPU_GRASS_RELEASE(s->draw_layout, wgpuBindGroupLayoutRelease);
     ecs_os_free(s);
@@ -603,12 +441,18 @@ static void box_gpu_grass_entity_groups(
     box_gpu_grass_entity_t *e)
 {
     uint64_t blades = (uint64_t)e->capacity * BOX_GRASS_LODS * sizeof(box_gpu_grass_blade_t);
-    if (e->place_group && e->group_params == s->params) {
+    uint64_t shadows = (uint64_t)e->shadow_capacity * BOX_GRASS_LODS *
+        sizeof(box_gpu_grass_blade_t);
+    if (e->place_group && e->group_params == s->params &&
+        (!e->shadow_blades || e->shadow_place_group))
+    {
         goto done;
     }
 
     BOX_GPU_GRASS_RELEASE(e->place_group, wgpuBindGroupRelease);
     BOX_GPU_GRASS_RELEASE(e->draw_group, wgpuBindGroupRelease);
+    BOX_GPU_GRASS_RELEASE(e->shadow_place_group, wgpuBindGroupRelease);
+    BOX_GPU_GRASS_RELEASE(e->shadow_draw_group, wgpuBindGroupRelease);
     WGPUBindGroupEntry place[4] = {
         { .binding = 0, .buffer = s->params, .size = sizeof(box_gpu_grass_params_t) },
         { .binding = 1, .buffer = e->blades, .size = blades },
@@ -625,6 +469,27 @@ static void box_gpu_grass_entity_groups(
         .entryCount = 2,
         .entries = place
     });
+    if (e->shadow_blades) {
+        WGPUBindGroupEntry shadow[4] = {
+            { .binding = 0, .buffer = s->params, .size = sizeof(box_gpu_grass_params_t) },
+            { .binding = 1, .buffer = e->shadow_blades, .size = shadows },
+            { .binding = 2, .buffer = e->shadow_counters, .size = BOX_GPU_GRASS_COUNTERS },
+            { .binding = 3, .buffer = s->stats, .size = BOX_GPU_GRASS_STATS }
+        };
+        e->shadow_place_group = wgpuDeviceCreateBindGroup(gpu->device,
+            &(WGPUBindGroupDescriptor){
+                .layout = s->place_layout,
+                .entryCount = 4,
+                .entries = shadow
+            });
+        e->shadow_draw_group = wgpuDeviceCreateBindGroup(gpu->device,
+            &(WGPUBindGroupDescriptor){
+                .layout = s->draw_layout,
+                .entryCount = 2,
+                .entries = shadow
+            });
+    }
+
     e->group_params = s->params;
 done:
     return;
@@ -668,6 +533,8 @@ static void box_gpu_grass_entity(
         e->counters = box_gpu_grass_buffer(gpu, BOX_GPU_GRASS_COUNTERS,
             WGPUBufferUsage_Storage | WGPUBufferUsage_Indirect | WGPUBufferUsage_CopySrc);
     }
+
+    box_gpu_grass_entity_shadows(gpu, e, box_gpu_grass_shadow_capacity(g));
 }
 
 /** Release the buffers of the Grass entities a packet no longer has.
@@ -699,8 +566,9 @@ static void box_gpu_grass_sweep(
     } while (count);
 }
 
-/** Make the ring of params hold those of every Grass in every view of a packet, and the group of
- * the sampled terrain of a Grass on a plane.
+/** Make the ring of params hold those of every Grass in every view of a packet, with those of
+ * its shadows in the cascades of the view and in the light tiles, and the group of the sampled
+ * terrain of a Grass on a plane.
  *
  * @param gpu The backend
  * @param s The grass passes
@@ -712,7 +580,8 @@ static void box_gpu_grass_params_reserve(
     const box_render_packet_t *packet)
 {
     uint32_t need = (uint32_t)(ecs_vec_count(&packet->grasses) *
-        (ecs_vec_count(&packet->views) + 1) * 2);
+        ((ecs_vec_count(&packet->views) + 1) * (2 + BOX_RENDER_SHADOW_CASCADES) + 1 +
+        ecs_vec_count(&packet->shadow_tiles) * BOX_RENDER_SHADOW_OCTANTS));
     s->params_used = 0;
     if (!s->params || s->params_capacity < need) {
         uint32_t capacity = s->params_capacity ? s->params_capacity : 16u;
@@ -825,12 +694,7 @@ static WGPUComputePipeline box_gpu_grass_compute(
     });
 }
 
-/** Make the compute pipelines match the place shader, requested until each exists.
- *
- * @param gpu The backend
- * @return Whether they all exist
- */
-static bool box_gpu_grass_place_pipelines(
+bool box_gpu_grass_place_pipelines(
     box_gpu_t *gpu)
 {
     box_gpu_grass_t *s = gpu->grass;
@@ -1007,33 +871,26 @@ static int32_t box_gpu_grass_patch(
     return (int32_t)p;
 }
 
-/** Fill the params of a Grass in a view.
- *
- * @param packet The packet
- * @param e The Grass
- * @param u The uniforms of the view
- * @param out Receives the params
- * @return The patches along an edge of the grid
- */
-static uint32_t box_gpu_grass_params(
+uint32_t box_gpu_grass_params(
     const box_render_packet_t *packet,
     const box_gpu_grass_entity_t *e,
-    const box_gpu_view_uniforms_t *u,
+    const float camera[3],
+    float distance,
+    uint32_t capacity,
     box_gpu_grass_params_t *out)
 {
     const box_render_grass_t *g = &e->grass;
-    double reach = ceil((double)g->lod[2] / BOX_GPU_GRASS_PATCH);
+    double reach = ceil((double)distance / BOX_GPU_GRASS_PATCH);
     int32_t n = (int32_t)reach * 2 + 1, cells, half;
     n = n > BOX_GPU_GRASS_PATCHES_MAX ? BOX_GPU_GRASS_PATCHES_MAX : n;
     half = n / 2;
     cells = (int32_t)lround(BOX_GPU_GRASS_PATCH * sqrt((double)g->density));
     cells = cells < 1 ? 1 : cells > BOX_GPU_GRASS_CELLS_MAX ? BOX_GPU_GRASS_CELLS_MAX : cells;
     ecs_os_memset_t(out, 0, box_gpu_grass_params_t);
-    ecs_os_memcpy_n(out->view_proj, u->view_proj, float, 16);
-    ecs_os_memcpy_n(out->camera, u->camera, float, 3);
-    out->camera[3] = g->lod[2];
-    int32_t px = box_gpu_grass_patch(packet->origin[0] + (double)u->camera[0]) - half;
-    int32_t pz = box_gpu_grass_patch(packet->origin[2] + (double)u->camera[2]) - half;
+    ecs_os_memcpy_n(out->camera, camera, float, 3);
+    out->camera[3] = distance;
+    int32_t px = box_gpu_grass_patch(packet->origin[0] + (double)camera[0]) - half;
+    int32_t pz = box_gpu_grass_patch(packet->origin[2] + (double)camera[2]) - half;
     out->patches[0] = px;
     out->patches[1] = pz;
     out->patches[2] = n;
@@ -1059,17 +916,11 @@ static uint32_t box_gpu_grass_params(
     out->config[0] = g->mask >= 0 ? (uint32_t)g->mask + 1u : 0u;
     out->config[1] = g->terrain ? 1u : 0u;
     out->config[2] = g->seed;
-    out->config[3] = e->capacity;
+    out->config[3] = capacity;
     out->shape[0] = g->clump[0];
     out->shape[1] = g->clump[1];
     out->shape[2] = g->variation;
     out->shape[3] = g->fold;
-    if (u->lights[3]) {
-        out->pixel[1] = 2.0f * u->cluster[1] * u->viewport[3];
-    } else {
-        out->pixel[0] = 2.0f * u->cluster[1] * u->viewport[3];
-    }
-
     out->wind_field[0] = g->wind_direction[0];
     out->wind_field[1] = g->wind_direction[1];
     out->wind_field[2] = g->wind_offset[0];
@@ -1083,80 +934,138 @@ static uint32_t box_gpu_grass_params(
     return (uint32_t)n;
 }
 
-/** Begin the compute pass of a view, timed when there is room for its timestamps.
+void box_gpu_grass_pixel(
+    const box_gpu_view_uniforms_t *u,
+    float out[4])
+{
+    if (u->lights[3]) {
+        out[1] = 2.0f * u->cluster[1] * u->viewport[3];
+    } else {
+        out[0] = 2.0f * u->cluster[1] * u->viewport[3];
+    }
+}
+
+/** Fill the params of a Grass in a view: its blades out to where they end, culled by the
+ * frustum of the view, at least a pixel wide, and the shadows they cast in the view.
  *
- * @param gpu The backend
- * @param s The grass passes
- * @param encoder The encoder
- * @return The pass
+ * @param packet The packet
+ * @param e The Grass
+ * @param v The view
+ * @param u The uniforms of the view
+ * @param out Receives the params
+ * @return The patches along an edge of the grid
  */
-static WGPUComputePassEncoder box_gpu_grass_pass(
-    box_gpu_t *gpu,
+static uint32_t box_gpu_grass_view_params(
+    const box_render_packet_t *packet,
+    const box_gpu_grass_entity_t *e,
+    const box_render_view_t *v,
+    const box_gpu_view_uniforms_t *u,
+    box_gpu_grass_params_t *out)
+{
+    uint32_t n = box_gpu_grass_params(packet, e, u->camera, e->grass.lod[2], e->capacity, out);
+    ecs_os_memcpy_n(out->view_proj, u->view_proj, float, 16);
+    box_gpu_grass_pixel(u, out->pixel);
+
+    if (box_render_grass_cascades(&e->grass, &v->shadows)) {
+        out->caster[0] = e->grass.shadow;
+        out->caster[1] = box_render_grass_shadow_fade(&e->grass);
+    }
+
+    return n;
+}
+
+const WGPUPassTimestampWrites* box_gpu_grass_writes(
     box_gpu_grass_t *s,
-    WGPUCommandEncoder encoder)
+    WGPUPassTimestampWrites *writes)
 {
     box_gpu_grass_readback_t *r = s->current != -1 ? &s->readbacks[s->current] : NULL;
-    WGPUPassTimestampWrites writes;
-    const WGPUPassTimestampWrites *timed = NULL;
+    const WGPUPassTimestampWrites *result = NULL;
     if (r && s->queries && r->stamps + 2 <= BOX_GPU_GRASS_STAMPS) {
         uint32_t first = (uint32_t)s->current * BOX_GPU_GRASS_STAMPS + r->stamps;
-        writes = (WGPUPassTimestampWrites){
+        *writes = (WGPUPassTimestampWrites){
             .querySet = s->queries,
             .beginningOfPassWriteIndex = first,
             .endOfPassWriteIndex = first + 1
         };
-        timed = &writes;
+        result = writes;
         r->stamps += 2;
     }
 
-    gpu->pending.grass_passes ++;
-
-    return box_gpu_compute_begin(encoder, timed);
+    return result;
 }
 
-/** Record the dispatches of a Grass in the compute pass of a view.
- *
- * @param gpu The backend
- * @param s The grass passes
- * @param pass The pass
- * @param packet The packet
- * @param e The Grass
- * @param u The uniforms of the view
- * @return Whether its blades were placed
- */
-static bool box_gpu_grass_dispatch(
+WGPUComputePassEncoder box_gpu_grass_pass(
+    box_gpu_t *gpu,
+    box_gpu_grass_t *s,
+    WGPUCommandEncoder encoder)
+{
+    WGPUPassTimestampWrites writes;
+    gpu->pending.grass_passes ++;
+
+    return box_gpu_compute_begin(encoder, box_gpu_grass_writes(s, &writes));
+}
+
+bool box_gpu_grass_dispatch(
     box_gpu_t *gpu,
     box_gpu_grass_t *s,
     WGPUComputePassEncoder pass,
-    const box_render_packet_t *packet,
-    box_gpu_grass_entity_t *e,
-    const box_gpu_view_uniforms_t *u)
+    const box_gpu_grass_entity_t *e,
+    const box_gpu_grass_params_t *params,
+    uint32_t n,
+    WGPUBindGroup group,
+    uint32_t *offset)
 {
-    box_gpu_grass_params_t params;
     bool result = false;
     WGPUBindGroup terrain = e->grass.terrain
         ? box_gpu_terrain_sample_group(gpu, e->grass.terrain) : s->no_terrain;
-    if (!terrain || !e->place_group || s->params_used >= s->params_capacity) {
+    if (!terrain || !group || s->params_used >= s->params_capacity) {
         goto done;
     }
 
-    uint32_t n = box_gpu_grass_params(packet, e, u, &params);
-    uint32_t offset = s->params_used * BOX_GPU_GRASS_PARAMS_STRIDE;
+    *offset = s->params_used * BOX_GPU_GRASS_PARAMS_STRIDE;
     s->params_used ++;
-    wgpuQueueWriteBuffer(gpu->queue, s->params, offset, &params, sizeof(params));
+    wgpuQueueWriteBuffer(gpu->queue, s->params, *offset, params, sizeof(*params));
     wgpuComputePassEncoderSetBindGroup(pass, 0, terrain, 0, NULL);
-    wgpuComputePassEncoderSetBindGroup(pass, 1, e->place_group, 1, &offset);
+    wgpuComputePassEncoderSetBindGroup(pass, 1, group, 1, offset);
     wgpuComputePassEncoderSetPipeline(pass, s->reset);
     wgpuComputePassEncoderDispatchWorkgroups(pass, 1, 1, 1);
     wgpuComputePassEncoderSetPipeline(pass, s->place);
     wgpuComputePassEncoderDispatchWorkgroups(pass, n, n, 1);
     wgpuComputePassEncoderSetPipeline(pass, s->finish);
     wgpuComputePassEncoderDispatchWorkgroups(pass, 1, 1, 1);
-    e->recorded = s->recording;
-    e->offset = offset;
     result = true;
 done:
     return result;
+}
+
+/** Record the placements of a Grass in the compute pass of a view: its blades, and when it
+ * casts shadows into the cascades of the view the blades that cast.
+ *
+ * @param gpu The backend
+ * @param s The grass passes
+ * @param pass The pass
+ * @param packet The packet
+ * @param e The Grass
+ * @param v The view
+ * @param u The uniforms of the view
+ */
+static void box_gpu_grass_place_view(
+    box_gpu_t *gpu,
+    box_gpu_grass_t *s,
+    WGPUComputePassEncoder pass,
+    const box_render_packet_t *packet,
+    box_gpu_grass_entity_t *e,
+    const box_render_view_t *v,
+    const box_gpu_view_uniforms_t *u)
+{
+    box_gpu_grass_params_t params;
+    uint32_t n = box_gpu_grass_view_params(packet, e, v, u, &params), offset = 0;
+    if (box_gpu_grass_dispatch(gpu, s, pass, e, &params, n, e->place_group, &offset)) {
+        e->recorded = s->recording;
+        e->offset = offset;
+    }
+
+    box_gpu_grass_place_shadows(gpu, s, pass, packet, e, v, u);
 }
 
 void box_gpu_grass_record(
@@ -1168,6 +1077,10 @@ void box_gpu_grass_record(
 {
     box_gpu_grass_t *s = gpu->grass;
     WGPUComputePassEncoder pass = NULL;
+    if (s) {
+        s->view = NULL;
+    }
+
     if (!box_gpu_grass_drawn(gpu, packet, v) || !box_gpu_grass_place_pipelines(gpu)) {
         goto done;
     }
@@ -1175,6 +1088,7 @@ void box_gpu_grass_record(
     const box_gpu_view_uniforms_t *u = (const box_gpu_view_uniforms_t*)ecs_vec_get_t(
         &gpu->view_data, uint8_t, slot * BOX_GPU_VIEW_STRIDE);
     s->recording ++;
+    s->view = v;
     ecs_map_iter_t it = ecs_map_iter(&s->entities);
     while (ecs_map_next(&it)) {
         box_gpu_grass_entity_t *e = ecs_map_ptr(&it);
@@ -1186,7 +1100,7 @@ void box_gpu_grass_record(
             pass = box_gpu_grass_pass(gpu, s, encoder);
         }
 
-        box_gpu_grass_dispatch(gpu, s, pass, packet, e, u);
+        box_gpu_grass_place_view(gpu, s, pass, packet, e, v, u);
     }
 
     if (pass) {

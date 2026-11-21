@@ -140,6 +140,8 @@ static void box_render_grass(
     }
 
     out.seed = g.seed;
+    out.shadow = g.shadow_distance;
+    out.shadow_lights = g.shadow_lights && g.shadow_distance > 0.0f;
     box_render_grass_wind(wind, &out);
     *ecs_vec_append_t(NULL, &p->grasses, box_render_grass_t) = out;
 done:
@@ -231,6 +233,50 @@ bool box_render_grass_far_of(
         }
     }
 
+    return result;
+}
+
+uint32_t box_render_grass_cascades(
+    const box_render_grass_t *g,
+    const box_render_view_shadows_t *s)
+{
+    uint32_t result = 0;
+    int32_t i, n = s->cascades;
+    if (!s->enabled || !(g->shadow > 0.0f) || n < 1 || n > BOX_RENDER_SHADOW_CASCADES) {
+        goto done;
+    }
+
+    for (i = 0; i < n; i ++) {
+        float start = i ? s->splits[i - 1] : s->near_;
+        if (start < g->shadow) {
+            result |= 1u << i;
+        }
+    }
+
+done:
+    return result;
+}
+
+float box_render_grass_shadow_fade(
+    const box_render_grass_t *g)
+{
+    return g->shadow > 0.0f ? g->shadow * BOX_RENDER_GRASS_SHADOW_FADE : 0.0f;
+}
+
+float box_render_grass_shadow_reach(
+    const box_render_grass_t *g,
+    const float direction[3])
+{
+    float up = isfinite(direction[1]) ? direction[1] : 1.0f;
+    float result = 0.0f;
+    if (!(g->shadow > 0.0f)) {
+        goto done;
+    }
+
+    up = up < BOX_RENDER_GRASS_SHADOW_LOW ? BOX_RENDER_GRASS_SHADOW_LOW : up;
+    result = BOX_RENDER_GRASS_SHADOW_SLACK * g->height[1] / up;
+    result = result > g->shadow ? g->shadow : result;
+done:
     return result;
 }
 

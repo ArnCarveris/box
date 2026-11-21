@@ -6,7 +6,9 @@
  * across a shift of the WorldOrigin, follow the mask of the terrain, gather in clumps that share
  * their facing, never draw thinner than about a pixel, vary in color over the world, render lit,
  * take a stiffness and the phase of their clump in the wind, bend and move in it, show its gusts
- * as bands of light that roll downwind and show in the GPU stats.
+ * as bands of light that roll downwind, show in the GPU stats, cast shadows into the cascades of
+ * the sun within their shadow distance and into the spot and point light tiles only with
+ * shadow_lights.
  *
  * The scenes are test/assets/grass/plane.flecs and test/assets/grass/terrain.flecs.
  */
@@ -1091,3 +1093,176 @@ void Grass_gusts_roll_as_waves(void) {
     stbi_image_free(steady[0]);
     stbi_image_free(steady[1]);
 }
+
+/** Get the GPU stats of a world.
+ *
+ * @param world The world
+ * @return The stats
+ */
+static box_render_gpu_stats_t gr_stats(
+    ecs_world_t *world)
+{
+    box_render_gpu_stats_t result;
+    test_bool(box_render_gpu_stats(world, &result), true);
+
+    return result;
+}
+
+void Grass_casts_into_cascades(void) {
+    ecs_world_t *world = gr_world("test/assets/grass/plane.flecs");
+    ecs_entity_t meadow = gr_lookup(world, "meadow");
+    gr_frames(world, 12);
+
+    // By default the blades cast into the cascades near the camera, every frame, and not into
+    // the light tiles
+    box_render_gpu_stats_t stats = gr_stats(world);
+    printf("cascades %d, tiles %d, passes %d\n", stats.grass_cascades, stats.grass_tiles,
+        stats.grass_passes);
+    test_assert(stats.grass_cascades >= 12);
+    test_int(stats.grass_tiles, 0);
+
+    // A Grass with no shadow distance casts none
+    Grass *g = ecs_ensure(world, meadow, Grass);
+    g->shadow_distance = 0;
+    ecs_modified(world, meadow, Grass);
+    gr_frames(world, 2);
+    int32_t before = gr_stats(world).grass_cascades;
+    gr_frames(world, 6);
+    test_int(gr_stats(world).grass_cascades, before);
+
+    // Casting again
+    g = ecs_ensure(world, meadow, Grass);
+    g->shadow_distance = 20;
+    ecs_modified(world, meadow, Grass);
+    gr_frames(world, 6);
+    test_assert(gr_stats(world).grass_cascades > before);
+
+    gr_expect_no_errors(world);
+    ecs_fini(world);
+}
+
+void Grass_shadow_counts_apart(void) {
+    ecs_world_t *world = gr_world("test/assets/grass/plane.flecs");
+    ecs_entity_t meadow = gr_lookup(world, "meadow");
+    ecs_singleton_set(world, GpuPanel, { .open = true, .interval = 0 });
+
+    // The blades that cast do not add to the blades the view placed and drew
+    Grass *g = ecs_ensure(world, meadow, Grass);
+    g->shadow_distance = 0;
+    ecs_modified(world, meadow, Grass);
+    gr_frames(world, 12);
+    double drawn = ecs_singleton_get(world, GpuStats)->grass.drawn;
+    g = ecs_ensure(world, meadow, Grass);
+    g->shadow_distance = 30;
+    ecs_modified(world, meadow, Grass);
+    gr_frames(world, 12);
+    double casting = ecs_singleton_get(world, GpuStats)->grass.drawn;
+    printf("drawn %.0f without shadows, %.0f with\n", drawn, casting);
+    test_assert(drawn > 0);
+    test_assert(fabs(casting - drawn) < 0.05 * drawn);
+
+    gr_expect_no_errors(world);
+    ecs_fini(world);
+}
+
+/** Add a spot light and a point light with shadows to the meadow of the plane scene, and turn
+ * on the shadows of the spot and point lights of the Scene.
+ *
+ * @param world The world
+ */
+static void gr_lights(
+    ecs_world_t *world)
+{
+    Scene *scene = ecs_singleton_ensure(world, Scene);
+    scene->punctual_shadows = true;
+    ecs_singleton_modified(world, Scene);
+    ecs_entity_t spot = ecs_entity(world, { .name = "grass_spot" });
+    ecs_set(world, spot, Position, {0, 3, -5});
+    ecs_set(world, spot, Rotation, {1.5708f, 0, 0});
+    ecs_set(world, spot, SpotLight, {.intensity = 60, .range = 10, .inner_angle = 20,
+        .outer_angle = 35, .shadows = true});
+    ecs_entity_t point = ecs_entity(world, { .name = "grass_point" });
+    ecs_set(world, point, Position, {3, 1.5, -4});
+    ecs_set(world, point, PointLight, {.intensity = 30, .range = 8, .shadows = true});
+}
+
+void Grass_lights_only_when_enabled(void) {
+    ecs_world_t *world = gr_world("test/assets/grass/plane.flecs");
+    ecs_entity_t meadow = gr_lookup(world, "meadow");
+    gr_lights(world);
+    gr_frames(world, 12);
+
+    // The light tiles render, the blades cast nothing into them
+    box_render_gpu_stats_t stats = gr_stats(world);
+    printf("tiles %d, grass tiles %d\n", stats.shadow_tiles, stats.grass_tiles);
+    test_assert(stats.shadow_tiles > 0);
+    test_int(stats.grass_tiles, 0);
+
+    // With shadow_lights the blades cast into both tiles every frame
+    Grass *g = ecs_ensure(world, meadow, Grass);
+    g->shadow_lights = true;
+    ecs_modified(world, meadow, Grass);
+    gr_frames(world, 2);
+    int32_t before = gr_stats(world).grass_tiles;
+    gr_frames(world, 6);
+    stats = gr_stats(world);
+    printf("grass tiles %d over 6 frames\n", stats.grass_tiles - before);
+    test_assert(stats.grass_tiles - before >= 6 * 2);
+
+    gr_expect_no_errors(world);
+    ecs_fini(world);
+}
+
+/** Get the mean brightness of the lower half of an image, the ground and blades near the
+ * camera.
+ *
+ * @param px The image
+ * @return The mean of the channels
+ */
+static double gr_bright(
+    const unsigned char *px)
+{
+    double sum = 0;
+    int32_t x, y;
+    for (y = GR_HEIGHT / 2; y < GR_HEIGHT; y ++) {
+        for (x = 0; x < GR_WIDTH; x ++) {
+            const unsigned char *p = &px[(y * GR_WIDTH + x) * 4];
+            sum += (double)p[0] + p[1] + p[2];
+        }
+    }
+
+    return sum / (3.0 * GR_WIDTH * (GR_HEIGHT - GR_HEIGHT / 2));
+}
+
+void Grass_shadows_darken_meadow(void) {
+    ecs_world_t *world = gr_world("test/assets/grass/plane.flecs");
+    ecs_entity_t meadow = gr_lookup(world, "meadow");
+    ecs_entity_t sun = gr_lookup(world, "grass_sun");
+
+    // A low sun from the side over tall blades
+    ecs_set(world, sun, Rotation, {0.25f, 1.9f, 0});
+    Grass *g = ecs_ensure(world, meadow, Grass);
+    g->density = 64;
+    g->min_height = 0.4f;
+    g->max_height = 0.8f;
+    g->shadow_distance = 0;
+    ecs_modified(world, meadow, Grass);
+    gr_frames(world, 10);
+    unsigned char *px = gr_capture(world, "grass_unshadowed.png");
+    double bare = gr_bright(px);
+    stbi_image_free(px);
+
+    g = ecs_ensure(world, meadow, Grass);
+    g->shadow_distance = 30;
+    ecs_modified(world, meadow, Grass);
+    gr_frames(world, 10);
+    px = gr_capture(world, "grass_shadowed.png");
+    double shadowed = gr_bright(px);
+    stbi_image_free(px);
+
+    printf("brightness %.2f without shadows, %.2f with\n", bare, shadowed);
+    test_assert(shadowed < bare * 0.95);
+    gr_expect_no_errors(world);
+    ecs_fini(world);
+}
+

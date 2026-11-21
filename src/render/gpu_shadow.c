@@ -553,6 +553,7 @@ void box_gpu_shadow_uniforms(
     mat4 proj,
     int32_t slot,
     int64_t frame,
+    uint32_t live,
     box_gpu_view_uniforms_t *u)
 {
     const box_render_view_shadows_t *s = &v->shadows;
@@ -588,7 +589,7 @@ void box_gpu_shadow_uniforms(
         }
 
         glm_mat4_copy(proj, store->proj);
-        cs->renders &= s->render | ~store->valid;
+        cs->renders &= s->render | live | ~store->valid;
     }
 
     float distance = s->splits[n - 1];
@@ -1218,6 +1219,8 @@ void box_gpu_shadow_render(
 
         wgpuRenderPassEncoderEnd(pass);
         wgpuRenderPassEncoderRelease(pass);
+        box_gpu_grass_shadow(gpu, encoder, v, i, layers[i], (const float*)ecs_vec_get_t(
+            &gpu->shadow_data, uint8_t, offset));
         box_gpu_count(gpu, BOX_GPU_STAT_CASCADE);
         if (store && complete) {
             store->valid |= 1u << i;
@@ -1612,6 +1615,7 @@ static bool box_gpu_atlas_renders(
         all = !atlas->valid || !gpu->shadow_clear || atlas->revision != gpu->shadow_revision ||
             (point && (atlas->point_shader != gpu->shadow_point_shader ||
             atlas->point_revision != gpu->shadow_point_revision));
+        all = all || box_gpu_grass_lights(gpu, packet, a->scene);
         for (j = 0; j < a->count; j ++) {
             renders[a->first + j] = all || tiles[j].render;
             result = result || renders[a->first + j];
@@ -1734,6 +1738,7 @@ static void box_gpu_atlas_pass(
 
     wgpuRenderPassEncoderEnd(pass);
     wgpuRenderPassEncoderRelease(pass);
+    box_gpu_grass_atlas(gpu, encoder, packet, a, renders, atlas->view, atlas->resolution);
     atlas->valid = kept;
     atlas->revision = gpu->shadow_revision;
     atlas->point_shader = point ? gpu->shadow_point_shader : 0;

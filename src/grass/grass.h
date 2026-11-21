@@ -15,6 +15,9 @@
 /** Height below which the blades of a new Grass fold into a V */
 #define BOX_GRASS_FOLD_HEIGHT (0.35f)
 
+/** Distance from the camera within which the blades of a new Grass cast shadows */
+#define BOX_GRASS_SHADOW_DISTANCE (30.0f)
+
 /** Distance between the clumps of a Grass with a clump size of 0 or less */
 #define BOX_GRASS_CLUMP_SIZE (1.2f)
 
@@ -29,7 +32,9 @@
  * finite take their defaults and the others are clamped to 0 to 1, a fold height that is not
  * finite takes its default and a negative one is 0, the density is clamped to BOX_GRASS_DENSITY_MAX,
  * each distance of the levels is at least the one before and the last at most
- * BOX_GRASS_DISTANCE_MAX, and a mask outside 0 to 3 is -1.
+ * BOX_GRASS_DISTANCE_MAX, a mask outside 0 to 3 is -1, and a shadow distance that is not finite
+ * takes its default, a negative one is 0 and a larger one than the last distance of the levels
+ * is that distance.
  *
  * @param value The Grass
  * @param out Receives the resolved values
