@@ -208,13 +208,22 @@ void box_render_wind_pack(
     out->wind_bend = isfinite(sway->bend) ? sway->bend : 0.0f;
     out->wind_height = isfinite(sway->height)
         ? glm_max(sway->height, BOX_RENDER_WIND_MIN) : BOX_MATERIAL_SWAY_HEIGHT;
-    out->wind_base = isfinite(sway->base)
-        ? (float)((double)sway->base - wind->origin_y) : (float)(0.0 - wind->origin_y);
+    if (sway->local_base) {
+        out->wind_base = isfinite(sway->base) ? sway->base : 0.0f;
+    } else {
+        out->wind_base = isfinite(sway->base)
+            ? (float)((double)sway->base - wind->origin_y) : (float)(0.0 - wind->origin_y);
+    }
+
     out->wind_flutter = isfinite(sway->flutter) && sway->flutter > 0.0f ? sway->flutter : 0.0f;
     out->wind_reach = isfinite(sway->flutter_reach)
         ? glm_max(sway->flutter_reach, BOX_RENDER_WIND_MIN) : BOX_MATERIAL_SWAY_FLUTTER_REACH;
     out->wind_flutter_phase = box_wind_wrap_float(frequency * wind->clock, 1.0);
     out->flags = BOX_RENDER_WIND_PRESENT;
+    if (sway->local_base) {
+        out->flags |= BOX_RENDER_WIND_LOCAL;
+    }
+
     out->reveal_threshold = 0.0f;
     out->wind_branch = 0.0f;
     out->wind_branch_phase = 0.0f;

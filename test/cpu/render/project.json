@@ -1272,6 +1272,7 @@
                     "clock_rate",
                     "reach",
                     "pack_pivots",
+                    "pack_local_base",
                     "reach_pivots",
                     "sway_vertex",
                     "sway_ancestors",

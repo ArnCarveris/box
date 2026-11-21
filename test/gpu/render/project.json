@@ -494,7 +494,8 @@
                     "shadow_follows",
                     "plain_mesh_unchanged",
                     "scene_off_draws_without",
-                    "gusts_roll"
+                    "gusts_roll",
+                    "local_base_any_height"
                 ]
             },
             {

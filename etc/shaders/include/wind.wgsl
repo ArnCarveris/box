@@ -33,6 +33,8 @@
 // as a whole without shearing while each branch turns by the gust at its own pivot; the flutter
 // is weighted by the flutter weight and reads the gust at the vertex, so a gust front crosses a
 // crown from its upwind side.
+// A material with WIND_LOCAL measures the base from the origin of the shape, so a plant bends
+// from its own foot wherever it stands.
 // A material with WIND_FOLIAGE turns a vertex only about the pivot of its twig (data0.xyz) with a
 // stiffness of 0, without its ancestors, like the twig, so a leaf stays on it.
 #pragma once
@@ -58,6 +60,10 @@ const WIND_PIVOTS: u32 = 64u;
 // Flag of a record with pivots that reads only data0, the foliage of a MeshGraph whose data1
 // holds the seed, hue, growth and occlusion of its cards (BOX_RENDER_WIND_FOLIAGE).
 const WIND_FOLIAGE: u32 = 2048u;
+
+// Flag of a record whose base is a height above the origin of the shape rather than a world Y
+// (BOX_RENDER_WIND_LOCAL).
+const WIND_LOCAL: u32 = 4096u;
 
 // Deepest branch level a record with pivots tells apart (BOX_MATERIAL_SWAY_LEVELS).
 const WIND_LEVELS: f32 = 4.0;
@@ -218,7 +224,9 @@ fn wind_move(world: vec3f, model: mat4x4f, m: Material, absolute: WorldOrigin) -
     let along = 1.0 + WIND_SWAY * sin(phase);
     let cross = WIND_CROSS * sin(2.0 * phase + 1.3);
 
-    let h = world.y - m.wind_base;
+    // The base is a world Y, or with WIND_LOCAL a height above the origin of the shape
+    let base = m.wind_base + select(0.0, origin.y, (m.flags & WIND_LOCAL) != 0u);
+    let h = world.y - base;
     let t = clamp(h / m.wind_height, 0.0, 1.0);
     // The gust at the vertex, or with pivots at the origin of the shape, read further downwind
     // higher up so the top follows the lower part

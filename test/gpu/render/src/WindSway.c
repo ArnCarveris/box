@@ -35,15 +35,18 @@
 /** Pixels of one unit on the floor: the capture height over the height the camera sees */
 #define SWAY_UNIT ((float)SWAY_SIZE / (24.0f * tanf(GLM_PIf / 6.0f)))
 
-/** Create the world of the cases: the camera above the origin looking down, a white floor, a sun
- * at 45 degrees that shadows toward +z, a little ambient light and shadows, in a scene with
- * Scene.wind or without it.
+/** Create the world of the cases lifted by a height: the camera above the origin looking down, a
+ * white floor, a sun at 45 degrees that shadows toward +z, a little ambient light and shadows,
+ * in a scene with Scene.wind or without it. The camera and the floor are lifted, so a lifted
+ * scene captures as one at height 0.
  *
  * @param wind Whether the scene has Scene.wind
+ * @param lift World height the camera and the floor are lifted by
  * @return The world
  */
-static ecs_world_t* sway_world(
-    bool wind)
+static ecs_world_t* sway_world_at(
+    bool wind,
+    float lift)
 {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
@@ -55,7 +58,7 @@ static ecs_world_t* sway_world(
     ecs_singleton_set(world, Scene, {.wind = wind});
 
     ecs_entity_t camera = ecs_new(world);
-    ecs_set(world, camera, Position, {0, 12, 0});
+    ecs_set(world, camera, Position, {0, 12 + lift, 0});
     ecs_set(world, camera, Rotation, {-(float)GLM_PI_2, 0, 0});
     ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
@@ -71,12 +74,23 @@ static ecs_world_t* sway_world(
     ecs_set(world, sun, DirectionalLight, {.intensity = GLM_PIf});
 
     ecs_entity_t floor = ecs_new(world);
-    ecs_set(world, floor, Position, {0, -0.1f, 0});
+    ecs_set(world, floor, Position, {0, -0.1f + lift, 0});
     ecs_set(world, floor, Box, {40, 0.2f, 40});
     ecs_set(world, floor, Rgb, {255, 255, 255});
     ecs_set(world, floor, PbrMaterial, {.roughness = 1});
 
     return world;
+}
+
+/** Create the world of the cases at height 0 (sway_world_at).
+ *
+ * @param wind Whether the scene has Scene.wind
+ * @return The world
+ */
+static ecs_world_t* sway_world(
+    bool wind)
+{
+    return sway_world_at(wind, 0);
 }
 
 /** Set the wind of the cases: along +x without gusts.
@@ -110,6 +124,30 @@ static ecs_entity_t sway_pole(
         ecs_set(world, e, WindSway, {.bend = 0.05f, .height = 3, .base = 0,
             .flutter_frequency = 2, .flutter_reach = 0.3f});
     }
+
+    return e;
+}
+
+/** Add the 3 unit swaying pole of the cases standing on a floor lifted by a height, with a
+ * bend of 0.05 that is full at its top. With a local base the base is its foot, 1.5 units below
+ * its origin, wherever it stands; without, the base is world Y 0.
+ *
+ * @param world The world
+ * @param lift World height of the foot of the pole
+ * @param local Whether the base is measured from the origin of the pole
+ * @return The pole
+ */
+static ecs_entity_t sway_pole_at(
+    ecs_world_t *world,
+    float lift,
+    bool local)
+{
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Position, {0, 1.5f + lift, 0});
+    ecs_set(world, e, Box, {0.3f, 3, 0.3f});
+    ecs_set(world, e, Rgb, {200, 60, 40});
+    ecs_set(world, e, WindSway, {.bend = 0.05f, .height = 3, .base = local ? -1.5f : 0,
+        .flutter_frequency = 2, .flutter_reach = 0.3f, .local_base = local});
 
     return e;
 }
@@ -379,4 +417,98 @@ void WindSway_gusts_roll(void) {
     test_assert(hi - lo > 0.2f * SWAY_UNIT);
 
     ecs_fini(world);
+}
+
+/** How far the wind moves a lifted pole and its shadow: the shift of the pole seen from above
+ * and of its shadow at 0.8 to 1.4 units and at 2.2 to 2.8 units along +z (the shadows of those
+ * heights of the pole), in pixels, between a calm frame and one after 30 frames of a wind of 10.
+ */
+typedef struct {
+    float pole;
+    float middle;
+    float tip;
+} sway_shift_t;
+
+/** Measure how far the wind moves the pole of the cases standing on a lifted floor.
+ *
+ * @param lift World height of the floor, the camera and the foot of the pole
+ * @param local Whether the base of the pole is measured from its origin
+ * @param name Prefix of the file names of the captures
+ * @return The shifts
+ */
+static sway_shift_t sway_shift(
+    float lift,
+    bool local,
+    const char *name)
+{
+    char calm_name[64], windy_name[64];
+    snprintf(calm_name, sizeof(calm_name), "%s_calm.png", name);
+    snprintf(windy_name, sizeof(windy_name), "%s_windy.png", name);
+    ecs_world_t *world = sway_world_at(true, lift);
+    sway_wind(world, 0);
+    sway_pole_at(world, lift, local);
+    sway_frames(world, 3);
+    unsigned char *calm = sway_render(world, calm_name);
+
+    sway_wind(world, 10);
+    sway_frames(world, 30);
+    unsigned char *windy = sway_render(world, windy_name);
+
+    int mid_top = SWAY_SIZE / 2 + (int)(0.8f * SWAY_UNIT);
+    int mid_bottom = SWAY_SIZE / 2 + (int)(1.4f * SWAY_UNIT);
+    int tip_top = SWAY_SIZE / 2 + (int)(2.2f * SWAY_UNIT);
+    int tip_bottom = SWAY_SIZE / 2 + (int)(2.8f * SWAY_UNIT);
+    float pole_rest = sway_pole_column(calm), pole_bent = sway_pole_column(windy);
+    float mid_rest = sway_dark_column(calm, mid_top, mid_bottom);
+    float mid_bent = sway_dark_column(windy, mid_top, mid_bottom);
+    float tip_rest = sway_dark_column(calm, tip_top, tip_bottom);
+    float tip_bent = sway_dark_column(windy, tip_top, tip_bottom);
+    test_assert(pole_rest > 0.0f && pole_bent > 0.0f);
+    test_assert(mid_rest > 0.0f && mid_bent > 0.0f);
+    test_assert(tip_rest > 0.0f && tip_bent > 0.0f);
+
+    sway_shift_t result = {
+        .pole = pole_bent - pole_rest,
+        .middle = mid_bent - mid_rest,
+        .tip = tip_bent - tip_rest
+    };
+
+    stbi_image_free(calm);
+    stbi_image_free(windy);
+    ecs_fini(world);
+
+    return result;
+}
+
+/** A pole with a local base bends from its foot wherever it stands: lifted with its floor and
+ * the camera, it and its shadow move as far as at height 0, in the forward pass and in the
+ * shadows; with a world base the lifted pole bends over its whole length */
+void WindSway_local_base_any_height(void) {
+    // materials/wind_sway
+    sway_shift_t ground = sway_shift(0, true, "wind_local_0");
+    sway_shift_t high = sway_shift(7.5f, true, "wind_local_high");
+    sway_shift_t low = sway_shift(-4.25f, true, "wind_local_low");
+
+    /* The top moves downwind, the middle of the pole far less than its top */
+    test_assert(ground.pole > 0.1f * SWAY_UNIT);
+    test_assert(ground.tip > 0.15f * SWAY_UNIT);
+    test_assert(ground.middle < 0.5f * ground.tip);
+
+    float tolerance = 0.05f * SWAY_UNIT;
+    test_assert(fabsf(high.pole - ground.pole) < tolerance);
+    test_assert(fabsf(high.middle - ground.middle) < tolerance);
+    test_assert(fabsf(high.tip - ground.tip) < tolerance);
+    test_assert(fabsf(low.pole - ground.pole) < tolerance);
+    test_assert(fabsf(low.middle - ground.middle) < tolerance);
+    test_assert(fabsf(low.tip - ground.tip) < tolerance);
+
+    /* At height 0 the local base bends as the world base at the foot */
+    sway_shift_t world_ground = sway_shift(0, false, "wind_world_0");
+    test_assert(fabsf(world_ground.pole - ground.pole) < tolerance);
+    test_assert(fabsf(world_ground.middle - ground.middle) < tolerance);
+    test_assert(fabsf(world_ground.tip - ground.tip) < tolerance);
+
+    /* Lifted above its world base the whole pole leans, its middle as far as its top */
+    sway_shift_t world_high = sway_shift(7.5f, false, "wind_world_high");
+    test_assert(world_high.middle - ground.middle > 0.2f * SWAY_UNIT);
 }

@@ -1053,6 +1053,11 @@ ECS_STRUCT(VertexOcclusion, {
  * With foliage the ancestors are not read: every vertex turns about the pivot in data0 with a
  * stiffness of 0 and without its parent.
  *
+ * With local_base the base is a height above the origin of the shape (the translation of its
+ * world transform) rather than a world Y, so a plant whose origin is at its foot bends the same
+ * wherever it stands, on terrain at any height. The shapes of one plant that share their origin
+ * (the bark and the foliage of a tree) still move together.
+ *
  * Its record is packed every frame, like that of a TextureScroll. Needs Scene.wind: a scene
  * without it draws the shape as if it had no WindSway, with the shaders it has without it. Only
  * 3D meshes sway, 2D shapes and text ignore it.
@@ -1062,7 +1067,8 @@ ECS_STRUCT(WindSway, {
                              *   0 for a rigid shape */
     float height;           /**< World height above base at which the bend reaches its full
                              *   amount; at least 0.001 */
-    float base;             /**< World Y at which the displacement is 0, the ground */
+    float base;             /**< World Y at which the displacement is 0, the ground; with
+                             *   local_base the height above the origin of the shape */
     float flutter;          /**< World units of the fast local flutter at full wind, 0 for
                              *   none */
     float flutter_frequency; /**< Hz of the flutter at full wind, slower in a light wind */
@@ -1081,6 +1087,9 @@ ECS_STRUCT(WindSway, {
                              *   and occlusion of the cards, is not read as a parent pivot or
                              *   stiffness; every vertex turns with a stiffness of 0 about the
                              *   pivot of its twig only, like the twig, so the stems stay on it */
+    bool local_base;        /**< Measure base from the world Y of the origin of the shape
+                             *   instead of from world Y 0, so a plant bends from its own foot
+                             *   wherever it stands */
 });
 
 /** Pack the per vertex data a WindSway with pivots reads for a vertex of a branch. The pivots

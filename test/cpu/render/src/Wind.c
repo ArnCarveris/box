@@ -244,6 +244,7 @@ void Wind_sway_defaults(void) {
     test_flt(s->branch_frequency, BOX_MATERIAL_SWAY_BRANCH_FREQUENCY);
     test_flt(s->branch_frequency, 0.5f);
     test_bool(s->foliage, false);
+    test_bool(s->local_base, false);
     test_bool(ecs_owns(world, added, MaterialId), true);
 
     test_assert(ecs_script_run(world, "sway",
@@ -252,7 +253,8 @@ void Wind_sway_defaults(void) {
             "flutter_frequency: 3, flutter_reach: 0.5} }\n"
         "grass { WindSway: {bend: 0.02} }\n"
         "oak { WindSway: {bend: 0.03, pivots: true, branch: 0.2, branch_frequency: 0.7} }\n"
-        "crown { WindSway: {pivots: true, flutter: 0.1, foliage: true} }\n",
+        "crown { WindSway: {pivots: true, flutter: 0.1, foliage: true} }\n"
+        "fern { WindSway: {bend: 0.04, base: 0.1, local_base: true} }\n",
         NULL) == 0);
     s = ecs_get(world, ecs_lookup(world, "tree"), WindSway);
     test_assert(s != NULL);
@@ -280,6 +282,12 @@ void Wind_sway_defaults(void) {
     test_bool(s->pivots, true);
     test_bool(s->foliage, true);
     test_flt(s->flutter, 0.1f);
+    test_bool(s->local_base, false);
+    s = ecs_get(world, ecs_lookup(world, "fern"), WindSway);
+    test_assert(s != NULL);
+    test_bool(s->local_base, true);
+    test_flt(s->base, 0.1f);
+    test_flt(s->bend, 0.04f);
 
     /* Inherited by instances */
     ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
@@ -733,6 +741,59 @@ void Wind_pack_pivots(void) {
         test_assert(fabs(wind_step(a.wind_branch_phase, b.wind_branch_phase, 1.0) -
             (double)0.7f / 60.0) < 1e-5);
     }
+}
+
+/** With a local base the record holds the flag and the base as it is, not moved by the local
+ * origin; without it the base is a world Y relative to the local origin */
+void Wind_pack_local_base(void) {
+    // materials/wind_sway
+    box_render_material_t record;
+    box_render_wind_t wind = {
+        .direction = {1, 0}, .speed = 6, .frequency = 0.05f, .sway = 0.25f, .clock = 10,
+        .origin_y = 100
+    };
+    WindSway sway = { .bend = 0.05f, .height = 4, .base = -1, .flutter_frequency = 2,
+        .flutter_reach = 0.3f };
+    ecs_os_memset_t(&record, 0x55, box_render_material_t);
+    box_render_wind_pack(&record, &sway, &wind);
+    test_uint(record.flags, BOX_RENDER_WIND_PRESENT);
+    test_flt(record.wind_base, -101);
+    box_render_material_t world_base = record;
+
+    sway.local_base = true;
+    box_render_wind_pack(&record, &sway, &wind);
+    test_uint(record.flags, BOX_RENDER_WIND_PRESENT | BOX_RENDER_WIND_LOCAL);
+    test_flt(record.wind_base, -1);
+
+    /* The local base leaves the other words as they are */
+    record.flags = world_base.flags;
+    record.wind_base = world_base.wind_base;
+    test_assert(!ecs_os_memcmp_t(&record, &world_base, box_render_material_t));
+
+    /* With pivots and foliage the flags add up */
+    sway.pivots = true;
+    sway.foliage = true;
+    box_render_wind_pack(&record, &sway, &wind);
+    test_uint(record.flags, BOX_RENDER_WIND_PRESENT | BOX_RENDER_WIND_PIVOTS |
+        BOX_RENDER_WIND_FOLIAGE | BOX_RENDER_WIND_LOCAL);
+    test_flt(record.wind_base, -1);
+
+    /* A broken base is 0 above the origin of the shape */
+    sway.base = NAN;
+    box_render_wind_pack(&record, &sway, &wind);
+    test_flt(record.wind_base, 0);
+
+    /* The flag does not collide with the other bits of the record */
+    test_uint(BOX_RENDER_WIND_LOCAL & (BOX_RENDER_WIND_PRESENT | BOX_RENDER_WIND_PIVOTS |
+        BOX_RENDER_WIND_FOLIAGE | BOX_RENDER_REVEAL_PRESENT | BOX_RENDER_REVEAL_INVERT |
+        (7u << BOX_RENDER_REVEAL_CHANNEL_SHIFT) | BOX_RENDER_OCCLUSION_PRESENT |
+        (7u << BOX_RENDER_OCCLUSION_CHANNEL_SHIFT) |
+        (0xFFFFu << BOX_RENDER_REVEAL_SOFTNESS_SHIFT)), 0);
+
+    /* Without a sway the flag is cleared */
+    box_render_wind_pack(&record, NULL, &wind);
+    test_uint(record.flags, 0);
+    test_flt(record.wind_base, 0);
 }
 
 /** With pivots the reach grows by the chords of the largest turns of a branch and its parent

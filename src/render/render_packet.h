@@ -1780,7 +1780,8 @@ typedef struct box_render_material_t {
     float wind_sway;        /**< Phase of the sway of the Wind, 0..1, 0 without a WindSway */
     float wind_bend;        /**< WindSway.bend, 0 without one or when not finite */
     float wind_height;      /**< WindSway.height, at least BOX_RENDER_WIND_MIN, 0 without one */
-    float wind_base;        /**< WindSway.base, 0 without one or when not finite */
+    float wind_base;        /**< WindSway.base relative to the local origin, or as it is
+                             *   with BOX_RENDER_WIND_LOCAL; 0 without one or when not finite */
     float wind_flutter;     /**< WindSway.flutter, 0 without one, when negative or not finite */
     float wind_reach;       /**< WindSway.flutter_reach, at least BOX_RENDER_WIND_MIN, 0
                              *   without one */
@@ -1788,7 +1789,8 @@ typedef struct box_render_material_t {
                              *   to 0..1, 0 without one */
     uint32_t flags;         /**< BOX_RENDER_WIND_PRESENT with a WindSway, and
                              *   BOX_RENDER_WIND_PIVOTS with WindSway.pivots (and
-                             *   BOX_RENDER_WIND_FOLIAGE with WindSway.foliage); with a VertexReveal
+                             *   BOX_RENDER_WIND_FOLIAGE with WindSway.foliage), and
+                             *   BOX_RENDER_WIND_LOCAL with WindSway.local_base; with a VertexReveal
                              *   whose channel is 0..7 BOX_RENDER_REVEAL_PRESENT, maybe
                              *   BOX_RENDER_REVEAL_INVERT, the channel at
                              *   BOX_RENDER_REVEAL_CHANNEL_SHIFT and its softness (0 when
@@ -1845,6 +1847,10 @@ typedef struct box_render_material_t {
 /** Flag of a WindSway record with pivots and foliage (WindSway.foliage): the pivots read only
  * data0, a vertex turns about its pivot with a stiffness of 0 and without its parent */
 #define BOX_RENDER_WIND_FOLIAGE (1u << 11)
+
+/** Flag of a WindSway record with a local base (WindSway.local_base): wind_base is a height
+ * above the origin of the shape rather than a world Y relative to the local origin */
+#define BOX_RENDER_WIND_LOCAL (1u << 12)
 
 /** Smallest Distortion.scale of a record */
 #define BOX_RENDER_DISTORTION_MIN (1e-3f)
