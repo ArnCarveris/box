@@ -588,6 +588,8 @@ typedef struct box_gpu_blend_group_t {
     uint32_t mask_serial;           /**< Serial of the image of the mask it binds */
     uint32_t emissive_serial;       /**< Serial of the image of the emissive layer it binds */
     uint32_t bake_serial;           /**< Version of the bake atlas of a terrain blend it binds */
+    box_render_grass_far_t grass;   /**< Far field of the Grass on a terrain blend its uniforms
+                                     *   hold, all zero without one */
     WGPUBuffer uniforms;            /**< BlendUniforms of mesh.wgsl */
     WGPUBindGroup group;            /**< The bind group, NULL until made */
     int64_t used;                   /**< Frame of the last packet that drew with it */

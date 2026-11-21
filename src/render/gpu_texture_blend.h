@@ -61,6 +61,9 @@ typedef struct box_gpu_blend_uniforms_t {
     uint32_t bake;      /**< BOX_GPU_BLEND_TERRAIN: texels along an edge of the bake of a tile
                          *   | cells across the bake atlas << 16, 0 without a bake atlas */
     uint32_t pad[3];    /**< Zero */
+    box_render_grass_far_t grass; /**< BOX_GPU_BLEND_TERRAIN: the far field of the Grass on the
+                         *   terrain (box_render_grass_far_of), written every packet, all zero
+                         *   without one */
 } box_gpu_blend_uniforms_t;
 
 /** Queue the textures a new bind group binds in a color layer whose levels average stored values.

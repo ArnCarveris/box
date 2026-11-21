@@ -405,3 +405,187 @@ void Grass_extract_wind(void) {
     ecs_fini(world);
     ecs_vec_fini_t(NULL, &grass_packet, box_render_grass_t);
 }
+
+/** A Grass of the packet with the defaults of a new Grass resolved.
+ *
+ * @return The Grass
+ */
+static box_render_grass_t grass_record(void)
+{
+    box_render_grass_t g = {0};
+    g.mask = -1;
+    g.density = 48;
+    g.height[0] = 0.25f;
+    g.height[1] = 0.6f;
+    g.width[0] = 0.03f;
+    g.width[1] = 0.06f;
+    g.base[0] = 0.02f;
+    g.base[1] = 0.05f;
+    g.base[2] = 0.01f;
+    g.tip[0] = 0.3f;
+    g.tip[1] = 0.43f;
+    g.tip[2] = 0.06f;
+    g.variation = 0.5f;
+    g.lod[0] = 20;
+    g.lod[1] = 60;
+    g.lod[2] = 200;
+    g.wind_direction[0] = 1;
+
+    return g;
+}
+
+void Grass_far_range(void) {
+    box_render_grass_t g = grass_record();
+    box_render_grass_far_t far;
+    box_render_grass_far(&g, &far);
+
+    // The far field fades in over the distances where the blades thin out and is full where
+    // they start to shrink away, before they end
+    test_flt(far.range[0], 20);
+    test_flt(far.range[1], 200 * BOX_RENDER_GRASS_FAR_FULL);
+    test_flt(far.range[2], 200);
+    test_flt(far.range[3], 0.6f);
+    test_assert(far.range[0] < far.range[1]);
+    test_assert(far.range[1] < far.range[2]);
+
+    // It starts where level 0 ends
+    g.lod[0] = 50;
+    g.lod[1] = 60;
+    g.lod[2] = 80;
+    box_render_grass_far(&g, &far);
+    test_flt(far.range[0], 50);
+    test_flt(far.range[1], 80 * BOX_RENDER_GRASS_FAR_FULL);
+
+    // And never after it is full
+    g.lod[0] = 100;
+    g.lod[1] = 100;
+    g.lod[2] = 100;
+    box_render_grass_far(&g, &far);
+    test_flt(far.range[0], 100 * BOX_RENDER_GRASS_FAR_FULL);
+    test_flt(far.range[1], 100 * BOX_RENDER_GRASS_FAR_FULL);
+}
+
+void Grass_far_cover(void) {
+    box_render_grass_t g = grass_record();
+    box_render_grass_far_t far;
+    box_render_grass_far(&g, &far);
+    float area = 0.045f * 0.425f * BOX_RENDER_GRASS_FAR_AREA;
+    test_assert(fabsf(far.tip[3] - (1.0f - expf(-48.0f * area))) < 1e-5f);
+    float cover = far.tip[3];
+
+    // A denser field covers more of the ground
+    g.density = 96;
+    box_render_grass_far(&g, &far);
+    test_assert(far.tip[3] > cover);
+
+    // The cover stays within its bounds
+    g.density = 0.01f;
+    box_render_grass_far(&g, &far);
+    test_flt(far.tip[3], BOX_RENDER_GRASS_FAR_COVER_MIN);
+    g.density = 256;
+    g.width[1] = 0.5f;
+    g.height[1] = 2;
+    box_render_grass_far(&g, &far);
+    test_flt(far.tip[3], BOX_RENDER_GRASS_FAR_COVER_MAX);
+}
+
+void Grass_far_values(void) {
+    box_render_grass_t g = grass_record();
+    g.mask = 2;
+    g.variation = 0.8f;
+    g.wind_direction[0] = 0;
+    g.wind_direction[1] = 1;
+    g.wind_offset[0] = 3;
+    g.wind_offset[1] = -4;
+    g.wind_speed = 6;
+    g.wind_gust = 0.4f;
+    g.wind_frequency = 0.1f;
+    g.wind_sway = 0.25f;
+    g.wind_phase = 0.75f;
+    box_render_grass_far_t far;
+    box_render_grass_far(&g, &far);
+
+    // The colors and variation of the blades
+    test_flt(far.base[0], 0.02f);
+    test_flt(far.base[1], 0.05f);
+    test_flt(far.base[2], 0.01f);
+    test_flt(far.base[3], 0.8f);
+    test_flt(far.tip[0], 0.3f);
+    test_flt(far.tip[1], 0.43f);
+    test_flt(far.tip[2], 0.06f);
+
+    // The wind the blades bend with
+    test_flt(far.wind_field[0], 0);
+    test_flt(far.wind_field[1], 1);
+    test_flt(far.wind_field[2], 3);
+    test_flt(far.wind_field[3], -4);
+    test_flt(far.wind_strength[0], 6);
+    test_flt(far.wind_strength[1], 0.4f);
+    test_flt(far.wind_strength[2], 0.1f);
+    test_flt(far.wind_strength[3], 0.25f);
+    test_flt(far.wind_time[0], 0.75f);
+    test_flt(far.wind_time[1], 0);
+
+    // The mask channel plus one, and that there is a Grass
+    test_uint(far.config[0], 3);
+    test_uint(far.config[1], 1);
+    test_uint(far.config[2], 0);
+    test_uint(far.config[3], 0);
+
+    // Without a mask channel the grass grows everywhere
+    g.mask = -1;
+    box_render_grass_far(&g, &far);
+    test_uint(far.config[0], 0);
+    test_uint(far.config[1], 1);
+}
+
+void Grass_far_of_terrain(void) {
+    ecs_os_set_api_defaults();
+    box_render_packet_t p;
+    ecs_os_memset_t(&p, 0, box_render_packet_t);
+    ecs_vec_init_t(NULL, &p.terrain_samples, box_render_terrain_sample_t, 0);
+    ecs_vec_init_t(NULL, &p.grasses, box_render_grass_t, 0);
+    box_render_terrain_sample_t *s = ecs_vec_append_t(NULL, &p.terrain_samples,
+        box_render_terrain_sample_t);
+    ecs_os_memset_t(s, 0, box_render_terrain_sample_t);
+    s->terrain = 1000;
+    s->mesh = 7;
+    s = ecs_vec_append_t(NULL, &p.terrain_samples, box_render_terrain_sample_t);
+    ecs_os_memset_t(s, 0, box_render_terrain_sample_t);
+    s->terrain = 2000;
+    s->mesh = 9;
+    box_render_grass_t g = grass_record();
+    g.grass = 10;
+    g.terrain = 0;
+    g.mask = 0;
+    *ecs_vec_append_t(NULL, &p.grasses, box_render_grass_t) = g;
+    g.grass = 11;
+    g.terrain = 1000;
+    g.mask = 1;
+    *ecs_vec_append_t(NULL, &p.grasses, box_render_grass_t) = g;
+    g.grass = 12;
+    g.terrain = 1000;
+    g.mask = 2;
+    *ecs_vec_append_t(NULL, &p.grasses, box_render_grass_t) = g;
+    box_render_grass_far_t far;
+
+    // The tiles of a terrain draw the far field of the first Grass on it
+    test_bool(box_render_grass_far_of(&p, 7, &far), true);
+    test_uint(far.config[0], 2);
+    test_uint(far.config[1], 1);
+
+    // A terrain without a Grass draws as before
+    far.config[1] = 5;
+    test_bool(box_render_grass_far_of(&p, 9, &far), false);
+    test_uint(far.config[1], 0);
+    test_flt(far.range[1], 0);
+
+    // As do the blends of meshes that are no terrain
+    test_bool(box_render_grass_far_of(&p, 0, &far), false);
+    test_uint(far.config[1], 0);
+    test_bool(box_render_grass_far_of(&p, 8, &far), false);
+    test_uint(far.config[1], 0);
+
+    ecs_vec_fini_t(NULL, &p.terrain_samples, box_render_terrain_sample_t);
+    ecs_vec_fini_t(NULL, &p.grasses, box_render_grass_t);
+}

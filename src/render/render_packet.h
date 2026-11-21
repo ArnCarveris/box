@@ -2323,6 +2323,39 @@ typedef struct box_render_grass_t {
                              *   without a Wind */
 } box_render_grass_t;
 
+/** The far field of a Grass as the fragments of the tiles of its Terrain shade it (the grass_*
+ * of BlendUniforms in blend.wgsl, terrain_grass of terrain.wgsl), all zero for a terrain without
+ * a Grass: beyond its blades the terrain takes the colors, the variation and the waves of the
+ * wind of the grass where its mask channel has density. 112 bytes. */
+typedef struct box_render_grass_far_t {
+    float base[4];          /**< Linear color at the base of the blades, then the variation over
+                             *   the world */
+    float tip[4];           /**< Linear color at the tip of the blades, then the share of the
+                             *   ground the blades cover seen from straight above, 0 to 1 */
+    float range[4];         /**< Distances from the camera where the far field starts to fade
+                             *   in and where it is full, where the blades end, then the tallest
+                             *   blade */
+    float wind_field[4];    /**< Normalized world X and Z the Wind blows toward, wrapped local X
+                             *   and Z offset of its gust field (GrassWind.field) */
+    float wind_strength[4]; /**< Speed, gust, 1 over the gust scale and phase of the sway of the
+                             *   Wind (GrassWind.strength) */
+    float wind_time[4];     /**< Phase of the swing of the blades, then 0 (GrassWind.time) */
+    uint32_t config[4];     /**< Mask channel plus one, 0 for none; 1 when the terrain has a
+                             *   Grass; then 0 */
+} box_render_grass_far_t;
+
+/** Share of the distance where the blades of a Grass end at which its far field is full, where
+ * the blades start to shrink away (GrassParams.lod.w of grass.wgsl) */
+#define BOX_RENDER_GRASS_FAR_FULL (0.85f)
+
+/** Area of the ground a blade covers seen from above, in units of its width times its height,
+ * which with the density gives the share of the ground a field covers from above */
+#define BOX_RENDER_GRASS_FAR_AREA (1.5f)
+
+/** Least and most share of the ground a far field covers from above */
+#define BOX_RENDER_GRASS_FAR_COVER_MIN (0.2f)
+#define BOX_RENDER_GRASS_FAR_COVER_MAX (0.97f)
+
 /** Turns per second of the wind clock (WindStatus.clock) of the phase of the swing of the clumps
  * of a Grass, whose blades flutter at whole multiples of it (GrassWind.time of grass_wind.wgsl) */
 #define BOX_RENDER_GRASS_WIND_RATE (0.5)

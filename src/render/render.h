@@ -856,6 +856,31 @@ bool box_render_grass_use(
     const box_render_packet_t *p,
     uint32_t handle);
 
+/** Fill the far field of a Grass, which the tiles of its terrain shade beyond its blades: it
+ * fades in from where level 0 ends and the blades start to thin out to BOX_RENDER_GRASS_FAR_FULL
+ * of the distance where they end, and covers the share of the ground its blades cover from
+ * above.
+ *
+ * @param g The Grass of the packet
+ * @param out Receives the far field
+ */
+void box_render_grass_far(
+    const box_render_grass_t *g,
+    box_render_grass_far_t *out);
+
+/** Find the far field the tiles of a terrain draw with: of the first Grass of the packet on the
+ * sampled Terrain whose tiles draw with a grid mesh.
+ *
+ * @param p The packet
+ * @param mesh Handle of the grid mesh of the tiles, 0 for none
+ * @param out Receives the far field, all zero when no Grass grows on the terrain
+ * @return Whether a Grass grows on the terrain
+ */
+bool box_render_grass_far_of(
+    const box_render_packet_t *p,
+    uint32_t mesh,
+    box_render_grass_far_t *out);
+
 /** Register the system that appends the heights of the terrain tiles that draw to the packet,
  * which the backend copies into the surface assets of their grid mesh (gpu_draw.c).
  *

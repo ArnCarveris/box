@@ -53,6 +53,14 @@ extern "C" {
  * from lod[0] and level 2 a single triangle from lod[1]; the blades end at lod[2], beyond which
  * the terrain itself shows the grass from afar.
  *
+ * On a Terrain with a TextureBlend the grass continues beyond its blades as shading of the
+ * terrain, its far field, where the mask channel has density: the colors and the variation of
+ * the blades, a canopy that shows more blade and less soil at grazing angles, filtered normals
+ * and specular and the waves of the wind as changes in brightness. It fades in by the distance
+ * to the camera from lod[0], where the blades start to thin out, to where they start to shrink
+ * away, so the edge of the blades does not show as a ring from any height. Of several Grass
+ * entities on one terrain the first draws the far field.
+ *
  * Each blade is a cubic bezier that leans along its facing, bends over toward its tip and curls
  * a little around its length. The blades gather in clumps, the cells of a voronoi pattern of
  * clump_size meters over the world: with clump_follow 1 the blades of a clump share its facing,

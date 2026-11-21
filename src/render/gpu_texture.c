@@ -13,6 +13,7 @@
 
 #include "gpu.h"
 #include "gpu_texture_blend.h"
+#include <stddef.h>
 
 #ifdef BOX_RENDER_WGPU
 
@@ -1484,6 +1485,7 @@ static void box_gpu_blend_group_bind(
         (g->blend.terrain ? BOX_GPU_BLEND_TERRAIN : 0) |
         (terrain ? BOX_GPU_BLEND_MASKED : 0);
     u.contrast = g->blend.contrast;
+    u.grass = g->grass;
     u.terrain = terrain
         ? terrain->terrain_mask_texels | (terrain->terrain_mask_columns << 16) : 0;
     WGPUTextureView bake = box_gpu_terrain_bake_view(gpu, &g->blend, &u.bake, &g->bake_serial);
@@ -1559,7 +1561,8 @@ static void box_gpu_blend_group_bind(
 }
 
 /** Get the blend group of a TextureBlend batch, created on first use. Once per packet it checks
- * the arrays and the images it binds, and binds them again when one changed.
+ * the arrays and the images it binds, and binds them again when one changed, and writes the far
+ * field of the Grass on the terrain of a terrain blend into its uniforms when it changed.
  *
  * The emissive layer and the mask sample loaded images only, not the image of a target. The
  * heights make an array only with a contrast above 0 and a height texture on some layer.
@@ -1581,8 +1584,9 @@ box_gpu_blend_group_t* box_gpu_blend_group_get(
     uint32_t emissive = b->textures[1] & BOX_RENDER_TEXTURE_TARGET ? 0 : b->textures[1];
     box_gpu_blend_group_t *g;
     int32_t m;
+    box_render_grass_far_t grass;
     bool heights = false;
-    bool stale;
+    bool stale, moved;
     for (g = gpu->blend_groups; g; g = g->next) {
         if (g->emissive == emissive && g->wrap == b->wrap &&
             g->anisotropy == packet->anisotropy &&
@@ -1609,6 +1613,9 @@ box_gpu_blend_group_t* box_gpu_blend_group_get(
     }
 
     g->checked = gpu->blend_frame;
+    box_render_grass_far_of(packet, r->terrain, &grass);
+    moved = ecs_os_memcmp(&grass, &g->grass, ECS_SIZEOF(box_render_grass_far_t)) != 0;
+    g->grass = grass;
     for (m = 0; r->contrast > 0.0f && m < (int32_t)r->count; m ++) {
         heights |= r->layers[m][BOX_RENDER_BLEND_HEIGHT] != 0;
     }
@@ -1639,6 +1646,10 @@ box_gpu_blend_group_t* box_gpu_blend_group_get(
 
     if (stale) {
         box_gpu_blend_group_bind(gpu, g);
+    } else if (moved && g->uniforms) {
+        wgpuQueueWriteBuffer(gpu->queue, g->uniforms,
+            offsetof(box_gpu_blend_uniforms_t, grass), &g->grass,
+            sizeof(box_render_grass_far_t));
     }
 
 done:

@@ -11,7 +11,8 @@
 // BLEND_MASKED, BLEND_SINGLE, BLEND_HEIGHT, BLEND_TILES and BLEND_TERRAIN flags, the contrast of
 // the height based transitions, 0 for the linear blend, and of a BLEND_TERRAIN blend with a mask
 // atlas the texels along an edge of the masks of a tile | the cells across the atlas << 16, and
-// the same of its bake atlas, 0 without one.
+// the same of its bake atlas, 0 without one. The grass_* of a BLEND_TERRAIN blend are the far
+// field of the Grass on the terrain (box_render_grass_far_t), all zero without one.
 struct BlendUniforms {
     transforms: array<vec4f, 4>,
     count: u32,
@@ -22,6 +23,15 @@ struct BlendUniforms {
     pad0: u32,
     pad1: u32,
     pad2: u32,
+    grass_base: vec4f,          // Linear color at the base of the blades, variation
+    grass_tip: vec4f,           // Linear color at the tip, share of the ground covered from
+                                // above
+    grass_range: vec4f,         // Distances the far field starts to fade in and is full, the
+                                // blades end, tallest blade
+    grass_wind_field: vec4f,    // GrassWind.field (grass_wind.wgsl)
+    grass_wind_strength: vec4f, // GrassWind.strength
+    grass_wind_time: vec4f,     // GrassWind.time
+    grass_config: vec4u,        // Mask channel plus one, 0 for none; 1 with a Grass
 };
 
 // The mask is loaded; without it layer 0 shows alone.

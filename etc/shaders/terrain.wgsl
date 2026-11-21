@@ -6,7 +6,8 @@
 // lit as the mesh shader lights them: a GGX specular and a Lambert diffuse lobe.
 //
 // fs_terrain shades the layers of the TextureBlend of the terrain weighed by the masks of the
-// tile (BLEND_TERRAIN), fs_terrain_plain the PbrTextures of a terrain without one. With
+// tile (BLEND_TERRAIN), and beyond the blades of a Grass on the terrain its far field
+// (terrain_grass), fs_terrain_plain the PbrTextures of a terrain without one. With
 // BOX_TEXTURE_LAYERS (BOX_RENDER_SHADER_TERRAIN_LAYERS) both apply the TextureLayers of the
 // terrain. vs_terrain_bake and fs_terrain_bake bake the material of a tile with masks into its
 // cell of the bake atlas of the grid mesh (box_gpu_terrain_bake).
@@ -16,6 +17,8 @@
 #include "include/mesh_surface.wgsl"
 #include "include/mesh_blend.wgsl"
 #include "include/terrain_bake.wgsl"
+#include "include/grass_field.wgsl"
+#include "include/grass_wind.wgsl"
 #ifdef BOX_TEXTURE_LAYERS
 #include "include/mesh_layers.wgsl"
 #endif
@@ -624,6 +627,120 @@ fn terrain_baked_mix(near: Surface, f: TerrainOut, geometric: vec3f, far: f32) -
     return s;
 }
 
+// Roughness of the canopy of a grass far field where it starts and far beyond, where its blades
+// are much smaller than a pixel and their highlights average out, and the distance in units of
+// the distance the blades end at over which it goes from one to the other.
+const TERRAIN_GRASS_ROUGH_NEAR: f32 = 0.9;
+const TERRAIN_GRASS_ROUGH_FAR: f32 = 1.0;
+const TERRAIN_GRASS_ROUGH_REACH: f32 = 8.0;
+
+// How far the filtered normal of the canopy leans from the normal of the ground toward up: the
+// blades stand upright on a slope.
+const TERRAIN_GRASS_UPRIGHT: f32 = 0.35;
+
+// How far the filtered normal of the canopy seen at a grazing angle turns toward the eye: the eye
+// sees the faces of the blades, not the ground, so the canopy keeps the sheen of the blades
+// rather than the mirror of the sky a flat ground shows at grazing angles.
+const TERRAIN_GRASS_FACING: f32 = 0.6;
+
+// Ambient occlusion and share of the sun that reaches the canopy seen from straight above, into
+// the shade between the blades and toward their roots, and at grazing angles, where the eye sees
+// more of the tips: the mean of the occlusion and shadow along the blades (grass.wgsl).
+const TERRAIN_GRASS_OCCLUSION: vec2f = vec2f(0.6, 0.3);
+const TERRAIN_GRASS_SUN: vec2f = vec2f(0.7, 0.55);
+
+// Share of the tip color in the color of the canopy seen from straight above and at grazing
+// angles, where the eye sees the tips of more blades.
+const TERRAIN_GRASS_TIPS_TOP: f32 = 0.5;
+const TERRAIN_GRASS_TIPS_GRAZING: f32 = 0.7;
+
+// Change of the brightness of the canopy per radian its blades lean beyond the mean lean of the
+// wind, so a gust that bends them over shows their lighter faces, and the least brightness.
+const TERRAIN_GRASS_SHEEN: f32 = 0.45;
+const TERRAIN_GRASS_SHEEN_MIN: f32 = 0.6;
+
+// Least cosine of the angle between the eye and the ground the cover of the canopy takes.
+const TERRAIN_GRASS_GRAZING: f32 = 0.05;
+
+// Brightness of the canopy of a grass far field at a local world x and z in the wave of the
+// wind (grass_wind_wave), the wave the blades bend with: brighter where a gust bends the blades
+// further than the mean lean of the wind, more so where they lean away from the eye, darker in
+// the lull behind it. 1 in a calm.
+fn terrain_grass_wind(xz: vec2f, v: vec3f) -> f32 {
+    let w = GrassWind(blending.grass_wind_field, blending.grass_wind_strength,
+        blending.grass_wind_time);
+    if (w.strength.x <= 0.0) {
+        return 1.0;
+    }
+    let wave = grass_wind_wave(xz, w);
+    let strength = length(wave.xy);
+    let lean = grass_wind_lean(strength) - grass_wind_lean(w.strength.x / GRASS_WIND_FULL);
+    let along = select(vec2f(0.0), wave.xy / max(strength, 1e-6), strength > 1e-6);
+    let flat = -v.xz;
+    let away = dot(along, flat * inverseSqrt(max(dot(flat, flat), 1e-12)));
+    return max(1.0 + TERRAIN_GRASS_SHEEN * lean * mix(0.6, 1.0, away * 0.5 + 0.5),
+        TERRAIN_GRASS_SHEEN_MIN);
+}
+
+// The surface of a fragment of a terrain tile under the far field of the Grass on the terrain
+// (BlendUniforms.grass_*): where the mask channel of the Grass has density it fades in over the
+// distances where the blades thin out and shrink away, by the distance to the eye as the blades
+// fade, so the edge of the blades never shows as a ring. The canopy covers the share of the
+// ground the blades cover from above, more of it at grazing angles, where the eye sees more
+// blade and less soil, and less where the density and the height of the variation are lower.
+// It takes the colors of the blades with the variation over the world (grass_field.wgsl) at the
+// absolute place of the fragment, a filtered normal, a rough specular that roughens with
+// distance, the occlusion between the blades and the brightness of the waves of the wind.
+fn terrain_grass(f: TerrainOut, near: Surface, geometric: vec3f) -> Surface {
+    var s = near;
+    if (blending.grass_config.y == 0u || view.lights.z > 1u) {
+        return s;
+    }
+    let span = blending.grass_range;
+    let to_eye = view.camera.xyz - f.world;
+    let d = length(to_eye);
+    let fade = smoothstep(span.x, max(span.y, span.x + 1e-3), d);
+    if (fade <= 0.0) {
+        return s;
+    }
+    var density = 1.0;
+    let channel = blending.grass_config.x;
+    if (channel != 0u && (blending.flags & BLEND_MASKED) != 0u) {
+        density = saturate(terrain_mask(f)[min(channel - 1u, 3u)]);
+    }
+    if (density <= 0.0) {
+        return s;
+    }
+
+    let v = to_eye / max(d, 1e-6);
+    let o = world_origin(view.origin);
+    let xz = f.world.xz + vec2f(o.whole.xz) + o.rest.xz;
+    let variation = grass_field_variation(xz, blending.grass_base.w);
+    let ndv = max(dot(geometric, v), TERRAIN_GRASS_GRAZING);
+    let gaps = 1.0 - blending.grass_tip.w;
+    let top = 1.0 - pow(gaps, density * variation.w * mix(0.7, 1.0, density));
+    let cover = 1.0 - pow(1.0 - top, 1.0 / ndv);
+    let k = fade * cover;
+    let grazing = 1.0 - ndv;
+    let tips = mix(TERRAIN_GRASS_TIPS_TOP, TERRAIN_GRASS_TIPS_GRAZING, grazing);
+    let color = mix(blending.grass_base.rgb, blending.grass_tip.rgb, tips) * variation.rgb *
+        terrain_grass_wind(f.world.xz, v);
+    let upright = normalize(mix(geometric, vec3f(0.0, 1.0, 0.0), TERRAIN_GRASS_UPRIGHT));
+    let facing = normalize(mix(upright, v, TERRAIN_GRASS_FACING * grazing * grazing));
+    let rough = mix(TERRAIN_GRASS_ROUGH_NEAR, TERRAIN_GRASS_ROUGH_FAR,
+        saturate(d / max(span.z * TERRAIN_GRASS_ROUGH_REACH, 1e-3)));
+    s.albedo = mix(s.albedo, color, k);
+    s.metallic = mix(s.metallic, 0.0, k);
+    s.roughness = mix(s.roughness, rough, k);
+    let occlusion = mix(TERRAIN_GRASS_OCCLUSION.x, TERRAIN_GRASS_OCCLUSION.y, grazing);
+    let sun = mix(TERRAIN_GRASS_SUN.x, TERRAIN_GRASS_SUN.y, grazing);
+    s.occlusion *= mix(1.0, occlusion, k);
+    s.shade = 1.0 - (1.0 - s.shade) * mix(1.0, sun, k);
+    s.emissive *= 1.0 - k;
+    s.normal = normalize(mix(s.normal, facing, k));
+    return s;
+}
+
 fn terrain_lit(f: TerrainOut, shaded: Surface) -> vec4f {
     if (draw_range && !range_keeps(f.extra >> 16u, f.pos.xy)) {
         discard;
@@ -645,7 +762,8 @@ fn terrain_lit(f: TerrainOut, shaded: Surface) -> vec4f {
 
 // A tile with a bake atlas shades from its bake alone where a bake texel is no smaller than a
 // pixel, in full and faded into the bake below that, and lit by the sun and the ambient
-// occlusion of its heights either way (terrain_baked_mix).
+// occlusion of its heights either way (terrain_baked_mix). The far field of a Grass on the
+// terrain covers either (terrain_grass); the bake holds the ground without it.
 @fragment fn fs_terrain(f: TerrainOut) -> @location(0) vec4f {
     let geometric = normalize(f.normal);
     let far = terrain_bake_far(f);
@@ -670,7 +788,8 @@ fn terrain_lit(f: TerrainOut, shaded: Surface) -> vec4f {
         s = layered(f, s, blend_heights, blending.count, b.low);
 #endif
     }
-    return terrain_lit(f, terrain_baked_mix(s, f, geometric, select(far, 0.0, alone)));
+    return terrain_lit(f, terrain_grass(f,
+        terrain_baked_mix(s, f, geometric, select(far, 0.0, alone)), geometric));
 }
 
 @fragment fn fs_terrain_plain(f: TerrainOut) -> @location(0) vec4f {

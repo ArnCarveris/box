@@ -369,7 +369,11 @@
                     "extract_plane",
                     "extract_terrain",
                     "extract_scene",
-                    "extract_wind"
+                    "extract_wind",
+                    "far_range",
+                    "far_cover",
+                    "far_values",
+                    "far_of_terrain"
                 ]
             },
             {

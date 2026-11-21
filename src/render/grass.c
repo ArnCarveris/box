@@ -174,6 +174,66 @@ void box_render_grass_init(
     });
 }
 
+void box_render_grass_far(
+    const box_render_grass_t *g,
+    box_render_grass_far_t *out)
+{
+    float width = 0.5f * (g->width[0] + g->width[1]);
+    float height = 0.5f * (g->height[0] + g->height[1]);
+    float cover = 1.0f - expf(-g->density * width * height * BOX_RENDER_GRASS_FAR_AREA);
+    float full = g->lod[2] * BOX_RENDER_GRASS_FAR_FULL;
+    float start = g->lod[0] > full ? full : g->lod[0];
+    cover = cover < BOX_RENDER_GRASS_FAR_COVER_MIN ? BOX_RENDER_GRASS_FAR_COVER_MIN : cover;
+    cover = cover > BOX_RENDER_GRASS_FAR_COVER_MAX ? BOX_RENDER_GRASS_FAR_COVER_MAX : cover;
+    ecs_os_memset_t(out, 0, box_render_grass_far_t);
+    ecs_os_memcpy_n(out->base, g->base, float, 3);
+    out->base[3] = g->variation;
+    ecs_os_memcpy_n(out->tip, g->tip, float, 3);
+    out->tip[3] = cover;
+    out->range[0] = start;
+    out->range[1] = full;
+    out->range[2] = g->lod[2];
+    out->range[3] = g->height[1];
+    out->wind_field[0] = g->wind_direction[0];
+    out->wind_field[1] = g->wind_direction[1];
+    out->wind_field[2] = g->wind_offset[0];
+    out->wind_field[3] = g->wind_offset[1];
+    out->wind_strength[0] = g->wind_speed;
+    out->wind_strength[1] = g->wind_gust;
+    out->wind_strength[2] = g->wind_frequency;
+    out->wind_strength[3] = g->wind_sway;
+    out->wind_time[0] = g->wind_phase;
+    out->config[0] = g->mask >= 0 ? (uint32_t)g->mask + 1u : 0u;
+    out->config[1] = 1u;
+}
+
+bool box_render_grass_far_of(
+    const box_render_packet_t *p,
+    uint32_t mesh,
+    box_render_grass_far_t *out)
+{
+    ecs_entity_t terrain = 0;
+    bool result = false;
+    int32_t i, count = ecs_vec_count(&p->terrain_samples);
+    ecs_os_memset_t(out, 0, box_render_grass_far_t);
+    for (i = 0; mesh && i < count && !terrain; i ++) {
+        const box_render_terrain_sample_t *s = ecs_vec_get_t(&p->terrain_samples,
+            box_render_terrain_sample_t, i);
+        terrain = s->mesh == mesh ? s->terrain : 0;
+    }
+
+    count = terrain ? ecs_vec_count(&p->grasses) : 0;
+    for (i = 0; i < count && !result; i ++) {
+        const box_render_grass_t *g = ecs_vec_get_t(&p->grasses, box_render_grass_t, i);
+        if (g->terrain == terrain) {
+            box_render_grass_far(g, out);
+            result = true;
+        }
+    }
+
+    return result;
+}
+
 bool box_render_grass_use(
     const box_render_packet_t *p,
     uint32_t handle)
