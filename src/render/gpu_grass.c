@@ -30,7 +30,7 @@
 #define BOX_GPU_GRASS_PATCHES_MAX (128)
 
 /** Bytes between the params of two Grass entities in a view, the uniform offset alignment */
-#define BOX_GPU_GRASS_PARAMS_STRIDE (256u)
+#define BOX_GPU_GRASS_PARAMS_STRIDE (512u)
 
 /** Fewest and most blades a level of a Grass holds */
 #define BOX_GPU_GRASS_CAPACITY_MIN (4096u)
@@ -78,9 +78,13 @@ typedef struct box_gpu_grass_params_t {
                                      *   below which blades fold */
     float pixel[4];                 /**< Size of a pixel per meter of distance and its size at
                                      *   any distance, one of them 0 */
+    float wind_field[4];            /**< Direction the wind blows toward, local offset of its
+                                     *   gust field (GrassWind of grass_wind.wgsl) */
+    float wind_strength[4];         /**< Speed, gust, 1 over the gust scale, phase of the sway */
+    float wind_time[4];             /**< Phase of the swing and flutter of the blades, 0 */
 } box_gpu_grass_params_t;
 
-_Static_assert(sizeof(box_gpu_grass_params_t) == 240, "GrassParams of grass.wgsl");
+_Static_assert(sizeof(box_gpu_grass_params_t) == 288, "GrassParams of grass.wgsl");
 _Static_assert(sizeof(box_gpu_grass_params_t) <= BOX_GPU_GRASS_PARAMS_STRIDE,
     "the params of a Grass must fit in their stride");
 
@@ -94,7 +98,9 @@ typedef struct box_gpu_grass_blade_t {
     float shade;                    /**< Brightness */
     float bend;                     /**< How far it bends over toward its tip, 0 to 1 */
     float curl;                     /**< Curl around its length, -1 to 1 */
-    uint32_t tint;                  /**< Color variation over the world, half of it in RGBA8 */
+    uint32_t tint;                  /**< Color variation over the world, half of it in RGB8,
+                                     *   the phase of its clump in the high and its stiffness
+                                     *   in the low 4 bits of A */
     float clump;                    /**< Distance from the center of its clump in clump edges */
 } box_gpu_grass_blade_t;
 
@@ -1064,6 +1070,16 @@ static uint32_t box_gpu_grass_params(
         out->pixel[0] = 2.0f * u->cluster[1] * u->viewport[3];
     }
 
+    out->wind_field[0] = g->wind_direction[0];
+    out->wind_field[1] = g->wind_direction[1];
+    out->wind_field[2] = g->wind_offset[0];
+    out->wind_field[3] = g->wind_offset[1];
+    out->wind_strength[0] = g->wind_speed;
+    out->wind_strength[1] = g->wind_gust;
+    out->wind_strength[2] = g->wind_frequency;
+    out->wind_strength[3] = g->wind_sway;
+    out->wind_time[0] = g->wind_phase;
+
     return (uint32_t)n;
 }
 
@@ -1263,6 +1279,8 @@ static bool box_gpu_grass_read_level(
         b->tint[0] = 2.0f * (float)(blades[i].tint & 255u) / 255.0f;
         b->tint[1] = 2.0f * (float)((blades[i].tint >> 8) & 255u) / 255.0f;
         b->tint[2] = 2.0f * (float)((blades[i].tint >> 16) & 255u) / 255.0f;
+        b->stiffness = (float)((blades[i].tint >> 24) & 15u) / 15.0f;
+        b->phase = (float)(blades[i].tint >> 28) / 16.0f;
         b->level = (int32_t)level;
     }
 

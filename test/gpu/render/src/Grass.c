@@ -4,8 +4,9 @@
  * gpu_grass.c): the blades stand on the plane or the terrain, take their level of detail from
  * their distance, thin out and widen further away, stay where they are as the camera moves and
  * across a shift of the WorldOrigin, follow the mask of the terrain, gather in clumps that share
- * their facing, never draw thinner than about a pixel, vary in color over the world, render lit
- * and show in the GPU stats.
+ * their facing, never draw thinner than about a pixel, vary in color over the world, render lit,
+ * take a stiffness and the phase of their clump in the wind, bend and move in it, show its gusts
+ * as bands of light that roll downwind and show in the GPU stats.
  *
  * The scenes are test/assets/grass/plane.flecs and test/assets/grass/terrain.flecs.
  */
@@ -824,4 +825,269 @@ void Grass_varies_over_world(void) {
     gr_expect_no_errors(world);
     ecs_vec_fini_t(NULL, &blades, box_render_grass_blade_t);
     ecs_fini(world);
+}
+
+void Grass_wind_stiffness_and_phase(void) {
+    ecs_world_t *world = gr_world("test/assets/grass/plane.flecs");
+    ecs_entity_t meadow = gr_lookup(world, "meadow");
+    ecs_entity_t camera = gr_lookup(world, "grass_camera");
+    ecs_vec_t blades, near_;
+    float eye[3], lo = INFINITY, hi = -INFINITY;
+    int32_t i, j, count, pairs = 0, shared = 0, phases[16] = {0}, distinct = 0;
+    ecs_vec_init_t(NULL, &blades, box_render_grass_blade_t, 0);
+    ecs_vec_init_t(NULL, &near_, box_render_grass_blade_t, 0);
+
+    gr_shape(world, meadow, 0.7f, 0.5f);
+    gr_frames(world, 10);
+    gr_position(world, camera, eye);
+    gr_blades(world, meadow, &blades);
+    test_assert(ecs_vec_count(&blades) > 1000);
+
+    // Every blade has its own stiffness and the phase of its clump
+    for (i = 0; i < ecs_vec_count(&blades); i ++) {
+        const box_render_grass_blade_t *b = ecs_vec_get_t(&blades, box_render_grass_blade_t, i);
+        test_assert(b->stiffness >= 0 && b->stiffness <= 1);
+        test_assert(b->phase >= 0 && b->phase < 1);
+        lo = b->stiffness < lo ? b->stiffness : lo;
+        hi = b->stiffness > hi ? b->stiffness : hi;
+        phases[(int32_t)(b->phase * 16.0f + 0.5f) & 15] ++;
+        float dx = b->position[0] - eye[0], dz = b->position[2] - eye[2];
+        if (b->level == 0 && dx > -2.0f && dx < 2.0f && dz > -8.0f && dz < -3.0f) {
+            *ecs_vec_append_t(NULL, &near_, box_render_grass_blade_t) = *b;
+        }
+    }
+
+    for (i = 0; i < 16; i ++) {
+        distinct += phases[i] != 0;
+    }
+
+    // Close blades mostly share their clump and so the phase of its swing
+    count = ecs_vec_count(&near_);
+    for (i = 0; i < count; i ++) {
+        const box_render_grass_blade_t *a = ecs_vec_get_t(&near_, box_render_grass_blade_t, i);
+        for (j = i + 1; j < count; j ++) {
+            const box_render_grass_blade_t *b = ecs_vec_get_t(&near_,
+                box_render_grass_blade_t, j);
+            if (gr_flat_distance(a, b->position) < 0.2f) {
+                shared += a->phase == b->phase;
+                pairs ++;
+            }
+        }
+    }
+
+    printf("stiffness %.3f to %.3f, %d phases, %d of %d close pairs share it\n", lo, hi,
+        distinct, shared, pairs);
+    test_assert(lo < 0.3f);
+    test_assert(hi > 0.7f);
+    test_assert(distinct >= 12);
+    test_assert(pairs > 100);
+    test_assert(shared * 2 > pairs);
+    gr_expect_no_errors(world);
+    ecs_vec_fini_t(NULL, &near_, box_render_grass_blade_t);
+    ecs_vec_fini_t(NULL, &blades, box_render_grass_blade_t);
+    ecs_fini(world);
+}
+
+/** Count the pixels of the lower half of two images that differ.
+ *
+ * @param a The first image
+ * @param b The second image
+ * @return The pixels where a channel differs by more than 24
+ */
+static int32_t gr_changed(
+    const unsigned char *a,
+    const unsigned char *b)
+{
+    int32_t x, y, c, result = 0;
+    for (y = GR_HEIGHT / 2; y < GR_HEIGHT; y ++) {
+        for (x = 0; x < GR_WIDTH; x ++) {
+            const unsigned char *p = &a[(y * GR_WIDTH + x) * 4];
+            const unsigned char *q = &b[(y * GR_WIDTH + x) * 4];
+            for (c = 0; c < 3; c ++) {
+                if (abs((int)p[c] - (int)q[c]) > 24) {
+                    result ++;
+                    break;
+                }
+            }
+        }
+    }
+
+    return result;
+}
+
+void Grass_bends_in_wind(void) {
+    ecs_world_t *world = gr_world("test/assets/grass/plane.flecs");
+    ecs_entity_t meadow = gr_lookup(world, "meadow");
+    double bright = 0;
+
+    // A dense meadow of wide blades in still air
+    Grass *g = ecs_ensure(world, meadow, Grass);
+    g->density = 96;
+    g->min_width = 0.05f;
+    g->max_width = 0.09f;
+    ecs_modified(world, meadow, Grass);
+    ecs_singleton_set(world, Wind, {.direction = {1, 0}, .speed = 0, .gust = 0.5f,
+        .gust_scale = 10});
+    gr_frames(world, 10);
+    unsigned char *calm0 = gr_capture(world, "grass_calm0.png");
+    gr_frames(world, 20);
+    unsigned char *calm1 = gr_capture(world, "grass_calm1.png");
+    int32_t calm_green = gr_green(calm1, &bright);
+
+    // A strong wind bends the blades over and keeps them moving
+    ecs_singleton_set(world, Wind, {.direction = {1, 0}, .speed = 10, .gust = 0.5f,
+        .gust_scale = 10});
+    gr_frames(world, 10);
+    unsigned char *wind0 = gr_capture(world, "grass_wind0.png");
+    gr_frames(world, 20);
+    unsigned char *wind1 = gr_capture(world, "grass_wind1.png");
+    int32_t wind_green = gr_green(wind1, &bright);
+
+    int32_t still = gr_changed(calm0, calm1);
+    int32_t bent = gr_changed(calm1, wind0);
+    int32_t moving = gr_changed(wind0, wind1);
+    printf("changed in calm %d, by the wind %d, in wind %d; green calm %d, wind %d\n", still,
+        bent, moving, calm_green, wind_green);
+    test_assert(bent > 4 * still);
+    test_assert(moving > 2 * still);
+    test_assert(moving > GR_WIDTH * GR_HEIGHT / 200);
+
+    // The bent blades still cover the ground they grow on
+    test_assert(wind_green * 10 > calm_green * 7);
+    stbi_image_free(calm0);
+    stbi_image_free(calm1);
+    stbi_image_free(wind0);
+    stbi_image_free(wind1);
+    gr_expect_no_errors(world);
+    ecs_fini(world);
+}
+
+/** Columns of the brightness profile of an image */
+#define GR_COLUMNS (64)
+
+/** Render a meadow seen from above the blades in a wind along +x, at two times half a second
+ * apart.
+ *
+ * @param gust The gust of the Wind
+ * @param out Receives the two images
+ */
+static void gr_gusts(
+    float gust,
+    unsigned char *out[2])
+{
+    ecs_world_t *world = gr_world("test/assets/grass/plane.flecs");
+    ecs_entity_t meadow = gr_lookup(world, "meadow");
+    ecs_entity_t camera = gr_lookup(world, "grass_camera");
+    Grass *g = ecs_ensure(world, meadow, Grass);
+    g->density = 48;
+    g->lod[0] = 30;
+    g->lod[1] = 80;
+    g->lod[2] = 160;
+    ecs_modified(world, meadow, Grass);
+    ecs_set(world, camera, Position, {0, 5, 0});
+    ecs_set(world, camera, Rotation, {-0.3f, 0, 0});
+    ecs_singleton_set(world, Wind, {.direction = {1, 0}, .speed = 8, .gust = gust,
+        .gust_scale = 12});
+    gr_frames(world, 60);
+    out[0] = gr_capture(world, gust > 0 ? "grass_gust0.png" : "grass_steady0.png");
+    gr_frames(world, 29);
+    out[1] = gr_capture(world, gust > 0 ? "grass_gust1.png" : "grass_steady1.png");
+    gr_expect_no_errors(world);
+    ecs_fini(world);
+}
+
+/** Brightness the gusts add to the columns of the far field of an image, against the same
+ * frame in a steady wind.
+ *
+ * @param gust The image in gusts
+ * @param steady The image in a steady wind
+ * @param out Receives the mean difference of each of GR_COLUMNS columns
+ */
+static void gr_gust_profile(
+    const unsigned char *gust,
+    const unsigned char *steady,
+    double out[GR_COLUMNS])
+{
+    int32_t x, y, c;
+    int32_t span = GR_WIDTH / GR_COLUMNS;
+    for (x = 0; x < GR_COLUMNS; x ++) {
+        double sum = 0;
+        for (y = GR_HEIGHT * 28 / 100; y < GR_HEIGHT * 40 / 100; y ++) {
+            for (c = x * span; c < (x + 1) * span; c ++) {
+                const unsigned char *p = &gust[(y * GR_WIDTH + c) * 4];
+                const unsigned char *q = &steady[(y * GR_WIDTH + c) * 4];
+                sum += (p[0] + p[1] + p[2]) - (q[0] + q[1] + q[2]);
+            }
+        }
+        out[x] = sum / (3.0 * span * (GR_HEIGHT * 40 / 100 - GR_HEIGHT * 28 / 100));
+    }
+}
+
+/** Correlation of a profile with another shifted by a number of columns, over the middle
+ * columns.
+ *
+ * @param a The first profile
+ * @param b The second profile
+ * @param shift Columns b moves to the right relative to a
+ * @return The correlation, -1..1
+ */
+static double gr_correlate(
+    const double a[GR_COLUMNS],
+    const double b[GR_COLUMNS],
+    int32_t shift)
+{
+    int32_t x, n = 0;
+    double sa = 0, sb = 0, saa = 0, sbb = 0, sab = 0;
+    for (x = GR_COLUMNS / 5; x < GR_COLUMNS * 4 / 5; x ++) {
+        double u = a[x], v = b[x + shift];
+        sa += u;
+        sb += v;
+        saa += u * u;
+        sbb += v * v;
+        sab += u * v;
+        n ++;
+    }
+
+    double cov = sab - sa * sb / n;
+    double var = (saa - sa * sa / n) * (sbb - sb * sb / n);
+    return var > 0 ? cov / sqrt(var) : 0;
+}
+
+void Grass_gusts_roll_as_waves(void) {
+    unsigned char *gust[2], *steady[2];
+    double before[GR_COLUMNS], after[GR_COLUMNS];
+    gr_gusts(0.6f, gust);
+    gr_gusts(0, steady);
+
+    // The gusts light and darken the far field in bands across the wind
+    gr_gust_profile(gust[0], steady[0], before);
+    gr_gust_profile(gust[1], steady[1], after);
+    double sum = 0, sum2 = 0;
+    int32_t x;
+    for (x = 0; x < GR_COLUMNS; x ++) {
+        sum += before[x];
+        sum2 += before[x] * before[x];
+    }
+    double spread = sqrt(sum2 / GR_COLUMNS - (sum / GR_COLUMNS) * (sum / GR_COLUMNS));
+
+    // Half a second later the bands moved downwind, to the right of the image
+    int32_t s, best = 0;
+    double best_corr = -1;
+    for (s = -GR_COLUMNS / 6; s <= GR_COLUMNS / 6; s ++) {
+        double corr = gr_correlate(before, after, s);
+        if (corr > best_corr) {
+            best_corr = corr;
+            best = s;
+        }
+    }
+
+    printf("gust bands spread %.2f, moved %d columns (correlation %.2f, %.2f in place)\n",
+        spread, best, best_corr, gr_correlate(before, after, 0));
+    test_assert(spread > 1.5);
+    test_assert(best >= 2);
+    test_assert(best_corr > 0.7);
+    stbi_image_free(gust[0]);
+    stbi_image_free(gust[1]);
+    stbi_image_free(steady[0]);
+    stbi_image_free(steady[1]);
 }

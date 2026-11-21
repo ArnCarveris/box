@@ -2310,7 +2310,22 @@ typedef struct box_render_grass_t {
     float variation;        /**< How much color and height vary over the world */
     float lod[3];           /**< Distances where levels 0 and 1 end and the blades end */
     uint32_t seed;          /**< Seed of the hash of the cells */
+    float wind_direction[2]; /**< Normalized world X and Z the Wind blows toward, {1, 0}
+                             *   without one */
+    float wind_offset[2];   /**< Wrapped local X and Z offset of the gust field of the Wind
+                             *   (box_render_wind_frame), 0 without one */
+    float wind_speed;       /**< Wind.speed, 0 when calm or without a Wind */
+    float wind_gust;        /**< Wind.gust clamped to 0..1, 0 without a Wind */
+    float wind_frequency;   /**< 1 over Wind.gust_scale */
+    float wind_sway;        /**< Phase of the sway of the Wind, 0..1, made local */
+    float wind_phase;       /**< WindStatus.clock times BOX_RENDER_GRASS_WIND_RATE wrapped to
+                             *   0..1, the phase of the swing and the flutter of the blades, 0
+                             *   without a Wind */
 } box_render_grass_t;
+
+/** Turns per second of the wind clock (WindStatus.clock) of the phase of the swing of the clumps
+ * of a Grass, whose blades flutter at whole multiples of it (GrassWind.time of grass_wind.wgsl) */
+#define BOX_RENDER_GRASS_WIND_RATE (0.5)
 
 /** Description of a BOX_RENDER_SHADER create or update, followed by its code and its label.
  *

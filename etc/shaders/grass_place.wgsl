@@ -13,7 +13,9 @@
 // voronoi pattern of absolute cells of a clump edge, as much as the clump follow says, and the
 // color and height of the variation over the world at its absolute place (grass_field.wgsl). A
 // blade thinner than a pixel at its distance widens to the pixel and stays only with the share
-// of blades that keeps the coverage, chosen by its hash.
+// of blades that keeps the coverage, chosen by its hash. Its stiffness in the wind is its own
+// and its clump's, the phase of its swing that of its clump, so neighbouring clumps do not move
+// in lockstep.
 // Blades outside the frustum are dropped, the others appended to the range of their level of
 // detail.
 #include "include/terrain_sample.wgsl"
@@ -56,6 +58,13 @@ const CLUMP_FACING: f32 = 0.85;
 
 // Largest factor of the height of the blades of a clump
 const CLUMP_HEIGHT: f32 = 0.35;
+
+// Share of the stiffness of a blade that comes from its clump
+const CLUMP_STIFFNESS: f32 = 0.5;
+
+// Factor of the radius of the bound of a blade that leans in the wind, so a blade bent over by a
+// gust is not culled
+const WIND_BOUND: f32 = 1.15;
 
 const TAU: f32 = 6.283185307179586;
 
@@ -239,6 +248,9 @@ fn grass_blade(at_patch: vec2i, lo: vec2f, c: vec2i, first: vec2i, k: u32,
     let ch2 = grass_hash(ch1);
     let ch3 = grass_hash(ch2);
     let ch4 = grass_hash(ch3);
+    let ch5 = grass_hash(ch4);
+    let ch6 = grass_hash(ch5);
+    let h11 = grass_hash(h10);
     let variation = grass_field_variation(world, params.shape.z);
 
     // Taller blades toward the center of a clump, all of them as tall as their clump
@@ -263,7 +275,8 @@ fn grass_blade(at_patch: vec2i, lo: vec2f, c: vec2i, first: vec2i, k: u32,
     }
 
     let center = base + vec3f(0.0, 0.5 * height, 0.0);
-    if (!grass_sphere_visible(planes, center, 0.6 * height + width)) {
+    let bound = select(0.6, WIND_BOUND, params.wind.strength.x > 0.0);
+    if (!grass_sphere_visible(planes, center, bound * height + width)) {
         return out;
     }
 
@@ -273,7 +286,9 @@ fn grass_blade(at_patch: vec2i, lo: vec2f, c: vec2i, first: vec2i, k: u32,
     let yaw = own_yaw + grass_turn(own_yaw, clump_yaw) * follow * CLUMP_FACING;
     let lean = mix(grass_unit(h6), grass_unit(ch3), follow);
     let shade = mix(0.75, 1.1, mix(grass_unit(h7), grass_unit(ch4), 0.5 * follow));
-    let tint = pack4x8unorm(vec4f(saturate(0.5 * variation.rgb), 0.0));
+    let stiffness = mix(grass_unit(h11), grass_unit(ch6), CLUMP_STIFFNESS);
+    let tint = (pack4x8unorm(vec4f(saturate(0.5 * variation.rgb), 0.0)) & 0xFFFFFFu) |
+        grass_wind_bits(grass_unit(ch5), stiffness);
 
     out.keep = true;
     out.blade = GrassBlade(base, yaw, height, width, lean, shade, grass_unit(h8),

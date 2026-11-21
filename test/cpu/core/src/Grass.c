@@ -359,3 +359,49 @@ void Grass_extract_scene(void) {
     ecs_fini(world);
     ecs_vec_fini_t(NULL, &grass_packet, box_render_grass_t);
 }
+
+void Grass_extract_wind(void) {
+    ecs_world_t *world = grass_world();
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Grass, {.mask = -1});
+    grass_frame(world);
+    grass_frame(world);
+
+    // Without a Wind the blades stand in still air
+    const box_render_grass_t *g = grass_find(e);
+    test_assert(g != NULL);
+    test_flt(g->wind_direction[0], 1);
+    test_flt(g->wind_direction[1], 0);
+    test_flt(g->wind_speed, 0);
+    test_flt(g->wind_phase, 0);
+
+    // With one they read its gust field and phases as the WindSway records do
+    ecs_singleton_set(world, Wind, {.direction = {0, 2}, .speed = 6, .gust = 0.4f,
+        .gust_scale = 10});
+    WindStatus *s = ecs_ensure(world, ecs_id(Wind), WindStatus);
+    s->clock = 5.3;
+    ecs_modified(world, ecs_id(Wind), WindStatus);
+    grass_frame(world);
+
+    box_render_wind_t w;
+    box_render_wind_frame(world, &w);
+    g = grass_find(e);
+    test_assert(g != NULL);
+    test_flt(g->wind_direction[0], 0);
+    test_flt(g->wind_direction[1], 1);
+    test_flt(g->wind_offset[0], w.offset[0]);
+    test_flt(g->wind_offset[1], w.offset[1]);
+    test_flt(g->wind_speed, 6);
+    test_flt(g->wind_gust, 0.4f);
+    test_flt(g->wind_frequency, 0.1f);
+    test_flt(g->wind_sway, w.sway);
+    const WindStatus *status = ecs_get(world, ecs_id(Wind), WindStatus);
+    test_assert(status != NULL);
+    test_assert(status->clock >= 5.3);
+    double phase = fmod(status->clock * BOX_RENDER_GRASS_WIND_RATE, 1.0);
+    test_assert(fabs((double)g->wind_phase - phase) < 1e-5);
+    test_assert(g->wind_phase >= 0 && g->wind_phase < 1);
+
+    ecs_fini(world);
+    ecs_vec_fini_t(NULL, &grass_packet, box_render_grass_t);
+}

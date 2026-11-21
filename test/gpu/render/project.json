@@ -2130,7 +2130,10 @@
                     "renders_lit_blades",
                     "clumps_share_facing",
                     "never_thinner_than_a_pixel",
-                    "varies_over_world"
+                    "varies_over_world",
+                    "wind_stiffness_and_phase",
+                    "bends_in_wind",
+                    "gusts_roll_as_waves"
                 ]
             },
             {

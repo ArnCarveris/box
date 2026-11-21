@@ -1,8 +1,9 @@
 /**
  * @file render/grass.c
  * @brief Extract of the Grass entities: their values with the defaults resolved, their colors
- * linear and their ground in the local frame, appended to the packet for the backend, which
- * places and draws their blades in the lit views of their scene (gpu_grass.c).
+ * linear, their ground in the local frame and the Wind of the frame, appended to the packet for
+ * the backend, which places and draws their blades in the lit views of their scene
+ * (gpu_grass.c).
  */
 
 #include "render.h"
@@ -60,18 +61,43 @@ static bool box_render_grass_terrain(
     return t != NULL;
 }
 
+/** Fill the wind of a Grass from the Wind of the frame.
+ *
+ * @param wind The Wind of the frame (box_render_wind_frame)
+ * @param out The grass
+ */
+static void box_render_grass_wind(
+    const box_render_wind_t *wind,
+    box_render_grass_t *out)
+{
+    double phase = isfinite(wind->clock) ? fmod(wind->clock * BOX_RENDER_GRASS_WIND_RATE, 1.0)
+        : 0.0;
+    phase = phase < 0.0 ? phase + 1.0 : phase;
+    out->wind_direction[0] = wind->direction[0];
+    out->wind_direction[1] = wind->direction[1];
+    out->wind_offset[0] = wind->offset[0];
+    out->wind_offset[1] = wind->offset[1];
+    out->wind_speed = wind->speed;
+    out->wind_gust = wind->gust;
+    out->wind_frequency = wind->frequency;
+    out->wind_sway = wind->sway;
+    out->wind_phase = (float)phase < 1.0f ? (float)phase : 0.0f;
+}
+
 /** Append a Grass to the packet.
  *
  * @param world The world
  * @param p The packet
  * @param e The Grass entity
  * @param value The Grass
+ * @param wind The Wind of the frame
  */
 static void box_render_grass(
     ecs_world_t *world,
     box_render_packet_t *p,
     ecs_entity_t e,
-    const Grass *value)
+    const Grass *value,
+    const box_render_wind_t *wind)
 {
     Grass g;
     WorldTransform buf;
@@ -114,6 +140,7 @@ static void box_render_grass(
     }
 
     out.seed = g.seed;
+    box_render_grass_wind(wind, &out);
     *ecs_vec_append_t(NULL, &p->grasses, box_render_grass_t) = out;
 done:
     return;
@@ -128,9 +155,11 @@ static void BoxRenderExtractGrass(
 {
     const Grass *grass = ecs_field(it, Grass, 0);
     box_render_packet_t *p = box_render_packet(it->world);
+    box_render_wind_t wind;
     int32_t i;
+    box_render_wind_frame(it->world, &wind);
     for (i = 0; i < it->count; i ++) {
-        box_render_grass(it->world, p, it->entities[i], &grass[i]);
+        box_render_grass(it->world, p, it->entities[i], &grass[i], &wind);
     }
 }
 

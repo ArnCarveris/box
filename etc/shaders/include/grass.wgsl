@@ -8,6 +8,8 @@
 // 2 * segments + 1 vertices built from the vertex index, the level of a draw in its first vertex.
 #pragma once
 
+#include "grass_wind.wgsl"
+
 // Levels of detail (BOX_GRASS_LODS)
 const GRASS_LODS: u32 = 3u;
 
@@ -42,6 +44,7 @@ struct GrassParams {
                             // over the world, height below which blades fold into a V, 0 for none
     pixel: vec4f,           // Size of a pixel per meter of distance (perspective) and at any
                             // distance (orthographic), one of them 0
+    wind: GrassWind,        // The Wind of the frame (grass_wind.wgsl)
 };
 
 // A blade (box_gpu_grass_blade_t), 48 bytes
@@ -55,7 +58,8 @@ struct GrassBlade {
     bend: f32,              // How far it bends over toward its tip, 0 to 1
     curl: f32,              // Curl around its length, -1 to 1
     tint: u32,              // Factor of its color from the variation over the world, halved,
-                            // in RGBA8 (pack4x8unorm)
+                            // in RGB8 (pack4x8unorm); in A the phase of the swing of its clump
+                            // in the high 4 bits, its stiffness in the wind in the low 4 bits
     clump: f32,             // Distance from the center of its clump in clump edges
 };
 
@@ -84,6 +88,14 @@ fn grass_hash(x: u32) -> u32 {
 // Hash of an absolute cell with a salt and a seed.
 fn grass_cell_hash(c: vec2i, salt: u32, seed: u32) -> u32 {
     return grass_hash(bitcast<u32>(c.x) ^ grass_hash(bitcast<u32>(c.y) ^ grass_hash(salt ^ seed)));
+}
+
+// Bits of the wind of a blade in the high byte of its tint: the phase of its clump in sixteenths
+// and its stiffness in fifteenths.
+fn grass_wind_bits(phase: f32, stiffness: f32) -> u32 {
+    let p = min(u32(phase * 16.0), 15u);
+    let s = u32(round(saturate(stiffness) * 15.0));
+    return ((p << 4u) | s) << 24u;
 }
 
 // A hash as a value from 0 to 1.

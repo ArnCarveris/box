@@ -368,7 +368,8 @@
                     "terrain_sampled",
                     "extract_plane",
                     "extract_terrain",
-                    "extract_scene"
+                    "extract_scene",
+                    "extract_wind"
                 ]
             },
             {

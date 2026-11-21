@@ -16,6 +16,19 @@
 // the straight one, so the field shows no step. A blade of a single triangle cannot fold and
 // widens as much instead.
 //
+// In the Wind a blade bends about its root toward the wave of the wind where it stands
+// (grass_wind.wgsl), which rolls the gusts over the field with the WindSway plants beside it: its
+// control points turn about the root by a growing share of the bend toward the tip, so the root
+// stays on the ground and the curve keeps about its length, and its rows turn with it, so the
+// bend also turns the normals and shifts the light on the blade. The up the normals lean toward
+// bends with the blade too, and a blade a gust bends over beyond the steady wind shows a sheen
+// while one that rises in a lull darkens, so the gusts read as bands of light rolling over the
+// field even where the blades are too small to see. Around that lean its clump
+// swings at the phase of the clump and the blade flutters and twists at its own phase, both
+// more as a gust stirs them, the stiffness of the blade and its clump damping all of it. In
+// still air the blades only sway faintly. The bend is a function of the blade, its place and the
+// wind of the frame, so the depth prepass and the forward pass agree on it.
+//
 // The blades are opaque and lit by the sun of the scene through its shadows and cookie, by the
 // ambient light and seen through the aerial perspective; the fog passes after the forward pass
 // fog them. Their normals round across their width, their roots are darker and occluded, a soft
@@ -74,6 +87,30 @@ const FOLD_AT: f32 = 0.2;
 // Share of the fold height below which a blade is fully folded (BOX_GRASS_FOLD_BLEND)
 const FOLD_BLEND: f32 = 0.7;
 
+// Share of the bend of a blade a stiff blade keeps
+const WIND_STIFF: f32 = 0.4;
+
+// Swing in radians of a clump along the wind at full wind, and across it as a share of that
+const WIND_SWING: f32 = 0.18;
+const WIND_SWING_CROSS: f32 = 0.5;
+
+// Flutter in radians of a blade at full wind, of which WIND_FLUTTER_STEADY flutters without a gust
+const WIND_FLUTTER: f32 = 0.1;
+const WIND_FLUTTER_STEADY: f32 = 0.3;
+
+// Twist in radians of the tip of a blade around its length as it flutters at full wind
+const WIND_TWIST: f32 = 0.35;
+
+// Swing and flutter in still air, as a share of those at full wind
+const WIND_CALM: f32 = 0.2;
+
+// Shares of the bend of a blade its three control points turn by, from the root
+const WIND_BEND_ALONG: vec3f = vec3f(0.15, 0.5, 1.0);
+
+// How much brighter a blade shows per radian a gust bends it over beyond the lean of the steady
+// wind, the sheen of its face to the sky, and darker per radian a lull lets it rise
+const WIND_SHEEN: f32 = 1.2;
+
 // How much wider than its width a blade seen edge on draws
 const EDGE_WIDEN: f32 = 0.8;
 
@@ -104,6 +141,11 @@ struct VertexOut {
     // 0 near, 1 where the normals and specular are flat
     @location(4) flatten: f32,
     @location(5) @interpolate(flat) color: vec3f,
+    // Up turned by the bend of the blade where it is, which the normal leans toward
+    @location(6) up: vec3f,
+    // Angle the gust where the blade stands bends it over beyond the steady wind at this height,
+    // below 0 in a lull
+    @location(7) gust: f32,
 };
 
 // Point of a cubic bezier that starts at 0.
@@ -140,6 +182,55 @@ fn grass_fold(height: f32) -> f32 {
         return 0.0;
     }
     return 1.0 - smoothstep(FOLD_BLEND * at, at, height);
+}
+
+// The bend of a blade in the wind: xy the horizontal direction and angle in radians its tip turns
+// toward about its root, z the angle its tip twists by around its length, w the angle the gust or
+// lull where it stands adds to the lean of the steady wind, below 0 in a lull.
+fn grass_wind_bend(b: GrassBlade) -> vec4f {
+    let w = params.wind;
+    let wave = grass_wind_wave(b.position.xz, w);
+    let bits = b.tint >> 24u;
+    let stiffness = f32(bits & 15u) / 15.0;
+    let clump = f32(bits >> 4u) / 16.0;
+    let own = grass_unit(grass_hash(bitcast<u32>(b.yaw)));
+    let free = mix(1.0, WIND_STIFF, stiffness);
+    let full = clamp(w.strength.x / GRASS_WIND_FULL, 0.0, 1.0);
+    let a = GRASS_WIND_TAU * w.time.x;
+    let dir = w.field.xy;
+    let across = vec2f(-dir.y, dir.x);
+
+    // The lean toward the wave
+    let strength = length(wave.xy);
+    let lean = grass_wind_lean(strength);
+    var r = vec2f(0.0);
+    if (strength > 0.0) {
+        r = wave.xy * (lean / strength);
+    }
+
+    // The clump swings around the lean as the gust stirs it, faintly in still air
+    let swing = WIND_SWING * (full * wave.w + WIND_CALM * (1.0 - full));
+    let sp = GRASS_WIND_TAU * clump;
+    r += dir * (swing * sin(a + sp)) +
+        across * (swing * WIND_SWING_CROSS * sin(2.0 * a + 1.3 + sp));
+
+    // The blade flutters at its own phase, more in a gust
+    let flutter = WIND_FLUTTER * (full * mix(WIND_FLUTTER_STEADY, 1.0, wave.w) +
+        WIND_CALM * (1.0 - full));
+    let fp = GRASS_WIND_TAU * own;
+    r += vec2f(sin(5.0 * a + fp), sin(7.0 * a + 1.7 * fp + 2.0)) * flutter;
+    let twist = WIND_TWIST / WIND_FLUTTER * flutter * sin(6.0 * a + fp + 1.0);
+    let gust = lean - grass_wind_lean(w.strength.x / GRASS_WIND_FULL);
+    return vec4f(r * free, twist * free, gust * free);
+}
+
+// Axis about which a turn of a horizontal direction moves a point above it toward it.
+fn grass_wind_axis(r: vec2f) -> vec3f {
+    let l = length(r);
+    if (l <= 0.0) {
+        return vec3f(1.0, 0.0, 0.0);
+    }
+    return vec3f(r.y, 0.0, -r.x) / l;
 }
 
 // Direction from a point toward the eye.
@@ -188,15 +279,34 @@ fn vs(@builtin(vertex_index) vertex: u32, @builtin(instance_index) instance: u32
     // the blade bends, so it arcs over toward its tip
     let a = b.lean * LEAN_MAX;
     let h = b.height;
-    let p3 = up * (h * cos(a)) + facing * (h * sin(a));
-    let p1 = up * (h * 0.4);
-    let p2 = up * (h * mix(0.7, 0.95, b.bend)) + facing * (h * sin(a) * mix(0.45, 0.15, b.bend));
+    var p3 = up * (h * cos(a)) + facing * (h * sin(a));
+    var p1 = up * (h * 0.4);
+    var p2 = up * (h * mix(0.7, 0.95, b.bend)) + facing * (h * sin(a) * mix(0.45, 0.15, b.bend));
+
+    // The wind turns the control points about the root, the more the higher up, so the blade
+    // bends over and stays rooted
+    let wind = grass_wind_bend(b);
+    let wind_angle = length(wind.xy);
+    let wind_axis = grass_wind_axis(wind.xy);
+    if (wind_angle > 0.0) {
+        p1 = grass_rotate(p1, wind_axis, wind_angle * WIND_BEND_ALONG.x);
+        p2 = grass_rotate(p2, wind_axis, wind_angle * WIND_BEND_ALONG.y);
+        p3 = grass_rotate(p3, wind_axis, wind_angle * WIND_BEND_ALONG.z);
+    }
+
     var local = grass_bezier(p1, p2, p3, t);
     var tangent = normalize(grass_bezier_tangent(p1, p2, p3, max(t, 1e-3)));
 
-    // The rows turn around the vertical as the blade curls
-    let twist = b.yaw + b.curl * CURL_MAX * t * t;
+    // The rows turn around the vertical as the blade curls and twists in the wind, and with the
+    // bend of the blade where they are
+    let twist = b.yaw + (b.curl * CURL_MAX + wind.z) * t * t;
     var across = vec3f(-sin(twist), 0.0, cos(twist));
+    out.up = up;
+    out.gust = wind.w * t;
+    if (wind_angle > 0.0) {
+        across = grass_rotate(across, wind_axis, wind_angle * t);
+        out.up = grass_rotate(up, wind_axis, wind_angle * t);
+    }
 
     // Above the fold each half leans out around the facing toward its own side and turns
     // around the vertical away from the other
@@ -246,10 +356,9 @@ fn vs(@builtin(vertex_index) vertex: u32, @builtin(instance_index) instance: u32
 // Light a blade reflects toward the eye: the ambient light, occluded toward its base, and the
 // directional lights, the first through its shadows and cookie, on its front with a specular
 // lobe and through it, the light through it tinted by the color of the blade.
-fn grass_light(world: vec3f, front: vec3f, n: vec3f, along: f32, flatten: f32, albedo: vec3f)
-    -> vec3f
+fn grass_light(world: vec3f, front: vec3f, n: vec3f, up: vec3f, along: f32, flatten: f32,
+    albedo: vec3f) -> vec3f
 {
-    let up = vec3f(0.0, 1.0, 0.0);
     let lit = normalize(mix(n, up, mix(NORMAL_UP, NORMAL_UP_FAR, flatten)));
     let v = grass_to_eye(world);
     let occlusion = mix(BASE_OCCLUSION, 1.0, pow(along, 0.8));
@@ -287,8 +396,9 @@ fn fs(in: VertexOut, @builtin(front_facing) front: bool) -> @location(0) vec4f {
     // bright single-pixel tips do not sparkle
     let along = mix(in.along, FLAT_ALONG, FLAT_GRADIENT * in.flatten);
     let gradient = mix(params.base.rgb, params.tip.rgb, smoothstep(0.0, 1.0, along));
-    let albedo = gradient * in.color;
-    var color = grass_light(in.world, flat_normal, n, along, in.flatten, albedo);
+    let up = normalize(in.up);
+    let albedo = gradient * in.color * max(1.0 + WIND_SHEEN * in.gust, 0.5);
+    var color = grass_light(in.world, flat_normal, n, up, along, in.flatten, albedo);
     if (view.aerial.w > 0.0) {
         let ap = aerial_sample(in.clip, in.world);
         color = color * ap.a + ap.rgb;

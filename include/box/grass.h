@@ -70,6 +70,13 @@ extern "C" {
  * shorter they are below fold_height, from straight at fold_height to fully parted at
  * BOX_GRASS_FOLD_BLEND times it, so the field shows no step between short and tall blades.
  *
+ * With a Wind the blades bend about their roots with the gust field of the Wind, the same the
+ * WindSway meshes and the particles with global wind read, so gusts roll over the field as waves
+ * at the same places and times as through the plants beside it, and the bend shifts the light on
+ * the blades. Around that lean the clumps swing and the blades flutter at phases of their own,
+ * each blade and clump as stiff as its hash says, so the field does not move in lockstep; in a
+ * calm the blades only sway faintly.
+ *
  * The blades are opaque and lit as the scene is: the sun with its shadows, the ambient light,
  * the aerial perspective and the fog. Their normals round across their width, their roots are
  * darker and occluded, they reflect a soft specular and the light behind them shines through, as

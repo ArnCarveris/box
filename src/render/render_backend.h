@@ -1012,6 +1012,9 @@ typedef struct box_render_grass_blade_t {
     float width;                /**< Width at its base in meters, widened with distance and
                                  *   to about a pixel */
     float tint[3];              /**< Factor of its color from the variation over the world */
+    float stiffness;            /**< How stiffly it resists the wind, 0 to 1, in sixteenths */
+    float phase;                /**< Phase of the swing of its clump in the wind, 0 to 1, in
+                                 *   sixteenths */
     int32_t level;              /**< Level of detail it is drawn with */
 } box_render_grass_blade_t;
 
