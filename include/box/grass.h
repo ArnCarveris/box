@@ -29,6 +29,9 @@ extern "C" {
 /** Most blades per square meter a Grass places, a larger Grass.density is clamped */
 #define BOX_GRASS_DENSITY_MAX (256.0f)
 
+/** Share of Grass.fold_height below which blades are fully folded, above it they part less */
+#define BOX_GRASS_FOLD_BLEND (0.7f)
+
 /** Farthest distance in meters a Grass reaches, a larger last level distance is clamped */
 #define BOX_GRASS_DISTANCE_MAX (500.0f)
 
@@ -60,6 +63,13 @@ extern "C" {
  * draws thinner than about a pixel: the place pass widens thinner ones and drops as many of them
  * as it widens.
  *
+ * Blades shorter than fold_height fold into a V, as two halves that part from a fold between
+ * their first and second segment, each leaning out on its own side, so short grass looks about
+ * twice as dense for the blades it places. The halves share the vertices of the blade at its
+ * level, so at level 2, a single triangle, the blade widens instead. Blades fold more the
+ * shorter they are below fold_height, from straight at fold_height to fully parted at
+ * BOX_GRASS_FOLD_BLEND times it, so the field shows no step between short and tall blades.
+ *
  * The blades are opaque and lit as the scene is: the sun with its shadows, the ambient light,
  * the aerial perspective and the fog. Their normals round across their width, their roots are
  * darker and occluded, they reflect a soft specular and the light behind them shines through, as
@@ -82,6 +92,8 @@ ECS_STRUCT(Grass, {
                              *   BOX_GRASS_DENSITY_MAX */
     float min_height;       /**< Shortest blade in meters, default 0.25 */
     float max_height;       /**< Tallest blade in meters, default 0.6 */
+    float fold_height;      /**< Height in meters below which blades fold into a V, default
+                             *   0.35; 0 for none */
     float min_width;        /**< Narrowest blade at its base in meters, default 0.03 */
     float max_width;        /**< Widest blade at its base in meters, default 0.06 */
     rgb base_color;         /**< Display encoded color at the base, default {38, 66, 18} */

@@ -74,7 +74,8 @@ typedef struct box_gpu_grass_params_t {
     float tip[4];                   /**< Linear color at the tip */
     uint32_t config[4];             /**< Mask channel plus one, terrain, seed, capacity */
     float shape[4];                 /**< Edge of a clump, how strongly blades follow their
-                                     *   clump, variation over the world, unused */
+                                     *   clump, variation over the world, height
+                                     *   below which blades fold */
     float pixel[4];                 /**< Size of a pixel per meter of distance and its size at
                                      *   any distance, one of them 0 */
 } box_gpu_grass_params_t;
@@ -1056,6 +1057,7 @@ static uint32_t box_gpu_grass_params(
     out->shape[0] = g->clump[0];
     out->shape[1] = g->clump[1];
     out->shape[2] = g->variation;
+    out->shape[3] = g->fold;
     if (u->lights[3]) {
         out->pixel[1] = 2.0f * u->cluster[1] * u->viewport[3];
     } else {

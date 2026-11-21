@@ -6,6 +6,16 @@
 // rows turning around the vertical as the blade curls. A blade seen edge on widens in view space
 // so it keeps covering about as many pixels.
 //
+// A blade shorter than the fold height of its Grass folds into a V: the first half of its strip
+// runs from the tip of one half down to the root and the second half from the root up to the tip
+// of the other, the two sharing the stem up to the fold between their first and second segment
+// and turning apart above it, each leaning out to its own side and turning away from the other
+// around the vertical, each as wide at the fold as a blade at its root. The first half turns its
+// sides around so both keep the winding and the shading of a straight blade. Below the fold height the halves part the
+// more the shorter the blade, from not at all at the fold height, where a folded blade draws as
+// the straight one, so the field shows no step. A blade of a single triangle cannot fold and
+// widens as much instead.
+//
 // The blades are opaque and lit by the sun of the scene through its shadows and cookie, by the
 // ambient light and seen through the aerial perspective; the fog passes after the forward pass
 // fog them. Their normals round across their width, their roots are darker and occluded, a soft
@@ -51,6 +61,19 @@ const LEAN_MAX: f32 = 1.2;
 // Largest curl of a blade at its tip in radians
 const CURL_MAX: f32 = 0.6;
 
+// Largest angle in radians each half of a folded blade turns out from the vertical by
+const FOLD_SPLAY: f32 = 0.5;
+
+// Largest angle in radians each half of a folded blade turns around the vertical by, so the
+// halves face apart and the V shows from every side
+const FOLD_TURN: f32 = 0.8;
+
+// Share of the length of a half of a folded blade below its fold, its first segment at level 0
+const FOLD_AT: f32 = 0.2;
+
+// Share of the fold height below which a blade is fully folded (BOX_GRASS_FOLD_BLEND)
+const FOLD_BLEND: f32 = 0.7;
+
 // How much wider than its width a blade seen edge on draws
 const EDGE_WIDEN: f32 = 0.8;
 
@@ -95,6 +118,30 @@ fn grass_bezier_tangent(p1: vec3f, p2: vec3f, p3: vec3f, t: f32) -> vec3f {
     return 3.0 * s * s * p1 + 6.0 * s * t * (p2 - p1) + 3.0 * t * t * (p3 - p2);
 }
 
+// Rotation of a vector around a unit axis.
+fn grass_rotate(v: vec3f, axis: vec3f, angle: f32) -> vec3f {
+    let c = cos(angle);
+    return v * c + cross(axis, v) * sin(angle) + axis * (dot(axis, v) * (1.0 - c));
+}
+
+// Where along a half of a folded blade of a number of segments a row of it lies, from its
+// root: the first segment ends at the fold, the others share the rest.
+fn grass_fold_along(k: u32, segments: u32) -> f32 {
+    if (k == 0u || segments < 2u) {
+        return f32(k) / f32(segments);
+    }
+    return mix(FOLD_AT, 1.0, f32(k - 1u) / f32(segments - 1u));
+}
+
+// How far a blade of a height folds, 0 straight to 1 fully parted.
+fn grass_fold(height: f32) -> f32 {
+    let at = params.shape.w;
+    if (at <= 0.0) {
+        return 0.0;
+    }
+    return 1.0 - smoothstep(FOLD_BLEND * at, at, height);
+}
+
 // Direction from a point toward the eye.
 fn grass_to_eye(world: vec3f) -> vec3f {
     if (view.lights.w != 0u) {
@@ -111,10 +158,31 @@ fn vs(@builtin(vertex_index) vertex: u32, @builtin(instance_index) instance: u32
     let segments = grass_segments(lod);
     let b = blades[lod * params.config.w + instance];
     let row = min(v / 2u, segments);
-    let t = f32(row) / f32(segments);
-    let side = select(f32(v & 1u) * 2.0 - 1.0, 0.0, v >= 2u * segments);
+    var t = f32(row) / f32(segments);
+    var side = select(f32(v & 1u) * 2.0 - 1.0, 0.0, v >= 2u * segments);
     let up = vec3f(0.0, 1.0, 0.0);
     let facing = vec3f(cos(b.yaw), 0.0, sin(b.yaw));
+
+    // A short blade folds: its first rows run down one half to the root, the others up the
+    // other half, the first half with its sides turned around to keep the winding. A single
+    // triangle widens instead
+    let fold = grass_fold(b.height);
+    let folded = fold > 0.0 && segments >= 3u;
+    var part = 0.0;
+    var width = b.width;
+    if (folded) {
+        let rows = (segments - 1u) / 2u;
+        if (row <= rows) {
+            t = grass_fold_along(rows - row, rows);
+            side = -side;
+            part = -1.0;
+        } else {
+            t = grass_fold_along(row - rows - 1u, rows);
+            part = 1.0;
+        }
+    } else if (segments < 3u) {
+        width *= 1.0 + fold;
+    }
 
     // The spine: the tip leans along the facing, the second control point stays higher the more
     // the blade bends, so it arcs over toward its tip
@@ -123,20 +191,38 @@ fn vs(@builtin(vertex_index) vertex: u32, @builtin(instance_index) instance: u32
     let p3 = up * (h * cos(a)) + facing * (h * sin(a));
     let p1 = up * (h * 0.4);
     let p2 = up * (h * mix(0.7, 0.95, b.bend)) + facing * (h * sin(a) * mix(0.45, 0.15, b.bend));
-    let spine = b.position + grass_bezier(p1, p2, p3, t);
-    let tangent = normalize(grass_bezier_tangent(p1, p2, p3, max(t, 1e-3)));
+    var local = grass_bezier(p1, p2, p3, t);
+    var tangent = normalize(grass_bezier_tangent(p1, p2, p3, max(t, 1e-3)));
 
     // The rows turn around the vertical as the blade curls
     let twist = b.yaw + b.curl * CURL_MAX * t * t;
-    let across = vec3f(-sin(twist), 0.0, cos(twist));
+    var across = vec3f(-sin(twist), 0.0, cos(twist));
+
+    // Above the fold each half leans out around the facing toward its own side and turns
+    // around the vertical away from the other
+    if (folded && t > FOLD_AT + 1e-4) {
+        let angle = part * fold * FOLD_SPLAY;
+        let turn = part * fold * FOLD_TURN;
+        let pivot = grass_bezier(p1, p2, p3, FOLD_AT);
+        local = pivot + grass_rotate(grass_rotate(local - pivot, facing, angle), up, turn);
+        tangent = grass_rotate(grass_rotate(tangent, facing, angle), up, turn);
+        across = grass_rotate(grass_rotate(across, facing, angle), up, turn);
+    }
+
+    let spine = b.position + local;
     let flat_normal = normalize(cross(across, tangent));
 
-    // Wider toward the base, narrowing faster toward the tip; seen edge on the blade widens
-    // across the view
-    let half_width = 0.5 * b.width * (1.0 - t * t) * mix(1.0, 1.0 - t, 0.5);
+    // Wider toward the base, narrowing faster toward the tip, a half of a folded blade from its
+    // fold as a whole blade from its root; seen edge on the blade widens across the view
+    var w = t;
+    if (folded) {
+        w = mix(t, max(t - FOLD_AT, 0.0) / (1.0 - FOLD_AT), fold);
+    }
+    let half_width = 0.5 * width * (1.0 - w * w) * mix(1.0, 1.0 - w, 0.5);
     let eye = grass_to_eye(b.position);
     let eye_xz = normalize(eye.xz + vec2f(1e-6, 0.0));
-    let edge = abs(dot(across.xz, eye_xz));
+    let across_xz = normalize(across.xz + vec2f(0.0, 1e-6));
+    let edge = abs(dot(across_xz, eye_xz));
     let screen = vec3f(-eye_xz.y, 0.0, eye_xz.x);
     let order = select(-1.0, 1.0, dot(across, screen) >= 0.0);
     let world = spine + across * (side * half_width) +

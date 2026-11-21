@@ -2270,6 +2270,7 @@ typedef struct box_render_grass_t {
     int32_t mask;           /**< Mask channel that weighs the density, -1 for none */
     float density;          /**< Blades per square meter */
     float height[2];        /**< Shortest and tallest blade */
+    float fold;             /**< Height below which blades fold into a V, 0 for none */
     float width[2];         /**< Narrowest and widest blade */
     float base[3];          /**< Linear color at the base */
     float tip[3];           /**< Linear color at the tip */

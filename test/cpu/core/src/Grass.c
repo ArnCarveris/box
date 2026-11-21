@@ -112,6 +112,7 @@ void Grass_defaults(void) {
     test_flt(g->density, BOX_GRASS_DENSITY);
     test_flt(g->min_height, 0.25f);
     test_flt(g->max_height, 0.6f);
+    test_flt(g->fold_height, BOX_GRASS_FOLD_HEIGHT);
     test_flt(g->min_width, 0.03f);
     test_flt(g->max_width, 0.06f);
     test_int(g->base_color.r, 38);
@@ -136,7 +137,7 @@ void Grass_script(void) {
     test_int(ecs_script_run(world, "grass",
         "using box.grass\n"
         "meadow { Grass: {density: 20, mask: 2, lod: [10, 30, 90], seed: 7, clump_size: 2.5,\n"
-        "  clump_follow: 0.9, variation: 0.25} }\n", NULL), 0);
+        "  clump_follow: 0.9, variation: 0.25, fold_height: 0.3} }\n", NULL), 0);
     ecs_entity_t meadow = ecs_lookup(world, "meadow");
     test_assert(meadow != 0);
     const Grass *g = ecs_get(world, meadow, Grass);
@@ -150,6 +151,7 @@ void Grass_script(void) {
     test_flt(g->clump_size, 2.5f);
     test_flt(g->clump_follow, 0.9f);
     test_flt(g->variation, 0.25f);
+    test_flt(g->fold_height, 0.3f);
     test_flt(g->min_height, 0.25f);
     test_int(g->base_color.g, 66);
     ecs_fini(world);
@@ -213,6 +215,29 @@ void Grass_resolve_clumps(void) {
     test_flt(out.variation, 1);
 }
 
+void Grass_resolve_fold(void) {
+    Grass in = { .fold_height = 0 };
+    Grass out;
+    box_grass_resolve(&in, &out);
+    test_flt(out.fold_height, 0);
+
+    in = (Grass){ .fold_height = -0.5f };
+    box_grass_resolve(&in, &out);
+    test_flt(out.fold_height, 0);
+
+    in = (Grass){ .fold_height = NAN };
+    box_grass_resolve(&in, &out);
+    test_flt(out.fold_height, BOX_GRASS_FOLD_HEIGHT);
+
+    in = (Grass){ .fold_height = INFINITY };
+    box_grass_resolve(&in, &out);
+    test_flt(out.fold_height, BOX_GRASS_FOLD_HEIGHT);
+
+    in = (Grass){ .fold_height = 0.42f };
+    box_grass_resolve(&in, &out);
+    test_flt(out.fold_height, 0.42f);
+}
+
 void Grass_terrain_sampled(void) {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
@@ -242,7 +267,7 @@ void Grass_extract_plane(void) {
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Position, {3, 2, -4});
     ecs_set(world, e, Grass, {.mask = 1, .density = 30, .min_height = 0.2f,
-        .max_height = 0.5f, .min_width = 0.02f, .max_width = 0.04f,
+        .max_height = 0.5f, .fold_height = 0.3f, .min_width = 0.02f, .max_width = 0.04f,
         .base_color = {40, 70, 20}, .tip_color = {140, 170, 70}, .clump_size = 2,
         .clump_follow = 0.6f, .variation = 0.8f, .lod = {15, 45, 150}, .seed = 9});
     grass_frame(world);
@@ -259,6 +284,7 @@ void Grass_extract_plane(void) {
     test_flt(g->density, 30);
     test_flt(g->height[0], 0.2f);
     test_flt(g->height[1], 0.5f);
+    test_flt(g->fold, 0.3f);
     test_flt(g->width[0], 0.02f);
     test_flt(g->width[1], 0.04f);
     test_flt(g->base[0], grass_linear(40));
@@ -328,6 +354,7 @@ void Grass_extract_scene(void) {
     const box_render_grass_t *g = grass_find(e);
     test_assert(g != NULL);
     test_uint(g->scene, scene);
+    test_flt(g->fold, 0);
 
     ecs_fini(world);
     ecs_vec_fini_t(NULL, &grass_packet, box_render_grass_t);

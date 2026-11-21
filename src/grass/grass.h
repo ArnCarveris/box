@@ -12,6 +12,9 @@
 /** Blades per square meter of a Grass with a density of 0 or less */
 #define BOX_GRASS_DENSITY (48.0f)
 
+/** Height below which the blades of a new Grass fold into a V */
+#define BOX_GRASS_FOLD_HEIGHT (0.35f)
+
 /** Distance between the clumps of a Grass with a clump size of 0 or less */
 #define BOX_GRASS_CLUMP_SIZE (1.2f)
 
@@ -23,7 +26,8 @@
 
 /** Resolve the defaults of a Grass: sizes of 0 or less and not finite take their defaults, the
  * largest of a range is at least its smallest, a clump follow and a variation that are not
- * finite take their defaults and the others are clamped to 0 to 1, the density is clamped to BOX_GRASS_DENSITY_MAX,
+ * finite take their defaults and the others are clamped to 0 to 1, a fold height that is not
+ * finite takes its default and a negative one is 0, the density is clamped to BOX_GRASS_DENSITY_MAX,
  * each distance of the levels is at least the one before and the last at most
  * BOX_GRASS_DISTANCE_MAX, and a mask outside 0 to 3 is -1.
  *

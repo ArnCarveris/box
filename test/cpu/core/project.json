@@ -364,6 +364,7 @@
                     "script",
                     "resolve",
                     "resolve_clumps",
+                    "resolve_fold",
                     "terrain_sampled",
                     "extract_plane",
                     "extract_terrain",

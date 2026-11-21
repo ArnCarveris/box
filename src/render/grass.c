@@ -97,6 +97,7 @@ static void box_render_grass(
     out.density = g.density;
     out.height[0] = g.min_height;
     out.height[1] = g.max_height;
+    out.fold = g.fold_height;
     out.width[0] = g.min_width;
     out.width[1] = g.max_width;
     out.base[0] = box_render_grass_linear(g.base_color.r);

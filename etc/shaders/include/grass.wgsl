@@ -39,7 +39,7 @@ struct GrassParams {
     config: vec4u,          // Mask channel plus one, 0 for none; 1 on a terrain; seed; blades
                             // a level holds at most
     shape: vec4f,           // Edge of a clump, how strongly blades follow their clump, variation
-                            // over the world
+                            // over the world, height below which blades fold into a V, 0 for none
     pixel: vec4f,           // Size of a pixel per meter of distance (perspective) and at any
                             // distance (orthographic), one of them 0
 };

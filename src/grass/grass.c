@@ -32,6 +32,7 @@ static void box_grass_ctor(
             .density = BOX_GRASS_DENSITY,
             .min_height = 0.25f,
             .max_height = 0.6f,
+            .fold_height = BOX_GRASS_FOLD_HEIGHT,
             .min_width = 0.03f,
             .max_width = 0.06f,
             .base_color = {38, 66, 18},
@@ -81,6 +82,8 @@ void box_grass_resolve(
     out->min_height = box_grass_positive(value->min_height, 0.25f);
     out->max_height = box_grass_positive(value->max_height, 0.6f);
     out->max_height = out->max_height < out->min_height ? out->min_height : out->max_height;
+    out->fold_height = !isfinite(value->fold_height) ? BOX_GRASS_FOLD_HEIGHT :
+        value->fold_height < 0.0f ? 0.0f : value->fold_height;
     out->min_width = box_grass_positive(value->min_width, 0.03f);
     out->max_width = box_grass_positive(value->max_width, 0.06f);
     out->max_width = out->max_width < out->min_width ? out->min_width : out->max_width;
