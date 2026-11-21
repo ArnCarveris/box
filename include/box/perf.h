@@ -97,6 +97,32 @@ ECS_STRUCT(PerfTextureGraphs, {
     PerfRange cached_kb; /**< Kilobytes of the cached values at each frame */
 });
 
+/** Grass blades of a level of detail per packet of the measurement of a run */
+ECS_STRUCT(PerfGrassLevel, {
+    double generated;    /**< Blades the grass passes placed in the patches the views saw */
+    double drawn;        /**< Blades of those the views drew */
+});
+
+/** Grass work of the measurement of a run, from the backend statistics (zero without the GPU
+ * backend or a Grass). The GPU time is per grass pass, one per frame of a lit view whose scene
+ * has a Grass, sampled in each measured frame that read back new timestamps. */
+ECS_STRUCT(PerfGrass, {
+    int32_t passes;      /**< Grass passes recorded */
+    int32_t timed;       /**< Grass passes whose GPU time was read back */
+    int32_t samples;     /**< Measured frames that read back GPU time, the samples of the times */
+    double mean_ms;      /**< Mean GPU time of a grass pass */
+    double p50_ms;       /**< Median GPU time of a grass pass over the samples */
+    double p95_ms;       /**< 95th percentile GPU time of a grass pass */
+    double p99_ms;       /**< 99th percentile GPU time of a grass pass */
+    double max_ms;       /**< Longest GPU time of a grass pass over the samples */
+    int32_t reads;       /**< Packets whose blade counts were read back */
+    double generated;    /**< Blades placed per packet, every level */
+    double drawn;        /**< Blades drawn per packet, every level */
+    PerfGrassLevel lod0; /**< Level 0, the finest */
+    PerfGrassLevel lod1; /**< Level 1 */
+    PerfGrassLevel lod2; /**< Level 2, the furthest out */
+});
+
 /** Result of a performance run, written by the engine and read only for applications */
 ECS_STRUCT(PerfStatus, {
     PerfState state;      /**< Progress of the run */
@@ -135,6 +161,7 @@ ECS_STRUCT(PerfStatus, {
     float audio_load;     /**< Largest AudioStatus.load of the measured frames, the share of
                            *   real time the audio.render took */
     PerfTextureGraphs texture_graphs; /**< Texture graph cache counts per measured frame */
+    PerfGrass grass;      /**< Grass GPU time and blades of the measurement */
 });
 
 /** Register the box.perf module.

@@ -17,7 +17,11 @@ state {
   export mut start_y: f32 = 60
   export mut start_z: f32 = START_Z
   export mut start_yaw: f32 = 0
+  export mut start_pitch: f32 = -0.06
   export mut started: bool = false
+
+  // Set by a script that moves the player itself, which takes it off its controllers
+  export mut scripted: bool = false
 }
 
 walk_keys {
@@ -37,13 +41,13 @@ walk_keys {
 
 player {
   Position: {start_x, start_y, start_z}
-  Rotation: {-0.06, start_yaw, 0}
+  Rotation: {start_pitch, start_yaw, 0}
   Camera: {fov: 62, near_: 0.05, far_: 6000}
   WorldFocus
 
-  if flying {
+  if flying && !scripted {
     CameraController: {speed: FLY_SPEED, boost: 8}
-  } else if started {
+  } else if started && !scripted {
     FirstPersonController: {
       speed: WALK_SPEED,
       eye: EYE,

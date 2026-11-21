@@ -139,6 +139,56 @@ static void box_perf_report_graphs(
     ecs_strbuf_appendstr(buf, "\n  },\n");
 }
 
+/** Append the grass GPU time and blades as JSON members.
+ *
+ * @param buf The buffer
+ * @param status The completed status
+ */
+static void box_perf_report_grass(
+    ecs_strbuf_t *buf,
+    const PerfStatus *status)
+{
+    const PerfGrass *g = &status->grass;
+    const PerfGrassLevel *levels[3] = { &g->lod0, &g->lod1, &g->lod2 };
+    int32_t i;
+    ecs_strbuf_append(buf,
+        "  \"grass\": {\n    \"passes\": %d,\n    \"timed\": %d,\n    \"samples\": %d,\n"
+        "    \"mean_ms\": %.4f,\n    \"p50_ms\": %.4f,\n    \"p95_ms\": %.4f,\n"
+        "    \"p99_ms\": %.4f,\n    \"max_ms\": %.4f,\n    \"reads\": %d,\n"
+        "    \"generated\": %.1f,\n    \"drawn\": %.1f,\n    \"lods\": [",
+        g->passes, g->timed, g->samples, g->mean_ms, g->p50_ms, g->p95_ms, g->p99_ms,
+        g->max_ms, g->reads, g->generated, g->drawn);
+    for (i = 0; i < 3; i ++) {
+        ecs_strbuf_append(buf, "%s{\"generated\": %.1f, \"drawn\": %.1f}", i ? ", " : "",
+            levels[i]->generated, levels[i]->drawn);
+    }
+
+    ecs_strbuf_appendstr(buf, "]\n  },\n");
+}
+
+/** Append a series of values per measured frame as a JSON member.
+ *
+ * @param buf The buffer
+ * @param name The name of the member
+ * @param values The values, of double
+ * @param last Whether the member is the last of the object
+ */
+static void box_perf_report_series(
+    ecs_strbuf_t *buf,
+    const char *name,
+    const ecs_vec_t *values,
+    bool last)
+{
+    const double *v = ecs_vec_first_t(values, double);
+    int32_t count = ecs_vec_count(values), i;
+    ecs_strbuf_append(buf, "  \"%s\": [", name);
+    for (i = 0; i < count; i ++) {
+        ecs_strbuf_append(buf, i ? ", %.4f" : "%.4f", v[i]);
+    }
+
+    ecs_strbuf_appendstr(buf, last ? "]\n" : "],\n");
+}
+
 /** Append the statistics of a status as JSON members.
  *
  * @param buf The buffer
@@ -179,29 +229,25 @@ int box_perf_report(
     ecs_world_t *world,
     const PerfRun *run,
     const PerfStatus *status,
-    const ecs_vec_t *intervals)
+    const box_perf_t *perf)
 {
     const App *app = ecs_singleton_get(world, App);
-    const double *values = ecs_vec_first_t(intervals, double);
-    int32_t count = ecs_vec_count(intervals);
     char *scene = flecs_astresc('"', app && app->scene ? app->scene : "");
     int target = (int)(status->target_ms > 0 ? 1000.0 / status->target_ms + 0.5 : 0);
     ecs_strbuf_t buf = ECS_STRBUF_INIT;
     char *json;
     FILE *f;
-    int32_t i;
     int result = -1;
     ecs_strbuf_append(&buf, "{\n  \"scene\": \"%s\",\n  \"target_fps\": %d,\n", scene, target);
     ecs_strbuf_append(&buf, "  \"stall_ms\": %.3f,\n", (double)run->stall);
     box_perf_report_stats(&buf, status);
     box_perf_report_orbit(&buf, status);
     box_perf_report_graphs(&buf, status);
-    ecs_strbuf_appendstr(&buf, "  \"intervals_ms\": [");
-    for (i = 0; i < count; i ++) {
-        ecs_strbuf_append(&buf, i ? ", %.4f" : "%.4f", values[i]);
-    }
-
-    ecs_strbuf_appendstr(&buf, "]\n}\n");
+    box_perf_report_grass(&buf, status);
+    box_perf_report_series(&buf, "grass_ms", &perf->grass_ms, false);
+    box_perf_report_series(&buf, "grass_drawn", &perf->grass_drawn, false);
+    box_perf_report_series(&buf, "intervals_ms", &perf->intervals, true);
+    ecs_strbuf_appendstr(&buf, "}\n");
     json = ecs_strbuf_get(&buf);
     f = fopen(run->report, "w");
     if (!f) {
