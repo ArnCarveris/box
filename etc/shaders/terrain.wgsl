@@ -248,7 +248,7 @@ fn terrain_bake_light(f: TerrainOut) -> vec4f {
         return vec4f(1.0, 1.0, 0.0, 0.0);
     }
     let c = terrain_bake_layer(terrain_bake_at(f), 2u);
-    return select(vec4f(c.r, c.g, 0.0, 1.0), vec4f(1.0, 1.0, 0.0, 0.0), c.a == 0.0);
+    return select(vec4f(c.r, c.g, c.b, 1.0), vec4f(1.0, 1.0, 0.0, 0.0), c.a == 0.0);
 }
 
 // The material of the bake of a fragment of a terrain tile with one (terrain_bake_light).
@@ -753,7 +753,7 @@ fn terrain_grass_wind(xz: vec2f, v: vec3f) -> f32 {
 // It takes the colors of the blades with the variation over the world (grass_field.wgsl) at the
 // absolute place of the fragment, a filtered normal, a rough specular that roughens with
 // distance, the occlusion between the blades and the brightness of the waves of the wind.
-fn terrain_grass(f: TerrainOut, near: Surface, geometric: vec3f) -> Surface {
+fn terrain_grass(f: TerrainOut, near: Surface, geometric: vec3f, covered: f32) -> Surface {
     var s = near;
     if (blending.grass_config.y == 0u || view.lights.z > 1u) {
         return s;
@@ -782,7 +782,7 @@ fn terrain_grass(f: TerrainOut, near: Surface, geometric: vec3f) -> Surface {
     let gaps = 1.0 - blending.grass_tip.w;
     let top = 1.0 - pow(gaps, density * variation.w * mix(0.7, 1.0, density));
     let cover = 1.0 - pow(1.0 - top, 1.0 / ndv);
-    let k = fade * cover;
+    let k = fade * cover * (1.0 - saturate(covered));
     let grazing = 1.0 - ndv;
     let tips = mix(TERRAIN_GRASS_TIPS_TOP, TERRAIN_GRASS_TIPS_GRAZING, grazing);
     let color = mix(blending.grass_base.rgb, blending.grass_tip.rgb, tips) * variation.rgb *
@@ -831,6 +831,7 @@ fn terrain_lit(f: TerrainOut, shaded: Surface) -> vec4f {
     let far = terrain_bake_far(f);
     let alone = far >= 1.0 && terrain_bake_light(f).w != 0.0;
     var s: Surface;
+    var covered = 0.0;
     if (alone) {
         let baked = terrain_bake_material(f);
         var layers: Layers;
@@ -849,11 +850,16 @@ fn terrain_lit(f: TerrainOut, shaded: Surface) -> vec4f {
 #ifdef BOX_TEXTURE_LAYERS
         if (layers_reach(f.world.y)) {
             s = layered(f, s, blend_heights, blending.count, b.low);
+            covered = layers_covered;
         }
 #endif
     }
+    let near = select(far, 0.0, alone);
+    if (near > 0.0 || alone) {
+        covered = mix(covered, terrain_bake_light(f).z, select(near, 1.0, alone));
+    }
     return terrain_lit(f, terrain_grass(f,
-        terrain_baked_mix(s, f, geometric, select(far, 0.0, alone)), geometric));
+        terrain_baked_mix(s, f, geometric, near), geometric, covered));
 }
 
 @fragment fn fs_terrain_plain(f: TerrainOut) -> @location(0) vec4f {
@@ -902,8 +908,10 @@ struct TerrainBakeOut {
     let geometric = terrain_smooth_normal(g, rough);
     let b = terrain_blend_layers(f, geometric);
     var s = surface_of(f, geometric, b.layers);
+    var covered = 0.0;
 #ifdef BOX_TEXTURE_LAYERS
     s = layered(f, s, blend_heights, blending.count, b.low);
+    covered = layers_covered;
 #endif
     let h = terrain_smooth(g, rough);
     let p = bake.tile.xy + uv * bake.tile.z;
@@ -912,6 +920,6 @@ struct TerrainBakeOut {
     o.albedo = vec4f(sqrt(clamp(s.albedo, vec3f(0.0), vec3f(1.0))),
         clamp(s.occlusion, 2.0 / 255.0, 1.0));
     o.normal = vec4f(s.normal.x * 0.5 + 0.5, s.normal.z * 0.5 + 0.5, s.roughness, s.metallic);
-    o.light = vec4f(terrain_bake_sun(p, h, texel), terrain_bake_ao(p, h, texel), 0.0, 1.0);
+    o.light = vec4f(terrain_bake_sun(p, h, texel), terrain_bake_ao(p, h, texel), covered, 1.0);
     return o;
 }

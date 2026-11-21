@@ -296,11 +296,14 @@ fn apply_layers(maps: texture_2d_array<f32>, first: u32, f: VertexOut, surface: 
     return apply_layers_at(maps, first, f.world, f.uv.xy, surface);
 }
 
+var<private> layers_covered: f32;
+
 // apply_layers of a fragment at a world position with mesh UVs uv.
 @diagnostic(off, derivative_uniformity)
 fn apply_layers_at(maps: texture_2d_array<f32>, first: u32, world: vec3f, uv: vec2f,
     surface: LayerSurface) -> LayerSurface {
     var s = surface;
+    layers_covered = 0.0;
     let dx = dpdx(world);
     let dy = dpdy(world);
     let ux = dpdx(uv);
@@ -328,6 +331,9 @@ fn apply_layers_at(maps: texture_2d_array<f32>, first: u32, world: vec3f, uv: ve
         let porous = (1.0 - s.metallic) * s.roughness;
         let soaked = covered * mix(1.0, porous, l.coverage.w);
         s.albedo = max(layer_blend3(l.modes.x, s.albedo, m.albedo, soaked), vec3f(0.0));
+        if (l.modes.x == LAYER_MIX) {
+            layers_covered = 1.0 - (1.0 - layers_covered) * (1.0 - soaked);
+        }
         s.roughness = clamp(layer_blend(l.modes.y, s.roughness, l.material.x * m.orm.g,
             soaked), MIN_ROUGHNESS, 1.0);
         s.metallic = clamp(layer_blend(l.modes.z, s.metallic, l.material.y * m.orm.b, covered),

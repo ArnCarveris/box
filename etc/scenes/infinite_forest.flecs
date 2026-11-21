@@ -8,9 +8,9 @@
 //
 // The forest library (forest/library) brings the state the sliders write, the materials, the
 // weather, the sky and the HUD. This scene adds one file per concern in infinite_forest/: its constants
-// and the fly toggle, the terrain materials, the terrain, the player, the tree library, the stands
-// that stream its trees over the terrain, the undergrowth that streams the plants of the forest
-// library close around the player, the water, stones and reeds of the brooks, the rare landmarks
+// and the fly toggle, the terrain materials, the terrain, the grass blades of the clearings, the
+// player, the tree library, the stands that stream its trees over the terrain, the undergrowth
+// that streams the plants of the forest library close around the player, the water, stones and reeds of the brooks, the rare landmarks
 // along the way (boulder fields and crags, fallen trunks, signposts, giant trees, ruins, cairns and
 // ponds) and the view.
 include ui/widgets
@@ -19,6 +19,7 @@ include forest/library
 include infinite_forest/state
 include infinite_forest/materials
 include infinite_forest/terrain
+include infinite_forest/grass
 include infinite_forest/player
 include infinite_forest/trees
 include infinite_forest/stands
