@@ -201,6 +201,7 @@
                     "manual_shift",
                     "path_follow",
                     "ground_heights",
+                    "follow_emitter_stays",
                     "spatial_same_hits",
                     "spatial_before_transforms"
                 ]

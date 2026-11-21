@@ -1,0 +1,63 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.particle
+using box.terrain
+using state
+
+infinite_forest {
+  land {
+    TerrainSampled
+  }
+
+  air {
+    if started {
+      const glow = forest_mote_light(season, hour, precipitation)
+
+      motes {
+        Position: {0, 2.8, 0}
+        Emitter: {
+          max: 6000, rate: 520, shape: EmitterBox, extents: {12, 2.6, 12},
+          direction: {0, 0, 0}, lifetime: {9, 12}, size: {0.012, 0.026},
+          opacity: {0.5 * glow, glow},
+          color: {255, 238, 206}, color_variance: {0, 16, 30}, seed: 71,
+          follow: player, ground: infinite_forest.land
+        }
+        Burst: {count: 5400}
+        Forces: {
+          gravity: {0, -0.015, 0},
+          wind: {fog_wind_x, 0, fog_wind_z},
+          drag: 0.6,
+          turbulence: 0.06,
+          turbulence_scale: 1.4,
+          global_wind: 0.08
+        }
+        Appearance: {shape: Circle, blend: Additive, lit: 1}
+        Curves: {opacity: {keys: [{0, 0}, {0.15, 1}, {0.85, 1}, {1, 0}]}}
+      }
+
+      pollen {
+        Position: {0, 2.6, 0}
+        Emitter: {
+          max: 900, rate: 70 * forest_pollen(season), shape: EmitterBox, extents: {14, 2.4, 14},
+          direction: {0, 1, 0}, spread: 180, speed: {0, 0.05}, lifetime: {9, 12},
+          size: {0.026, 0.042},
+          opacity: {0.5 * glow, 0.9 * glow},
+          color: {255, 222, 120}, color_variance: {0, 18, 30}, seed: 72,
+          follow: player, ground: infinite_forest.land
+        }
+        Burst: {count: 760 * forest_pollen(season)}
+        Forces: {
+          gravity: {0, -0.03, 0},
+          wind: {fog_wind_x * 1.5, 0, fog_wind_z * 1.5},
+          drag: 0.8,
+          turbulence: 0.1,
+          turbulence_scale: 0.9,
+          global_wind: 0.12
+        }
+        Appearance: {shape: Circle, blend: Additive, lit: 1}
+        Curves: {opacity: {keys: [{0, 0}, {0.15, 1}, {0.85, 1}, {1, 0}]}}
+      }
+    }
+  }
+}

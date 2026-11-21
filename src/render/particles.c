@@ -979,35 +979,6 @@ static void box_particles_block_forces(
     box_particles_block_wind(world, forces->global_wind * scale, out);
 }
 
-/** Get the ground collision of an emitter, its plane at the height of its terrain below the
- * emitter where the terrain is resident there.
- *
- * @param world The world
- * @param e The emitter
- * @param transform World transform of the emitter
- * @param buf Holds the collision with the height of the terrain
- * @return The collision, NULL for none
- */
-static const ParticleCollision* box_particles_collision(
-    const ecs_world_t *world,
-    ecs_entity_t e,
-    const WorldTransform *transform,
-    ParticleCollision *buf)
-{
-    const ParticleCollision *result = ecs_get(world, e, ParticleCollision);
-    float y = 0;
-    if (result && result->ground && result->terrain && ecs_is_alive(world, result->terrain) &&
-        box_terrain_ground(world, result->terrain, transform->m[3][0], transform->m[3][2], &y,
-            NULL))
-    {
-        *buf = *result;
-        buf->height = y;
-        result = buf;
-    }
-
-    return result;
-}
-
 /** Write the parameters of an emitter for this frame but its forces.
  *
  * @param emitter The emitter values
@@ -1101,9 +1072,9 @@ static void box_particles_velocity(
 _Static_assert(offsetof(box_render_particle_block_t, global_wind) ==
     offsetof(box_render_particle_block_t, gradient_row) + sizeof(uint32_t),
     "the curves of a block end at gradient_row");
-_Static_assert(sizeof(box_render_particle_block_t) ==
+_Static_assert(offsetof(box_render_particle_block_t, sampled) ==
     offsetof(box_render_particle_block_t, motion_force) + 4 * sizeof(float),
-    "the motion is the last member of a block");
+    "the motion ends the curves and motion of a block");
 
 /** Write the shift of the world origin of a pool into the w lanes of its block.
  *
@@ -1150,7 +1121,7 @@ static void box_particles_block_still(
     ecs_os_memcpy(ECS_OFFSET(out, first), ECS_OFFSET(&box_particles_still, first),
         (ecs_size_t)(end - first));
     first = offsetof(box_render_particle_block_t, curve_max_rows);
-    end = sizeof(box_render_particle_block_t);
+    end = offsetof(box_render_particle_block_t, sampled);
     ecs_os_memcpy(ECS_OFFSET(out, first), ECS_OFFSET(&box_particles_still, first),
         (ecs_size_t)(end - first));
 }
@@ -1496,8 +1467,9 @@ static void box_particles_emitter(
     vec3 acceleration;
     glm_vec3_scale(ECS_CONST_CAST(float*, emitter->acceleration), scale, acceleration);
     ParticleCollision ground;
-    box_particles_block(emitter, transform, box_particles_collision(world, e, transform, &ground),
-        velocity, age_us ? p->delta : 0.0f, scale, &entry->block);
+    box_particles_block(emitter, transform,
+        box_render_particles_collision(world, e, transform, &ground), velocity,
+        age_us ? p->delta : 0.0f, scale, &entry->block);
     if (timeline) {
         float speed = box_particle_timeline_speed(timeline, pool->time);
         entry->block.speed[0] *= speed;
@@ -1514,6 +1486,7 @@ static void box_particles_emitter(
 
     box_particles_block_look(look, pool, scale, &entry->block);
     entry->block.local = emitter->local ? 1u : 0u;
+    box_render_particles_sampled(world, e, emitter, entry);
     entry->curves = pool->curved && (box_particle_rows_used(&pool->curves) ||
         box_particle_rows_motion_used(&pool->motion))
         ? BOX_RENDER_BUFFER_PARTICLE_CURVES
@@ -1680,9 +1653,10 @@ static void BoxRenderExtractParticles(
         bool timelines_shared = timelines && !ecs_field_is_self(&qit, 9);
         bool motions_shared = motions && !ecs_field_is_self(&qit, 10);
         for (i = 0; i < qit.count; i ++) {
-            WorldTransform buf;
+            WorldTransform buf, followed;
             const WorldTransform *t = shared ? &transforms[0] :
                 box_transform_world_field(world, &qit, transforms, i, &buf);
+            t = box_render_particles_follow(world, &emitters[i], t, &followed);
             box_particles_light_t light = {
                 .light = lights ? &lights[lights_shared ? 0 : i] : NULL,
                 .point = points ? &points[i] : NULL,

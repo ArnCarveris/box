@@ -14,50 +14,6 @@ using trees
 // copper, russet and gold leaves in autumn, the last dead leaves of the beech in winter, and
 // needles all year. Nothing falls in a calm, and the harder the wind blows the more falls.
 state {
-  // How much the wind strips from the trees, 0 in a calm to 1 in a gale
-  fn forest_shed(w: f64) -> f64 {
-    const s = clamp(w / WIND_MAX, 0, 1)
-    s * (0.55 + 0.45 * s)
-  }
-
-  // How many of the leaves of the broadleaves fall through the year, 0..1: a few green ones in a
-  // summer storm, most of them in autumn, the last dead ones of the beech in winter
-  fn forest_leaf_fall(season: f64) -> f64 {
-    forest_seasonal(season, 0.03, 0.1, 1, 0.07)
-  }
-
-  // Petals of the elder and the flowers of the floor, in spring
-  fn forest_petal_fall(season: f64) -> f64 {
-    forest_seasonal(season, 1, 0.12, 0, 0)
-  }
-
-  // Needles of the spruces and firs, all year, more in winter
-  fn forest_needle_fall(season: f64) -> f64 {
-    forest_seasonal(season, 0.6, 0.5, 0.8, 1)
-  }
-
-  // Winged seeds of the birches and limes, from late summer through autumn
-  fn forest_seed_fall(season: f64) -> f64 {
-    forest_seasonal(season, 0, 0.5, 0.8, 0.12)
-  }
-
-  // The color of a falling leaf of a broadleaf species (0 beech, 1 oak, 2 birch) by channel:
-  // the leaf colors of leaves.flecs, but brown and dead in winter
-  fn forest_fall_r(species: f64, season: f64) -> f64 {
-    species < 0.5 ? forest_seasonal(season, 138, 86, 190, 120) : (
-      species < 1.5 ? forest_seasonal(season, 124, 66, 160, 112) : forest_seasonal(season, 150, 104, 222, 156))
-  }
-
-  fn forest_fall_g(species: f64, season: f64) -> f64 {
-    species < 0.5 ? forest_seasonal(season, 180, 126, 94, 74) : (
-      species < 1.5 ? forest_seasonal(season, 164, 102, 106, 80) : forest_seasonal(season, 188, 144, 176, 122))
-  }
-
-  fn forest_fall_b(species: f64, season: f64) -> f64 {
-    species < 0.5 ? forest_seasonal(season, 58, 44, 26, 38) : (
-      species < 1.5 ? forest_seasonal(season, 52, 36, 34, 42) : forest_seasonal(season, 66, 50, 40, 58))
-  }
-
   // The falling cards spawn in FALL_HALF meters to either side of the clearing, from FALL_LOW to
   // FALL_HIGH up in the crowns; the petals lower, in the shrubs and the flowers
   export const FALL_HALF: f32 = 34
@@ -65,41 +21,6 @@ state {
   export const FALL_HIGH: f32 = 19
   export const PETAL_HALF: f32 = 22
   export const PETAL_HIGH: f32 = 6
-}
-
-assets {
-  // The albedo of a falling card from the data of one blade (leaves.flecs): nearly white, the
-  // veins lighter, the coverage as alpha; the particle color tints it
-  template ForestFallMap {
-    prop data: entity = 0
-
-    img { nodes.Image: {texture: data, linear: true} }
-    cover { nodes.Split: {input: img, channel: ChannelR} }
-    vein { nodes.Split: {input: img, channel: ChannelG} }
-    tone { nodes.Remap: {input: vein, from_min: 0, from_max: 1, to_min: 0.84, to_max: 1, clamp: true} }
-    color { nodes.Combine: {r: tone, g: tone, b: tone, a: cover} }
-    Graph: {output: color, width: TREE_BLADE_RES}
-  }
-
-  // A rounded petal, a needle and the wing of a seed, as blades
-  TreeBladeMap fall_petal_blade(width: 0.46, shape: 0.75, veins: 3, stem: 0.02)
-  TreeBladeMap fall_needle_blade(width: 0.05, shape: 0.35, veins: 0, stem: 0.02)
-  TreeBladeMap fall_seed_blade(width: 0.2, shape: 0.45, veins: 9, stem: 0.12)
-
-  ForestFallMap fall_beech_albedo(data: leaf_beech_blade)
-  ForestFallMap fall_oak_albedo(data: leaf_oak_blade)
-  ForestFallMap fall_birch_albedo(data: leaf_birch_blade)
-  ForestFallMap fall_petal_albedo(data: fall_petal_blade)
-  ForestFallMap fall_needle_albedo(data: fall_needle_blade)
-  ForestFallMap fall_seed_albedo(data: fall_seed_blade)
-
-  // The fall of the cards: gravity against a drag that holds them to a slow, fluttering fall,
-  // the wind and its gusts through the drag, and a wander for the tumble; on the ground they
-  // stop and lie flat, but a gale still drags them along it
-  prefab ForestFall {
-    Collision: {ground: true, height: 0, bounce: 0.05, friction: 0.25}
-    Curves: {opacity: {keys: [{0, 0}, {0.04, 1}, {0.86, 1}, {1, 0}]}}
-  }
 }
 
 forest {

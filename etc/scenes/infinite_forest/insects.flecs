@@ -1,0 +1,394 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using box.light
+using box.particle
+using box.animation
+using box.world
+using state
+using assets
+
+state {
+  export const INSECT_CELL: f32 = 16
+  export const INSECT_NEAR: f32 = 12
+  export const INSECT_RANGE: f32 = 32
+  export const INSECT_BUDGET: i32 = 4
+  export const INSECT_BUDGET_MS: f32 = 2
+
+  export const INSECT_BUTTERFLIES: i32 = 1
+  export const INSECT_BEES: i32 = 2
+  export const INSECT_DRAGONFLIES: i32 = 2
+  export const INSECT_GNAT_SHARE: f32 = 0.25
+  export const INSECT_LANTERN_SHARE: f32 = 0.2
+
+  fn wild_insect_hash(cx: f64, cz: f64, i: f64, seed: f64) -> f64 {
+    forest_hash2(cx + 0.37 * i, cz - 0.61 * i, seed)
+  }
+
+  fn wild_insect_ground(x: f64, z: f64) -> f64 {
+    box.terrain.height(infinite_forest.land, x, z)
+  }
+
+  fn wild_insect_meadow(x: f64, z: f64) -> f64 {
+    infinite_forest_mask(x, z, MASK_GRASS)
+  }
+
+  fn wild_insect_dry(x: f64, z: f64) -> bool {
+    !box.terrain.known(infinite_forest.brooks, x, z) || wild_brook_d(x, z) > BROOK_WET + 0.5
+  }
+
+  fn wild_insect_slope_x(x: f64, z: f64) -> f64 {
+    wild_brook_d(x + 0.5, z) - wild_brook_d(x - 0.5, z)
+  }
+
+  fn wild_insect_slope_z(x: f64, z: f64) -> f64 {
+    wild_brook_d(x, z + 0.5) - wild_brook_d(x, z - 0.5)
+  }
+
+  fn wild_insect_water_x(x: f64, z: f64) -> f64 {
+    const gx = wild_insect_slope_x(x, z)
+    const gz = wild_insect_slope_z(x, z)
+    x - gx / max(sqrt(gx * gx + gz * gz), 0.001) * wild_brook_d(x, z)
+  }
+
+  fn wild_insect_water_z(x: f64, z: f64) -> f64 {
+    const gx = wild_insect_slope_x(x, z)
+    const gz = wild_insect_slope_z(x, z)
+    z - gz / max(sqrt(gx * gx + gz * gz), 0.001) * wild_brook_d(x, z)
+  }
+
+  fn wild_insect_wet(x: f64, z: f64) -> bool {
+    box.terrain.known(infinite_forest.brooks, x, z) && wild_brook_d(x, z) < 1 &&
+      wild_brook_held(x, z)
+  }
+
+  fn wild_insect_water_y(x: f64, z: f64) -> f64 {
+    wild_brook_level(wild_brook_k(wild_brook_bed(x, z)))
+  }
+}
+
+assets {
+  template WildButterflies {
+    prop cell_x: i32 = 0
+    prop cell_z: i32 = 0
+    prop size: f32 = 16
+    prop meadow: f32 = 0
+
+    const x0 = cell_x * size
+    const z0 = cell_z * size
+
+    for b in 0..INSECT_BUTTERFLIES {
+      if wild_insect_hash(cell_x, cell_z, b, 501) < butterfly_count * meadow / BUTTERFLY_MAX {
+        const px = x0 + size * (0.25 + 0.5 * wild_insect_hash(cell_x, cell_z, b, 502))
+        const pz = z0 + size * (0.25 + 0.5 * wild_insect_hash(cell_x, cell_z, b, 503))
+        const ax = px + 2.5 * (wild_insect_hash(cell_x, cell_z, b, 511) - 0.5)
+        const az = pz + 2.5 * (wild_insect_hash(cell_x, cell_z, b, 512) - 0.5)
+        const bx = px + 3 + 2 * wild_insect_hash(cell_x, cell_z, b, 513)
+        const bz = pz + 2.5 * (wild_insect_hash(cell_x, cell_z, b, 514) - 0.5)
+        const cx = px + 3 + 2 * wild_insect_hash(cell_x, cell_z, b, 515)
+        const cz = pz + 3 + 2 * wild_insect_hash(cell_x, cell_z, b, 516)
+        const dx = px + 2.5 * (wild_insect_hash(cell_x, cell_z, b, 517) - 0.5)
+        const dz = pz + 3 + 2 * wild_insect_hash(cell_x, cell_z, b, 518)
+        const ay = wild_insect_ground(ax, az) +
+          0.72 + 0.18 * wild_insect_hash(cell_x, cell_z, b, 521)
+        const by = wild_insect_ground(bx, bz) +
+          0.72 + 0.18 * wild_insect_hash(cell_x, cell_z, b, 522)
+        const cy = wild_insect_ground(cx, cz) +
+          0.72 + 0.18 * wild_insect_hash(cell_x, cell_z, b, 523)
+        const dy = wild_insect_ground(dx, dz) +
+          0.72 + 0.18 * wild_insect_hash(cell_x, cell_z, b, 524)
+
+        "butterfly_{b}" {
+          Position: {ax - x0, ay, az - z0}
+          Rotation: {0, 0, 0}
+
+          ForestFlight flight(
+            x0: ax - x0, y0: ay, z0: az - z0, x1: bx - x0, y1: by, z1: bz - z0,
+            x2: cx - x0, y2: cy, z2: cz - z0, x3: dx - x0, y3: dy, z3: dz - z0,
+            seed: 510 + b + cell_x * 7 + cell_z * 13, hold: 1.5, hold_var: 3, fly: 2.4,
+            fly_var: 1.8, rise: 0.7, wander: 0.5, turn: 0.3, flap: true)
+
+          Animator: {clip: flight, time: wild_insect_hash(cell_x, cell_z, b, 505) * 14, speed: 1}
+          ForestButterfly model(
+            kind: floor(wild_insect_hash(cell_x, cell_z, b, 506) * 4.99),
+            phase: wild_insect_hash(cell_x, cell_z, b, 507))
+        }
+      }
+    }
+  }
+
+  template WildBees {
+    prop cell_x: i32 = 0
+    prop cell_z: i32 = 0
+    prop size: f32 = 16
+    prop meadow: f32 = 0
+
+    const x0 = cell_x * size
+    const z0 = cell_z * size
+
+    for b in 0..INSECT_BEES {
+      if wild_insect_hash(cell_x, cell_z, b, 531) < bee_count * meadow / BEE_MAX {
+        const px = x0 + size * (0.2 + 0.6 * wild_insect_hash(cell_x, cell_z, b, 532))
+        const pz = z0 + size * (0.2 + 0.6 * wild_insect_hash(cell_x, cell_z, b, 533))
+        const ax = px + 0.8 * (wild_insect_hash(cell_x, cell_z, b, 541) - 0.5)
+        const az = pz + 0.8 * (wild_insect_hash(cell_x, cell_z, b, 542) - 0.5)
+        const bx = px + 0.4 + 0.6 * wild_insect_hash(cell_x, cell_z, b, 543)
+        const bz = pz + 0.8 * (wild_insect_hash(cell_x, cell_z, b, 544) - 0.5)
+        const cx = px + 1 + 0.8 * wild_insect_hash(cell_x, cell_z, b, 545)
+        const cz = pz + 0.6 + 0.8 * wild_insect_hash(cell_x, cell_z, b, 546)
+        const dx = px + 0.8 * (wild_insect_hash(cell_x, cell_z, b, 547) - 0.5)
+        const dz = pz + 1 + 0.6 * wild_insect_hash(cell_x, cell_z, b, 548)
+        const ay = wild_insect_ground(ax, az) +
+          0.66 + 0.14 * wild_insect_hash(cell_x, cell_z, b, 551)
+        const by = wild_insect_ground(bx, bz) +
+          0.66 + 0.14 * wild_insect_hash(cell_x, cell_z, b, 552)
+        const cy = wild_insect_ground(cx, cz) +
+          0.66 + 0.14 * wild_insect_hash(cell_x, cell_z, b, 553)
+        const dy = wild_insect_ground(dx, dz) +
+          0.66 + 0.14 * wild_insect_hash(cell_x, cell_z, b, 554)
+
+        "bee_{b}" {
+          Position: {ax - x0, ay, az - z0}
+          Rotation: {0, 0, 0}
+
+          ForestFlight flight(
+            x0: ax - x0, y0: ay, z0: az - z0, x1: bx - x0, y1: by, z1: bz - z0,
+            x2: cx - x0, y2: cy, z2: cz - z0, x3: dx - x0, y3: dy, z3: dz - z0,
+            seed: 530 + b + cell_x * 7 + cell_z * 13, hold: 0.8, hold_var: 1.6, fly: 0.6,
+            fly_var: 0.6, rise: 0.12, wander: 0.2, turn: 0.18)
+
+          Animator: {clip: flight, time: wild_insect_hash(cell_x, cell_z, b, 535) * 6, speed: 1}
+          ForestBee model(phase: wild_insect_hash(cell_x, cell_z, b, 536))
+        }
+      }
+    }
+  }
+
+  template WildDragonflies {
+    prop cell_x: i32 = 0
+    prop cell_z: i32 = 0
+    prop size: f32 = 16
+
+    const x0 = cell_x * size
+    const z0 = cell_z * size
+
+    for d in 0..INSECT_DRAGONFLIES {
+      if wild_insect_hash(cell_x, cell_z, d, 601) < dragonfly_count * 1.0 / DRAGONFLY_MAX {
+        const ux = x0 + size * wild_insect_hash(cell_x, cell_z, d, 602)
+        const uz = z0 + size * wild_insect_hash(cell_x, cell_z, d, 603)
+        const vx = x0 + size * wild_insect_hash(cell_x, cell_z, d, 604)
+        const vz = z0 + size * wild_insect_hash(cell_x, cell_z, d, 605)
+        const sx = x0 + size * wild_insect_hash(cell_x, cell_z, d, 606)
+        const sz = z0 + size * wild_insect_hash(cell_x, cell_z, d, 607)
+        const tx = x0 + size * wild_insect_hash(cell_x, cell_z, d, 608)
+        const tz = z0 + size * wild_insect_hash(cell_x, cell_z, d, 609)
+        const ax = wild_insect_water_x(ux, uz)
+        const az = wild_insect_water_z(ux, uz)
+        const bx = wild_insect_water_x(vx, vz)
+        const bz = wild_insect_water_z(vx, vz)
+        const cx = wild_insect_water_x(sx, sz)
+        const cz = wild_insect_water_z(sx, sz)
+        const dx = wild_insect_water_x(tx, tz)
+        const dz = wild_insect_water_z(tx, tz)
+        const wet = wild_insect_wet(ax, az) && wild_insect_wet(bx, bz) &&
+          wild_insect_wet(cx, cz) && wild_insect_wet(dx, dz)
+
+        if wet {
+          const ay = wild_insect_water_y(ax, az) +
+            0.25 + 0.6 * wild_insect_hash(cell_x, cell_z, d, 620)
+          const by = wild_insect_water_y(bx, bz) +
+            0.25 + 0.6 * wild_insect_hash(cell_x, cell_z, d, 621)
+          const cy = wild_insect_water_y(cx, cz) +
+            0.25 + 0.6 * wild_insect_hash(cell_x, cell_z, d, 622)
+          const dy = wild_insect_water_y(dx, dz) +
+            0.25 + 0.6 * wild_insect_hash(cell_x, cell_z, d, 623)
+
+          "dragonfly_{d}" {
+            Position: {ax - x0, ay, az - z0}
+            Rotation: {0, 0, 0}
+
+            ForestFlight flight(
+              x0: ax - x0, y0: ay, z0: az - z0, x1: bx - x0, y1: by, z1: bz - z0,
+              x2: cx - x0, y2: cy, z2: cz - z0, x3: dx - x0, y3: dy, z3: dz - z0,
+              seed: 640 + d + cell_x * 7 + cell_z * 13, hold: 0.8, hold_var: 2.4, fly: 0.4,
+              fly_var: 0.45, rise: 0.08, wander: 0.15, turn: 0.14)
+
+            Animator: {
+              clip: flight, time: wild_insect_hash(cell_x, cell_z, d, 614) * 5, speed: 1
+            }
+            ForestDragonfly model(
+              kind: floor(wild_insect_hash(cell_x, cell_z, d, 615) * 2.99),
+              phase: wild_insect_hash(cell_x, cell_z, d, 616))
+          }
+        }
+      }
+    }
+  }
+
+  template WildGnats {
+    prop cell_x: i32 = 0
+    prop cell_z: i32 = 0
+    prop size: f32 = 16
+
+    const x0 = cell_x * size
+    const z0 = cell_z * size
+    const gx = x0 + size * (0.2 + 0.6 * wild_insect_hash(cell_x, cell_z, 0, 802))
+    const gz = z0 + size * (0.2 + 0.6 * wild_insect_hash(cell_x, cell_z, 0, 803))
+    const share = gnat_swarms * INSECT_GNAT_SHARE / GNAT_SWARM_MAX
+
+    if wild_insect_hash(cell_x, cell_z, 0, 801) < share {
+      swarm {
+        Position: {
+          gx - x0,
+          wild_insect_ground(gx, gz) + 1.3 + wild_insect_hash(cell_x, cell_z, 0, 804),
+          gz - z0
+        }
+
+        dance {
+          Position: {0, 0, 0}
+          Animator: {
+            clip: forest_gnat_bob, time: wild_insect_hash(cell_x, cell_z, 0, 805) * 4,
+            speed: 0.8 + 0.4 * wild_insect_hash(cell_x, cell_z, 0, 806)
+          }
+          Emitter: {
+            max: 500, rate: 220, shape: EmitterSphere, radius: 0.35,
+            direction: {0, 1, 0}, spread: 180, speed: {0.3, 0.8}, lifetime: {1.8, 2.2},
+            size: {0.014, 0.019}, opacity: {0.8, 1},
+            color: {120, 108, 88}, color_variance: {16, 14, 12},
+            seed: 810 + cell_x * 7 + cell_z * 13, local: true
+          }
+          Burst: {count: 400}
+          Forces: {
+            gravity: {0, 0, 0}, drag: 3.5, turbulence: 9, turbulence_scale: 5, global_wind: 0.05
+          }
+          Appearance: {shape: Circle, blend: Alpha, stretch: 0.4, lit: 1}
+          Curves: {opacity: {keys: [{0, 0}, {0.15, 1}, {0.85, 1}, {1, 0}]}}
+        }
+      }
+    }
+  }
+
+  template WildLantern {
+    prop cell_x: i32 = 0
+    prop cell_z: i32 = 0
+    prop size: f32 = 16
+
+    const x0 = cell_x * size
+    const z0 = cell_z * size
+    const fx = x0 + size * wild_insect_hash(cell_x, cell_z, 0, 702)
+    const fz = z0 + size * wild_insect_hash(cell_x, cell_z, 0, 703)
+    const share = firefly_lights * INSECT_LANTERN_SHARE / FIREFLY_LIGHT_MAX
+
+    if wild_insect_hash(cell_x, cell_z, 0, 701) < share {
+      firefly {
+        Position: {
+          fx - x0,
+          wild_insect_ground(fx, fz) + 0.35 + 0.7 * wild_insect_hash(cell_x, cell_z, 0, 704),
+          fz - z0
+        }
+
+        drift {
+          Position: {0, 0, 0}
+          Animator: {
+            clip: forest_firefly_drift, time: wild_insect_hash(cell_x, cell_z, 0, 705) * 9,
+            speed: 0.85 + 0.3 * wild_insect_hash(cell_x, cell_z, 0, 706)
+          }
+
+          glow : ForestFireflyGlow {
+            Scale: {0.0035, 0.0035, 0.006}
+            Sphere: {radius: 1, segments: 6}
+            PointLight: {intensity: 0, range: 3, bake: Realtime}
+          }
+        }
+      }
+    }
+  }
+
+  template WildInsectCell {
+    prop cell_x: i32 = 0
+    prop cell_z: i32 = 0
+    prop level: i32 = 0
+    prop size: f32 = 16
+
+    const mx = (cell_x + 0.5) * size
+    const mz = (cell_z + 0.5) * size
+    const meadow = wild_insect_meadow(mx, mz)
+    const brooks = box.terrain.known(infinite_forest.brooks, mx, mz)
+    const near_brook = brooks ? wild_brook_d(mx, mz) < size * 0.6 : false
+
+    if meadow > 0.4 && wild_insect_dry(mx, mz) {
+      butterflies {
+        Position: {0, 0, 0}
+        WildButterflies: {cell_x: cell_x, cell_z: cell_z, size: size, meadow: meadow}
+      }
+
+      if level == 0 {
+        bees {
+          Position: {0, 0, 0}
+          WildBees: {cell_x: cell_x, cell_z: cell_z, size: size, meadow: meadow}
+        }
+      }
+    }
+
+    if near_brook {
+      dragonflies {
+        Position: {0, 0, 0}
+        WildDragonflies: {cell_x: cell_x, cell_z: cell_z, size: size}
+      }
+    }
+
+    if meadow > 0.25 {
+      gnats {
+        Position: {0, 0, 0}
+        WildGnats: {cell_x: cell_x, cell_z: cell_z, size: size}
+      }
+    }
+
+    lantern {
+      Position: {0, 0, 0}
+      WildLantern: {cell_x: cell_x, cell_z: cell_z, size: size}
+    }
+  }
+}
+
+infinite_forest {
+  insects {
+    box.spatial.Ignore
+
+    if started {
+      fireflies {
+        Position: {0, 0.75, 0}
+        Emitter: {
+          max: 2000, rate: 2.2 * FIREFLY_RATE * firefly_glow, shape: EmitterBox,
+          extents: {14, 0.55, 14}, direction: {0, 1, 0}, spread: 180, speed: {0, 0.12},
+          lifetime: {6, 10}, size: {0.045, 0.065}, opacity: {0.8, 1},
+          color: {178, 255, 62}, color_variance: {30, 0, 24}, seed: 91,
+          follow: player, ground: infinite_forest.land
+        }
+        Burst: {count: 920 * firefly_glow}
+        Forces: {
+          gravity: {0, 0, 0}, drag: 0.7, turbulence: 0.35, turbulence_scale: 1.3, global_wind: 0.04
+        }
+        Appearance: {shape: Circle, blend: Additive, lit: 0}
+        Curves: {opacity: {keys: [
+          {0, 0}, {0.04, 0}, {0.07, 1}, {0.12, 0}, {0.3, 0}, {0.33, 1}, {0.38, 0}, {0.55, 0},
+          {0.58, 1}, {0.63, 0}, {0.8, 0}, {0.83, 0.9}, {0.88, 0}, {1, 0}
+        ]}}
+      }
+    }
+
+    cells {
+      ChunkGrid: {
+        template: WildInsectCell,
+        cell_size: {INSECT_CELL, 0, INSECT_CELL},
+        levels: [INSECT_NEAR, INSECT_RANGE],
+        hysteresis: 6,
+        budget: INSECT_BUDGET,
+        budget_ms: INSECT_BUDGET_MS,
+        ground: infinite_forest.land
+      }
+    }
+  }
+}

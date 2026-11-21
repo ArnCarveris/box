@@ -103,7 +103,10 @@ ECS_STRUCT(ParticleCollision, {
     bool die;               /**< Kill a particle that hits the plane instead, default false */
     ecs_entity_t terrain;   /**< Terrain whose height below the emitter the plane takes every
                              *   frame instead of height, where the terrain is resident there;
-                             *   0 for the plane at height */
+                             *   0 for the plane at height. A world space emitter on a terrain
+                             *   with TerrainSampled meets its surface under each particle
+                             *   instead, where a tile draws, as long as ParticleEmitter.ground
+                             *   is 0 or the same terrain */
 });
 
 /** An emitter that spawns rate times the frame delta particles a frame, carrying the fraction.
@@ -175,6 +178,18 @@ ECS_STRUCT(ParticleEmitter, {
                              *   keep acting in world directions and world units at the
                              *   world position of a particle; inherit_velocity does nothing,
                              *   as the particles already move with the emitter */
+    ecs_entity_t follow;    /**< Entity whose world position moves the emitter, as a parent
+                             *   that neither turns nor scales it would: the spawn volume is
+                             *   the WorldTransform of the emitter offset by the translation
+                             *   of the WorldTransform of follow, along X and Z only with a
+                             *   ground. The emitter stays where it is when the world origin
+                             *   shifts, its live particles move with follow. Default 0 for
+                             *   none */
+    ecs_entity_t ground;    /**< Terrain with TerrainSampled whose surface the spawn volume of
+                             *   a world space emitter stands on: a spawn is raised by the
+                             *   height of the surface at its X and Z, so the Y of the emitter
+                             *   is its height above the ground; a spawn where no tile of the
+                             *   terrain draws dies at once. Default 0 for none */
 });
 
 /** What an emitter with ParticlePlayback does this frame */

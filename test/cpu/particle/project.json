@@ -41,7 +41,12 @@
                     "world_scale_forces",
                     "world_scale_forces_one_unchanged",
                     "world_scale_forces_non_uniform",
-                    "world_scale_forces_linger"
+                    "world_scale_forces_linger",
+                    "follow_offsets_model",
+                    "follow_ground_keeps_height",
+                    "ground_sampled_terrain",
+                    "collision_sampled_terrain",
+                    "collision_other_terrain_than_ground"
                 ]
             },
             {

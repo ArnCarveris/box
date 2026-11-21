@@ -583,6 +583,24 @@ void WorldOrigin_ground_heights(void) {
     ecs_fini(world);
 }
 
+void WorldOrigin_follow_emitter_stays(void) {
+    ecs_world_t *world = origin_world(100, 50);
+    ecs_entity_t player = origin_entity(world, 120, 0, 0);
+    ecs_add(world, player, WorldFocus);
+    ecs_entity_t emitter = origin_entity(world, 0, 3, 0);
+    ecs_set(world, emitter, ParticleEmitter, {.follow = player});
+    ecs_entity_t fixed = origin_entity(world, 0, 3, 0);
+    ecs_progress(world, 0);
+
+    test_assert(ecs_singleton_get(world, WorldOrigin)->x == 100);
+    test_flt(ecs_get(world, player, Position)->x, 20);
+    test_flt(ecs_get(world, emitter, Position)->x, 0);
+    test_flt(ecs_get(world, emitter, Position)->y, 3);
+    test_flt(ecs_get(world, fixed, Position)->x, -100);
+
+    ecs_fini(world);
+}
+
 /** Collect the entities a ray along +Z at x and y hits, nearest first.
  *
  * @param world The world

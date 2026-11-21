@@ -121,7 +121,19 @@ typedef struct box_render_particle_block_t {
                              *   BOX_PARTICLE_CURVE_CONSTANT for a constant one or none */
     float motion_velocity[4]; /**< Velocity xyz and speed w while constant */
     float motion_force[4];  /**< Force xyz and drag w while constant */
+    uint32_t sampled;       /**< BOX_RENDER_PARTICLE_SPAWN_GROUND and
+                             *   BOX_RENDER_PARTICLE_COLLIDE_TERRAIN of the terrain of the pool */
+    uint32_t sampled_pad[3]; /**< Zero */
+    int32_t origin[4];      /**< The world origin split as box_gpu_origin_split, set by the
+                             *   backend */
 } box_render_particle_block_t;
+
+/** The spawns of a pool stand on the surface of its terrain (ParticleEmitter.ground) */
+#define BOX_RENDER_PARTICLE_SPAWN_GROUND (1u << 0)
+
+/** The particles of a pool collide with the surface of its terrain under each of them
+ * (ParticleCollision.terrain) */
+#define BOX_RENDER_PARTICLE_COLLIDE_TERRAIN (1u << 1)
 
 /** A particle pool of the frame: a range of the particle arena, simulated after the scatters
  * and drawn by the views of its scene */
@@ -138,6 +150,8 @@ typedef struct box_render_particle_pool_t {
     uint32_t texture;       /**< Texture handle of a sprite, 0 for white */
     uint32_t curves;        /**< Buffer handle of the curve table, 0 when no curve of the
                              *   pool reads a row */
+    ecs_entity_t terrain;   /**< Sampled terrain the passes bind for block.sampled, 0 for
+                             *   none */
     box_render_particle_block_t block; /**< Parameters of the frame */
 } box_render_particle_pool_t;
 
@@ -242,6 +256,51 @@ void box_render_particles_curve_stats(
 const float* box_render_particles_curve_table(
     const box_render_particles_t *s,
     int32_t *rows);
+
+/** Get the ground collision of an emitter, its plane at the height of its terrain below the
+ * emitter where the terrain is resident there.
+ *
+ * @param world The world
+ * @param e The emitter
+ * @param transform World transform of the emitter
+ * @param buf Holds the collision with the height of the terrain
+ * @return The collision, NULL for none
+ */
+const ParticleCollision* box_render_particles_collision(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    const WorldTransform *transform,
+    ParticleCollision *buf);
+
+/** Pick the sampled terrain of the pool of a world space emitter: its ground, which its spawns
+ * stand on, and the terrain of its ParticleCollision when it is the same or there is no ground,
+ * which its particles collide with one by one.
+ *
+ * @param world The world
+ * @param e The emitter
+ * @param emitter Its values
+ * @param entry The pool of the packet, receives the terrain and the flags of its block
+ */
+void box_render_particles_sampled(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    const ParticleEmitter *emitter,
+    box_render_particle_pool_t *entry);
+
+/** Get the transform an emitter spawns with: its own, offset by the world position of the
+ * entity it follows, along X and Z only when its spawns stand on a ground.
+ *
+ * @param world The world
+ * @param emitter The emitter values
+ * @param transform World transform of the emitter
+ * @param buf Holds the offset transform
+ * @return The transform
+ */
+const WorldTransform* box_render_particles_follow(
+    const ecs_world_t *world,
+    const ParticleEmitter *emitter,
+    const WorldTransform *transform,
+    WorldTransform *buf);
 
 /** Check whether a packet runs a particle shader.
  *

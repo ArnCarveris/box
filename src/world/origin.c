@@ -30,8 +30,9 @@ static bool box_world_stays(
 {
     bool result = ecs_has(world, e, LayoutItem);
     while (e && !result) {
+        const ParticleEmitter *emitter = ecs_get(world, e, ParticleEmitter);
         result = ecs_has_id(world, e, WorldOriginFixed) || ecs_has(world, e, Layout) ||
-            ecs_has(world, e, Surface);
+            ecs_has(world, e, Surface) || (emitter && emitter->follow);
         e = ecs_get_parent(world, e);
     }
 
@@ -86,6 +87,29 @@ static bool box_world_shifted(
     while (e && !result) {
         result = ecs_map_get(&shift->roots, e) != NULL;
         e = ecs_get_parent(shift->world, e);
+    }
+
+    return result;
+}
+
+/** Check whether a shift moves the particles of an emitter: it moves, or the entity it
+ * follows moves.
+ *
+ * @param ctx The shift
+ * @param e The emitter
+ * @return Whether its particles move
+ */
+static bool box_world_particles_shifted(
+    void *ctx,
+    ecs_entity_t e)
+{
+    box_world_shift_t *shift = ctx;
+    const ParticleEmitter *emitter = ecs_is_alive(shift->world, e)
+        ? ecs_get(shift->world, e, ParticleEmitter)
+        : NULL;
+    bool result = box_world_shifted(ctx, e);
+    if (!result && emitter && emitter->follow && ecs_is_alive(shift->world, emitter->follow)) {
+        result = box_world_shifted(ctx, emitter->follow);
     }
 
     return result;
@@ -245,7 +269,7 @@ void box_world_origin_shift(
 
     box_spatial_shift(world, scene, delta, box_world_shifted, &shift);
     box_render_particles_shift(box_render_particles_get(world), scene, delta,
-        box_world_shifted, &shift);
+        box_world_particles_shifted, &shift);
     box_render_bake_shift(world, scene, delta);
     box_render_reflect_shift(world, scene, delta);
     box_render_shadows_reset(world);

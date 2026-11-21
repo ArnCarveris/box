@@ -12,7 +12,8 @@
 // player, the tree library, the stands that stream its trees over the terrain, the undergrowth
 // that streams the plants of the forest library close around the player, the water, stones and reeds of the brooks, the rare landmarks
 // along the way (boulder fields and crags, fallen trunks, signposts, giant trees, ruins, cairns and
-// ponds) and the view.
+// ponds), the motes and pollen in the air, what falls from the trees in the wind, the insects
+// around the player and the view.
 include ui/widgets
 include trees/generator
 include forest/library
@@ -26,6 +27,9 @@ include infinite_forest/stands
 include infinite_forest/undergrowth
 include infinite_forest/brooks
 include infinite_forest/landmarks
+include infinite_forest/air
+include infinite_forest/fall
+include infinite_forest/insects
 include infinite_forest/view
 
 using box.view

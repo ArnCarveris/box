@@ -46,33 +46,9 @@ state {
     0.5 * m * forest_seasonal(season, 1, 0.7, 1.3, 0.9)
   }
 
-  // Drift of the fog billows and the motes in m/s along X and Z for a wind, along the Wind
-  // (wind.flecs): still in a calm
-  fn forest_fog_wind_x(w: f64) -> f64 {
-    w * 0.1 * WIND_DIR_X
-  }
-
-  fn forest_fog_wind_z(w: f64) -> f64 {
-    w * 0.1 * WIND_DIR_Z
-  }
-
-  // Pollen in the air through the year, 0..1: spring and early summer
-  fn forest_pollen(season: f64) -> f64 {
-    forest_seasonal(season, 1, 0.55, 0.04, 0)
-  }
-
-  // How much the motes and pollen show: the sun lights them by day; at night the moon barely
-  // does (the auto exposure of the dark would make any more of them a field of stars), and
-  // rain and snow wash them out of the air
-  fn forest_mote_light(season: f64, hour: f64, p: f64) -> f64 {
-    (0.015 + 0.985 * forest_daylight(season, hour)) * (1 - 0.9 * min(1, p * 2))
-  }
-
   // The values the weather drives, kept up to date from the sliders by the async block at the
-  // end: the drift of the fog and motes (ForestWind), the mist (ForestPrecipitation) and the
-  // shafts; cloud_velocity_x and _z in sky.flecs move the cookie and the cumulus
-  export mut fog_wind_x: f32 = forest_fog_wind_x(START_WIND)
-  export mut fog_wind_z: f32 = forest_fog_wind_z(START_WIND)
+  // end: the mist (ForestPrecipitation) and the shafts; cloud_velocity_x and _z in sky.flecs
+  // move the cookie and the cumulus, fog_wind_x and _z in air.flecs the fog and the motes
   export mut mist_density: f32 = forest_mist_density(START_SEASON, START_HOUR, START_PRECIPITATION)
   export mut shaft_density: f32 =
     forest_shaft_density(START_SEASON, START_HOUR, START_PRECIPITATION)
@@ -205,8 +181,6 @@ async {
     const p = state.precipitation
     const cx: f32 = state.forest_cloud_drift_x(state.wind)
     const cz: f32 = state.forest_cloud_drift_z(state.wind)
-    const fx: f32 = state.forest_fog_wind_x(state.wind)
-    const fz: f32 = state.forest_fog_wind_z(state.wind)
     const md: f32 = state.forest_mist_density(s, h, p)
     const sd: f32 = state.forest_shaft_density(s, h, p)
 
@@ -216,14 +190,6 @@ async {
 
     if abs(cz - state.cloud_velocity_z) > 0.0001 {
       state.cloud_velocity_z = cz
-    }
-
-    if abs(fx - state.fog_wind_x) > 0.0001 {
-      state.fog_wind_x = fx
-    }
-
-    if abs(fz - state.fog_wind_z) > 0.0001 {
-      state.fog_wind_z = fz
     }
 
     if abs(md - state.mist_density) > 0.0001 {

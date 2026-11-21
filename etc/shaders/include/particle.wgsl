@@ -102,7 +102,12 @@ struct Emitter {
     gradient_max: vec4u,
     // Rows of the curves of the ParticleMotion, read only while gradient_max.y is 1
     motion: MotionRows,
+    sampled: vec4u,
+    origin: vec4i,
 };
+
+const SAMPLED_SPAWN_GROUND: u32 = 1u;
+const SAMPLED_COLLIDE_TERRAIN: u32 = 2u;
 
 // A pool slot, box_particle_t: remaining is 0 for a free slot. Position and velocity are in the
 // world, or in the space of model for a local emitter.

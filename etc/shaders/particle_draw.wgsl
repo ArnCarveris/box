@@ -18,7 +18,7 @@ const PI: f32 = 3.141592653589793;
 
 // The blocks of the pools of the packet, BOX_GPU_PARTICLE_STRIDE apart
 struct EmitterBlock {
-    @size(512) emitter: Emitter,
+    @size(544) emitter: Emitter,
 };
 
 // Slots of a pool one entry of the chunk buffer draws, BOX_GPU_PARTICLE_CHUNK
