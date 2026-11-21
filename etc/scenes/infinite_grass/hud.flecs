@@ -1,0 +1,105 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.camera
+using box.view
+using box.geometry
+using box.material
+using box.layout
+using box.text
+using box.input
+using box.picking
+using box.surface
+using box.ui
+using box.widgets
+using state
+
+state {
+  export const PANEL_W: f32 = 280
+  export const SLIDER_W: f32 = PANEL_W - 36
+}
+
+window {
+  Surface: {width: 1440, height: 960, vsync: true}
+}
+
+hud {
+  Scene: {shader_features: {Extended: {blend_modes: true}}}
+
+  camera {
+    Position: {0, 0, 100}
+    Camera: {ortho: true, ortho_scale: 1}
+  }
+
+  screen {
+    Fill: {surface: window}
+    Layout: {}
+    FocusScope
+
+    panel {
+      InputBlocker
+      Layout: {}
+      Item: {h: Left, v: Bottom, x: state.hud_shown ? 18 : -2000, y: 18}
+
+      Panel body(title: "Grass", width: PANEL_W) {
+        Slider wind_speed(
+          label: "Wind",
+          decimals: 1,
+          unit: " m/s",
+          width: SLIDER_W,
+          min: 0,
+          max: 20,
+          step: 0.5,
+          value: state.wind_speed
+        )
+
+        Slider gust(
+          label: "Gusts",
+          decimals: 2,
+          width: SLIDER_W,
+          min: 0,
+          max: 1,
+          step: 0.05,
+          value: state.gust
+        )
+
+        Slider hour(
+          label: "Time of day",
+          decimals: 2,
+          unit: " h",
+          width: SLIDER_W,
+          min: 0,
+          max: 24,
+          step: 0.25,
+          value: state.hour
+        )
+
+        Label hint(text: "F flies, H hides this panel", variant: "caption")
+      }
+    }
+  }
+
+  view {
+    View: {camera: hud.camera, order: 1, lighting: {enabled: false}, culling: {enabled: false}}
+  }
+}
+
+async {
+  while true {
+    const e = await on.change(hud.screen.panel)
+    const w = e.widget
+    const n = w.name()
+
+    if w.has(Slider) {
+      const v: f32 = w[Slider.mut].current
+
+      if n == "wind_speed" {
+        state.wind_speed = v
+      } else if n == "gust" {
+        state.gust = v
+      } else if n == "hour" {
+        state.hour = v
+      }
+    }
+  }
+}

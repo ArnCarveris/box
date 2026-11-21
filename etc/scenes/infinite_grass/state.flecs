@@ -1,0 +1,61 @@
+using flecs.script
+using flecs.script.math
+using box.input
+
+state {
+  export const START_X: f32 = 0
+  export const START_Z: f32 = 0
+
+  export const EYE: f32 = 1.7
+  export const WALK_SPEED: f32 = 4
+  export const FLY_SPEED: f32 = 30
+
+  export const DAY_OF_YEAR: f32 = 170
+  export const WIND_X: f32 = 1
+  export const WIND_Z: f32 = 0.35
+
+  export const QUERY_SPACING: f32 = 0.5
+  export const QUERY_RADIUS: f32 = 128
+
+  export const GROUND_MIN: f32 = -20
+  export const GROUND_MAX: f32 = 200
+
+  export const TILE_SIZE: f32 = 16
+  export const RESOLUTION: f32 = 33
+  export const DETAIL: f32 = 96
+  export const LEVELS: f32 = 9
+  export const BUDGET: f32 = 24
+
+  export mut hour: f32 = 17.5
+  export mut wind_speed: f32 = 7
+  export mut gust: f32 = 0.6
+
+  export mut flying: bool = false
+  export mut hud_shown: bool = true
+
+  actions {
+    toggle_fly {
+      Action: {description: "Switch between walking and flying"}
+      Binding: {key: F}
+    }
+
+    toggle_hud {
+      Action: {description: "Hide or show the panel"}
+      Binding: {key: H}
+    }
+  }
+}
+
+async {
+  while true {
+    await on.pressed(state.actions.toggle_fly)
+    state.flying = !state.flying
+  }
+}
+
+async {
+  while true {
+    await on.pressed(state.actions.toggle_hud)
+    state.hud_shown = !state.hud_shown
+  }
+}

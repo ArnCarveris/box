@@ -1,0 +1,116 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.camera
+using box.input
+using box.controllers
+using box.world
+using box.terrain
+using state
+
+state {
+  export const SEARCH_RADIUS: f32 = 150
+  export const SEARCH_STEP: f32 = 25
+  export const FLANK: f32 = 40
+
+  export mut start_x: f32 = START_X
+  export mut start_y: f32 = 60
+  export mut start_z: f32 = START_Z
+  export mut start_yaw: f32 = 0
+  export mut started: bool = false
+}
+
+walk_keys {
+  Forward { Action: {description: "Walk forward"}; Binding: {key: W} }
+  Back { Action: {description: "Walk back"}; Binding: {key: S} }
+  Left { Action: {description: "Walk left"}; Binding: {key: A} }
+  Right { Action: {description: "Walk right"}; Binding: {key: D} }
+  Fast { Action: {description: "Run while held"}; Binding: {key: ShiftLeft} }
+  Look { Action: {description: "Turn with the cursor while held"}; Binding: {key: MouseRight} }
+  Jump { Action: {description: "Jump"}; Binding: {key: Space} }
+  Crouch { Action: {description: "Crouch while held"}; Binding: {key: CtrlLeft} }
+  TurnLeft { Action: {description: "Turn left while held"}; Binding: {key: Left} }
+  TurnRight { Action: {description: "Turn right while held"}; Binding: {key: Right} }
+  TurnUp { Action: {description: "Look up while held"}; Binding: {key: Up} }
+  TurnDown { Action: {description: "Look down while held"}; Binding: {key: Down} }
+}
+
+player {
+  Position: {start_x, start_y, start_z}
+  Rotation: {-0.06, start_yaw, 0}
+  Camera: {fov: 62, near_: 0.05, far_: 6000}
+  WorldFocus
+
+  if flying {
+    CameraController: {speed: FLY_SPEED, boost: 8}
+  } else if started {
+    FirstPersonController: {
+      speed: WALK_SPEED,
+      eye: EYE,
+      ground: GROUND_MIN - 100,
+      actions: walk_keys
+    }
+  }
+}
+
+// Stand on the flank of the highest hill around the start, facing down the slope over the hills
+async {
+  const land = infinite_grass.land
+  const n: i32 = 2 * SEARCH_RADIUS / SEARCH_STEP
+  mut wait: i32 = 0
+
+  while wait < 600 &&
+    !(box.terrain.known(land, START_X - SEARCH_RADIUS, START_Z - SEARCH_RADIUS) &&
+      box.terrain.known(land, START_X + SEARCH_RADIUS, START_Z + SEARCH_RADIUS) &&
+      box.terrain.known(land, START_X - SEARCH_RADIUS - FLANK, START_Z + SEARCH_RADIUS + FLANK) &&
+      box.terrain.known(land, START_X + SEARCH_RADIUS + FLANK, START_Z - SEARCH_RADIUS - FLANK))
+  {
+    wait += 1
+    await next_frame()
+  }
+
+  mut top_x: f32 = START_X
+  mut top_z: f32 = START_Z
+  mut top_h: f32 = -1000000
+
+  for i in 0..n + 1 {
+    for j in 0..n + 1 {
+      const x: f32 = START_X - SEARCH_RADIUS + i * SEARCH_STEP
+      const z: f32 = START_Z - SEARCH_RADIUS + j * SEARCH_STEP
+      const h: f32 = box.terrain.height(land, x, z)
+
+      if h > top_h {
+        top_h = h
+        top_x = x
+        top_z = z
+      }
+    }
+  }
+
+  mut dir_x: f32 = 0
+  mut dir_z: f32 = 1
+  mut low_h: f32 = 1000000
+
+  for k in 0..12 {
+    const a: f32 = k * PI / 6
+    const h: f32 = box.terrain.height(land, top_x + sin(a) * FLANK * 2, top_z + cos(a) * FLANK * 2)
+
+    if h < low_h {
+      low_h = h
+      dir_x = sin(a)
+      dir_z = cos(a)
+    }
+  }
+
+  state.start_x = top_x + dir_x * FLANK
+  state.start_z = top_z + dir_z * FLANK
+
+  while !box.terrain.resident(land, state.start_x, state.start_z) {
+    await next_frame()
+  }
+
+  state.start_yaw = atan2(-dir_x, -dir_z)
+  state.start_y = box.terrain.height(land, state.start_x, state.start_z) +
+    (state.flying ? 40 : EYE + 0.05)
+  state.started = true
+}
