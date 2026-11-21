@@ -215,6 +215,21 @@ fn layer_altitude(l: TextureLayer, y: f32) -> f32 {
     return select(1.0, clamp((y - bitcast<f32>(l.flags.y)) / fade, 0.0, 1.0), fade > 0.0);
 }
 
+// Whether a layer can cover a fragment at a local world height: it has an amount and the height is
+// above its altitude, or it has no fade (layer_altitude).
+fn layer_reaches(color: vec4f, flags: vec4u, y: f32) -> bool {
+    let fade = bitcast<f32>(flags.z);
+    return color.a > 0.0 && (!(fade > 0.0) || y > bitcast<f32>(flags.y));
+}
+
+// Whether any layer can cover a fragment at a local world height, read without the layers.
+fn layers_reach(y: f32) -> bool {
+    return layer_reaches(texture_layer0.color, texture_layer0.flags, y) ||
+        layer_reaches(texture_layer1.color, texture_layer1.flags, y) ||
+        layer_reaches(texture_layer2.color, texture_layer2.flags, y) ||
+        layer_reaches(texture_layer3.color, texture_layer3.flags, y);
+}
+
 // How much of a fragment a layer covers. The score is how well the normal faces the direction
 // of the layer (allowed above a cosine of 2 facing - 1, ignored at a facing of 0), times the
 // mask raised by the cavity times how occluded or low the surface is (lowered for a negative
@@ -273,7 +288,8 @@ fn layer_blend3(mode: u32, v: vec3f, layer: vec3f, k: f32) -> vec3f {
 // slice first (layer_maps from 0, or blend_heights after the heights of a blend). The porosity
 // of the surface beneath, (1 - metallic) times its roughness, scales the change of the albedo
 // and the roughness by porosity; metallic, occlusion and normal change by the coverage. The
-// derivatives are taken once, before the layers branch.
+// derivatives are taken once, before the layers branch; a fragment no layer reaches
+// (layers_reach) returns before reading the layers.
 @diagnostic(off, derivative_uniformity)
 fn apply_layers(maps: texture_2d_array<f32>, first: u32, f: VertexOut, surface: LayerSurface)
     -> LayerSurface {
@@ -289,6 +305,9 @@ fn apply_layers_at(maps: texture_2d_array<f32>, first: u32, world: vec3f, uv: ve
     let dy = dpdy(world);
     let ux = dpdx(uv);
     let uy = dpdy(uv);
+    if (!layers_reach(world.y)) {
+        return s;
+    }
     for (var k = 0u; k < 4u; k++) {
         let l = texture_layer(k);
         if (l.color.a <= 0.0) {

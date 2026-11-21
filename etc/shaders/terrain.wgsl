@@ -129,27 +129,6 @@ fn tf_emissive(f: TerrainOut) -> vec3f {
     return vec3f(unpack2x16float(f.material.z), unpack2x16float(f.material.w).x);
 }
 
-// The masks of a fragment of a terrain tile with masks: those of its tile at its grid uv, faded
-// into the masks of the next coarser level, at every second texel of the window, by the morph
-// factor of its distance to the focus, as the vertex stage morphs the grid (terrain_vertex_of),
-// so at the edge of its range the tile has the masks of the coarser tiles it meets. The cell of
-// slot s in the mask atlas is s % columns across and s / columns down, twice as wide as the
-// masks: the masks of the tile at its left, the coarse ones at the right.
-fn terrain_mask_texel(origin: vec2i, size: i32, p: vec2i) -> vec4f {
-    return textureLoad(blend_mask, origin + clamp(p, vec2i(0), vec2i(size - 1)), 0);
-}
-
-fn terrain_mask_bilinear(origin: vec2i, size: i32, t: vec2f) -> vec4f {
-    let f = floor(t);
-    let a = t - f;
-    let p = vec2i(f);
-    let top = mix(terrain_mask_texel(origin, size, p),
-        terrain_mask_texel(origin, size, p + vec2i(1, 0)), a.x);
-    let bottom = mix(terrain_mask_texel(origin, size, p + vec2i(0, 1)),
-        terrain_mask_texel(origin, size, p + vec2i(1, 1)), a.x);
-    return mix(top, bottom, a.y);
-}
-
 // Morph factor of a fragment at a grid uv, as the vertex stage morphs the grid.
 fn terrain_fragment_morph(f: TerrainOut, uv: vec2f) -> f32 {
     let focus = unpack2x16float(f.tile.y);
@@ -158,20 +137,35 @@ fn terrain_fragment_morph(f: TerrainOut, uv: vec2f) -> f32 {
     return clamp((d - morph.x) / max(morph.y - morph.x, 1e-4), 0.0, 1.0);
 }
 
+// The masks of a fragment of a terrain tile with masks: those of its tile at its grid uv, faded
+// into the masks of the next coarser level, at every second texel of the window, by the morph
+// factor of its distance to the focus, as the vertex stage morphs the grid (terrain_vertex_of),
+// so at the edge of its range the tile has the masks of the coarser tiles it meets. The cell of
+// slot s in the mask atlas is s % columns across and s / columns down, twice as wide as the
+// masks: the masks of the tile at its left, the coarse ones at the right. The border texels of
+// the cells keep the bilinear filter of the sampler within a cell; the coarse masks are only read
+// where the tile morphs.
 fn terrain_mask(f: TerrainOut) -> vec4f {
     if ((blending.flags & BLEND_MASKED) == 0u) {
         return vec4f(1.0, 0.0, 0.0, 0.0);
     }
-    let texels = i32(blending.terrain & 0xFFFFu);
+    let texels = f32(blending.terrain & 0xFFFFu);
     let columns = max(blending.terrain >> 16u, 1u);
     let slot = f.tile.x;
-    let origin = vec2i(i32(slot % columns) * 2 * texels, i32(slot / columns) * texels);
-    let steps = f32(texels) - 1.0 - 2.0 * TERRAIN_BORDER;
+    let origin = vec2f(f32(slot % columns) * 2.0 * texels, f32(slot / columns) * texels);
+    let dims = vec2f(textureDimensions(blend_mask));
+    let steps = texels - 1.0 - 2.0 * TERRAIN_BORDER;
     let uv = f.uv.zw;
     let t = uv * steps + vec2f(TERRAIN_BORDER);
-    let fine = terrain_mask_bilinear(origin, texels, t);
-    let coarse = terrain_mask_bilinear(origin + vec2i(texels, 0), (texels + 1) / 2, t * 0.5);
-    return mix(fine, coarse, terrain_fragment_morph(f, uv));
+    var mask = textureSampleLevel(blend_mask, material_sampler, (origin + t + vec2f(0.5)) / dims,
+        0.0);
+    let k = terrain_fragment_morph(f, uv);
+    if (k > 0.0) {
+        let coarse = textureSampleLevel(blend_mask, material_sampler,
+            (origin + vec2f(texels, 0.0) + t * 0.5 + vec2f(0.5)) / dims, 0.0);
+        mask = mix(mask, coarse, k);
+    }
+    return mask;
 }
 
 // Bake texels per pixel below which a terrain fragment shades its material in full, and above
@@ -270,52 +264,123 @@ fn tangent_along(v: vec3f, n: vec3f) -> vec3f {
     return p * inverseSqrt(max(dot(p, p), 1e-12));
 }
 
-// The weighted albedo, ORM and tangent space normal of the layers of the TextureBlend at uv.
+// The two layers of the TextureBlend a fragment shades, the two that weigh the most, and their
+// weights, normalized; b has a weight of 0 where one layer is alone.
+struct TerrainPair {
+    a: u32,
+    b: u32,
+    w: vec2f,
+};
+
+fn terrain_pair(w: vec4f) -> TerrainPair {
+    var a = 0u;
+    for (var k = 1u; k < 4u; k++) {
+        if (w[k] > w[a]) {
+            a = k;
+        }
+    }
+    var b = select(0u, 1u, a == 0u);
+    for (var k = 0u; k < 4u; k++) {
+        if (k != a && w[k] > w[b]) {
+            b = k;
+        }
+    }
+    let sum = max(w[a] + w[b], 1e-6);
+    return TerrainPair(a, b, vec2f(w[a], w[b]) / sum);
+}
+
+// The weights of a pair of layers shaped by their heights at uv, as blend_height_weights shapes
+// the weights of all four: each weight w times exp(contrast * (h + w - m)), m the largest h + w,
+// normalized, and a layer under BLEND_HEIGHT_DROP of the sum dropped.
+fn terrain_pair_heights(p: TerrainPair, uv: vec2f, gx: vec2f, gy: vec2f) -> vec2f {
+    if (!(blending.contrast > 0.0) || p.w.y <= 0.0) {
+        return p.w;
+    }
+    var h = vec2f(0.5);
+    let ta = blending.transforms[p.a];
+    let tb = blending.transforms[p.b];
+    if ((blending.flags & (BLEND_HEIGHT << p.a)) != 0u) {
+        h.x = textureSampleGrad(blend_heights, material_sampler, uv * ta.xy + ta.zw, p.a,
+            gx * ta.xy, gy * ta.xy).r;
+    }
+    if ((blending.flags & (BLEND_HEIGHT << p.b)) != 0u) {
+        h.y = textureSampleGrad(blend_heights, material_sampler, uv * tb.xy + tb.zw, p.b,
+            gx * tb.xy, gy * tb.xy).r;
+    }
+    let s = h + p.w;
+    let m = max(s.x, s.y);
+    var o = p.w * exp(blending.contrast * (s - vec2f(m)));
+    let sum = o.x + o.y;
+    if (!(sum > 1e-12)) {
+        return p.w;
+    }
+    o = select(vec2f(0.0), o, o > vec2f(sum * BLEND_HEIGHT_DROP));
+    return o / (o.x + o.y);
+}
+
+// How low a fragment lies in the heights of a pair of layers for the cavity of the
+// TextureLayers: 1 - their height, weighted as they blend; 0 without heights.
+fn terrain_pair_low(p: TerrainPair, w: vec2f, uv: vec2f, gx: vec2f, gy: vec2f) -> f32 {
+    if (!(blending.contrast > 0.0)) {
+        return 0.0;
+    }
+    var h = 0.0;
+    var sum = 0.0;
+    for (var i = 0u; i < 2u; i++) {
+        let k = select(p.a, p.b, i == 1u);
+        if (w[i] > 0.0 && (blending.flags & (BLEND_HEIGHT << k)) != 0u) {
+            let t = blending.transforms[k];
+            h += w[i] * textureSampleGrad(blend_heights, material_sampler, uv * t.xy + t.zw, k,
+                gx * t.xy, gy * t.xy).r;
+            sum += w[i];
+        }
+    }
+    return select(0.0, clamp(1.0 - h / sum, 0.0, 1.0), sum > 0.0);
+}
+
+// The weighted albedo, ORM and tangent space normal of a pair of layers at uv.
 struct BlendSample {
     albedo: vec4f,
     orm: vec3f,
     normal: vec3f,
 };
 
-fn blend_sample(uv: vec2f, gx: vec2f, gy: vec2f, w: vec4f) -> BlendSample {
+fn terrain_pair_sample(p: TerrainPair, w: vec2f, uv: vec2f, gx: vec2f, gy: vec2f) -> BlendSample {
     var o: BlendSample;
     o.albedo = vec4f(0.0);
     o.orm = vec3f(0.0);
     var m = vec3f(0.0);
-    for (var k = 0u; k < 4u; k++) {
-        if (w[k] <= 0.0) {
+    for (var i = 0u; i < 2u; i++) {
+        if (w[i] <= 0.0) {
             continue;
         }
+        let k = select(p.a, p.b, i == 1u);
         let t = blending.transforms[k];
         let at = uv * t.xy + t.zw;
         let lx = gx * t.xy;
         let ly = gy * t.xy;
-        o.albedo += w[k] * textureSampleGrad(blend_albedo, material_sampler, at, k, lx, ly);
-        o.orm += w[k] * textureSampleGrad(blend_orm, material_sampler, at, k, lx, ly).rgb;
-        m += w[k] * (textureSampleGrad(blend_normal, material_sampler, at, k, lx, ly).xyz * 2.0 -
+        o.albedo += w[i] * textureSampleGrad(blend_albedo, material_sampler, at, k, lx, ly);
+        o.orm += w[i] * textureSampleGrad(blend_orm, material_sampler, at, k, lx, ly).rgb;
+        m += w[i] * (textureSampleGrad(blend_normal, material_sampler, at, k, lx, ly).xyz * 2.0 -
             1.0);
     }
     o.normal = select(vec3f(0.0, 0.0, 1.0), normalize(m), dot(m, m) > 1e-12);
     return o;
 }
 
-// How low a fragment lies in the heights of its layers for the cavity of the TextureLayers:
-// 1 - the height of its layers with a height image, weighted as they blend; 0 without heights.
-fn terrain_low(w: vec4f, uv: vec2f, gx: vec2f, gy: vec2f) -> f32 {
-    if (!(blending.contrast > 0.0)) {
-        return 0.0;
-    }
-    var h = 0.0;
-    var sum = 0.0;
-    for (var k = 0u; k < 4u; k++) {
-        if (w[k] > 0.0 && (blending.flags & (BLEND_HEIGHT << k)) != 0u) {
-            let t = blending.transforms[k];
-            h += w[k] * textureSampleGrad(blend_heights, material_sampler, uv * t.xy + t.zw, k,
-                gx * t.xy, gy * t.xy).r;
-            sum += w[k];
+// The weights of the projections of a triplanar mapping a fragment samples: the dominant axis
+// and the next one (biplanar), renormalized.
+fn terrain_biplanar(w: vec3f, dominant: u32) -> vec3f {
+    var second = select(0u, 1u, dominant == 0u);
+    for (var k = 0u; k < 3u; k++) {
+        if (k != dominant && w[k] > w[second]) {
+            second = k;
         }
     }
-    return select(0.0, clamp(1.0 - h / sum, 0.0, 1.0), sum > 0.0);
+    var o = vec3f(0.0);
+    o[dominant] = w[dominant];
+    o[second] = w[second];
+    return o / max(o.x + o.y + o.z, 1e-6);
 }
 
 // The layers of a fragment of a TextureBlend and how low it lies in their heights.
@@ -324,28 +389,31 @@ struct TerrainLayers {
     low: f32,
 };
 
-// The layers of a fragment of the TextureBlend of a terrain, weighed by its masks: with a
-// triplanar mapping each projection weighs the layers by the heights there and blends them as
-// the triplanar mapping of one set of textures does; else one projection, the mapping or the UVs.
+// The layers of a fragment of the TextureBlend of a terrain, weighed by its masks: the two layers
+// that weigh the most, shaped by their heights on the dominant projection. With a triplanar
+// mapping the dominant projection and the next one blend as the triplanar mapping of one set of
+// textures does; else one projection, the mapping or the UVs.
 @diagnostic(off, derivative_uniformity)
 fn terrain_blend_layers(f: TerrainOut, geometric: vec3f) -> TerrainLayers {
     let mapped = tf_mapped(f);
-    let mask = terrain_mask(f);
+    let pair = terrain_pair(blend_weights(terrain_mask(f), blending));
     var o: TerrainLayers;
     o.low = 0.0;
     o.layers.albedo = vec4f(0.0);
-    o.layers.emissive = vec3f(0.0);
+    o.layers.emissive = vec3f(1.0);
     o.layers.orm = vec3f(0.0);
     if (material_triplanar && mapped > 1.0) {
         let dx = dpdx(f.object);
         let dy = dpdy(f.object);
         let n = f.normal;
-        let w = mapping_weights(n, mapped - 1.0);
         let s = mapping_signs(n);
         let dominant = mapping_axis(n);
+        let w = terrain_biplanar(mapping_weights(n, mapped - 1.0), dominant);
         var planes = mapping_planes(f.object, s);
         var gx = mapping_planes(dx, s);
         var gy = mapping_planes(dy, s);
+        let lw = terrain_pair_heights(pair, planes[dominant] + f.uv.xy, gx[dominant],
+            gy[dominant]);
         var normal = vec3f(0.0);
         for (var k = 0u; k < 3u; k++) {
             if (w[k] == 0.0) {
@@ -356,13 +424,8 @@ fn terrain_blend_layers(f: TerrainOut, geometric: vec3f) -> TerrainLayers {
             if (k == dominant) {
                 o.layers.frame = Frame(tangent, bitangent, false);
             }
-            let uv = planes[k] + f.uv.xy;
-            let lw = blend_height_weights(blend_heights, material_sampler, blending,
-                blend_weights(mask, blending), uv, gx[k], gy[k]);
-            let b = blend_sample(uv, gx[k], gy[k], lw);
+            let b = terrain_pair_sample(pair, lw, planes[k] + f.uv.xy, gx[k], gy[k]);
             o.layers.albedo += w[k] * b.albedo;
-            o.layers.emissive += w[k] * textureSampleGrad(emissive_map, material_sampler, uv,
-                gx[k], gy[k]).rgb;
             o.layers.orm += w[k] * b.orm;
             let m = b.normal;
             normal += w[k] * (tangent * m.x + bitangent * m.y + geometric * m.z);
@@ -377,15 +440,13 @@ fn terrain_blend_layers(f: TerrainOut, geometric: vec3f) -> TerrainLayers {
     }
     let gx = dpdx(uv);
     let gy = dpdy(uv);
-    let w = blend_height_weights(blend_heights, material_sampler, blending,
-        blend_weights(mask, blending), uv, gx, gy);
-    let b = blend_sample(uv, gx, gy, w);
+    let lw = terrain_pair_heights(pair, uv, gx, gy);
+    let b = terrain_pair_sample(pair, lw, uv, gx, gy);
     o.layers.albedo = b.albedo;
-    o.layers.emissive = textureSampleGrad(emissive_map, material_sampler, uv, gx, gy).rgb;
     o.layers.orm = b.orm;
     o.layers.frame = cotangent_frame_grad(geometric, dpdx(f.world), dpdy(f.world), gx, gy);
     o.layers.normal = perturb(geometric, o.layers.frame, b.normal);
-    o.low = terrain_low(w, uv, gx, gy);
+    o.low = terrain_pair_low(pair, lw, uv, gx, gy);
     return o;
 }
 
