@@ -13,7 +13,7 @@ using box.grass
 //
 // frames: 60
 $ {
-  Scene: {wind: true}
+  Scene: {shader_features: {Extended: {wind: true}}}
   Wind: {direction: {1, 0}, speed: 9, gust: 0.6, gust_scale: 6}
 }
 
