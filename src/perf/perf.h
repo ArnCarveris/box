@@ -13,7 +13,7 @@
 
 /** Grass counters of the backend statistics a run follows: the passes, their GPU nanoseconds,
  * the passes timed, the packets read back and the blades generated and drawn per level */
-#define BOX_PERF_GRASS_COUNTS (4 + 2 * BOX_GRASS_LODS)
+#define BOX_PERF_GRASS_COUNTS (6 + 2 * BOX_GRASS_LODS)
 
 /** State of the run in progress, shared by the observer and the systems of the module */
 typedef struct box_perf_t {

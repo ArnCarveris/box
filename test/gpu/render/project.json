@@ -2137,7 +2137,10 @@
                     "casts_into_cascades",
                     "shadow_counts_apart",
                     "lights_only_when_enabled",
-                    "shadows_darken_meadow"
+                    "shadows_darken_meadow",
+                    "culls_behind_occluder",
+                    "occlusion_follows_camera",
+                    "culls_behind_hills"
                 ]
             },
             {

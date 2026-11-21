@@ -623,6 +623,9 @@ static void box_perf_sample_grass(
         now[4 + BOX_GRASS_LODS + i] = stats.grass_drawn[i];
     }
 
+    now[4 + 2 * BOX_GRASS_LODS] = stats.grass_culled_patches;
+    now[5 + 2 * BOX_GRASS_LODS] = stats.grass_culled_blades;
+
     if (!perf->grass_sampled) {
         ecs_os_memcpy(perf->grass_base, now, ECS_SIZEOF(now));
         ecs_os_memcpy(last, now, ECS_SIZEOF(now));
@@ -688,6 +691,11 @@ static void box_perf_end_grass(
         g->generated += levels[i]->generated;
         g->drawn += levels[i]->drawn;
     }
+
+    g->culled_patches = (double)(last[4 + 2 * BOX_GRASS_LODS] -
+        base[4 + 2 * BOX_GRASS_LODS]) / reads;
+    g->culled_blades = (double)(last[5 + 2 * BOX_GRASS_LODS] -
+        base[5 + 2 * BOX_GRASS_LODS]) / reads;
 
 done:
     return;

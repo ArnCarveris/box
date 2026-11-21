@@ -1551,9 +1551,8 @@ static void box_gpu_draw_pass(
 
     wgpuRenderPassEncoderSetBindGroup(vp.pass, 0, group, 1, &offset);
     wgpuRenderPassEncoderSetBindGroup(vp.pass, 3, box_gpu_volume_group(gpu, v), 0, NULL);
-    if (phase != 2) {
-        box_gpu_grass_draw(gpu, vp.pass, packet, v, format, phase == 3);
-    }
+    box_gpu_grass_draw(gpu, vp.pass, packet, v, format, phase == 3,
+        phase == 1 ? BOX_GPU_GRASS_EARLY : phase == 2 ? BOX_GPU_GRASS_LATE : BOX_GPU_GRASS_ALL);
 
     box_gpu_draw_batches(gpu, t, &vp, format, packet, v, group, slot, phase);
     wgpuRenderPassEncoderEnd(vp.pass);
@@ -1665,7 +1664,7 @@ static void box_gpu_draw_prepass_draws(
 }
 
 /** Record a depth prepass of a view: its opaque and alpha tested mesh draws, depth only, and
- * in the early prepass its grass blades.
+ * the grass blades it placed before (early) or after (late) its depth pyramid.
  *
  * @param gpu The backend
  * @param t The target
@@ -1698,9 +1697,8 @@ static void box_gpu_draw_prepass(
     WGPURenderPassEncoder pass = box_gpu_profile_render_pass(gpu, encoder, &desc, "prepass");
     box_gpu_draw_prepass_draws(gpu, pass, packet, v, group, slot, late,
         WGPUTextureFormat_Undefined, BOX_GPU_STAT_PREPASS_DRAW);
-    if (!late) {
-        box_gpu_grass_draw(gpu, pass, packet, v, WGPUTextureFormat_Undefined, false);
-    }
+    box_gpu_grass_draw(gpu, pass, packet, v, WGPUTextureFormat_Undefined, false,
+        late ? BOX_GPU_GRASS_LATE : BOX_GPU_GRASS_EARLY);
 
     wgpuRenderPassEncoderEnd(pass);
     wgpuRenderPassEncoderRelease(pass);
@@ -1798,6 +1796,7 @@ void box_gpu_draw_views(
             box_gpu_draw_prepass(gpu, t, encoder, packet, v, group, slot, false);
             if (occludes) {
                 box_gpu_cull_record_late(gpu, encoder, t->depth_view, slot);
+                box_gpu_grass_record_late(gpu, encoder, packet, v, slot);
                 box_gpu_draw_prepass(gpu, t, encoder, packet, v, group, slot, true);
             }
 
@@ -1812,6 +1811,7 @@ void box_gpu_draw_views(
                 occludes ? 1 : 0, snapshot, source);
             if (occludes) {
                 box_gpu_cull_record_late(gpu, encoder, t->depth_view, slot);
+                box_gpu_grass_record_late(gpu, encoder, packet, v, slot);
                 box_gpu_draw_pass(gpu, t, encoder, color, hdr, packet, v, group, slot, 2,
                     snapshot, source);
             }

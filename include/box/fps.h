@@ -395,6 +395,10 @@ ECS_STRUCT(GpuGrassStats, {
     double passes;              /**< Grass passes, one per lit view whose scene has a Grass */
     double generated;           /**< Blades placed, every level */
     double drawn;               /**< Blades drawn, every level */
+    double culled_patches;      /**< Patches in the frustum that placed no blades as they were
+                                 *   behind the depth pyramid of a view that culls by
+                                 *   occlusion */
+    double culled_blades;       /**< Blades in the frustum dropped as they were behind it */
     GpuGrassLevel lod0;         /**< Level 0, the blades of 7 segments near the camera */
     GpuGrassLevel lod1;         /**< Level 1, the blades of 3 segments */
     GpuGrassLevel lod2;         /**< Level 2, the single triangles furthest out */

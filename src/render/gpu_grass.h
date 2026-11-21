@@ -34,7 +34,8 @@
 /** Bytes of the counters of a Grass: the indirect arguments of its levels and their blades */
 #define BOX_GPU_GRASS_COUNTERS (64u)
 
-/** Bytes of the counts of a packet: blades placed and drawn per level */
+/** Bytes of the counts of a packet: blades placed and drawn per level, then the patches and the
+ * blades culled by occlusion */
 #define BOX_GPU_GRASS_STATS (32u)
 
 /** Readbacks of the counts and timestamps in flight at most */
@@ -84,9 +85,12 @@ typedef struct box_gpu_grass_params_t {
     float caster[4];                /**< Distance the blades cast within, distance their
                                      *   shadows fade from, reach of the shadows that sweeps
                                      *   the frustum, 1 to place the blades that cast */
+    uint32_t hiz[4];                /**< Width, height and levels of the depth pyramid of the
+                                     *   view the placement culls by occlusion against, 0
+                                     *   levels for none */
 } box_gpu_grass_params_t;
 
-_Static_assert(sizeof(box_gpu_grass_params_t) == 336, "GrassParams of grass.wgsl");
+_Static_assert(sizeof(box_gpu_grass_params_t) == 352, "GrassParams of grass.wgsl");
 _Static_assert(sizeof(box_gpu_grass_params_t) <= BOX_GPU_GRASS_PARAMS_STRIDE,
     "the params of a Grass must fit in their stride");
 
@@ -139,6 +143,8 @@ typedef struct box_gpu_grass_entity_t {
     WGPUBuffer group_params;        /**< Params ring the groups bind */
     uint64_t recorded;              /**< Recording of the last view that placed its blades */
     uint32_t offset;                /**< Offset of its params in that view */
+    bool late;                      /**< That view placed them after its depth pyramid, culled
+                                     *   by occlusion */
     uint32_t shadow_capacity;       /**< Blades a level of the blades that cast holds, 0 when
                                      *   the Grass casts no shadows */
     WGPUBuffer shadow_blades;       /**< Blades that cast shadows, a range per level */
@@ -160,7 +166,9 @@ typedef struct box_gpu_grass_pipeline_t {
 typedef struct box_gpu_grass_t {
     WGPUBindGroupLayout place_layout; /**< Params, blades, counters and counts of the packet */
     WGPUBindGroupLayout draw_layout; /**< Params and blades */
-    WGPUPipelineLayout place_pipeline_layout; /**< Sampled terrain, then place_layout */
+    WGPUBindGroupLayout hiz_layout; /**< Depth pyramid the place pass culls against */
+    WGPUPipelineLayout place_pipeline_layout; /**< Sampled terrain, place_layout, then
+                                     *   hiz_layout */
     WGPUPipelineLayout draw_pipeline_layout; /**< View group, then draw_layout */
     WGPUComputePipeline reset;      /**< Writes the vertex counts and zeroes the blades */
     WGPUComputePipeline place;      /**< Places the blades of the patches */
@@ -183,6 +191,12 @@ typedef struct box_gpu_grass_t {
     WGPUBuffer no_params;           /**< Zero params of the sampled terrain of a Grass without */
     WGPUBuffer no_grid;             /**< Empty grid of that terrain */
     WGPUBindGroup no_terrain;       /**< Binds them, the terrain of the Grass on a plane */
+    WGPUTexture no_pyramid;         /**< Pyramid of the placements that do not cull by
+                                     *   occlusion */
+    WGPUTextureView no_pyramid_view; /**< View of it */
+    WGPUBindGroup no_hiz;           /**< Binds it */
+    WGPUBindGroup hiz;              /**< Binds the pyramid of the view whose blades are being
+                                     *   placed after it, NULL for no_hiz */
     ecs_map_t entities;             /**< Grass entity to box_gpu_grass_entity_t */
     uint64_t recording;             /**< Views that placed blades so far */
     const box_render_view_t *view;  /**< View whose blades the last recording placed, NULL when

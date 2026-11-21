@@ -8,7 +8,8 @@
  * take a stiffness and the phase of their clump in the wind, bend and move in it, show its gusts
  * as bands of light that roll downwind, show in the GPU stats, cast shadows into the cascades of
  * the sun within their shadow distance and into the spot and point light tiles only with
- * shadow_lights.
+ * shadow_lights, and are culled behind what hides them from a view that culls by occlusion,
+ * from its camera of the frame.
  *
  * The scenes are test/assets/grass/plane.flecs and test/assets/grass/terrain.flecs.
  */
@@ -45,6 +46,13 @@
 
 /** Quanta per meter of the map that matches blades */
 #define GR_QUANTA (256.0)
+
+/** Meters the line from the eye to the tip of a blade clears the terrain by where it shows */
+#define GR_SHOW_MARGIN (0.1f)
+
+/** Meters the terrain rises above the line from the eye to the tip of a blade that is buried
+ * deeper behind it than the blade is tall */
+#define GR_BURIED (1.5f)
 
 /** Create a headless world that renders on the main thread into a capture surface and run a
  * scene of the tests.
@@ -1266,3 +1274,234 @@ void Grass_shadows_darken_meadow(void) {
     ecs_fini(world);
 }
 
+
+/** Add a wall across the meadow of the plane scene in front of the camera, which hides the
+ * ground beyond it from the camera.
+ *
+ * @param world The world
+ * @return The wall
+ */
+static ecs_entity_t gr_wall(
+    ecs_world_t *world)
+{
+    ecs_entity_t result = ecs_entity(world, { .name = "grass_wall" });
+    ecs_set(world, result, Position, {0, 2.0f, -20.0f});
+    ecs_set(world, result, Box, {400, 10, 1});
+    ecs_set(world, result, Rgb, {120, 120, 120});
+
+    return result;
+}
+
+/** Count the blades within a range of x and z.
+ *
+ * @param blades The blades
+ * @param x0 Lowest x
+ * @param x1 Highest x
+ * @param z0 Lowest z
+ * @param z1 Highest z
+ * @return The blades
+ */
+static int32_t gr_within(
+    const ecs_vec_t *blades,
+    float x0,
+    float x1,
+    float z0,
+    float z1)
+{
+    int32_t i, result = 0;
+    for (i = 0; i < ecs_vec_count(blades); i ++) {
+        const box_render_grass_blade_t *b = ecs_vec_get_t(blades, box_render_grass_blade_t, i);
+        result += b->position[0] >= x0 && b->position[0] <= x1 &&
+            b->position[2] >= z0 && b->position[2] <= z1;
+    }
+
+    return result;
+}
+
+void Grass_culls_behind_occluder(void) {
+    ecs_world_t *world = gr_world("test/assets/grass/plane.flecs");
+    ecs_entity_t meadow = gr_lookup(world, "meadow");
+    ecs_vec_t open, walled;
+    ecs_vec_init_t(NULL, &open, box_render_grass_blade_t, 0);
+    ecs_vec_init_t(NULL, &walled, box_render_grass_blade_t, 0);
+    ecs_singleton_set(world, GpuPanel, { .open = true, .interval = 0 });
+    gr_frames(world, 12);
+    gr_blades(world, meadow, &open);
+    const GpuStats *s = ecs_singleton_get(world, GpuStats);
+    double drawn_open = s->grass.drawn;
+    test_flt(s->grass.culled_patches, 0);
+    test_flt(s->grass.culled_blades, 0);
+
+    gr_wall(world);
+    gr_frames(world, 12);
+    gr_blades(world, meadow, &walled);
+    s = ecs_singleton_get(world, GpuStats);
+    int32_t behind_open = gr_within(&open, -1000, 1000, -1000, -25);
+    int32_t behind = gr_within(&walled, -1000, 1000, -1000, -25);
+    int32_t front_open = gr_within(&open, -1000, 1000, -18, 1000);
+    int32_t front = gr_within(&walled, -1000, 1000, -18, 1000);
+    printf("open %d (%d behind), walled %d (%d behind), drawn %.0f then %.0f, "
+        "culled %.1f patches %.0f blades\n", ecs_vec_count(&open), behind_open,
+        ecs_vec_count(&walled), behind, drawn_open, s->grass.drawn, s->grass.culled_patches,
+        s->grass.culled_blades);
+
+    // Nothing behind the wall, everything in front of it
+    test_assert(behind_open > 1000);
+    test_int(behind, 0);
+    test_assert(front * 100 >= front_open * 99);
+    test_assert(s->grass.culled_patches > 10);
+    test_assert(s->grass.drawn < drawn_open * 0.8);
+    gr_expect_no_errors(world);
+    ecs_vec_fini_t(NULL, &open, box_render_grass_blade_t);
+    ecs_vec_fini_t(NULL, &walled, box_render_grass_blade_t);
+    ecs_fini(world);
+}
+
+void Grass_occlusion_follows_camera(void) {
+    ecs_world_t *world = gr_world("test/assets/grass/plane.flecs");
+    ecs_entity_t meadow = gr_lookup(world, "meadow");
+    ecs_entity_t camera = gr_lookup(world, "grass_camera");
+    ecs_entity_t wall = gr_wall(world);
+    ecs_vec_t first, settled;
+    ecs_vec_init_t(NULL, &first, box_render_grass_blade_t, 0);
+    ecs_vec_init_t(NULL, &settled, box_render_grass_blade_t, 0);
+    gr_frames(world, 12);
+
+    // Turn away from the wall toward +x: the blades there are all placed in the first frame
+    // that looks at them, not a frame after
+    ecs_set(world, camera, Rotation, {-0.25f, -1.5707963f, 0});
+    gr_frames(world, 1);
+    gr_blades(world, meadow, &first);
+    gr_frames(world, 10);
+    gr_blades(world, meadow, &settled);
+    int32_t turned = gr_within(&first, 5, 1000, -15, 15);
+    int32_t turned_settled = gr_within(&settled, 5, 1000, -15, 15);
+    printf("turned %d, settled %d\n", turned, turned_settled);
+    test_assert(turned_settled > 1000);
+    test_assert(turned * 100 >= turned_settled * 99);
+
+    // Turn back and remove the wall: the meadow beyond it shows in the first frame
+    ecs_set(world, camera, Rotation, {-0.25f, 0, 0});
+    gr_frames(world, 10);
+    gr_blades(world, meadow, &first);
+    test_int(gr_within(&first, -1000, 1000, -1000, -25), 0);
+    ecs_delete(world, wall);
+    gr_frames(world, 1);
+    gr_blades(world, meadow, &first);
+    gr_frames(world, 10);
+    gr_blades(world, meadow, &settled);
+    int32_t shown = gr_within(&first, -1000, 1000, -1000, -25);
+    int32_t shown_settled = gr_within(&settled, -1000, 1000, -1000, -25);
+    printf("shown %d, settled %d\n", shown, shown_settled);
+    test_assert(shown_settled > 1000);
+    test_assert(shown * 100 >= shown_settled * 99);
+    gr_expect_no_errors(world);
+    ecs_vec_fini_t(NULL, &first, box_render_grass_blade_t);
+    ecs_vec_fini_t(NULL, &settled, box_render_grass_blade_t);
+    ecs_fini(world);
+}
+
+/** Get how deep the tip of a blade is buried behind the terrain seen from an eye: the most the
+ * resident terrain rises above the line from the eye to the tip, negative where the line clears
+ * it everywhere.
+ *
+ * @param world The world
+ * @param terrain The terrain
+ * @param origin Origin of the frame of the terrain in the local world
+ * @param eye The eye in the local world
+ * @param b The blade
+ * @return Meters, -1000 where the terrain under the line is not resident
+ */
+static float gr_buried(
+    ecs_world_t *world,
+    ecs_entity_t terrain,
+    const double origin[3],
+    const float eye[3],
+    const box_render_grass_blade_t *b)
+{
+    float d[3] = { b->position[0] - eye[0], b->position[1] + b->height - eye[1],
+        b->position[2] - eye[2] };
+    float length = sqrtf(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]), result = -1000.0f;
+    int32_t i, steps = (int32_t)(length / 0.25f);
+    for (i = 4; i < steps - 4; i ++) {
+        float t = (float)i / (float)steps, h = 0;
+        float x = eye[0] + d[0] * t, z = eye[2] + d[2] * t;
+        if (!box_terrain_height(world, terrain, x - origin[0], z - origin[2], &h)) {
+            return -1000.0f;
+        }
+
+        h = (float)origin[1] + h - (eye[1] + d[1] * t);
+        result = h > result ? h : result;
+    }
+
+    return result;
+}
+
+void Grass_culls_behind_hills(void) {
+    ecs_world_t *world = gr_world("test/assets/grass/hills.flecs");
+    ecs_entity_t terrain = gr_lookup(world, "grass_hills");
+    ecs_entity_t meadow = gr_lookup(world, "grass_meadow");
+    ecs_entity_t view = gr_lookup(world, "grass_view");
+    ecs_entity_t walker = gr_lookup(world, "grass_walker");
+    ecs_vec_t culled, open;
+    ecs_map_t map;
+    double origin[3], at[2] = {0, 0};
+    float ground = 0, eye[3];
+    int32_t i, missing = 0, shown = 0, buried = 0, buried_culled = 0;
+    ecs_vec_init_t(NULL, &culled, box_render_grass_blade_t, 0);
+    ecs_vec_init_t(NULL, &open, box_render_grass_blade_t, 0);
+    ecs_singleton_set(world, GpuPanel, { .open = true, .interval = 0 });
+    gr_terrain_wait(world, terrain);
+
+    // Stand at eye height among the hills
+    box_terrain_origin(world, terrain, origin);
+    test_bool(box_terrain_height(world, terrain, -origin[0], -origin[2], &ground), true);
+    eye[0] = 0;
+    eye[1] = (float)origin[1] + ground + 1.7f;
+    eye[2] = 0;
+    ecs_set(world, walker, Position, {eye[0], eye[1], eye[2]});
+    gr_frames(world, 12);
+    gr_blades(world, meadow, &culled);
+    const GpuStats *s = ecs_singleton_get(world, GpuStats);
+    double drawn = s->grass.drawn, patches = s->grass.culled_patches;
+    double blades = s->grass.culled_blades;
+
+    // The same view without occlusion culling
+    View *v = ecs_get_mut(world, view, View);
+    v->culling.occlusion = false;
+    ecs_modified(world, view, View);
+    gr_frames(world, 12);
+    gr_blades(world, meadow, &open);
+    s = ecs_singleton_get(world, GpuStats);
+
+    // No blade that occlusion dropped shows over the hills, and it drops most of those buried
+    // deeper behind them than a blade is tall
+    gr_map(&culled, at, &map);
+    for (i = 0; i < ecs_vec_count(&open); i ++) {
+        const box_render_grass_blade_t *b = ecs_vec_get_t(&open, box_render_grass_blade_t, i);
+        bool kept = gr_match(&culled, &map, at, b, at);
+        float depth = gr_buried(world, terrain, origin, eye, b);
+        missing += !kept;
+        shown += !kept && depth < -GR_SHOW_MARGIN;
+        buried += depth > GR_BURIED;
+        buried_culled += depth > GR_BURIED && !kept;
+    }
+
+    ecs_map_fini(&map);
+    printf("culled %d, open %d, missing %d (%d shown), buried %d (%d culled), drawn %.0f of "
+        "%.0f, culled %.1f patches %.0f blades\n", ecs_vec_count(&culled),
+        ecs_vec_count(&open), missing, shown, buried, buried_culled, drawn, s->grass.drawn,
+        patches, blades);
+    test_int(shown, 0);
+    test_assert(buried > 500);
+    test_assert(buried_culled * 10 >= buried * 6);
+    test_assert(blades + patches > 0);
+    test_assert(missing > 500);
+    test_assert(drawn < s->grass.drawn);
+    test_flt(s->grass.culled_patches, 0);
+    test_flt(s->grass.culled_blades, 0);
+    gr_expect_no_errors(world);
+    ecs_vec_fini_t(NULL, &culled, box_render_grass_blade_t);
+    ecs_vec_fini_t(NULL, &open, box_render_grass_blade_t);
+    ecs_fini(world);
+}

@@ -155,9 +155,10 @@ static void box_perf_report_grass(
         "  \"grass\": {\n    \"passes\": %d,\n    \"timed\": %d,\n    \"samples\": %d,\n"
         "    \"mean_ms\": %.4f,\n    \"p50_ms\": %.4f,\n    \"p95_ms\": %.4f,\n"
         "    \"p99_ms\": %.4f,\n    \"max_ms\": %.4f,\n    \"reads\": %d,\n"
-        "    \"generated\": %.1f,\n    \"drawn\": %.1f,\n    \"lods\": [",
+        "    \"generated\": %.1f,\n    \"drawn\": %.1f,\n    \"culled_patches\": %.1f,\n"
+        "    \"culled_blades\": %.1f,\n    \"lods\": [",
         g->passes, g->timed, g->samples, g->mean_ms, g->p50_ms, g->p95_ms, g->p99_ms,
-        g->max_ms, g->reads, g->generated, g->drawn);
+        g->max_ms, g->reads, g->generated, g->drawn, g->culled_patches, g->culled_blades);
     for (i = 0; i < 3; i ++) {
         ecs_strbuf_append(buf, "%s{\"generated\": %.1f, \"drawn\": %.1f}", i ? ", " : "",
             levels[i]->generated, levels[i]->drawn);

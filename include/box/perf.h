@@ -118,6 +118,9 @@ ECS_STRUCT(PerfGrass, {
     int32_t reads;       /**< Packets whose blade counts were read back */
     double generated;    /**< Blades placed per packet, every level */
     double drawn;        /**< Blades drawn per packet, every level */
+    double culled_patches; /**< Patches per packet behind the depth pyramid of a view that
+                          *   culls by occlusion, which placed no blades */
+    double culled_blades; /**< Blades per packet dropped behind it */
     PerfGrassLevel lod0; /**< Level 0, the finest */
     PerfGrassLevel lod1; /**< Level 1 */
     PerfGrassLevel lod2; /**< Level 2, the furthest out */

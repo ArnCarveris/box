@@ -244,6 +244,10 @@ static void box_fps_gpu_grass(
     GpuGrassLevel *levels[BOX_GRASS_LODS] = { &out->lod0, &out->lod1, &out->lod2 };
     int32_t i;
     out->passes = box_fps_gpu_rate(now->grass_passes, base->grass_passes, n);
+    out->culled_patches = box_fps_gpu_rate(
+        now->grass_culled_patches, base->grass_culled_patches, reads);
+    out->culled_blades = box_fps_gpu_rate(
+        now->grass_culled_blades, base->grass_culled_blades, reads);
     for (i = 0; i < BOX_GRASS_LODS; i ++) {
         levels[i]->generated = box_fps_gpu_rate(
             now->grass_generated[i], base->grass_generated[i], reads);

@@ -54,6 +54,8 @@ struct GrassParams {
                             // their shadows start to fade at; how far along the light a
                             // placement of the blades that cast sweeps the frustum; 1 for that
                             // placement, 0 for the one of the view
+    hiz: vec4u,             // Width, height and levels of the depth pyramid of the view the
+                            // placement culls by occlusion against, 0 levels for none
 };
 
 // A blade (box_gpu_grass_blade_t), 48 bytes

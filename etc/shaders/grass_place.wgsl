@@ -19,6 +19,13 @@
 // Blades outside the frustum are dropped, the others appended to the range of their level of
 // detail.
 //
+// A view that culls by occlusion places its blades after its depth pyramid (gpu_hiz.c) is built
+// from the depth of what it drew first this frame, from its camera of this frame, so nothing it
+// hides lags behind the camera (hiz.z levels, 0 for none). A patch whose box is behind the
+// pyramid places nothing, its ground bounded by the heights of the terrain on a grid over the
+// patch, when it has enough blades to pay for the grid; a blade whose bound is behind it is
+// dropped. Both count in the stats of the packet.
+//
 // The placement of the blades that cast shadows (cast.w) keeps the blades within the distance
 // they cast within whose shadow falls into the frustum: each side plane moves out along the
 // light by as far as the shadows reach (cast.z), and a view projection of zero keeps every blade.
@@ -35,17 +42,28 @@ struct GrassCounters {
     pad: u32,
 };
 
-// The blades placed and drawn per level over the views of a packet (box_gpu_grass_stats_t)
+// The blades placed and drawn per level over the views of a packet, then the patches and the
+// blades culled by occlusion (box_gpu_grass_stats_t)
 struct GrassStats {
     generated: array<atomic<u32>, 3>,
     drawn: array<atomic<u32>, 3>,
-    pad: vec2u,
+    culled: array<atomic<u32>, 2>,
 };
 
 @group(1) @binding(0) var<uniform> params: GrassParams;
 @group(1) @binding(1) var<storage, read_write> blades: array<GrassBlade>;
 @group(1) @binding(2) var<storage, read_write> counters: GrassCounters;
 @group(1) @binding(3) var<storage, read_write> stats: GrassStats;
+
+// The depth pyramid of the view, farthest depths (reversed Z), params.hiz its size and levels
+@group(2) @binding(0) var pyramid: texture_2d<f32>;
+
+// Lowest and highest ground of the patch of a workgroup in BOUND_QUANTA, whether it is hidden
+// (1) and its blades culled by occlusion
+var<workgroup> patch_low: atomic<i32>;
+var<workgroup> patch_high: atomic<i32>;
+var<workgroup> patch_hidden: u32;
+var<workgroup> patch_culled: atomic<u32>;
 
 // Invocations of a workgroup of the place dispatch (BOX_GPU_GRASS_GROUP)
 const GROUP: u32 = 64u;
@@ -70,6 +88,20 @@ const CLUMP_STIFFNESS: f32 = 0.5;
 // Factor of the radius of the bound of a blade that leans in the wind, so a blade bent over by a
 // gust is not culled
 const WIND_BOUND: f32 = 1.15;
+
+// Heights of the terrain along each edge of the grid that bounds the ground of a patch
+const BOUND_SAMPLES: u32 = 9u;
+
+// Fewest blades a patch places for it to be culled as a whole
+const BOUND_BLADES: u32 = 64u;
+
+// Quanta per meter of the bounds of the ground of a patch
+const BOUND_QUANTA: f32 = 64.0;
+
+// Slack of the bounds of the ground of a patch for the terrain between their heights: meters,
+// then share of the height range of the patch
+const BOUND_SLACK: f32 = 0.25;
+const BOUND_SLACK_RANGE: f32 = 0.25;
 
 const TAU: f32 = 6.283185307179586;
 
@@ -140,6 +172,157 @@ fn grass_sphere_visible(planes: array<vec4f, 4>, c: vec3f, r: f32) -> bool {
         }
     }
     return true;
+}
+
+// Whether a rectangle of the screen (uv) whose nearest depth (the largest with reversed Z) is
+// given is behind the depth pyramid of the view, as occluded of cull.wgsl does: the finest level
+// whose texels are a third of the rectangle covers it with at most four by four texels, and it is
+// hidden when its nearest depth is farther than the farthest they hold. A rectangle in front of
+// the near plane hides nothing.
+fn grass_hidden(lo: vec2f, hi: vec2f, depth: f32) -> bool {
+    let a = clamp(lo, vec2f(0.0), vec2f(1.0));
+    let b = clamp(hi, vec2f(0.0), vec2f(1.0));
+    if (depth >= 1.0 || any(b < a)) {
+        return false;
+    }
+
+    let size = vec2f(params.hiz.xy);
+    let span = max((b.x - a.x) * size.x, (b.y - a.y) * size.y);
+    let level = min(u32(max(ceil(log2(span / 3.0)), 0.0)), params.hiz.z - 1u);
+    let dims = max(params.hiz.xy >> vec2u(level), vec2u(1u));
+    let ta = min(vec2u(a * vec2f(dims)), dims - 1u);
+    let tb = min(vec2u(b * vec2f(dims)), dims - 1u);
+    if (any(tb - ta > vec2u(3u))) {
+        return false;
+    }
+
+    var far = 1.0;
+    for (var y = ta.y; y <= tb.y; y++) {
+        for (var x = ta.x; x <= tb.x; x++) {
+            far = min(far, textureLoad(pyramid, vec2u(x, y), i32(level)).r);
+        }
+    }
+
+    return depth < far;
+}
+
+// Whether a box is behind the depth pyramid of the view: its eight corners give its screen
+// rectangle and nearest depth. A box that reaches behind the camera, or a view without a pyramid,
+// hides nothing.
+fn grass_occluded(lo: vec3f, hi: vec3f) -> bool {
+    if (params.hiz.z == 0u) {
+        return false;
+    }
+
+    var a = vec2f(1.0);
+    var b = vec2f(0.0);
+    var depth = 0.0;
+    for (var i = 0u; i < 8u; i++) {
+        let corner = select(lo, hi, vec3<bool>((i & 1u) != 0u, (i & 2u) != 0u, (i & 4u) != 0u));
+        let p = params.view_proj * vec4f(corner, 1.0);
+        if (p.w <= 1e-6) {
+            return false;
+        }
+        let ndc = p.xyz / p.w;
+        let uv = vec2f(ndc.x * 0.5 + 0.5, 0.5 - ndc.y * 0.5);
+        a = min(a, uv);
+        b = max(b, uv);
+        depth = max(depth, ndc.z);
+    }
+
+    return grass_hidden(a, b, depth);
+}
+
+// Whether a sphere is behind the depth pyramid of the view, cheaper than the box around it: each
+// clip coordinate of its points lies within the radius times the length of its row of the view
+// projection of that of its center, which bounds its screen rectangle and nearest depth. A sphere
+// that reaches behind the camera, or a view without a pyramid, hides nothing.
+fn grass_sphere_occluded(c: vec3f, r: f32) -> bool {
+    if (params.hiz.z == 0u) {
+        return false;
+    }
+
+    let m = params.view_proj;
+    let p = m * vec4f(c, 1.0);
+    let e = r * vec4f(length(vec3f(m[0].x, m[1].x, m[2].x)), length(vec3f(m[0].y, m[1].y, m[2].y)),
+        length(vec3f(m[0].z, m[1].z, m[2].z)), length(vec3f(m[0].w, m[1].w, m[2].w)));
+    let w0 = p.w - e.w;
+    let w1 = p.w + e.w;
+    if (w0 <= 1e-6) {
+        return false;
+    }
+
+    let near_ = (p.xyz + e.xyz) / w0;
+    let far_ = (p.xyz + e.xyz) / w1;
+    let low = min((p.xy - e.xy) / w0, (p.xy - e.xy) / w1);
+    let high = max(near_.xy, far_.xy);
+    let depth = max(near_.z, far_.z);
+    let a = clamp(vec2f(low.x * 0.5 + 0.5, 0.5 - high.y * 0.5), vec2f(0.0), vec2f(1.0));
+    let b = clamp(vec2f(high.x * 0.5 + 0.5, 0.5 - low.y * 0.5), vec2f(0.0), vec2f(1.0));
+    if (depth >= 1.0 || any(b < a)) {
+        return false;
+    }
+
+    // The level whose texels are half the rectangle when it covers the rectangle with two by
+    // two texels, else the one above, whose texels are as large as it: four loads that do not
+    // wait on each other
+    let size = vec2f(params.hiz.xy);
+    let span = max((b.x - a.x) * size.x, (b.y - a.y) * size.y);
+    var level = min(u32(max(ceil(log2(span)) - 1.0, 0.0)), params.hiz.z - 1u);
+    var dims = max(params.hiz.xy >> vec2u(level), vec2u(1u));
+    var ta = min(vec2u(a * vec2f(dims)), dims - 1u);
+    var tb = min(vec2u(b * vec2f(dims)), dims - 1u);
+    if (any(tb - ta > vec2u(1u)) && level + 1u < params.hiz.z) {
+        level += 1u;
+        dims = max(params.hiz.xy >> vec2u(level), vec2u(1u));
+        ta = min(vec2u(a * vec2f(dims)), dims - 1u);
+        tb = min(vec2u(b * vec2f(dims)), dims - 1u);
+    }
+
+    if (any(tb - ta > vec2u(1u))) {
+        return false;
+    }
+
+    let far = min(
+        min(textureLoad(pyramid, ta, i32(level)).r,
+            textureLoad(pyramid, vec2u(tb.x, ta.y), i32(level)).r),
+        min(textureLoad(pyramid, vec2u(ta.x, tb.y), i32(level)).r,
+            textureLoad(pyramid, tb, i32(level)).r));
+    return depth < far;
+}
+
+// The lowest and highest ground under the blades of a patch, out to reach from its corner along
+// each edge: the plane, or the heights of the terrain on a grid of BOUND_SAMPLES along each edge
+// with slack for the terrain between them; x above y where the terrain has no tile. Called by
+// every invocation of the workgroup, the bounds are those of the first.
+fn grass_patch_ground(at_patch: vec2i, reach: f32, local: u32) -> vec2f {
+    if (params.config.y == 0u) {
+        return vec2f(params.ground.z);
+    }
+
+    if (local == 0u) {
+        atomicStore(&patch_low, 0x7fffffff);
+        atomicStore(&patch_high, -0x7fffffff);
+    }
+    workgroupBarrier();
+
+    let step = reach / f32(BOUND_SAMPLES - 1u);
+    for (var i = local; i < BOUND_SAMPLES * BOUND_SAMPLES; i += GROUP) {
+        let offset = vec2f(f32(i % BOUND_SAMPLES), f32(i / BOUND_SAMPLES)) * step;
+        let tile = terrain_sample_find(at_patch * i32(params.corner.z), offset);
+        if (tile.found) {
+            let y = (terrain_sample_tile_height(tile) + terrain_sample_params.origin.w) *
+                BOUND_QUANTA;
+            atomicMin(&patch_low, i32(floor(y)));
+            atomicMax(&patch_high, i32(ceil(y)));
+        }
+    }
+    workgroupBarrier();
+
+    let low = f32(atomicLoad(&patch_low)) / BOUND_QUANTA;
+    let high = f32(atomicLoad(&patch_high)) / BOUND_QUANTA;
+    let slack = BOUND_SLACK + BOUND_SLACK_RANGE * (high - low);
+    return select(vec2f(low - slack, high + slack), vec2f(1.0, 0.0), low > high);
 }
 
 // Distance from the camera to the nearest point of a box.
@@ -284,7 +467,8 @@ fn grass_blade(at_patch: vec2i, lo: vec2f, c: vec2i, first: vec2i, k: u32,
 
     let center = base + vec3f(0.0, 0.5 * height, 0.0);
     let bound = select(0.6, WIND_BOUND, params.wind.strength.x > 0.0);
-    if (!grass_sphere_visible(planes, center, bound * height + width)) {
+    let radius = bound * height + width;
+    if (!grass_sphere_visible(planes, center, radius)) {
         return out;
     }
 
@@ -302,6 +486,14 @@ fn grass_blade(at_patch: vec2i, lo: vec2f, c: vec2i, first: vec2i, k: u32,
     out.blade = GrassBlade(base, yaw, height, width, lean, shade, grass_unit(h8),
         grass_unit(h9) * 2.0 - 1.0, tint, clump.distance);
     return out;
+}
+
+// Whether a blade is behind the depth pyramid of the view: the sphere around it, leaning in the
+// wind. Tested once the blade is made, which keeps the registers of grass_blade to themselves.
+fn grass_blade_occluded(b: GrassBlade) -> bool {
+    let bound = select(0.6, WIND_BOUND, params.wind.strength.x > 0.0);
+    return grass_sphere_occluded(b.position + vec3f(0.0, 0.5 * b.height, 0.0),
+        bound * b.height + b.width);
 }
 
 // Write the vertex counts of the levels and zero their blades.
@@ -354,6 +546,28 @@ fn place(@builtin(workgroup_id) wg: vec3u, @builtin(local_invocation_index) loca
     let span = select(vec2i(0), (end - vec2i(1) - start) / s + vec2i(1), start < end);
     let total = u32(span.x * span.y);
     let columns = u32(max(span.x, 1));
+
+    // A patch of at least BOUND_BLADES blades behind the depth pyramid places nothing; its box
+    // holds the blades standing on its ground, leaning in the wind, out to the cells of the
+    // blocks that start in it. The blades of a thinner patch are culled one by one, as bounding
+    // its ground would cost more than they do.
+    if (params.hiz.z != 0u && total >= BOUND_BLADES) {
+        let ground = grass_patch_ground(at_patch, reach, local);
+        if (local == 0u) {
+            let hidden = ground.x <= ground.y && grass_occluded(
+                vec3f(lo.x - margin, ground.x, lo.y - margin),
+                vec3f(lo.x + reach + margin, ground.y + params.blade.y * WIND_BOUND,
+                    lo.y + reach + margin));
+            patch_hidden = select(0u, 1u, hidden);
+            if (hidden) {
+                atomicAdd(&stats.culled[0], 1u);
+            }
+        }
+        if (workgroupUniformLoad(&patch_hidden) != 0u) {
+            return;
+        }
+    }
+
     let capacity = params.config.w;
     for (var i = local; i < total; i += GROUP) {
         let b = start + vec2i(i32(i % columns), i32(i / columns)) * s;
@@ -362,11 +576,21 @@ fn place(@builtin(workgroup_id) wg: vec3u, @builtin(local_invocation_index) loca
         if (made.generated) {
             atomicAdd(&counters.generated[made.lod], 1u);
         }
-        if (made.keep) {
+        if (made.keep && grass_blade_occluded(made.blade)) {
+            atomicAdd(&patch_culled, 1u);
+        } else if (made.keep) {
             let at_level = atomicAdd(&counters.args[made.lod * 4u + 1u], 1u);
             if (at_level < capacity) {
                 blades[made.lod * capacity + at_level] = made.blade;
             }
+        }
+    }
+
+    if (params.hiz.z != 0u) {
+        workgroupBarrier();
+        let culled = atomicLoad(&patch_culled);
+        if (local == 0u && culled != 0u) {
+            atomicAdd(&stats.culled[1], culled);
         }
     }
 }

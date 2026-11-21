@@ -1307,6 +1307,8 @@ bool box_gpu_grass_drawn(
 /** Record the compute pass that places the blades of the Grass entities of the scene of a view
  * around its camera: per Grass a reset, a place dispatch over the patches of its grid and a
  * finish that clamps the indirect arguments of its levels and adds the counts of the packet.
+ * Of a view that culls by occlusion it places only the blades that cast shadows, its blades
+ * are placed after its depth pyramid (box_gpu_grass_record_late).
  *
  * @param gpu The backend
  * @param encoder The encoder of the frame
@@ -1390,8 +1392,35 @@ void box_gpu_grass_atlas(
     WGPUTextureView target,
     int32_t resolution);
 
-/** Record the draws of the blades a view placed (box_gpu_grass_record) into one of its passes,
- * one indirect draw per Grass and level of detail. Replaces the pipeline and the bind group at 1.
+/** Record the compute pass that places the blades of the Grass entities of the scene of a view
+ * that culls by occlusion, after the depth pyramid of what it drew first was built
+ * (box_gpu_cull_record_late): box_gpu_grass_record placed only the blades that cast shadows,
+ * these cull the patches and the blades hidden behind the pyramid. Nothing for another view.
+ *
+ * @param gpu The backend
+ * @param encoder The encoder of the frame
+ * @param packet The packet
+ * @param v The view, the last box_gpu_grass_record recorded
+ * @param slot Slot of the view in the view buffer, whose uniforms are in view_data
+ */
+void box_gpu_grass_record_late(
+    box_gpu_t *gpu,
+    WGPUCommandEncoder encoder,
+    const box_render_packet_t *packet,
+    const box_render_view_t *v,
+    int32_t slot);
+
+/** Which blades of a view a pass draws (box_gpu_grass_draw) */
+typedef enum box_gpu_grass_phase_t {
+    BOX_GPU_GRASS_EARLY,            /**< Those placed before the depth pyramid of the view, all
+                                     *   of a view that does not cull by occlusion */
+    BOX_GPU_GRASS_LATE,             /**< Those placed after it (box_gpu_grass_record_late) */
+    BOX_GPU_GRASS_ALL               /**< Both */
+} box_gpu_grass_phase_t;
+
+/** Record the draws of the blades a view placed (box_gpu_grass_record,
+ * box_gpu_grass_record_late) into one of its passes, one indirect draw per Grass and level of
+ * detail. Replaces the pipeline and the bind group at 1.
  *
  * @param gpu The backend
  * @param pass The pass, with the bind group of the view at 0
@@ -1400,6 +1429,7 @@ void box_gpu_grass_atlas(
  * @param format Format of the color target, Undefined for the depth prepass
  * @param equal Whether the pass loads the depth of a prepass that drew the blades, so it tests
  * against it without writing it
+ * @param phase Which of the blades it draws, box_gpu_grass_phase_t
  * @return Whether a blade draw was recorded
  */
 bool box_gpu_grass_draw(
@@ -1408,7 +1438,8 @@ bool box_gpu_grass_draw(
     const box_render_packet_t *packet,
     const box_render_view_t *v,
     WGPUTextureFormat format,
-    bool equal);
+    bool equal,
+    int32_t phase);
 
 /** Write the uploads of a packet into their buffers.
  *

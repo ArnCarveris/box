@@ -106,7 +106,9 @@ typedef struct box_render_gpu_stats_t {
     int32_t atmosphere_passes[BOX_RENDER_ATMOS_PASSES]; /**< Passes whose GPU time
                                  *   atmosphere_ns holds */
     int32_t grass_passes;       /**< Compute passes that placed the grass blades of a view,
-                                 *   one per frame of a lit view whose scene has a Grass, and
+                                 *   one per frame of a lit view whose scene has a Grass, plus
+                                 *   one before the depth pyramid of a view that culls by
+                                 *   occlusion for the blades that cast into its cascades, and
                                  *   those that placed the blades that cast into light tiles */
     int64_t grass_ns;           /**< GPU time of the grass compute passes and of the passes that
                                  *   draw the blades into the shadows read back, 0 without
@@ -119,8 +121,13 @@ typedef struct box_render_gpu_stats_t {
                                  *   the views saw, per level of detail, read back */
     int64_t grass_drawn[BOX_GRASS_LODS]; /**< Blades of those the views drew per level of
                                  *   detail, read back */
-    int32_t grass_reads;        /**< Packets whose blades grass_generated and grass_drawn
-                                 *   hold */
+    int64_t grass_culled_patches; /**< Patches in the frustum of a view that culls by
+                                 *   occlusion that placed no blades as they were behind its
+                                 *   depth pyramid, read back */
+    int64_t grass_culled_blades; /**< Blades in the frustum of such a view dropped as they were
+                                 *   behind it, read back */
+    int32_t grass_reads;        /**< Packets whose blades grass_generated, grass_drawn and the
+                                 *   culled patches and blades hold */
     int32_t shadow_tiles;       /**< Shadow atlas tiles rendered */
     int32_t shadow_reused;      /**< Shadow atlas tiles kept from an earlier frame instead of
                                  *   rendered */

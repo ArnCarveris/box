@@ -3,6 +3,8 @@
  * @brief Grass passes of the webgpu backend: per lit view a compute pass places the blades of
  * the Grass entities of its scene around its camera, and its depth prepass and forward pass draw
  * them with one indirect draw per Grass and level of detail (grass_place.wgsl, grass.wgsl).
+ * A view that culls by occlusion places its blades after the depth pyramid of what it drew first
+ * (gpu_hiz.c) and draws them in its late passes, the patches and blades behind it culled.
  *
  * Each Grass has a blade buffer with a range per level and the indirect arguments of its levels,
  * which every view that draws it fills again before its passes, its params in a uniform ring.
@@ -77,14 +79,26 @@ static void box_gpu_grass_layouts(
             .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
         }
     };
+    WGPUBindGroupLayoutEntry hiz = {
+        .binding = 0,
+        .visibility = WGPUShaderStage_Compute,
+        .texture = {
+            .sampleType = WGPUTextureSampleType_UnfilterableFloat,
+            .viewDimension = WGPUTextureViewDimension_2D
+        }
+    };
     s->place_layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
         &(WGPUBindGroupLayoutDescriptor){ .entryCount = 4, .entries = place });
+    s->hiz_layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
+        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 1, .entries = &hiz });
     s->draw_layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
         &(WGPUBindGroupLayoutDescriptor){ .entryCount = 2, .entries = draw });
-    WGPUBindGroupLayout place_groups[2] = { gpu->terrain_sample_layout, s->place_layout };
+    WGPUBindGroupLayout place_groups[3] = {
+        gpu->terrain_sample_layout, s->place_layout, s->hiz_layout
+    };
     s->place_pipeline_layout = wgpuDeviceCreatePipelineLayout(gpu->device,
         &(WGPUPipelineLayoutDescriptor){
-            .bindGroupLayoutCount = 2,
+            .bindGroupLayoutCount = 3,
             .bindGroupLayouts = place_groups
         });
     WGPUBindGroupLayout draw_groups[2] = { gpu->view_layout, s->draw_layout };
@@ -146,6 +160,20 @@ void box_gpu_grass_init(
     s->no_params = box_gpu_grass_buffer(gpu, sizeof(box_gpu_terrain_sample_params_t),
         WGPUBufferUsage_Uniform | WGPUBufferUsage_CopyDst);
     s->no_grid = box_gpu_grass_buffer(gpu, 16, WGPUBufferUsage_Storage);
+    s->no_pyramid = wgpuDeviceCreateTexture(gpu->device, &(WGPUTextureDescriptor){
+        .usage = WGPUTextureUsage_TextureBinding,
+        .dimension = WGPUTextureDimension_2D,
+        .size = { 1, 1, 1 },
+        .format = WGPUTextureFormat_R32Float,
+        .mipLevelCount = 1,
+        .sampleCount = 1
+    });
+    s->no_pyramid_view = wgpuTextureCreateView(s->no_pyramid, NULL);
+    s->no_hiz = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
+        .layout = s->hiz_layout,
+        .entryCount = 1,
+        .entries = &(WGPUBindGroupEntry){ .binding = 0, .textureView = s->no_pyramid_view }
+    });
     ecs_map_init(&s->entities, NULL);
     gpu->grass = s;
 }
@@ -220,6 +248,9 @@ void box_gpu_grass_fini(
     BOX_GPU_GRASS_RELEASE(s->no_terrain, wgpuBindGroupRelease);
     BOX_GPU_GRASS_RELEASE(s->no_params, wgpuBufferRelease);
     BOX_GPU_GRASS_RELEASE(s->no_grid, wgpuBufferRelease);
+    BOX_GPU_GRASS_RELEASE(s->no_hiz, wgpuBindGroupRelease);
+    BOX_GPU_GRASS_RELEASE(s->no_pyramid_view, wgpuTextureViewRelease);
+    BOX_GPU_GRASS_RELEASE(s->no_pyramid, wgpuTextureRelease);
     BOX_GPU_GRASS_RELEASE(s->params, wgpuBufferRelease);
     BOX_GPU_GRASS_RELEASE(s->stats, wgpuBufferRelease);
     BOX_GPU_GRASS_RELEASE(s->place_pipeline_layout, wgpuPipelineLayoutRelease);
@@ -228,6 +259,7 @@ void box_gpu_grass_fini(
     BOX_GPU_GRASS_RELEASE(s->empty_group, wgpuBindGroupRelease);
     BOX_GPU_GRASS_RELEASE(s->empty_layout, wgpuBindGroupLayoutRelease);
     BOX_GPU_GRASS_RELEASE(s->place_layout, wgpuBindGroupLayoutRelease);
+    BOX_GPU_GRASS_RELEASE(s->hiz_layout, wgpuBindGroupLayoutRelease);
     BOX_GPU_GRASS_RELEASE(s->draw_layout, wgpuBindGroupLayoutRelease);
     ecs_os_free(s);
     gpu->grass = NULL;
@@ -297,6 +329,9 @@ static void box_gpu_grass_measured(
         gpu->pending.grass_generated[i] += counts[i];
         gpu->pending.grass_drawn[i] += counts[BOX_GRASS_LODS + i];
     }
+
+    gpu->pending.grass_culled_patches += counts[2 * BOX_GRASS_LODS];
+    gpu->pending.grass_culled_blades += counts[2 * BOX_GRASS_LODS + 1];
 
     gpu->pending.grass_reads ++;
     const uint64_t *t = (const uint64_t*)ECS_OFFSET(counts, BOX_GPU_GRASS_STATS);
@@ -1027,6 +1062,7 @@ bool box_gpu_grass_dispatch(
     wgpuQueueWriteBuffer(gpu->queue, s->params, *offset, params, sizeof(*params));
     wgpuComputePassEncoderSetBindGroup(pass, 0, terrain, 0, NULL);
     wgpuComputePassEncoderSetBindGroup(pass, 1, group, 1, offset);
+    wgpuComputePassEncoderSetBindGroup(pass, 2, s->hiz ? s->hiz : s->no_hiz, 0, NULL);
     wgpuComputePassEncoderSetPipeline(pass, s->reset);
     wgpuComputePassEncoderDispatchWorkgroups(pass, 1, 1, 1);
     wgpuComputePassEncoderSetPipeline(pass, s->place);
@@ -1038,34 +1074,55 @@ done:
     return result;
 }
 
-/** Record the placements of a Grass in the compute pass of a view: its blades, and when it
- * casts shadows into the cascades of the view the blades that cast.
+/** Record the placement of the blades of a Grass in a compute pass of a view, culled by
+ * occlusion against a depth pyramid.
  *
  * @param gpu The backend
- * @param s The grass passes
+ * @param s The grass passes, hiz binding the pyramid
  * @param pass The pass
  * @param packet The packet
  * @param e The Grass
  * @param v The view
  * @param u The uniforms of the view
+ * @param hiz The pyramid, NULL to cull by none
  */
-static void box_gpu_grass_place_view(
+static void box_gpu_grass_place_blades(
     box_gpu_t *gpu,
     box_gpu_grass_t *s,
     WGPUComputePassEncoder pass,
     const box_render_packet_t *packet,
     box_gpu_grass_entity_t *e,
     const box_render_view_t *v,
-    const box_gpu_view_uniforms_t *u)
+    const box_gpu_view_uniforms_t *u,
+    const box_gpu_hiz_t *hiz)
 {
     box_gpu_grass_params_t params;
     uint32_t n = box_gpu_grass_view_params(packet, e, v, u, &params), offset = 0;
+    if (hiz) {
+        params.hiz[0] = hiz->width;
+        params.hiz[1] = hiz->height;
+        params.hiz[2] = hiz->levels;
+    }
+
     if (box_gpu_grass_dispatch(gpu, s, pass, e, &params, n, e->place_group, &offset)) {
         e->recorded = s->recording;
         e->offset = offset;
+        e->late = hiz != NULL;
     }
+}
 
-    box_gpu_grass_place_shadows(gpu, s, pass, packet, e, v, u);
+/** Get the uniforms of a view.
+ *
+ * @param gpu The backend
+ * @param slot Slot of the view in the view buffer
+ * @return Its uniforms in view_data
+ */
+static const box_gpu_view_uniforms_t* box_gpu_grass_uniforms(
+    box_gpu_t *gpu,
+    int32_t slot)
+{
+    return (const box_gpu_view_uniforms_t*)ecs_vec_get_t(
+        &gpu->view_data, uint8_t, slot * BOX_GPU_VIEW_STRIDE);
 }
 
 void box_gpu_grass_record(
@@ -1085,8 +1142,8 @@ void box_gpu_grass_record(
         goto done;
     }
 
-    const box_gpu_view_uniforms_t *u = (const box_gpu_view_uniforms_t*)ecs_vec_get_t(
-        &gpu->view_data, uint8_t, slot * BOX_GPU_VIEW_STRIDE);
+    const box_gpu_view_uniforms_t *u = box_gpu_grass_uniforms(gpu, slot);
+    bool late = box_gpu_cull_occludes(gpu, slot);
     s->recording ++;
     s->view = v;
     ecs_map_iter_t it = ecs_map_iter(&s->entities);
@@ -1096,11 +1153,21 @@ void box_gpu_grass_record(
             continue;
         }
 
+        if (late && (!e->shadow_place_group ||
+            !box_render_grass_cascades(&e->grass, &v->shadows)))
+        {
+            continue;
+        }
+
         if (!pass) {
             pass = box_gpu_grass_pass(gpu, s, encoder);
         }
 
-        box_gpu_grass_place_view(gpu, s, pass, packet, e, v, u);
+        if (!late) {
+            box_gpu_grass_place_blades(gpu, s, pass, packet, e, v, u, NULL);
+        }
+
+        box_gpu_grass_place_shadows(gpu, s, pass, packet, e, v, u);
     }
 
     if (pass) {
@@ -1112,13 +1179,58 @@ done:
     return;
 }
 
+void box_gpu_grass_record_late(
+    box_gpu_t *gpu,
+    WGPUCommandEncoder encoder,
+    const box_render_packet_t *packet,
+    const box_render_view_t *v,
+    int32_t slot)
+{
+    box_gpu_grass_t *s = gpu->grass;
+    const box_gpu_cull_view_t *cv = box_gpu_cull_view(gpu, slot, -1);
+    WGPUComputePassEncoder pass = NULL;
+    if (!s || s->view != v || !cv || !cv->hiz || !box_gpu_grass_place_pipelines(gpu)) {
+        goto done;
+    }
+
+    const box_gpu_view_uniforms_t *u = box_gpu_grass_uniforms(gpu, slot);
+    s->hiz = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
+        .layout = s->hiz_layout,
+        .entryCount = 1,
+        .entries = &(WGPUBindGroupEntry){ .binding = 0, .textureView = cv->hiz->view }
+    });
+    ecs_map_iter_t it = ecs_map_iter(&s->entities);
+    while (ecs_map_next(&it)) {
+        box_gpu_grass_entity_t *e = ecs_map_ptr(&it);
+        if (e->frame != packet->frame || e->grass.scene != v->scene) {
+            continue;
+        }
+
+        if (!pass) {
+            pass = box_gpu_grass_pass(gpu, s, encoder);
+        }
+
+        box_gpu_grass_place_blades(gpu, s, pass, packet, e, v, u, cv->hiz);
+    }
+
+    if (pass) {
+        wgpuComputePassEncoderEnd(pass);
+        wgpuComputePassEncoderRelease(pass);
+    }
+
+    BOX_GPU_GRASS_RELEASE(s->hiz, wgpuBindGroupRelease);
+done:
+    return;
+}
+
 bool box_gpu_grass_draw(
     box_gpu_t *gpu,
     WGPURenderPassEncoder pass,
     const box_render_packet_t *packet,
     const box_render_view_t *v,
     WGPUTextureFormat format,
-    bool equal)
+    bool equal,
+    int32_t phase)
 {
     box_gpu_grass_t *s = gpu->grass;
     WGPURenderPipeline pipeline = NULL;
@@ -1131,7 +1243,9 @@ bool box_gpu_grass_draw(
     ecs_map_iter_t it = ecs_map_iter(&s->entities);
     while (ecs_map_next(&it)) {
         box_gpu_grass_entity_t *e = ecs_map_ptr(&it);
-        if (e->recorded != s->recording || !e->recorded || !e->draw_group) {
+        if (e->recorded != s->recording || !e->recorded || !e->draw_group ||
+            (phase != BOX_GPU_GRASS_ALL && e->late != (phase == BOX_GPU_GRASS_LATE)))
+        {
             continue;
         }
 
