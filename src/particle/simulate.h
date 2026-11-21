@@ -619,6 +619,20 @@ static inline void box_particle_integrate(
     }
 }
 
+/** Spacing in gust patches across the wind of the samples a band of the gust field averages, as
+ * WIND_BAND_SPACING in wind_gust.wgsl */
+#define BOX_PARTICLE_WIND_BAND_SPACING (1.1f)
+
+/** Contrast that restores the spread of the averaged band, as WIND_BAND_CONTRAST */
+#define BOX_PARTICLE_WIND_BAND_CONTRAST (2.2f)
+
+/** Detail patches per gust patch, a whole number so the detail repeats with the field, as
+ * WIND_DETAIL */
+#define BOX_PARTICLE_WIND_DETAIL (4.0f)
+
+/** How far the detail moves the gust field, as WIND_DETAIL_AMOUNT */
+#define BOX_PARTICLE_WIND_DETAIL_AMOUNT (0.15f)
+
 /** Value in 0..1 of a lattice point of the gust field of the Wind, which repeats every
  * BOX_WIND_GUST_PERIOD points, as wind_hash in wind_gust.wgsl.
  *
@@ -677,12 +691,46 @@ static inline float box_particle_wind_noise(
         box_particle_wind_mix(d, e, sx), sz);
 }
 
+/** Gust field in 0..1 at a point in gust patches for a wind that blows along a normalized
+ * direction, as wind_band in wind_gust.wgsl: the noise averaged across the wind into a band of
+ * BOX_PARTICLE_WIND_BAND_SPACING spaced samples, raised back by BOX_PARTICLE_WIND_BAND_CONTRAST
+ * and eased, plus a finer detail of BOX_PARTICLE_WIND_DETAIL patches per gust patch.
+ *
+ * @param u The point
+ * @param direction The normalized world X and Z the wind blows toward
+ * @return The field
+ */
+static inline float box_particle_wind_band(
+    const float u[2],
+    const float direction[2])
+{
+    float ax = -direction[1] * BOX_PARTICLE_WIND_BAND_SPACING;
+    float az = direction[0] * BOX_PARTICLE_WIND_BAND_SPACING;
+    float sum = 0.0f;
+    int32_t i;
+    for (i = 0; i < 4; i ++) {
+        float k = (float)i - 1.5f;
+        float p[2] = {u[0] + k * ax, u[1] + k * az};
+        sum += box_particle_wind_noise(p);
+    }
+
+    float b = 0.5f + BOX_PARTICLE_WIND_BAND_CONTRAST * (0.25f * sum - 0.5f);
+    b = b < 0.0f ? 0.0f : (b > 1.0f ? 1.0f : b);
+    float band = b * b * (3.0f - 2.0f * b);
+    float d[2] = {u[0] * BOX_PARTICLE_WIND_DETAIL + 7.0f, u[1] * BOX_PARTICLE_WIND_DETAIL + 13.0f};
+    float result = band + 2.0f * BOX_PARTICLE_WIND_DETAIL_AMOUNT *
+        (box_particle_wind_noise(d) - 0.5f);
+
+    return result < 0.0f ? 0.0f : (result > 1.0f ? 1.0f : result);
+}
+
 /** Gust factor between 1 - gust and 1 + gust that multiplies the wind speed at the world X and Z
  * of a point, as wind_gust in wind_gust.wgsl, the field the WindSway of the meshes reads.
  *
  * @param x World X
  * @param z World Z
  * @param offset Wrapped world X and Z offset of the gust field
+ * @param direction The normalized world X and Z the wind blows toward
  * @param frequency 1 over the gust scale
  * @param gust The gust, 0..1
  * @return The factor
@@ -691,12 +739,13 @@ static inline float box_particle_wind_gust(
     float x,
     float z,
     const float offset[2],
+    const float direction[2],
     float frequency,
     float gust)
 {
     float u[2] = {(x - offset[0]) * frequency, (z - offset[1]) * frequency};
 
-    return 1.0f + gust * (2.0f * box_particle_wind_noise(u) - 1.0f);
+    return 1.0f + gust * (2.0f * box_particle_wind_band(u, direction) - 1.0f);
 }
 
 /** The world velocity the Wind pulls a particle at a world position toward, added to the wind
@@ -720,7 +769,15 @@ static inline void box_particle_global_wind(
 {
     out[0] = out[1] = out[2] = 0.0f;
     if (frequency != 0.0f) {
-        float factor = box_particle_wind_gust(world[0], world[2], offset, frequency, wind[2]);
+        float speed = sqrtf(wind[0] * wind[0] + wind[1] * wind[1]);
+        float direction[2] = {1.0f, 0.0f};
+        if (speed > 0.0f) {
+            direction[0] = wind[0] / speed;
+            direction[1] = wind[1] / speed;
+        }
+
+        float factor = box_particle_wind_gust(
+            world[0], world[2], offset, direction, frequency, wind[2]);
         out[0] = wind[0] * factor;
         out[2] = wind[1] * factor;
     }

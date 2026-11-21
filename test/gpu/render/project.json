@@ -493,7 +493,8 @@
                     "bends_downwind",
                     "shadow_follows",
                     "plain_mesh_unchanged",
-                    "scene_off_draws_without"
+                    "scene_off_draws_without",
+                    "gusts_roll"
                 ]
             },
             {

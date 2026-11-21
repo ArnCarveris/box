@@ -478,10 +478,10 @@ typedef struct box_render_wind_t {
 #define BOX_RENDER_WIND_MIN (1e-3f)
 
 /** Relative amplitude of the sway of a plant around its lean, along the wind */
-#define BOX_RENDER_WIND_SWAY (0.25f)
+#define BOX_RENDER_WIND_SWAY (0.1f)
 
 /** Relative amplitude of the sway of a plant across the wind */
-#define BOX_RENDER_WIND_CROSS (0.12f)
+#define BOX_RENDER_WIND_CROSS (0.06f)
 
 /** Relative amplitude of the turn of a branch of a WindSway with pivots about the wind axis */
 #define BOX_RENDER_WIND_BRANCH_CROSS (0.3f)

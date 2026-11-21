@@ -344,12 +344,12 @@ void GlobalWind_linger(void) {
 
 void GlobalWind_gust_range(void) {
     // particle/global_wind
-    float offset[2] = {3.5f, -12.25f};
+    float offset[2] = {3.5f, -12.25f}, dir[2] = {0.6f, 0.8f};
     float lo = 2, hi = 0;
     int32_t x, z;
     for (z = -20; z <= 20; z ++) {
         for (x = -20; x <= 20; x ++) {
-            float g = box_particle_wind_gust(x * 1.37f, z * 0.91f, offset, 0.2f, 0.5f);
+            float g = box_particle_wind_gust(x * 1.37f, z * 0.91f, offset, dir, 0.2f, 0.5f);
             test_assert(g >= 0.5f - 1e-6f);
             test_assert(g <= 1.5f + 1e-6f);
             lo = g < lo ? g : lo;
@@ -361,7 +361,7 @@ void GlobalWind_gust_range(void) {
     test_assert(hi - lo > 0.25f);
 
     /* a steady wind has no gusts */
-    test_flt(box_particle_wind_gust(4.2f, -1.3f, offset, 0.2f, 0), 1);
+    test_flt(box_particle_wind_gust(4.2f, -1.3f, offset, dir, 0.2f, 0), 1);
 
     /* the lattice points hold the hash, the field is smooth between them */
     float u[2] = {2, 5};
@@ -372,26 +372,87 @@ void GlobalWind_gust_range(void) {
 
 void GlobalWind_gust_period(void) {
     // particle/global_wind
-    float offset[2] = {0, 0};
+    float offset[2] = {0, 0}, dir[2] = {0.6f, -0.8f};
     float scale = 40, f = 1.0f / scale, period = (float)BOX_WIND_GUST_PERIOD * scale;
     int32_t i;
     for (i = 0; i < 16; i ++) {
         float x = 13.0f * (float)i - 70.0f, z = -9.0f * (float)i + 31.0f;
-        float a = box_particle_wind_gust(x, z, offset, f, 1);
-        float b = box_particle_wind_gust(x + period, z - period, offset, f, 1);
+        float a = box_particle_wind_gust(x, z, offset, dir, f, 1);
+        float b = box_particle_wind_gust(x + period, z - period, offset, dir, f, 1);
+        float c = box_particle_wind_gust(x - period, z, offset, dir, f, 1);
         test_assert(fabsf(a - b) < 1e-3f);
+        test_assert(fabsf(a - c) < 1e-3f);
     }
 
     /* the field moved by the offset is the field at the point minus the offset */
     float moved[2] = {7, -5};
-    test_flt(box_particle_wind_gust(17, 5, moved, f, 1),
-        box_particle_wind_gust(10, 10, offset, f, 1));
+    test_flt(box_particle_wind_gust(17, 5, moved, dir, f, 1),
+        box_particle_wind_gust(10, 10, offset, dir, f, 1));
+}
+
+/** Mean difference of the gust field between points a step apart along a direction, over a
+ * grid of points in gust patches.
+ *
+ * @param wind The normalized direction of the wind
+ * @param step The step between the points, in gust patches
+ * @return The mean difference
+ */
+static float gust_change(
+    const float wind[2],
+    const float step[2])
+{
+    float offset[2] = {0, 0}, sum = 0;
+    int32_t x, z, count = 0;
+    for (z = 0; z < 40; z ++) {
+        for (x = 0; x < 40; x ++) {
+            float px = 0.73f * (float)x, pz = 0.79f * (float)z;
+            float a = box_particle_wind_gust(px, pz, offset, wind, 1, 1);
+            float b = box_particle_wind_gust(px + step[0], pz + step[1], offset, wind, 1, 1);
+            sum += fabsf(a - b);
+            count ++;
+        }
+    }
+
+    return sum / (float)count;
+}
+
+void GlobalWind_gust_bands(void) {
+    // particle/global_wind
+    /* the gusts are bands stretched across the wind: the field changes much less a patch across
+     * the wind than a patch along it, whichever way it blows */
+    float dirs[3][2] = {{1, 0}, {0, 1}, {0.6f, -0.8f}};
+    int32_t i;
+    for (i = 0; i < 3; i ++) {
+        const float *d = dirs[i];
+        float along[2] = {d[0], d[1]}, across[2] = {-d[1], d[0]};
+        float a = gust_change(d, along), c = gust_change(d, across);
+        test_assert(a > 1.4f * c);
+    }
+
+    /* with finer detail of a quarter patch: a tenth of a patch across the wind still changes */
+    float d[2] = {1, 0}, fine[2] = {0, 0.1f};
+    test_assert(gust_change(d, fine) > 0.01f);
+}
+
+void GlobalWind_gust_travels(void) {
+    // particle/global_wind
+    /* a gust front rolls along the wind: as the offset moves downwind, the field downwind is
+     * the field that was upwind */
+    float dir[2] = {0.6f, 0.8f}, offset[2] = {1, 2}, later[2] = {1 + 0.6f * 9, 2 + 0.8f * 9};
+    int32_t i;
+    for (i = 0; i < 16; i ++) {
+        float x = 3.0f * (float)i - 20.0f, z = 11.0f - 2.0f * (float)i;
+        float before = box_particle_wind_gust(x, z, offset, dir, 0.1f, 0.5f);
+        float after = box_particle_wind_gust(x + 0.6f * 9, z + 0.8f * 9, later, dir, 0.1f, 0.5f);
+        test_assert(fabsf(before - after) < 1e-3f);
+    }
 }
 
 void GlobalWind_velocity(void) {
     // particle/global_wind
     float wind[3] = {3, 4, 0.5f}, offset[2] = {1, 2}, p[3] = {12, 7, -30}, out[3];
-    float factor = box_particle_wind_gust(p[0], p[2], offset, 0.05f, wind[2]);
+    float dir[2] = {0.6f, 0.8f};
+    float factor = box_particle_wind_gust(p[0], p[2], offset, dir, 0.05f, wind[2]);
     box_particle_global_wind(wind, offset, 0.05f, p, out);
     test_flt(out[0], 3 * factor);
     test_flt(out[1], 0);

@@ -85,7 +85,9 @@ fn card_rest(emitter: Emitter, i: u32, p: Particle) {
 fn particle_global_wind(emitter: Emitter, world: vec3f) -> vec3f {
     let g = emitter.global_wind;
     let offset = vec2f(emitter.wander.w, emitter.inherit.w);
-    let factor = wind_gust(world.xz, offset, emitter.turbulence.w, g.z);
+    let speed = length(g.xy);
+    let dir = select(vec2f(1.0, 0.0), g.xy / speed, speed > 0.0);
+    let factor = wind_gust(world.xz, offset, dir, emitter.turbulence.w, g.z);
     return vec3f(g.x * factor, 0.0, g.y * factor);
 }
 

@@ -505,6 +505,8 @@
                     "linger",
                     "gust_range",
                     "gust_period",
+                    "gust_bands",
+                    "gust_travels",
                     "velocity",
                     "step_drifts_with_wind",
                     "local_space"

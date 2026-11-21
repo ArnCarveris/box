@@ -289,10 +289,12 @@ ECS_STRUCT(TimeOfDayStatus, {
  * every scene with Scene.wind. Adding it adds WindStatus, which the engine advances.
  *
  * The strength of the wind at a point is its speed times a gust factor between 1 - gust and
- * 1 + gust, read from a smooth noise field of patches of gust_scale world units over world X
- * and Z. The field travels along the direction at the speed, so gusts sweep across a forest as
- * patches: grass waves and trees lean in turn. The plants also sway around their lean, faster
- * as the wind grows, in a slow wave that travels along the direction.
+ * 1 + gust, read from a field of broad bands stretched across the wind, a few gust_scale world
+ * units wide, with finer detail of a quarter of that. The field travels along the direction at
+ * the speed, so gusts roll across a forest as waves: grass and crowns lean further as a gust
+ * front reaches them, their branches swing and their leaves flutter more, and they settle after
+ * it passed. Between the gusts the plants sway gently around their lean, faster as the wind
+ * grows, in a slow wave that travels along the direction.
  *
  * The engine integrates the offset of the field and the phase of the sway on the CPU in double
  * precision, wrapped to their periods (WindStatus), so the motion stays smooth after hours, a

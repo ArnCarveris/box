@@ -6,14 +6,18 @@
 // CPU packed for the absolute position of the local origin (WorldOrigin), the phase of the
 // flutter adds that of the origin, so plants sway the same across a shift of the origin.
 //
-// The main bend is a function of the world position of a vertex only, so every shape of a plant
-// with the same bend, height and base moves together without cracks: the height above the base
-// over the height, clamped and squared, times the bend and the strength of the wind there. The
-// strength is the speed times a gust factor read from a smooth noise field of gust patches that
-// travels along the wind (its wrapped offset, wind_gust.wgsl, which the particles share), and
-// the plants sway around their lean in a slow wave along the wind. A vertex that moves sideways
-// drops so the length to the base is about kept. The flutter adds a fast per vertex motion that grows with the distance from the origin
-// of the shape over the flutter reach.
+// The main bend is the response of a plant to the gust where it stands, a function of the world
+// position of a vertex only, so every shape of a plant with the same bend, height and base moves
+// together without cracks: the height above the base over the height, clamped and squared, times
+// the bend and the strength of the wind there. The strength is the speed times a gust factor
+// read from the gust field, broad bands across the wind that travel along it (its wrapped
+// offset, wind_gust.wgsl, which the particles share), so a plant leans further as a gust front
+// reaches it and straightens after it passed. Higher up a vertex reads the field further
+// downwind (WIND_LAG seconds of the wind at its top), where the gust arrives later, so the top
+// follows its lower part. Around that lean the plants sway gently in a slow wave along the wind.
+// A vertex that moves sideways drops so the length to the base is about kept. The flutter adds a
+// fast per vertex motion that grows with the distance from the origin of the shape over the
+// flutter reach, and with the gust at the vertex, so leaves rustle as a gust passes.
 //
 // A material with WIND_PIVOTS whose mesh has per vertex data (the _data entry points set it with
 // wind_vertex_data) first turns every vertex of a branch rigidly about the pivot of the branch
@@ -25,7 +29,10 @@
 // ancestors in data2.w (WindSway and box_wind_sway_vertex in material.h). Every pivot snaps down
 // to the grid of WIND_GRID, so the pivots a branch turns about are the same values in its own
 // vertices and in those of its descendants. It then bends the vertex by its rest position as
-// above; the flutter is weighted by the flutter weight.
+// above, by the gust at the origin of the shape rather than at the vertex, so the trunk leans
+// as a whole without shearing while each branch turns by the gust at its own pivot; the flutter
+// is weighted by the flutter weight and reads the gust at the vertex, so a gust front crosses a
+// crown from its upwind side.
 // A material with WIND_FOLIAGE turns a vertex only about the pivot of its twig (data0.xyz) with a
 // stiffness of 0, without its ancestors, like the twig, so a leaf stays on it.
 #pragma once
@@ -34,8 +41,8 @@
 
 // Relative amplitudes of the sway along and across the wind (BOX_RENDER_WIND_SWAY and
 // BOX_RENDER_WIND_CROSS).
-const WIND_SWAY: f32 = 0.25;
-const WIND_CROSS: f32 = 0.12;
+const WIND_SWAY: f32 = 0.1;
+const WIND_CROSS: f32 = 0.06;
 
 // Wind speed of the full flutter (BOX_WIND_FULL_SPEED).
 const WIND_FULL: f32 = 10.0;
@@ -65,6 +72,10 @@ const WIND_OFFSET_BIAS: f32 = 32768.0;
 // wind axis (BOX_RENDER_WIND_BRANCH_CROSS).
 const WIND_BRANCH_LEAN: f32 = 0.6;
 const WIND_BRANCH_CROSS: f32 = 0.3;
+
+// Seconds a gust takes to travel from the base of a plant to its top: the top of a plant reads
+// the gust field this long times the wind speed downwind of its base.
+const WIND_LAG: f32 = 0.5;
 
 // Per vertex data of the vertex being placed, set by the _data entry points (wind_vertex_data);
 // without it a WIND_PIVOTS material sways as without pivots.
@@ -124,23 +135,33 @@ fn wind_branch_phase(pivot: vec3f) -> f32 {
     return f32(h >> 8u) / 16777216.0;
 }
 
+// How much the local gust stirs a branch or a leaf, 0..1: the gust factor g over its top
+// 1 + gust, squared, so the swing and the flutter grow as a gust passes and settle between
+// gusts; 1 in a steady wind.
+fn wind_stir(g: f32, m: Material) -> f32 {
+    let e = clamp(g / (1.0 + m.wind_gust), 0.0, 1.0);
+    return e * e;
+}
+
 // The turn of a branch of a level (1 or more), a stiffness and a phase about its world pivot as a
-// unit quaternion, by the wind at the pivot, so every vertex of the branch turns alike. The
-// branch leans about the horizontal axis across the wind and swings around its lean at level
-// times the branch frequency, offset by its phase and travelling along the wind like the sway,
-// and swings less about the wind axis.
+// unit quaternion, by the wind at the pivot, so every vertex of the branch turns alike and a gust
+// reaches the branches of a crown in turn. The branch leans about the horizontal axis across the
+// wind by the strength there and swings around its lean at level times the branch frequency,
+// offset by its phase and travelling along the wind like the sway, by as much as the gust stirs
+// it, and swings less about the wind axis.
 fn wind_turn(pivot: vec3f, level: f32, stiffness: f32, phase0: f32, m: Material) -> vec4f {
     var result = vec4f(0.0, 0.0, 0.0, 1.0);
     let free = 1.0 - clamp(stiffness, 0.0, 1.0);
     if (level >= 1.0 && free > 0.0 && m.wind_branch != 0.0) {
         let dir = m.wind_direction;
-        let strength = m.wind_speed * wind_gust(pivot.xz, m.wind_offset, m.wind_frequency,
-            m.wind_gust);
+        let g = wind_gust(pivot.xz, m.wind_offset, dir, m.wind_frequency, m.wind_gust);
+        let strength = m.wind_speed * g;
+        let stir = wind_stir(g, m);
         let amount = m.wind_branch * free * clamp(strength / WIND_FULL, 0.0, 1.0);
         let phase = WIND_TAU * (level * m.wind_branch_phase + phase0) -
             0.5 * dot(pivot.xz, dir) * m.wind_frequency;
-        let along = WIND_BRANCH_LEAN + (1.0 - WIND_BRANCH_LEAN) * sin(phase);
-        let cross = WIND_BRANCH_CROSS * sin(2.0 * phase + 1.3);
+        let along = WIND_BRANCH_LEAN + (1.0 - WIND_BRANCH_LEAN) * stir * sin(phase);
+        let cross = WIND_BRANCH_CROSS * stir * sin(2.0 * phase + 1.3);
         // A turn about (dir.y, 0, -dir.x) moves the vertices above the pivot along the wind, one
         // about the wind axis across it
         let r = vec3f(dir.y, 0.0, -dir.x) * (amount * along) +
@@ -193,14 +214,17 @@ fn wind_move(world: vec3f, model: mat4x4f, m: Material, absolute: WorldOrigin) -
     let pivots = wind_pivots(m);
     let dir = m.wind_direction;
     let across = vec2f(-dir.y, dir.x);
-    let strength = m.wind_speed * wind_gust(world.xz, m.wind_offset, m.wind_frequency,
-        m.wind_gust);
     let phase = WIND_TAU * m.wind_sway - 0.5 * dot(world.xz, dir) * m.wind_frequency;
     let along = 1.0 + WIND_SWAY * sin(phase);
     let cross = WIND_CROSS * sin(2.0 * phase + 1.3);
 
     let h = world.y - m.wind_base;
     let t = clamp(h / m.wind_height, 0.0, 1.0);
+    // The gust at the vertex, or with pivots at the origin of the shape, read further downwind
+    // higher up so the top follows the lower part
+    let gust_at = select(world.xz, origin.xz, pivots) + dir * (WIND_LAG * m.wind_speed * t);
+    let strength = m.wind_speed * wind_gust(gust_at, m.wind_offset, dir, m.wind_frequency,
+        m.wind_gust);
     let amount = m.wind_bend * strength;
     let bend = amount * t * t;
     let d = dir * (bend * along) + across * (bend * cross);
@@ -241,7 +265,10 @@ fn wind_move(world: vec3f, model: mat4x4f, m: Material, absolute: WorldOrigin) -
         if (pivots) {
             reach = weight;
         }
-        let size = m.wind_flutter * clamp(strength / WIND_FULL, 0.0, 1.0) * reach;
+        // A leaf flutters by the gust where it is
+        let g = wind_gust(world.xz, m.wind_offset, dir, m.wind_frequency, m.wind_gust);
+        let size = m.wind_flutter * clamp(m.wind_speed * g / WIND_FULL, 0.0, 1.0) *
+            wind_stir(g, m) * reach;
         let q = dot(world, WIND_FLUTTER_AXIS) + WIND_FLUTTER_PERIOD *
             origin_phase_dot(absolute, WIND_FLUTTER_AXIS / WIND_FLUTTER_PERIOD);
         let a = WIND_TAU * m.wind_flutter_phase;

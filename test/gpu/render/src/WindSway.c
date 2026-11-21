@@ -13,6 +13,7 @@
 #include <box.h>
 #include <bake_test.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <math.h>
 #include <string.h>
 #include "render.h"
@@ -264,7 +265,7 @@ void WindSway_bends_downwind(void) {
     sway_frames(world, 40);
     unsigned char *b = sway_render(world, "wind_bend_b.png");
 
-    /* At full bend the top moves 0.5 units times the sway, 0.375 to 0.625 */
+    /* At full bend the top moves 0.5 units times the sway, 0.45 to 0.55 */
     float rest = sway_pole_column(calm);
     float bent = sway_pole_column(a);
     test_assert(rest > 0.0f && bent > 0.0f);
@@ -346,5 +347,36 @@ void WindSway_scene_off_draws_without(void) {
 
     stbi_image_free(off);
     stbi_image_free(rigid);
+    ecs_fini(world);
+}
+
+/** A gusty wind rolls gusts through the pole: as the gust bands travel past it, the pole leans
+ * further and straightens again, so its top moves well beyond the gentle sway around its lean */
+void WindSway_gusts_roll(void) {
+    // materials/wind_sway
+    ecs_world_t *world = sway_world(true);
+    ecs_singleton_set(world, Wind, {.direction = {1, 0}, .speed = 10, .gust = 1,
+        .gust_scale = 4});
+    sway_pole(world, true);
+    sway_frames(world, 3);
+
+    float lo = (float)SWAY_SIZE, hi = 0.0f;
+    int32_t i;
+    for (i = 0; i < 8; i ++) {
+        char name[64];
+        snprintf(name, sizeof(name), "wind_gust_%d.png", (int)i);
+        sway_frames(world, 20);
+        unsigned char *px = sway_render(world, name);
+        float column = sway_pole_column(px);
+        test_assert(column > 0.0f);
+        lo = column < lo ? column : lo;
+        hi = column > hi ? column : hi;
+        stbi_image_free(px);
+    }
+
+    /* At full bend and no gust the top moves 0.5 units; the gusts move it between 0 and twice
+     * that, the sway by a tenth of it */
+    test_assert(hi - lo > 0.2f * SWAY_UNIT);
+
     ecs_fini(world);
 }
