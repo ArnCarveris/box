@@ -340,6 +340,7 @@
                     "tile_shape",
                     "ready_tiles_draw",
                     "coarse_kept_until_ready",
+                    "drawn_kept_past_budget",
                     "drops_within_budget",
                     "origin_shift_keeps_tiles",
                     "materials_copied",

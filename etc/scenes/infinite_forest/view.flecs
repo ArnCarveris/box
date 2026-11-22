@@ -34,7 +34,7 @@ view {
 
   View: {
     camera: player,
-    lod: {levels: 4, distances: [0, 6, 18, 40]},
+    lod: {levels: 4, distances: [0, 6, 18, 40], fade: 0.25},
     clear: {enabled: true, color: {120, 140, 160, 255}},
     lighting: {
       enabled: true,

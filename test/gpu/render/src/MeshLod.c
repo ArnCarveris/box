@@ -401,3 +401,62 @@ void MeshLod_one_level_unchanged(void) {
 
     ecs_fini(world);
 }
+
+void MeshLod_fade_ranged_both_levels(void) {
+    ecs_world_t *world = world_new();
+    ecs_entity_t camera = camera_new(world);
+    LodSettings lod = lod_three;
+    lod.fade = 0.2f;
+    ecs_entity_t view = view_new(world, camera, lod, true, false);
+    ecs_entity_t sphere = sphere_new(world, -11, 1);
+    ecs_set(world, sphere, DrawRange, {.far_ = 500});
+    frames(world, 2);
+
+    box_render_cull_stats_t stats;
+    test_bool(box_render_gpu_cull_stats(world, view, &stats), true);
+    test_int(stats.levels[0], 1);
+    test_int(stats.levels[1], 1);
+    test_int(stats.levels[2], 0);
+    test_int(stats.indices, level_indices(world, sphere, 0) + level_indices(world, sphere, 1));
+
+    ecs_fini(world);
+}
+
+void MeshLod_fade_unranged_one_level(void) {
+    ecs_world_t *world = world_new();
+    ecs_entity_t camera = camera_new(world);
+    LodSettings lod = lod_three;
+    lod.fade = 0.2f;
+    ecs_entity_t view = view_new(world, camera, lod, true, false);
+    ecs_entity_t sphere = sphere_new(world, -11, 1);
+    frames(world, 2);
+
+    box_render_cull_stats_t stats;
+    test_bool(box_render_gpu_cull_stats(world, view, &stats), true);
+    test_int(stats.levels[0], 1);
+    test_int(stats.levels[1], 0);
+    test_int(stats.levels[2], 0);
+    test_int(stats.indices, level_indices(world, sphere, 0));
+
+    ecs_fini(world);
+}
+
+void MeshLod_fade_outside_band_one_level(void) {
+    ecs_world_t *world = world_new();
+    ecs_entity_t camera = camera_new(world);
+    LodSettings lod = lod_three;
+    lod.fade = 0.2f;
+    ecs_entity_t view = view_new(world, camera, lod, true, false);
+    ecs_entity_t sphere = sphere_new(world, -20, 1);
+    ecs_set(world, sphere, DrawRange, {.far_ = 500});
+    frames(world, 2);
+
+    box_render_cull_stats_t stats;
+    test_bool(box_render_gpu_cull_stats(world, view, &stats), true);
+    test_int(stats.levels[0], 0);
+    test_int(stats.levels[1], 1);
+    test_int(stats.levels[2], 0);
+    test_int(stats.indices, level_indices(world, sphere, 1));
+
+    ecs_fini(world);
+}

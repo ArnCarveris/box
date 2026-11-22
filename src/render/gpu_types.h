@@ -927,7 +927,8 @@ typedef struct box_gpu_cull_job_t {
  * visible entry of its level runs, history the entries of a run and list the first draw
  * arguments of its levels. fixture is the first merged arguments plus one, 0 for none, and for
  * a late job exclude is the first entry of the early runs plus one and reach their entries, which
- * it appends to at the merged count. */
+ * it appends to at the merged count. range is the DrawRange of a batch with one, whose passes
+ * dither, so its instances crossfade between levels (LodSettings.fade); 0 for the others. */
 typedef struct box_gpu_cull_lod_job_t {
     box_gpu_cull_job_t job;         /**< The job as the shader reads it */
     int32_t group;                  /**< Index of its cull group */
@@ -982,7 +983,8 @@ typedef struct box_gpu_cull_uniforms_t {
                                      *   detail and that the draw ranges are measured from, w 1,
                                      *   w 0 for a group without a camera, which culls no
                                      *   instance by its range */
-    float lod[4];                   /**< Distance at which level i starts, LodSettings.distances */
+    float lod[4];                   /**< LodSettings.fade, then the distance at which level i
+                                     *   starts for levels 1 to 3, LodSettings.distances */
 } box_gpu_cull_uniforms_t;
 
 /** The frustums one pass of the cull shader tests together: a view of a target and the

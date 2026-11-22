@@ -328,6 +328,51 @@ void Terrain_coarse_kept_until_ready(void) {
     ecs_fini(world);
 }
 
+void Terrain_drawn_kept_past_budget(void) {
+    ecs_entity_t terrain, focus;
+    ecs_world_t *world = tt_world(&terrain, &focus, 1000);
+    ecs_progress(world, 0);
+    tt_ready(world, terrain);
+    ecs_progress(world, 0);
+
+    bool before[64][64];
+    int32_t count, i, x, z, frame;
+    box_terrain_tile_t *const *tiles = box_terrain_tiles(world, terrain, &count);
+    for (z = 0; z < 64; z ++) {
+        for (x = 0; x < 64; x ++) {
+            before[z][x] = false;
+            for (i = 0; i < count; i ++) {
+                before[z][x] |= tiles[i]->drawn &&
+                    tt_distance(tiles[i], x * 8.0 - 252.0, z * 8.0 - 252.0) == 0.0;
+            }
+        }
+    }
+
+    Terrain *t = ecs_get_mut(world, terrain, Terrain);
+    t->budget = 1;
+    ecs_modified(world, terrain, Terrain);
+    ecs_set(world, focus, Position, {120, 10, 40});
+    for (frame = 0; frame < 3; frame ++) {
+        ecs_progress(world, 0);
+        test_assert(ecs_get(world, terrain, TerrainStatus)->pending > 0);
+        tiles = box_terrain_tiles(world, terrain, &count);
+        tt_expect_disjoint(tiles, count);
+        for (z = 0; z < 64; z ++) {
+            for (x = 0; x < 64; x ++) {
+                bool covered = false;
+                for (i = 0; i < count; i ++) {
+                    covered |= tiles[i]->drawn &&
+                        tt_distance(tiles[i], x * 8.0 - 252.0, z * 8.0 - 252.0) == 0.0;
+                }
+
+                test_assert(!before[z][x] || covered);
+            }
+        }
+    }
+
+    ecs_fini(world);
+}
+
 void Terrain_drops_within_budget(void) {
     ecs_entity_t terrain, focus;
     ecs_world_t *world = tt_world(&terrain, &focus, 1000);

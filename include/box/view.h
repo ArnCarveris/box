@@ -238,11 +238,17 @@ ECS_STRUCT(ViewDebug, {
  *
  * Level 0 starts at distance 0, level i at distances[i] in world units, ascending; distances[0]
  * is not used. A View, constructed or a C literal, has levels 0: every shape at full detail.
+ *
+ * With a fade an instance near distances[i] draws both levels i - 1 and i with the screen door
+ * dither of a DrawRange, so the levels crossfade instead of popping. This applies to shapes with
+ * a DrawRange (or the instances of an Impostor), whose passes dither; the others switch at once.
  */
 ECS_STRUCT(LodSettings, {
     int32_t levels;     /**< Number of levels, 0 or 1 for none, at most BOX_LOD_LEVELS_MAX */
     float distances[4]; /**< Distance from the camera at which level i starts, for levels 1 to
                          *   levels - 1 */
+    float fade;         /**< Half width of the crossfade around distances[i] as a share of it,
+                         *   from 0 for a hard switch to at most 0.5 */
 });
 
 /** Element in view effects array. */

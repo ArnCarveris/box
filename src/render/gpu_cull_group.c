@@ -270,7 +270,8 @@ static uint64_t box_gpu_cull_draw_slots(
 
 /** Append the level job of a draw with levels of detail for a phase (box_gpu_cull_lod_job_t).
  *
- * The job of the late phase goes to the late jobs of the group, which follow its other jobs.
+ * The job of the late phase goes to the late jobs of the group, which follow its other jobs. A
+ * batch with a DrawRange passes it on, as its passes dither the crossfade between its levels.
  *
  * @param gpu The backend
  * @param packet The packet
@@ -310,6 +311,10 @@ static void box_gpu_cull_lod_add(
             job->exclude = d->lod_base + 1;
             job->reach = d->lod_stride;
         }
+    }
+
+    if (box_render_batch_ranged(b)) {
+        ecs_os_memcpy_n(job->range, b->range, float, 3);
     }
 
     if (b->bounded) {
@@ -1193,9 +1198,11 @@ static void box_gpu_cull_lod_begin(
         goto done;
     }
 
-    for (i = 0; i < BOX_LOD_LEVELS_MAX; i ++) {
+    for (i = 1; i < BOX_LOD_LEVELS_MAX; i ++) {
         base->lod[i] = v->lod.distances[i];
     }
+
+    base->lod[0] = v->lod.fade;
 
 done:
     return;

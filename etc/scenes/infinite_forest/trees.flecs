@@ -32,8 +32,8 @@ state {
   // Mature trees draw as impostors beyond WILD_IMPOSTOR_DISTANCE, crossfading over
   // WILD_IMPOSTOR_FADE on either side; the atlases have WILD_IMPOSTOR_FRAMES by
   // WILD_IMPOSTOR_FRAMES views of WILD_IMPOSTOR_RESOLUTION pixels
-  export const WILD_IMPOSTOR_DISTANCE: f32 = 54
-  export const WILD_IMPOSTOR_FADE: f32 = 6
+  export const WILD_IMPOSTOR_DISTANCE: f32 = 100
+  export const WILD_IMPOSTOR_FADE: f32 = 10
   export const WILD_IMPOSTOR_FRAMES: i32 = 8
   export const WILD_IMPOSTOR_RESOLUTION: i32 = 128
   export const WILD_LODS: i32 = 3

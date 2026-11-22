@@ -854,18 +854,130 @@ static void box_terrain_drop_all(
     tiles->materials = 0;
 }
 
-/** Decide which tiles draw: a wanted tile that is ready; for one that is not, its nearest ready
- * ancestor, else its ready descendants; and no tile under a coarser tile that draws.
+/** Stop drawing every tile under a coarser tile that draws, so the tiles that draw do not
+ * overlap.
  *
  * @param tiles The tiles
  * @param levels Levels of the terrain
  */
-static void box_terrain_resolve(
+static void box_terrain_disjoint(
     box_terrain_tiles_t *tiles,
     int32_t levels)
 {
     box_terrain_tile_t **list = ecs_vec_first(&tiles->list);
+    int32_t count = ecs_vec_count(&tiles->list), i;
+    for (i = 0; i < count; i ++) {
+        box_terrain_tile_t *t = list[i];
+        int32_t level = t->level, ix = t->ix, iz = t->iz;
+        while (t->drawn && level + 1 < levels) {
+            level ++;
+            ix = box_terrain_half(ix);
+            iz = box_terrain_half(iz);
+            const box_terrain_tile_t *a = box_terrain_find(tiles, level, ix, iz);
+            if (a && a->drawn) {
+                t->drawn = false;
+            }
+        }
+    }
+}
+
+/** Check whether the tiles that draw cover the part of a node inside the terrain: the tile of
+ * the node draws, or tiles of finer levels cover each of its four children.
+ *
+ * @param tiles The tiles
+ * @param level The level of the node
+ * @param ix The column
+ * @param iz The row
+ * @return Whether nothing of the node is left without a tile that draws
+ */
+static bool box_terrain_covered_below(
+    const box_terrain_tiles_t *tiles,
+    int32_t level,
+    int32_t ix,
+    int32_t iz)
+{
+    const box_terrain_tile_t *t = box_terrain_find(tiles, level, ix, iz);
+    bool result = !box_terrain_inside(&tiles->settings, level, ix, iz) || (t && t->drawn);
+    if (!result && level) {
+        result = box_terrain_covered_below(tiles, level - 1, ix * 2, iz * 2) &&
+            box_terrain_covered_below(tiles, level - 1, ix * 2 + 1, iz * 2) &&
+            box_terrain_covered_below(tiles, level - 1, ix * 2, iz * 2 + 1) &&
+            box_terrain_covered_below(tiles, level - 1, ix * 2 + 1, iz * 2 + 1);
+    }
+
+    return result;
+}
+
+/** Check whether the tiles that draw cover all of a tile: a coarser tile over it draws, or finer
+ * tiles cover it (box_terrain_covered_below).
+ *
+ * @param tiles The tiles
+ * @param t The tile
+ * @param levels Levels of the terrain
+ * @return Whether the tile can stop drawing without leaving a hole
+ */
+static bool box_terrain_covered(
+    const box_terrain_tiles_t *tiles,
+    const box_terrain_tile_t *t,
+    int32_t levels)
+{
+    int32_t level = t->level, ix = t->ix, iz = t->iz;
+    bool result = false;
+    while (!result && level + 1 < levels) {
+        level ++;
+        ix = box_terrain_half(ix);
+        iz = box_terrain_half(iz);
+        const box_terrain_tile_t *a = box_terrain_find(tiles, level, ix, iz);
+        result = a && a->drawn;
+    }
+
+    return result || box_terrain_covered_below(tiles, t->level, t->ix, t->iz);
+}
+
+/** Check whether a tile lies in a root node the foci selected this frame (box_terrain_select),
+ * whose area the wanted tiles cover.
+ *
+ * @param ctx The state
+ * @param t The tile
+ * @param levels Levels of the terrain
+ * @return Whether the foci want the area of the tile
+ */
+static bool box_terrain_selected(
+    const box_terrain_ctx_t *ctx,
+    const box_terrain_tile_t *t,
+    int32_t levels)
+{
+    int32_t level = t->level, ix = t->ix, iz = t->iz;
+    while (level + 1 < levels) {
+        level ++;
+        ix = box_terrain_half(ix);
+        iz = box_terrain_half(iz);
+    }
+
+    return ecs_map_get(&ctx->roots, box_terrain_key(level, ix, iz)) != NULL;
+}
+
+/** Decide which tiles draw: a wanted tile that is ready; for one that is not, its nearest ready
+ * ancestor, else its ready descendants; and no tile under a coarser tile that draws.
+ *
+ * A tile that drew in the frame before keeps drawing while the foci want its area and the tiles
+ * that draw do not cover all of it, as when the budget has not made its replacements yet, so
+ * the terrain never shows a hole where it showed ground.
+ *
+ * @param ctx The state, with the root nodes the foci select
+ * @param tiles The tiles
+ * @param levels Levels of the terrain
+ * @param focused Whether the foci selected the tiles, else every tile is wanted
+ */
+static void box_terrain_resolve(
+    const box_terrain_ctx_t *ctx,
+    box_terrain_tiles_t *tiles,
+    int32_t levels,
+    bool focused)
+{
+    box_terrain_tile_t **list = ecs_vec_first(&tiles->list);
     int32_t count = ecs_vec_count(&tiles->list), i, j, ready = 0;
+    bool held = false;
     for (i = 0; i < count; i ++) {
         list[i]->drawn = false;
         list[i]->keep = false;
@@ -907,19 +1019,27 @@ static void box_terrain_resolve(
         }
     }
 
+    box_terrain_disjoint(tiles, levels);
+    if (!focused) {
+        goto done;
+    }
+
     for (i = 0; i < count; i ++) {
         box_terrain_tile_t *t = list[i];
-        int32_t level = t->level, ix = t->ix, iz = t->iz;
-        while (t->drawn && level + 1 < levels) {
-            level ++;
-            ix = box_terrain_half(ix);
-            iz = box_terrain_half(iz);
-            const box_terrain_tile_t *a = box_terrain_find(tiles, level, ix, iz);
-            if (a && a->drawn) {
-                t->drawn = false;
-            }
+        if (t->enabled && t->ready && !t->drawn && box_terrain_selected(ctx, t, levels) &&
+            !box_terrain_covered(tiles, t, levels))
+        {
+            t->drawn = true;
+            t->keep = true;
+            held = true;
         }
     }
+
+    if (held) {
+        box_terrain_disjoint(tiles, levels);
+    }
+done:
+    return;
 }
 
 void box_terrain_local(
@@ -1305,7 +1425,7 @@ static void box_terrain_update(
         }
     }
 
-    box_terrain_resolve(tiles, s.levels);
+    box_terrain_resolve(ctx, tiles, s.levels, count > 0);
     for (i = ecs_vec_count(&tiles->list) - 1; i >= 0; i --) {
         box_terrain_tile_t *t = *ecs_vec_get_t(&tiles->list, box_terrain_tile_t*, i);
         bool fresh = i >= first;

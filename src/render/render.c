@@ -399,6 +399,9 @@ void box_render_lod_settings(
         distance = isfinite(distance) && distance > 0.0f ? distance : 0.0f;
         out->distances[i] = previous = glm_max(distance, previous);
     }
+
+    out->fade = isfinite(settings->fade) && out->levels ? glm_clamp(settings->fade, 0.0f, 0.5f)
+        : 0.0f;
 }
 
 /** Add a view to the packet for every View whose camera is alive and has a Camera, in

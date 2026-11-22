@@ -767,6 +767,7 @@
                     "defaults_script",
                     "script_set",
                     "resolve",
+                    "resolve_fade",
                     "packet"
                 ]
             },

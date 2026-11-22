@@ -21,8 +21,8 @@ state {
   export const ISLAND_KAPOK: i32 = 7
   export const ISLAND_TREE_FERN: i32 = 8
 
-  export const ISLAND_IMPOSTOR_DISTANCE: f32 = 60
-  export const ISLAND_IMPOSTOR_FADE: f32 = 6
+  export const ISLAND_IMPOSTOR_DISTANCE: f32 = 110
+  export const ISLAND_IMPOSTOR_FADE: f32 = 10
   export const ISLAND_IMPOSTOR_FRAMES: i32 = 8
   export const ISLAND_IMPOSTOR_RESOLUTION: i32 = 128
   export const ISLAND_TREE_LODS: i32 = 3

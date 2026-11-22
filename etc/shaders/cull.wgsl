@@ -14,7 +14,8 @@ struct Cull {
     // World position of the camera that picks the levels of detail and that the draw ranges
     // are measured from, w 1; w 0 culls no instance by its range.
     camera: vec4f,
-    // Distance at which level i starts, for levels 1 to 3.
+    // x: the half width of the crossfade around the distance of a level as a share of it, 0 for
+    // none; y to w: the distance at which level i starts, for levels 1 to 3.
     lod: vec4f,
 };
 
@@ -608,11 +609,27 @@ fn cull_ordered(
     }
 }
 
+// Append an instance to the run of a level of a lod job, with the dither code of the crossfade
+// between levels above its slot.
+fn lod_append(job: Job, level: u32, slot: u32) {
+    let at = atomicAdd(&args[(job.list + level) * ARGS + 1u], 1u);
+    visible_slots[job.base + level * job.history + at] = slot;
+    if (job.fixture != 0u) {
+        let merged = atomicAdd(&args[(job.fixture - 1u + level) * ARGS + 1u], 1u);
+        if (job.exclude != 0u) {
+            visible_slots[job.exclude - 1u + level * job.reach + merged] = slot;
+        }
+    }
+}
+
 // Sorts the instances a draw of a cull view kept in a phase into the runs of its levels of
 // detail, a job (jobs.y of them from jobs.x) per row of workgroups that stride over its
 // instances. The level of an instance is the last whose distance (lod) its bounding sphere is
 // at from the camera, measured to the nearest point of the sphere, so a camera inside it keeps
-// level 0. The job reads its fields as:
+// level 0. Within the crossfade (cull.lod.x) of the distance of a level an instance of a job
+// with a range, whose passes dither, and that its range does not already dither goes to both
+// levels around it, faded out of the one and into the other with complementary dither codes.
+// The job reads its fields as:
 //   first, count, args: first visible entry, instances at most and arguments of the draw
 //   base, history, list: first entry of the level runs, entries of a run, first level arguments
 //   mask: levels; center, extent: bounds of the mesh
@@ -633,6 +650,7 @@ fn cull_lod(
     let job = jobs[cull.jobs.x + group.y];
     let total = min(atomicLoad(&args[job.args * ARGS + 1u]), job.count);
     let levels = min(job.mask, LOD_LEVELS);
+    let fade = select(0.0, cull.lod.x, range_set(job.range));
     for (var i = group.x * 64u + local; i < total; i += groups.x * 64u) {
         let slot = visible_slots[job.first + i];
         let m = instance_model(transforms[slot_of(slot)]);
@@ -647,12 +665,26 @@ fn cull_lod(
             }
         }
 
-        let at = atomicAdd(&args[(job.list + level) * ARGS + 1u], 1u);
-        visible_slots[job.base + level * job.history + at] = slot;
-        if (job.fixture != 0u) {
-            let merged = atomicAdd(&args[(job.fixture - 1u + level) * ARGS + 1u], 1u);
-            if (job.exclude != 0u) {
-                visible_slots[job.exclude - 1u + level * job.reach + merged] = slot;
+        var edge = 0u;
+        if (fade > 0.0 && range_of(slot) == 0u) {
+            if (level + 1u < levels && distance > cull.lod[level + 1u] * (1.0 - fade)) {
+                edge = level + 1u;
+            } else if (level > 0u && distance < cull.lod[level] * (1.0 + fade)) {
+                edge = level;
+            }
+        }
+
+        if (edge == 0u) {
+            lod_append(job, level, slot);
+        } else {
+            let at = cull.lod[edge];
+            let t = u32(round(range_share(distance, at, at * fade) * 255.0));
+            if (t < 255u) {
+                lod_append(job, edge - 1u,
+                    slot | (range_code(vec2u(255u, t)) << RANGE_SLOT_BITS));
+            }
+            if (t > 0u) {
+                lod_append(job, edge, slot | (range_code(vec2u(t, 0u)) << RANGE_SLOT_BITS));
             }
         }
     }

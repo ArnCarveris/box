@@ -86,7 +86,10 @@
                     "far_lathe_and_sweep_level_2",
                     "culling_off",
                     "occlusion",
-                    "one_level_unchanged"
+                    "one_level_unchanged",
+                    "fade_ranged_both_levels",
+                    "fade_unranged_one_level",
+                    "fade_outside_band_one_level"
                 ]
             },
             {
