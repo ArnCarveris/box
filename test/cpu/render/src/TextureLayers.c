@@ -397,6 +397,56 @@ void TextureLayers_pack(void) {
     ecs_fini(world);
 }
 
+/** A layer packs its altitude relative to the WorldOrigin and its altitude_fade, positive to
+ * cover above the altitude, negative to cover below it; a fade of 0 or one that is not finite
+ * packs zero, which ignores the altitude */
+void TextureLayers_altitude_pack(void) {
+    // materials/texture_layers
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    box_render_texture_layer_t v;
+    float altitude, fade;
+    ecs_entity_t layer = ecs_new(world);
+
+    ecs_set(world, layer, TextureLayer, {.amount = 1, .altitude = 5, .altitude_fade = 2});
+    box_draws_layer_pack(world, layer, 0.0, &v);
+    memcpy(&altitude, &v.flags[1], sizeof(float));
+    memcpy(&fade, &v.flags[2], sizeof(float));
+    test_flt(altitude, 5);
+    test_flt(fade, 2);
+
+    ecs_set(world, layer, TextureLayer, {.amount = 1, .altitude = 5, .altitude_fade = -2});
+    box_draws_layer_pack(world, layer, 0.0, &v);
+    memcpy(&altitude, &v.flags[1], sizeof(float));
+    memcpy(&fade, &v.flags[2], sizeof(float));
+    test_flt(altitude, 5);
+    test_flt(fade, -2);
+
+    ecs_singleton_set(world, WorldOrigin, {.y = 3, .enabled = false});
+    box_draws_layer_pack(world, layer, 0.0, &v);
+    memcpy(&altitude, &v.flags[1], sizeof(float));
+    memcpy(&fade, &v.flags[2], sizeof(float));
+    test_flt(altitude, 2);
+    test_flt(fade, -2);
+
+    ecs_set(world, layer, TextureLayer, {.amount = 1, .altitude = 5, .altitude_fade = 0});
+    box_draws_layer_pack(world, layer, 0.0, &v);
+    test_uint(v.flags[1], 0);
+    test_uint(v.flags[2], 0);
+
+    ecs_set(world, layer, TextureLayer, {.amount = 1, .altitude = 5, .altitude_fade = -INFINITY});
+    box_draws_layer_pack(world, layer, 0.0, &v);
+    test_uint(v.flags[1], 0);
+    test_uint(v.flags[2], 0);
+
+    ecs_set(world, layer, TextureLayer, {.amount = 1, .altitude = NAN, .altitude_fade = -2});
+    box_draws_layer_pack(world, layer, 0.0, &v);
+    test_uint(v.flags[1], 0);
+    test_uint(v.flags[2], 0);
+
+    ecs_fini(world);
+}
+
 /** Without Scene.texture_layers a shape with TextureLayers keys and draws as without them */
 void TextureLayers_batches_without_feature(void) {
     // materials/texture_layers

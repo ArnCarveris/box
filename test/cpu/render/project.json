@@ -1302,6 +1302,7 @@
                     "defaults",
                     "scene_feature",
                     "pack",
+                    "altitude_pack",
                     "batches_without_feature",
                     "batches",
                     "add_remove",

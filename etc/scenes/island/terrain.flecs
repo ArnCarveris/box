@@ -106,13 +106,15 @@ island {
     rough_m { nodes.Multiply: {a: rough, b_value: {ISLAND_H, ISLAND_H, ISLAND_H, ISLAND_H}} }
 
     rough_g { nodes.Gradient: {height: rough_m} }
+    rough_gs { nodes.Blur: {input: rough_g, radius: 10} }
     gullies {
       nodes.Erosion: {
-        slope: rough_g,
+        slope: rough_gs,
         frequency: 0.005 / ISLAND_K,
         octaves: 4,
         gain: 0.42,
         scale: 3.2,
+        branch: 0,
         seed: 31
       }
     }
@@ -146,11 +148,33 @@ island {
     h1 { nodes.Multiply: {a: h0, b_value: {ISLAND_H, ISLAND_H, ISLAND_H, ISLAND_H}} }
     h2 { nodes.Add: {a: h1, b: bumps} }
 
+    lip_n { nodes.Noise: {frequency: 0.07, octaves: 2, seed: 71} }
+    lip_w { nodes.Remap: {input: lip_n, from_min: 0, from_max: 1, to_min: -0.5, to_max: 0.5} }
+    lip_side { nodes.Multiply: {a: stream_d, b_value: {0.05, 0.05, 0.05, 0.05}} }
+    lip_off { nodes.Add: {a: lip_w, b: lip_side} }
+    fall_cone { nodes.Add: {a: cone, b: lip_off} }
+
     falls {
-      nodes.Curve: {input: cone, curve: {keys: [
-        {-300, 0}, {0, 0}, {44, 9}, {45, 0}, {60, 0}, {129, 14}, {130.5, 0}, {160, 0},
-        {256, 18}, {258, 0}, {900, 0}
+      nodes.Curve: {input: fall_cone, curve: {keys: [
+        {-300, 0}, {0, 0}, {44, 9}, {44.2, 0}, {60, 0}, {129, 14}, {129.25, 0}, {160, 0},
+        {256, 18}, {256.25, 0}, {900, 0}
       ]}}
+    }
+
+    pool_k {
+      nodes.Curve: {input: fall_cone, curve: {keys: [
+        {-300, 0}, {42.4, 0}, {43.2, 1}, {43.98, 1}, {44.02, 0}, {127.6, 0}, {128.3, 1},
+        {128.98, 1}, {129.02, 0}, {254.4, 0}, {255.2, 1}, {255.98, 1}, {256.02, 0}, {900, 0}
+      ]}}
+    }
+
+    pool_in {
+      nodes.Smoothstep: {input: stream_d, edge0_value: {4.2, 0, 0, 0}, edge1_value: {1.4, 0, 0, 0}}
+    }
+
+    pool_a { nodes.Multiply: {a: pool_k, b: pool_in} }
+    pool {
+      nodes.Multiply: {a: pool_a, b_value: {STREAM_POOL, STREAM_POOL, STREAM_POOL, STREAM_POOL}}
     }
 
     bed_a { nodes.Subtract: {a: cone, b: gully_amp} }
@@ -175,7 +199,8 @@ island {
 
     bank { nodes.Add: {a: stream_bed, b: bank_rise} }
     stream_cut { nodes.Max: {a: bed_steps, b: bank} }
-    height { nodes.Min: {a: h2, b: stream_cut} }
+    held { nodes.Min: {a: h2, b: stream_cut} }
+    height { nodes.Subtract: {a: held, b: pool} }
 
     slope { nodes.Slope: {height: height} }
     steep {
@@ -280,12 +305,12 @@ island {
     }
 
     texture.Mapping: {mode: MappingWorld, size: GROUND_MAP_SIZE, blend: 0.15}
-    texture.Layers: {layers: [island_peak_snow, layer_wet]}
+    texture.Layers: {layers: [island_scoria, island_peak_snow, layer_wet, island_wet_sand]}
     Rgb: {212, 206, 196}
     PbrMaterial: {roughness: 0.95}
 
     far_h { nodes.Subtract: {a: height, b_value: {FAR_DATA_DROP, 0, 0, 0}} }
-    stream_data_h { nodes.Subtract: {a: height, b_value: {STREAM_DATA_DROP, 0, 0, 0}} }
+    stream_data_h { nodes.Subtract: {a: held, b_value: {STREAM_DATA_DROP, 0, 0, 0}} }
     stream_data { nodes.Combine: {r: stream_d, g: stream_bed} }
   }
 

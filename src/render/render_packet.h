@@ -2453,7 +2453,8 @@ typedef struct box_render_texture_layer_t {
                              *   occlusion */
     uint32_t flags[4];      /**< BOX_RENDER_LAYER_HAS_* and BOX_RENDER_LAYER_UV, then the
                              *   bits of the f32 local world height of TextureLayer.altitude
-                             *   and of its altitude_fade (0 for none), then 0 */
+                             *   and of its altitude_fade (0 for none, negative to cover
+                             *   below the altitude), then 0 */
     float origin[4];        /**< Wrapped offset of the world projection for the absolute
                              *   position of the local origin (box_render_origin_mapping); 0 with
                              *   BOX_RENDER_LAYER_UV */

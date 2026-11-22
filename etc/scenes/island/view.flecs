@@ -38,7 +38,7 @@ view {
       atmosphere: true,
       environment: {
         source: sky,
-        intensity: forest_seasonal(season, 1.04, 1, 0.97, 1.08),
+        intensity: forest_seasonal(season, 1.25, 1.2, 1.16, 1.28),
         background: false
       }
     },

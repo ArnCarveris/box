@@ -645,6 +645,9 @@
                     "texture_blend",
                     "amount_animates",
                     "flag_off",
+                    "altitude_below",
+                    "altitude_below_above",
+                    "altitude_below_band",
                     "water",
                     "water_ripples"
                 ]

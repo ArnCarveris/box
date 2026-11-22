@@ -67,8 +67,8 @@ assets {
         items: [
           {island_trees.jungle_a_2.tree, 1}, {island_trees.jungle_b_2.tree, 1},
           {island_trees.jungle_b_0.tree, 0.6}, {island_trees.birch_0.tree, 0.7},
-          {island_trees.birch_1.tree, 0.7}, {island_trees.spruce_0.tree, 0.4},
-          {island_trees.fir_0.tree, 0.4}
+          {island_trees.birch_1.tree, 0.5}, {island_trees.fern_0.tree, 0.6},
+          {island_trees.fern_2.tree, 0.5}
         ],
         density: STAND_DENSITY, spacing: STAND_SPACING - 0.5, mode: ScatterPoisson, seed: 8303,
         ground: island.land, mask_channel: 0, mask_min: 0.55, mask_max: 1, mask_edge: 0.3,
@@ -80,9 +80,9 @@ assets {
     cloud {
       Scatter: {
         items: [
-          {island_trees.spruce_0.tree, 1}, {island_trees.spruce_1.tree, 1.4},
-          {island_trees.fir_0.tree, 1}, {island_trees.fir_1.tree, 1.4},
-          {island_trees.birch_0.tree, 0.5}, {island_trees.birch_1.tree, 0.9}
+          {island_trees.fern_0.tree, 1.2}, {island_trees.fern_1.tree, 1.2},
+          {island_trees.fern_2.tree, 1}, {island_trees.jungle_b_2.tree, 0.8},
+          {island_trees.jungle_a_2.tree, 0.6}, {island_trees.birch_1.tree, 0.5}
         ],
         density: STAND_DENSITY, spacing: STAND_SPACING - 1, mode: ScatterPoisson, seed: 8404,
         ground: island.land, mask_channel: 0, mask_min: 0.5, mask_max: 1, mask_edge: 0.35,

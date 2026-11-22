@@ -208,18 +208,20 @@ fn layer_sample(maps: texture_2d_array<f32>, first: u32, l: TextureLayer, world:
     return o;
 }
 
-// How far a local world height is into the altitude band of a layer, 0 below its altitude to 1
-// at its altitude plus its fade; 1 for a layer without a fade
+// How far a local world height is into the altitude band of a layer, 0 at its altitude to 1 at
+// its altitude plus its fade: above the altitude for a positive fade, below it for a negative
+// one, 0 on the other side; 1 for a layer without a fade
 fn layer_altitude(l: TextureLayer, y: f32) -> f32 {
     let fade = bitcast<f32>(l.flags.z);
-    return select(1.0, clamp((y - bitcast<f32>(l.flags.y)) / fade, 0.0, 1.0), fade > 0.0);
+    return select(1.0, clamp((y - bitcast<f32>(l.flags.y)) / fade, 0.0, 1.0), fade != 0.0);
 }
 
 // Whether a layer can cover a fragment at a local world height: it has an amount and the height is
-// above its altitude, or it has no fade (layer_altitude).
+// on the side of its altitude its fade points to, or it has no fade (layer_altitude).
 fn layer_reaches(color: vec4f, flags: vec4u, y: f32) -> bool {
     let fade = bitcast<f32>(flags.z);
-    return color.a > 0.0 && (!(fade > 0.0) || y > bitcast<f32>(flags.y));
+    let altitude = bitcast<f32>(flags.y);
+    return color.a > 0.0 && (fade == 0.0 || select(y > altitude, y < altitude, fade < 0.0));
 }
 
 // Whether any layer can cover a fragment at a local world height, read without the layers.

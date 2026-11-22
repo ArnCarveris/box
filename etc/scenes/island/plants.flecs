@@ -184,6 +184,16 @@ assets {
       }
     }
 
+    shore_rocks {
+      Scatter: {
+        items: [{IslandRockFlat, 1.4}, {IslandRock, 1}],
+        density: 0.1, spacing: 3, mode: ScatterPoisson, seed: 9505,
+        ground: island.land, mask_channel: 2, mask_min: 0.5, mask_max: 1, mask_edge: 0.2,
+        height_min: -0.6, height_max: BEACH_TOP, slope_max: 30,
+        scale_min: 0.2, scale_max: 0.9, align: 0.8, sink: 0.12, spatial_ignore: true
+      }
+    }
+
     if level == 0 {
       flowers {
         Scatter: {

@@ -29,8 +29,7 @@ island_trees {
   birch_0 { IslandTree: {species: ISLAND_BIRCH, seed: 7, height: 16, slender: 0.95} }
   birch_1 { IslandTree: {species: ISLAND_BIRCH, seed: 15, height: 13, slender: 0.9} }
 
-  spruce_0 { IslandTree: {species: ISLAND_SPRUCE, seed: 9, height: 22} }
-  spruce_1 { IslandTree: {species: ISLAND_SPRUCE, seed: 17, height: 16, slender: 1.05} }
-  fir_0 { IslandTree: {species: ISLAND_FIR, seed: 10, height: 20} }
-  fir_1 { IslandTree: {species: ISLAND_FIR, seed: 18, height: 14, slender: 1.05} }
+  fern_0 { IslandTree: {species: ISLAND_TREE_FERN, seed: 4, height: 6} }
+  fern_1 { IslandTree: {species: ISLAND_TREE_FERN, seed: 9, height: 4.2} }
+  fern_2 { IslandTree: {species: ISLAND_TREE_FERN, seed: 14, height: 7.5} }
 }

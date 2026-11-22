@@ -19,6 +19,7 @@ state {
   export const ISLAND_FIR: i32 = 4
   export const ISLAND_PALM: i32 = 6
   export const ISLAND_KAPOK: i32 = 7
+  export const ISLAND_TREE_FERN: i32 = 8
 
   export const ISLAND_IMPOSTOR_DISTANCE: f32 = 60
   export const ISLAND_IMPOSTOR_FADE: f32 = 6
@@ -62,6 +63,15 @@ assets {
     PbrTextures: {albedo: island_frond_albedo, normal: island_frond_normal}
     texture.Layers: {layers: [layer_wet_foliage]}
     NoBake
+  }
+
+  prefab IslandLeafFern : IslandLeafPalm {
+    Rgb: {
+      forest_seasonal(season, 116, 92, 128, 112),
+      forest_seasonal(season, 168, 146, 146, 132),
+      forest_seasonal(season, 58, 48, 52, 56)
+    }
+    DiffuseTransmission: {factor: 0.65, color: {214, 255, 140}}
   }
 
   prefab IslandLeafJungle : TreeLeafBeech {
@@ -111,6 +121,13 @@ assets {
     WindSway: {bend: SWAY_BIRCH_BEND, height: SWAY_BIRCH_HEIGHT, base: 0}
     PbrTextures: {albedo: bark_spruce_albedo, normal: bark_spruce_normal, orm: bark_spruce_orm}
     texture.Mapping: {mode: MappingObject, size: BARK_MASK_SIZE / (BARK_TILES * 2)}
+  }
+
+  prefab IslandBarkFern : IslandBark {
+    Rgb: {96, 80, 66}
+    WindSway: {bend: SWAY_BIRCH_BEND, height: SWAY_BIRCH_HEIGHT, base: 0}
+    PbrTextures: {albedo: bark_oak_albedo, normal: bark_oak_normal, orm: bark_oak_orm}
+    texture.Mapping: {mode: MappingObject, size: BARK_MASK_SIZE / (BARK_TILES * 3)}
   }
 
   prefab IslandBarkBirch : IslandBark {
@@ -187,6 +204,30 @@ assets {
       needle_cards: 1, needle_width: 0.3, needle_droop: 0.12, card: Bent, card_bend: 0.3,
       crown_shape: Density, crown_normals: 0.3, occlusion: 0.35, stiffness: 0.3,
       flutter: 0.12, flutter_frequency: 2.2, sway_branch: 0.2, branch_frequency: 0.5,
+      lods: lods
+    ) { Position: {0, 0, 0} }
+  }
+
+  template IslandTreeFern {
+    prop seed: i32 = 1
+    prop height: f32 = 5
+    prop lods: i32 = 3
+
+    const rng: flecs.script.math.Rng = {seed: seed + 91}
+    const lean = 0.03 + rng.f(0.1)
+
+    Tree tree(
+      seed: seed, height: height, radius: 0.11 + height * 0.006, taper: 0.25, bend: 0.04,
+      lean: lean, bark_material: IslandBarkFern,
+      b1: {count: 18, start: 0.97, end: 1, distribution: Spiral, down: 1.1, down_end: 0.55,
+        length: 2.7 / height, length_end: 2 / height, gravity: 0.22, light: 0, noise: 0.08,
+        exponent: 2.2},
+      b2: {count: 0}, b3: {count: 0}, b4: {count: 0},
+      crown: None, prune: false, bark_drop: 0.3,
+      needles: true, leaf_material: IslandLeafFern, leaf_start: 0.05, needle_style: Fir,
+      needle_cards: 1, needle_width: 0.42, needle_droop: 0.2, card: Bent, card_bend: 0.4,
+      crown_shape: Density, crown_normals: 0.3, occlusion: 0.4, stiffness: 0.4,
+      flutter: 0.1, flutter_frequency: 2, sway_branch: 0.15, branch_frequency: 0.6,
       lods: lods
     ) { Position: {0, 0, 0} }
   }
@@ -272,6 +313,10 @@ assets {
           leaf_material: ForestNeedleFir, stiffness: conifer_stiff,
           flutter: SWAY_NEEDLE_FLUTTER, lods: ISLAND_TREE_LODS, leaf_lod_skip: 1,
           leaf_lod_flat: 2) {
+          Position: {0, 0, 0}
+        }
+      } else if species == ISLAND_TREE_FERN {
+        IslandTreeFern tree(seed: seed, height: height, lods: ISLAND_TREE_LODS) {
           Position: {0, 0, 0}
         }
       } else if species == ISLAND_PALM {

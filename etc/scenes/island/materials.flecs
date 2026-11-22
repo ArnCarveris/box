@@ -22,7 +22,7 @@ assets {
       tone {
         nodes.Ramp: {
           input: height,
-          keys: [{0.25, {206, 186, 144}}, {0.5, {232, 216, 178}}, {0.75, {248, 238, 208}}]
+          keys: [{0.25, {226, 210, 172}}, {0.5, {242, 232, 204}}, {0.75, {252, 248, 230}}]
         }
       }
 
@@ -56,18 +56,18 @@ assets {
     ridges { nodes.Noise: {frequency: 5, octaves: 6, fractal: NoiseRidged, seed: 321} }
     grain { nodes.Noise: {frequency: 140, octaves: 2, seed: 322} }
     crack_n { nodes.Noise: {channels: 3, frequency: 9, octaves: 3, seed: 326} }
-    crack_w { nodes.Warp: {offset: crack_n, amount_value: 0.08} }
+    crack_w { nodes.Warp: {offset: crack_n, amount_value: 0.2} }
     cracks_c {
-      nodes.Cells: {distance: CellsEdge, count: 200, edge: 0.14, seed: 323, coords: crack_w}
+      nodes.Cells: {distance: CellsEdge, count: 90, edge: 0.07, seed: 323, coords: crack_w}
     }
 
     cracks { nodes.Split: {input: cracks_c, channel: ChannelR} }
     crack_shade {
-      nodes.Remap: {input: cracks, from_min: 0, from_max: 1, to_min: 0.92, to_max: 1, clamp: true}
+      nodes.Remap: {input: cracks, from_min: 0, from_max: 1, to_min: 0.95, to_max: 1, clamp: true}
     }
 
     relief_a { nodes.Mix: {a: ridges, b: grain, factor_value: {0.2, 0, 0, 0}} }
-    height { nodes.Mix: {a: relief_a, b: crack_shade, factor_value: {0.08, 0, 0, 0}} }
+    height { nodes.Mix: {a: relief_a, b: crack_shade, factor_value: {0.04, 0, 0, 0}} }
 
     if map == MAP_ALBEDO {
       stone {
@@ -101,7 +101,7 @@ assets {
       Graph: {output: height, width: GROUND_RES, format: GraphSingle}
     } else {
       occlusion {
-        nodes.Remap: {input: crack_shade, from_min: 0.92, from_max: 1, to_min: 0.7, to_max: 1,
+        nodes.Remap: {input: crack_shade, from_min: 0.95, from_max: 1, to_min: 0.8, to_max: 1,
           clamp: true}
       }
 
@@ -201,7 +201,7 @@ assets {
       normal: island_basalt_normal,
       orm: island_basalt_orm
     }
-    texture.Transform: {scale_x: 12, scale_y: 12}
+    texture.Transform: {scale_x: 18, scale_y: 18}
   }
 
   island_peak_snow {
@@ -224,5 +224,50 @@ assets {
     PbrMaterial: {roughness: 0.7, metallic: 0}
     PbrTextures: {normal: forest_snow_n}
     texture.Mapping: {mode: MappingWorld, size: 60}
+  }
+
+  island_scoria_mask {
+    Gen: {
+      width: 256,
+      height: 256,
+      seed: 331,
+      layers: [
+        {kind: GenNoise, frequency: 3, octaves: 5, amount: 1},
+        {kind: GenNoise, frequency: 12, octaves: 2, amount: 0.25, seed: 1}
+      ]
+    }
+  }
+
+  island_scoria {
+    texture.Layer: {
+      amount: 0.45,
+      mask: island_scoria_mask,
+      contrast: 1.6,
+      albedo: LayerMultiply,
+      roughness: LayerKeep,
+      metallic: LayerKeep,
+      occlusion: LayerKeep,
+      altitude: ASH_LINE - 70 * ISLAND_H,
+      altitude_fade: 90 * ISLAND_H
+    }
+    Rgb: {232, 184, 160}
+    texture.Mapping: {mode: MappingWorld, size: 110}
+  }
+
+  island_wet_sand {
+    texture.Layer: {
+      amount: 1,
+      contrast: 4,
+      albedo: LayerMultiply,
+      roughness: LayerMix,
+      metallic: LayerKeep,
+      occlusion: LayerKeep,
+      normal: 0.4,
+      porosity: 1,
+      altitude: 1.6,
+      altitude_fade: -1.1
+    }
+    Rgb: {168, 156, 140}
+    PbrMaterial: {roughness: 0.32}
   }
 }

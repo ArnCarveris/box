@@ -1253,9 +1253,11 @@ ECS_ENUM(TextureLayerBlend, {
  * What it changes. albedo, roughness, metallic and occlusion each keep, mix toward or multiply
  * by the value of the layer by the coverage; normal mixes the shading normal toward the normal
  * of the layer (the geometric normal for a flat layer, which flattens as a water film does).
- * With an altitude_fade above 0 the score is also scaled by how far the fragment is above
- * altitude in the absolute world (across shifts of the WorldOrigin), rising to 1 at altitude +
- * altitude_fade, so snow lies on high peaks only and its line moves down as the amount grows.
+ * With an altitude_fade other than 0 the score is also scaled by how far the fragment is past
+ * altitude in the absolute world (across shifts of the WorldOrigin), from 0 at altitude to 1 at
+ * altitude + altitude_fade: above it for a positive fade, so snow lies on high peaks only and its
+ * line moves down as the amount grows, below it for a negative one, so wet sand lies along a
+ * shoreline only and its line moves up as the amount grows.
  *
  * porosity scales the change of the albedo and the roughness by how porous the surface beneath
  * is, (1 - metallic) times its roughness: at 1 a rough dielectric (soil, bark, stone) changes
@@ -1292,10 +1294,12 @@ ECS_STRUCT(TextureLayer, {
     float porosity;         /**< 0..1, how much the change of albedo and roughness follows the
                              *   porosity of the surface beneath */
     float altitude;         /**< Absolute world height in meters below which the layer covers
-                             *   nothing, with altitude_fade above 0 */
-    float altitude_fade;    /**< Meters above altitude over which the score rises from 0 to
-                             *   1, so a smaller amount covers only the higher places; 0 (the
-                             *   default) ignores the altitude */
+                             *   nothing with altitude_fade above 0, above which it covers
+                             *   nothing with altitude_fade below 0 */
+    float altitude_fade;    /**< Meters past altitude over which the score rises from 0 to 1:
+                             *   positive above it, so a smaller amount covers only the higher
+                             *   places, negative below it, so a smaller amount covers only the
+                             *   lower places; 0 (the default) ignores the altitude */
 });
 
 /** Up to BOX_MATERIAL_TEXTURE_LAYERS TextureLayer entities applied in order over the resolved

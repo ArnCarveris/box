@@ -7,6 +7,7 @@ state {
   export const STREAM_STEP: f32 = 0.3
   export const STREAM_DEPTH: f32 = 0.2
   export const STREAM_SINK: f32 = 4.5
+  export const STREAM_POOL: f32 = 1.5
   export const STREAM_DATA_DROP: f32 = 2000
   export const FAR_DATA_DROP: f32 = 4000
 }

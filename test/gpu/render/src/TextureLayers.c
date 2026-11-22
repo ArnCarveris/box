@@ -338,6 +338,87 @@ void TextureLayers_flag_off(void) {
     stbi_image_free(b);
 }
 
+/** A layer with a negative altitude_fade covers a quad wholly below its altitude */
+void TextureLayers_altitude_below(void) {
+    // materials/texture_layers
+    ecs_world_t *world = world_new("layers_below.png", true);
+    ecs_entity_t layer = layer_new(world, LayerMix, LayerKeep);
+    ecs_set(world, layer, Rgb, {200, 40, 30});
+    TextureLayer *l = ecs_get_mut(world, layer, TextureLayer);
+    l->altitude = 10;
+    l->altitude_fade = -1;
+    ecs_modified(world, layer, TextureLayer);
+    ecs_entity_t covered = quad_new(world, -3.46f, (Rgb){40, 90, 220}, 0, 1);
+    ecs_set(world, covered, TextureLayers, {.layers = {layer}});
+    quad_new(world, 3.46f, (Rgb){200, 40, 30}, 0, 1);
+
+    box_render_gpu_stats_t stats;
+    render_compare(world, "layers_below.png", &stats);
+
+    ecs_fini(world);
+}
+
+/** A layer with a negative altitude_fade covers nothing of a quad wholly above its altitude */
+void TextureLayers_altitude_below_above(void) {
+    // materials/texture_layers
+    ecs_world_t *world = world_new("layers_below_above.png", true);
+    ecs_entity_t layer = layer_new(world, LayerMix, LayerKeep);
+    ecs_set(world, layer, Rgb, {200, 40, 30});
+    TextureLayer *l = ecs_get_mut(world, layer, TextureLayer);
+    l->altitude = -10;
+    l->altitude_fade = -1;
+    ecs_modified(world, layer, TextureLayer);
+    ecs_entity_t covered = quad_new(world, -3.46f, (Rgb){40, 90, 220}, 0, 1);
+    ecs_set(world, covered, TextureLayers, {.layers = {layer}});
+    quad_new(world, 3.46f, (Rgb){40, 90, 220}, 0, 1);
+
+    box_render_gpu_stats_t stats;
+    render_compare(world, "layers_below_above.png", &stats);
+
+    ecs_fini(world);
+}
+
+/** A layer with an altitude of 1 and an altitude_fade of -2 over a quad from y -1.5 to 1.5 at a
+ * contrast of 1, where the coverage is the score: rows above y 1 are uncovered, rows below y -1
+ * fully covered and the rows between partly, more toward the bottom */
+void TextureLayers_altitude_below_band(void) {
+    // materials/texture_layers
+    ecs_world_t *world = world_new("layers_below_band.png", true);
+    ecs_entity_t layer = layer_new(world, LayerMix, LayerKeep);
+    ecs_set(world, layer, Rgb, {200, 40, 30});
+    TextureLayer *l = ecs_get_mut(world, layer, TextureLayer);
+    l->contrast = 1;
+    l->altitude = 1;
+    l->altitude_fade = -2;
+    ecs_modified(world, layer, TextureLayer);
+    ecs_entity_t covered = quad_new(world, -3.46f, (Rgb){40, 90, 220}, 0, 1);
+    ecs_set(world, covered, TextureLayers, {.layers = {layer}});
+    quad_new(world, 3.46f, (Rgb){40, 90, 220}, 0, 1);
+
+    box_render_gpu_stats_t stats;
+    unsigned char *img = render(world, "layers_below_band.png", &stats);
+    unsigned char *top = &img[(10 * 64 + 16) * 4];
+    unsigned char *top_plain = &img[(10 * 64 + 48) * 4];
+    unsigned char *middle = &img[(16 * 64 + 16) * 4];
+    unsigned char *bottom = &img[(21 * 64 + 16) * 4];
+    unsigned char *bottom_plain = &img[(21 * 64 + 48) * 4];
+    int32_t c;
+    for (c = 0; c < 3; c ++) {
+        test_assert(abs(top[c] - top_plain[c]) <= 3);
+    }
+
+    test_assert(top[2] > top[0]);
+    test_assert(bottom[0] > bottom[2]);
+    test_assert(bottom_plain[2] > bottom_plain[0]);
+    test_assert(middle[0] > top[0] + 16);
+    test_assert(middle[0] < bottom[0] - 16);
+    test_assert(middle[2] < top[2] - 16);
+    test_assert(middle[2] > bottom[2] + 16);
+    stbi_image_free(img);
+
+    ecs_fini(world);
+}
+
 /** Create a headless world of Scene.water and Scene.texture_layers with a surface of 64 by 32
  * pixels that sees two horizontal Water quads from above at an angle, the sun mirrored in their
  * middle, one in each half of the image; the left one with a layer whose normal is a constant

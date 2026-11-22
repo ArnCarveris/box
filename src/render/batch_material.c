@@ -1456,7 +1456,7 @@ void box_draws_layer_pack(
             out->transform[1], out->origin);
     }
 
-    if (isfinite(l->altitude) && isfinite(l->altitude_fade) && l->altitude_fade > 0.0f) {
+    if (isfinite(l->altitude) && isfinite(l->altitude_fade) && l->altitude_fade != 0.0f) {
         float altitude = (float)((double)l->altitude - origin[1]);
         ecs_os_memcpy(&out->flags[1], &altitude, ECS_SIZEOF(float));
         ecs_os_memcpy(&out->flags[2], &l->altitude_fade, ECS_SIZEOF(float));
