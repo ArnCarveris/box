@@ -24,6 +24,7 @@ include island/ocean
 include island/stream_water
 include island/streams
 include island/player
+include island/precipitation
 include island/fronds
 include island/tree_kinds
 include island/trees

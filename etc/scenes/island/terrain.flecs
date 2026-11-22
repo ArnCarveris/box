@@ -305,7 +305,7 @@ island {
     }
 
     texture.Mapping: {mode: MappingWorld, size: GROUND_MAP_SIZE, blend: 0.15}
-    texture.Layers: {layers: [island_scoria, island_peak_snow, layer_wet, island_wet_sand]}
+    texture.Layers: {layers: [island_scoria, island_peak_snow, island_wet, island_wet_sand]}
     Rgb: {212, 206, 196}
     PbrMaterial: {roughness: 0.95}
 

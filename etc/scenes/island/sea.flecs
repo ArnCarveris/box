@@ -70,6 +70,7 @@ assets {
     PbrTextures: {normal: island_wave_n}
     texture.Mapping: {mode: MappingWorld, size: 23}
     texture.Scroll: {velocity: {0.004, 0.01}}
+    texture.Layers: {layers: [layer_rain_rings]}
     WaterWaves: {
       waves: [
         {direction: {WIND_DIR_X, WIND_DIR_Z}, wavelength: 46, amplitude: 0.3 + 0.05 * wind,
@@ -111,6 +112,7 @@ assets {
     }
     PbrTextures: {normal: island_wave_n}
     texture.Mapping: {mode: MappingWorld, size: 6}
+    texture.Layers: {layers: [layer_rain_rings]}
     NoShadow
   }
 

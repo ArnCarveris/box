@@ -1,0 +1,105 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.particle
+using box.terrain
+using state
+
+state {
+  export const RAIN_HALF: f32 = 11
+  export const RAIN_TOP: f32 = 9
+  export const RAIN_FAR_HALF: f32 = 42
+  export const RAIN_FAR_TOP: f32 = 24
+  export const SNOW_HALF: f32 = 14
+  export const SNOW_TOP: f32 = 10
+
+  export const RAIN_RATE: f32 = 18000
+  export const RAIN_FAR_RATE: f32 = 26000
+  export const SLEET_RATE: f32 = 5000
+  export const SNOW_RATE: f32 = 4200
+  export const SPLASH_RATE: f32 = 7000
+}
+
+island {
+  land {
+    TerrainSampled
+  }
+
+  falling {
+    if started {
+      const r = forest_rainfall(precipitation, temperature)
+      const sleet = precip_kind == PRECIP_SLEET ? precipitation : 0
+      const snowing = precip_kind == PRECIP_SNOW ? precipitation : 0
+
+      raindrops {
+        Position: {0, RAIN_TOP / 2 - 1, 0}
+        Emitter: {
+          max: 30000, rate: RAIN_RATE * r, shape: EmitterBox,
+          extents: {RAIN_HALF, RAIN_TOP / 2, RAIN_HALF},
+          direction: {0, -1, 0}, speed: {7.5, 8.5}, lifetime: {1.1, 1.4}, size: {0.005, 0.007},
+          opacity: {0.1, 0.24}, color: {178, 186, 196}, color_variance: {10, 10, 10}, seed: 81,
+          follow: player
+        }
+        Forces: {gravity: {0, -9.81, 0}, drag: 1.2, global_wind: 1}
+        Appearance: {shape: Circle, blend: Alpha, stretch: 7, lit: 0.85}
+        Collision: {die: true, terrain: island.land}
+      }
+
+      rain_sheets {
+        Position: {0, RAIN_FAR_TOP / 2 - 4, 0}
+        Emitter: {
+          max: 90000, rate: RAIN_FAR_RATE * r, shape: EmitterBox,
+          extents: {RAIN_FAR_HALF, RAIN_FAR_TOP / 2, RAIN_FAR_HALF},
+          direction: {0, -1, 0}, speed: {8, 9}, lifetime: {2.6, 3.2}, size: {0.022, 0.034},
+          opacity: {0.05, 0.11}, color: {186, 194, 204}, color_variance: {8, 8, 8}, seed: 86,
+          follow: player
+        }
+        Forces: {gravity: {0, -9.81, 0}, drag: 1.2, global_wind: 1}
+        Appearance: {shape: Circle, blend: Alpha, stretch: 5, lit: 0.85}
+        Collision: {die: true, terrain: island.land}
+      }
+
+      sleet_pellets {
+        Position: {0, RAIN_TOP / 2 - 1, 0}
+        Emitter: {
+          max: 8000, rate: SLEET_RATE * sleet, shape: EmitterBox,
+          extents: {RAIN_HALF, RAIN_TOP / 2, RAIN_HALF},
+          direction: {0, -1, 0}, speed: {4, 5}, lifetime: {1.8, 2.2}, size: {0.012, 0.02},
+          opacity: {0.6, 0.9}, color: {236, 240, 246}, seed: 82,
+          follow: player
+        }
+        Forces: {gravity: {0, -9.81, 0}, drag: 2.2, global_wind: 1, turbulence: 0.6}
+        Appearance: {shape: Circle, blend: Alpha, stretch: 0.8, lit: 0.85}
+        Collision: {die: true, terrain: island.land}
+      }
+
+      snowflakes {
+        Position: {0, SNOW_TOP / 2 - 1, 0}
+        Emitter: {
+          max: 40000, rate: SNOW_RATE * snowing, shape: EmitterBox,
+          extents: {SNOW_HALF, SNOW_TOP / 2, SNOW_HALF},
+          direction: {0, -1, 0}, speed: {0.8, 1.2}, lifetime: {7, 9}, size: {0.024, 0.045},
+          rotation: {0, 360}, opacity: {0.8, 1}, color: {246, 249, 255}, seed: 83,
+          follow: player
+        }
+        Forces: {
+          gravity: {0, -3, 0}, drag: 3, global_wind: 1, turbulence: 2.2, turbulence_scale: 1.6
+        }
+        Appearance: {shape: Circle, blend: Alpha, softness: 0.05, lit: 0.45}
+        Collision: {die: true, terrain: island.land}
+      }
+
+      splashes {
+        Position: {0, 0.02, 0}
+        Emitter: {
+          max: 5000, rate: SPLASH_RATE * r, shape: EmitterDisc, radius: RAIN_HALF * 0.8,
+          direction: {0, 1, 0}, spread: 45, speed: {0.6, 1.5}, lifetime: {0.18, 0.32},
+          size: {0.005, 0.01}, opacity: {0.18, 0.4}, color: {200, 208, 216}, seed: 84,
+          follow: player, ground: island.land
+        }
+        Forces: {gravity: {0, -9.81, 0}}
+        Appearance: {shape: Circle, blend: Alpha, stretch: 3, lit: 0.75}
+      }
+    }
+  }
+}

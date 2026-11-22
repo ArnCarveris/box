@@ -112,6 +112,7 @@ assets {
     WaterCaustics: {strength: 1.3, scale: 0.3, speed: 0.6, depth: 0.7}
     PbrTextures: {normal: island_stream_ripple_n}
     texture.Mapping: {mode: MappingWorld, size: 1}
+    texture.Layers: {layers: [layer_rain_rings]}
     NoShadow
   }
 
