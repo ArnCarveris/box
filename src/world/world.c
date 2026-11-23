@@ -307,6 +307,7 @@ void BoxWorldImport(
     ECS_META_COMPONENT(world, WorldOrigin);
     ECS_META_COMPONENT(world, WorldOriginStatus);
     ECS_META_COMPONENT(world, WorldOriginShift);
+    ECS_META_COMPONENT(world, WorldCell);
     ECS_META_COMPONENT(world, ChunkGrid);
     ECS_META_COMPONENT(world, ChunkGridStatus);
     ECS_META_COMPONENT(world, ChunkGridCell);
@@ -323,6 +324,7 @@ void BoxWorldImport(
     });
 
     box_world_functions_init(world);
+    box_world_cell_import(world);
     box_world_origin_import(world);
     box_world_chunk_import(world);
     box_world_scatter_import(world);

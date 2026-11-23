@@ -39,6 +39,28 @@ static bool box_world_stays(
     return result;
 }
 
+/** Check whether the entities of a table can be roots: the parent their ChildOf pair names, if
+ * any, and its ancestors have no WorldTransform. A table of the children of a placed parent is
+ * skipped whole, so the collection of a shift does not visit the descendants of a root.
+ *
+ * @param world The world
+ * @param table The table
+ * @return Whether its entities can be roots
+ */
+static bool box_world_table_rooted(
+    const ecs_world_t *world,
+    const ecs_table_t *table)
+{
+    ecs_entity_t parent = ecs_table_get_target(world, table, EcsChildOf, 0);
+    bool result = true;
+    while (parent && result) {
+        result = !ecs_has(world, parent, WorldTransform);
+        parent = ecs_get_parent(world, parent);
+    }
+
+    return result;
+}
+
 /** Collect the roots of a scene that a shift moves: the entities with a Position whose
  * ancestors have no WorldTransform and that box_world_stays does not keep.
  *
@@ -54,7 +76,9 @@ static void box_world_shift_collect(
     int32_t i;
     ecs_iter_t it = ecs_each_id(ECS_CONST_CAST(ecs_world_t*, world), ecs_id(Position));
     while (ecs_each_next(&it)) {
-        if (ecs_table_has_id(world, it.table, EcsPrefab)) {
+        if (ecs_table_has_id(world, it.table, EcsPrefab) ||
+            !box_world_table_rooted(world, it.table))
+        {
             continue;
         }
 
@@ -116,22 +140,31 @@ static bool box_world_particles_shifted(
 }
 
 /** Move a root by minus the offset of a shift: its Position, the WorldTransform of a
- * ManualTransform root and the offset of a PathFollow, whose path is in its world space.
+ * ManualTransform root and the offset of a PathFollow, whose path is in its world space. A
+ * WorldCell root is placed at its cell relative to the new origin instead.
  *
  * @param world The world
  * @param e The root
  * @param offset Distance the origin moves
+ * @param origin The absolute position of the local origin after the shift
  * @return Components written
  */
 static int32_t box_world_shift_root(
     ecs_world_t *world,
     ecs_entity_t e,
-    const double offset[3])
+    const double offset[3],
+    const double origin[3])
 {
     const Position *p = ecs_get(world, e, Position);
+    const WorldCell *cell = ecs_get(world, e, WorldCell);
     int32_t written = 0;
     int32_t i;
-    if (p) {
+    if (cell) {
+        Position placed;
+        box_world_cell_position(cell, origin, &placed);
+        ecs_set_ptr(world, e, Position, &placed);
+        written ++;
+    } else if (p) {
         ecs_set(world, e, Position, {
             (float)((double)p->x - offset[0]),
             (float)((double)p->y - offset[1]),
@@ -309,10 +342,18 @@ static void box_world_origin_shift_for(
     box_render_reflect_shift(world, scene, delta);
     box_render_shadows_reset(world);
 
+    const WorldOrigin *o = ecs_singleton_get(world, WorldOrigin);
+    double origin[3] = {offset[0], offset[1], offset[2]};
+    if (o) {
+        origin[0] += o->x;
+        origin[1] += o->y;
+        origin[2] += o->z;
+    }
+
     written += box_world_shift_heights(world, &shift, offset[1]);
     for (i = 0; i < ecs_vec_count(&shift.list); i ++) {
         ecs_entity_t root = *ecs_vec_get_t(&shift.list, ecs_entity_t, i);
-        written += box_world_shift_root(world, root, offset);
+        written += box_world_shift_root(world, root, offset, origin);
     }
 
     float ms = (float)(ecs_time_measure(&start) * 1000.0);

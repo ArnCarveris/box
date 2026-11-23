@@ -42,6 +42,25 @@ bool box_world_position(
     ecs_entity_t e,
     vec3 out);
 
+/** Register WorldCell: its DynamicTransform and the observer that places a root at its cell.
+ *
+ * @param world The world
+ */
+void box_world_cell_import(
+    ecs_world_t *world);
+
+/** Get the Position of a WorldCell root for an absolute origin: the corner of its cell
+ * relative to the origin, computed in f64.
+ *
+ * @param cell The cell
+ * @param origin The absolute position of the local origin
+ * @param out Receives the position
+ */
+void box_world_cell_position(
+    const WorldCell *cell,
+    const double origin[3],
+    Position *out);
+
 /** Register the rebase system and the queries of the shift.
  *
  * @param world The world

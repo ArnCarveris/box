@@ -206,7 +206,10 @@
                     "spatial_before_transforms",
                     "status_stats",
                     "every_frame",
-                    "from_zero"
+                    "from_zero",
+                    "cell_placed",
+                    "cell_shift_exact",
+                    "cell_cost"
                 ]
             },
             {

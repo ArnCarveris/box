@@ -10,6 +10,7 @@
 #include <box.h>
 #include <bake_test.h>
 #include <math.h>
+#include <stdio.h>
 #include "spatial.h"
 
 /** Create a world with box and a WorldOrigin with a small threshold and step.
@@ -780,4 +781,110 @@ void WorldOrigin_from_zero(void) {
     test_int(ecs_singleton_get(world, WorldOriginStatus)->shifts, 2);
 
     ecs_fini(world);
+}
+
+void WorldOrigin_cell_placed(void) {
+    // scenes/world_origin
+    ecs_world_t *world = origin_world(100, 50);
+    box_world_origin_shift(world, 0, (double[3]){4096000.0 - 10.0, 0, 0});
+
+    ecs_entity_t root = ecs_new(world);
+    ecs_set(world, root, WorldCell, {1000, 0, -1});
+    test_assert(ecs_has(world, root, DynamicTransform));
+    const Position *p = ecs_get(world, root, Position);
+    test_assert(p != NULL);
+    test_flt(p->x, 10);
+    test_flt(p->y, 0);
+    test_flt(p->z, -4096);
+
+    ecs_fini(world);
+}
+
+void WorldOrigin_cell_shift_exact(void) {
+    // scenes/world_origin
+    ecs_world_t *world = origin_world(100, 50);
+    ecs_entity_t root = ecs_new(world);
+    ecs_set(world, root, WorldCell, {250000, 0, 0});
+    ecs_entity_t child = ecs_new_w_pair(world, EcsChildOf, root);
+    ecs_set(world, child, Position, {0.25f, 1, 0});
+    ecs_progress(world, 0);
+
+    for (int32_t i = 0; i < 1000; i ++) {
+        box_world_origin_shift(world, 0, (double[3]){1024.0 + 0.125, 0, 0});
+    }
+
+    const WorldOrigin *o = ecs_singleton_get(world, WorldOrigin);
+    double expect = 250000.0 * BOX_WORLD_CELL_SIZE - o->x;
+    test_assert(ecs_get(world, root, Position)->x == (float)expect);
+    test_flt(ecs_get(world, child, Position)->x, 0.25f);
+
+    ecs_fini(world);
+}
+
+/** Time a shift of a root with descendants and the frame after it.
+ *
+ * @param count Descendants of the root
+ * @param cell Whether the root is a WorldCell root, else a static root
+ * @param written Receives the components the shift wrote
+ * @param shift_ms Receives the milliseconds of the shift
+ * @param frame_ms Receives the milliseconds of the frame after it
+ */
+static void origin_cell_cost(
+    int32_t count,
+    bool cell,
+    int32_t *written,
+    float *shift_ms,
+    float *frame_ms)
+{
+    ecs_world_t *world = origin_world(100000, 4096);
+    ecs_entity_t focus = origin_entity(world, 0, 0, 0);
+    ecs_add(world, focus, WorldFocus);
+    ecs_entity_t root = ecs_new(world);
+    if (cell) {
+        ecs_set(world, root, WorldCell, {1, 0, 0});
+    } else {
+        ecs_set(world, root, Position, {4096, 0, 0});
+    }
+
+    for (int32_t i = 0; i < count; i ++) {
+        ecs_entity_t child = ecs_new_w_pair(world, EcsChildOf, root);
+        ecs_set(world, child, Position, {(float)(i % 100), 0, (float)(i / 100)});
+    }
+
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+
+    box_world_origin_shift(world, 0, (double[3]){4096, 0, 0});
+    const WorldOriginStatus *s = ecs_singleton_get(world, WorldOriginStatus);
+    *written = s->written;
+    *shift_ms = s->ms;
+
+    ecs_time_t t = {0};
+    ecs_time_measure(&t);
+    ecs_progress(world, 0);
+    *frame_ms = (float)(ecs_time_measure(&t) * 1000.0);
+    test_flt(ecs_get(world, root, Position)->x, 0);
+
+    ecs_fini(world);
+}
+
+void WorldOrigin_cell_cost(void) {
+    // scenes/world_origin
+    int32_t written[4];
+    float shift_ms[4];
+    float frame_ms[4];
+    origin_cell_cost(1000, true, &written[0], &shift_ms[0], &frame_ms[0]);
+    origin_cell_cost(100000, true, &written[1], &shift_ms[1], &frame_ms[1]);
+    origin_cell_cost(1000, false, &written[2], &shift_ms[2], &frame_ms[2]);
+    origin_cell_cost(100000, false, &written[3], &shift_ms[3], &frame_ms[3]);
+
+    test_int(written[0], 2);
+    test_int(written[1], 2);
+    test_int(written[2], 2);
+    test_int(written[3], 2);
+
+    printf("WorldCell shift: 1k %.3f ms + frame %.3f ms, 100k %.3f ms + frame %.3f ms\n",
+        shift_ms[0], frame_ms[0], shift_ms[1], frame_ms[1]);
+    printf("Static root shift: 1k %.3f ms + frame %.3f ms, 100k %.3f ms + frame %.3f ms\n",
+        shift_ms[2], frame_ms[2], shift_ms[3], frame_ms[3]);
 }

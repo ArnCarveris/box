@@ -28,6 +28,9 @@ extern "C" {
 /** Shifts are whole multiples of this distance, by default */
 #define BOX_WORLD_ORIGIN_STEP (256.0f)
 
+/** Size of a WorldCell along each axis in meters, a power of two so cell * size is exact */
+#define BOX_WORLD_CELL_SIZE (4096.0)
+
 /** Marks the entities that streaming systems follow, such as a player or a camera.
  *
  * The systems take every WorldFocus entity; without any they follow the camera of the first
@@ -72,6 +75,21 @@ ECS_STRUCT(WorldOriginStatus, {
                           *   'Z' from_zero, 'M' a box_world_origin_shift call, 0 for none */
     int32_t written;     /**< Components the last shift wrote */
     float ms;            /**< Milliseconds the last shift took */
+});
+
+/** Anchors a root entity at a whole cell of the absolute world: its frame is at the absolute
+ * position cell * BOX_WORLD_CELL_SIZE, exact at any distance, and its descendants are placed
+ * relative to it in f32.
+ *
+ * The engine owns the Position of the root: it is the corner of the cell relative to the local
+ * origin, computed in f64 when the WorldCell is set and on every shift of the origin. A
+ * WorldCell root has DynamicTransform, so its descendants move with it on the GPU: a shift writes
+ * the Position of the root and nothing of its descendants, however many there are.
+ */
+ECS_STRUCT(WorldCell, {
+    int32_t x;           /**< Absolute cell along X */
+    int32_t y;           /**< Absolute cell along Y */
+    int32_t z;           /**< Absolute cell along Z */
 });
 
 /** Event emitted on the WorldOrigin singleton entity with every shift, its payload the shift.
