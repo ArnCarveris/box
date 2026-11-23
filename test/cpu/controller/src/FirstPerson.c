@@ -654,6 +654,54 @@ void FirstPerson_crouch_speed(void) {
     ecs_fini(world);
 }
 
+void FirstPerson_run(void) {
+    // controllers/first_person
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t fp = ecs_new(world);
+    ecs_add(world, fp, FirstPersonController);
+    test_flt(ecs_get(world, fp, FirstPersonController)->run_speed, 0);
+    ecs_get_mut(world, fp, FirstPersonController)->run_speed = 8;
+
+    box_input_key(world, KeyShiftLeft, true);
+    box_input_key(world, KeyS, true);
+    ecs_progress(world, 0.5f);
+    test_flt(ecs_get(world, fp, Position)->z, 4);
+    test_flt(ecs_get(world, fp, Position)->y, 1.7f);
+
+    box_input_key(world, KeyShiftLeft, false);
+    ecs_progress(world, 0.5f);
+    test_flt(ecs_get(world, fp, Position)->z, 6);
+
+    ecs_get_mut(world, fp, FirstPersonController)->run_speed = 6;
+    box_input_key(world, KeyShiftLeft, true);
+    ecs_progress(world, 0.5f);
+    test_flt(ecs_get(world, fp, Position)->z, 9);
+
+    ecs_fini(world);
+}
+
+void FirstPerson_run_crouched(void) {
+    // controllers/first_person
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t fp = ecs_new(world);
+    ecs_add(world, fp, FirstPersonController);
+    ecs_get_mut(world, fp, FirstPersonController)->run_speed = 8;
+
+    box_input_key(world, KeyShiftLeft, true);
+    box_input_key(world, KeyCtrlLeft, true);
+    box_input_key(world, KeyD, true);
+    ecs_progress(world, 0.5f);
+    const Position *p = ecs_get(world, fp, Position);
+    test_flt(p->x, 1);
+    test_flt(p->y, 0.9f);
+
+    ecs_fini(world);
+}
+
 void FirstPerson_fly_toggle(void) {
     // controllers/first_person
     ecs_world_t *world = ecs_init();

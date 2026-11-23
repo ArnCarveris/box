@@ -8,6 +8,8 @@ state {
 
   export const EYE: f32 = 1.7
   export const WALK_SPEED: f32 = 4
+  export const RUN_SPEED: f32 = 8
+  export const CLIMB: i32 = 6
   export const FLY_SPEED: f32 = 30
 
   export const HOUR: f32 = 17

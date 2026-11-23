@@ -72,7 +72,7 @@ typedef enum box_first_person_action_t {
     BoxFirstPersonRight,      /**< Strafe right in the XZ plane */
     BoxFirstPersonUp,         /**< Move up along Y in free flight */
     BoxFirstPersonDown,       /**< Move down along Y in free flight */
-    BoxFirstPersonFast,       /**< Multiply the flight speed by the boost while held */
+    BoxFirstPersonFast,       /**< Run, or multiply the flight speed by the boost, while held */
     BoxFirstPersonLook,       /**< Turn with the cursor while held */
     BoxFirstPersonJump,       /**< Leave the ground when pressed */
     BoxFirstPersonCrouch,     /**< Lower the eye and walk slower while held */
@@ -138,6 +138,8 @@ typedef struct box_controller_body_t {
 typedef struct box_controller_hit_t {
     bool grounded; /**< The body ended on a surface flat enough to stand on */
     bool blocked;  /**< A shape pushed the body back */
+    bool steep;    /**< The body touched a surface too steep to stand on that is not a ceiling */
+    vec3 wall;     /**< Normal of the steep surface that faces up the most, zero for none */
 } box_controller_hit_t;
 
 /** Resolve the collider of an indexed shape.

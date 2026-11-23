@@ -110,6 +110,8 @@
                     "eye",
                     "crouch",
                     "crouch_speed",
+                    "run",
+                    "run_crouched",
                     "fly_toggle",
                     "fly_no_gravity",
                     "fly_up_down",
@@ -156,6 +158,9 @@
                     "first_person_thin_wall_walk",
                     "steep_slope_blocks_walk",
                     "steep_slope_blocks_jump",
+                    "steep_slope_climb",
+                    "climb_slope_limit",
+                    "climb_vertical_wall_blocks",
                     "walkable_slope_climbs",
                     "stairs_climb",
                     "camera_rotated_thin_wall",
@@ -186,6 +191,7 @@
                 "testcases": [
                     "walks_up_slope",
                     "stops_at_cliff",
+                    "climbs_cliff",
                     "lands_on_terrain",
                     "camera_collides"
                 ]

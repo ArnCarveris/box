@@ -50,6 +50,8 @@ player {
   } else if started && !scripted {
     FirstPersonController: {
       speed: WALK_SPEED,
+      run_speed: RUN_SPEED,
+      climb: CLIMB,
       eye: EYE,
       ground: GROUND_MIN - 100,
       actions: walk_keys

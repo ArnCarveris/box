@@ -972,6 +972,26 @@ static void box_move_clip(
     velocity[1] = velocity[1] > rise ? rise : velocity[1];
 }
 
+/** Find the steep surface a move touched that faces up the most.
+ *
+ * @param m The move
+ * @param hit Receives whether the move touched a steep surface and its normal
+ */
+static void box_move_wall(
+    const box_move_t *m,
+    box_controller_hit_t *hit)
+{
+    int32_t i;
+    for (i = 0; i < m->normal_count; i ++) {
+        const float *n = m->normals[i];
+        bool steep = n[1] >= 0 && n[1] < BOX_MOVE_WALKABLE && (n[0] != 0 || n[2] != 0);
+        if (steep && (!hit->steep || n[1] > hit->wall[1])) {
+            hit->steep = true;
+            glm_vec3_copy(ECS_CONST_CAST(float*, n), hit->wall);
+        }
+    }
+}
+
 bool box_controller_move(
     ecs_world_t *world,
     const box_controller_body_t *body,
@@ -1017,6 +1037,7 @@ bool box_controller_move(
         if (hit) {
             hit->grounded = m.ground;
             hit->blocked = m.normal_count > 0;
+            box_move_wall(&m, hit);
         }
     }
 

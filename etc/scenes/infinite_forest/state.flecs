@@ -13,9 +13,11 @@ state {
   export const START_SEARCH: f32 = 180
   export const START_STEP: f32 = 5
 
-  // Eye height above the ground and walking speed
+  // Eye height above the ground, walking and running speed and the jumps a climb takes
   export const EYE: f32 = 1.7
   export const WALK_SPEED: f32 = 4
+  export const RUN_SPEED: f32 = 8
+  export const CLIMB: i32 = 6
   export const FLY_SPEED: f32 = 30
 
   // Streaming radii around the focus, whatever entity it is. The terrain draws its finest tiles

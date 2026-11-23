@@ -1,6 +1,7 @@
 /**
  * @file controllers/first_person.c
- * @brief The OnUpdate system that walks, jumps, crouches and flies a first person controller.
+ * @brief The OnUpdate system that walks, runs, jumps, climbs, crouches and flies a first person
+ * controller.
  */
 
 #include "controllers.h"
@@ -9,6 +10,9 @@
 
 /** Walking units per second of a constructed controller */
 #define BOX_FIRST_PERSON_SPEED (4.0f)
+
+/** Steepest surface a climb jumps off of a constructed controller, radians from level */
+#define BOX_FIRST_PERSON_CLIMB_SLOPE (1.4f)
 
 /** Units per second while crouching of a constructed controller */
 #define BOX_FIRST_PERSON_CROUCH_SPEED (2.0f)
@@ -62,7 +66,8 @@ const box_controller_action_t box_first_person_actions[BoxFirstPersonActionCount
     [BoxFirstPersonRight] = { "Right", "Walk right", KeyD, KeyNone },
     [BoxFirstPersonUp] = { "Up", "Move up in free flight", KeyE, KeyNone },
     [BoxFirstPersonDown] = { "Down", "Move down in free flight", KeyQ, KeyNone },
-    [BoxFirstPersonFast] = { "Fast", "Fly faster while held", KeyShiftLeft, KeyShiftRight },
+    [BoxFirstPersonFast] = { "Fast", "Run, or fly faster, while held", KeyShiftLeft,
+        KeyShiftRight },
     [BoxFirstPersonLook] = { "Look", "Turn with the cursor while held", KeyMouseRight, KeyNone },
     [BoxFirstPersonJump] = { "Jump", "Jump from the ground", KeySpace, KeyNone },
     [BoxFirstPersonCrouch] = { "Crouch", "Lower the eye and walk slower while held", KeyCtrlLeft,
@@ -97,6 +102,7 @@ void box_first_person_controller_ctor(
             .fly_speed = BOX_FIRST_PERSON_FLY_SPEED,
             .boost = BOX_FIRST_PERSON_BOOST,
             .jump = BOX_FIRST_PERSON_JUMP,
+            .climb_slope = BOX_FIRST_PERSON_CLIMB_SLOPE,
             .gravity = BOX_FIRST_PERSON_GRAVITY,
             .eye = BOX_FIRST_PERSON_EYE,
             .crouch_eye = BOX_FIRST_PERSON_CROUCH_EYE,
@@ -196,6 +202,8 @@ static float box_first_person_speed(
         }
     } else if (fp->crouched) {
         result = fp->crouch_speed;
+    } else if (in->held[BoxFirstPersonFast] && fp->run_speed > 0) {
+        result = fp->run_speed;
     }
 
     return result;
@@ -235,7 +243,10 @@ static void box_first_person_accelerate(
     }
 }
 
-/** Apply the flight toggle, the jump and the gravity of a frame.
+/** Apply the flight toggle, the jump, the climb and the gravity of a frame.
+ *
+ * A climb jumps off the steep surface the body touched in the last frame, only once the body
+ * stopped rising, so pressing Jump over and over climbs in whole jumps.
  *
  * @param fp The controller, its velocity and state are written
  * @param in The input of the frame
@@ -258,6 +269,11 @@ static void box_first_person_state(
     if (!fp->flying && fp->grounded && in->pressed[BoxFirstPersonJump]) {
         fp->velocity[1] = fp->jump;
         fp->grounded = false;
+    } else if (!fp->flying && !fp->grounded && fp->climbable && fp->climbed < fp->climb &&
+        fp->velocity[1] <= 0 && in->pressed[BoxFirstPersonJump])
+    {
+        fp->velocity[1] = fp->jump;
+        fp->climbed ++;
     }
 
     if (!fp->flying && !fp->grounded) {
@@ -322,11 +338,12 @@ static void box_first_person_crouch(
 
 /** Move the feet of a controller over the frame and put its eye above them.
  *
- * The ground plane only holds the feet when no shape is below them.
+ * The ground plane only holds the feet when no shape is below them. Standing on the ground
+ * gives the climbs back.
  *
  * @param world The world
  * @param e The controlled entity
- * @param fp The controller, its velocity, height and grounded flag are written
+ * @param fp The controller, its velocity, height, grounded and climb state are written
  * @param p The position of the eye, written in place
  * @param dt Seconds the frame took
  * @return Whether the position changed
@@ -358,6 +375,9 @@ static bool box_first_person_step(
     }
 
     fp->grounded = (landed || hit.grounded) && !fp->flying;
+    fp->climbable = !fp->grounded && !fp->flying && hit.steep &&
+        hit.wall[1] >= cosf(fp->climb_slope);
+    fp->climbed = fp->grounded || fp->flying ? 0 : fp->climbed;
     fp->height = height;
     eye_pos.x = feet.x;
     eye_pos.y = feet.y + height;

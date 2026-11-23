@@ -52,9 +52,13 @@ ECS_STRUCT(CameraController, {
 
 /** First person controller that walks its entity and writes its Position and Rotation.
  *
- * The Position is the eye, above the feet. WASD walk along the yaw, Look and the turn actions
- * turn like a camera controller, Jump leaves the ground, gravity pulls the feet down, Crouch
- * lowers the eye and Fly toggles free flight. The constructor sets the defaults.
+ * The Position is the eye, above the feet. WASD walk along the yaw, Fast runs, Look and the turn
+ * actions turn like a camera controller, Jump leaves the ground, gravity pulls the feet down,
+ * Crouch lowers the eye and Fly toggles free flight. The constructor sets the defaults.
+ *
+ * A controller with climb set climbs: Jump pressed while the body falls against a surface too
+ * steep to stand on, but no steeper than climb_slope, jumps again, up to climb times before the
+ * feet stand on the ground again.
  *
  * The body is a capsule from the feet to just above the eye that slides along the shapes of
  * its scene, stands on them, steps onto ledges and only stands up when there is room. The
@@ -62,10 +66,13 @@ ECS_STRUCT(CameraController, {
  */
 ECS_STRUCT(FirstPersonController, {
     float speed;           /**< Walking units per second, 4 by default */
+    float run_speed;       /**< Walking units per second while Fast is held, 0 walks */
     float crouch_speed;    /**< Units per second while crouching, 2 by default */
     float fly_speed;       /**< Units per second in free flight, 10 by default */
     float boost;           /**< Flight speed multiplier while Fast is held, 4 by default */
     float jump;            /**< Upward speed of a jump, 5 by default */
+    int32_t climb;         /**< Jumps off steep surfaces before standing again, 0 by default */
+    float climb_slope;     /**< Steepest surface a climb jumps off, radians from level, 1.4 */
     float gravity;         /**< Downward acceleration in units per second squared, 18 by default */
     float eye;             /**< Height of the eye above the feet, 1.7 by default */
     float crouch_eye;      /**< Height of the eye above the feet while crouching, 0.9 by default */
@@ -85,6 +92,8 @@ ECS_STRUCT(FirstPersonController, {
     bool grounded;         /**< The feet stand on the ground, written by the controller */
     bool crouched;         /**< Crouch is held or there is no room to stand, written */
     bool flying;           /**< Free flight, toggled by the Fly action */
+    bool climbable;        /**< The body touches a surface it can climb, written */
+    int32_t climbed;       /**< Climbing jumps since the feet last stood, written */
 });
 
 /** Register the box.controllers module and the default controller actions.

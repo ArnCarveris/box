@@ -198,6 +198,34 @@ void TerrainWalk_stops_at_cliff(void) {
     ecs_fini(world);
 }
 
+void TerrainWalk_climbs_cliff(void) {
+    // controllers/collision
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t terrain = tw_terrain(world, tw_cliff);
+    ecs_entity_t fp = tw_walker(world, 1.7f);
+    ecs_get_mut(world, fp, FirstPersonController)->climb = 20;
+    tw_run(world, terrain, 2);
+
+    box_input_key(world, KeyW, true);
+    for (int32_t i = 0; i < 600; i ++) {
+        box_input_key(world, KeySpace, (i % 2) == 0);
+        ecs_progress(world, 1.0f / 60.0f);
+        tw_fill(world, terrain);
+    }
+
+    box_input_key(world, KeySpace, false);
+    tw_run(world, terrain, 5);
+    const Position *p = ecs_get(world, fp, Position);
+    test_assert(p->z < -6.0f);
+    test_assert(fabsf(p->y - 7.7f) < 0.1f);
+    const FirstPersonController *c = ecs_get(world, fp, FirstPersonController);
+    test_bool(c->grounded, true);
+    test_int(c->climbed, 0);
+
+    ecs_fini(world);
+}
+
 void TerrainWalk_lands_on_terrain(void) {
     // controllers/collision
     ecs_world_t *world = ecs_init();
