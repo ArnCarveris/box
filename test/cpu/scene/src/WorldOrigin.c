@@ -707,3 +707,77 @@ void WorldOrigin_spatial_before_transforms(void) {
 
     ecs_fini(world);
 }
+
+void WorldOrigin_status_stats(void) {
+    // scenes/world_origin
+    ecs_world_t *world = origin_world(100, 50);
+    ecs_entity_t focus = origin_entity(world, 120, 0, 0);
+    ecs_add(world, focus, WorldFocus);
+    for (int32_t i = 0; i < 9; i ++) {
+        origin_entity(world, (float)i, 0, 0);
+    }
+
+    ecs_progress(world, 0);
+
+    const WorldOriginStatus *s = ecs_singleton_get(world, WorldOriginStatus);
+    test_int(s->shifts, 1);
+    test_int(s->reason, 'T');
+    test_int(s->written, 10);
+    test_assert(s->ms >= 0);
+
+    box_world_origin_shift(world, 0, (double[3]){0, 50, 0});
+    s = ecs_singleton_get(world, WorldOriginStatus);
+    test_int(s->shifts, 2);
+    test_int(s->reason, 'M');
+
+    ecs_fini(world);
+}
+
+void WorldOrigin_every_frame(void) {
+    // scenes/world_origin
+    ecs_world_t *world = origin_world(100, 50);
+    ecs_singleton_get_mut(world, WorldOrigin)->every_frame = true;
+    ecs_entity_t focus = origin_entity(world, 30, 0, 0);
+    ecs_add(world, focus, WorldFocus);
+
+    ecs_progress(world, 0);
+    test_flt(ecs_get(world, focus, Position)->x, -20);
+    test_assert(ecs_singleton_get(world, WorldOrigin)->x == 50);
+    const WorldOriginStatus *s = ecs_singleton_get(world, WorldOriginStatus);
+    test_int(s->shifts, 1);
+    test_int(s->reason, 'O');
+
+    ecs_progress(world, 0);
+    test_int(ecs_singleton_get(world, WorldOriginStatus)->shifts, 1);
+
+    ecs_set(world, focus, Position, {160, 0, 0});
+    ecs_progress(world, 0);
+    test_flt(ecs_get(world, focus, Position)->x, 10);
+    test_assert(ecs_singleton_get(world, WorldOrigin)->x == 200);
+    test_int(ecs_singleton_get(world, WorldOriginStatus)->reason, 'T');
+
+    ecs_fini(world);
+}
+
+void WorldOrigin_from_zero(void) {
+    // scenes/world_origin
+    ecs_world_t *world = origin_world(100, 50);
+    ecs_entity_t focus = origin_entity(world, 120, 0, 0);
+    ecs_add(world, focus, WorldFocus);
+    ecs_progress(world, 0);
+    test_assert(ecs_singleton_get(world, WorldOrigin)->x == 100);
+
+    ecs_singleton_get_mut(world, WorldOrigin)->from_zero = true;
+    ecs_progress(world, 0);
+    test_assert(ecs_singleton_get(world, WorldOrigin)->x == 0);
+    test_flt(ecs_get(world, focus, Position)->x, 120);
+    test_int(ecs_singleton_get(world, WorldOriginStatus)->reason, 'Z');
+
+    ecs_set(world, focus, Position, {5000, 0, 0});
+    ecs_progress(world, 0);
+    test_assert(ecs_singleton_get(world, WorldOrigin)->x == 0);
+    test_flt(ecs_get(world, focus, Position)->x, 5000);
+    test_int(ecs_singleton_get(world, WorldOriginStatus)->shifts, 2);
+
+    ecs_fini(world);
+}

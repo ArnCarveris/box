@@ -55,6 +55,11 @@ ECS_STRUCT(WorldOrigin, {
     float threshold;     /**< Distance of the focus along an axis that shifts, default 2048 */
     float step;          /**< Shifts are whole multiples of it, default 256 */
     bool enabled;        /**< Shift when the focus passes the threshold, default true */
+    bool every_frame;    /**< Stress: shift by the whole steps nearest to the focus every frame
+                          *   it is a step or more away, default false */
+    bool from_zero;      /**< Debug: pin the origin to the absolute origin, shifting back to it
+                          *   and never away, to show the precision lost far from it, default
+                          *   false */
 });
 
 /** Shifts of the world origin so far, written by the engine next to WorldOrigin */
@@ -63,6 +68,10 @@ ECS_STRUCT(WorldOriginStatus, {
     double x;            /**< X the origin moved by in the last shift */
     double y;            /**< Y the origin moved by in the last shift */
     double z;            /**< Z the origin moved by in the last shift */
+    char reason;         /**< Why the last shift happened: 'T' the threshold, 'O' every_frame,
+                          *   'Z' from_zero, 'M' a box_world_origin_shift call, 0 for none */
+    int32_t written;     /**< Components the last shift wrote */
+    float ms;            /**< Milliseconds the last shift took */
 });
 
 /** Event emitted on the WorldOrigin singleton entity with every shift, its payload the shift.

@@ -203,7 +203,10 @@
                     "ground_heights",
                     "follow_emitter_stays",
                     "spatial_same_hits",
-                    "spatial_before_transforms"
+                    "spatial_before_transforms",
+                    "status_stats",
+                    "every_frame",
+                    "from_zero"
                 ]
             },
             {

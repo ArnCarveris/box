@@ -121,13 +121,15 @@ static bool box_world_particles_shifted(
  * @param world The world
  * @param e The root
  * @param offset Distance the origin moves
+ * @return Components written
  */
-static void box_world_shift_root(
+static int32_t box_world_shift_root(
     ecs_world_t *world,
     ecs_entity_t e,
     const double offset[3])
 {
     const Position *p = ecs_get(world, e, Position);
+    int32_t written = 0;
     int32_t i;
     if (p) {
         ecs_set(world, e, Position, {
@@ -135,6 +137,7 @@ static void box_world_shift_root(
             (float)((double)p->y - offset[1]),
             (float)((double)p->z - offset[2])
         });
+        written ++;
     }
 
     const WorldTransform *t = ecs_has_id(world, e, ManualTransform)
@@ -147,6 +150,7 @@ static void box_world_shift_root(
         }
 
         ecs_set_ptr(world, e, WorldTransform, &moved);
+        written ++;
     }
 
     const PathFollow *follow = ecs_get(world, e, PathFollow);
@@ -157,7 +161,10 @@ static void box_world_shift_root(
         }
 
         ecs_set_ptr(world, e, PathFollow, &moved);
+        written ++;
     }
+
+    return written;
 }
 
 /** Move the world heights of the ground planes of the moved first person controllers and
@@ -166,8 +173,9 @@ static void box_world_shift_root(
  * @param world The world
  * @param shift The shift
  * @param dy Distance the origin moves along Y
+ * @return Components written
  */
-static void box_world_shift_heights(
+static int32_t box_world_shift_heights(
     ecs_world_t *world,
     box_world_shift_t *shift,
     double dy)
@@ -208,8 +216,12 @@ static void box_world_shift_heights(
         ecs_set_ptr(world, e, ParticleCollision, &c);
     }
 
+    int32_t written = ecs_vec_count(&controllers) + ecs_vec_count(&collisions);
+
     ecs_vec_fini_t(NULL, &controllers, ecs_entity_t);
     ecs_vec_fini_t(NULL, &collisions, ecs_entity_t);
+
+    return written;
 }
 
 /** Add the offset of a shift to the WorldOrigin and WorldOriginStatus singletons, creating a
@@ -218,11 +230,17 @@ static void box_world_shift_heights(
  * @param world The world
  * @param scene The scene that moved
  * @param offset Distance the origin moves
+ * @param reason Why the origin moves, as WorldOriginStatus.reason
+ * @param written Components the shift wrote
+ * @param ms Milliseconds the shift took
  */
 static void box_world_shift_record(
     ecs_world_t *world,
     ecs_entity_t scene,
-    const double offset[3])
+    const double offset[3],
+    char reason,
+    int32_t written,
+    float ms)
 {
     WorldOrigin *o = ecs_singleton_get_mut(world, WorldOrigin);
     if (o) {
@@ -242,7 +260,13 @@ static void box_world_shift_record(
     WorldOriginStatus *status = ecs_singleton_get_mut(world, WorldOriginStatus);
     int32_t shifts = status ? status->shifts + 1 : 1;
     ecs_singleton_set(world, WorldOriginStatus, {
-        .shifts = shifts, .x = offset[0], .y = offset[1], .z = offset[2]
+        .shifts = shifts,
+        .x = offset[0],
+        .y = offset[1],
+        .z = offset[2],
+        .reason = reason,
+        .written = written,
+        .ms = ms
     });
 
     ecs_enqueue(world, &(ecs_event_desc_t){
@@ -255,14 +279,25 @@ static void box_world_shift_record(
     });
 }
 
-void box_world_origin_shift(
+/** Shift the world origin of a scene now, recording why (box_world_origin_shift).
+ *
+ * @param world The world
+ * @param scene The scene, 0 for the default scene
+ * @param offset Distance the origin moves along each axis
+ * @param reason Why the origin moves, as WorldOriginStatus.reason
+ */
+static void box_world_origin_shift_for(
     ecs_world_t *world,
     ecs_entity_t scene,
-    const double offset[3])
+    const double offset[3],
+    char reason)
 {
     box_world_shift_t shift = { .world = world };
+    ecs_time_t start = {0};
+    int32_t written = 0;
     vec3 delta = { (float)-offset[0], (float)-offset[1], (float)-offset[2] };
     int32_t i;
+    ecs_time_measure(&start);
     ecs_map_init(&shift.roots, NULL);
     ecs_vec_init_t(NULL, &shift.list, ecs_entity_t, 0);
     box_world_shift_collect(world, scene, &shift);
@@ -274,19 +309,30 @@ void box_world_origin_shift(
     box_render_reflect_shift(world, scene, delta);
     box_render_shadows_reset(world);
 
-    box_world_shift_heights(world, &shift, offset[1]);
+    written += box_world_shift_heights(world, &shift, offset[1]);
     for (i = 0; i < ecs_vec_count(&shift.list); i ++) {
-        box_world_shift_root(world, *ecs_vec_get_t(&shift.list, ecs_entity_t, i), offset);
+        ecs_entity_t root = *ecs_vec_get_t(&shift.list, ecs_entity_t, i);
+        written += box_world_shift_root(world, root, offset);
     }
 
-    box_world_shift_record(world, scene, offset);
+    float ms = (float)(ecs_time_measure(&start) * 1000.0);
+    box_world_shift_record(world, scene, offset, reason, written, ms);
 
     ecs_map_fini(&shift.roots);
     ecs_vec_fini_t(NULL, &shift.list, ecs_entity_t);
 }
 
+void box_world_origin_shift(
+    ecs_world_t *world,
+    ecs_entity_t scene,
+    const double offset[3])
+{
+    box_world_origin_shift_for(world, scene, offset, 'M');
+}
+
 /** Shift the origin when the first focus is beyond the threshold along an axis, by the whole
- * steps nearest to the focus along each such axis.
+ * steps nearest to the focus along each such axis; with every_frame along every axis it is a
+ * step or more away; with from_zero back to the absolute origin, and never away from it.
  *
  * @param it The iterator of the system
  */
@@ -298,23 +344,41 @@ static void BoxWorldRebase(
     box_world_focus_t focus;
     double offset[3] = {0, 0, 0};
     bool shift = false;
+    bool past = false;
     int32_t i;
-    if (!o || !o->enabled || !(o->threshold > 0) || !(o->step > 0) ||
-        !box_world_focus(world, &focus, 1))
-    {
+    if (!o || !o->enabled) {
+        goto done;
+    }
+
+    if (o->from_zero) {
+        ecs_entity_t scene = box_world_focus(world, &focus, 1) ? focus.scene : 0;
+        offset[0] = -o->x;
+        offset[1] = -o->y;
+        offset[2] = -o->z;
+        shift = offset[0] != 0 || offset[1] != 0 || offset[2] != 0;
+        if (shift) {
+            box_world_origin_shift_for(world, scene, offset, 'Z');
+        }
+
+        goto done;
+    }
+
+    if (!(o->threshold > 0) || !(o->step > 0) || !box_world_focus(world, &focus, 1)) {
         goto done;
     }
 
     for (i = 0; i < 3; i ++) {
         double p = (double)focus.position[i];
-        if (fabs(p) > (double)o->threshold) {
+        bool axis_past = fabs(p) > (double)o->threshold;
+        if (axis_past || o->every_frame) {
             offset[i] = round(p / (double)o->step) * (double)o->step;
             shift = shift || offset[i] != 0;
+            past = past || axis_past;
         }
     }
 
     if (shift) {
-        box_world_origin_shift(world, focus.scene, offset);
+        box_world_origin_shift_for(world, focus.scene, offset, past ? 'T' : 'O');
     }
 
 done:
