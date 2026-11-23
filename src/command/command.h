@@ -441,6 +441,13 @@ void box_cmd_frames_init(
 void box_cmd_edit_init(
     ecs_world_t *world);
 
+/** Register the time command that reads and sets the time of day of the scene.
+ *
+ * @param world The world
+ */
+void box_cmd_time_init(
+    ecs_world_t *world);
+
 /** Register the geometry command that counts the shapes and geometry.check that lists the
  * pairs of 3D shapes with faces that z-fight.
  *

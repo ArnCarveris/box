@@ -34,6 +34,7 @@ include portal_bunker/island
 include portal_bunker/ship
 include portal_bunker/screens
 
+using flecs.script.math
 using box.transform
 using box.geometry
 using box.material
@@ -43,10 +44,13 @@ using box.light
 using box.effects
 using box.surface
 using box.controllers
+using box.atmosphere
+using box.texture
 
 $ {
   box.app.FpsTarget: {60}
-  Scene: {blend_modes: true, fresnel: true, water: true, texture_scroll: true}
+  Scene: {blend_modes: true, fresnel: true, water: true, texture_scroll: true, environment: true,
+    aerial_perspective: true, reflections: true}
 }
 
 window {
@@ -167,15 +171,55 @@ freighter {
   }
 }
 
+// The sky: the sun and the moon are top of atmosphere values, the engine turns them over the day
+// (TimeOfDay on sky; its hour, time_scale and pause are set with the time command). The sun comes
+// first so the portals take it as the light that shines through apertures
 sun {
-  Rotation: {0.9209, -0.9098, 0}
-  DirectionalLight: {intensity: 5}
-  Rgb: {255, 228, 194}
+  DirectionalLight: {intensity: 3 * PI}
+  Rgb: {255, 248, 236}
 }
 
-$ {
-  AmbientLight: {sky: {55, 100, 237}, ground: {40, 36, 30}, intensity: 0.5}
+moon {
+  DirectionalLight: {intensity: 0.45 * PI}
+  Rgb: {190, 210, 255}
 }
+
+sky {
+  Atmosphere: {
+    sun: sun,
+    moon: moon,
+    units_per_km: 220,
+    sea_level: 0,
+    ground_altitude: 3.2,
+    mie: {scale_height: 1.2, anisotropy: 0.8, scattering_scale: 0.8, tint: {255, 236, 214}},
+    ozone_scale: 2,
+    night_tint: {64, 88, 190},
+    night_intensity: 0.055,
+    sun_disk_intensity: 8,
+    sun_radius: 1.1,
+    moon_radius: 1.6,
+    moon_disk_intensity: 24,
+    earthshine: 0.05
+  }
+  TimeOfDay: {
+    hour: 9.5,
+    day_of_year: 172,
+    latitude: 21.4,
+    north: 30,
+    time_scale: 0.1,
+    sun: sun,
+    moon: moon
+  }
+}
+
+sky_cloud_h {
+  Gen: {width: 512, height: 512, seed: 23, layers: [{kind: GenNoise, frequency: 7, octaves: 5, gain: 0.5}]}
+}
+
+// Three layers drifting with the wind: low scattered clouds, a broken middle deck and thin high ones
+cloud_low { CloudLayer: {texture: sky_cloud_h, size: 3000, altitude: 900, threshold: 0.6, softness: 0.08, density: 0.9, velocity: {6, 3}} }
+cloud_mid { CloudLayer: {texture: sky_cloud_h, size: 6500, altitude: 1500, threshold: 0.66, softness: 0.12, density: 0.7, offset: {900, 400}, velocity: {9, 4}} }
+cloud_high { CloudLayer: {texture: sky_cloud_h, size: 11000, altitude: 2400, threshold: 0.72, softness: 0.16, density: 0.4, offset: {300, 1700}, velocity: {14, 6}} }
 
 // The scenario's viewpoints, shown with --camera views.<name>
 views {
@@ -387,7 +431,9 @@ view {
   smaa { Smaa: {} }
   View: {
     camera: camera,
-    clear: {enabled: true, color: {191, 219, 255, 255}},
+    clear: {enabled: true, color: {10, 12, 20, 255}},
+    lighting: {enabled: true, reflections: true, atmosphere: true,
+      environment: {source: sky, intensity: 1, background: false}},
     shadows: {enabled: true},
     effects: [{effect: tonemap}, {effect: smaa}]
   }

@@ -35,6 +35,7 @@ curl localhost:27760/shell/session/<id>/resource/<name> -o out.png   # empty unt
 | `frames` | Rate, cap, vsync; last/min/mean/max of delta, interval, error, present; late (`\|delta - interval\| > 1 ms`) and dropped (> 1.5 intervals) counts; render packets in flight |
 | `edit [on\|off]` | Toggle or set `Editor.open`, returns whether open |
 | `logs [level] [count]` | Last `count` (20) captured log messages at `level` (`fatal`, `error`, `warning`, `info`, `debug` or a number) or worse; keeps 1024 |
+| `time [set <hour>\|pause\|speed <hours per second>]` | No arg: the hour, day, speed, sun and moon altitude and daylight of the first `TimeOfDay`. `set` turns the clock to an hour (0..24), `pause` stops it, `speed` sets `time_scale` (simulated hours per real second) and starts it. The status is kept where it is |
 | `geometry` | Shape, triangle and cached mesh counts |
 | `geometry.check [root] [tolerance=u] [area=u^2] [max=n] [hidden]` | Lists pairs of 3D shapes whose faces z-fight (coplanar, same facing, overlapping); defaults 0.0001 / 0.0001 / 100 |
 | `portal [view]`, `portal.status [view]` | The portal options of a view (the first view that clears, in render order, by default) and what its camera saw in the last traversal: its area, the areas and entries it sees, the portals tested, passed and closed, whether it is frozen or truncated |

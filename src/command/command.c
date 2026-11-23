@@ -303,6 +303,7 @@ void BoxCommandImport(
     box_cmd_portal_init(world);
     box_cmd_frames_init(world);
     box_cmd_edit_init(world);
+    box_cmd_time_init(world);
     box_cmd_geometry_init(world);
 #ifdef __EMSCRIPTEN__
     if (!box_command_web_world) {

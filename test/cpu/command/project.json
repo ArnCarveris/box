@@ -185,6 +185,16 @@
                 ]
             },
             {
+                "id": "Time",
+                "testcases": [
+                    "print",
+                    "set",
+                    "pause_keeps_the_clock",
+                    "speed_continues_from_now",
+                    "invalid"
+                ]
+            },
+            {
                 "id": "Clipboard",
                 "testcases": [
                     "set_get",
