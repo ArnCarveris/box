@@ -1,0 +1,70 @@
+using flecs.script
+using flecs.script.math
+using box.light
+using box.transform
+using box.ui
+using box.widgets
+using assets
+using state
+
+state {
+  export const START_FOG: f32 = 0.25
+  export const FOG_MAX_DENSITY: f32 = 0.05
+  export const FOG_FALLOFF: f32 = 0.035
+  export const FOG_DISTANCE: f32 = 320
+
+  fn forest_fog_density(f: f64) -> f64 {
+    FOG_MAX_DENSITY * f * f
+  }
+
+  export mut fog: f32 = START_FOG
+  export mut fog_y: f32 = 0
+}
+
+fog_layer {
+  if fog > 0.005 {
+    Position: {0, fog_y, 0}
+    FogVolume: {
+      shape: FogVolumeUnbounded,
+      density: forest_fog_density(fog),
+      height_falloff: FOG_FALLOFF,
+      color: {
+        forest_seasonal(season, 226, 232, 238, 222),
+        forest_seasonal(season, 232, 232, 230, 230),
+        forest_seasonal(season, 238, 230, 220, 240)
+      },
+      asymmetry: 0.5,
+      sun_inscatter: 1,
+      ambient_inscatter: 1,
+      light_inscatter: 0,
+      noise_strength: 0.55,
+      noise_scale: 24,
+      wind: {fog_wind_x, 0.04, fog_wind_z}
+    }
+  }
+}
+
+hud {
+  screen {
+    panel {
+      weather {
+        ForestSlider fog(
+          label: "Fog",
+          kind: READOUT_FOG,
+          width: SLIDER_W,
+          min: 0,
+          max: 1,
+          step: 0.01,
+          value: state.fog
+        )
+      }
+    }
+  }
+}
+
+async {
+  while true {
+    await on.change(hud.screen.panel.weather.fog)
+    state.fog = hud.screen.panel.weather.fog[ForestSlider.mut].current
+  }
+}

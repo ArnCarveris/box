@@ -17,6 +17,7 @@
 include ui/widgets
 include trees/generator
 include forest/library
+include forest/fog
 include infinite_forest/state
 include infinite_forest/materials
 include infinite_forest/terrain

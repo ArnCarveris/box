@@ -30,6 +30,7 @@ state {
   export const READOUT_WIND: i32 = 2
   export const READOUT_HOUR: i32 = 3
   export const READOUT_VOLUME: i32 = 4
+  export const READOUT_FOG: i32 = 5
 
   // The value of a slider in words; t is the temperature for the precipitation, and 1 while
   // the sound is muted for the volume
@@ -39,7 +40,8 @@ state {
       1: forest_precip_text(v, t)
       2: forest_wind_text(v)
       3: forest_clock(v)
-      _: forest_volume_text(v, t > 0.5)
+      4: forest_volume_text(v, t > 0.5)
+      _: forest_fog_text(v)
     }
   }
 }
@@ -212,46 +214,51 @@ hud {
 
       ForestRule rule_top()
 
-      ForestSlider season(
-        label: "Season",
-        kind: READOUT_SEASON,
-        width: SLIDER_W,
-        min: 0,
-        max: SEASON_CYCLE,
-        step: 0.01,
-        value: state.season
-      )
+      weather {
+        Layout: {direction: Column, spacing: 12}
+        Item: {width: {mode: Grow}}
 
-      ForestSlider precipitation(
-        label: "Precipitation",
-        kind: READOUT_PRECIPITATION,
-        t: state.temperature,
-        width: SLIDER_W,
-        min: 0,
-        max: 1,
-        step: 0.01,
-        value: state.precipitation
-      )
+        ForestSlider season(
+          label: "Season",
+          kind: READOUT_SEASON,
+          width: SLIDER_W,
+          min: 0,
+          max: SEASON_CYCLE,
+          step: 0.01,
+          value: state.season
+        )
 
-      ForestSlider wind(
-        label: "Wind",
-        kind: READOUT_WIND,
-        width: SLIDER_W,
-        min: 0,
-        max: WIND_MAX,
-        step: 0.1,
-        value: state.wind
-      )
+        ForestSlider precipitation(
+          label: "Precipitation",
+          kind: READOUT_PRECIPITATION,
+          t: state.temperature,
+          width: SLIDER_W,
+          min: 0,
+          max: 1,
+          step: 0.01,
+          value: state.precipitation
+        )
 
-      ForestSlider hour(
-        label: "Time of day",
-        kind: READOUT_HOUR,
-        width: SLIDER_W,
-        min: HOUR_MIN,
-        max: HOUR_MAX,
-        step: 0.05,
-        value: state.hour
-      )
+        ForestSlider wind(
+          label: "Wind",
+          kind: READOUT_WIND,
+          width: SLIDER_W,
+          min: 0,
+          max: WIND_MAX,
+          step: 0.1,
+          value: state.wind
+        )
+
+        ForestSlider hour(
+          label: "Time of day",
+          kind: READOUT_HOUR,
+          width: SLIDER_W,
+          min: HOUR_MIN,
+          max: HOUR_MAX,
+          step: 0.05,
+          value: state.hour
+        )
+      }
 
       ForestRule rule_bottom()
 

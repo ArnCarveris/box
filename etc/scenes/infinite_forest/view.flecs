@@ -4,6 +4,8 @@ using box.view
 using box.effects
 using box.light
 using box.world
+using box.transform
+using box.terrain
 using state
 
 // The view of the player, set up like the forest's (forest/view.flecs) without its ambient
@@ -41,6 +43,7 @@ view {
       baked: false,
       reflections: true,
       atmosphere: true,
+      fog_distance: FOG_DISTANCE,
       environment: {source: sky, intensity: forest_seasonal(season, 1.04, 1, 0.97, 1.08), background: false}
     },
     shadows: {
@@ -63,6 +66,25 @@ view {
       {effect: vignette},
       {effect: edges}
     ]
+  }
+}
+
+async {
+  while true {
+    await delay(0.1)
+    const o = WorldOrigin[WorldOrigin]
+    const p = player[Position]
+    const x = p.x + o.x
+    const z = p.z + o.z
+
+    if box.terrain.known(infinite_forest.land, x, z) {
+      const ground: f32 = box.terrain.height(infinite_forest.land, x, z) - o.y
+      const y: f32 = state.fog_y + (ground - state.fog_y) * 0.15
+
+      if abs(y - state.fog_y) > 0.02 {
+        state.fog_y = y
+      }
+    }
   }
 }
 

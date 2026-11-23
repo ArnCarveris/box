@@ -176,6 +176,16 @@ state {
     muted ? "Muted" : "{pct:.0}%"
   }
 
+  fn forest_fog_name(f: f64) -> string {
+    f < 0.25 ? "Haze" : (f < 0.5 ? "Mist" : (f < 0.8 ? "Fog" : "Dense fog"))
+  }
+
+  fn forest_fog_text(f: f64) -> string {
+    const name = forest_fog_name(f)
+    const pct = f * 100
+    f < 0.01 ? "Clear" : "{name} {pct:.0}%"
+  }
+
   fn forest_temperature_text(t: f64) -> string {
     const r = round(t)
     const shown = r == 0 ? 0 : r

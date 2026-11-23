@@ -3,6 +3,8 @@ using flecs.script.math
 using box.view
 using box.effects
 using box.light
+using box.transform
+using box.terrain
 using box.text
 using state
 using assets
@@ -36,6 +38,7 @@ view {
       baked: false,
       reflections: true,
       atmosphere: true,
+      fog_distance: FOG_DISTANCE,
       environment: {
         source: sky,
         intensity: forest_seasonal(season, 1.25, 1.2, 1.16, 1.28),
@@ -62,6 +65,22 @@ view {
       {effect: vignette},
       {effect: edges}
     ]
+  }
+}
+
+async {
+  while true {
+    await delay(0.1)
+    const p = player[Position]
+
+    if box.terrain.known(island.land, p.x, p.z) {
+      const ground: f32 = max(0, box.terrain.height(island.land, p.x, p.z))
+      const y: f32 = state.fog_y + (ground - state.fog_y) * 0.15
+
+      if abs(y - state.fog_y) > 0.02 {
+        state.fog_y = y
+      }
+    }
   }
 }
 

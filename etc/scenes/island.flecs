@@ -15,6 +15,7 @@ include forest/air
 include forest/shedding
 include forest/insect_kinds
 include forest/hud
+include forest/fog
 include island/state
 include island/materials
 include island/rays
