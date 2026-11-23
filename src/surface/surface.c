@@ -277,28 +277,72 @@ done:
     return;
 }
 
+/** Check whether the world runs a benchmark (App.benchmark), whose surfaces present without
+ * vertical sync and whose surfaces that are not a texture render at the benchmark size.
+ *
+ * @param world The world
+ * @return Whether the world runs a benchmark
+ */
+static bool box_surface_benchmark(
+    const ecs_world_t *world)
+{
+    const App *app = ecs_id(App) ? ecs_singleton_get(world, App) : NULL;
+
+    return app && app->benchmark;
+}
+
+/** Get the pixels per point of a surface: those its window reports, else its pixel_ratio.
+ *
+ * @param s The surface
+ * @param impl The engine side of the surface
+ * @return The pixels per point
+ */
+static float box_surface_ratio(
+    const Surface *s,
+    SurfaceImpl *impl)
+{
+    int32_t pixels = 0, points = 0, height = 0;
+    float result = s->pixel_ratio > 0 ? s->pixel_ratio : 1.0f;
+    if (impl->window) {
+        box_window_size(impl->window, &pixels, &height);
+        box_window_points(impl->window, &points, &height);
+        result = pixels > 0 && points > 0 ? (float)pixels / (float)points : 1.0f;
+    }
+
+    return result;
+}
+
 /** Describe the target of a surface: its size in pixels and points, render size and window
  * layer. Offscreen a point is pixel_ratio pixels; a window reports both, so a retina window has two
  * pixels per point.
  *
+ * A benchmark surface asks for BOX_APP_BENCHMARK_WIDTH by BOX_APP_BENCHMARK_HEIGHT pixels and
+ * renders at that size, also when the window it gets is smaller, which its views are scaled to.
+ *
  * @param s The surface
  * @param impl The engine side of the surface, whose window follows the requested size
+ * @param vsync The window presents with vertical sync
+ * @param benchmark The surface renders at the benchmark size
  * @param desc The description, zeroed first so it can be compared bytewise
  */
 static void box_surface_measure(
     const Surface *s,
     SurfaceImpl *impl,
+    bool vsync,
+    bool benchmark,
     box_render_target_desc_t *desc)
 {
-    int32_t width = box_surface_points(s->width);
-    int32_t height = box_surface_points(s->height);
-    float ratio = s->pixel_ratio > 0 ? s->pixel_ratio : 1.0f;
+    float ratio = box_surface_ratio(s, impl);
+    int32_t width = box_surface_points(benchmark
+        ? (int32_t)((float)BOX_APP_BENCHMARK_WIDTH / ratio + 0.5f) : s->width);
+    int32_t height = box_surface_points(benchmark
+        ? (int32_t)((float)BOX_APP_BENCHMARK_HEIGHT / ratio + 0.5f) : s->height);
     ecs_os_memset_t(desc, 0, box_render_target_desc_t);
     desc->width = box_surface_points((int32_t)((float)width * ratio + 0.5f));
     desc->height = box_surface_points((int32_t)((float)height * ratio + 0.5f));
     desc->point_width = width;
     desc->point_height = height;
-    desc->vsync = s->vsync;
+    desc->vsync = vsync;
     desc->texture = s->texture != 0;
     if (impl->window) {
         if (width != impl->window_width || height != impl->window_height) {
@@ -310,10 +354,13 @@ static void box_surface_measure(
         box_window_size(impl->window, &desc->width, &desc->height);
         box_window_points(impl->window, &desc->point_width, &desc->point_height);
         desc->layer = box_window_layer(impl->window);
-        desc->refresh = s->vsync ? box_window_refresh(impl->window) : 0;
+        desc->refresh = vsync ? box_window_refresh(impl->window) : 0;
     }
 
-    if (desc->width > 0 && desc->height > 0) {
+    if (desc->width > 0 && desc->height > 0 && benchmark) {
+        desc->render_width = BOX_APP_BENCHMARK_WIDTH;
+        desc->render_height = BOX_APP_BENCHMARK_HEIGHT;
+    } else if (desc->width > 0 && desc->height > 0) {
         desc->render_width = box_surface_scaled(desc->width, s->resolution_scale);
         desc->render_height = box_surface_scaled(desc->height, s->resolution_scale);
     }
@@ -426,6 +473,8 @@ static void box_surface_frame(
     box_render_target_desc_t desc;
     float clear[4];
     int32_t generation = box_render_get_backend(world)->generation;
+    bool benchmark = box_surface_benchmark(world);
+    bool vsync = s->vsync && !benchmark;
     if (!impl->opened) {
         box_surface_open(world, e, s, impl, state);
         op = BOX_RENDER_CREATE;
@@ -433,7 +482,7 @@ static void box_surface_frame(
         op = BOX_RENDER_CREATE;
     }
 
-    box_surface_measure(s, impl, &desc);
+    box_surface_measure(s, impl, vsync, benchmark && !s->texture, &desc);
     if (!desc.render_width) {
         goto done;
     }
@@ -455,7 +504,7 @@ static void box_surface_frame(
         });
     }
 
-    if (s->vsync && !box_surface_offscreen(world, s)) {
+    if (vsync && !box_surface_offscreen(world, s)) {
         p->vsync = true;
         p->refresh = p->refresh > 0 ? p->refresh : desc.refresh;
     }

@@ -5,6 +5,7 @@
 
 #define BOX_APP_IMPL
 #include "app.h"
+#include "benchmark.h"
 #include "watch.h"
 #include "../render/render.h"
 #include "../transform/transform_version.h"
@@ -158,7 +159,9 @@ float box_app_fps(
     const App *app = ecs_singleton_get(world, App);
     const FpsTarget *target = ecs_singleton_get(world, FpsTarget);
     float result = 0;
-    if (app && app->fps > 0) {
+    if (app && app->benchmark) {
+        result = 0;
+    } else if (app && app->fps > 0) {
         result = app->fps;
     } else if (target && target->value > 0) {
         result = target->value;
@@ -282,7 +285,7 @@ static void BoxAppFrame(
         ecs_quit(it->world);
     }
 
-    if (app->headless && !app->unpaced && clock->wall > 0) {
+    if (app->headless && !app->unpaced && !app->benchmark && clock->wall > 0) {
         double sleep = box_app_pace(cpu - clock->cpu, wall - clock->pace, app->cpu_budget);
         if (sleep > 0) {
             double now = box_wait_until(wall + sleep);
@@ -1062,8 +1065,8 @@ static int box_app_start(
         goto done;
     }
 
-    if (app->headless && app->frames <= 0 && app->timeout == 0) {
-        ecs_err("headless mode requires --frames or --timeout");
+    if (app->headless && app->frames <= 0 && app->timeout == 0 && !app->benchmark) {
+        ecs_err("headless mode requires --frames, --timeout or --benchmark");
         goto done;
     }
 
@@ -1101,7 +1104,9 @@ static int box_app_start(
     }
 
     app = ecs_singleton_get(world, App);
-    if (app->port > 0) {
+    if (app->port > 0 && app->benchmark) {
+        ecs_trace("not serving the REST API during a benchmark");
+    } else if (app->port > 0) {
         ecs_trace("serving REST API on port %d", app->port);
         box_app_serve(world, app->port);
     }
@@ -1182,6 +1187,10 @@ static int box_app_end(
             ecs_err("run ended with scene '%s' not loaded", app->scene);
             result = -1;
         }
+    }
+
+    if (box_app_benchmark_end(world)) {
+        result = -1;
     }
 
     status->errors = box_app_errors(clock);
@@ -1327,6 +1336,8 @@ void BoxAppImport(
         .run = BoxAppFrame,
         .ctx = clock
     });
+
+    box_app_benchmark_init(world);
 
     ecs_singleton_set(world, App, {
         .cpu_budget = 100,

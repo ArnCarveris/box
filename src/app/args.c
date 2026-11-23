@@ -217,6 +217,8 @@ static const char *box_app_usage_options =
     "  --unguarded            start a headless run even when the machine is oversubscribed\n"
     "  --async-loads          headless frames don't wait for texture, text and other loads\n"
     "  --fail-on-error        exit with 1 when an error was logged during the run\n"
+    "  --benchmark            time 600 frames at 3840x2160 once the scene settled, without\n"
+    "                         vsync or frame pacing, print the result and exit\n"
     "  --frames <n>           stop after n frames, n >= 1\n"
     "  --timeout <s|infinite> stop after s seconds (s > 0), or never with infinite\n"
     "  --cpu-budget <pct>     percent of one core a headless run may use, such as 50 or 50%,\n"
@@ -286,6 +288,8 @@ int box_app_parse(
             app->async_loads = true;
         } else if (!strcmp(arg, "--fail-on-error")) {
             app->fail_on_error = true;
+        } else if (!strcmp(arg, "--benchmark")) {
+            app->benchmark = true;
         } else if (arg[1] == '-' && box_app_has_value(&arg[2])) {
             result = box_app_option(app, &arg[2], i + 1 < argc ? argv[i + 1] : NULL);
             i ++;
@@ -297,6 +301,18 @@ int box_app_parse(
 
     if (!result && !app->help && app->design && app->camera) {
         ecs_err("--design and --camera cannot be combined");
+        result = -1;
+    }
+
+    if (!result && !app->help && app->benchmark && app->frames > 0) {
+        ecs_err("--benchmark and --frames cannot be combined, a benchmark measures %d frames",
+            BOX_APP_BENCHMARK_FRAMES);
+        result = -1;
+    }
+
+    if (!result && !app->help && app->benchmark && app->surface_width > 0) {
+        ecs_err("--benchmark and --surface cannot be combined, a benchmark renders at %dx%d",
+            BOX_APP_BENCHMARK_WIDTH, BOX_APP_BENCHMARK_HEIGHT);
         result = -1;
     }
 

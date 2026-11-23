@@ -661,8 +661,9 @@ static void BoxFileWatchPoll(
     const FileWatch *settings = ecs_singleton_get(world, FileWatch);
     float interval = settings ? settings->interval : BOX_FILE_WATCH_INTERVAL;
     box_watch_found_t found = {0};
+    const App *app = ecs_singleton_get(world, App);
     int32_t i;
-    if (!w || interval < 0) {
+    if (!w || interval < 0 || (app && app->benchmark)) {
         goto done;
     }
 
@@ -671,7 +672,6 @@ static void BoxFileWatchPoll(
 #else
     bool threaded = interval > 0 && !w->no_thread && ecs_os_has_threading();
 #endif
-    const App *app = ecs_singleton_get(world, App);
     bool wait = !threaded || (app && app->headless && !app->async_loads);
     box_watch_pass_state_t state = box_watch_pass_get(&w->pass, wait);
     if (state == BoxWatchDone) {

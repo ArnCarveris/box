@@ -69,8 +69,19 @@ ECS_STRUCT(App, {
     char *out;          /**< Image file the surface is written to, set by --out, NULL for none */
     bool no_audio;      /**< Open no audio output, set by --no-audio */
     bool fail_on_error; /**< A run during which an error was logged fails, by --fail-on-error */
+    bool benchmark;     /**< Time BOX_APP_BENCHMARK_FRAMES settled, unpaced frames without
+                         *   vsync at 4K, print the result and exit, by --benchmark */
     bool help;          /**< The usage was printed by --help or -h, the app exits with 0 */
 });
+
+/** Frames a benchmark (App.benchmark) measures */
+#define BOX_APP_BENCHMARK_FRAMES (600)
+
+/** Width in pixels every surface of a benchmark that is not a texture renders at, 4K */
+#define BOX_APP_BENCHMARK_WIDTH (3840)
+
+/** Height in pixels every surface of a benchmark that is not a texture renders at, 4K */
+#define BOX_APP_BENCHMARK_HEIGHT (2160)
 
 /** Frame rate cap of a scene, a singleton a scene script sets, such as
  * `$ { box.app.FpsTarget: {30} }`.
@@ -190,7 +201,7 @@ void BoxAppImport(
 
 /** Write command line arguments into the App singleton: --headless, --unguarded, --frames <n>,
  * --timeout <s|infinite>, --cpu-budget <pct>, --fps <n>, --delta-time <s>, --port <n>,
- * --surface <w>x<h>, --fail-on-error, --async-loads, --help, a scene.
+ * --surface <w>x<h>, --fail-on-error, --async-loads, --benchmark, --help, a scene.
  *
  * --async-loads lets headless frames run on while texture, TextureGen, glyph and other jobs are
  * in flight, so their results appear in a later frame as in a windowed run. Without it a

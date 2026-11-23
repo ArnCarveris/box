@@ -93,6 +93,64 @@ void Args_async_loads(void) {
     ecs_fini(world);
 }
 
+void Args_benchmark(void) {
+    // engine_core/app
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    test_bool(ecs_singleton_get(world, App)->benchmark, false);
+    char *argv[] = {"boxrun", "--headless", "--benchmark"};
+    test_int(box_app_parse(world, 3, argv), 0);
+
+    const App *app = ecs_singleton_get(world, App);
+    test_bool(app->benchmark, true);
+    test_bool(app->headless, true);
+    test_int(app->frames, 0);
+    test_flt(box_app_fps(world), 0);
+
+    ecs_fini(world);
+}
+
+void Args_benchmark_no_fps_cap(void) {
+    // engine_core/app
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    char *argv[] = {"boxrun", "--fps", "30", "--benchmark"};
+    test_int(box_app_parse(world, 4, argv), 0);
+
+    const App *app = ecs_singleton_get(world, App);
+    test_bool(app->benchmark, true);
+    test_flt(app->fps, 30);
+    test_flt(box_app_fps(world), 0);
+
+    ecs_fini(world);
+}
+
+void Args_benchmark_with_frames(void) {
+    // engine_core/app
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_log_set_level(-4);
+
+    char *argv[] = {"boxrun", "--benchmark", "--frames", "10"};
+    test_assert(box_app_parse(world, 4, argv) != 0);
+
+    ecs_fini(world);
+}
+
+void Args_benchmark_with_surface(void) {
+    // engine_core/app
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_log_set_level(-4);
+
+    char *argv[] = {"boxrun", "--benchmark", "--surface", "1280x720"};
+    test_assert(box_app_parse(world, 4, argv) != 0);
+
+    ecs_fini(world);
+}
+
 void Args_fail_on_error(void) {
     // engine_core/app
     ecs_world_t *world = ecs_init();

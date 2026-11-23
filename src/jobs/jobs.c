@@ -135,7 +135,7 @@ static int32_t box_jobs_thread_count(
     if (result == BOX_JOBS_AUTO) {
         const App *app = ecs_singleton_get(world, App);
         float budget = 0;
-        if (app && app->headless && !app->unpaced) {
+        if (app && app->headless && !app->unpaced && !app->benchmark) {
             budget = app->cpu_budget;
         }
 
