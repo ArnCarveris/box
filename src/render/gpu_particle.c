@@ -1000,7 +1000,7 @@ void box_gpu_particles_simulate(
     }
 
     WGPUBindGroup group = box_gpu_particle_sim_group(gpu);
-    WGPUComputePassEncoder pass = wgpuCommandEncoderBeginComputePass(encoder, NULL);
+    WGPUComputePassEncoder pass = box_gpu_profile_compute_pass(gpu, encoder, "particles");
     for (i = 0; i < ecs_vec_count(&s->dispatches); i ++) {
         const box_gpu_particle_dispatch_t *d = ecs_vec_get_t(
             &s->dispatches, box_gpu_particle_dispatch_t, i);

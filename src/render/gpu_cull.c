@@ -1011,17 +1011,19 @@ done:
 
 /** Begin the compute pass of the cull dispatches when it is not begun yet.
  *
+ * @param gpu The backend
  * @param encoder The encoder of the frame
  * @param pass The pass, set when it begins
  * @param writes Timestamps the compute pass writes, NULL for none
  */
 static void box_gpu_cull_pass(
+    box_gpu_t *gpu,
     WGPUCommandEncoder encoder,
     WGPUComputePassEncoder *pass,
     const WGPUPassTimestampWrites *writes)
 {
     if (!*pass) {
-        *pass = box_gpu_compute_begin(encoder, writes);
+        *pass = box_gpu_compute_begin(gpu, encoder, writes, "cull");
     }
 }
 
@@ -1102,7 +1104,7 @@ static void box_gpu_cull_dispatches(
             }
 
             box_gpu_cull_rows(dp->groups, groups);
-            box_gpu_cull_pass(encoder, &pass, writes);
+            box_gpu_cull_pass(gpu, encoder, &pass, writes);
             if (c->ordered != bound) {
                 wgpuComputePassEncoderSetPipeline(pass, c->ordered);
                 bound = c->ordered;
@@ -1126,7 +1128,7 @@ static void box_gpu_cull_dispatches(
         }
 
         box_gpu_cull_rows(r->groups, groups);
-        box_gpu_cull_pass(encoder, &pass, writes);
+        box_gpu_cull_pass(gpu, encoder, &pass, writes);
         if (c->parallel != bound) {
             wgpuComputePassEncoderSetPipeline(pass, c->parallel);
             bound = c->parallel;
@@ -1152,7 +1154,7 @@ static void box_gpu_cull_dispatches(
             }
 
             box_gpu_cull_rows(stage ? (t->entries ? t->groups : 0) : t->entries, groups);
-            box_gpu_cull_pass(encoder, &pass, writes);
+            box_gpu_cull_pass(gpu, encoder, &pass, writes);
             if (pipeline != bound) {
                 wgpuComputePassEncoderSetPipeline(pass, pipeline);
                 bound = pipeline;
@@ -1175,7 +1177,7 @@ static void box_gpu_cull_dispatches(
             continue;
         }
 
-        box_gpu_cull_pass(encoder, &pass, writes);
+        box_gpu_cull_pass(gpu, encoder, &pass, writes);
         if (c->lod != bound) {
             wgpuComputePassEncoderSetPipeline(pass, c->lod);
             bound = c->lod;

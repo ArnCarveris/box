@@ -809,12 +809,14 @@ done:
 
 /** Begin a compute pass of the atmosphere, timed when there is room for its timestamps.
  *
+ * @param gpu The backend
  * @param a The atmosphere state
  * @param encoder The encoder
  * @param pass The pass
  * @return The compute pass, with the pipeline of the pass set
  */
 static WGPUComputePassEncoder box_gpu_atmos_begin(
+    box_gpu_t *gpu,
     box_gpu_atmos_t *a,
     WGPUCommandEncoder encoder,
     box_render_atmos_pass_t pass)
@@ -834,7 +836,7 @@ static WGPUComputePassEncoder box_gpu_atmos_begin(
         r->count += 2;
     }
 
-    WGPUComputePassEncoder result = box_gpu_compute_begin(encoder, timed);
+    WGPUComputePassEncoder result = box_gpu_compute_begin(gpu, encoder, timed, "atmosphere");
     wgpuComputePassEncoderSetPipeline(result, a->pipelines[pass]);
 
     return result;
@@ -867,7 +869,7 @@ static void box_gpu_atmos_dispatch(
         .entryCount = count,
         .entries = entries
     });
-    WGPUComputePassEncoder cp = box_gpu_atmos_begin(a, encoder, pass);
+    WGPUComputePassEncoder cp = box_gpu_atmos_begin(gpu, a, encoder, pass);
     wgpuComputePassEncoderSetBindGroup(cp, 0, group, 0, NULL);
     wgpuComputePassEncoderDispatchWorkgroups(cp,
         (width + BOX_GPU_ATMOS_GROUP - 1) / BOX_GPU_ATMOS_GROUP,

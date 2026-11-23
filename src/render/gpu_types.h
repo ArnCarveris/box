@@ -1693,6 +1693,11 @@ typedef struct box_gpu_t {
                                      *   next packet, under the lock */
     bool stats_detail;              /**< The read back of the cull counters also copies the
                                      *   draw arguments to count triangles, under the lock */
+    bool timing;                    /**< The passes are timed (box_render_gpu_timing), under the
+                                     *   lock */
+    ecs_vec_t timings;              /**< box_render_gpu_timing_t not yet taken, under the lock */
+    struct box_gpu_profile_t *profile; /**< Timestamps of the passes (gpu_profile.c), created
+                                     *   when the timing or BOX_GPU_PROFILE first needs them */
     uint64_t buffer_writes;         /**< Writes to buffers, the version of the last one */
     box_render_gpu_stats_t stats;   /**< Counters read by the main thread */
     box_render_gpu_stats_t pending; /**< Counter changes not yet published, render thread only */

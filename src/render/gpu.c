@@ -596,7 +596,7 @@ static void box_gpu_render(
     box_gpu_targets_render(gpu, packet);
     box_gpu_grass_end(gpu, packet);
     box_gpu_impostor_render(gpu, packet);
-    box_gpu_profile_frame(gpu);
+    box_gpu_profile_frame(gpu, packet);
     box_gpu_pace(gpu);
 
     box_gpu_effects_sweep(gpu, packet);
@@ -654,6 +654,7 @@ static void box_gpu_fini(
 {
     box_gpu_t *gpu = ctx;
     box_gpu_pipelines_fini(gpu);
+    box_gpu_profile_fini(gpu);
     if (gpu->device) {
         box_gpu_texture_graphs_fini(gpu);
         box_gpu_impostor_fini(gpu);
@@ -714,14 +715,18 @@ static void box_gpu_free(
     ecs_vec_fini_t(NULL, &gpu->graph_results, box_render_texture_graph_result_t);
     ecs_vec_fini_t(NULL, &gpu->graph_requests, box_render_texture_read_t);
     ecs_vec_fini_t(NULL, &gpu->graph_reads, box_render_texture_read_t);
+    ecs_vec_fini_t(NULL, &gpu->timings, box_render_gpu_timing_t);
     ecs_os_mutex_free(gpu->lock);
     ecs_os_free(gpu);
 }
 
 WGPUComputePassEncoder box_gpu_compute_begin(
+    box_gpu_t *gpu,
     WGPUCommandEncoder encoder,
-    const WGPUPassTimestampWrites *writes)
+    const WGPUPassTimestampWrites *writes,
+    const char *label)
 {
+    WGPUPassTimestampWrites own;
     ecs_assert(!writes || writes->querySet, ECS_INVALID_PARAMETER,
         "timestamp writes without a query set");
     ecs_assert(!writes ||
@@ -730,6 +735,12 @@ WGPUComputePassEncoder box_gpu_compute_begin(
     ecs_assert(!writes ||
         writes->endOfPassWriteIndex < wgpuQuerySetGetCount(writes->querySet),
         ECS_INVALID_PARAMETER, "timestamp end index out of range of its query set");
+
+    if (writes) {
+        box_gpu_profile_borrow(gpu, label, writes);
+    } else {
+        writes = box_gpu_profile_writes(gpu, label, &own);
+    }
 
     return wgpuCommandEncoderBeginComputePass(encoder,
         &(WGPUComputePassDescriptor){ .timestampWrites = writes });
@@ -1074,6 +1085,50 @@ bool box_render_gpu_stats_detail(
     return result;
 }
 
+bool box_render_gpu_timing(
+    ecs_world_t *world,
+    bool enable)
+{
+    const box_render_backend_t *backend = box_render_get_backend(world);
+    bool result = backend->render == box_gpu_render;
+    if (result) {
+        box_gpu_t *gpu = backend->ctx;
+        ecs_os_mutex_lock(gpu->lock);
+        gpu->timing = enable;
+        result = gpu->stats.ready && gpu->timestamps;
+        ecs_os_mutex_unlock(gpu->lock);
+    }
+
+    return result;
+}
+
+int32_t box_render_gpu_timings(
+    ecs_world_t *world,
+    box_render_gpu_timing_t *out,
+    int32_t count)
+{
+    const box_render_backend_t *backend = box_render_get_backend(world);
+    int32_t result = 0;
+    if (backend->render == box_gpu_render && count > 0) {
+        box_gpu_t *gpu = backend->ctx;
+        ecs_os_mutex_lock(gpu->lock);
+        int32_t available = ecs_vec_count(&gpu->timings);
+        result = available < count ? available : count;
+        box_render_gpu_timing_t *timings = ecs_vec_first(&gpu->timings);
+        if (result) {
+            ecs_os_memcpy_n(out, timings, box_render_gpu_timing_t, result);
+            ecs_os_memmove(timings, &timings[result],
+                (available - result) * ECS_SIZEOF(box_render_gpu_timing_t));
+            ecs_vec_set_count_t(NULL, &gpu->timings, box_render_gpu_timing_t,
+                available - result);
+        }
+
+        ecs_os_mutex_unlock(gpu->lock);
+    }
+
+    return result;
+}
+
 bool box_render_gpu_compile_delivery(
     ecs_world_t *world,
     box_render_compile_delivery_t delivery)
@@ -1224,6 +1279,28 @@ bool box_render_gpu_stats_detail(
     (void)detail;
 
     return false;
+}
+
+bool box_render_gpu_timing(
+    ecs_world_t *world,
+    bool enable)
+{
+    (void)world;
+    (void)enable;
+
+    return false;
+}
+
+int32_t box_render_gpu_timings(
+    ecs_world_t *world,
+    box_render_gpu_timing_t *out,
+    int32_t count)
+{
+    (void)world;
+    (void)out;
+    (void)count;
+
+    return 0;
 }
 
 bool box_render_gpu_compile_delivery(

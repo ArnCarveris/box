@@ -1738,8 +1738,8 @@ void box_gpu_texture_graphs_evaluate(
             .beginningOfPassWriteIndex = (uint32_t)stamp * 2,
             .endOfPassWriteIndex = (uint32_t)stamp * 2 + 1
         };
-        WGPUComputePassEncoder cpass = box_gpu_compute_begin(encoder,
-            stamp >= 0 ? &writes : NULL);
+        WGPUComputePassEncoder cpass = box_gpu_compute_begin(gpu, encoder,
+            stamp >= 0 ? &writes : NULL, "texture graphs");
         for (; i < count && ev[i].pass == pass; i ++) {
             if (ev[i].key == BOX_GPU_TG_BLEND) {
                 box_gpu_tg_blend(gpu, tg, cpass, &ev[i]);

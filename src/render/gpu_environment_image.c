@@ -271,7 +271,8 @@ static void box_gpu_env_image_convert(
         }
     });
     WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(gpu->device, NULL);
-    WGPUComputePassEncoder pass = wgpuCommandEncoderBeginComputePass(encoder, NULL);
+    WGPUComputePassEncoder pass = box_gpu_profile_compute_pass(gpu, encoder,
+        "environment image");
     wgpuComputePassEncoderSetPipeline(pass, pipeline);
     wgpuComputePassEncoderSetBindGroup(pass, 0, group, 0, NULL);
     wgpuComputePassEncoderDispatchWorkgroups(pass, groups, groups, 6);

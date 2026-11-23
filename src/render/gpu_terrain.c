@@ -836,7 +836,8 @@ bool box_render_gpu_terrain_compute(
         .entries = bindings
     });
     WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(gpu->device, NULL);
-    WGPUComputePassEncoder pass = box_gpu_compute_begin(encoder, NULL);
+    WGPUComputePassEncoder pass = box_gpu_compute_begin(gpu, encoder, NULL,
+        "terrain");
     wgpuComputePassEncoderSetPipeline(pass, pipeline);
     wgpuComputePassEncoderSetBindGroup(pass, 0, sampled, 0, NULL);
     wgpuComputePassEncoderSetBindGroup(pass, 1, group, 0, NULL);

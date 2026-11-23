@@ -36,19 +36,24 @@ void box_gpu_count(
     box_gpu_t *gpu,
     box_gpu_stat_t stat);
 
-/** Begin a compute pass, timed when it has timestamp writes.
+/** Begin a compute pass, timed when it has timestamp writes, and measured by the GPU profile
+ * under a label: with the timestamps of the writes, or with its own without writes.
  *
  * Debug builds assert that the query set of the writes is set and that both indices are below
  * its count, so WGPU_QUERY_SET_INDEX_UNDEFINED fails natively too: emdawnwebgpu passes it on as
  * an out of range index, which makes the pass and its command buffer invalid in the browser.
  *
+ * @param gpu The backend
  * @param encoder The encoder
  * @param writes Timestamps the pass writes, NULL when the pass is not timed
+ * @param label Label of the pass, a string that outlives the backend
  * @return The compute pass
  */
 WGPUComputePassEncoder box_gpu_compute_begin(
+    box_gpu_t *gpu,
     WGPUCommandEncoder encoder,
-    const WGPUPassTimestampWrites *writes);
+    const WGPUPassTimestampWrites *writes,
+    const char *label);
 
 /** Request a render pipeline, created in the background and counted in the stats while it is
  * created and once it exists.
@@ -1155,7 +1160,7 @@ void box_gpu_terrain_bake(
     int32_t slot);
 
 /** Get the timestamp writes of a pass to measure with the GPU profile (gpu_profile.c), on
- * when the BOX_GPU_PROFILE environment variable is set.
+ * when the BOX_GPU_PROFILE environment variable is set or box_render_gpu_timing turned it on.
  *
  * @param gpu The backend
  * @param label Label of the pass, a string that outlives the backend
@@ -1167,11 +1172,24 @@ const WGPUPassTimestampWrites* box_gpu_profile_writes(
     const char *label,
     WGPUPassTimestampWrites *out);
 
-/** Begin a render pass that the GPU profile measures under a label when it is on.
+/** Measure a pass that writes timestamps of its own with the GPU profile: the profile resolves
+ * them at the end of the frame, before the queries are written again.
+ *
+ * @param gpu The backend
+ * @param label Label of the pass, a string that outlives the backend
+ * @param writes The timestamps of the pass
+ */
+void box_gpu_profile_borrow(
+    box_gpu_t *gpu,
+    const char *label,
+    const WGPUPassTimestampWrites *writes);
+
+/** Begin a render pass that the GPU profile measures under a label when it is on, with the
+ * timestamp writes of the pass when it has them.
  *
  * @param gpu The backend
  * @param encoder The encoder
- * @param desc The pass, measured only without timestamp writes of its own
+ * @param desc The pass
  * @param label Label of the pass, a string that outlives the backend
  * @return The pass
  */
@@ -1193,11 +1211,21 @@ WGPUComputePassEncoder box_gpu_profile_compute_pass(
     WGPUCommandEncoder encoder,
     const char *label);
 
-/** End the frame of the GPU profile: read the frames the queue finished and log their means.
+/** End the frame of the GPU profile: resolve the timestamps of the packet, publish the timings
+ * of the packets the GPU finished and, with BOX_GPU_PROFILE, log their means.
+ *
+ * @param gpu The backend
+ * @param packet The packet the frame rendered
+ */
+void box_gpu_profile_frame(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet);
+
+/** Release the queries and buffers of the GPU profile, with the device.
  *
  * @param gpu The backend
  */
-void box_gpu_profile_frame(
+void box_gpu_profile_fini(
     box_gpu_t *gpu);
 
 /** Release the bake atlas of a terrain grid mesh.

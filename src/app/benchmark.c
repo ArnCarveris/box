@@ -6,6 +6,9 @@
  * A frame is settled when no aperiodic work ran in it: no task, job, pipeline or shader compile,
  * bake, texture graph miss, terrain tile, impostor bake, capture or resize. Such work during the
  * measurement throws the frames away, so the benchmark settles and measures again.
+ *
+ * The GPU timing of the backend (box_render_gpu_timing) is on from the first frame, so the
+ * timestamps cost the same while settling, and reports the GPU time of the measured frames.
  */
 
 #include "app.h"
@@ -36,7 +39,13 @@
 #define BOX_BENCHMARK_PERCENTILES (5)
 
 /** Width of the label column of the report */
-#define BOX_BENCHMARK_LABEL_WIDTH (26)
+#define BOX_BENCHMARK_LABEL_WIDTH (34)
+
+/** Frames the benchmark waits after the measurement for the GPU timings of its frames */
+#define BOX_BENCHMARK_DRAIN (60)
+
+/** GPU timings taken from the backend at once */
+#define BOX_BENCHMARK_TIMINGS (32)
 
 /** Counters of aperiodic work, which a settled frame leaves unchanged */
 typedef enum box_benchmark_counter_t {
@@ -90,6 +99,7 @@ static const double box_benchmark_percentiles[BOX_BENCHMARK_PERCENTILES] = {
 typedef enum box_benchmark_phase_t {
     BoxBenchmarkSettle = 0,     /**< Waiting for BOX_BENCHMARK_SETTLE settled frames */
     BoxBenchmarkMeasure,        /**< Recording the frames */
+    BoxBenchmarkDrain,          /**< Waiting for the GPU timings of the measured frames */
     BoxBenchmarkDone,           /**< Reported */
     BoxBenchmarkFailed          /**< Did not settle in time */
 } box_benchmark_phase_t;
@@ -109,7 +119,19 @@ typedef struct box_benchmark_t {
     double settle_start;            /**< Wall seconds the current settling started, 0 none */
     double settle_time;             /**< Wall seconds of the earlier settling */
     ecs_vec_t series[BOX_BENCHMARK_SERIES]; /**< Milliseconds per measured frame, of double */
+    bool timing;                    /**< The GPU timing of the backend is on */
+    ecs_vec_t gpu;                  /**< box_render_gpu_timing_t of the measured frames */
+    int64_t gpu_first;              /**< Frame of the first measured packet */
+    int64_t gpu_last;               /**< Frame of the last measured packet */
+    int64_t gpu_seen;               /**< Frame of the newest GPU timing, -1 for none */
+    int32_t drained;                /**< Frames waited for the GPU timings */
 } box_benchmark_t;
+
+/** Totals of a pass label over the GPU timings of the measured frames */
+typedef struct box_benchmark_label_t {
+    const char *label;              /**< The label */
+    double ms;                      /**< Milliseconds of its passes over every frame */
+} box_benchmark_label_t;
 
 /** Free the state of the benchmark.
  *
@@ -124,6 +146,7 @@ static void box_benchmark_free(
         ecs_vec_fini_t(NULL, &b->series[i], double);
     }
 
+    ecs_vec_fini_t(NULL, &b->gpu, box_render_gpu_timing_t);
     ecs_os_free(b);
 }
 
@@ -363,10 +386,59 @@ static void box_benchmark_sample(
         load ? box_frame_sample(&load->audio, 0) : 0,
         load ? box_frame_sample(&load->jobs, 0) : 0
     };
+    int64_t frame = (int64_t)ecs_get_world_info(world)->frame_count_total - 1;
     int32_t i;
     for (i = 0; i < BOX_BENCHMARK_SERIES; i ++) {
         ecs_vec_append_t(NULL, &b->series[i], double)[0] = values[i];
     }
+
+    b->gpu_first = ecs_vec_count(&b->series[0]) == 1 ? frame : b->gpu_first;
+    b->gpu_last = frame;
+}
+
+/** Turn on the GPU timing of the backend until it is on, and take the GPU timings that
+ * arrived: those of the measured frames are kept while measuring or draining.
+ *
+ * @param world The world
+ * @param b The state
+ */
+static void box_benchmark_gpu(
+    ecs_world_t *world,
+    box_benchmark_t *b)
+{
+    box_render_gpu_timing_t timings[BOX_BENCHMARK_TIMINGS];
+    bool keep = b->phase == BoxBenchmarkMeasure || b->phase == BoxBenchmarkDrain;
+    int32_t i, count = BOX_BENCHMARK_TIMINGS;
+    if (!ecs_id(RenderStatus)) {
+        goto done;
+    }
+
+    b->timing = b->timing || box_render_gpu_timing(world, true);
+    while (count == BOX_BENCHMARK_TIMINGS) {
+        count = box_render_gpu_timings(world, timings, BOX_BENCHMARK_TIMINGS);
+        for (i = 0; i < count; i ++) {
+            b->gpu_seen = timings[i].frame > b->gpu_seen ? timings[i].frame : b->gpu_seen;
+            if (keep && ecs_vec_count(&b->series[0]) && timings[i].frame >= b->gpu_first) {
+                ecs_vec_append_t(NULL, &b->gpu, box_render_gpu_timing_t)[0] = timings[i];
+            }
+        }
+    }
+
+done:
+    return;
+}
+
+/** Check whether a GPU timing is of a measured frame.
+ *
+ * @param b The state
+ * @param t The timing
+ * @return Whether the timing is of a frame between the first and the last measured frame
+ */
+static bool box_benchmark_measured(
+    const box_benchmark_t *b,
+    const box_render_gpu_timing_t *t)
+{
+    return t->frame >= b->gpu_first && t->frame <= b->gpu_last;
 }
 
 /** Compare two samples for qsort.
@@ -440,8 +512,8 @@ static void box_benchmark_row(
     double sum = box_benchmark_sum(series);
     ecs_os_memcpy_n(sorted, ecs_vec_first_t(series, double), double, count);
     qsort(sorted, (size_t)count, sizeof(double), box_benchmark_cmp);
-    ecs_strbuf_append(buf, "%-*s %8.3f", BOX_BENCHMARK_LABEL_WIDTH, label,
-        sum / (double)count);
+    ecs_strbuf_append(buf, "%-*.*s %8.3f", BOX_BENCHMARK_LABEL_WIDTH,
+        BOX_BENCHMARK_LABEL_WIDTH, label, sum / (double)count);
     for (i = 0; i < BOX_BENCHMARK_PERCENTILES; i ++) {
         ecs_strbuf_append(buf, " %8.3f",
             box_benchmark_percentile(sorted, count, box_benchmark_percentiles[i]));
@@ -490,6 +562,125 @@ static void box_benchmark_surface(
     }
 }
 
+/** Compare two pass labels by their milliseconds for qsort, the largest first.
+ *
+ * @param a The first label
+ * @param b The second label
+ * @return Negative when a took longer, positive when b did, 0 when they took as long
+ */
+static int box_benchmark_label_cmp(
+    const void *a,
+    const void *b)
+{
+    double x = ((const box_benchmark_label_t*)a)->ms;
+    double y = ((const box_benchmark_label_t*)b)->ms;
+
+    return (x < y) - (x > y);
+}
+
+/** Total the milliseconds of every pass label over the GPU timings of the measured frames.
+ *
+ * @param b The state
+ * @param labels Receives the labels, the largest first, BOX_RENDER_GPU_TIMING_LABELS at most
+ * @return The labels
+ */
+static int32_t box_benchmark_labels(
+    const box_benchmark_t *b,
+    box_benchmark_label_t *labels)
+{
+    const box_render_gpu_timing_t *t = ecs_vec_first_t(&b->gpu, box_render_gpu_timing_t);
+    int32_t i, j, l, result = 0;
+    for (i = 0; i < ecs_vec_count(&b->gpu); i ++) {
+        for (j = 0; box_benchmark_measured(b, &t[i]) && j < t[i].labels; j ++) {
+            for (l = 0; l < result && strcmp(labels[l].label, t[i].label[j]); l ++) { }
+            if (l == result && result < BOX_RENDER_GPU_TIMING_LABELS) {
+                labels[result ++] = (box_benchmark_label_t){ t[i].label[j], 0 };
+            }
+
+            labels[l].ms += l < result ? t[i].label_ms[j] : 0;
+        }
+    }
+
+    qsort(labels, (size_t)result, sizeof(box_benchmark_label_t), box_benchmark_label_cmp);
+
+    return result;
+}
+
+/** Fill a series with a value of every GPU timing of the measured frames: its busy time, its
+ * span, or the milliseconds of the passes of a label.
+ *
+ * @param b The state
+ * @param label The label of the passes, NULL for the busy time
+ * @param span Fill the span instead of the busy time, when label is NULL
+ * @param out Receives the values, of double
+ */
+static void box_benchmark_gpu_series(
+    const box_benchmark_t *b,
+    const char *label,
+    bool span,
+    ecs_vec_t *out)
+{
+    const box_render_gpu_timing_t *t = ecs_vec_first_t(&b->gpu, box_render_gpu_timing_t);
+    int32_t i, j;
+    ecs_vec_clear(out);
+    for (i = 0; i < ecs_vec_count(&b->gpu); i ++) {
+        double ms = span ? t[i].span_ms : t[i].busy_ms;
+        if (label) {
+            ms = 0;
+            for (j = 0; j < t[i].labels; j ++) {
+                ms += strcmp(t[i].label[j], label) ? 0 : t[i].label_ms[j];
+            }
+        }
+
+        if (box_benchmark_measured(b, &t[i])) {
+            ecs_vec_append_t(NULL, out, double)[0] = ms;
+        }
+    }
+}
+
+/** Append the GPU time of the measured frames to the report: the busy time and span of the
+ * frames, as a share of the frame time, and the time of every pass label, as a share of busy.
+ *
+ * @param buf The report
+ * @param b The state
+ * @param frame_mean The mean frame interval in milliseconds
+ */
+static void box_benchmark_report_gpu(
+    ecs_strbuf_t *buf,
+    const box_benchmark_t *b,
+    double frame_mean)
+{
+    box_benchmark_label_t labels[BOX_RENDER_GPU_TIMING_LABELS];
+    ecs_vec_t series = {0};
+    int32_t l, count = 0;
+    double busy = 0;
+    char label[64];
+    box_benchmark_gpu_series(b, NULL, false, &series);
+    count = ecs_vec_count(&series);
+    busy = box_benchmark_sum(&series);
+    if (!b->timing || !count) {
+        ecs_strbuf_append(buf, "\nGPU time not measured: %s\n", b->timing
+            ? "no GPU timings arrived" : "the device has no timestamp queries");
+        goto done;
+    }
+
+    ecs_strbuf_append(buf, "\nGPU, %d of %d frames timed\n", count,
+        ecs_vec_count(&b->series[0]));
+    box_benchmark_row(buf, "GPU busy", &series, frame_mean * (double)count);
+    box_benchmark_gpu_series(b, NULL, true, &series);
+    box_benchmark_row(buf, "GPU span", &series, frame_mean * (double)count);
+    ecs_strbuf_appendstr(buf, "\nGPU passes, share of GPU busy\n");
+    count = box_benchmark_labels(b, labels);
+    for (l = 0; l < count; l ++) {
+        ecs_os_snprintf(label, sizeof(label), "  %s", labels[l].label);
+        box_benchmark_gpu_series(b, labels[l].label, false, &series);
+        box_benchmark_row(buf, label, &series, busy);
+    }
+
+done:
+    ecs_vec_fini_t(NULL, &series, double);
+}
+
 /** Print the report of a benchmark to stdout.
  *
  * @param world The world
@@ -534,6 +725,7 @@ static void box_benchmark_report(
         box_benchmark_row(&buf, label, &b->series[i], i ? frame_ms : 0);
     }
 
+    box_benchmark_report_gpu(&buf, b, count ? frame_ms / (double)count : 0);
     char *report = ecs_strbuf_get(&buf);
     printf("%s", report);
     fflush(stdout);
@@ -556,6 +748,8 @@ static void box_benchmark_settle(
     for (i = 0; i < BOX_BENCHMARK_SERIES; i ++) {
         ecs_vec_clear(&b->series[i]);
     }
+
+    ecs_vec_clear(&b->gpu);
 }
 
 /** Advance a settling benchmark: start the measurement once enough frames in a row settled, or
@@ -611,7 +805,15 @@ static void BoxAppBenchmark(
 
     b->frames ++;
     busy = box_benchmark_busy(world, b);
-    if (b->phase == BoxBenchmarkMeasure && busy) {
+    box_benchmark_gpu(world, b);
+    if (b->phase == BoxBenchmarkDrain) {
+        b->drained ++;
+        if (b->gpu_seen >= b->gpu_last || !b->timing || b->drained >= BOX_BENCHMARK_DRAIN) {
+            box_benchmark_report(world, b);
+            b->phase = BoxBenchmarkDone;
+            ecs_quit(world);
+        }
+    } else if (b->phase == BoxBenchmarkMeasure && busy) {
         ecs_trace("benchmark: %s during the measurement, settling again", busy);
         b->restarts ++;
         b->busy = busy;
@@ -619,9 +821,8 @@ static void BoxAppBenchmark(
     } else if (b->phase == BoxBenchmarkMeasure) {
         box_benchmark_sample(world, b);
         if (ecs_vec_count(&b->series[0]) >= BOX_APP_BENCHMARK_FRAMES) {
-            box_benchmark_report(world, b);
-            b->phase = BoxBenchmarkDone;
-            ecs_quit(world);
+            b->phase = BoxBenchmarkDrain;
+            b->drained = 0;
         }
     } else {
         box_benchmark_settling(world, b, busy, now);
@@ -657,6 +858,7 @@ void box_app_benchmark_init(
     ecs_world_t *world)
 {
     box_benchmark_t *b = ecs_os_calloc_t(box_benchmark_t);
+    b->gpu_seen = -1;
     ecs_system(world, {
         .entity = ecs_entity(world, { .name = "Benchmark" }),
         .phase = EcsOnLoad,

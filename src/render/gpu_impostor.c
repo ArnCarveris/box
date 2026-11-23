@@ -213,11 +213,11 @@ static void box_gpu_impostor_copy(
         .loadOp = WGPULoadOp_Load,
         .storeOp = WGPUStoreOp_Store
     };
-    WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder,
+    WGPURenderPassEncoder pass = box_gpu_profile_render_pass(gpu, encoder,
         &(WGPURenderPassDescriptor){
             .colorAttachmentCount = 1,
             .colorAttachments = &attachment
-        });
+        }, "impostors");
     wgpuRenderPassEncoderSetPipeline(pass, pipeline);
     wgpuRenderPassEncoderSetBindGroup(pass, 0, group, 0, NULL);
     wgpuRenderPassEncoderSetViewport(pass, (float)b->x, (float)b->y, (float)size, (float)size,

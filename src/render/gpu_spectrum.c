@@ -598,7 +598,7 @@ void box_gpu_spectra_evolve(
             wgpuQueueWriteBuffer(gpu->queue, f->params, 0, &params, sizeof(params));
             if (!encoder) {
                 encoder = wgpuDeviceCreateCommandEncoder(gpu->device, NULL);
-                pass = wgpuCommandEncoderBeginComputePass(encoder, NULL);
+                pass = box_gpu_profile_compute_pass(gpu, encoder, "water spectra");
             }
 
             box_gpu_spectrum_dispatch(s, pass, f, generate);

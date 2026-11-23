@@ -520,7 +520,8 @@ bool box_gpu_reflect_store(
     }
 
     box_gpu_reflect_t *source = box_gpu_reflect_source(gpu, cube->resolution, (uint32_t)count);
-    WGPUComputePassEncoder pass = box_gpu_compute_begin(encoder, writes);
+    WGPUComputePassEncoder pass = box_gpu_compute_begin(gpu, encoder, writes,
+        "reflections");
     wgpuComputePassEncoderSetPipeline(pass, gpu->reflect_store);
     box_gpu_reflect_dispatch(gpu, pass, gpu->reflect_store_layout, (WGPUBindGroupEntry[6]){
         { .binding = 0, .buffer = params, .size = params_size },

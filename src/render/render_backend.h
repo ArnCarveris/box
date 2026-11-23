@@ -847,6 +847,56 @@ bool box_render_gpu_stats_detail(
     ecs_world_t *world,
     bool detail);
 
+/** Pass labels a GPU timing tells apart at most; the passes of further labels count only in
+ * the totals */
+#define BOX_RENDER_GPU_TIMING_LABELS (48)
+
+/** Timings the GPU backend keeps until box_render_gpu_timings takes them; it drops newer ones */
+#define BOX_RENDER_GPU_TIMING_KEEP (1024)
+
+/** GPU time of the passes of one packet, measured with timestamp queries.
+ *
+ * A pass counts the time from where the passes before it ended to where it ends, as the passes of
+ * a tiled GPU overlap, so the times of the labels add up to busy_ms, the time the GPU worked.
+ */
+typedef struct box_render_gpu_timing_t {
+    int64_t frame;          /**< Frame the packet was extracted in, box_render_packet_t.frame */
+    double busy_ms;         /**< Milliseconds the GPU worked on the passes of the packet */
+    double span_ms;         /**< Milliseconds from the start of the first pass to the end of the
+                             *   last, busy_ms plus the time the GPU idled between them */
+    int32_t passes;         /**< Passes timed */
+    int32_t labels;         /**< Entries of label and label_ms */
+    const char *label[BOX_RENDER_GPU_TIMING_LABELS]; /**< Labels of the passes, static strings */
+    double label_ms[BOX_RENDER_GPU_TIMING_LABELS]; /**< Milliseconds the passes of each label
+                             *   added to busy_ms */
+} box_render_gpu_timing_t;
+
+/** Turn on or off the GPU timing of the backend of a world: every pass of a packet writes
+ * timestamps, and each packet yields a box_render_gpu_timing_t once the GPU finished it.
+ *
+ * Applies from the next packet; off by default. Needs a device with timestamp queries.
+ *
+ * @param world The world
+ * @param enable Whether the passes are timed
+ * @return Whether the world renders with the GPU backend and its device has timestamp queries,
+ *         false before the device exists
+ */
+bool box_render_gpu_timing(
+    ecs_world_t *world,
+    bool enable);
+
+/** Take the GPU timings of the packets the GPU finished since the last call, oldest first.
+ *
+ * @param world The world
+ * @param out Receives the timings
+ * @param count Timings out has room for
+ * @return The timings written to out; the rest stays for the next call
+ */
+int32_t box_render_gpu_timings(
+    ecs_world_t *world,
+    box_render_gpu_timing_t *out,
+    int32_t count);
+
 /** Check whether the GPU backend of a world may still write the capture of a file: its packet
  * rendered and the readback of the image is still mapping.
  *

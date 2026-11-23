@@ -138,10 +138,9 @@ int main(
 
     ECS_IMPORT(world, Box);
 
-    ecs_log_set_level(0);
-    ecs_trace("imported box modules");
-
     result = box_app_parse(world, argc, argv);
+    ecs_log_set_level(ecs_singleton_get(world, App)->benchmark ? -3 : 0);
+    ecs_trace("imported box modules");
     if (!result && !ecs_singleton_get(world, App)->help) {
         boxrun_scene_name(world);
         result = box_app_run(world);

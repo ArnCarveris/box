@@ -439,7 +439,8 @@ static void box_gpu_env_record(
         mips = source->mips;
     }
 
-    WGPUComputePassEncoder pass = box_gpu_compute_begin(encoder, writes);
+    WGPUComputePassEncoder pass = box_gpu_compute_begin(gpu, encoder, writes,
+        "environment");
     box_gpu_reflect_mip_chain(gpu, pass, e->params, sizeof(box_gpu_bake_params_t), levels,
         e->resolution, mips, faces);
     if (source) {

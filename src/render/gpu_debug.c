@@ -1734,7 +1734,7 @@ void box_gpu_debug_record(
         .depthStencilAttachment = &depth
     };
     uint32_t offset = (uint32_t)(slot * BOX_GPU_VIEW_STRIDE);
-    WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &desc);
+    WGPURenderPassEncoder pass = box_gpu_profile_render_pass(gpu, encoder, &desc, "debug");
     wgpuRenderPassEncoderSetBindGroup(pass, 0, group, 1, &offset);
     if (overdraw) {
         wgpuRenderPassEncoderSetPipeline(pass, overdraw);

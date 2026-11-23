@@ -581,11 +581,13 @@ done:
 
 /** Clear a texture view with a render pass.
  *
+ * @param gpu The backend
  * @param encoder The encoder of the frame
  * @param view The view
  * @param color The linear clear color
  */
 static void box_gpu_clear(
+    box_gpu_t *gpu,
     WGPUCommandEncoder encoder,
     WGPUTextureView view,
     const float *color)
@@ -601,7 +603,7 @@ static void box_gpu_clear(
         .colorAttachmentCount = 1,
         .colorAttachments = &attachment
     };
-    WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &desc);
+    WGPURenderPassEncoder pass = box_gpu_profile_render_pass(gpu, encoder, &desc, "clear");
     wgpuRenderPassEncoderEnd(pass);
     wgpuRenderPassEncoderRelease(pass);
 }
@@ -701,7 +703,7 @@ static void box_gpu_target_scene_draw(
 {
     WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(gpu->device, NULL);
     WGPUCommandBuffer commands;
-    box_gpu_clear(encoder, t->scene_view, frame->clear);
+    box_gpu_clear(gpu, encoder, t->scene_view, frame->clear);
     box_gpu_draw_views(gpu, t, packet, frame, encoder, t->scene_view, t->scene);
     commands = wgpuCommandEncoderFinish(encoder, NULL);
     wgpuQueueSubmit(gpu->queue, 1, &commands);
@@ -732,7 +734,7 @@ void box_gpu_target_render(
     if (drawn) {
         box_gpu_blit(gpu, t, encoder, view);
     } else {
-        box_gpu_clear(encoder, view, frame->clear);
+        box_gpu_clear(gpu, encoder, view, frame->clear);
         box_gpu_draw_views(gpu, t, packet, frame, encoder, view, texture);
     }
 

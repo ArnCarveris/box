@@ -1025,7 +1025,7 @@ WGPUComputePassEncoder box_gpu_grass_pass(
     WGPUPassTimestampWrites writes;
     gpu->pending.grass_passes ++;
 
-    return box_gpu_compute_begin(encoder, box_gpu_grass_writes(s, &writes));
+    return box_gpu_compute_begin(gpu, encoder, box_gpu_grass_writes(s, &writes), "grass");
 }
 
 bool box_gpu_grass_dispatch(

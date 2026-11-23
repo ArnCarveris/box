@@ -687,11 +687,11 @@ static void box_gpu_planar_pyramid_pass(
         .storeOp = WGPUStoreOp_Store,
         .clearValue = { 0, 0, 0, 0 }
     };
-    WGPURenderPassEncoder rp = wgpuCommandEncoderBeginRenderPass(encoder,
+    WGPURenderPassEncoder rp = box_gpu_profile_render_pass(gpu, encoder,
         &(WGPURenderPassDescriptor){
             .colorAttachmentCount = 1,
             .colorAttachments = &attachment
-        });
+        }, "planar reflections");
     wgpuRenderPassEncoderSetViewport(rp, 0, 0, (float)width, (float)height, 0, 1);
     wgpuRenderPassEncoderSetScissorRect(rp, 0, 0, width, height);
     wgpuRenderPassEncoderSetPipeline(rp, pipeline);
@@ -921,12 +921,12 @@ void box_gpu_planar_render(
             .depthStoreOp = WGPUStoreOp_Discard,
             .depthClearValue = 0.0f
         };
-        WGPURenderPassEncoder rp = wgpuCommandEncoderBeginRenderPass(encoder,
+        WGPURenderPassEncoder rp = box_gpu_profile_render_pass(gpu, encoder,
             &(WGPURenderPassDescriptor){
                 .colorAttachmentCount = 1,
                 .colorAttachments = &attachment,
                 .depthStencilAttachment = &depth
-            });
+            }, "planar reflections");
         if (pass->clips) {
             box_gpu_planar_draws(gpu, t, rp, packet, v, pass, rec->slot, group);
         }

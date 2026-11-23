@@ -757,7 +757,7 @@ static bool box_gpu_bake_cull(
         goto done;
     }
 
-    WGPUComputePassEncoder pass = box_gpu_compute_begin(encoder, writes);
+    WGPUComputePassEncoder pass = box_gpu_compute_begin(gpu, encoder, writes, "bake");
     if (first && b->bounds_stale) {
         b->bounds_stale = false;
         wgpuComputePassEncoderSetPipeline(pass, b->bounds);
@@ -1162,12 +1162,12 @@ static void box_gpu_bake_faces_render(
         draws += ecs_vec_get_t(&b->draws, box_gpu_bake_draw_t, d)->pipeline ? 1 : 0;
     }
 
-    WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder,
+    WGPURenderPassEncoder pass = box_gpu_profile_render_pass(gpu, encoder,
         &(WGPURenderPassDescriptor){
             .colorAttachmentCount = 1,
             .colorAttachments = &color,
             .depthStencilAttachment = &depth
-        });
+        }, "bake");
     for (i = 0; i < faces; i ++) {
         uint32_t x = (uint32_t)(i % 6) * size, y = (uint32_t)(i / 6) * size;
         wgpuRenderPassEncoderSetViewport(pass, (float)x, (float)y, (float)size, (float)size,
@@ -1284,7 +1284,8 @@ static void box_gpu_bake_project_record(
         .entryCount = 6,
         .entries = entries
     });
-    WGPUComputePassEncoder cpass = box_gpu_compute_begin(encoder, writes);
+    WGPUComputePassEncoder cpass = box_gpu_compute_begin(gpu, encoder, writes,
+        "bake");
     wgpuComputePassEncoderSetPipeline(cpass, pipeline);
     wgpuComputePassEncoderSetBindGroup(cpass, 0, group, 0, NULL);
     wgpuComputePassEncoderDispatchWorkgroups(cpass, (uint32_t)count, 1, 1);
