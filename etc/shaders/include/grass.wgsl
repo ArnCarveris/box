@@ -1,5 +1,6 @@
 // What the place pass (grass_place.wgsl) and the draw (grass.wgsl) of the grass blades share: the
-// params of a Grass in a view, a blade, the levels of detail and the hash of the cells.
+// params of a Grass in a view, a blade, the levels of detail, the hash of the cells and the bend
+// of a blade in the wind, which the place pass makes and the draw reads.
 //
 // A blade belongs to a cell of a grid of absolute world cells and takes its place, size, facing
 // and shade from a hash of the cell and the seed, and of the clump of a voronoi pattern over the
@@ -58,7 +59,7 @@ struct GrassParams {
                             // placement culls by occlusion against, 0 levels for none
 };
 
-// A blade (box_gpu_grass_blade_t), 48 bytes
+// A blade (box_gpu_grass_blade_t), 64 bytes
 struct GrassBlade {
     position: vec3f,        // Local position of its base
     yaw: f32,               // Angle of its facing around the vertical
@@ -72,6 +73,8 @@ struct GrassBlade {
                             // in RGB8 (pack4x8unorm); in A the phase of the swing of its clump
                             // in the high 4 bits, its stiffness in the wind in the low 4 bits
     clump: f32,             // Distance from the center of its clump in clump edges
+    wind: vec4f,            // Its bend in the wind of the frame (grass_wind_bend), made as it
+                            // is placed, so its vertices do not each make it again
 };
 
 // Size in meters of a pixel at a distance from the camera.
@@ -112,4 +115,61 @@ fn grass_wind_bits(phase: f32, stiffness: f32) -> u32 {
 // A hash as a value from 0 to 1.
 fn grass_unit(h: u32) -> f32 {
     return f32(h >> 8u) * (1.0 / 16777216.0);
+}
+
+// Share of the bend of a blade a stiff blade keeps
+const WIND_STIFF: f32 = 0.4;
+
+// Swing in radians of a clump along the wind at full wind, and across it as a share of that
+const WIND_SWING: f32 = 0.18;
+const WIND_SWING_CROSS: f32 = 0.5;
+
+// Flutter in radians of a blade at full wind, of which WIND_FLUTTER_STEADY flutters without a gust
+const WIND_FLUTTER: f32 = 0.1;
+const WIND_FLUTTER_STEADY: f32 = 0.3;
+
+// Twist in radians of the tip of a blade around its length as it flutters at full wind
+const WIND_TWIST: f32 = 0.35;
+
+// Swing and flutter in still air, as a share of those at full wind
+const WIND_CALM: f32 = 0.2;
+
+// The bend of a blade in the wind: xy the horizontal direction and angle in radians its tip turns
+// toward about its root, z the angle its tip twists by around its length, w the angle the gust or
+// lull where it stands adds to the lean of the steady wind, below 0 in a lull.
+fn grass_wind_bend(b: GrassBlade) -> vec4f {
+    let w = params.wind;
+    let wave = grass_wind_wave(b.position.xz, w);
+    let bits = b.tint >> 24u;
+    let stiffness = f32(bits & 15u) / 15.0;
+    let clump = f32(bits >> 4u) / 16.0;
+    let own = grass_unit(grass_hash(bitcast<u32>(b.yaw)));
+    let free = mix(1.0, WIND_STIFF, stiffness);
+    let full = clamp(w.strength.x / GRASS_WIND_FULL, 0.0, 1.0);
+    let a = GRASS_WIND_TAU * w.time.x;
+    let dir = w.field.xy;
+    let across = vec2f(-dir.y, dir.x);
+
+    // The lean toward the wave
+    let strength = length(wave.xy);
+    let lean = grass_wind_lean(strength);
+    var r = vec2f(0.0);
+    if (strength > 0.0) {
+        r = wave.xy * (lean / strength);
+    }
+
+    // The clump swings around the lean as the gust stirs it, faintly in still air
+    let swing = WIND_SWING * (full * wave.w + WIND_CALM * (1.0 - full));
+    let sp = GRASS_WIND_TAU * clump;
+    r += dir * (swing * sin(a + sp)) +
+        across * (swing * WIND_SWING_CROSS * sin(2.0 * a + 1.3 + sp));
+
+    // The blade flutters at its own phase, more in a gust
+    let flutter = WIND_FLUTTER * (full * mix(WIND_FLUTTER_STEADY, 1.0, wave.w) +
+        WIND_CALM * (1.0 - full));
+    let fp = GRASS_WIND_TAU * own;
+    r += vec2f(sin(5.0 * a + fp), sin(7.0 * a + 1.7 * fp + 2.0)) * flutter;
+    let twist = WIND_TWIST / WIND_FLUTTER * flutter * sin(6.0 * a + fp + 1.0);
+    let gust = lean - grass_wind_lean(w.strength.x / GRASS_WIND_FULL);
+    return vec4f(r * free, twist * free, gust * free);
 }

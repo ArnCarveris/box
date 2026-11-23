@@ -1555,7 +1555,7 @@ static void box_gpu_draw_pass(
 
     wgpuRenderPassEncoderSetBindGroup(vp.pass, 0, group, 1, &offset);
     wgpuRenderPassEncoderSetBindGroup(vp.pass, 3, box_gpu_volume_group(gpu, v), 0, NULL);
-    box_gpu_grass_draw(gpu, vp.pass, packet, v, format, phase == 3,
+    box_gpu_grass_draw(gpu, vp.pass, packet, v, format,
         phase == 1 ? BOX_GPU_GRASS_EARLY : phase == 2 ? BOX_GPU_GRASS_LATE : BOX_GPU_GRASS_ALL);
 
     box_gpu_draw_batches(gpu, t, &vp, format, packet, v, group, slot, phase);
@@ -1669,8 +1669,8 @@ static void box_gpu_draw_prepass_draws(
     }
 }
 
-/** Record a depth prepass of a view: its opaque and alpha tested mesh draws, depth only, and
- * the grass blades it placed before (early) or after (late) its depth pyramid.
+/** Record a depth prepass of a view: its opaque and alpha tested mesh draws, depth only. The
+ * grass blades are left to its forward pass (box_gpu_grass_draw).
  *
  * @param gpu The backend
  * @param t The target
@@ -1703,8 +1703,6 @@ static void box_gpu_draw_prepass(
     WGPURenderPassEncoder pass = box_gpu_profile_render_pass(gpu, encoder, &desc, "prepass");
     box_gpu_draw_prepass_draws(gpu, pass, packet, v, group, slot, late,
         WGPUTextureFormat_Undefined, BOX_GPU_STAT_PREPASS_DRAW);
-    box_gpu_grass_draw(gpu, pass, packet, v, WGPUTextureFormat_Undefined, false,
-        late ? BOX_GPU_GRASS_LATE : BOX_GPU_GRASS_EARLY);
 
     wgpuRenderPassEncoderEnd(pass);
     wgpuRenderPassEncoderRelease(pass);
@@ -1783,11 +1781,11 @@ void box_gpu_draw_views(
         bool occludes = box_gpu_cull_occludes(gpu, slot);
         box_gpu_atmosphere_view(gpu, t, encoder, packet, v);
         box_gpu_light_cluster(gpu, t, encoder, v, slot);
+        bool prepasses = box_gpu_draw_prepasses(gpu, packet, v, slot);
         box_gpu_cull_record(gpu, encoder, slot);
-        box_gpu_grass_record(gpu, encoder, packet, v, slot);
+        box_gpu_grass_record(gpu, encoder, packet, v, slot, prepasses);
         box_gpu_shadow_render(gpu, encoder, packet, i, slot);
         box_gpu_planar_render(gpu, t, encoder, packet, v, slot);
-        bool prepasses = box_gpu_draw_prepasses(gpu, packet, v, slot);
         box_gpu_draw_prewarm(gpu, hdr ? BOX_GPU_HDR_FORMAT : t->format, v,
             v->lights.enabled && (v->features & BOX_RENDER_FEATURE_DEPTH_PREPASS) &&
             box_camera_has_depth(&v->camera_data));
@@ -1804,6 +1802,7 @@ void box_gpu_draw_views(
                 box_gpu_cull_record_late(gpu, encoder, t->depth_view, slot);
                 box_gpu_grass_record_late(gpu, encoder, packet, v, slot);
                 box_gpu_draw_prepass(gpu, t, encoder, packet, v, group, slot, true);
+                box_gpu_shadow_grass_late(gpu, encoder, packet, i, slot);
             }
 
             if (ao) {

@@ -714,6 +714,24 @@ void Grass_shadow_fade(void) {
     test_flt(box_render_grass_shadow_fade(&g), 0);
 }
 
+void Grass_shadow_thin(void) {
+    box_render_grass_t g = grass_record();
+
+    // The blades that cast thin out where their shadows start to fade, before the blades of the
+    // view thin out
+    g.shadow = 30;
+    test_flt(box_render_grass_shadow_thin(&g), box_render_grass_shadow_fade(&g));
+    test_assert(box_render_grass_shadow_thin(&g) < g.lod[0]);
+
+    // Or where the blades of the view thin out, when that is nearer
+    g.shadow = 200;
+    test_flt(box_render_grass_shadow_thin(&g), g.lod[0]);
+
+    // None without shadows
+    g.shadow = 0;
+    test_flt(box_render_grass_shadow_thin(&g), 0);
+}
+
 void Grass_shadow_reach(void) {
     box_render_grass_t g = grass_record();
     g.shadow = 30;

@@ -589,8 +589,8 @@ done:
     return;
 }
 
-/** Sample the grass work of a measured frame: the GPU time of a grass pass when new
- * timestamps were read back since the previous measured frame, and the blades drawn per packet
+/** Sample the grass work of a measured frame: the GPU time of the grass passes of a packet when
+ * new timestamps were read back since the previous measured frame, and the blades drawn per packet
  * when new counts were. Both series carry the latest value through the frames without one.
  *
  * @param world The world
@@ -633,12 +633,12 @@ static void box_perf_sample_grass(
     }
 
     timed = now[2] - last[2];
-    if (timed > 0) {
-        ms = (double)(now[1] - last[1]) * 1e-6 / (double)timed;
+    reads = now[3] - last[3];
+    if (timed > 0 && reads > 0) {
+        ms = (double)(now[1] - last[1]) * 1e-6 / (double)reads;
         ecs_vec_append_t(NULL, &perf->grass_samples, double)[0] = ms;
     }
 
-    reads = now[3] - last[3];
     if (reads > 0) {
         for (i = 0; i < BOX_GRASS_LODS; i ++) {
             drawn += now[4 + BOX_GRASS_LODS + i] - last[4 + BOX_GRASS_LODS + i];
@@ -677,7 +677,8 @@ static void box_perf_end_grass(
     g->timed = (int32_t)(last[2] - base[2]);
     g->reads = (int32_t)(last[3] - base[3]);
     g->samples = ecs_vec_count(&perf->grass_samples);
-    g->mean_ms = g->timed > 0 ? (double)(last[1] - base[1]) * 1e-6 / (double)g->timed : 0;
+    g->mean_ms = g->timed > 0 && g->reads > 0
+        ? (double)(last[1] - base[1]) * 1e-6 / (double)g->reads : 0;
     box_perf_stats(&perf->grass_samples, &times);
     g->p50_ms = times.p50;
     g->p95_ms = times.p95;

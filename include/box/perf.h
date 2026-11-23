@@ -104,17 +104,18 @@ ECS_STRUCT(PerfGrassLevel, {
 });
 
 /** Grass work of the measurement of a run, from the backend statistics (zero without the GPU
- * backend or a Grass). The GPU time is per grass pass, one per frame of a lit view whose scene
- * has a Grass, sampled in each measured frame that read back new timestamps. */
+ * backend or a Grass). The GPU time is per packet whose counts were read back: the sum of its
+ * grass passes, the placements of its views and the draws of the blades into their shadows,
+ * sampled in each measured frame that read back new timestamps. */
 ECS_STRUCT(PerfGrass, {
     int32_t passes;      /**< Grass passes recorded */
     int32_t timed;       /**< Grass passes whose GPU time was read back */
     int32_t samples;     /**< Measured frames that read back GPU time, the samples of the times */
-    double mean_ms;      /**< Mean GPU time of a grass pass */
-    double p50_ms;       /**< Median GPU time of a grass pass over the samples */
-    double p95_ms;       /**< 95th percentile GPU time of a grass pass */
-    double p99_ms;       /**< 99th percentile GPU time of a grass pass */
-    double max_ms;       /**< Longest GPU time of a grass pass over the samples */
+    double mean_ms;      /**< Mean GPU time of the grass passes of a packet */
+    double p50_ms;       /**< Median GPU time of the grass passes of a packet */
+    double p95_ms;       /**< 95th percentile GPU time of the grass passes of a packet */
+    double p99_ms;       /**< 99th percentile GPU time of the grass passes of a packet */
+    double max_ms;       /**< Longest GPU time of the grass passes of a packet */
     int32_t reads;       /**< Packets whose blade counts were read back */
     double generated;    /**< Blades placed per packet, every level */
     double drawn;        /**< Blades drawn per packet, every level */

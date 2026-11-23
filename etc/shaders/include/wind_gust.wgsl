@@ -9,7 +9,7 @@
 #pragma once
 
 // Gust patches over which the gust field repeats along each axis (BOX_WIND_GUST_PERIOD), the
-// period the gust offset wraps to.
+// period the gust offset wraps to. A power of two, so a lattice point wraps with a mask.
 const WIND_PERIOD: i32 = 32;
 
 // Spacing in gust patches across the wind of the samples a band averages
@@ -26,7 +26,7 @@ const WIND_DETAIL_AMOUNT: f32 = 0.15;
 
 // Value in 0..1 of a lattice point of the gust field, which repeats every WIND_PERIOD points.
 fn wind_hash(c: vec2i) -> f32 {
-    let p = vec2u(((c % WIND_PERIOD) + WIND_PERIOD) % WIND_PERIOD);
+    let p = bitcast<vec2u>(c) & vec2u(u32(WIND_PERIOD - 1));
     var h = p.x * 374761393u + p.y * 668265263u + 1013904223u;
     h = (h ^ (h >> 13u)) * 1274126177u;
     h = h ^ (h >> 16u);

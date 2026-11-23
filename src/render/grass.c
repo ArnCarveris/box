@@ -263,6 +263,14 @@ float box_render_grass_shadow_fade(
     return g->shadow > 0.0f ? g->shadow * BOX_RENDER_GRASS_SHADOW_FADE : 0.0f;
 }
 
+float box_render_grass_shadow_thin(
+    const box_render_grass_t *g)
+{
+    float fade = box_render_grass_shadow_fade(g);
+
+    return fade < g->lod[0] ? fade : g->lod[0];
+}
+
 float box_render_grass_shadow_reach(
     const box_render_grass_t *g,
     const float direction[3])

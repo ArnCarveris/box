@@ -11,8 +11,8 @@
 // and the high flight the last 9600 (50 m/s, 150 m over the highest ground ahead). The perf run
 // writes infinite_grass_flight.json: the frame time percentiles, the GPU time of the grass passes
 // and the blades placed and drawn per level over the whole course, and per measured frame the
-// frame interval (intervals_ms), the GPU time of a grass pass (grass_ms) and the blades drawn
-// (grass_drawn). The course panel (top right, H hides it) shows where the player is and a row
+// frame interval (intervals_ms), the GPU time of the grass passes of a frame (grass_ms) and the
+// blades drawn (grass_drawn). The course panel (top right, H hides it) shows where the player is and a row
 // every COURSE_MARK meters with the measured frame it starts at.
 include infinite_grass
 

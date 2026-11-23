@@ -54,10 +54,10 @@ typedef struct box_perf_t {
     bool grass_sampled;   /**< grass_base and grass_last hold the counts of a measured frame */
     int64_t grass_base[BOX_PERF_GRASS_COUNTS]; /**< Grass counters at the first measured frame */
     int64_t grass_last[BOX_PERF_GRASS_COUNTS]; /**< Grass counters at the last measured frame */
-    ecs_vec_t grass_samples; /**< GPU milliseconds of a grass pass in the measured frames that
-                           *   read back new timestamps, of double */
-    ecs_vec_t grass_ms;   /**< GPU milliseconds of a grass pass at every measured frame, the
-                           *   latest read back, of double */
+    ecs_vec_t grass_samples; /**< GPU milliseconds of the grass passes of a packet in the measured
+                           *   frames that read back new timestamps, of double */
+    ecs_vec_t grass_ms;   /**< GPU milliseconds of the grass passes of a packet at every measured
+                           *   frame, the latest read back, of double */
     ecs_vec_t grass_drawn; /**< Blades drawn per packet at every measured frame, the latest read
                            *   back, of double */
 } box_perf_t;

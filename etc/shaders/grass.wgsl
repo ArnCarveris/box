@@ -1,6 +1,6 @@
-// Grass draw (gpu_grass.c): one indirect draw per Grass and level of detail in the depth prepass
-// and the forward pass of a lit view, every instance a blade the place pass appended to the range
-// of its level (grass_place.wgsl). The vertex stage builds the blade as a triangle strip from the
+// Grass draw (gpu_grass.c): one indirect draw per Grass and level of detail in the forward pass
+// of a lit view, which writes their depth, every instance a blade the place pass appended to the
+// range of its level (grass_place.wgsl). The vertex stage builds the blade as a triangle strip from the
 // vertex index, the level in its first vertex: two vertices per row across the blade and one at
 // the tip, along a cubic bezier that leans along its facing and bends over toward its tip, the
 // rows turning around the vertical as the blade curls. A blade seen edge on widens in view space
@@ -27,7 +27,8 @@
 // swings at the phase of the clump and the blade flutters and twists at its own phase, both
 // more as a gust stirs them, the stiffness of the blade and its clump damping all of it. In
 // still air the blades only sway faintly. The bend is a function of the blade, its place and the
-// wind of the frame, so the depth prepass and the forward pass agree on it.
+// wind of the frame, so the view and the shadows agree on it; the place pass makes it once per
+// blade (grass_wind_bend of grass.wgsl in include) and the vertices read it.
 //
 // The blades that cast shadows draw into the cascades of the directional light and the light
 // tiles with vs_shadow and, into the octants of a point light tile, vs_shadow_point and
@@ -96,23 +97,6 @@ const FOLD_AT: f32 = 0.2;
 
 // Share of the fold height below which a blade is fully folded (BOX_GRASS_FOLD_BLEND)
 const FOLD_BLEND: f32 = 0.7;
-
-// Share of the bend of a blade a stiff blade keeps
-const WIND_STIFF: f32 = 0.4;
-
-// Swing in radians of a clump along the wind at full wind, and across it as a share of that
-const WIND_SWING: f32 = 0.18;
-const WIND_SWING_CROSS: f32 = 0.5;
-
-// Flutter in radians of a blade at full wind, of which WIND_FLUTTER_STEADY flutters without a gust
-const WIND_FLUTTER: f32 = 0.1;
-const WIND_FLUTTER_STEADY: f32 = 0.3;
-
-// Twist in radians of the tip of a blade around its length as it flutters at full wind
-const WIND_TWIST: f32 = 0.35;
-
-// Swing and flutter in still air, as a share of those at full wind
-const WIND_CALM: f32 = 0.2;
 
 // Shares of the bend of a blade its three control points turn by, from the root
 const WIND_BEND_ALONG: vec3f = vec3f(0.15, 0.5, 1.0);
@@ -194,46 +178,6 @@ fn grass_fold(height: f32) -> f32 {
     return 1.0 - smoothstep(FOLD_BLEND * at, at, height);
 }
 
-// The bend of a blade in the wind: xy the horizontal direction and angle in radians its tip turns
-// toward about its root, z the angle its tip twists by around its length, w the angle the gust or
-// lull where it stands adds to the lean of the steady wind, below 0 in a lull.
-fn grass_wind_bend(b: GrassBlade) -> vec4f {
-    let w = params.wind;
-    let wave = grass_wind_wave(b.position.xz, w);
-    let bits = b.tint >> 24u;
-    let stiffness = f32(bits & 15u) / 15.0;
-    let clump = f32(bits >> 4u) / 16.0;
-    let own = grass_unit(grass_hash(bitcast<u32>(b.yaw)));
-    let free = mix(1.0, WIND_STIFF, stiffness);
-    let full = clamp(w.strength.x / GRASS_WIND_FULL, 0.0, 1.0);
-    let a = GRASS_WIND_TAU * w.time.x;
-    let dir = w.field.xy;
-    let across = vec2f(-dir.y, dir.x);
-
-    // The lean toward the wave
-    let strength = length(wave.xy);
-    let lean = grass_wind_lean(strength);
-    var r = vec2f(0.0);
-    if (strength > 0.0) {
-        r = wave.xy * (lean / strength);
-    }
-
-    // The clump swings around the lean as the gust stirs it, faintly in still air
-    let swing = WIND_SWING * (full * wave.w + WIND_CALM * (1.0 - full));
-    let sp = GRASS_WIND_TAU * clump;
-    r += dir * (swing * sin(a + sp)) +
-        across * (swing * WIND_SWING_CROSS * sin(2.0 * a + 1.3 + sp));
-
-    // The blade flutters at its own phase, more in a gust
-    let flutter = WIND_FLUTTER * (full * mix(WIND_FLUTTER_STEADY, 1.0, wave.w) +
-        WIND_CALM * (1.0 - full));
-    let fp = GRASS_WIND_TAU * own;
-    r += vec2f(sin(5.0 * a + fp), sin(7.0 * a + 1.7 * fp + 2.0)) * flutter;
-    let twist = WIND_TWIST / WIND_FLUTTER * flutter * sin(6.0 * a + fp + 1.0);
-    let gust = lean - grass_wind_lean(w.strength.x / GRASS_WIND_FULL);
-    return vec4f(r * free, twist * free, gust * free);
-}
-
 // Axis about which a turn of a horizontal direction moves a point above it toward it.
 fn grass_wind_axis(r: vec2f) -> vec3f {
     let l = length(r);
@@ -310,7 +254,7 @@ fn grass_shape(b: GrassBlade, lod: u32, v: u32, eye: vec3f) -> GrassShape {
 
     // The wind turns the control points about the root, the more the higher up, so the blade
     // bends over and stays rooted
-    let wind = grass_wind_bend(b);
+    let wind = b.wind;
     let wind_angle = length(wind.xy);
     let wind_axis = grass_wind_axis(wind.xy);
     if (wind_angle > 0.0) {

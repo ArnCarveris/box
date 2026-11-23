@@ -889,6 +889,17 @@ uint32_t box_render_grass_cascades(
 float box_render_grass_shadow_fade(
     const box_render_grass_t *g);
 
+/** Get the distance from the camera at which the blades of a Grass that cast shadows start to
+ * thin out: where they start to shrink away (box_render_grass_shadow_fade) or where the blades
+ * of the view thin out, whichever is nearer. Beyond it fewer and wider blades cast, whose
+ * shadows cover about as much of the ground.
+ *
+ * @param g The Grass of the packet
+ * @return The distance, 0 for a Grass that casts no shadows
+ */
+float box_render_grass_shadow_thin(
+    const box_render_grass_t *g);
+
 /** Get how far along the light the shadow of a blade of a Grass reaches: BOX_RENDER_GRASS_SHADOW_SLACK
  * times the length along the light at which the shadow of its tallest blade reaches the ground,
  * longer the lower the light, at most its shadow distance. The pass that places the blades that

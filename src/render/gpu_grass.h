@@ -10,7 +10,7 @@
 #ifdef BOX_RENDER_WGPU
 
 /** Invocations of a workgroup of the place dispatch, as GROUP in grass_place.wgsl */
-#define BOX_GPU_GRASS_GROUP (64u)
+#define BOX_GPU_GRASS_GROUP (128u)
 
 /** Vertex indices a level of detail takes, as GRASS_LOD_VERTICES in grass.wgsl */
 #define BOX_GPU_GRASS_LOD_VERTICES (64u)
@@ -53,8 +53,8 @@
 /** Nanoseconds above which a measured pass is dropped as a stale timestamp */
 #define BOX_GPU_GRASS_MEASURE_MAX (1e9)
 
-/** Draw pipelines, one per color format and depth mode */
-#define BOX_GPU_GRASS_DRAWS (BOX_GPU_BLIT_FORMATS * 2)
+/** Draw pipelines, one per color format */
+#define BOX_GPU_GRASS_DRAWS (BOX_GPU_BLIT_FORMATS)
 
 /** The params of a Grass in a view (GrassParams of grass.wgsl) */
 typedef struct box_gpu_grass_params_t {
@@ -108,9 +108,10 @@ typedef struct box_gpu_grass_blade_t {
                                      *   the phase of its clump in the high and its stiffness
                                      *   in the low 4 bits of A */
     float clump;                    /**< Distance from the center of its clump in clump edges */
+    float wind[4];                  /**< Its bend in the wind of the frame, made as it is placed */
 } box_gpu_grass_blade_t;
 
-_Static_assert(sizeof(box_gpu_grass_blade_t) == 48, "GrassBlade of grass.wgsl");
+_Static_assert(sizeof(box_gpu_grass_blade_t) == 64, "GrassBlade of grass.wgsl");
 
 /** State of a readback of the counts and timestamps of a packet */
 typedef enum box_gpu_grass_read_state_t {
@@ -155,10 +156,9 @@ typedef struct box_gpu_grass_entity_t {
     box_gpu_grass_params_t shadow_params; /**< Params they were placed with */
 } box_gpu_grass_entity_t;
 
-/** A draw pipeline of a color format and depth mode */
+/** A draw pipeline of a color format */
 typedef struct box_gpu_grass_pipeline_t {
     WGPUTextureFormat format;       /**< Format of the color target */
-    bool equal;                     /**< Tests the depth of the prepass without writing it */
     WGPURenderPipeline pipeline;    /**< The pipeline */
 } box_gpu_grass_pipeline_t;
 
@@ -176,7 +176,6 @@ typedef struct box_gpu_grass_t {
     int32_t place_revision;         /**< Revision of the shader of the compute pipelines */
     box_gpu_grass_pipeline_t draws[BOX_GPU_GRASS_DRAWS]; /**< Draw pipelines */
     int32_t draw_count;             /**< Draw pipelines created */
-    WGPURenderPipeline depth;       /**< Draw pipeline of the depth prepass */
     WGPURenderPipeline shadow;      /**< Draws the blades that cast into a cascade or a spot
                                      *   light tile */
     WGPURenderPipeline shadow_point; /**< Draws them into an octant of a point light tile */
@@ -202,6 +201,8 @@ typedef struct box_gpu_grass_t {
     const box_render_view_t *view;  /**< View whose blades the last recording placed, NULL when
                                      *   the last view placed none */
     bool active;                    /**< The packet has a Grass */
+    bool shadows_late;              /**< The view of the last recording places the blades that
+                                     *   cast in its late compute pass */
     WGPUQuerySet queries;           /**< Timestamps per readback, NULL without the feature */
     WGPUBuffer resolve;             /**< Resolved timestamps */
     box_gpu_grass_readback_t readbacks[BOX_GPU_GRASS_READBACKS]; /**< Count copies */
@@ -321,7 +322,8 @@ void box_gpu_grass_pixel(
     float out[4]);
 
 /** Get the blades a level of the blades of a Grass that cast shadows holds: those within its
- * shadow distance, the full density within the end of level 0 and the thinned field beyond.
+ * shadow distance, the full density within where they thin (box_render_grass_shadow_thin) and
+ * the thinned field beyond.
  *
  * @param g The Grass
  * @return The blades, a multiple of the workgroup size, 0 for a Grass that casts no shadows

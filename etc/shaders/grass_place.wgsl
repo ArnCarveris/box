@@ -16,8 +16,9 @@
 // of blades that keeps the coverage, chosen by its hash. Its stiffness in the wind is its own
 // and its clump's, the phase of its swing that of its clump, so neighbouring clumps do not move
 // in lockstep.
-// Blades outside the frustum are dropped, the others appended to the range of their level of
-// detail.
+// Blades outside the frustum are dropped, the others take their bend in the wind of the frame
+// (grass_wind_bend), which every vertex of the draws reads, and are appended to the range of
+// their level of detail.
 //
 // A view that culls by occlusion places its blades after its depth pyramid (gpu_hiz.c) is built
 // from the depth of what it drew first this frame, from its camera of this frame, so nothing it
@@ -65,8 +66,14 @@ var<workgroup> patch_high: atomic<i32>;
 var<workgroup> patch_hidden: u32;
 var<workgroup> patch_culled: atomic<u32>;
 
+// Blades of the patch of a workgroup made per level, those of a round it keeps per level and
+// where their range of the level starts
+var<workgroup> group_generated: array<atomic<u32>, 3>;
+var<workgroup> group_kept: array<atomic<u32>, 3>;
+var<workgroup> group_base: array<u32, 3>;
+
 // Invocations of a workgroup of the place dispatch (BOX_GPU_GRASS_GROUP)
-const GROUP: u32 = 64u;
+const GROUP: u32 = 128u;
 
 // Salts of the hashes of a cell
 const SALT_PICK: u32 = 0x51a7u;
@@ -405,14 +412,16 @@ fn grass_blade(at_patch: vec2i, lo: vec2f, c: vec2i, first: vec2i, k: u32,
             return out;
         }
 
-        y = terrain_sample_tile_height(tile) + terrain_sample_params.origin.w;
+        // The mask first: most cells of a Grass on a mask channel do not grow and skip the
+        // height
         if (params.config.x != 0u && terrain_sample_params.strides.z != 0u) {
             weight = terrain_sample_tile_mask(tile)[params.config.x - 1u];
         }
-    }
+        if (grass_unit(h2) >= weight) {
+            return out;
+        }
 
-    if (grass_unit(h2) >= weight) {
-        return out;
+        y = terrain_sample_tile_height(tile) + terrain_sample_params.origin.w;
     }
 
     let xz = lo + offset;
@@ -431,6 +440,29 @@ fn grass_blade(at_patch: vec2i, lo: vec2f, c: vec2i, first: vec2i, k: u32,
         fade *= clamp((f32(level) + 1.0 - t) * 2.0, 0.0, 1.0);
     }
 
+    // A blade thinner than a pixel widens to it, and only the share of blades that keeps the
+    // coverage stays, the others shrinking away over a short band of the share
+    let widen = min(exp2(2.0 * t), GRASS_WIDEN_MAX);
+    var width = mix(params.blade.z, params.blade.w, grass_unit(h4)) * widen;
+    let pixel = MIN_PIXELS * grass_pixel(d);
+    var keep = fade * mix(0.7, 1.0, weight);
+    if (width < pixel) {
+        let share = width / pixel;
+        keep *= saturate((share - grass_unit(h10)) * 8.0);
+        width = pixel;
+    }
+
+    // Before the clump and the variation, which only lower the tallest blade the cell can hold:
+    // a cell whose tallest blade is too short or outside the frustum holds none
+    let bound = select(0.6, WIND_BOUND, params.wind.strength.x > 0.0);
+    let tallest = params.blade.y * keep;
+    if (tallest < 0.05 * params.blade.x ||
+        !grass_sphere_visible(planes, base + vec3f(0.0, 0.5 * tallest, 0.0),
+            bound * tallest + width))
+    {
+        return out;
+    }
+
     // The clump and the variation over the world at the absolute place of the blade
     let world = (vec2f(c) + vec2f(grass_unit(h0), grass_unit(h1))) * params.corner.w;
     let clump = grass_clump(world);
@@ -447,28 +479,13 @@ fn grass_blade(at_patch: vec2i, lo: vec2f, c: vec2i, first: vec2i, k: u32,
     // Taller blades toward the center of a clump, all of them as tall as their clump
     let tall = mix(grass_unit(h3), grass_unit(ch1), follow) *
         mix(1.0, 1.0 - CLUMP_HEIGHT * saturate(clump.distance), follow);
-    var height = mix(params.blade.x, params.blade.y, tall) * variation.w *
-        mix(0.7, 1.0, weight) * fade;
-    let widen = min(exp2(2.0 * t), GRASS_WIDEN_MAX);
-    var width = mix(params.blade.z, params.blade.w, grass_unit(h4)) * widen;
-
-    // A blade thinner than a pixel widens to it, and only the share of blades that keeps the
-    // coverage stays, the others shrinking away over a short band of the share
-    let pixel = MIN_PIXELS * grass_pixel(d);
-    if (width < pixel) {
-        let share = width / pixel;
-        height *= saturate((share - grass_unit(h10)) * 8.0);
-        width = pixel;
-    }
-
+    let height = mix(params.blade.x, params.blade.y, tall) * variation.w * keep;
     if (height < 0.05 * params.blade.x) {
         return out;
     }
 
     let center = base + vec3f(0.0, 0.5 * height, 0.0);
-    let bound = select(0.6, WIND_BOUND, params.wind.strength.x > 0.0);
-    let radius = bound * height + width;
-    if (!grass_sphere_visible(planes, center, radius)) {
+    if (!grass_sphere_visible(planes, center, bound * height + width)) {
         return out;
     }
 
@@ -484,7 +501,7 @@ fn grass_blade(at_patch: vec2i, lo: vec2f, c: vec2i, first: vec2i, k: u32,
 
     out.keep = true;
     out.blade = GrassBlade(base, yaw, height, width, lean, shade, grass_unit(h8),
-        grass_unit(h9) * 2.0 - 1.0, tint, clump.distance);
+        grass_unit(h9) * 2.0 - 1.0, tint, clump.distance, vec4f(0.0));
     return out;
 }
 
@@ -509,7 +526,7 @@ fn reset() {
 }
 
 // Place the blades of a patch of the grid.
-@compute @workgroup_size(64)
+@compute @workgroup_size(128)
 fn place(@builtin(workgroup_id) wg: vec3u, @builtin(local_invocation_index) local: u32) {
     let n = u32(params.patches.z);
     if (wg.x >= n || wg.y >= n) {
@@ -568,28 +585,67 @@ fn place(@builtin(workgroup_id) wg: vec3u, @builtin(local_invocation_index) loca
         }
     }
 
+    // A round makes a blade per invocation, counts them per level in the workgroup and reserves
+    // the range of each level with a single atomic of the counters, so the invocations of the
+    // grid do not wait on each other for every blade
     let capacity = params.config.w;
-    for (var i = local; i < total; i += GROUP) {
-        let b = start + vec2i(i32(i % columns), i32(i / columns)) * s;
-        let c = grass_pick(b, k);
-        let made = grass_blade(at_patch, lo, c, first, k, planes);
-        if (made.generated) {
-            atomicAdd(&counters.generated[made.lod], 1u);
+    let rounds = (total + GROUP - 1u) / GROUP;
+    var made: GrassPlaced;
+    for (var r = 0u; r < rounds; r++) {
+        // Assigned every round: an invocation past the last cell of the patch makes no blade,
+        // rather than the one of its round before
+        let i = r * GROUP + local;
+        made = GrassPlaced();
+        if (i < total) {
+            let b = start + vec2i(i32(i % columns), i32(i / columns)) * s;
+            let c = grass_pick(b, k);
+            made = grass_blade(at_patch, lo, c, first, k, planes);
+            if (made.keep && grass_blade_occluded(made.blade)) {
+                made.keep = false;
+                atomicAdd(&patch_culled, 1u);
+            }
+            if (made.keep) {
+                made.blade.wind = grass_wind_bend(made.blade);
+            }
         }
-        if (made.keep && grass_blade_occluded(made.blade)) {
-            atomicAdd(&patch_culled, 1u);
-        } else if (made.keep) {
-            let at_level = atomicAdd(&counters.args[made.lod * 4u + 1u], 1u);
+
+        if (made.generated) {
+            atomicAdd(&group_generated[made.lod], 1u);
+        }
+        var slot = 0u;
+        if (made.keep) {
+            slot = atomicAdd(&group_kept[made.lod], 1u);
+        }
+        workgroupBarrier();
+
+        if (local < GRASS_LODS) {
+            let kept = atomicExchange(&group_kept[local], 0u);
+            var at = 0u;
+            if (kept != 0u) {
+                at = atomicAdd(&counters.args[local * 4u + 1u], kept);
+            }
+            group_base[local] = at;
+        }
+        workgroupBarrier();
+
+        if (made.keep) {
+            let at_level = group_base[made.lod] + slot;
             if (at_level < capacity) {
                 blades[made.lod * capacity + at_level] = made.blade;
             }
         }
     }
 
-    if (params.hiz.z != 0u) {
-        workgroupBarrier();
+    // Every round ended with a barrier, so the counts of the workgroup are complete
+    if (local < GRASS_LODS) {
+        let generated = atomicLoad(&group_generated[local]);
+        if (generated != 0u) {
+            atomicAdd(&counters.generated[local], generated);
+        }
+    }
+    if (local == 0u) {
         let culled = atomicLoad(&patch_culled);
-        if (local == 0u && culled != 0u) {
+        if (culled != 0u) {
             atomicAdd(&stats.culled[1], culled);
         }
     }

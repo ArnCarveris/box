@@ -1223,7 +1223,7 @@ void box_gpu_shadow_render(
         wgpuRenderPassEncoderEnd(pass);
         wgpuRenderPassEncoderRelease(pass);
         box_gpu_grass_shadow(gpu, encoder, v, i, layers[i], (const float*)ecs_vec_get_t(
-            &gpu->shadow_data, uint8_t, offset));
+            &gpu->shadow_data, uint8_t, offset), false);
         box_gpu_count(gpu, BOX_GPU_STAT_CASCADE);
         if (store && complete) {
             store->valid |= 1u << i;
@@ -1231,6 +1231,41 @@ void box_gpu_shadow_render(
     }
 
     wgpuBindGroupRelease(group);
+done:
+    return;
+}
+
+void box_gpu_shadow_grass_late(
+    box_gpu_t *gpu,
+    WGPUCommandEncoder encoder,
+    const box_render_packet_t *packet,
+    int32_t index,
+    int32_t slot)
+{
+    const box_render_view_t *v = ecs_vec_get_t(&packet->views, box_render_view_t, index);
+    const box_gpu_cascade_slot_t *cs = box_gpu_cascade_slot(gpu, slot);
+    const box_gpu_cascade_store_t *store = cs && cs->store >= 0
+        ? ecs_vec_get_t(&gpu->cascade_stores, box_gpu_cascade_store_t, cs->store)
+        : NULL;
+    WGPUTextureView const *layers = store ? store->layers : gpu->shadow_layers;
+    int32_t i;
+    if (!v->shadows.enabled || !cs || !gpu->shadow_buffer) {
+        goto done;
+    }
+
+    if (!store && box_gpu_shadow_binding(gpu, v) != gpu->shadow_map_view) {
+        goto done;
+    }
+
+    for (i = 0; i < v->shadows.cascades; i ++) {
+        uint32_t offset = (uint32_t)((slot * BOX_RENDER_SHADOW_CASCADES + i) *
+            BOX_GPU_CASCADE_STRIDE);
+        if (cs->renders & (1u << i)) {
+            box_gpu_grass_shadow(gpu, encoder, v, i, layers[i], (const float*)ecs_vec_get_t(
+                &gpu->shadow_data, uint8_t, offset), true);
+        }
+    }
+
 done:
     return;
 }

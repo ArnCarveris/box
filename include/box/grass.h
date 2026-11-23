@@ -4,8 +4,8 @@
  * on the plane of their entity.
  *
  * The box.grass module registers Grass. No entity exists per blade: each frame a compute pass
- * places the blades of the patches of a grid around the camera that the view sees, and the depth
- * prepass and the forward pass draw them with one indirect draw per level of detail.
+ * places the blades of the patches of a grid around the camera that the view sees, and the
+ * forward pass draws them with one indirect draw per level of detail.
  */
 
 #ifndef BOX_GRASS_H

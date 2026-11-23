@@ -3,7 +3,7 @@
  * @brief Shadows of the grass blades of the webgpu backend: the placement of the blades that cast
  * within the shadow distance of a Grass and their draws into the cascades and the light tiles.
  *
- * The compute pass of a view places the blades that cast at coarser levels, which a render pass
+ * A compute pass of a view places the blades that cast at coarser levels, which a render pass
  * after the casters of each cascade they cast into draws into its layer (grass.wgsl vs_shadow).
  *
  * The atlas of a scene whose Grass casts into the lights places them around the camera of its
@@ -19,7 +19,8 @@
 uint32_t box_gpu_grass_shadow_capacity(
     const box_render_grass_t *g)
 {
-    double r0 = g->lod[0] > 1.0f ? g->lod[0] : 1.0;
+    float thin = box_render_grass_shadow_thin(g);
+    double r0 = thin > 1.0f ? thin : 1.0;
     double r = g->shadow, rho = g->density, pi = 3.14159265358979, blades;
     uint32_t result = 0;
     if (!(r > 0.0)) {
@@ -154,7 +155,8 @@ done:
 }
 
 /** Make params of a Grass place the blades that cast shadows: out to its shadow distance, at
- * the coarser levels of the shadows, shrinking away from where the shadows start to fade.
+ * the coarser levels of the shadows, thinning and shrinking away from where the shadows start to
+ * fade.
  *
  * @param e The Grass
  * @param direction Direction toward the light whose shadows sweep the frustum
@@ -169,6 +171,7 @@ static void box_gpu_grass_cast_params(
 {
     const box_render_grass_t *g = &e->grass;
     float fade = box_render_grass_shadow_fade(g);
+    out->ground[3] = box_render_grass_shadow_thin(g);
     out->lod[0] = 0.0f;
     out->lod[1] = g->shadow * BOX_RENDER_GRASS_SHADOW_LOD;
     out->lod[2] = g->shadow;
@@ -311,13 +314,14 @@ void box_gpu_grass_shadow(
     const box_render_view_t *v,
     int32_t cascade,
     WGPUTextureView layer,
-    const float *matrix)
+    const float *matrix,
+    bool late)
 {
     box_gpu_grass_t *s = gpu->grass;
     WGPURenderPassEncoder pass = NULL;
     WGPURenderPipeline pipeline = NULL;
     box_gpu_grass_params_t params;
-    if (!s || !s->active || s->view != v) {
+    if (!s || !s->active || s->view != v || s->shadows_late != late) {
         goto done;
     }
 

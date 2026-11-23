@@ -383,6 +383,7 @@
                     "far_of_terrain",
                     "shadow_cascades",
                     "shadow_fade",
+                    "shadow_thin",
                     "shadow_reach"
                 ]
             },

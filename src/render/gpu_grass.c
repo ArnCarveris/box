@@ -1,10 +1,12 @@
 /**
  * @file render/gpu_grass.c
  * @brief Grass passes of the webgpu backend: per lit view a compute pass places the blades of
- * the Grass entities of its scene around its camera, and its depth prepass and forward pass draw
- * them with one indirect draw per Grass and level of detail (grass_place.wgsl, grass.wgsl).
- * A view that culls by occlusion places its blades after the depth pyramid of what it drew first
- * (gpu_hiz.c) and draws them in its late passes, the patches and blades behind it culled.
+ * the Grass entities of its scene around its camera, and its forward pass draws them with one
+ * indirect draw per Grass and level of detail (grass_place.wgsl, grass.wgsl). The depth prepass
+ * leaves them out: drawn in both, the blades cost their vertices twice for the few fragments the
+ * prepass saves the forward pass. A view that culls by occlusion places its blades after the
+ * depth pyramid of what it drew first (gpu_hiz.c) and draws them in its late forward pass, the
+ * patches and blades behind it culled.
  *
  * Each Grass has a blade buffer with a range per level and the indirect arguments of its levels,
  * which every view that draws it fills again before its passes, its params in a uniform ring.
@@ -14,6 +16,7 @@
 #include "gpu.h"
 #include "gpu_grass.h"
 #include <math.h>
+#include <stdlib.h>
 
 #ifdef BOX_RENDER_WGPU
 
@@ -205,7 +208,6 @@ void box_gpu_grass_draw_reset(
     }
 
     s->draw_count = 0;
-    BOX_GPU_GRASS_RELEASE(s->depth, wgpuRenderPipelineRelease);
     BOX_GPU_GRASS_RELEASE(s->shadow, wgpuRenderPipelineRelease);
     BOX_GPU_GRASS_RELEASE(s->shadow_point, wgpuRenderPipelineRelease);
 }
@@ -760,20 +762,18 @@ done:
     return shader && shader->module && s->reset && s->place && s->finish;
 }
 
-/** Create a draw pipeline: the blades as triangle strips, both sides, into a color format, or
- * depth only for the prepass.
+/** Create a draw pipeline: the blades as triangle strips, both sides, into a color format,
+ * writing their depth.
  *
  * @param gpu The backend
  * @param module The module of the draw shader
- * @param format Format of the color target, Undefined for depth only
- * @param equal Whether it tests the depth of the prepass without writing it
+ * @param format Format of the color target
  * @return The pipeline, NULL while it is created
  */
 static WGPURenderPipeline box_gpu_grass_draw_create(
     box_gpu_t *gpu,
     WGPUShaderModule module,
-    WGPUTextureFormat format,
-    bool equal)
+    WGPUTextureFormat format)
 {
     WGPUColorTargetState target = {
         .format = format,
@@ -787,8 +787,8 @@ static WGPURenderPipeline box_gpu_grass_draw_create(
     };
     WGPUDepthStencilState depth = {
         .format = BOX_GPU_DEPTH_FORMAT,
-        .depthWriteEnabled = equal ? WGPUOptionalBool_False : WGPUOptionalBool_True,
-        .depthCompare = equal ? WGPUCompareFunction_GreaterEqual : WGPUCompareFunction_Greater,
+        .depthWriteEnabled = WGPUOptionalBool_True,
+        .depthCompare = WGPUCompareFunction_Greater,
         .stencilFront = { .compare = WGPUCompareFunction_Always },
         .stencilBack = { .compare = WGPUCompareFunction_Always }
     };
@@ -805,25 +805,23 @@ static WGPURenderPipeline box_gpu_grass_draw_create(
         },
         .depthStencil = &depth,
         .multisample = { .count = 1, .mask = 0xFFFFFFFF },
-        .fragment = format == WGPUTextureFormat_Undefined ? NULL : &fragment
+        .fragment = &fragment
     };
 
     return box_gpu_render_pipeline(gpu, &desc);
 }
 
-/** Get the draw pipeline of a color format and depth mode, created on first use and again after
- * the draw shader recompiled.
+/** Get the draw pipeline of a color format, created on first use and again after the draw
+ * shader recompiled.
  *
  * @param gpu The backend
- * @param format Format of the color target, Undefined for the depth prepass
- * @param equal Whether it tests the depth of the prepass without writing it
+ * @param format Format of the color target
  * @return The pipeline, NULL without a draw shader, while it is created or when too many
  * formats are in use
  */
 static WGPURenderPipeline box_gpu_grass_draw_pipeline(
     box_gpu_t *gpu,
-    WGPUTextureFormat format,
-    bool equal)
+    WGPUTextureFormat format)
 {
     box_gpu_grass_t *s = gpu->grass;
     box_gpu_shader_t *shader = ecs_map_get_deref(
@@ -839,29 +837,19 @@ static WGPURenderPipeline box_gpu_grass_draw_pipeline(
         s->draw_revision = shader->revision;
     }
 
-    if (format == WGPUTextureFormat_Undefined) {
-        if (!s->depth) {
-            s->depth = box_gpu_grass_draw_create(gpu, shader->module, format, false);
-        }
-
-        result = s->depth;
-        goto done;
-    }
-
     for (i = 0; i < s->draw_count; i ++) {
-        if (s->draws[i].format == format && s->draws[i].equal == equal) {
+        if (s->draws[i].format == format) {
             result = s->draws[i].pipeline;
             goto done;
         }
     }
 
     if (s->draw_count < BOX_GPU_GRASS_DRAWS) {
-        result = box_gpu_grass_draw_create(gpu, shader->module, format, equal);
+        result = box_gpu_grass_draw_create(gpu, shader->module, format);
     }
 
     if (result) {
         s->draws[s->draw_count].format = format;
-        s->draws[s->draw_count].equal = equal;
         s->draws[s->draw_count].pipeline = result;
         s->draw_count ++;
     }
@@ -1130,12 +1118,14 @@ void box_gpu_grass_record(
     WGPUCommandEncoder encoder,
     const box_render_packet_t *packet,
     const box_render_view_t *v,
-    int32_t slot)
+    int32_t slot,
+    bool prepass)
 {
     box_gpu_grass_t *s = gpu->grass;
     WGPUComputePassEncoder pass = NULL;
     if (s) {
         s->view = NULL;
+        s->shadows_late = false;
     }
 
     if (!box_gpu_grass_drawn(gpu, packet, v) || !box_gpu_grass_place_pipelines(gpu)) {
@@ -1146,6 +1136,7 @@ void box_gpu_grass_record(
     bool late = box_gpu_cull_occludes(gpu, slot);
     s->recording ++;
     s->view = v;
+    s->shadows_late = late && prepass;
     ecs_map_iter_t it = ecs_map_iter(&s->entities);
     while (ecs_map_next(&it)) {
         box_gpu_grass_entity_t *e = ecs_map_ptr(&it);
@@ -1153,7 +1144,7 @@ void box_gpu_grass_record(
             continue;
         }
 
-        if (late && (!e->shadow_place_group ||
+        if (late && (s->shadows_late || !e->shadow_place_group ||
             !box_render_grass_cascades(&e->grass, &v->shadows)))
         {
             continue;
@@ -1211,6 +1202,9 @@ void box_gpu_grass_record_late(
         }
 
         box_gpu_grass_place_blades(gpu, s, pass, packet, e, v, u, cv->hiz);
+        if (s->shadows_late) {
+            box_gpu_grass_place_shadows(gpu, s, pass, packet, e, v, u);
+        }
     }
 
     if (pass) {
@@ -1229,7 +1223,6 @@ bool box_gpu_grass_draw(
     const box_render_packet_t *packet,
     const box_render_view_t *v,
     WGPUTextureFormat format,
-    bool equal,
     int32_t phase)
 {
     box_gpu_grass_t *s = gpu->grass;
@@ -1250,7 +1243,7 @@ bool box_gpu_grass_draw(
         }
 
         if (!pipeline) {
-            pipeline = box_gpu_grass_draw_pipeline(gpu, format, equal);
+            pipeline = box_gpu_grass_draw_pipeline(gpu, format);
             if (!pipeline) {
                 goto done;
             }
@@ -1261,8 +1254,7 @@ bool box_gpu_grass_draw(
         wgpuRenderPassEncoderSetBindGroup(pass, 1, e->draw_group, 1, &e->offset);
         for (l = 0; l < BOX_GRASS_LODS; l ++) {
             wgpuRenderPassEncoderDrawIndirect(pass, e->counters, (uint64_t)l * 16u);
-            box_gpu_count(gpu, format == WGPUTextureFormat_Undefined
-                ? BOX_GPU_STAT_PREPASS_DRAW : BOX_GPU_STAT_DRAW);
+            box_gpu_count(gpu, BOX_GPU_STAT_DRAW);
         }
 
         result = true;

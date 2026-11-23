@@ -1313,20 +1313,26 @@ bool box_gpu_grass_drawn(
  * around its camera: per Grass a reset, a place dispatch over the patches of its grid and a
  * finish that clamps the indirect arguments of its levels and adds the counts of the packet.
  * Of a view that culls by occlusion it places only the blades that cast shadows, its blades
- * are placed after its depth pyramid (box_gpu_grass_record_late).
+ * are placed after its depth pyramid (box_gpu_grass_record_late), and of one that also draws a
+ * depth prepass none: its late pass places the blades that cast too, which then draw into its
+ * cascades before its forward pass (box_gpu_shadow_grass_late), so a frame has a single grass
+ * compute pass.
  *
  * @param gpu The backend
  * @param encoder The encoder of the frame
  * @param packet The packet
  * @param v The view
  * @param slot Slot of the view in the view buffer, whose uniforms are in view_data
+ * @param prepass Whether the view draws a depth prepass, whose late half its forward pass
+ * waits for
  */
 void box_gpu_grass_record(
     box_gpu_t *gpu,
     WGPUCommandEncoder encoder,
     const box_render_packet_t *packet,
     const box_render_view_t *v,
-    int32_t slot);
+    int32_t slot,
+    bool prepass);
 
 /** Get the cascades of the directional light of a view the blades of the Grass entities of its
  * scene cast into, which render in every packet instead of keeping their depth.
@@ -1341,10 +1347,11 @@ uint32_t box_gpu_grass_cascades(
     const box_render_packet_t *packet,
     const box_render_view_t *v);
 
-/** Record the render pass that draws the blades the last box_gpu_grass_record placed for a view
- * to cast shadows into a cascade of the view, after its casters: one indirect draw per Grass
- * casting into the cascade and level, timed with the grass passes. No pass when no Grass casts
- * into it.
+/** Record the render pass that draws the blades the last box_gpu_grass_record or
+ * box_gpu_grass_record_late placed for a view to cast shadows into a cascade of the view, after
+ * its casters: one indirect draw per Grass casting into the cascade and level, timed with the
+ * grass passes. No pass when no Grass casts into it, or when the blades that cast are placed in
+ * the other compute pass of the view than late says.
  *
  * @param gpu The backend
  * @param encoder The encoder of the frame
@@ -1352,6 +1359,8 @@ uint32_t box_gpu_grass_cascades(
  * @param cascade Index of the cascade
  * @param layer View of the layer of the cascade, which the pass loads
  * @param matrix Local world to clip space of the cascade
+ * @param late Whether the late compute pass of the view placed them (box_gpu_shadow_grass_late),
+ * else the first (box_gpu_shadow_render)
  */
 void box_gpu_grass_shadow(
     box_gpu_t *gpu,
@@ -1359,7 +1368,8 @@ void box_gpu_grass_shadow(
     const box_render_view_t *v,
     int32_t cascade,
     WGPUTextureView layer,
-    const float *matrix);
+    const float *matrix,
+    bool late);
 
 /** Check whether a Grass of a scene casts into the spot and point light tiles of its atlas
  * (Grass.shadow_lights), so its tiles render in every packet.
@@ -1399,8 +1409,9 @@ void box_gpu_grass_atlas(
 
 /** Record the compute pass that places the blades of the Grass entities of the scene of a view
  * that culls by occlusion, after the depth pyramid of what it drew first was built
- * (box_gpu_cull_record_late): box_gpu_grass_record placed only the blades that cast shadows,
- * these cull the patches and the blades hidden behind the pyramid. Nothing for another view.
+ * (box_gpu_cull_record_late): box_gpu_grass_record placed at most the blades that cast shadows,
+ * these cull the patches and the blades hidden behind the pyramid, and of a view with a depth
+ * prepass place the blades that cast too. Nothing for another view.
  *
  * @param gpu The backend
  * @param encoder The encoder of the frame
@@ -1424,16 +1435,15 @@ typedef enum box_gpu_grass_phase_t {
 } box_gpu_grass_phase_t;
 
 /** Record the draws of the blades a view placed (box_gpu_grass_record,
- * box_gpu_grass_record_late) into one of its passes, one indirect draw per Grass and level of
- * detail. Replaces the pipeline and the bind group at 1.
+ * box_gpu_grass_record_late) into one of its forward passes, one indirect draw per Grass and
+ * level of detail, writing their depth: its depth prepass does not draw them. Replaces the
+ * pipeline and the bind group at 1.
  *
  * @param gpu The backend
  * @param pass The pass, with the bind group of the view at 0
  * @param packet The packet
  * @param v The view
- * @param format Format of the color target, Undefined for the depth prepass
- * @param equal Whether the pass loads the depth of a prepass that drew the blades, so it tests
- * against it without writing it
+ * @param format Format of the color target
  * @param phase Which of the blades it draws, box_gpu_grass_phase_t
  * @return Whether a blade draw was recorded
  */
@@ -1443,7 +1453,6 @@ bool box_gpu_grass_draw(
     const box_render_packet_t *packet,
     const box_render_view_t *v,
     WGPUTextureFormat format,
-    bool equal,
     int32_t phase);
 
 /** Write the uploads of a packet into their buffers.
@@ -1741,6 +1750,23 @@ void box_gpu_shadow_upload(
  * @param slot Slot of the view in the view buffer
  */
 void box_gpu_shadow_render(
+    box_gpu_t *gpu,
+    WGPUCommandEncoder encoder,
+    const box_render_packet_t *packet,
+    int32_t index,
+    int32_t slot);
+
+/** Record the passes that draw the grass blades the late compute pass of a view placed to cast
+ * shadows (box_gpu_grass_record_late) into every cascade that renders in the packet, after
+ * box_gpu_shadow_render drew its casters there. Nothing when its first compute pass placed them.
+ *
+ * @param gpu The backend
+ * @param encoder The encoder of the frame
+ * @param index Index of the view in the packet
+ * @param packet The packet
+ * @param slot Slot of the view in the view buffer
+ */
+void box_gpu_shadow_grass_late(
     box_gpu_t *gpu,
     WGPUCommandEncoder encoder,
     const box_render_packet_t *packet,
