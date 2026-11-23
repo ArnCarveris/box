@@ -1,0 +1,201 @@
+using flecs.script
+using flecs.script.math
+using box.material
+using box.texture
+using state
+
+assets {
+  template TerrainCliffMap {
+    prop map: i32 = 0
+    prop res: i32 = GROUND_RES
+    prop beds: i32 = 16
+
+    uv { nodes.Coords: {} }
+    u { nodes.Split: {input: uv, channel: ChannelR} }
+    v { nodes.Split: {input: uv, channel: ChannelG} }
+    v_beds {
+      nodes.Curve: {input: v, curve: {keys: [
+        {0, 0}, {0.05, 0.09}, {0.09, 0.13}, {0.2, 0.19}, {0.28, 0.31}, {0.33, 0.38},
+        {0.47, 0.44}, {0.55, 0.5}, {0.6, 0.57}, {0.69, 0.63}, {0.74, 0.69}, {0.86, 0.75},
+        {0.9, 0.82}, {0.95, 0.9}, {1, 1}
+      ]}}
+    }
+
+    bed_uv { nodes.Combine: {r: u, g: v_beds, b_value: 0, a_value: 1} }
+    sway_n { nodes.Noise: {channels: 3, frequency: 2, octaves: 3, seed: 140} }
+    bed_w { nodes.Warp: {coords: bed_uv, offset: sway_n, amount_value: 0.02} }
+
+    bed_blocks {
+      nodes.Blocks: {coords: bed_w, courses: beds, per_course: 1, jitter: 0.5, seed: 141}
+    }
+
+    bed_tone { nodes.Split: {input: bed_blocks, channel: ChannelG} }
+    bed_kind { nodes.Split: {input: bed_blocks, channel: ChannelA} }
+
+    hard {
+      nodes.Smoothstep: {input: bed_kind, edge0_value: {0.3, 0, 0, 0}, edge1_value: {0.7, 0, 0, 0}}
+    }
+
+    bed_v { nodes.Split: {input: bed_w, channel: ChannelG} }
+    bed_q { nodes.Multiply: {a: bed_v, b_value: {beds, beds, beds, beds}} }
+    bed_f { nodes.Fract: {input: bed_q} }
+    bed_round {
+      nodes.Curve: {input: bed_f, curve: {kind: CurveCatmullRom, keys: [
+        {0, 0}, {0.05, 0.35}, {0.14, 0.75}, {0.5, 1}, {0.86, 0.8}, {0.95, 0.4}, {1, 0}
+      ]}}
+    }
+
+    parting {
+      nodes.Curve: {input: bed_f, curve: {keys: [{0, 0}, {0.03, 1}, {0.97, 1}, {1, 0}]}}
+    }
+
+    crack_c { nodes.Transform: {coords: bed_w, scale: {2, 1, 1}} }
+    crack_w { nodes.Noise: {channels: 3, frequency: 9, octaves: 3, seed: 148} }
+    crack_cw { nodes.Warp: {coords: crack_c, offset: crack_w, amount_value: 0.03} }
+
+    cracks_c {
+      nodes.Cells: {distance: CellsEdge, count: 40, edge: 0.05, seed: 142, coords: crack_cw}
+    }
+
+    cracks { nodes.Split: {input: cracks_c, channel: ChannelR} }
+    block_r { nodes.Split: {input: cracks_c, channel: ChannelB} }
+    crack_n { nodes.Noise: {frequency: 5, octaves: 2, seed: 151} }
+
+    crack_on {
+      nodes.Smoothstep: {input: crack_n, edge0_value: {0.42, 0, 0, 0}, edge1_value: {0.55, 0, 0, 0}}
+    }
+
+    crack_k { nodes.Multiply: {a: crack_on, b: hard} }
+    crack_vis { nodes.Mix: {a_value: {1, 0, 0, 0}, b: cracks, factor: crack_k} }
+
+    chips_c {
+      nodes.Cells: {distance: CellsEdge, count: 400, edge: 0.2, seed: 149, coords: crack_cw}
+    }
+
+    chips { nodes.Split: {input: chips_c, channel: ChannelR} }
+    lam_c { nodes.Transform: {coords: bed_w, scale: {2, 120, 1}} }
+    lam { nodes.Noise: {coords: lam_c, frequency: 1, octaves: 3, seed: 143} }
+    grain { nodes.Noise: {frequency: 200, octaves: 2, seed: 144} }
+    rough { nodes.Noise: {frequency: 24, octaves: 4, fractal: NoiseRidged, seed: 145} }
+
+    ledge { nodes.Mix: {a_value: {0.35, 0, 0, 0}, b_value: {1, 0, 0, 0}, factor: hard} }
+    stand { nodes.Multiply: {a: bed_round, b: ledge} }
+    stand_c { nodes.Multiply: {a: stand, b: crack_vis} }
+    stand_h { nodes.Multiply: {a: stand_c, b_value: {0.5, 0, 0, 0}} }
+    chips_h { nodes.Multiply: {a: chips, b_value: {0.08, 0, 0, 0}} }
+    lam_h { nodes.Multiply: {a: lam, b_value: {0.08, 0, 0, 0}} }
+    grain_h { nodes.Multiply: {a: grain, b_value: {0.05, 0, 0, 0}} }
+    rough_h { nodes.Multiply: {a: rough, b_value: {0.22, 0, 0, 0}} }
+    h_a { nodes.Add: {a: stand_h, b: chips_h} }
+    h_b { nodes.Add: {a: h_a, b: lam_h} }
+    h_c { nodes.Add: {a: h_b, b: grain_h} }
+    height { nodes.Add: {a: h_c, b: rough_h} }
+
+    if map == MAP_ALBEDO {
+      tone {
+        nodes.Ramp: {
+          input: bed_tone,
+          keys: [
+            {0, {92, 86, 78}}, {0.15, {118, 106, 88}}, {0.3, {134, 124, 106}},
+            {0.42, {108, 104, 98}}, {0.55, {142, 128, 104}}, {0.68, {122, 98, 78}},
+            {0.8, {100, 96, 90}}, {0.9, {136, 130, 118}}, {1, {116, 104, 86}}
+          ]
+        }
+      }
+
+      patch_n { nodes.Noise: {frequency: 3, octaves: 3, seed: 150} }
+
+      patch_s {
+        nodes.Remap: {
+          input: patch_n, from_min: 0.3, from_max: 0.7, to_min: 0.8, to_max: 1.12, clamp: true
+        }
+      }
+
+      lam_s {
+        nodes.Remap: {
+          input: lam, from_min: 0.2, from_max: 0.8, to_min: 0.88, to_max: 1.08, clamp: true
+        }
+      }
+
+      block_s {
+        nodes.Remap: {input: block_r, from_min: 0, from_max: 1, to_min: 0.92, to_max: 1.06}
+      }
+
+      crack_s {
+        nodes.Remap: {
+          input: crack_vis, from_min: 0, from_max: 1, to_min: 0.68, to_max: 1, clamp: true
+        }
+      }
+
+      parting_k {
+        nodes.Smoothstep: {
+          input: bed_kind, edge0_value: {0.45, 0, 0, 0}, edge1_value: {0.6, 0, 0, 0}
+        }
+      }
+
+      parting_v { nodes.Mix: {a_value: {1, 0, 0, 0}, b: parting, factor: parting_k} }
+
+      parting_s {
+        nodes.Remap: {input: parting_v, from_min: 0, from_max: 1, to_min: 0.6, to_max: 1}
+      }
+
+      recess_s {
+        nodes.Remap: {
+          input: stand_c, from_min: 0, from_max: 0.5, to_min: 0.78, to_max: 1, clamp: true
+        }
+      }
+
+      streak_c { nodes.Transform: {scale: {10, 1, 1}} }
+      streak_w { nodes.Warp: {coords: streak_c, offset: sway_n, amount_value: 0.3} }
+      streak_n { nodes.Noise: {coords: streak_w, frequency: 2, octaves: 4, seed: 146} }
+      streak {
+        nodes.Smoothstep: {
+          input: streak_n, edge0_value: {0.5, 0, 0, 0}, edge1_value: {0.72, 0, 0, 0}
+        }
+      }
+
+      streak_s { nodes.Remap: {input: streak, from_min: 0, from_max: 1, to_min: 1, to_max: 0.72} }
+      spots { nodes.Noise: {frequency: 26, octaves: 4, seed: 147} }
+      lichen {
+        nodes.Smoothstep: {input: spots, edge0_value: {0.66, 0, 0, 0}, edge1_value: {0.72, 0, 0, 0}}
+      }
+
+      c_a { nodes.Multiply: {a: tone, b: patch_s} }
+      c_b { nodes.Multiply: {a: c_a, b: lam_s} }
+      c_c { nodes.Multiply: {a: c_b, b: block_s} }
+      c_d { nodes.Multiply: {a: c_c, b: crack_s} }
+      c_e { nodes.Multiply: {a: c_d, b: parting_s} }
+      c_f { nodes.Multiply: {a: c_e, b: recess_s} }
+      c_g { nodes.Multiply: {a: c_f, b: streak_s} }
+      color { nodes.Mix: {a: c_g, b_value: {0.26, 0.28, 0.18, 1}, factor: lichen} }
+      Graph: {output: color, width: res}
+    } else if map == MAP_NORMAL {
+      bumps { nodes.Normal: {height: height, strength: 3} }
+      Graph: {output: bumps, width: res, format: GraphLinear}
+    } else if map == MAP_HEIGHT {
+      Graph: {output: height, width: res, format: GraphSingle}
+    } else {
+      occlusion {
+        nodes.Remap: {
+          input: height, from_min: 0, from_max: 0.4, to_min: 0.45, to_max: 1, clamp: true
+        }
+      }
+
+      rough_o { nodes.Remap: {input: grain, from_min: 0, from_max: 1, to_min: 0.92, to_max: 0.76} }
+      orm { nodes.Combine: {r: occlusion, g: rough_o, b_value: 0, a_value: 1} }
+      Graph: {output: orm, width: res, format: GraphLinear}
+    }
+  }
+
+  TerrainCliffMap terrain_cliff_albedo(map: MAP_ALBEDO)
+  TerrainCliffMap terrain_cliff_normal(map: MAP_NORMAL)
+  TerrainCliffMap terrain_cliff_height(map: MAP_HEIGHT)
+  TerrainCliffMap terrain_cliff_orm(map: MAP_ORM)
+
+  terrain_cliff {
+    PbrTextures: {
+      albedo: terrain_cliff_albedo, normal: terrain_cliff_normal, orm: terrain_cliff_orm
+    }
+    texture.Transform: {scale_x: 8, scale_y: 8}
+  }
+}

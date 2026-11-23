@@ -1,6 +1,7 @@
-// Infinite forest: an endless forest to walk through: terrain without end, rolling forest floor with flat
-// shelves, clearings, a network of trails, brooks stepping down the valleys, tall rock walls with
-// scree at their feet and mountain ranges with snow on their peaks in the distance, grown over with
+// Infinite forest: an endless forest to walk through: terrain without end, rolling forest floor in
+// hills and valleys, clearings, a network of trails, brooks stepping down the valley floors, bands
+// of bedded cliffs with scree at their feet along the valley sides and mountain ranges with snow
+// on their peaks in the distance, grown over with
 // stands of beech, oak, birch, spruce and fir, young trees and snags, and an undergrowth of grass,
 // flowers, ferns, shrubs, logs, stumps, rocks and litter around the player.
 // Walk with WASD, F switches to flying and back; the panel of the forest library (H hides it) sets
@@ -20,6 +21,7 @@ include forest/library
 include forest/fog
 include infinite_forest/state
 include infinite_forest/materials
+include infinite_terrain/cliff
 include infinite_forest/terrain
 include infinite_forest/grass
 include infinite_forest/player

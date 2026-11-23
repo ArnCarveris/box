@@ -1,6 +1,7 @@
 include ui/widgets
 include infinite_terrain/state
 include infinite_terrain/materials
+include infinite_terrain/cliff
 include infinite_terrain/terrain
 include infinite_terrain/water
 include infinite_terrain/sky

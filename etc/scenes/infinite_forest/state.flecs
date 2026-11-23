@@ -41,7 +41,8 @@ state {
   export const GROUND_MAX: f32 = 900
 
   // The brooks (terrain.flecs, brooks.flecs) run along the edges of cells of about BROOK_SIZE
-  // meters. Their beds step down in terraces of BROOK_STEP meters with the water BROOK_DEPTH
+  // meters, their beds BROOK_SINK meters under the ground around them. Their beds step down in
+  // terraces of BROOK_STEP meters with the water BROOK_DEPTH
   // over each, so the water of a terrace hides under the bed of the one above it. The heights of
   // the land and the values of the brooks that the cells read come from a second terrain that
   // draws no tiles, BROOK_DATA_DROP meters under the land, whose CPU heights reach
@@ -51,11 +52,16 @@ state {
   export const BROOK_DEPTH: f32 = 0.2
   export const BROOK_DATA_DROP: f32 = 1000
   export const BROOK_QUERY_RADIUS: f32 = 96
+  export const BROOK_SINK: f32 = 1.8
+
+  // The cliffs of the terrain stand in strata of STRATA_PERIOD meters
+  export const STRATA_PERIOD: f32 = 30
 
   // Peaks above SNOW_LINE carry snow, more of it higher up, filling the band of SNOW_FADE
-  // meters above it in winter
+  // meters above it in winter, and above BARREN_LINE the ground is scree
   export const SNOW_LINE: f32 = 330
   export const SNOW_FADE: f32 = 320
+  export const BARREN_LINE: f32 = 400
 
   // Whether the player flies with the camera controller instead of walking, toggled by F
   export mut flying: bool = false

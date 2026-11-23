@@ -25,9 +25,13 @@ state {
   export const BROOK_DEPTH: f32 = 0.2
   export const BROOK_DATA_DROP: f32 = 1000
   export const BROOK_QUERY_RADIUS: f32 = 96
+  export const BROOK_SINK: f32 = 1.8
+
+  export const STRATA_PERIOD: f32 = 30
 
   export const SNOW_LINE: f32 = 330
   export const SNOW_FADE: f32 = 320
+  export const BARREN_LINE: f32 = 400
 
   export const TILE_MIN: f32 = 4
   export const TILE_MAX: f32 = 64

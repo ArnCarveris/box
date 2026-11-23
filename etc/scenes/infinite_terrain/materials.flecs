@@ -111,42 +111,6 @@ assets {
     }
   }
 
-  template TerrainRockMap {
-    prop map: i32 = 0
-
-    ridges { nodes.Noise: {frequency: 5, octaves: 6, fractal: NoiseRidged, seed: 71} }
-    grain { nodes.Noise: {frequency: 128, octaves: 2, seed: 72} }
-    cracks_c { nodes.Cells: {distance: CellsEdge, count: 24, edge: 0.05, seed: 73} }
-    cracks { nodes.Split: {input: cracks_c, channel: ChannelR} }
-    crack_shade { nodes.Remap: {input: cracks, from_min: 0, from_max: 1, to_min: 0.55, to_max: 1, clamp: true} }
-    relief { nodes.Mix: {a: ridges, b: grain, factor_value: {0.2, 0, 0, 0}} }
-    height { nodes.Multiply: {a: relief, b: crack_shade} }
-
-    if map == MAP_ALBEDO {
-      stone {
-        nodes.Ramp: {
-          input: relief,
-          keys: [{0.2, {70, 68, 64}}, {0.45, {112, 108, 100}}, {0.7, {148, 142, 130}}, {0.9, {170, 164, 152}}]
-        }
-      }
-
-      spots { nodes.Noise: {frequency: 36, octaves: 3, seed: 74} }
-      lichen { nodes.Smoothstep: {input: spots, edge0_value: {0.6, 0, 0, 0}, edge1_value: {0.66, 0, 0, 0}} }
-      shaded { nodes.Multiply: {a: stone, b: crack_shade} }
-      color { nodes.Mix: {a: shaded, b_value: {0.36, 0.38, 0.2, 1}, factor: lichen} }
-      Graph: {output: color, width: GROUND_RES}
-    } else if map == MAP_NORMAL {
-      bumps { nodes.Normal: {height: height, strength: 3} }
-      Graph: {output: bumps, width: GROUND_RES, format: GraphLinear}
-    } else if map == MAP_HEIGHT {
-      Graph: {output: height, width: GROUND_RES, format: GraphSingle}
-    } else {
-      occlusion { nodes.Remap: {input: crack_shade, from_min: 0.55, from_max: 1, to_min: 0.5, to_max: 1, clamp: true} }
-      orm { nodes.Combine: {r: occlusion, g_value: 0.82, b_value: 0, a_value: 1} }
-      Graph: {output: orm, width: GROUND_RES, format: GraphLinear}
-    }
-  }
-
   TerrainGrassMap terrain_rough_albedo(map: MAP_ALBEDO, seed: 90, dry: 0.45)
   TerrainGrassMap terrain_rough_normal(map: MAP_NORMAL, seed: 90, dry: 0.45)
   TerrainGrassMap terrain_rough_height(map: MAP_HEIGHT, seed: 90, dry: 0.45)
@@ -159,10 +123,6 @@ assets {
   TerrainDirtMap terrain_dirt_normal(map: MAP_NORMAL)
   TerrainDirtMap terrain_dirt_height(map: MAP_HEIGHT)
   TerrainDirtMap terrain_dirt_orm(map: MAP_ORM)
-  TerrainRockMap terrain_rock_albedo(map: MAP_ALBEDO)
-  TerrainRockMap terrain_rock_normal(map: MAP_NORMAL)
-  TerrainRockMap terrain_rock_height(map: MAP_HEIGHT)
-  TerrainRockMap terrain_rock_orm(map: MAP_ORM)
 
   terrain_rough {
     PbrTextures: {albedo: terrain_rough_albedo, normal: terrain_rough_normal, orm: terrain_rough_orm}
@@ -177,11 +137,6 @@ assets {
   terrain_dirt {
     PbrTextures: {albedo: terrain_dirt_albedo, normal: terrain_dirt_normal, orm: terrain_dirt_orm}
     texture.Transform: {scale_x: 56, scale_y: 56}
-  }
-
-  terrain_rock {
-    PbrTextures: {albedo: terrain_rock_albedo, normal: terrain_rock_normal, orm: terrain_rock_orm}
-    texture.Transform: {scale_x: 16, scale_y: 16}
   }
 
   terrain_snow_drifts {

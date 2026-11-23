@@ -7,9 +7,10 @@ using assets
 
 // The materials of the infinite forest terrain. Its TextureBlend has four layers, weighed by the masks
 // of terrain.flecs: the forest floor (the leaf litter of the forest library), the grass of the
-// clearings and the alpine meadows, the dirt of the trails and the rock of the walls, mapped
-// triplanar so steep faces do not stretch. Scree is rock half buried in dirt, which the height
-// based contrast of the blend breaks into stones. Over them lie three TextureLayers: snow on the
+// clearings and the alpine meadows, the dirt of the trails and the bedded rock of the cliffs
+// (infinite_terrain/cliff.flecs), mapped triplanar so steep faces do not stretch and the beds lie
+// level across them. Scree is rock half buried in dirt, which the height based contrast of the
+// blend breaks into stones. Over them lie three TextureLayers: snow on the
 // high peaks, more of it in winter, and the wet and the snow of the weather of the forest
 // library.
 assets {
@@ -76,11 +77,6 @@ assets {
   infinite_forest_dirt {
     PbrTextures: {albedo: path_albedo, normal: path_normal, orm: path_orm}
     texture.Transform: {scale_x: 56, scale_y: 56}
-  }
-
-  infinite_forest_rock {
-    PbrTextures: {albedo: rock_albedo, normal: rock_normal, orm: rock_orm}
-    texture.Transform: {scale_x: 16, scale_y: 16}
   }
 
   // Snow on the peaks above SNOW_LINE on what faces up, drifting in patches: on the summits in
