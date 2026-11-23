@@ -82,6 +82,7 @@ template PortalCctvFeed {
       View: {
         camera: camera,
         clear: {enabled: true, color: {191, 219, 255, 255}},
+        shadows: {enabled: true, resolution: 1024, max_distance: 100},
         effects: [{effect: tonemap}]
       }
     }
