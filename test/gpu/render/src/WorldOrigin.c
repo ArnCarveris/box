@@ -41,10 +41,12 @@
  * boxes, a sun with shadows and a camera with a view.
  *
  * @param camera Receives the camera
+ * @param cell Whether the floor and boxes are children of a WorldCell root at cell 1 0 0
  * @return The world
  */
-static ecs_world_t* origin_scene(
-    ecs_entity_t *camera)
+static ecs_world_t* origin_scene_in(
+    ecs_entity_t *camera,
+    bool cell)
 {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
@@ -54,14 +56,22 @@ static ecs_world_t* origin_scene(
     ecs_singleton_set(world, RenderSettings, {.in_flight = 2, .main_thread = true});
     ecs_singleton_set(world, AmbientLight, {.intensity = 0.3f});
 
-    ecs_entity_t floor = ecs_new(world);
-    ecs_set(world, floor, Position, {ORIGIN_X, -0.1f, 0});
+    ecs_entity_t parent = 0;
+    float x = ORIGIN_X;
+    if (cell) {
+        parent = ecs_new(world);
+        ecs_set(world, parent, WorldCell, {1, 0, 0});
+        x -= (float)BOX_WORLD_CELL_SIZE;
+    }
+
+    ecs_entity_t floor = parent ? ecs_new_w_pair(world, EcsChildOf, parent) : ecs_new(world);
+    ecs_set(world, floor, Position, {x, -0.1f, 0});
     ecs_set(world, floor, Box, {60, 0.2f, 60});
     ecs_set(world, floor, Rgb, {255, 255, 255});
     ecs_set(world, floor, PbrMaterial, {.roughness = 1});
     for (int32_t i = 0; i < 3; i ++) {
-        ecs_entity_t box = ecs_new(world);
-        ecs_set(world, box, Position, {ORIGIN_X - 4 + 4 * (float)i, 1, -2 * (float)i});
+        ecs_entity_t box = parent ? ecs_new_w_pair(world, EcsChildOf, parent) : ecs_new(world);
+        ecs_set(world, box, Position, {x - 4 + 4 * (float)i, 1, -2 * (float)i});
         ecs_set(world, box, Rotation, {0, 0.3f * (float)i, 0});
         ecs_set(world, box, Box, {1.5f, 2, 1.5f});
         ecs_set(world, box, Rgb, {(uint8_t)(80 * i + 60), 120, 200});
@@ -84,6 +94,17 @@ static ecs_world_t* origin_scene(
     ecs_modified(world, view, View);
 
     return world;
+}
+
+/** Create the scene of the tests, its content at the absolute X of ORIGIN_X.
+ *
+ * @param camera Receives the camera
+ * @return The world
+ */
+static ecs_world_t* origin_scene(
+    ecs_entity_t *camera)
+{
+    return origin_scene_in(camera, false);
 }
 
 /** Render the next frame into an image file of the temporary folder and load it.
@@ -272,6 +293,38 @@ void WorldOrigin_particles_same_image(void) {
 
     origin_expect_content(pa);
     origin_expect_particles(pb);
+    origin_expect_same(pa, pb);
+    stbi_image_free(pa);
+    stbi_image_free(pb);
+    ecs_fini(a);
+    ecs_fini(b);
+}
+
+void WorldOrigin_cell_same_image(void) {
+    // render/world_origin
+    ecs_entity_t camera_a, camera_b;
+    ecs_world_t *a = origin_scene(&camera_a);
+    ecs_world_t *b = origin_scene_in(&camera_b, true);
+    unsigned char *pa = NULL, *pb = NULL;
+    for (int32_t i = 0; i < 3; i ++) {
+        stbi_image_free(pa);
+        stbi_image_free(pb);
+        pa = origin_frame(a, "a.png");
+        pb = origin_frame(b, "b.png");
+    }
+
+    origin_expect_content(pa);
+    origin_expect_same(pa, pb);
+
+    box_world_origin_shift(b, 0, (double[3]){ 2816, 0, -256 });
+    test_int(ecs_singleton_get(b, WorldOriginStatus)->written, 3);
+    for (int32_t i = 0; i < 3; i ++) {
+        stbi_image_free(pa);
+        stbi_image_free(pb);
+        pa = origin_frame(a, "a.png");
+        pb = origin_frame(b, "b.png");
+    }
+
     origin_expect_same(pa, pb);
     stbi_image_free(pa);
     stbi_image_free(pb);

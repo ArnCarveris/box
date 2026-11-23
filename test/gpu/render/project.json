@@ -2185,7 +2185,8 @@
                 "testcases": [
                     "shift_same_image",
                     "rebase_same_image",
-                    "particles_same_image"
+                    "particles_same_image",
+                    "cell_same_image"
                 ]
             },
             {
