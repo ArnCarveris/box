@@ -306,6 +306,10 @@ static inline void box_gpu_api_copy_buffer(
  * what the adapter offers */
 #define BOX_GPU_SAMPLED_TEXTURES (16u)
 
+/** Uniform buffers per shader stage of the WebGPU default limits, which the device raises to
+ * what the adapter offers: the fragment stage of the texture layer pipelines binds 13 */
+#define BOX_GPU_UNIFORM_BUFFERS (12u)
+
 /** Bytes between the matrices of two cascades, the dynamic offset alignment of webgpu */
 #define BOX_GPU_CASCADE_STRIDE (256)
 

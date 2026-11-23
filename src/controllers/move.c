@@ -1227,27 +1227,33 @@ static bool box_move_ground_filter(
         box_collider_cast(r->world, e, r->origin, down, FLT_MAX, distance, NULL);
 }
 
-/* A terrain of the scene of the body has ground under its feet, no higher than the origin of
- * the ray of box_controller_ground_shape */
+/** A terrain of the scene of the body has ground under its feet, no higher than the origin of
+ * the ray of box_controller_ground_shape.
+ *
+ * @param world The world
+ * @param body The body
+ * @param feet Position of the feet of the body
+ * @return true when a terrain has ground under the feet
+ */
 static bool box_move_terrain_below(
     ecs_world_t *world,
     const box_controller_body_t *body,
     const Position *feet)
 {
     ecs_entity_t terrains[BOX_MOVE_TERRAINS];
+    bool below = false;
     int32_t i, count = body->radius > 0
         ? box_terrain_scene(world, body->scene, terrains, BOX_MOVE_TERRAINS)
         : 0;
-    for (i = 0; i < count; i ++) {
+
+    for (i = 0; i < count && !below; i ++) {
         float y = 0;
-        if (box_terrain_ground(world, terrains[i], feet->x, feet->z, &y, NULL) &&
-            y <= feet->y + body->radius)
-        {
-            return true;
-        }
+
+        below = box_terrain_ground(world, terrains[i], feet->x, feet->z, &y, NULL) &&
+            y <= feet->y + body->radius;
     }
 
-    return false;
+    return below;
 }
 
 bool box_controller_ground_below(

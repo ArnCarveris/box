@@ -145,7 +145,9 @@ static void portal_gpu_flood(
     portal_gpu_t *t)
 {
     ecs_world_t *world = t->world;
-    ecs_singleton_set(world, Scene, {.transmission = true, .water = true});
+    ecs_singleton_set(world, Scene, {
+        .shader_features.Extended.transmission = true,
+        .shader_features.Extended.water = true});
     ecs_singleton_set(world, AmbientLight, {.sky = {255, 255, 255},
         .ground = {255, 255, 255}, .intensity = 1});
 

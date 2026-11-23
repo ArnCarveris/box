@@ -289,9 +289,11 @@ void Material_alpha_cutoff_prefab_and_dynamic(void) {
     box_render_null_free(null);
 }
 
-/** Path of this project in the repository, which locates the repository root (MSVC names this
- * file with a backslash before src) */
+/** Path of this project in the repository, which locates the repository root */
 #define MATERIAL_SOURCE "test/cpu/render"
+
+/** MATERIAL_SOURCE as MSVC names it when bake passes the file with backslashes */
+#define MATERIAL_SOURCE_WIN "test\\cpu\\render"
 
 /** Read a file of the repository into a string.
  *
@@ -304,6 +306,10 @@ static char* material_file_read(
     char *result = NULL;
     const char *self = __FILE__;
     const char *source = strstr(self, MATERIAL_SOURCE);
+    if (!source) {
+        source = strstr(self, MATERIAL_SOURCE_WIN);
+    }
+
     int32_t root = source ? (int32_t)(source - self) : 0;
     char *path = flecs_asprintf("%.*s%s", root, self, file);
     FILE *f = fopen(path, "rb");

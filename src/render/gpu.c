@@ -302,6 +302,13 @@ static void box_gpu_device_init(
             limits.maxSampledTexturesPerShaderStage = adapter.maxSampledTexturesPerShaderStage;
             desc.requiredLimits = &limits;
         }
+
+        if (adapter.maxUniformBuffersPerShaderStage != WGPU_LIMIT_U32_UNDEFINED &&
+            adapter.maxUniformBuffersPerShaderStage > BOX_GPU_UNIFORM_BUFFERS)
+        {
+            limits.maxUniformBuffersPerShaderStage = adapter.maxUniformBuffersPerShaderStage;
+            desc.requiredLimits = &limits;
+        }
     }
 
     desc.uncapturedErrorCallbackInfo.callback = box_gpu_on_error;

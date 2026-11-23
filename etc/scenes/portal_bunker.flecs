@@ -49,8 +49,8 @@ using box.texture
 
 $ {
   box.app.FpsTarget: {60}
-  Scene: {blend_modes: true, fresnel: true, water: true, texture_scroll: true, environment: true,
-    aerial_perspective: true, reflections: true}
+  Scene: {environment: true, aerial_perspective: true, reflections: true,
+    shader_features: {Extended: {blend_modes: true, fresnel: true, water: true, texture_scroll: true}}}
 }
 
 window {

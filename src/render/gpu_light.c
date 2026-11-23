@@ -861,6 +861,30 @@ static int32_t box_gpu_light_area_slot(
     return result;
 }
 
+/** A bind group layout entry of a texture the fragment stage samples.
+ *
+ * @param binding The binding
+ * @param sample_type The sample type of the texture
+ * @param dimension The view dimension of the texture
+ * @return The entry
+ */
+static WGPUBindGroupLayoutEntry box_gpu_light_texture_entry(
+    uint32_t binding,
+    WGPUTextureSampleType sample_type,
+    WGPUTextureViewDimension dimension)
+{
+    WGPUBindGroupLayoutEntry entry = {
+        .binding = binding,
+        .visibility = WGPUShaderStage_Fragment,
+        .texture = {
+            .sampleType = sample_type,
+            .viewDimension = dimension
+        }
+    };
+
+    return entry;
+}
+
 WGPUBindGroupLayout box_gpu_light_layout(
     box_gpu_t *gpu)
 {
@@ -884,14 +908,8 @@ WGPUBindGroupLayout box_gpu_light_layout(
             .visibility = WGPUShaderStage_Fragment,
             .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
         },
-        {
-            .binding = 3,
-            .visibility = WGPUShaderStage_Fragment,
-            .texture = {
-                .sampleType = WGPUTextureSampleType_Depth,
-                .viewDimension = WGPUTextureViewDimension_2DArray
-            }
-        },
+        box_gpu_light_texture_entry(
+            3, WGPUTextureSampleType_Depth, WGPUTextureViewDimension_2DArray),
         {
             .binding = 4,
             .visibility = WGPUShaderStage_Fragment,
@@ -902,14 +920,8 @@ WGPUBindGroupLayout box_gpu_light_layout(
             .visibility = WGPUShaderStage_Vertex | WGPUShaderStage_Fragment,
             .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
         },
-        {
-            .binding = 6,
-            .visibility = WGPUShaderStage_Fragment,
-            .texture = {
-                .sampleType = WGPUTextureSampleType_Float,
-                .viewDimension = WGPUTextureViewDimension_CubeArray
-            }
-        },
+        box_gpu_light_texture_entry(
+            6, WGPUTextureSampleType_Float, WGPUTextureViewDimension_CubeArray),
         {
             .binding = 7,
             .visibility = WGPUShaderStage_Fragment,
@@ -920,14 +932,8 @@ WGPUBindGroupLayout box_gpu_light_layout(
             .visibility = WGPUShaderStage_Fragment,
             .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
         },
-        {
-            .binding = 9,
-            .visibility = WGPUShaderStage_Fragment,
-            .texture = {
-                .sampleType = WGPUTextureSampleType_Float,
-                .viewDimension = WGPUTextureViewDimension_3D
-            }
-        },
+        box_gpu_light_texture_entry(
+            9, WGPUTextureSampleType_Float, WGPUTextureViewDimension_3D),
         {
             .binding = 10,
             .visibility = WGPUShaderStage_Fragment,
@@ -938,14 +944,8 @@ WGPUBindGroupLayout box_gpu_light_layout(
             .visibility = WGPUShaderStage_Vertex | WGPUShaderStage_Fragment,
             .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
         },
-        {
-            .binding = 12,
-            .visibility = WGPUShaderStage_Fragment,
-            .texture = {
-                .sampleType = WGPUTextureSampleType_Float,
-                .viewDimension = WGPUTextureViewDimension_Cube
-            }
-        },
+        box_gpu_light_texture_entry(
+            12, WGPUTextureSampleType_Float, WGPUTextureViewDimension_Cube),
         {
             .binding = 13,
             .visibility = WGPUShaderStage_Fragment,
@@ -954,22 +954,10 @@ WGPUBindGroupLayout box_gpu_light_layout(
                 .minBindingSize = BOX_GPU_PROBE_SIZE
             }
         },
-        {
-            .binding = 14,
-            .visibility = WGPUShaderStage_Fragment,
-            .texture = {
-                .sampleType = WGPUTextureSampleType_UnfilterableFloat,
-                .viewDimension = WGPUTextureViewDimension_2D
-            }
-        },
-        {
-            .binding = 15,
-            .visibility = WGPUShaderStage_Fragment,
-            .texture = {
-                .sampleType = WGPUTextureSampleType_Depth,
-                .viewDimension = WGPUTextureViewDimension_2D
-            }
-        },
+        box_gpu_light_texture_entry(
+            14, WGPUTextureSampleType_UnfilterableFloat, WGPUTextureViewDimension_2D),
+        box_gpu_light_texture_entry(
+            15, WGPUTextureSampleType_Depth, WGPUTextureViewDimension_2D),
         {
             .binding = 16,
             .visibility = WGPUShaderStage_Fragment,
@@ -978,43 +966,19 @@ WGPUBindGroupLayout box_gpu_light_layout(
                 .minBindingSize = BOX_GPU_ATLAS_TILES_SIZE
             }
         },
-        {
-            .binding = 17,
-            .visibility = WGPUShaderStage_Fragment,
-            .texture = {
-                .sampleType = WGPUTextureSampleType_Float,
-                .viewDimension = WGPUTextureViewDimension_2D
-            }
-        },
+        box_gpu_light_texture_entry(
+            17, WGPUTextureSampleType_Float, WGPUTextureViewDimension_2D),
         {
             .binding = 18,
             .visibility = WGPUShaderStage_Fragment,
             .sampler = { .type = WGPUSamplerBindingType_Filtering }
         },
-        {
-            .binding = 19,
-            .visibility = WGPUShaderStage_Fragment,
-            .texture = {
-                .sampleType = WGPUTextureSampleType_Float,
-                .viewDimension = WGPUTextureViewDimension_2D
-            }
-        },
-        {
-            .binding = 20,
-            .visibility = WGPUShaderStage_Fragment,
-            .texture = {
-                .sampleType = WGPUTextureSampleType_Depth,
-                .viewDimension = WGPUTextureViewDimension_2D
-            }
-        },
-        {
-            .binding = 21,
-            .visibility = WGPUShaderStage_Fragment,
-            .texture = {
-                .sampleType = WGPUTextureSampleType_Float,
-                .viewDimension = WGPUTextureViewDimension_2DArray
-            }
-        },
+        box_gpu_light_texture_entry(
+            19, WGPUTextureSampleType_Float, WGPUTextureViewDimension_2D),
+        box_gpu_light_texture_entry(
+            20, WGPUTextureSampleType_Depth, WGPUTextureViewDimension_2D),
+        box_gpu_light_texture_entry(
+            21, WGPUTextureSampleType_Float, WGPUTextureViewDimension_2DArray),
         {
             .binding = BOX_GPU_PLANET_LIGHTS_BINDING,
             .visibility = WGPUShaderStage_Fragment,
@@ -1040,14 +1004,8 @@ WGPUBindGroupLayout box_gpu_light_layout(
                 .minBindingSize = BOX_RENDER_WATER_WAVE_SETS * sizeof(box_render_water_waves_t)
             }
         },
-        [BOX_GPU_FOG_GRID_BINDING] = {
-            .binding = BOX_GPU_FOG_GRID_BINDING,
-            .visibility = WGPUShaderStage_Fragment,
-            .texture = {
-                .sampleType = WGPUTextureSampleType_Float,
-                .viewDimension = WGPUTextureViewDimension_3D
-            }
-        },
+        [BOX_GPU_FOG_GRID_BINDING] = box_gpu_light_texture_entry(
+            BOX_GPU_FOG_GRID_BINDING, WGPUTextureSampleType_Float, WGPUTextureViewDimension_3D),
         [BOX_GPU_AREAS_BINDING] = {
             .binding = BOX_GPU_AREAS_BINDING,
             .visibility = WGPUShaderStage_Fragment,

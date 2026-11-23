@@ -110,6 +110,55 @@ static size_t box_gpu_terrain_constants(
     return BOX_RENDER_MESH_OVERRIDES_PLAIN + 1;
 }
 
+/** The depth and stencil state of a forward pipeline.
+ *
+ * @param blend The blend mode; only opaque pipelines write depth
+ * @param shape2d Whether the pipeline draws 2D shapes, which pass on equal depth
+ * @param equal Whether the pipeline draws after a depth prepass, which passes on equal depth only
+ * @param transmissive Whether the pipeline draws transmissive surfaces, which write no depth
+ * @param water Whether the pipeline draws water, which only draws where the stencil is dry
+ * @return The depth and stencil state
+ */
+static WGPUDepthStencilState box_gpu_forward_depth(
+    uint32_t blend,
+    bool shape2d,
+    bool equal,
+    bool transmissive,
+    bool water)
+{
+    WGPUCompareFunction compare = WGPUCompareFunction_Greater;
+    if (shape2d) {
+        compare = WGPUCompareFunction_GreaterEqual;
+    } else if (equal) {
+        compare = WGPUCompareFunction_Equal;
+    }
+
+    WGPUDepthStencilState depth = {
+        .format = BOX_GPU_DEPTH_FORMAT,
+        .depthWriteEnabled = blend == Opaque && !equal && !transmissive
+            ? WGPUOptionalBool_True : WGPUOptionalBool_False,
+        .depthCompare = compare,
+        .stencilFront = { .compare = WGPUCompareFunction_Always },
+        .stencilBack = { .compare = WGPUCompareFunction_Always }
+    };
+
+    if (water) {
+        WGPUStencilFaceState dry = {
+            .compare = WGPUCompareFunction_Equal,
+            .failOp = WGPUStencilOperation_Keep,
+            .depthFailOp = WGPUStencilOperation_Keep,
+            .passOp = WGPUStencilOperation_Keep
+        };
+
+        depth.stencilFront = dry;
+        depth.stencilBack = dry;
+        depth.stencilReadMask = BOX_RENDER_STENCIL_DRY;
+        depth.stencilWriteMask = 0;
+    }
+
+    return depth;
+}
+
 /** Create the forward pipeline of a shader, color format, blend mode, back face mode, alpha
  * test and depth mode.
  *
@@ -236,13 +285,6 @@ static WGPURenderPipeline box_gpu_forward_create(
         data = false;
     }
 
-    WGPUCompareFunction compare = WGPUCompareFunction_Greater;
-    if (shape2d) {
-        compare = WGPUCompareFunction_GreaterEqual;
-    } else if (equal) {
-        compare = WGPUCompareFunction_Equal;
-    }
-
     WGPUVertexAttribute vertex_attrs[3] = {
         { .format = WGPUVertexFormat_Float32x3, .offset = 0, .shaderLocation = 0 },
         { .format = WGPUVertexFormat_Float32x3, .offset = 12, .shaderLocation = 1 },
@@ -352,27 +394,8 @@ static WGPURenderPipeline box_gpu_forward_create(
         .targetCount = 1,
         .targets = &target
     };
-    WGPUDepthStencilState depth = {
-        .format = BOX_GPU_DEPTH_FORMAT,
-        .depthWriteEnabled = blend == Opaque && !equal && !transmissive
-            ? WGPUOptionalBool_True : WGPUOptionalBool_False,
-        .depthCompare = compare,
-        .stencilFront = { .compare = WGPUCompareFunction_Always },
-        .stencilBack = { .compare = WGPUCompareFunction_Always }
-    };
-    if (water) {
-        WGPUStencilFaceState dry = {
-            .compare = WGPUCompareFunction_Equal,
-            .failOp = WGPUStencilOperation_Keep,
-            .depthFailOp = WGPUStencilOperation_Keep,
-            .passOp = WGPUStencilOperation_Keep
-        };
-
-        depth.stencilFront = dry;
-        depth.stencilBack = dry;
-        depth.stencilReadMask = BOX_RENDER_STENCIL_DRY;
-        depth.stencilWriteMask = 0;
-    }
+    WGPUDepthStencilState depth = box_gpu_forward_depth(
+        blend, shape2d, equal, transmissive, water);
 
     WGPURenderPipelineDescriptor desc = {
         .layout = layers ? box_gpu_layer_pipeline_layout(gpu, texture_blend)
