@@ -163,29 +163,11 @@ void box_world_quat_mul(
     out[3] = w;
 }
 
-void box_world_quat_of_rotation(
-    const Rotation *r,
-    double out[4])
-{
-    double hx = 0.5 * (double)r->x;
-    double hy = 0.5 * (double)r->y;
-    double hz = 0.5 * (double)r->z;
-    double yaw[4] = {0, sin(hy), 0, cos(hy)};
-    double pitch[4] = {sin(hx), 0, 0, cos(hx)};
-    double roll[4] = {0, 0, sin(hz), cos(hz)};
-    double turned[4];
-
-    box_world_quat_mul(yaw, pitch, turned);
-    box_world_quat_mul(turned, roll, out);
-}
-
-void box_world_rotation_of_quat(
-    const double q[4],
+void box_world_rotation_of_matrix(
+    const double m[3][3],
     Rotation *out)
 {
-    double x = q[0], y = q[1], z = q[2], w = q[3];
-    double sx = -2 * (y * z - w * x);
-
+    double sx = -m[1][2];
     if (sx > 1.0) {
         sx = 1.0;
     } else if (sx < -1.0) {
@@ -194,10 +176,10 @@ void box_world_rotation_of_quat(
 
     out->x = (float)asin(sx);
     if (fabs(sx) < 0.9999999) {
-        out->y = (float)atan2(2 * (x * z + w * y), 1 - 2 * (x * x + y * y));
-        out->z = (float)atan2(2 * (x * y + w * z), 1 - 2 * (x * x + z * z));
+        out->y = (float)atan2(m[0][2], m[2][2]);
+        out->z = (float)atan2(m[1][0], m[1][1]);
     } else {
-        out->y = (float)atan2(-2 * (x * z - w * y), 1 - 2 * (y * y + z * z));
+        out->y = (float)atan2(-m[2][0], m[0][0]);
         out->z = 0.0f;
     }
 }

@@ -134,24 +134,15 @@ void box_world_quat_mul(
     const double b[4],
     double out[4]);
 
-/** Get the rotation of a Rotation (yaw, then pitch, then roll) as a quaternion.
- *
- * @param r The Euler angles
- * @param out Receives the rotation, a quaternion x y z w
- */
-void box_world_quat_of_rotation(
-    const Rotation *r,
-    double out[4]);
-
-/** Get the Rotation (yaw, then pitch, then roll) of a unit quaternion. The angles give the same
+/** Get the Rotation (yaw, then pitch, then roll) of a rotation matrix. The angles give the same
  * orientation at any pitch; at a pitch of 90 degrees, where yaw and roll turn about one axis,
  * the roll is 0.
  *
- * @param q The rotation, a quaternion x y z w
+ * @param m The matrix, m[row][column]
  * @param out Receives the Euler angles
  */
-void box_world_rotation_of_quat(
-    const double q[4],
+void box_world_rotation_of_matrix(
+    const double m[3][3],
     Rotation *out);
 
 /** Get the Position of a WorldCell root in a frame: the corner of its cell in local units,

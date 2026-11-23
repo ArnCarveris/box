@@ -141,12 +141,11 @@ static bool box_world_particles_shifted(
 
 
 /** How a shift maps the local positions of the old frame into the new one:
- * new = k * old + d */
+ * new = ratio * u * old + d */
 typedef struct box_world_map_t {
-    double k[3][3];      /**< Linear part, k[row][column]; the identity when only the origin
+    double u[3][3];      /**< Rotation, u[row][column]; the identity when only the origin
                           *   moves */
-    double turn[4];      /**< Rotation part of k, without the scale: a quaternion x y z w */
-    double ratio;        /**< Scale part of k: meters per unit of the old over the new frame */
+    double ratio;        /**< Scale: meters per unit of the old over the new frame */
     double d[3];         /**< Offset */
     bool linear;         /**< The rotation or scale changes, so k is not the identity */
 } box_world_map_t;
@@ -169,9 +168,6 @@ static void box_world_map_init(
         from->q[2] != to->q[2] || from->q[3] != to->q[3] || from->s != to->s;
     out->ratio = out->linear ? from->s / to->s : 1.0;
 
-    double back[4] = { -to->q[0], -to->q[1], -to->q[2], to->q[3] };
-    box_world_quat_mul(back, from->q, out->turn);
-
     for (i = 0; i < 3; i ++) {
         moved[i] = from->t[i] - to->t[i];
     }
@@ -184,13 +180,12 @@ static void box_world_map_init(
         for (j = 0; j < 3; j ++) {
             double dot = to->r[i][0] * from->r[j][0] + to->r[i][1] * from->r[j][1] +
                 to->r[i][2] * from->r[j][2];
-            double turned = out->linear ? dot : (double)(i == j);
-            out->k[i][j] = turned * out->ratio;
+            out->u[i][j] = out->linear ? dot : (double)(i == j);
         }
     }
 }
 
-/** Apply a map to a point: k * p + d.
+/** Apply a map to a point: ratio * u * p + d.
  *
  * @param map The map
  * @param p The point
@@ -204,8 +199,9 @@ static void box_world_map_point(
     double result[3];
     int32_t i;
     for (i = 0; i < 3; i ++) {
-        result[i] = map->k[i][0] * (double)p[0] + map->k[i][1] * (double)p[1] +
-            map->k[i][2] * (double)p[2] + map->d[i];
+        double turned = map->u[i][0] * (double)p[0] + map->u[i][1] * (double)p[1] +
+            map->u[i][2] * (double)p[2];
+        result[i] = map->ratio * turned + map->d[i];
     }
 
     for (i = 0; i < 3; i ++) {
@@ -213,30 +209,37 @@ static void box_world_map_point(
     }
 }
 
-/** Turn the Rotation of a root by a rotation, composed as quaternions, or set it to one.
+/** Turn the Rotation of a root by a rotation matrix, or set it to one.
  *
  * @param world The world
  * @param e The root
- * @param turn The rotation, a quaternion x y z w
+ * @param turn The rotation, turn[row][column]
  * @param absolute Whether turn replaces the rotation of the root instead
  */
 static void box_world_turn_root(
     ecs_world_t *world,
     ecs_entity_t e,
-    const double turn[4],
+    const double turn[3][3],
     bool absolute)
 {
     const Rotation *r = ecs_get(world, e, Rotation);
-    double old[4] = {0, 0, 0, 1};
-    double result[4];
+    double result[3][3];
+    mat4 old = GLM_MAT4_IDENTITY_INIT;
+    int32_t i, j;
     Rotation turned;
 
     if (r && !absolute) {
-        box_world_quat_of_rotation(r, old);
+        glm_euler_yxz((vec3){ r->x, r->y, r->z }, old);
     }
 
-    box_world_quat_mul(turn, old, result);
-    box_world_rotation_of_quat(result, &turned);
+    for (i = 0; i < 3; i ++) {
+        for (j = 0; j < 3; j ++) {
+            result[i][j] = turn[i][0] * (double)old[j][0] + turn[i][1] * (double)old[j][1] +
+                turn[i][2] * (double)old[j][2];
+        }
+    }
+
+    box_world_rotation_of_matrix(result, &turned);
     ecs_set_ptr(world, e, Rotation, &turned);
 }
 
@@ -269,9 +272,8 @@ static int32_t box_world_shift_root(
         ecs_set_ptr(world, e, Position, &placed);
         written ++;
         if (map->linear) {
-            double back[4] = { -frame->q[0], -frame->q[1], -frame->q[2], frame->q[3] };
             float s = (float)(1.0 / frame->s);
-            box_world_turn_root(world, e, back, true);
+            box_world_turn_root(world, e, frame->r, true);
             ecs_set(world, e, Scale, {s, s, s});
             written += 2;
         }
@@ -288,7 +290,7 @@ static int32_t box_world_shift_root(
                 (s ? s->y : 1.0f) * ratio,
                 (s ? s->z : 1.0f) * ratio
             };
-            box_world_turn_root(world, e, map->turn, false);
+            box_world_turn_root(world, e, map->u, false);
             ecs_set_ptr(world, e, Scale, &scaled);
             written += 2;
         }
@@ -302,9 +304,9 @@ static int32_t box_world_shift_root(
         int32_t col;
         for (col = 0; col < 3; col ++) {
             for (i = 0; i < 3; i ++) {
-                moved.m[col][i] = (float)(map->k[i][0] * (double)t->m[col][0] +
-                    map->k[i][1] * (double)t->m[col][1] +
-                    map->k[i][2] * (double)t->m[col][2]);
+                double turned = map->u[i][0] * (double)t->m[col][0] +
+                    map->u[i][1] * (double)t->m[col][1] + map->u[i][2] * (double)t->m[col][2];
+                moved.m[col][i] = (float)(map->ratio * turned);
             }
         }
 
@@ -362,14 +364,14 @@ static int32_t box_world_shift_heights(
     for (i = 0; i < ecs_vec_count(&controllers); i ++) {
         ecs_entity_t e = *ecs_vec_get_t(&controllers, ecs_entity_t, i);
         FirstPersonController c = *ecs_get(world, e, FirstPersonController);
-        c.ground = (float)(map->k[1][1] * (double)c.ground + map->d[1]);
+        c.ground = (float)(map->ratio * map->u[1][1] * (double)c.ground + map->d[1]);
         ecs_set_ptr(world, e, FirstPersonController, &c);
     }
 
     for (i = 0; i < ecs_vec_count(&collisions); i ++) {
         ecs_entity_t e = *ecs_vec_get_t(&collisions, ecs_entity_t, i);
         ParticleCollision c = *ecs_get(world, e, ParticleCollision);
-        c.height = (float)(map->k[1][1] * (double)c.height + map->d[1]);
+        c.height = (float)(map->ratio * map->u[1][1] * (double)c.height + map->d[1]);
         ecs_set_ptr(world, e, ParticleCollision, &c);
     }
 

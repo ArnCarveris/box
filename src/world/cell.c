@@ -42,8 +42,7 @@ static void box_world_cell_on_set(
     float s = (float)(1.0 / frame.s);
 
     if (framed) {
-        double back[4] = { -frame.q[0], -frame.q[1], -frame.q[2], frame.q[3] };
-        box_world_rotation_of_quat(back, &turned);
+        box_world_rotation_of_matrix(frame.r, &turned);
     }
 
     for (i = 0; i < it->count; i ++) {
