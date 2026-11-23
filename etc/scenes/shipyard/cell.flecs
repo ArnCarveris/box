@@ -28,11 +28,16 @@ assets {
     prop color: Rgb = {255, 255, 255}
 
     const h = CH
+
     for i in 0..4 {
       const sx = i % 2 == 0 ? -1 : 1
       const sz = i < 2 ? -1 : 1
-      CursorEdge "v_{i}"(len: h, color: color) { Position: {sx * 2, h / 2, sz * 2}; Rotation: {0, 0, HALF_PI} }
+      CursorEdge "v_{i}"(len: h, color: color) {
+        Position: {sx * 2, h / 2, sz * 2}
+        Rotation: {0, 0, HALF_PI}
+      }
     }
+
     for i in 0..2 {
       const y = i * h
       CursorEdge "xa_{i}"(len: 4, color: color) { Position: {0, y, -2} }
@@ -42,11 +47,8 @@ assets {
     }
   }
 
-  // The editor over cell idx of the rig, whose view in the design is v: picking on the deck
-  // being worked on, the build pad, the cursor, the fault warning and the sparks of a build. The
-  // Rig instance leaves the modules of that deck out and the cell draws its module itself, so a
-  // pick on any part of it reaches the cell. The module is tinted for the tool when hovered,
-  // rises after a build, and a ghost of the module of the tool shows in a hovered empty cell.
+  // The Rig instance leaves the modules of the deck being worked on out and the cell draws its
+  // module itself, so a pick on any part of it reaches the cell.
   template ShipCell {
     prop idx: i32 = 0
     prop v: RigCellView = {}
@@ -77,8 +79,16 @@ assets {
       }
       // Power and heat levels that change only on user actions, trips and heat levels
       RigModule unit(
-        idx: idx, k: k, v: v, live: rig_live(idx, k), heat: rig_heat(idx, k), trip: k == K_POWER && rig_trip(idx),
-        cool: k == K_RADIATOR && heat_falling, lifted: rising, tinted: hovered && tint.a > 0, tint: tint
+        idx: idx,
+        k: k,
+        v: v,
+        live: rig_live(idx, k),
+        heat: rig_heat(idx, k),
+        trip: k == K_POWER && rig_trip(idx),
+        cool: k == K_RADIATOR && heat_falling,
+        lifted: rising,
+        tinted: hovered && tint.a > 0,
+        tint: tint
       )
     }
 
@@ -89,7 +99,11 @@ assets {
         Ignore
         NoShadow
         ModuleView view(
-          k: t, v: rig_ghost_view(yard_design, v, deck, idx, t), y: y, seed: idx, live: (t != K_ENGINE || burning) ? 1 : 0
+          k: t,
+          v: rig_ghost_view(yard_design, v, deck, idx, t),
+          y: y,
+          seed: idx,
+          live: (t != K_ENGINE || burning) ? 1 : 0
         )
       }
     }
@@ -100,7 +114,12 @@ assets {
         AngularVelocity: {0, 1.6, 0}
         Ignore
         NoShadow
-        gem : ShipWarning { Position: {0, 0, 0}; Rotation: {0.7854, 0, 0.7854}; Box: {0.45, 0.45, 0.45} }
+        gem : ShipWarning {
+          Position: {0, 0, 0}
+          Rotation: {0.7854, 0, 0.7854}
+          Box: {0.45, 0.45, 0.45}
+        }
+
         glow { Position: {0, 0, 0}; PointLight: {intensity: 3, range: 4}; Rgb: {255, 60, 40} }
       }
     }
@@ -148,6 +167,7 @@ assets {
     async {
       while true {
         await on.leave(this)
+
         if hover == idx {
           hover = -1
         }
@@ -157,6 +177,7 @@ assets {
     async {
       while true {
         const ev = await on.click(this)
+
         if ev.button == 0 {
           emit Click(cell: idx)
         }
@@ -166,6 +187,7 @@ assets {
     async {
       while true {
         const e = await Built
+
         if e.cell == idx {
           rising = true
           sparking = true

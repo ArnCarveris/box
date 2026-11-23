@@ -1115,7 +1115,7 @@ static void box_lights_views(
         box_light_scene_t *s = index != -1
             ? ecs_vec_get_t(&l->scenes, box_light_scene_t, index)
             : NULL;
-        out->enabled = view ? view->lighting.enabled : true;
+        out->enabled = !v->impostor && (view ? view->lighting.enabled : true);
         ecs_os_memset_t(&out->cookie, 0, box_render_view_cookie_t);
         const box_light_list_t *list = s ? &s->lists[BOX_LIGHTS_VIEW] : NULL;
         if (s && (s->has_lights || s->atmos_unlit)) {

@@ -22,18 +22,28 @@ assets {
       Cylinder: {radius: 0.82, length: 0.1, segments: 32}
       Rgb: MarketHoney
     }
+
     pedestal {
       Position: {0, 0.54, 0}
       Frustum: {radius_bottom: 0.16, radius_top: 0.08, length: 0.96, segments: 12}
       Rgb: MarketIron
     }
+
     for leg in 0..3 {
       const a = leg * 2.094
-      MarketBeam(ax: 0, ay: 0.4, bx: math.sin(a) * 0.55, by: 0.07, bz: math.cos(a) * 0.55, radius: 0.04);
+      MarketBeam(
+        ax: 0,
+        ay: 0.4,
+        bx: math.sin(a) * 0.55,
+        by: 0.07,
+        bz: math.cos(a) * 0.55,
+        radius: 0.04
+      );
       {
         Position: {math.sin(a) * 1.2, 0.55, math.cos(a) * 1.2}
         Cylinder: {radius: 0.3, length: 0.1, segments: 20}
         Rgb: MarketOak
+
         for side in 0..3 {
           {
             Position: {math.sin(side * 2.094) * 0.19, -0.26, math.cos(side * 2.094) * 0.19}
@@ -43,17 +53,24 @@ assets {
         }
       }
     }
+
     board {
       Position: {0, 1.12, 0}
       RoundedBox: {1.05, 0.05, 0.65, 0.12}
       Rgb: {213, 167, 107}
     }
+
     CheeseWedge() { Position: {-0.14, 1.15, -0.05}; Scale: {0.5, 0.5, 0.5} }
     Brie(radius: 0.15) { Position: {0.28, 1.22, 0.04} }
     Baguette() { Position: {-0.35, 1.15, 0.1}; Rotation: {0, 0.7, 0}; Scale: {0.5, 0.5, 0.5} }
+
     for i in 0..12 {
       {
-        Position: {0.31 + math.sin(i * 2.4) * 0.1, 1.19 + i % 3 * 0.044, -0.22 + math.cos(i * 2.4) * 0.1}
+        Position: {
+          0.31 + math.sin(i * 2.4) * 0.1,
+          1.19 + i % 3 * 0.044,
+          -0.22 + math.cos(i * 2.4) * 0.1
+        }
         Sphere: {radius: 0.045, segments: 10, smooth: true}
         Rgb: {99, 72, 103}
       }

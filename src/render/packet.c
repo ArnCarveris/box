@@ -30,6 +30,17 @@ void box_render_packet_init(
     ecs_vec_init_t(NULL, &p->star_fields, box_render_star_field_t, 0);
     ecs_vec_init_t(NULL, &p->planet_lights, box_render_planet_light_t, 0);
     ecs_vec_init_t(NULL, &p->planar_reflections, box_render_planar_t, 0);
+    ecs_vec_init_t(NULL, &p->water_ripples, box_render_water_ripples_t, 0);
+    ecs_vec_init_t(NULL, &p->ripple_sources, box_render_ripple_source_t, 0);
+    ecs_vec_init_t(NULL, &p->ripple_flows, box_render_ripple_flow_t, 0);
+    ecs_vec_init_t(NULL, &p->water_spectra, box_render_water_spectrum_t, 0);
+    ecs_vec_init_t(NULL, &p->impostor_blits, box_render_impostor_blit_t, 0);
+    ecs_vec_init_t(NULL, &p->impostor_reads, box_render_impostor_read_t, 0);
+    ecs_vec_init_t(NULL, &p->terrain_heights, box_render_terrain_height_t, 0);
+    ecs_vec_init_t(NULL, &p->terrain_bakes, box_render_terrain_bake_t, 0);
+    ecs_vec_init_t(NULL, &p->terrain_indices, box_render_terrain_index_t, 0);
+    ecs_vec_init_t(NULL, &p->terrain_samples, box_render_terrain_sample_t, 0);
+    ecs_vec_init_t(NULL, &p->grasses, box_render_grass_t, 0);
     ecs_vec_init_t(NULL, &p->debug_boxes, box_render_debug_box_t, 0);
     ecs_vec_init_t(NULL, &p->debug_poses, mat4, 0);
     ecs_vec_init_t(NULL, &p->portal_debug_boxes, box_render_debug_box_t, 0);
@@ -65,6 +76,17 @@ void box_render_packet_fini(
     ecs_vec_fini_t(NULL, &p->star_fields, box_render_star_field_t);
     ecs_vec_fini_t(NULL, &p->planet_lights, box_render_planet_light_t);
     ecs_vec_fini_t(NULL, &p->planar_reflections, box_render_planar_t);
+    ecs_vec_fini_t(NULL, &p->water_ripples, box_render_water_ripples_t);
+    ecs_vec_fini_t(NULL, &p->ripple_sources, box_render_ripple_source_t);
+    ecs_vec_fini_t(NULL, &p->ripple_flows, box_render_ripple_flow_t);
+    ecs_vec_fini_t(NULL, &p->water_spectra, box_render_water_spectrum_t);
+    ecs_vec_fini_t(NULL, &p->impostor_blits, box_render_impostor_blit_t);
+    ecs_vec_fini_t(NULL, &p->impostor_reads, box_render_impostor_read_t);
+    ecs_vec_fini_t(NULL, &p->terrain_heights, box_render_terrain_height_t);
+    ecs_vec_fini_t(NULL, &p->terrain_bakes, box_render_terrain_bake_t);
+    ecs_vec_fini_t(NULL, &p->terrain_indices, box_render_terrain_index_t);
+    ecs_vec_fini_t(NULL, &p->terrain_samples, box_render_terrain_sample_t);
+    ecs_vec_fini_t(NULL, &p->grasses, box_render_grass_t);
     ecs_vec_fini_t(NULL, &p->debug_boxes, box_render_debug_box_t);
     ecs_vec_fini_t(NULL, &p->debug_poses, mat4);
     ecs_vec_fini_t(NULL, &p->portal_debug_boxes, box_render_debug_box_t);
@@ -84,6 +106,7 @@ void box_render_packet_reset(
     int32_t capacity = ecs_vec_size(&p->data);
     p->frame = 0;
     p->time = 0;
+    p->origin[0] = p->origin[1] = p->origin[2] = 0;
     p->delta = 0;
     p->fps = 0;
     p->vsync = false;
@@ -111,6 +134,17 @@ void box_render_packet_reset(
     ecs_vec_clear(&p->star_fields);
     ecs_vec_clear(&p->planet_lights);
     ecs_vec_clear(&p->planar_reflections);
+    ecs_vec_clear(&p->water_ripples);
+    ecs_vec_clear(&p->ripple_sources);
+    ecs_vec_clear(&p->ripple_flows);
+    ecs_vec_clear(&p->water_spectra);
+    ecs_vec_clear(&p->impostor_blits);
+    ecs_vec_clear(&p->impostor_reads);
+    ecs_vec_clear(&p->terrain_heights);
+    ecs_vec_clear(&p->terrain_bakes);
+    ecs_vec_clear(&p->terrain_indices);
+    ecs_vec_clear(&p->terrain_samples);
+    ecs_vec_clear(&p->grasses);
     ecs_vec_clear(&p->debug_boxes);
     ecs_vec_clear(&p->debug_poses);
     ecs_vec_clear(&p->portal_debug_boxes);
@@ -161,6 +195,9 @@ void box_render_packet_copy(
 {
     dst->frame = src->frame;
     dst->time = src->time;
+    dst->origin[0] = src->origin[0];
+    dst->origin[1] = src->origin[1];
+    dst->origin[2] = src->origin[2];
     dst->delta = src->delta;
     dst->fps = src->fps;
     dst->vsync = src->vsync;
@@ -197,6 +234,27 @@ void box_render_packet_copy(
         ECS_SIZEOF(box_render_planet_light_t));
     box_render_vec_copy(&dst->planar_reflections, &src->planar_reflections,
         ECS_SIZEOF(box_render_planar_t));
+    box_render_vec_copy(&dst->water_ripples, &src->water_ripples,
+        ECS_SIZEOF(box_render_water_ripples_t));
+    box_render_vec_copy(&dst->ripple_sources, &src->ripple_sources,
+        ECS_SIZEOF(box_render_ripple_source_t));
+    box_render_vec_copy(&dst->ripple_flows, &src->ripple_flows,
+        ECS_SIZEOF(box_render_ripple_flow_t));
+    box_render_vec_copy(&dst->water_spectra, &src->water_spectra,
+        ECS_SIZEOF(box_render_water_spectrum_t));
+    box_render_vec_copy(&dst->impostor_blits, &src->impostor_blits,
+        ECS_SIZEOF(box_render_impostor_blit_t));
+    box_render_vec_copy(&dst->impostor_reads, &src->impostor_reads,
+        ECS_SIZEOF(box_render_impostor_read_t));
+    box_render_vec_copy(&dst->terrain_heights, &src->terrain_heights,
+        ECS_SIZEOF(box_render_terrain_height_t));
+    box_render_vec_copy(&dst->terrain_bakes, &src->terrain_bakes,
+        ECS_SIZEOF(box_render_terrain_bake_t));
+    box_render_vec_copy(&dst->terrain_indices, &src->terrain_indices,
+        ECS_SIZEOF(box_render_terrain_index_t));
+    box_render_vec_copy(&dst->terrain_samples, &src->terrain_samples,
+        ECS_SIZEOF(box_render_terrain_sample_t));
+    box_render_vec_copy(&dst->grasses, &src->grasses, ECS_SIZEOF(box_render_grass_t));
     box_render_vec_copy(&dst->debug_boxes, &src->debug_boxes,
         ECS_SIZEOF(box_render_debug_box_t));
     box_render_vec_copy(&dst->debug_poses, &src->debug_poses, ECS_SIZEOF(mat4));

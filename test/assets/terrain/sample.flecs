@@ -1,0 +1,41 @@
+// A terrain of smooth hills with masks for the TerrainSample tests of
+// test/gpu/render/src/TerrainSample.c, sampled on the GPU (TerrainSampled). Its tiles of level 0
+// have a vertex every half meter, the spacing of its query tiles, so the surface the tiles draw
+// and the heights the CPU queries read agree. A walker that is the focus stands at (32, 32).
+
+using box.transform
+using box.material
+using box.texture
+using box.terrain
+using box.camera
+using box.view
+using box.light
+using box.world
+
+sample_hills {
+  broad  { nodes.Noise: {frequency: 0.004, octaves: 2, seed: 3} }
+  height { nodes.Multiply: {a: broad, b_value: {40, 40, 40, 40}} }
+  spots  { nodes.Noise: {frequency: 0.02, seed: 7} }
+  masks  { nodes.Combine: {r: spots, g: broad, b_value: 0.25, a_value: 1} }
+  Terrain: {height: height, masks: masks, tile_size: 32, resolution: 65, levels: 5,
+            lod_distance: 128, min_height: -10, max_height: 60, budget: 64,
+            query_spacing: 0.5, query_radius: 96}
+  TerrainSampled
+  Rgb: {120, 140, 90}
+  PbrMaterial: {roughness: 1}
+}
+
+sample_walker {
+  Position: {32, 30, 32}
+  Camera: {fov: 60, near_: 0.1, far_: 2000}
+  WorldFocus
+}
+
+sample_view {
+  View: {camera: sample_walker, clear: {enabled: true, color: {20, 30, 60, 255}}}
+}
+
+sample_sun {
+  Rotation: {1.0, 0.6, 0}
+  DirectionalLight: {intensity: 3.14}
+}

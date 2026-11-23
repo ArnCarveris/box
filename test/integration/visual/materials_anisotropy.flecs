@@ -6,7 +6,7 @@ using box.view
 using box.light
 
 $ {
-  Scene: {environment: true, anisotropy: true}
+  Scene: {environment: true, shader_features: {Extended: {anisotropy: true}}}
 }
 
 // Specular anisotropy (SpecularAnisotropy) on brushed light gray metal of roughness 0.3, lit by a
@@ -19,7 +19,7 @@ $ {
 // pi / 4, 3 pi / 8 and pi / 2: the arc turns from around the axis to along it, a vertical streak
 // at pi / 2.
 anisotropy {
-  Scene: {environment: true, anisotropy: true}
+  Scene: {environment: true, shader_features: {Extended: {anisotropy: true}}}
   AmbientLight: {sky: {0, 0, 0}, ground: {0, 0, 0}, intensity: 0}
 
   sky {

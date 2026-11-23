@@ -7,10 +7,8 @@ using box.movement
 using box.text
 using state
 
-// The station, in meters with the top of its outer deck at y = 0: a domed hub crowned with
-// spires, an inner and a middle ring joined to it by corridors, cargo yards on the decks
-// between them, and an outer deck with the hangar wall of the rig bays. The liner gates and the
-// rig bays are drawn by the LinerGate and RigBay templates.
+// The station, in meters with the top of its outer deck at y = 0: a domed hub, an inner and a
+// middle ring, cargo yards between them, and an outer deck with the hangar wall of the rig bays.
 assets {
   template HarborStation {
     HarborHub hub

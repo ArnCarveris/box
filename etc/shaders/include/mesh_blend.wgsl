@@ -17,17 +17,19 @@
 // fs_blend_cutout discards; the forward pass after the prepass does not alpha test, its Equal
 // depth test rejects those.
 @fragment fn fs_depth_cutout_blend(f: CutoutOut) {
+    range_discard(f.range, f.pos);
     let albedo = blend_alpha(blend_albedo, blend_mask, blend_heights, material_sampler, blending,
         f.uv, cutout_scalars(f).w, f.object, f.object_normal);
-    if (f.alpha * albedo < cutout_scalars(f).x) {
+    if (cut_out_depth(f, f.alpha * albedo)) {
         discard;
     }
 }
 
 @fragment fn fs_count_cutout_blend(f: CutoutOut) -> @location(0) vec4f {
+    range_discard(f.range, f.pos);
     let albedo = blend_alpha(blend_albedo, blend_mask, blend_heights, material_sampler, blending,
         f.uv, cutout_scalars(f).w, f.object, f.object_normal);
-    if (f.alpha * albedo < cutout_scalars(f).x) {
+    if (cut_out_depth(f, f.alpha * albedo)) {
         discard;
     }
 
@@ -125,6 +127,11 @@ fn blend_tiles(o: ptr<function, BlendFragment>) {
     (*o).albedo = vec4f(color, 1.0);
 }
 
+// The mask of a fragment at uv: the mask image.
+fn blend_mask_at(uv: vec2f, gx: vec2f, gy: vec2f) -> vec4f {
+    return textureSampleGrad(blend_mask, material_sampler, uv, gx, gy);
+}
+
 fn blend_slice(b: BlendFragment, k: u32) -> u32 {
     return select(k, b.slice[k], b.tiled != 0u);
 }
@@ -147,7 +154,7 @@ fn blend_fragment(f: VertexOut) -> BlendFragment {
     var o: BlendFragment;
     o.uv = f.uv.xy;
     if (vo_scalars(f).w != 0.0) {
-        o.uv = mapping_uv(f.object, f.object_normal, f.uv.xy);
+        o.uv = mapping_uv(f.object, f.object_normal.xyz, f.uv.xy);
     }
     o.gx = dpdx(o.uv);
     o.gy = dpdy(o.uv);
@@ -158,8 +165,7 @@ fn blend_fragment(f: VertexOut) -> BlendFragment {
         blend_tiles(&o);
     } else {
         o.w = blend_height_weights(blend_heights, material_sampler, blending,
-            blend_weights(textureSampleGrad(blend_mask, material_sampler, o.uv, o.gx, o.gy),
-            blending), o.uv, o.gx, o.gy);
+            blend_weights(blend_mask_at(o.uv, o.gx, o.gy), blending), o.uv, o.gx, o.gy);
     }
     return o;
 }

@@ -1,0 +1,206 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using box.mesh
+using box.camera
+using box.view
+using box.light
+using box.effects
+using box.atmosphere
+using box.surface
+using box.texture
+using trees
+using tree_editor
+
+// The window, which the panel shares with the view of the tree
+window {
+  Surface: {width: 1440, height: 960, vsync: true}
+}
+
+// The preset the props load from: one instance of the chosen preset at the chosen age and seed,
+// in a scene of its own that no view draws. Loading copies the props of its tree, so the edited
+// tree grows the same graph and takes its meshes from the cache.
+source {
+  Scene: {}
+
+  if preset == 0 {
+    TreeBeech beech(seed: source_seed, age: age)
+  } else if preset == 1 {
+    TreeOak oak(seed: source_seed, age: age)
+  } else if preset == 2 {
+    TreeBirch birch(seed: source_seed, age: age)
+  } else if preset == 3 {
+    TreeSpruce spruce(seed: source_seed, age: age)
+  } else if preset == 4 {
+    TreeFir fir(seed: source_seed, age: age)
+  } else if preset == 5 {
+    TreePine pine(seed: source_seed, age: age)
+  } else if preset == 6 {
+    TreeWillow willow(seed: source_seed, age: age)
+  } else {
+    TreeSnag snag(seed: source_seed, age: age)
+  }
+}
+
+sun {
+  DirectionalLight: {intensity: 3 * PI}
+  Rgb: {255, 244, 228}
+}
+
+sky {
+  Atmosphere: {
+    sun: sun,
+    units_per_km: 1000,
+    rayleigh: {scale_height: 8, scattering_scale: 1},
+    mie: {scale_height: 1.2, anisotropy: 0.8, scattering_scale: 1},
+    ozone_scale: 1,
+    ground_albedo: {60, 70, 50},
+    sun_disk_intensity: 4
+  }
+  TimeOfDay: {hour: hour, day_of_year: 190, latitude: 50, north: 200, sun: sun}
+}
+
+// The orbit camera: the rig turns about the trunk at the height of the target, the camera sits
+// dist behind it, shifted right so the tree stands in the middle of the part of the window the
+// panel leaves free
+rig {
+  Position: {0, target_y, 0}
+  Rotation: {0 - pitch, yaw, 0}
+
+  camera {
+    Position: {panel_shown ? dist * 0.135 : 0, 0, dist}
+    Camera: {fov: 40, near_: 0.1, far_: 3000}
+  }
+}
+
+// The meadow: short grass in patches of greener and drier green
+editor_meadow_albedo {
+  patches { nodes.Noise: {frequency: 5, octaves: 5, seed: 41} }
+  blades { nodes.Noise: {frequency: 500, octaves: 2, seed: 42} }
+  grass { nodes.Ramp: {input: patches, keys: [{0.3, {72, 92, 40}}, {0.5, {86, 106, 46}}, {0.65, {100, 108, 54}}, {0.8, {78, 98, 42}}]} }
+  speckle { nodes.Ramp: {input: blades, keys: [{0.3, {190, 190, 190}}, {0.7, {255, 255, 255}}]} }
+  color { nodes.Multiply: {a: grass, b: speckle} }
+  Graph: {output: color, width: 1024}
+}
+
+editor_meadow_normal {
+  blades { nodes.Noise: {frequency: 500, octaves: 2, seed: 42} }
+  bumps { nodes.Normal: {height: blades, strength: 0.8} }
+  Graph: {output: bumps, width: 1024, format: GraphLinear}
+}
+
+stage {
+  // The field around the turntable, a little darker than it
+  field {
+    Position: {0, -0.45, 0}
+    Box: {600, 0.5, 600}
+    Rgb: {200, 200, 190}
+    PbrMaterial: {roughness: 1}
+    PbrTextures: {albedo: editor_meadow_albedo, normal: editor_meadow_normal}
+    texture.Mapping: {mode: MappingWorld, size: 8}
+  }
+
+  // The grassy disc the tree grows on, which turns while the turntable is on, round enough to
+  // stay round at the levels of detail the panel forces
+  turntable {
+    Position: {0, 0, 0}
+    Rotation: {0, spin, 0}
+
+    disc {
+      Position: {0, -0.2, 0}
+      Cylinder: {segments: 384, smooth: true, length: 0.4, radius: 16}
+      Rgb: {255, 255, 255}
+      PbrMaterial: {roughness: 1}
+      PbrTextures: {albedo: editor_meadow_albedo, normal: editor_meadow_normal}
+      texture.Mapping: {mode: MappingObject, size: 8}
+    }
+
+    rim {
+      Position: {0, -0.25, 0}
+      Cylinder: {segments: 384, smooth: true, length: 0.4, radius: 16.25}
+      Rgb: {92, 74, 56}
+      PbrMaterial: {roughness: 0.9}
+    }
+
+    // The edited tree, thinned and colored by the season, its shapes hidden by the switches
+    // of the panel; the skeleton is its curves as thin tubes
+    tree {
+      Tree: seasoned(grown, season)
+      Position: {0, 0, 0}
+
+      bark {
+        if !show_bark {
+          flecs.core.Disabled
+        }
+      }
+
+      foliage {
+        Rgb: season_rgb(grown.leaf_material[Rgb], season, grown.needles)
+        if !show_foliage {
+          flecs.core.Disabled
+        }
+      }
+
+      pruned {}
+
+      skeleton_mesh {
+        nodes.Tube: {curves: pruned, sides: 4, radius: 0.35, collar: -1, flare: -1, lod_sides: -1}
+      }
+
+      skeleton {
+        Position: {0, 0, 0}
+        Rgb: {255, 128, 40}
+        PbrMaterial: {roughness: 0.6}
+        Emissive: {strength: 1.5, color: {255, 110, 30}}
+        box.mesh.Graph: {output: skeleton_mesh}
+        WindSway: {
+          bend: tree_sway(grown), height: grown.height, base: grown.ground, pivots: true,
+          branch: grown.sway_branch
+        }
+        if !show_skeleton {
+          flecs.core.Disabled
+        }
+      }
+    }
+  }
+}
+
+view {
+  gtao {
+    Gtao: {radius: 0.8, final_value_power: 2}
+  }
+
+  exposure {
+    AutoExposure: {}
+  }
+
+  bloom {
+    Bloom: {intensity: 0.12, threshold: 1}
+  }
+
+  tonemap {
+    Tonemap: {auto_exposure: exposure}
+  }
+
+  smaa {
+    Smaa: {}
+  }
+
+  View: {
+    camera: rig.camera,
+    clear: {enabled: true, color: {150, 178, 210, 255}},
+    lighting: {
+      enabled: true,
+      atmosphere: true,
+      environment: {source: sky, intensity: 0.6, background: false}
+    },
+    shadows: {enabled: true, cascades: 4, resolution: 2048, max_distance: 200},
+    lod: {
+      levels: 4,
+      distances: [0, lod_distance(lod, 1), lod_distance(lod, 2), lod_distance(lod, 3)]
+    },
+    effects: [{effect: gtao}, {effect: sky}, {effect: bloom}, {effect: tonemap}, {effect: smaa}]
+  }
+}

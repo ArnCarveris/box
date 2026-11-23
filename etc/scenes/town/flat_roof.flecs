@@ -13,6 +13,7 @@ assets {
       Box: {width + 0.35, 0.2, depth + 0.35}
       Rgb: TownCream
     }
+
     for side in 0..2 {
       {
         Position: {(side * 2 - 1) * width / 2, 0.22, 0}
@@ -20,19 +21,23 @@ assets {
         Rgb: color
       }
     }
+
     {
       Position: {-width * 0.22, 0.6, -depth * 0.22}
       Cylinder: {radius: 0.5, length: 1.05, segments: 16}
       Rgb: {184, 200, 195}
     }
+
     {
       Position: {-width * 0.22, 1.15, -depth * 0.22}
       Cone: {radius: 0.55, length: 0.18, segments: 16}
       Rgb: TownIron
     }
+
     AirConditioner() { Position: {width * 0.23, 0.45, 0} }
     {
       Position: {0, 0, depth * 0.28}
+
       for i in 0..2 {
         {
           Position: {(i - 0.5) * width * 0.7, 0.75, 0}
@@ -40,11 +45,13 @@ assets {
           Rgb: TownIron
         }
       }
+
       {
         Position: {0, 1.4, 0}
         Box: {width * 0.7, 0.025, 0.025}
         Rgb: TownIron
       }
+
       for i in 0..3 {
         {
           Position: {(i - 1) * width * 0.2, 1.08, 0}

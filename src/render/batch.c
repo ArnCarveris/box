@@ -26,7 +26,9 @@
 _Static_assert(sizeof(box_render_transform_t) == 48, "InstanceTransform of instance.wgsl");
 _Static_assert(sizeof(box_render_shading_t) == 64, "Shape2DShading of shape2d.wgsl");
 _Static_assert(sizeof(box_render_mesh_shading_t) == 16, "MeshShading of instance.wgsl");
-_Static_assert(sizeof(box_render_material_t) == 192, "Material of material.wgsl");
+_Static_assert(BOX_DRAWS_PAGE_BYTES / sizeof(box_render_transform_t) <= (1u << 22),
+    "A visible slot keeps the bits above RANGE_SLOT_BITS of draw_range.wgsl for its dither code");
+_Static_assert(sizeof(box_render_material_t) == 272, "Material of material.wgsl");
 _Static_assert(BOX_RENDER_MATERIALS_MAX <= BOX_RENDER_MESH_MATERIAL_MASK,
     "the material slots fit below the planet light slot of a mesh shading");
 
@@ -49,8 +51,9 @@ static uint64_t box_draws_hash(
     h ^= (((((uint64_t)key->blend * 2 + key->back_face) * 4 + key->wrap) * 2 + key->cutout) * 2 +
         key->transmissive + 1) * 0x27D4EB2F165667C5ull;
     h ^= ((uint64_t)key->surface + (uint64_t)key->water * 2 + (uint64_t)key->frame * 4 +
-        (uint64_t)key->mover * 8) * 0x85EBCA77C2B2AE63ull;
-    h ^= ((uint64_t)key->foam + 1) * 0x9FB21C651E98DF25ull;
+        (uint64_t)key->mover * 8 + (uint64_t)key->wind * 16) * 0x85EBCA77C2B2AE63ull;
+    h ^= (((uint64_t)key->foam + 1) * 0x9FB21C651E98DF25ull) ^ box_draws_layers_hash(key);
+    h ^= key->impostor * 0xD1B54A32D192ED03ull;
     for (i = 0; i < BOX_RENDER_TEXTURE_SLOTS; i ++) {
         h = (h ^ (h >> 31)) * 0x9E3779B97F4A7C15ull + key->textures[i];
     }
@@ -61,6 +64,8 @@ static uint64_t box_draws_hash(
     h ^= ((uint64_t)key->features + 1) * 0xA0761D6478BD642Full;
     h ^= ((uint64_t)key->planet + 1) * 0xE7037ED1A0B428DBull;
     h ^= (key->atmosphere + 1) * 0x8EBC6AF09C88C6E3ull;
+    h ^= ((uint64_t)(key->range[0] * 1024.0f) + (uint64_t)(key->range[1] * 32.0f) * 0x10001ull +
+        (uint64_t)(key->range[2] * 1024.0f) * 0x1000001ull) * 0xBF58476D1CE4E5B9ull;
 
     return h ^ (h >> 29);
 }
@@ -80,12 +85,14 @@ static bool box_draws_key_eq(
         a->transmissive == b->transmissive && a->water == b->water && a->foam == b->foam &&
         a->dynamic_transform == b->dynamic_transform &&
         a->dynamic_material == b->dynamic_material && a->mover == b->mover &&
-        a->wrap == b->wrap && !ecs_os_memcmp(a->textures, b->textures, ECS_SIZEOF(a->textures)) &&
+        a->wrap == b->wrap && !ecs_os_memcmp(a->textures, b->textures,
+            ECS_SIZEOF(a->textures) + ECS_SIZEOF(a->layers)) &&
         a->shadow == b->shadow && a->fixture == b->fixture && a->bake == b->bake &&
         a->atlas == b->atlas && a->features == b->features && a->planet == b->planet &&
         a->atmosphere == b->atmosphere && a->surface == b->surface && a->frame == b->frame &&
         a->box_shadow == b->box_shadow && a->slice == b->slice &&
-        a->texture_blend == b->texture_blend && a->polygon == b->polygon;
+        a->texture_blend == b->texture_blend && a->polygon == b->polygon && a->wind == b->wind &&
+        a->impostor == b->impostor && !ecs_os_memcmp(a->range, b->range, ECS_SIZEOF(a->range));
 }
 
 box_draw_batch_t* box_draws_batch(
@@ -1037,32 +1044,6 @@ static uint64_t box_draws_segment_size(
         : 0;
 }
 
-void box_draws_batch_textures(
-    const box_render_draws_t *d,
-    const box_draw_batch_t *b,
-    box_render_batch_t *out)
-{
-    int32_t i;
-    for (i = 0; i < BOX_RENDER_TEXTURE_SLOTS; i ++) {
-        ecs_entity_t e = b->key.textures[i];
-        out->textures[i] = e ? box_textures_handle(d->textures, e) : 0;
-        if (e && !out->textures[i] && d->world) {
-            out->textures[i] = box_render_texture_target_handle(d->world, e);
-        }
-    }
-
-    if (b->key.atlas) {
-        out->textures[2] = b->key.atlas;
-    }
-
-    out->foam = b->key.foam ? box_textures_handle(d->textures, b->key.foam) : 0;
-    if (b->key.foam && !out->foam && d->world) {
-        out->foam = box_render_texture_target_handle(d->world, b->key.foam);
-    }
-
-    out->wrap = b->key.wrap;
-}
-
 void box_draws_batch_blend(
     box_render_packet_t *p,
     const box_render_draws_t *d,
@@ -1097,8 +1078,17 @@ void box_draws_batch_blend(
     } else if (blend) {
         float contrast = isfinite(blend->contrast) && blend->contrast > 0.0f
             ? blend->contrast : 0.0f;
-        r->mask = box_draws_texture_handle(d, blend->mask);
+        const Terrain *heights = ecs_id(Terrain)
+            ? ecs_get(d->world, b->key.textures[0], Terrain) : NULL;
+        if (heights && heights->masks) {
+            r->terrain = b->key.mesh;
+        } else {
+            r->mask = box_draws_texture_handle(d, blend->mask);
+        }
+
         r->contrast = contrast;
+        r->variation = isfinite(blend->variation) ? glm_clamp(blend->variation, 0.0f, 1.0f)
+            : 0.0f;
         for (k = 0; k < BOX_RENDER_BLEND_LAYERS; k ++) {
             ecs_entity_t layer = blend->layers[k];
             bool alive = layer && ecs_is_alive(d->world, layer);
@@ -1138,7 +1128,7 @@ void box_draws_batch_blend(
     out->textures[2] = 0;
     out->textures[3] = 0;
 done:
-    return;
+    box_draws_batch_layers(p, d, b, out);
 }
 
 /** Write the instance page, the run and the bounds of a batch into its draw.
@@ -1315,12 +1305,17 @@ static void box_draws_send_batch(
     out->fixture = b->key.fixture;
     out->bake = b->key.bake;
     out->surface = b->key.surface;
+    out->wind = b->key.wind;
+    out->wind_reach = b->key.wind ? b->wind_reach : 0.0f;
+    ecs_os_memcpy_n(out->range, b->key.range, float, 3);
+    out->impostor = b->key.impostor != 0;
     out->mesh = b->key.mesh;
     ecs_os_memcpy_n(out->lods, b->lods, uint32_t, BOX_LOD_LEVELS_MAX);
     box_draws_batch_textures(d, b, out);
     box_draws_batch_blend(p, d, b, out);
     box_draws_batch_page(d, b, out);
     out->instance_count = count;
+    box_draws_send_nearest(p, d, b, out);
 done:
     return;
 }
@@ -1458,10 +1453,13 @@ static void box_draws_send_blended(
             out->shadow = b->key.shadow;
             out->fixture = b->key.fixture;
             out->surface = b->key.surface;
+            out->wind = b->key.wind;
+            out->wind_reach = b->key.wind ? b->wind_reach : 0.0f;
+            ecs_os_memcpy_n(out->range, b->key.range, float, 3);
             out->mesh = b->key.mesh;
             box_draws_batch_textures(d, b, out);
             box_draws_batch_blend(p, d, b, out);
-            box_draws_batch_page(d, b, out);
+                    box_draws_batch_page(d, b, out);
             out->first_instance = 0;
             out->listed = true;
             out->slots = offset + (uint32_t)i * (uint32_t)sizeof(uint32_t);
@@ -1722,8 +1720,8 @@ static void box_draws_fill_material(
             }
         }
 
-        bool cutout = box_draws_scene_cutout(material.cutoff, material.shape2d,
-            b->key.features);
+        bool cutout = box_draws_scene_cutout(material.cutoff,
+            ecs_get(it->world, it->entities[i], VertexReveal), material.shape2d, b->key.features);
         uint8_t blend = box_draws_scene_blend(box_draws_at(modes, mode_step, i), alpha, cutout,
             material.shape2d, b->key.features);
         if (!b->key.transmissive && (blend != b->key.blend || cutout != b->key.cutout)) {
@@ -1828,6 +1826,8 @@ void box_draws_send(
     d->stats.box_shadows = d->box_shadows;
     d->stats.instances = 0;
     d->stats.dynamic = 0;
+    d->stats.impostors = 0;
+    d->stats.impostor_batches = 0;
     d->stats.scatters = 0;
     for (i = 0; i < count; i ++) {
         box_draw_batch_t *b = box_draws_batch(d, i);
@@ -1844,6 +1844,11 @@ void box_draws_send(
             d->stats.dynamic += ecs_vec_count(&b->entities);
         } else {
             d->stats.instances += ecs_vec_count(&b->entities);
+        }
+
+        if (b->key.impostor) {
+            d->stats.impostor_batches ++;
+            d->stats.impostors += ecs_vec_count(&b->entities);
         }
     }
 
@@ -1881,6 +1886,7 @@ void box_draws_send(
 
     box_draws_pages(p, d);
     box_draws_shadow_movers(world, d);
+    box_draws_wind(world, d, cache);
     for (i = 0; i < count; i ++) {
         box_draw_batch_t *b = box_draws_batch(d, i);
         if (b->ready && b->bounds_dirty) {

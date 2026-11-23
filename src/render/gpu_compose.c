@@ -224,7 +224,7 @@ void box_gpu_compose(
     }
 
     WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(gpu->device, NULL);
-    WGPUComputePassEncoder pass = wgpuCommandEncoderBeginComputePass(encoder, NULL);
+    WGPUComputePassEncoder pass = box_gpu_profile_compute_pass(gpu, encoder, "compose");
     wgpuComputePassEncoderSetPipeline(pass, pipeline);
     for (i = 0; i < count; i ++) {
         box_gpu_compose_one(gpu, pass, movers,

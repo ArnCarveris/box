@@ -1,0 +1,146 @@
+// A terrain whose look is authored entirely as texture graphs: the heights make terraces (a
+// stepped TexCurve), a cliff band (a steep stepped curve on a noise mask) and mountains (ridged
+// noise under a low frequency range mask).
+
+// The masks of the same graph paint rock by slope, grass on the flats, a path along the edges of
+// large cells and forest floor in noise patches: four TextureBlend layers mapped on the world
+// with a triplanar blend, moss on the flat tops. Seen from a camera that is the focus.
+
+using box.transform
+using box.material
+using box.texture
+using box.terrain
+using box.camera
+using box.view
+using box.light
+using box.world
+
+terrain_materials {
+  Scene: {shader_features: {Terrain: {texture_blend: true, triplanar: true, texture_layers: true}}}
+
+  camera {
+    Position: {0, 230, 420}
+    Rotation: {-0.35, 0, 0}
+    Camera: {fov: 60, near_: 1, far_: 6000}
+    WorldFocus
+  }
+
+  view {
+    View: {camera: camera, clear: {enabled: true, color: {20, 30, 60, 255}},
+      shadows: {enabled: true}}
+  }
+
+  sun {
+    Rotation: {-0.7, 2.6, 0}
+    DirectionalLight: {intensity: 3.14}
+  }
+
+  ambient {
+    AmbientLight: {intensity: 0.8}
+  }
+
+  // Albedo of the layers, tiling images of the plane
+  rock_albedo {
+    n { nodes.Noise: {frequency: 8, octaves: 4, seed: 1} }
+    color { nodes.Ramp: {input: n, keys: [{0.2, {120, 116, 110}}, {0.8, {190, 186, 178}}]} }
+    Graph: {output: color, width: 256}
+  }
+
+  grass_albedo {
+    n { nodes.Noise: {frequency: 16, octaves: 3, seed: 2} }
+    color { nodes.Ramp: {input: n, keys: [{0.2, {80, 135, 50}}, {0.8, {125, 175, 75}}]} }
+    Graph: {output: color, width: 256}
+  }
+
+  path_albedo {
+    n { nodes.Noise: {frequency: 12, octaves: 3, seed: 3} }
+    color { nodes.Ramp: {input: n, keys: [{0.2, {160, 120, 80}}, {0.8, {200, 160, 110}}]} }
+    Graph: {output: color, width: 256}
+  }
+
+  forest_albedo {
+    n { nodes.Noise: {frequency: 10, octaves: 4, seed: 4} }
+    color { nodes.Ramp: {input: n, keys: [{0.2, {80, 66, 40}}, {0.8, {120, 98, 60}}]} }
+    Graph: {output: color, width: 256}
+  }
+
+  grass { PbrTextures: {albedo: grass_albedo} }
+  rock { PbrTextures: {albedo: rock_albedo} }
+  path { PbrTextures: {albedo: path_albedo} }
+  forest { PbrTextures: {albedo: forest_albedo} }
+
+  // Patches of moss on the flat tops, where the red of a noise is high
+  moss_mask {
+    n { nodes.Noise: {frequency: 4, octaves: 3, seed: 6} }
+    edge { nodes.Smoothstep: {input: n, edge0_value: {0.5, 0, 0, 0}, edge1_value: {0.65, 0, 0, 0}} }
+    Graph: {output: edge, width: 256, format: GraphLinear}
+  }
+
+  moss {
+    Rgb: {60, 120, 40}
+    texture.Layer: {amount: 0.6, direction: {0, 1, 0}, facing: 0.9, mask: moss_mask,
+      albedo: LayerMix, roughness: LayerMix}
+    texture.Mapping: {mode: MappingWorld, size: 150}
+  }
+
+  land {
+    // Heights in meters
+    broad     { nodes.Noise: {frequency: 0.0025, octaves: 4, seed: 11} }
+    terraces  {
+      nodes.Curve: {input: broad, curve: {keys: [
+        {0, 0}, {0.35, 0.15}, {0.42, 0.15}, {0.47, 0.3}, {0.56, 0.3}, {0.61, 0.45}, {1, 0.6}
+      ]}}
+    }
+
+    hills     { nodes.Multiply: {a: terraces, b_value: {80, 80, 80, 80}} }
+    band      { nodes.Noise: {frequency: 0.0015, octaves: 2, seed: 5} }
+    step      {
+      nodes.Curve: {input: band, curve: {keys: [{0, 0}, {0.49, 0}, {0.51, 1}, {1, 1}]}}
+    }
+
+    cliffs    { nodes.Multiply: {a: step, b_value: {45, 45, 45, 45}} }
+    range_n   { nodes.Noise: {frequency: 0.0006, seed: 2} }
+    range     {
+      nodes.Smoothstep: {input: range_n, edge0_value: {0.5, 0, 0, 0}, edge1_value: {0.7, 0, 0, 0}}
+    }
+
+    ridges    { nodes.Noise: {frequency: 0.004, octaves: 6, fractal: NoiseRidged, seed: 9} }
+    peaks_r   { nodes.Multiply: {a: ridges, b: range} }
+    peaks     { nodes.Multiply: {a: peaks_r, b_value: {260, 260, 260, 260}} }
+    base      { nodes.Add: {a: hills, b: cliffs} }
+    height    { nodes.Add: {a: base, b: peaks} }
+
+    // Masks: grass, rock, path, forest floor
+    slope     { nodes.Slope: {height: height} }
+    rock_w    {
+      nodes.Smoothstep: {input: slope, edge0_value: {0.7, 0, 0, 0}, edge1_value: {1.1, 0, 0, 0}}
+    }
+
+    open      { nodes.Subtract: {a_value: {1, 1, 1, 1}, b: rock_w} }
+    cells     { nodes.Cells: {distance: CellsEdge, size: 90, edge: 0.3, seed: 4} }
+    edge      { nodes.Split: {input: cells, channel: ChannelR} }
+    track     {
+      nodes.Remap: {input: edge, from_min: 0.02, from_max: 0.12, to_min: 1, to_max: 0,
+        clamp: true}
+    }
+
+    path_w    { nodes.Multiply: {a: track, b: open} }
+    off_path  { nodes.Subtract: {a: open, b: path_w} }
+    woods     { nodes.Noise: {frequency: 0.012, octaves: 3, seed: 8} }
+    woods_m   {
+      nodes.Smoothstep: {input: woods, edge0_value: {0.52, 0, 0, 0}, edge1_value: {0.6, 0, 0, 0}}
+    }
+
+    forest_w  { nodes.Multiply: {a: woods_m, b: off_path} }
+    grass_w   { nodes.Subtract: {a: off_path, b: forest_w} }
+    masks     { nodes.Combine: {r: grass_w, g: rock_w, b: path_w, a: forest_w} }
+
+    Terrain: {height: height, masks: masks, tile_size: 32, resolution: 65, levels: 6,
+      lod_distance: 128, min_height: -10, max_height: 450, budget: 64}
+    texture.Blend: {layers: [grass, rock, path, forest], contrast: 4}
+    texture.Mapping: {mode: MappingWorld, size: 6, blend: 0.4}
+    texture.Layers: {layers: [moss]}
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 0.95}
+  }
+}

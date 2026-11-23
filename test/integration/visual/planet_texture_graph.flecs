@@ -18,7 +18,7 @@ using box.light
 using box.material
 
 $ {
-  Scene: {blend_modes: true}
+  Scene: {shader_features: {Extended: {blend_modes: true}}}
   AmbientLight: {sky: {60, 70, 90}, ground: {20, 20, 24}, intensity: 0.4}
 }
 

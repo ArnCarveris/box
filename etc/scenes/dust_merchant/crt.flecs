@@ -76,12 +76,35 @@ assets {
       Ignore
     }
 
-    lines { Position: {0, 0, 50}; Rect: {w, h}; Image: {texture: tex_scanlines}; Rgb: {255, 255, 255}; BlendMode: AlphaBlend; Ignore }
-    shade { Position: {0, 0, 60}; Rect: {w, h}; Image: {texture: tex_vignette}; Rgb: {255, 255, 255}; BlendMode: AlphaBlend; Ignore }
+    lines {
+      Position: {0, 0, 50}
+      Rect: {w, h}
+      Image: {texture: tex_scanlines}
+      Rgb: {255, 255, 255}
+      BlendMode: AlphaBlend
+      Ignore
+    }
+
+    shade {
+      Position: {0, 0, 60}
+      Rect: {w, h}
+      Image: {texture: tex_vignette}
+      Rgb: {255, 255, 255}
+      BlendMode: AlphaBlend
+      Ignore
+    }
 
     rtt_views {
-      rtt_view { View: {camera: camera, clear: {enabled: true, color: {0, 0, 0, 255}}, lighting: {enabled: false}, culling: {enabled: false}} }
+      rtt_view {
+        View: {
+          camera: camera,
+          clear: {enabled: true, color: {0, 0, 0, 255}},
+          lighting: {enabled: false},
+          culling: {enabled: false}
+        }
+      }
     }
+
     rtt_surface { Surface: {width: w, height: h, texture: tex, view_root: rtt_views} }
   }
 
@@ -106,12 +129,39 @@ assets {
     const pad = 16
 
     Layout: {}
-    Item: {width: {mode: Fixed, value: w + pad * 2 + 8}, height: {mode: Fixed, value: h + pad * 2 + 8}}
+    Item: {
+      width: {mode: Fixed, value: w + pad * 2 + 8},
+      height: {mode: Fixed, value: h + pad * 2 + 8}
+    }
 
-    hood_t : Soot { Position: {0, h / 2 + pad / 2 + 2, 14}; Box: {w + pad * 2 + 8, pad + 4, 28}; texture.Mapping: {mode: MappingObject, size: 0.77}; Ignore }
-    hood_b : Soot { Position: {0, 0 - h / 2 - pad / 2 - 2, 14}; Box: {w + pad * 2 + 8, pad + 4, 28}; texture.Mapping: {mode: MappingObject, size: 0.77}; Ignore }
-    hood_l : Soot { Position: {0 - w / 2 - pad / 2 - 2, 0, 14}; Box: {pad + 4, h + 8, 28}; texture.Mapping: {mode: MappingObject, size: 0.77}; Ignore }
-    hood_r : Soot { Position: {w / 2 + pad / 2 + 2, 0, 14}; Box: {pad + 4, h + 8, 28}; texture.Mapping: {mode: MappingObject, size: 0.77}; Ignore }
+    hood_t : Soot {
+      Position: {0, h / 2 + pad / 2 + 2, 14}
+      Box: {w + pad * 2 + 8, pad + 4, 28}
+      texture.Mapping: {mode: MappingObject, size: 0.77}
+      Ignore
+    }
+
+    hood_b : Soot {
+      Position: {0, 0 - h / 2 - pad / 2 - 2, 14}
+      Box: {w + pad * 2 + 8, pad + 4, 28}
+      texture.Mapping: {mode: MappingObject, size: 0.77}
+      Ignore
+    }
+
+    hood_l : Soot {
+      Position: {0 - w / 2 - pad / 2 - 2, 0, 14}
+      Box: {pad + 4, h + 8, 28}
+      texture.Mapping: {mode: MappingObject, size: 0.77}
+      Ignore
+    }
+
+    hood_r : Soot {
+      Position: {w / 2 + pad / 2 + 2, 0, 14}
+      Box: {pad + 4, h + 8, 28}
+      texture.Mapping: {mode: MappingObject, size: 0.77}
+      Ignore
+    }
+
     gasket_t : Rubber { Position: {0, h / 2 + 2, 17}; Box: {w + 6, 5, 28}; Ignore }
     gasket_b : Rubber { Position: {0, 0 - h / 2 - 2, 17}; Box: {w + 6, 5, 28}; Ignore }
     gasket_l : Rubber { Position: {0 - w / 2 - 2, 0, 17}; Box: {5, h + 6, 28}; Ignore }

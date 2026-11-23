@@ -10,7 +10,9 @@
     "lang.c": {
         "include": [
             "../../../src/render",
-            "../../../src/spatial"
+            "../../../src/spatial",
+            "../../../src/texture",
+            "../../../src/terrain"
         ]
     },
     "test": {
@@ -171,6 +173,80 @@
                 "id": "Projection",
                 "testcases": [
                     "offscreen_surface_resize"
+                ]
+            },
+            {
+                "id": "WorldOrigin",
+                "testcases": [
+                    "defaults",
+                    "no_origin_no_shift",
+                    "within_threshold",
+                    "shift_past_threshold",
+                    "shift_whole_steps",
+                    "shift_per_axis",
+                    "disabled",
+                    "roots_shift_children_dont",
+                    "scope_without_transform",
+                    "dynamic_root",
+                    "camera_shifts",
+                    "focus_default_camera",
+                    "focus_entities",
+                    "fixed_stays",
+                    "ui_stays",
+                    "focus_in_scene",
+                    "event",
+                    "walk_1000_km",
+                    "to_local",
+                    "script_functions",
+                    "manual_shift",
+                    "path_follow",
+                    "ground_heights",
+                    "follow_emitter_stays",
+                    "spatial_same_hits",
+                    "spatial_before_transforms"
+                ]
+            },
+            {
+                "id": "ChunkGrid",
+                "testcases": [
+                    "rings",
+                    "props_declared_only",
+                    "move_loads_unloads",
+                    "hysteresis_no_thrash",
+                    "hysteresis_levels",
+                    "budget_nearest_first",
+                    "budget_more_detail_first",
+                    "levels_update",
+                    "grid_3d",
+                    "origin_shift_no_reload",
+                    "delete_grid",
+                    "multiple_foci",
+                    "extent",
+                    "gate",
+                    "template_change",
+                    "script",
+                    "endless_walk",
+                    "ground",
+                    "budget_ms_spreads_deletes",
+                    "budget_ms_keeps_returning_cells"
+                ]
+            },
+            {
+                "id": "Scatter",
+                "testcases": [
+                    "defaults",
+                    "density_counts",
+                    "spacing_holds",
+                    "cells_seamless",
+                    "deterministic",
+                    "avoid",
+                    "reevaluate_on_change",
+                    "bulk_instances",
+                    "filter_mask",
+                    "filter_slope",
+                    "filter_height",
+                    "terrain_waits_and_aligns",
+                    "chunk_grid_script"
                 ]
             }
         ]

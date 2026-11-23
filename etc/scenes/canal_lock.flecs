@@ -78,16 +78,33 @@ sky {
 $ {
   box.app.FpsTarget: {60}
   Scene: {baked: true, reflections: true, punctual_shadows: true, environment: true,
-    aerial_perspective: true, alpha_cutout: true, transmission: true, triplanar: true,
-    clear_coat: true, diffuse_transmission: true, texture_scroll: true}
-  ReflectionBake: {resolution: 128, budget_ms: 2, scene_probe: true, scene_probe_height: 6, environment: sky}
-  Bake: {environment: sky, probe_spacing: 2.5, bounds_padding: 0.4, bounces: 1, capture_size: 32, budget_ms: 6, compute: hud.screen.options.body.baked[Checkbox.mut].current}
+    aerial_perspective: true, shader_features: {Extended: {alpha_cutout: true, transmission: true,
+    triplanar: true, clear_coat: true, diffuse_transmission: true, texture_scroll: true}}}
+  ReflectionBake: {
+    resolution: 128,
+    budget_ms: 2,
+    scene_probe: true,
+    scene_probe_height: 6,
+    environment: sky
+  }
+  Bake: {
+    environment: sky,
+    probe_spacing: 2.5,
+    bounds_padding: 0.4,
+    bounces: 1,
+    capture_size: 32,
+    budget_ms: 6,
+    compute: hud.screen.options.body.baked[Checkbox.mut].current
+  }
 }
 
 view {
   canal_contact { Gtao: {radius: 0.5, final_value_power: 1.9} }
   canal_bloom { Bloom: {intensity: 0.1, threshold: 1.4} }
-  canal_exposure { AutoExposure: {min_log_luma: -10.8, exposure_compensation: 0.75, max_exposure: 20} }
+  canal_exposure {
+    AutoExposure: {min_log_luma: -10.8, exposure_compensation: 0.75, max_exposure: 20}
+  }
+
   canal_film { Tonemap: {auto_exposure: canal_exposure, operator_: TonyMcMapface} }
   canal_edges { Smaa: {} }
 
@@ -101,7 +118,13 @@ view {
       atmosphere: true,
       environment: {source: sky, intensity: 0.9, yaw: 0, background: false}
     },
-    shadows: {enabled: hud.screen.options.body.shadows[Checkbox.mut].current, resolution: 4096, max_distance: 120},
+    shadows: {
+      enabled: hud.screen.options.body.shadows[Checkbox.mut].current,
+      cascades: 3,
+      resolution: 2048,
+      interval: [1, 2, 2],
+      max_distance: 120
+    },
     effects: [
       {enabled: hud.screen.options.body.gtao[Checkbox.mut].current, effect: canal_contact},
       {enabled: true, effect: sky},
@@ -120,12 +143,14 @@ canal_lock {
     Camera: {fov: 50, near_: 0.1, far_: 400}
     CameraController: {speed: 5}
   }
+
   bridge_camera {
     Position: {-19, 3, 9}
     Rotation: {-0.16, -1, 0}
     Camera: {fov: 48, near_: 0.1, far_: 400}
     CameraController: {speed: 5}
   }
+
   landscape { CanalLandscape: {} }
 
   CanalWaterFace low_water(x0: -21, x1: -6.5, z0: -3, z1: 3) { Position = {-13.75, -2.25, 0} }
@@ -137,16 +162,38 @@ canal_lock {
     CanalWaterFace surface(x0: -5.37, x1: 6, z0: -1.6, z1: 1.6) { Position = {0.315, 0, 0} }
   }
 
-  LockGateLeaf top_gate_n(side: 1, top: true, bottom: -1.05, enabled: lock_high) { Position: {5.7, 0, -1.45} }
-  LockGateLeaf top_gate_s(side: -1, top: true, bottom: -1.05, enabled: lock_high) { Position: {5.7, 0, 1.45} }
-  LockGateLeaf bottom_gate_n(side: 1, top: false, bottom: -4.2, enabled: !lock_high) { Position: {-5.5, 0, -1.45} }
-  LockGateLeaf bottom_gate_s(side: -1, top: false, bottom: -4.2, enabled: !lock_high) { Position: {-5.5, 0, 1.45} }
+  LockGateLeaf top_gate_n(side: 1, top: true, bottom: -1.05, enabled: lock_high) {
+    Position: {5.7, 0, -1.45}
+  }
+
+  LockGateLeaf top_gate_s(side: -1, top: true, bottom: -1.05, enabled: lock_high) {
+    Position: {5.7, 0, 1.45}
+  }
+
+  LockGateLeaf bottom_gate_n(side: 1, top: false, bottom: -4.2, enabled: !lock_high) {
+    Position: {-5.5, 0, -1.45}
+  }
+
+  LockGateLeaf bottom_gate_s(side: -1, top: false, bottom: -4.2, enabled: !lock_high) {
+    Position: {-5.5, 0, 1.45}
+  }
 
   LockSignal top_signal(lit: lock_high) { Position: {7.3, 0, -3.1} }
   LockSignal bottom_signal(lit: !lock_high) { Position: {-4.9, 0, -3.3} }
 
-  LockPaddleGear top_paddle(top: true, enabled: lock_top_paddle || (!lock_bottom_paddle && !lock_bottom_gate)) { Position: {3.9, 0.1, 2.05} }
-  LockPaddleGear bottom_paddle(top: false, enabled: lock_bottom_paddle || (!lock_top_paddle && !lock_top_gate)) { Position: {-3.2, 0.1, 2.05} }
+  LockPaddleGear top_paddle(
+    top: true,
+    enabled: lock_top_paddle || (!lock_bottom_paddle && !lock_bottom_gate)
+  ) {
+    Position: {3.9, 0.1, 2.05}
+  }
+
+  LockPaddleGear bottom_paddle(
+    top: false,
+    enabled: lock_bottom_paddle || (!lock_top_paddle && !lock_top_gate)
+  ) {
+    Position: {-3.2, 0.1, 2.05}
+  }
 
   top_jet {
     Position: {5.72, -1.25, 0}
@@ -160,6 +207,7 @@ canal_lock {
     }
     Collision: {height: -2.25, die: true}
   }
+
   bottom_jet {
     Position: {-5.75, -1.98, 0}
     Emitter: {
@@ -175,14 +223,40 @@ canal_lock {
 
   low_mist {
     Position: {-13.75, -1.95, 0}
-    FogVolume: {extent: {7.4, 0.4, 3.2}, density: 0.15, color: {232, 238, 240}, asymmetry: 0.4, edge_fade: 0.35, noise_strength: 0.8, noise_scale: 3, wind: {0.25, 0, 0.05}, light_inscatter: 0.5}
-  }
-  high_mist {
-    Position: {13.75, -0.15, 0}
-    FogVolume: {extent: {7.4, 0.4, 3.2}, density: 0.15, color: {232, 238, 240}, asymmetry: 0.4, edge_fade: 0.35, noise_strength: 0.8, noise_scale: 3, wind: {0.25, 0, 0.05}, light_inscatter: 0.5}
+    FogVolume: {
+      extent: {7.4, 0.4, 3.2},
+      density: 0.15,
+      color: {232, 238, 240},
+      asymmetry: 0.4,
+      edge_fade: 0.35,
+      noise_strength: 0.8,
+      noise_scale: 3,
+      wind: {0.25, 0, 0.05},
+      light_inscatter: 0.5
+    }
   }
 
-  LockNarrowboat boat(enabled: (lock_boat_up && lock_boat_at == 1 && lock_top_gate) || (lock_boat_at == 2 && lock_top_gate) || ((lock_boat_at == 0 || (lock_boat_at == 1 && !lock_boat_up)) && lock_bridge_up && lock_bottom_gate)) {}
+  high_mist {
+    Position: {13.75, -0.15, 0}
+    FogVolume: {
+      extent: {7.4, 0.4, 3.2},
+      density: 0.15,
+      color: {232, 238, 240},
+      asymmetry: 0.4,
+      edge_fade: 0.35,
+      noise_strength: 0.8,
+      noise_scale: 3,
+      wind: {0.25, 0, 0.05},
+      light_inscatter: 0.5
+    }
+  }
+
+  LockNarrowboat boat(
+    enabled: (lock_boat_up && lock_boat_at == 1 && lock_top_gate) ||
+      (lock_boat_at == 2 && lock_top_gate) ||
+      ((lock_boat_at == 0 || (lock_boat_at == 1 && !lock_boat_up)) && lock_bridge_up &&
+        lock_bottom_gate)
+  ) {}
 
   bridge { LockLiftBridge: {}; Position: {-11, -1.18, 0} }
 
@@ -191,11 +265,13 @@ canal_lock {
   mill { LockMill: {}; Position: {-6.5, 0, -7.2} }
 
   bench { CanalBench: {}; Position: {7.5, 0.05, 5.6}; Rotation: {0, math.PI, 0} }
+
   for i in 0..4 {
     CanalBollard() { Position: {9 + i * 3, 0.1, 3.3} }
     CanalBollard() { Position: {-19.5 + i * 3.2, -1.06, 3.3} }
     CanalBollard() { Position: {-5 + i * 3.2, 0.1, -2.2} }
   }
+
   CanalLifebuoy() { Position: {2.2, 0.03, 3.25} }
   CanalLifebuoy() { Position: {-14, -1.15, 3.6} }
   CanalBarrel() { Position: {8.2, 0.02, -5.7} }
@@ -207,6 +283,7 @@ canal_lock {
 
   CanalPicket(length: 7.5) { Position: {0.9, 0.02, -9.7} }
   CanalPicket(length: 3.6) { Position: {8.4, 0.02, -9.7}; Rotation: {0, -1.5708, 0} }
+
   for i in 0..3 {
     CanalVegRow(length: 3.6) { Position: {8.9, 0.02, -7.2 - i * 0.7}; }
   }
@@ -232,10 +309,51 @@ canal_lock {
   CanalShrub(size: 0.9, seed: 7) { Position: {0.2, 0, -8.8} }
   CanalShrub(size: 1.1, seed: 8) { Position: {19.6, 0, -9} }
 
-  CanalMeadow(x0: -6.2, x1: 20.8, z0: 5.2, z1: 9.9, count: 260, seed: 1, gap_x0: 6.2, gap_x1: 8.8, gap_z0: 4, gap_z1: 6.6) { Position: {0, 0, 0} }
+  CanalMeadow(
+    x0: -6.2,
+    x1: 20.8,
+    z0: 5.2,
+    z1: 9.9,
+    count: 260,
+    seed: 1,
+    gap_x0: 6.2,
+    gap_x1: 8.8,
+    gap_z0: 4,
+    gap_z1: 6.6
+  ) {
+    Position: {0, 0, 0}
+  }
+
   CanalMeadow(x0: 9.8, x1: 20.8, z0: -9.8, z1: -5.2, count: 110, seed: 2) { Position: {0, 0, 0} }
-  CanalMeadow(x0: -20.8, x1: -6.7, z0: 5, z1: 9.9, count: 150, seed: 3, gap_x0: -12.8, gap_x1: -6.6, gap_z0: 4, gap_z1: 9) { Position: {0, -1.18, 0} }
-  CanalMeadow(x0: -20.8, x1: -9, z0: -9.8, z1: -3.8, count: 170, seed: 4, gap_x0: -12.8, gap_x1: -9.2, gap_z0: -5, gap_z1: -3) { Position: {0, -1.18, 0} }
+  CanalMeadow(
+    x0: -20.8,
+    x1: -6.7,
+    z0: 5,
+    z1: 9.9,
+    count: 150,
+    seed: 3,
+    gap_x0: -12.8,
+    gap_x1: -6.6,
+    gap_z0: 4,
+    gap_z1: 9
+  ) {
+    Position: {0, -1.18, 0}
+  }
+
+  CanalMeadow(
+    x0: -20.8,
+    x1: -9,
+    z0: -9.8,
+    z1: -3.8,
+    count: 170,
+    seed: 4,
+    gap_x0: -12.8,
+    gap_x1: -9.2,
+    gap_z0: -5,
+    gap_z1: -3
+  ) {
+    Position: {0, -1.18, 0}
+  }
 
   CanalPebbles(count: 10, spread: 0.9, seed: 1) { Position: {7.2, 0.03, 4.4} }
   CanalPebbles(count: 10, spread: 1, seed: 2) { Position: {-10, -1.15, 4.1} }

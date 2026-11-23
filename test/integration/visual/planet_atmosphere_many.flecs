@@ -11,7 +11,7 @@ using box.atmosphere
 // which is not hazed.
 
 $ {
-  Scene: {blend_modes: true}
+  Scene: {shader_features: {Extended: {blend_modes: true}}}
 }
 
 camera {

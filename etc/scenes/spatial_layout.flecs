@@ -7,116 +7,116 @@ using box.view
 using box.light
 
 camera {
-    Position: {28, 20, 32}
-    Rotation: {-0.42, 0.65, 0}
-    Camera: {fov: 55}
+  Position: {28, 20, 32}
+  Rotation: {-0.42, 0.65, 0}
+  Camera: {fov: 55}
 }
 
 view {
-    View: {
-        camera: camera,
-        clear: {enabled: true, color: {24, 30, 42, 255}},
-        shadows: {enabled: true}
-    }
+  View: {
+    camera: camera,
+    clear: {enabled: true, color: {24, 30, 42, 255}},
+    shadows: {enabled: true, cascades: 3, resolution: 2048, interval: [1, 2, 2]}
+  }
 }
 
 sky {
-    Rotation: {0.7, 2.4, 0}
-    DirectionalLight: {intensity: 2 * flecs.script.math.PI}
+  Rotation: {0.7, 2.4, 0}
+  DirectionalLight: {intensity: 2 * flecs.script.math.PI}
 }
 
 $ {
-    box.app.FpsTarget: {60}
-    AmbientLight: {sky: {100, 130, 170}, ground: {50, 45, 40}, intensity: 0.7}
+  box.app.FpsTarget: {60}
+  AmbientLight: {sky: {100, 130, 170}, ground: {50, 45, 40}, intensity: 0.7}
 }
 
 spatial_layout {
-    ship {
-        Rotation: {0, 0.25, 0}
+  ship {
+    Rotation: {0, 0.25, 0}
 
-        hull {
-            Box: {8, 3, 18}
-            Rgb: {75, 90, 115}
-            docking_port {
-                AttachmentFrame: {position: {4, 0, 0}, rotation: {0, 1.5707963, 0}}
-            }
-        }
-
-        armor {
-            Box: {1, 0.2, 1}
-            Rgb: {160, 175, 195}
-            Fit: {target: hull, axes: XZ, padding: {0.4, 0, 0.8}, mode: Stretch}
-            Align: {target: hull, self: {y: Min}, other: {y: Max}}
-        }
-
-        cockpit {
-            Box: {3, 1, 4}
-            Rgb: {70, 170, 220}
-            Align: {
-                target: armor,
-                self: {y: Min},
-                other: {y: Max},
-                offset: {0, 0.1, 2}
-            }
-        }
-
-        vents {
-            Array: {axis: Z, count: 8, spacing: 0.7}
-            Align: {
-                target: armor,
-                self: {y: Min},
-                other: {y: Max},
-                offset: {-2.5, 0, 0}
-            }
-            rib {
-                Box: {0.7, 0.3, 0.15}
-                Rgb: {230, 140, 55}
-            }
-        }
-
-        sensors {
-            Distribute: {axis: X, span: 6, mode: SpaceBetween}
-            Align: {
-                target: armor,
-                self: {y: Min, z: Max},
-                other: {y: Max, z: Max}
-            }
-            left { Box: {0.5, 0.5, 0.5}; Rgb: {230, 80, 65} }
-            center { Box: {1, 0.7, 0.5}; Rgb: {230, 200, 80} }
-            right { Box: {0.5, 0.5, 0.5}; Rgb: {230, 80, 65} }
-        }
-
-        dock {
-            Box: {1, 1, 0.5}
-            Rgb: {220, 200, 100}
-            Align: {
-                target: hull,
-                self: Back,
-                other: {frame: hull.docking_port},
-                rotation: Match
-            }
-        }
+    hull {
+      Box: {8, 3, 18}
+      Rgb: {75, 90, 115}
+      docking_port {
+        AttachmentFrame: {position: {4, 0, 0}, rotation: {0, 1.5707963, 0}}
+      }
     }
 
-    wall {
-        Position: {14, 1, 0}
-        Rotation: {0, -0.4, 0}
-        Box: {8, 5, 0.3}
-        Rgb: {140, 145, 150}
+    armor {
+      Box: {1, 0.2, 1}
+      Rgb: {160, 175, 195}
+      Fit: {target: hull, axes: XZ, padding: {0.4, 0, 0.8}, mode: Stretch}
+      Align: {target: hull, self: {y: Min}, other: {y: Max}}
     }
 
-    windows {
-        Array: {axis: X, count: 3, spacing: 2.5}
-        Align: {
-            target: wall,
-            self: Back,
-            other: Front,
-            rotation: Match,
-            offset: {0, 0, 0.05}
-        }
-        pane {
-            Box: {1.5, 2, 0.1}
-            Rgb: {60, 170, 210}
-        }
+    cockpit {
+      Box: {3, 1, 4}
+      Rgb: {70, 170, 220}
+      Align: {
+        target: armor,
+        self: {y: Min},
+        other: {y: Max},
+        offset: {0, 0.1, 2}
+      }
     }
+
+    vents {
+      Array: {axis: Z, count: 8, spacing: 0.7}
+      Align: {
+        target: armor,
+        self: {y: Min},
+        other: {y: Max},
+        offset: {-2.5, 0, 0}
+      }
+      rib {
+        Box: {0.7, 0.3, 0.15}
+        Rgb: {230, 140, 55}
+      }
+    }
+
+    sensors {
+      Distribute: {axis: X, span: 6, mode: SpaceBetween}
+      Align: {
+        target: armor,
+        self: {y: Min, z: Max},
+        other: {y: Max, z: Max}
+      }
+      left { Box: {0.5, 0.5, 0.5}; Rgb: {230, 80, 65} }
+      center { Box: {1, 0.7, 0.5}; Rgb: {230, 200, 80} }
+      right { Box: {0.5, 0.5, 0.5}; Rgb: {230, 80, 65} }
+    }
+
+    dock {
+      Box: {1, 1, 0.5}
+      Rgb: {220, 200, 100}
+      Align: {
+        target: hull,
+        self: Back,
+        other: {frame: hull.docking_port},
+        rotation: Match
+      }
+    }
+  }
+
+  wall {
+    Position: {14, 1, 0}
+    Rotation: {0, -0.4, 0}
+    Box: {8, 5, 0.3}
+    Rgb: {140, 145, 150}
+  }
+
+  windows {
+    Array: {axis: X, count: 3, spacing: 2.5}
+    Align: {
+      target: wall,
+      self: Back,
+      other: Front,
+      rotation: Match,
+      offset: {0, 0, 0.05}
+    }
+    pane {
+      Box: {1.5, 2, 0.1}
+      Rgb: {60, 170, 210}
+    }
+  }
 }

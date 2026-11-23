@@ -30,8 +30,8 @@ using assets
 
 $ {
   box.app.FpsTarget: {60}
-  Scene: {baked: true, reflections: true, cookies: true, transmission: true, sheen: true,
-    diffuse_transmission: true}
+  Scene: {baked: true, reflections: true, cookies: true,
+    shader_features: {Extended: {transmission: true, sheen: true, diffuse_transmission: true}}}
 }
 
 $ {
@@ -43,7 +43,9 @@ $ {
 window { Surface: {width: 1440, height: 960, vsync: true} }
 
 assets {
-  clouds { Gen: {width: 256, seed: 17, layers: [{kind: GenNoise, frequency: 3, octaves: 4, gain: 0.55}]} }
+  clouds {
+    Gen: {width: 256, seed: 17, layers: [{kind: GenNoise, frequency: 3, octaves: 4, gain: 0.55}]}
+  }
 }
 
 camera {
@@ -57,18 +59,38 @@ sky {
   Rotation: {0.83, -2.3, 0}
   DirectionalLight: {intensity: 2.1 * math.PI}
   Rgb: {255, 237, 208}
-  Cookie: {texture: assets.clouds, size: 48, height: 40, velocity: {0.7, 0.25}, threshold: 0.42, softness: 0.22, strength: 0.55}
+  Cookie: {
+    texture: assets.clouds,
+    size: 48,
+    height: 40,
+    velocity: {0.7, 0.25},
+    threshold: 0.42,
+    softness: 0.22,
+    strength: 0.55
+  }
 }
 
 santorini {
-  sea_base { Position: {0, -0.8, 1}; RoundedBox: {37, 1.4, 33, 0.65, segments: 6}; Rgb: {19, 89, 133} }
+  sea_base {
+    Position: {0, -0.8, 1}
+    RoundedBox: {37, 1.4, 33, 0.65, segments: 6}
+    Rgb: {19, 89, 133}
+  }
+
   water {
     Position: {0, -0.06, 1}
     RoundedBox: {36.8, 0.12, 32.8, 0.55, segments: 6}
     Rgb: {40, 152, 182}
     PbrMaterial: {roughness: 0.12}
-    Transmission: {transmission_factor: 0.5, ior: 1.33, thickness_factor: 1, attenuation_distance: 0.6, attenuation_color: {70, 190, 205}}
+    Transmission: {
+      transmission_factor: 0.5,
+      ior: 1.33,
+      thickness_factor: 1,
+      attenuation_distance: 0.6,
+      attenuation_color: {70, 190, 205}
+    }
   }
+
   for i in 0..160 {
     const x = -17.6 + (i * 17 % 71) * 0.5
     const z = 9.1 + (i * 13 % 31) * 0.24
@@ -90,16 +112,22 @@ santorini {
       RoundedBox: {width, top, depth, 0.55, segments: 4}
       Rgb: {150 + level * 12, 126 + level * 12, 104 + level * 12}
     }
+
     {
       Position: {0, top - 0.1, z}
       RoundedBox: {width + 0.12, 0.2, depth + 0.1, 0.35, segments: 4}
       Rgb: IslandPlaster
     }
+
     for layer in 0..3 {
       for i in 0..28 {
         const tone = (i * 13 + level * 5 + layer * 3) % 6
         {
-          Position: {-width / 2 + 0.45 + i * (width - 0.9) / 27 + math.sin(i * 5 + layer) * 0.15, top - 0.65 - layer * 0.92 + math.sin(i * 7) * 0.15, z + depth / 2 - 0.12}
+          Position: {
+            -width / 2 + 0.45 + i * (width - 0.9) / 27 + math.sin(i * 5 + layer) * 0.15,
+            top - 0.65 - layer * 0.92 + math.sin(i * 7) * 0.15,
+            z + depth / 2 - 0.12
+          }
           Rotation: {0.15, i * 1.7 + layer, 0.15 * math.sin(i * 3)}
           Scale: {0.8 + i % 3 * 0.18, 0.57 + i % 4 * 0.09, 0.5 + layer * 0.05}
           IcoSphere: {radius: 1, segments: 1}
@@ -107,11 +135,16 @@ santorini {
         }
       }
     }
+
     for side in 0..2 {
       for layer in 0..3 {
         for i in 0..24 {
           {
-            Position: {(side - 0.5) * (width - 0.1), top - 0.6 - layer * 0.95 + math.sin(i * 5) * 0.12, z - depth / 2 + 0.5 + i * (depth - 1) / 23}
+            Position: {
+              (side - 0.5) * (width - 0.1),
+              top - 0.6 - layer * 0.95 + math.sin(i * 5) * 0.12,
+              z - depth / 2 + 0.5 + i * (depth - 1) / 23
+            }
             Rotation: {0.1, i * 1.9 + layer, 0.13}
             Scale: {0.58 + layer * 0.04, 0.56 + i % 3 * 0.1, 0.72 + i % 4 * 0.08}
             IcoSphere: {radius: 1, segments: 1}
@@ -130,6 +163,7 @@ santorini {
       IcoSphere: {radius: 0.42 + i % 4 * 0.13, segments: 1}
       Rgb: {114 + i % 5 * 12, 113 + i % 5 * 9, 99 + i % 5 * 7}
     }
+
     {
       Position: {-14.8 + i * 0.68, 0.022, 8.35 + math.sin(i * 2.4) * 0.35}
       Scale: {1, 0.025, 0.65}
@@ -146,19 +180,35 @@ santorini {
     IslandOlive() { Position: {3.3, 0.05, 2.6}; Scale: {0.8, 0.8, 0.8} }
     IslandPot(flowers: true, size: 1.1) { Position: {-2.7, 0.06, 3.5} }
   }
+
   IslandHouse(width: 3.3, depth: 3.1, height: 3, flowers: true) { Position: {-10.7, 9.02, -9.9} }
-  IslandHouse(width: 3, depth: 3.2, height: 2.7, tint: {240, 214, 179}) { Position: {1.9, 9.02, -10.9} }
+  IslandHouse(width: 3, depth: 3.2, height: 2.7, tint: {240, 214, 179}) {
+    Position: {1.9, 9.02, -10.9}
+  }
+
   IslandHouse(width: 3.6, depth: 3, height: 3.7, balcony: true) { Position: {5.9, 9.02, -9.7} }
   IslandWindmill() { Position: {10.7, 9.02, -10.6}; Rotation: {0, -0.22, 0} }
   IslandPaving(width: 8.3, depth: 2.4, columns: 14, rows: 4) { Position: {6.7, 9.04, -6} }
   IslandRailing(width: 3.7) { Position: {7.5, 9.05, -4.57} }
   IslandOlive() { Position: {11.9, 9.05, -5.8} }
 
-  IslandHouse(width: 3.6, depth: 3.4, height: 3.2, flowers: true, balcony: true) { Position: {-10.7, 6.02, -3.05} }
-  IslandHouse(width: 3.6, depth: 3.3, height: 2.7, tint: {238, 223, 196}, balcony: true) { Position: {-6.45, 6.02, -2.65} }
+  IslandHouse(width: 3.6, depth: 3.4, height: 3.2, flowers: true, balcony: true) {
+    Position: {-10.7, 6.02, -3.05}
+  }
+
+  IslandHouse(width: 3.6, depth: 3.3, height: 2.7, tint: {238, 223, 196}, balcony: true) {
+    Position: {-6.45, 6.02, -2.65}
+  }
+
   IslandHouse(width: 3.5, depth: 3.2, height: 3.25, flowers: true) { Position: {1.7, 6.02, -2.9} }
-  IslandHouse(width: 3.2, depth: 3.2, height: 2.8, balcony: true, trim: {46, 131, 152}) { Position: {5.6, 6.02, -2.65} }
-  IslandHouse(width: 2.9, depth: 3, height: 3.1, tint: {244, 224, 185}, terrace: false) { Position: {11, 6.02, -2.6} }
+  IslandHouse(width: 3.2, depth: 3.2, height: 2.8, balcony: true, trim: {46, 131, 152}) {
+    Position: {5.6, 6.02, -2.65}
+  }
+
+  IslandHouse(width: 2.9, depth: 3, height: 3.1, tint: {244, 224, 185}, terrace: false) {
+    Position: {11, 6.02, -2.6}
+  }
+
   BlueChapel(size: 0.51) { Position: {10.8, 9.12, -2.6} }
   IslandPaving(width: 26.5, depth: 1.4, columns: 43, rows: 3) { Position: {0, 6.03, 0.65} }
   IslandStairs(width: 1.75, rise: 3, run: 4.7, steps: 17) { Position: {-2.65, 6.04, -0.1} }
@@ -166,10 +216,16 @@ santorini {
   IslandPot(flowers: true, size: 1.3) { Position: {-3.9, 6.05, 0.65} }
   IslandPot(flowers: true) { Position: {7.25, 6.05, 0.7} }
 
-  IslandHouse(width: 3.7, depth: 3.2, height: 2.9, flowers: true, tint: {249, 232, 205}) { Position: {-10.5, 3.02, 3.4} }
+  IslandHouse(width: 3.7, depth: 3.2, height: 2.9, flowers: true, tint: {249, 232, 205}) {
+    Position: {-10.5, 3.02, 3.4}
+  }
+
   IslandHouse(width: 3.5, depth: 3, height: 3.2, balcony: true) { Position: {2, 3.02, 3.6} }
   IslandHouse(width: 3.1, depth: 3.1, height: 2.7, flowers: true) { Position: {6, 3.02, 3.45} }
-  IslandHouse(width: 3, depth: 3, height: 2.7, trim: {46, 131, 152}, tint: {228, 207, 170}) { Position: {11.4, 3.02, 3.3} }
+  IslandHouse(width: 3, depth: 3, height: 2.7, trim: {46, 131, 152}, tint: {228, 207, 170}) {
+    Position: {11.4, 3.02, 3.3}
+  }
+
   IslandPaving(width: 27.8, depth: 1.65, columns: 45, rows: 3) { Position: {0, 3.04, 6.3} }
   IslandStairs(width: 1.75, rise: 3, run: 4.6, steps: 17) { Position: {-1, 3.04, 6} }
   IslandStairs(width: 1.5, rise: 3, run: 4.6, steps: 17) { Position: {8.9, 3.04, 6} }
@@ -187,11 +243,23 @@ santorini {
       Rotation: {-0.12, -0.25, 0}
       frame { Position: {}; RoundedBox: {0.75, 1.15, 0.08, 0.04}; Rgb: IslandWood }
       board { Position: {0, 0, 0.045}; Box: {0.65, 1.03, 0.02}; Rgb: IslandRecess }
-      lettering { Position: {0, 0.05, 0.06}; Scale: {0.01, 0.01, 0.01}; Text: {value: "CAFE\n\nFRAPPE\nMEZE\n\nOIA", size: 12}; Rgb: IslandChalk }
+      lettering {
+        Position: {0, 0.05, 0.06}
+        Scale: {0.01, 0.01, 0.01}
+        Text: {value: "CAFE\n\nFRAPPE\nMEZE\n\nOIA", size: 12}
+        Rgb: IslandChalk
+      }
+
       for side in 0..2 {
-        { Position: {(side - 0.5) * 0.65, -0.57, -0.12}; Rotation: {-0.2, 0, 0}; Box: {0.06, 0.45, 0.08}; Rgb: IslandWood }
+        {
+          Position: {(side - 0.5) * 0.65, -0.57, -0.12}
+          Rotation: {-0.2, 0, 0}
+          Box: {0.06, 0.45, 0.08}
+          Rgb: IslandWood
+        }
       }
     }
+
     IslandRailing(width: 4.6) { Position: {0, 0.04, 2.95} }
     IslandPot(flowers: true, size: 1.2) { Position: {-2.2, 0.04, 2.5} }
     IslandOlive() { Position: {2.15, 0.04, -2.5}; Scale: {0.7, 0.7, 0.7} }
@@ -202,6 +270,7 @@ santorini {
     CafeTable() { Position: {-0.35, 0, -0.2}; Scale: {0.7, 0.7, 0.7} }
     Sunshade(radius: 1.35) { Position: {0.6, 0, -0.65}; Scale: {0.8, 0.8, 0.8} }
   }
+
   Sunshade(radius: 1.2) { Position: {1.8, 6.35, 3.4}; Scale: {0.8, 0.8, 0.8} }
   CafeTable() { Position: {1.6, 6.35, 3.8}; Scale: {0.65, 0.65, 0.65} }
   IslandPergola(width: 2.6, depth: 2) { Position: {5.65, 8.96, -2.65}; Scale: {1, 0.75, 1} }
@@ -209,10 +278,27 @@ santorini {
 
   laundry {
     Position: {-10.5, 6.1, 3.4}
+
     for side in 0..2 {
-      { Position: {(side - 0.5) * 2.9, 0.85, -0.55}; Cylinder: {radius: 0.028, length: 1.7, segments: 8}; Rgb: IslandIron }
+      {
+        Position: {(side - 0.5) * 2.9, 0.85, -0.55}
+        Cylinder: {radius: 0.028, length: 1.7, segments: 8}
+        Rgb: IslandIron
+      }
     }
-    IslandRope(ax: -1.45, ay: 1.65, az: -0.55, bx: 1.45, by: 1.65, bz: -0.55, sag: 0.24, thick: 0.012, tint: IslandPlaster) {}
+
+    IslandRope(
+      ax: -1.45,
+      ay: 1.65,
+      az: -0.55,
+      bx: 1.45,
+      by: 1.65,
+      bz: -0.55,
+      sag: 0.24,
+      thick: 0.012,
+      tint: IslandPlaster
+    ) {}
+
     for i in 0..5 {
       {
         Position: {-1.1 + i * 0.52, 1.1 + i % 2 * 0.06, -0.55}
@@ -222,8 +308,13 @@ santorini {
         Sheen: IslandLinen
         DiffuseTransmission: IslandCloth
       }
+
       for pin in 0..2 {
-        { Position: {-1.26 + i * 0.52 + pin * 0.32, 1.5, -0.54}; Box: {0.03, 0.09, 0.04}; Rgb: IslandWood }
+        {
+          Position: {-1.26 + i * 0.52 + pin * 0.32, 1.5, -0.54}
+          Box: {0.03, 0.09, 0.04}
+          Rgb: IslandWood
+        }
       }
     }
   }
@@ -232,35 +323,69 @@ santorini {
     Position: {0, 0.65, 9.25}
     quay { Position: {0, -0.32, 0}; RoundedBox: {22, 0.65, 2.2, 0.13}; Rgb: {177, 170, 144} }
     IslandPaving(width: 22, depth: 2.2, columns: 35, rows: 4) { Position: {0, 0.02, 0} }
+
     for i in 0..31 {
-      { Position: {-10.65 + i * 0.71, -0.13, 1.08}; RoundedBox: {0.67, 0.29, 0.2, 0.035}; Rgb: IslandPlaster }
+      {
+        Position: {-10.65 + i * 0.71, -0.13, 1.08}
+        RoundedBox: {0.67, 0.29, 0.2, 0.035}
+        Rgb: IslandPlaster
+      }
     }
+
     for i in 0..7 {
-      { Position: {-9.6 + i * 3.2, 0.21, 0.85}; Cylinder: {radius: 0.08, length: 0.4, segments: 12}; Rgb: IslandIron }
-      { Position: {-9.6 + i * 3.2, 0.4, 0.85}; Sphere: {radius: 0.105, segments: 12}; Rgb: IslandIron }
+      {
+        Position: {-9.6 + i * 3.2, 0.21, 0.85}
+        Cylinder: {radius: 0.08, length: 0.4, segments: 12}
+        Rgb: IslandIron
+      }
+
+      {
+        Position: {-9.6 + i * 3.2, 0.4, 0.85}
+        Sphere: {radius: 0.105, segments: 12}
+        Rgb: IslandIron
+      }
     }
-    IslandStairs(width: 1.65, rise: 2.4, run: 4.1, steps: 14) { Position: {-9.2, 0, -0.2}; Rotation: {0, math.PI / 2, 0} }
+
+    IslandStairs(width: 1.65, rise: 2.4, run: 4.1, steps: 14) {
+      Position: {-9.2, 0, -0.2}
+      Rotation: {0, math.PI / 2, 0}
+    }
+
     IslandPaving(width: 1.7, depth: 3.4, columns: 3, rows: 6) { Position: {-13.3, 2.4, -1.1} }
     IslandOlive() { Position: {9.8, 0.04, 0}; Scale: {0.7, 0.7, 0.7} }
     IslandPot(flowers: true, size: 1.2) { Position: {-8.9, 0.04, -0.55} }
+
     for i in 0..3 {
       { Position: {6.6 + i * 0.6, 0.25, -0.4}; Box: {0.52, 0.45, 0.6}; Rgb: IslandWood }
+
       for slat in 0..4 {
-        { Position: {6.38 + i * 0.6 + slat * 0.145, 0.49, -0.4}; Box: {0.11, 0.045, 0.62}; Rgb: {188, 150, 95} }
+        {
+          Position: {6.38 + i * 0.6 + slat * 0.145, 0.49, -0.4}
+          Box: {0.11, 0.045, 0.62}
+          Rgb: {188, 150, 95}
+        }
       }
     }
   }
+
   FishingBoat() { Position: {-5.3, 0.04, 12.7}; Rotation: {0, 0.45, 0} }
-  FishingBoat(tint: {182, 67, 48}) { Position: {5.3, 0.04, 12.5}; Rotation: {0, -0.38, 0}; Scale: {0.8, 0.8, 0.8} }
+  FishingBoat(tint: {182, 67, 48}) {
+    Position: {5.3, 0.04, 12.5}
+    Rotation: {0, -0.38, 0}
+    Scale: {0.8, 0.8, 0.8}
+  }
+
   IslandRope(ax: -5.1, ay: 0.6, az: 14.5, bx: -6.4, by: 1.04, bz: 10.1, sag: 0.35, thick: 0.015) {}
   IslandRope(ax: 4.6, ay: 0.55, az: 13.9, bx: 3.2, by: 1.04, bz: 10.1, sag: 0.35, thick: 0.015) {}
 
   for i in 0..5 {
     IslandPot(flowers: true, size: 0.85 + i % 2 * 0.3) { Position: {-12.6 + i * 5.7, 3.07, 6.85} }
   }
+
   for i in 0..4 {
     IslandRailing(width: 2.4) { Position: {-11.4 + i * 6.8, 3.05, 7.35} }
   }
+
   for i in 0..7 {
     {
       Position: {-13.3 + i * 4.25, 2.6, 7.58}
@@ -270,7 +395,16 @@ santorini {
     }
   }
 
-  sea_reflection { Position: {0, 2.2, 11.5}; ReflectionProbe: {extent: {17, 3, 6}, blend: 1, priority: 1, projection: {18, 9, 15}, offset: {0, 5, -7}} }
+  sea_reflection {
+    Position: {0, 2.2, 11.5}
+    ReflectionProbe: {
+      extent: {17, 3, 6},
+      blend: 1,
+      priority: 1,
+      projection: {18, 9, 15},
+      offset: {0, 5, -7}
+    }
+  }
 }
 
 view {
@@ -283,7 +417,7 @@ view {
     camera: camera,
     clear: {enabled: true, color: {139, 191, 214, 255}},
     lighting: {enabled: true, baked: true, reflections: true},
-    shadows: {enabled: true, resolution: 2048, max_distance: 120},
+    shadows: {enabled: true, cascades: 3, resolution: 2048, interval: [1, 2, 2], max_distance: 120},
     effects: [{effect: gtao}, {effect: bloom}, {effect: tonemap}, {effect: smaa}]
   }
 }

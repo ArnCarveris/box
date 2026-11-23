@@ -229,7 +229,9 @@ static void BoxSpatialOnLocal(
 {
     box_spatial_t *index = it->ctx;
     int32_t i;
-    if (!ecs_is_fini(it->world) && ecs_map_count(&index->mover_of)) {
+    if (!ecs_is_fini(it->world) && ecs_map_count(&index->mover_of) &&
+        box_transform_dynamic(it->world, it->table))
+    {
         for (i = 0; i < it->count; i ++) {
             if (!ecs_owns_id(it->world, it->entities[i], DynamicTransform)) {
                 box_spatial_mover_touch(it->world, index, it->entities[i]);
@@ -456,6 +458,9 @@ static bool box_spatial_ignored(
 
 /** Place a changed entity in the index of its scene, or take it out.
  *
+ * A prefab or an entity under SpatialIgnore is checked first, so the shapes of a streamed
+ * subtree that stays out of the index cost neither a world transform nor bounds.
+ *
  * @param world The world
  * @param index The index
  * @param cache The mesh cache
@@ -479,11 +484,11 @@ static void box_spatial_refresh(
     p->dirty = false;
     p->rescope = false;
     WorldTransform t_buf;
-    const WorldTransform *t = box_transform_world(world, e, &t_buf);
     vec3 l_min, l_max;
     bool ui = false;
-    bool indexed = t && box_spatial_local(world, cache, e, l_min, l_max, &ui) &&
-        !ecs_has_id(world, e, EcsPrefab) && !box_spatial_ignored(world, e);
+    bool candidate = !ecs_has_id(world, e, EcsPrefab) && !box_spatial_ignored(world, e);
+    const WorldTransform *t = candidate ? box_transform_world(world, e, &t_buf) : NULL;
+    bool indexed = t && box_spatial_local(world, cache, e, l_min, l_max, &ui);
     if (indexed) {
         box_spatial_world_bounds(l_min, l_max, t, min, max);
         scene = rescope ? box_render_scene_of(world, e) : p->scene;
@@ -731,6 +736,20 @@ done:
     return;
 }
 
+void box_spatial_shift(
+    ecs_world_t *world,
+    ecs_entity_t scene,
+    const vec3 offset,
+    box_spatial_shifts_t shifts,
+    void *ctx)
+{
+    box_spatial_t *index = box_spatial_get(world);
+    box_spatial_scene_t *s = index ? box_spatial_scene(index, scene) : NULL;
+    if (s) {
+        box_spatial_scene_shift(index, s, offset, shifts, ctx);
+    }
+}
+
 void box_spatial_stats(
     const ecs_world_t *world,
     box_spatial_stats_t *stats)
@@ -823,10 +842,7 @@ static void box_spatial_local_observers(
     int32_t i;
     for (i = 0; i < 3; i ++) {
         box_spatial_observer(world, index, names[i], (ecs_observer_desc_t){
-            .query.terms = {
-                { .id = ids[i] },
-                { .id = DynamicTransform, .inout = EcsInOutNone }
-            },
+            .query.terms = {{ .id = ids[i] }},
             .events = { EcsOnSet } }, BoxSpatialOnLocal);
     }
 }

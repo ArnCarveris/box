@@ -5,22 +5,51 @@ using state
 
 state {
   actions {
-    Deck1 { Action: {description: "Work on deck 1, or on the core spine of a liner"}; Binding: {key: Num1} }
-    Deck2 { Action: {description: "Work on deck 2, or on the port spine of a liner"}; Binding: {key: Num2} }
-    Deck3 { Action: {description: "Work on deck 3, or on the starboard spine of a liner"}; Binding: {key: Num3} }
-    Deck4 { Action: {description: "Work on deck 4, or on the dorsal spine of a liner"}; Binding: {key: Num4} }
-    Deck5 { Action: {description: "Work on deck 5, or on the ventral spine of a liner"}; Binding: {key: Num5} }
+    Deck1 {
+      Action: {description: "Work on deck 1, or on the core spine of a liner"}
+      Binding: {key: Num1}
+    }
+
+    Deck2 {
+      Action: {description: "Work on deck 2, or on the port spine of a liner"}
+      Binding: {key: Num2}
+    }
+
+    Deck3 {
+      Action: {description: "Work on deck 3, or on the starboard spine of a liner"}
+      Binding: {key: Num3}
+    }
+
+    Deck4 {
+      Action: {description: "Work on deck 4, or on the dorsal spine of a liner"}
+      Binding: {key: Num4}
+    }
+
+    Deck5 {
+      Action: {description: "Work on deck 5, or on the ventral spine of a liner"}
+      Binding: {key: Num5}
+    }
+
     Deck6 { Action: {description: "Work on deck 6"}; Binding: {key: Num6} }
     Remove { Action: {description: "Pick the remove tool"}; Binding: {key: X} }
     Cancel { Action: {description: "Put the tool away"}; Binding: {key: Escape} }
-    DeckUp { Action: {description: "Work on the deck above, or on the next spine of a liner"}; Binding: {key: PageUp} }
-    DeckDown { Action: {description: "Work on the deck below, or on the previous spine of a liner"}; Binding: {key: PageDown} }
+    DeckUp {
+      Action: {description: "Work on the deck above, or on the next spine of a liner"}
+      Binding: {key: PageUp}
+    }
+
+    DeckDown {
+      Action: {description: "Work on the deck below, or on the previous spine of a liner"}
+      Binding: {key: PageDown}
+    }
   }
 
   fn load(op: i32) {
     const order: RigGrid = {}
-    const none: RigPlan = {}
-    const plan: RigPlan = op == OP_FRIGATE ? frigate_plan : op == OP_SCOUT ? scout_plan : op == OP_MINER ? miner_plan : none
+    const none: i32[] = []
+    const plan: i32[] = op == OP_FRIGATE ? frigate_plan :
+      op == OP_SCOUT ? scout_plan :
+      op == OP_MINER ? miner_plan : none
     grid = plan_kinds(plan)
     placed = order
     stamp = 0
@@ -34,6 +63,7 @@ state {
       tool = 0
       hover = -1
       lhover = -1
+
       if big && !lloaded {
         lloaded = true
         load_liner(OP_PASSENGER)
@@ -80,6 +110,7 @@ async {
     const e = await Click
     const i = e.cell
     const k = grid[i]
+
     if tool > 0 && tool != T_REMOVE {
       if k != tool {
         const built = tool
@@ -102,6 +133,7 @@ async {
     const e = await SlotClick
     const i = e.slot
     const k = lgrid[i]
+
     if tool > 0 && tool != T_REMOVE {
       if k != tool {
         const built = tool
@@ -121,6 +153,7 @@ async {
   while true {
     const e = await Request
     const op = e.op
+
     if (op > 0 && op <= T_REMOVE) || (op >= L_BASE && op < L_END) {
       tool = tool == op ? 0 : op
     } else if op == OP_CANCEL {
@@ -145,7 +178,8 @@ async {
       deck = max(deck - 1, 0)
     } else if op == OP_FRIGATE || op == OP_SCOUT || op == OP_MINER || (op == OP_CLEAR && !liner) {
       load(op)
-    } else if op == OP_PASSENGER || op == OP_FREIGHTER || op == OP_TENDER || op == OP_BATTLESHIP || (op == OP_CLEAR && liner) {
+    } else if op == OP_PASSENGER || op == OP_FREIGHTER || op == OP_TENDER ||
+      op == OP_BATTLESHIP || (op == OP_CLEAR && liner) {
       load_liner(op)
     } else if op == OP_RIGS || op == OP_LINERS {
       switch_class(op == OP_LINERS)

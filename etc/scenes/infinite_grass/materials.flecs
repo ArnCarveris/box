@@ -1,0 +1,194 @@
+using flecs.script
+using flecs.script.math
+using box.material
+using box.texture
+using state
+
+state {
+  export const MAP_ALBEDO: i32 = 0
+  export const MAP_NORMAL: i32 = 1
+  export const MAP_ORM: i32 = 2
+  export const GROUND_RES: i32 = 1024
+  export const GROUND_MAP_SIZE: f32 = 160
+}
+
+assets {
+  // Ground of grass, yellower with dry and with more soil between the tufts with bare
+  template GrassGroundMap {
+    prop map: i32 = 0
+    prop seed: i32 = 70
+    prop dry: f32 = 0
+    prop bare: f32 = 0
+
+    warp_n { nodes.Noise: {channels: 3, frequency: 5, octaves: 2, seed: seed} }
+    warp { nodes.Warp: {offset: warp_n, amount_value: 0.05} }
+    tufts {
+      nodes.Noise: {coords: warp, frequency: 48, octaves: 3, fractal: NoiseBillow, seed: seed + 1}
+    }
+
+    blades { nodes.Noise: {coords: warp, frequency: 320, octaves: 2, seed: seed + 2} }
+    patch { nodes.Noise: {frequency: 6, octaves: 3, seed: seed + 3} }
+    height { nodes.Mix: {a: tufts, b: blades, factor_value: {0.45, 0, 0, 0}} }
+    soil {
+      nodes.Smoothstep: {
+        input: height,
+        edge0_value: {0.32 + bare, 0, 0, 0},
+        edge1_value: {0.22 + bare, 0, 0, 0}
+      }
+    }
+
+    if map == MAP_ALBEDO {
+      tone {
+        nodes.Ramp: {
+          input: height,
+          keys: [
+            {0.2, {38 + 30 * dry, 54 + 6 * dry, 18 + 6 * dry}},
+            {0.4, {60 + 40 * dry, 90 - 2 * dry, 24 + 10 * dry}},
+            {0.55, {84 + 44 * dry, 112 - 2 * dry, 32 + 14 * dry}},
+            {0.7, {108 + 44 * dry, 130 + 2 * dry, 42 + 18 * dry}},
+            {0.85, {140 + 40 * dry, 150 + 8 * dry, 64 + 20 * dry}}
+          ]
+        }
+      }
+
+      straw {
+        nodes.Ramp: {
+          input: patch,
+          keys: [{0.35, {230, 245, 225}}, {0.55, {255, 255, 255}}, {0.75, {255, 236, 186}}]
+        }
+      }
+
+      dried { nodes.Multiply: {a: tone, b: straw} }
+      color { nodes.Mix: {a: dried, b_value: {0.06, 0.045, 0.028, 1}, factor: soil} }
+      Graph: {output: color, width: GROUND_RES}
+    } else if map == MAP_NORMAL {
+      bumps { nodes.Normal: {height: height, strength: 2.5} }
+      Graph: {output: bumps, width: GROUND_RES, format: GraphLinear}
+    } else {
+      occlusion {
+        nodes.Remap: {input: height, from_min: 0.15, from_max: 0.6, to_min: 0.55, to_max: 1,
+          clamp: true}
+      }
+
+      orm { nodes.Combine: {r: occlusion, g_value: 0.9, b_value: 0, a_value: 1} }
+      Graph: {output: orm, width: GROUND_RES}
+    }
+  }
+
+  // Bare soil with grit and a few stones
+  template SoilMap {
+    prop map: i32 = 0
+
+    warp_n { nodes.Noise: {channels: 3, frequency: 12, octaves: 2, seed: 30} }
+    warp { nodes.Warp: {offset: warp_n, amount_value: 0.01} }
+    soil { nodes.Noise: {coords: warp, frequency: 12, octaves: 6, gain: 0.55, seed: 31} }
+    grit { nodes.Noise: {frequency: 320, octaves: 2, seed: 32} }
+    stones_c { nodes.Cells: {coords: warp, distance: CellsNearest, count: 900, seed: 33} }
+    stone_d { nodes.Split: {input: stones_c, channel: ChannelR} }
+    stone_r { nodes.Split: {input: stones_c, channel: ChannelB} }
+    stone_t { nodes.Split: {input: stones_c, channel: ChannelA} }
+    stone_on { nodes.Step: {input: stone_r, edge_value: {0.86, 0, 0, 0}} }
+    stone_size {
+      nodes.Remap: {input: stone_t, from_min: 0, from_max: 1, to_min: 0.12, to_max: 0.3}
+    }
+
+    stone_edge { nodes.Add: {a: stone_size, b_value: {0.06, 0, 0, 0}} }
+    stone_out { nodes.Smoothstep: {input: stone_d, edge0: stone_size, edge1: stone_edge} }
+    stone_in { nodes.Subtract: {a_value: {1, 0, 0, 0}, b: stone_out} }
+    stones { nodes.Multiply: {a: stone_in, b: stone_on} }
+    ground { nodes.Mix: {a: soil, b: grit, factor_value: {0.3, 0, 0, 0}} }
+    ground_low { nodes.Multiply: {a: ground, b_value: {0.5, 0, 0, 0}} }
+    height { nodes.Mix: {a: ground_low, b_value: {0.85, 0, 0, 0}, factor: stones} }
+
+    if map == MAP_ALBEDO {
+      dirt {
+        nodes.Ramp: {
+          input: ground,
+          keys: [
+            {0.25, {58, 44, 32}}, {0.45, {82, 64, 46}}, {0.6, {100, 80, 58}}, {0.8, {118, 98, 72}}
+          ]
+        }
+      }
+
+      stone_color {
+        nodes.Ramp: {
+          input: stone_t,
+          keys: [
+            {0, {84, 80, 74}}, {0.4, {112, 106, 96}}, {0.7, {96, 88, 76}}, {1, {126, 118, 104}}
+          ]
+        }
+      }
+
+      color { nodes.Mix: {a: dirt, b: stone_color, factor: stones} }
+      Graph: {output: color, width: GROUND_RES}
+    } else if map == MAP_NORMAL {
+      bumps { nodes.Normal: {height: height, strength: 2} }
+      Graph: {output: bumps, width: GROUND_RES, format: GraphLinear}
+    } else {
+      rough {
+        nodes.Remap: {input: stones, from_min: 0, from_max: 1, to_min: 0.92, to_max: 0.62,
+          clamp: true}
+      }
+
+      occlusion {
+        nodes.Remap: {input: height, from_min: 0, from_max: 0.5, to_min: 0.7, to_max: 1,
+          clamp: true}
+      }
+
+      orm { nodes.Combine: {r: occlusion, g: rough, b_value: 0, a_value: 1} }
+      Graph: {output: orm, width: GROUND_RES, format: GraphLinear}
+    }
+  }
+
+  GrassGroundMap ground_meadow_albedo(map: MAP_ALBEDO)
+  GrassGroundMap ground_meadow_normal(map: MAP_NORMAL)
+  GrassGroundMap ground_meadow_orm(map: MAP_ORM)
+  GrassGroundMap ground_short_albedo(map: MAP_ALBEDO, seed: 90, dry: 0.9)
+  GrassGroundMap ground_short_normal(map: MAP_NORMAL, seed: 90, dry: 0.9)
+  GrassGroundMap ground_short_orm(map: MAP_ORM, seed: 90, dry: 0.9)
+  GrassGroundMap ground_sparse_albedo(map: MAP_ALBEDO, seed: 110, dry: 1, bare: 0.22)
+  GrassGroundMap ground_sparse_normal(map: MAP_NORMAL, seed: 110, dry: 1, bare: 0.22)
+  GrassGroundMap ground_sparse_orm(map: MAP_ORM, seed: 110, dry: 1, bare: 0.22)
+  SoilMap ground_soil_albedo(map: MAP_ALBEDO)
+  SoilMap ground_soil_normal(map: MAP_NORMAL)
+  SoilMap ground_soil_orm(map: MAP_ORM)
+
+  ground_meadow {
+    PbrTextures: {
+      albedo: ground_meadow_albedo,
+      normal: ground_meadow_normal,
+      orm: ground_meadow_orm
+    }
+
+    texture.Transform: {scale_x: 40, scale_y: 40}
+  }
+
+  ground_short {
+    PbrTextures: {
+      albedo: ground_short_albedo,
+      normal: ground_short_normal,
+      orm: ground_short_orm
+    }
+
+    texture.Transform: {scale_x: 48, scale_y: 48}
+  }
+
+  ground_sparse {
+    PbrTextures: {
+      albedo: ground_sparse_albedo,
+      normal: ground_sparse_normal,
+      orm: ground_sparse_orm
+    }
+
+    texture.Transform: {scale_x: 48, scale_y: 48}
+  }
+
+  ground_soil {
+    PbrTextures: {albedo: ground_soil_albedo, normal: ground_soil_normal, orm: ground_soil_orm}
+    texture.Transform: {scale_x: 56, scale_y: 56}
+  }
+
+  grass_clouds {
+    Gen: {width: 512, seed: 17, layers: [{kind: GenNoise, frequency: 4, octaves: 5, gain: 0.55}]}
+  }
+}

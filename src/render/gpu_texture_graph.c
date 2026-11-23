@@ -188,8 +188,8 @@ done:
 }
 
 /** Compute the key of the program a graph needs: its structure, the kinds of its nodes, which
- * nodes are animated, the format its output stage writes, its forced boundaries and the shared
- * code. Which images its sampling nodes sample is not part of it, only their indices.
+ * nodes are animated, the format its output stage writes, whether it is on DomainWorld, its
+ * forced boundaries and the shared code. Which images its nodes sample is not part of it.
  *
  * @param tg The graph state
  * @param graph The graph, its hashes computed
@@ -201,10 +201,11 @@ static uint64_t box_gpu_tg_key(
 {
     uint64_t result = BOX_GPU_TG_FNV_BASIS;
     WGPUTextureFormat format = box_gpu_tg_output_format(graph->desc.format);
-    uint32_t i;
+    uint32_t i, world = graph->desc.domain == DomainWorld;
     result = box_gpu_tg_hash(result, &graph->desc.structure_hash, sizeof(uint64_t));
     result = box_gpu_tg_hash(result, &graph->desc.node_count, sizeof(uint32_t));
     result = box_gpu_tg_hash(result, &format, sizeof(format));
+    result = box_gpu_tg_hash(result, &world, sizeof(uint32_t));
     result = box_gpu_tg_hash(result, &tg->prelude_hash, sizeof(uint64_t));
     for (i = 0; i < graph->desc.node_count; i ++) {
         const box_gpu_tg_kind_t *kind = box_gpu_tg_kind(tg, graph->nodes[i].kind);
@@ -215,6 +216,7 @@ static uint64_t box_gpu_tg_key(
         result = box_gpu_tg_hash(result, &graph->nodes[i].params, sizeof(uint32_t));
         result = box_gpu_tg_hash(result, &graph->nodes[i].output, sizeof(uint32_t));
         result = box_gpu_tg_hash(result, &graph->nodes[i].texture, sizeof(int32_t));
+        result = box_gpu_tg_hash(result, &graph->nodes[i].window, sizeof(uint32_t));
         result = box_gpu_tg_hash(result, &graph->animated[i], sizeof(bool));
     }
 
@@ -228,10 +230,12 @@ static uint64_t box_gpu_tg_key(
  * depends on a sampled texture.
  *
  * The hash of a node covers its kind, output type, parameter bytes, the hashes of its inputs,
- * the size, domain and range of the graph and the shared code, so two nodes of one hash make the
- * same value; for a sampling node also the handle, flags and serial of the image it samples now.
+ * the size, domain, range, window and apron of the graph and the shared code, so two nodes of
+ * one hash make the same value and two windows never share one.
  *
- * A node is animated when its kind is, unless its time factor is 0, or one of its inputs is.
+ * A node with window elements also hashes the elements from its own to the end of the
+ * parameters, a sampling node the handle, flags and serial of the image it samples now. A node
+ * is animated when its kind is, unless its time factor is 0, or one of its inputs is.
  *
  * @param gpu The backend
  * @param tg The graph state
@@ -276,7 +280,15 @@ static void box_gpu_tg_hashes(
         h = box_gpu_tg_hash(h, &graph->desc.height, sizeof(uint32_t));
         h = box_gpu_tg_hash(h, &graph->desc.domain, sizeof(uint32_t));
         h = box_gpu_tg_hash(h, graph->desc.region, sizeof(graph->desc.region));
+        h = box_gpu_tg_hash(h, graph->desc.origin, sizeof(graph->desc.origin));
+        h = box_gpu_tg_hash(h, graph->desc.spacing, sizeof(graph->desc.spacing));
+        h = box_gpu_tg_hash(h, &graph->desc.apron, sizeof(uint32_t));
         h = box_gpu_tg_hash(h, graph->params + node->params, node->param_size);
+        if (node->window && node->window < graph->desc.param_size) {
+            h = box_gpu_tg_hash(h, graph->params + node->window,
+                graph->desc.param_size - node->window);
+        }
+
         for (j = 0; j < BOX_TEXTURE_NODE_INPUTS; j ++) {
             int32_t in = node->inputs[j];
             uint64_t input = in >= 0 ? graph->hashes[in] : 0;
@@ -342,9 +354,10 @@ static box_gpu_tg_entry_t* box_gpu_tg_cache_take(
     bool *computed)
 {
     uint64_t hash = graph->hashes[node];
-    uint32_t w = graph->desc.width, h = graph->desc.height;
+    uint32_t w, h;
     box_gpu_tg_entry_t *held = node < graph->entry_count ? graph->entries[node] : NULL;
     box_gpu_tg_entry_t *result = held;
+    box_gpu_tg_grid(&graph->desc, &w, &h);
     *computed = true;
     if (result && result->hash == hash) {
         goto done;
@@ -500,6 +513,27 @@ static void box_gpu_tg_cache_hold(
     ecs_os_free(graph->entries);
     graph->entries = entries;
     graph->entry_count = entries ? count : 0;
+}
+
+/** Check whether a graph whose image was written lets go of the cached values of its nodes: it
+ * is on DomainWorld, its output does not depend on time and no node of it on a sampled texture.
+ *
+ * The values of such a graph are those of its place in the world, which no other graph shares,
+ * and a streamed world has thousands of them: they stay in the cache while its budget has room.
+ *
+ * @param graph The graph
+ * @return Whether the graph holds none of its values until it is edited
+ */
+static bool box_gpu_tg_settled(
+    const box_gpu_tg_graph_t *graph)
+{
+    bool result = graph->desc.domain == DomainWorld && !graph->is_animated && graph->current;
+    int32_t i;
+    for (i = 0; result && graph->sampling && i < graph->current->node_count; i ++) {
+        result = !graph->sampling[i];
+    }
+
+    return result;
 }
 
 void box_gpu_texture_graph_sampled(
@@ -737,13 +771,15 @@ done:
  *
  * @param graph The graph
  * @param node The node
- * @return R32Float for a scalar, RGBA16Float for a vector
+ * @return R32Float for a scalar, RGBA16Float for a vector, RGBA32Float on DomainWorld whose
+ * coordinates and heights are in meters
  */
 static WGPUTextureFormat box_gpu_tg_node_format(
     const box_gpu_tg_graph_t *graph,
     int32_t node)
 {
     return graph->nodes[node].output == TexScalar ? WGPUTextureFormat_R32Float
+        : graph->desc.domain == DomainWorld ? WGPUTextureFormat_RGBA32Float
         : WGPUTextureFormat_RGBA16Float;
 }
 
@@ -1229,7 +1265,9 @@ void box_gpu_texture_graph_apply(
     graph->key = 0;
     graph->dirty = true;
     graph->keys_valid = false;
-    if (!desc->interpolate || !(desc->rate > 0) || desc->format == GraphSingle) {
+    if (!desc->interpolate || !(desc->rate > 0) || desc->format == GraphSingle ||
+        desc->format == GraphFloat || desc->format == GraphFloat4)
+    {
         box_gpu_tg_keyframes_free(gpu, graph);
     }
 done:
@@ -1387,12 +1425,8 @@ static void box_gpu_tg_upload(
     uint64_t size = box_gpu_tg_param_bytes(&graph->desc);
     uint32_t encode = graph->desc.format == GraphColor ? 1u
         : graph->desc.format == GraphSingle ? 2u : 0u;
-    float time = (float)seconds;
-    uint32_t uniforms[12] = {
-        graph->desc.width, graph->desc.height, graph->desc.domain, encode, 0, 0, 0, 0
-    };
-    ecs_os_memcpy(&uniforms[4], &time, ECS_SIZEOF(float));
-    ecs_os_memcpy(&uniforms[8], graph->desc.region, ECS_SIZEOF(graph->desc.region));
+    uint32_t uniforms[16];
+    box_gpu_tg_uniforms(&graph->desc, encode, (float)seconds, uniforms);
     if (graph->param_capacity < size) {
         if (graph->param_buffer) {
             wgpuBufferRelease(graph->param_buffer);
@@ -1441,7 +1475,7 @@ static void box_gpu_tg_record(
 {
     box_gpu_tg_graph_t *graph = ev->graph;
     box_gpu_tg_program_t *program = graph->current;
-    uint32_t w = graph->desc.width, h = graph->desc.height;
+    uint32_t w = graph->desc.width, h = graph->desc.height, gw, gh;
     WGPUTextureFormat image = box_gpu_tg_image_format(graph->desc.format);
     WGPUTextureView out = NULL, key_view = NULL;
     WGPUBindGroupEntry entries[BOX_GPU_TG_FIRST_INPUT + BOX_GPU_TG_INPUTS +
@@ -1453,6 +1487,7 @@ static void box_gpu_tg_record(
     WGPUBuffer *uniforms = key ? &graph->key_uniforms[ev->key] : &graph->uniforms;
     bool *computed = ecs_os_calloc_n(bool, program->stage_count);
     bool *needed = ecs_os_calloc_n(bool, program->slot_count);
+    box_gpu_tg_grid(&graph->desc, &gw, &gh);
     if (graph->desc.texture_count) {
         box_gpu_tg_hashes(gpu, tg, graph);
         for (k = 0; k < (int32_t)graph->desc.texture_count; k ++) {
@@ -1489,7 +1524,7 @@ static void box_gpu_tg_record(
         }
 
         if (graph->animated[root]) {
-            ev->textures[root] = box_gpu_tg_pool_take(gpu, tg, w, h, stage->format);
+            ev->textures[root] = box_gpu_tg_pool_take(gpu, tg, gw, gh, stage->format);
             continue;
         }
 
@@ -1503,7 +1538,7 @@ static void box_gpu_tg_record(
         if (stage->pass >= 0) {
             computed[s] = !needed[stage->slot];
             if (!computed[s]) {
-                ev->textures[stage->slot] = box_gpu_tg_pool_take(gpu, tg, w, h,
+                ev->textures[stage->slot] = box_gpu_tg_pool_take(gpu, tg, gw, gh,
                     stage->format);
             }
         }
@@ -1519,6 +1554,7 @@ static void box_gpu_tg_record(
             continue;
         }
 
+        uint32_t sw = stage->output ? w : gw, sh = stage->output ? h : gh;
         WGPUTextureView target = stage->output
             ? (ev->temp ? ev->temp->view : key_view ? key_view : out)
             : ev->textures[stage->slot]->view;
@@ -1560,11 +1596,11 @@ static void box_gpu_tg_record(
         wgpuComputePassEncoderSetPipeline(pass, stage->pipeline);
         wgpuComputePassEncoderSetBindGroup(pass, 0, group, 0, NULL);
         wgpuComputePassEncoderDispatchWorkgroups(pass,
-            (w + BOX_GPU_TG_GROUP - 1) / BOX_GPU_TG_GROUP,
-            (h + BOX_GPU_TG_GROUP - 1) / BOX_GPU_TG_GROUP, 1);
+            (sw + BOX_GPU_TG_GROUP - 1) / BOX_GPU_TG_GROUP,
+            (sh + BOX_GPU_TG_GROUP - 1) / BOX_GPU_TG_GROUP, 1);
         wgpuBindGroupRelease(group);
         gpu->pending.texture_graph_dispatches ++;
-        gpu->pending.texture_graph_texels += (int64_t)w * h;
+        gpu->pending.texture_graph_texels += (int64_t)sw * sh;
     }
 
     if (out) {
@@ -1583,6 +1619,19 @@ static void box_gpu_tg_record(
     }
 }
 
+/** Texels of the nodes a graph evaluates, what its evaluation costs.
+ *
+ * @param graph The graph
+ * @return Its texels times its nodes
+ */
+static int64_t box_gpu_tg_texels(
+    const box_gpu_tg_graph_t *graph)
+{
+    int64_t nodes = graph->desc.node_count > 0 ? (int64_t)graph->desc.node_count : 1;
+
+    return (int64_t)graph->desc.width * (int64_t)graph->desc.height * nodes;
+}
+
 void box_gpu_texture_graphs_evaluate(
     box_gpu_t *gpu,
     const box_render_packet_t *packet)
@@ -1591,6 +1640,7 @@ void box_gpu_texture_graphs_evaluate(
     ecs_vec_t evals, order;
     WGPUCommandEncoder encoder = NULL;
     int32_t i, count, stamp = -1, passes = 0, pass;
+    int64_t waiting = 0, allowed, spent = 0;
     bool requested;
     ecs_os_mutex_lock(gpu->lock);
     requested = ecs_vec_count(&gpu->graph_requests) > 0;
@@ -1622,11 +1672,26 @@ void box_gpu_texture_graphs_evaluate(
         box_gpu_tg_propagate(tg, graphs[i]);
     }
 
+    for (i = 0; packet->spread && i < ecs_vec_count(&order); i ++) {
+        waiting += graphs[i]->dirty ? box_gpu_tg_texels(graphs[i]) : 0;
+    }
+
+    allowed = (int64_t)(BOX_GPU_TG_SPREAD_TEXELS *
+        glm_clamp(packet->delta * 60.0f, 0.25f, 2.0f));
+    allowed = glm_max(allowed, waiting / BOX_GPU_TG_SPREAD_SHARE);
     for (i = 0; i < ecs_vec_count(&order); i ++) {
         box_gpu_tg_graph_t *graph = graphs[i];
         bool reads = box_gpu_tg_node_reads(tg, graph), update;
         if (!box_gpu_tg_graph_ready(gpu, tg, graph)) {
             continue;
+        }
+
+        if (packet->spread && graph->dirty && !reads && !box_gpu_tg_interpolated(graph)) {
+            if (spent && spent + box_gpu_tg_texels(graph) > allowed) {
+                continue;
+            }
+
+            spent += box_gpu_tg_texels(graph);
         }
 
         if (box_gpu_tg_interpolated(graph)) {
@@ -1742,6 +1807,9 @@ void box_gpu_texture_graphs_evaluate(
         graph->written = true;
         gpu->pending.texture_graph_updates += ev->update;
         box_gpu_tg_report(gpu, graph, NULL, -1);
+        if (box_gpu_tg_settled(graph)) {
+            box_gpu_tg_cache_hold(gpu, tg, graph, NULL, 0);
+        }
     }
 
 sweep:

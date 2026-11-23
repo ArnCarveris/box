@@ -11,16 +11,61 @@ using box.curve
 using state
 
 assets {
-  const nat_flower_a: Rgb = match season { 0: {255, 170, 205}; 1: {236, 64, 58}; 2: {238, 140, 40}; _: {240, 240, 240} }
-  const nat_flower_b: Rgb = match season { 0: {255, 250, 240}; 1: {250, 208, 60}; 2: {150, 70, 150}; _: {240, 240, 240} }
-  const nat_flower_c: Rgb = match season { 0: {252, 226, 96}; 1: {120, 110, 230}; 2: {200, 60, 50}; _: {240, 240, 240} }
-  const nat_blade: Rgb = match season { 0: {120, 190, 80}; 1: {86, 160, 62}; 2: {176, 160, 70}; _: {190, 204, 190} }
-  const nat_bush: Rgb = match season { 0: {76, 150, 74}; 1: {52, 124, 60}; 2: {150, 120, 48}; _: {222, 232, 242} }
+  const nat_flower_a: Rgb = match season {
+    0: {255, 170, 205}
+    1: {236, 64, 58}
+    2: {238, 140, 40}
+    _: {240, 240, 240}
+  }
+  const nat_flower_b: Rgb = match season {
+    0: {255, 250, 240}
+    1: {250, 208, 60}
+    2: {150, 70, 150}
+    _: {240, 240, 240}
+  }
+  const nat_flower_c: Rgb = match season {
+    0: {252, 226, 96}
+    1: {120, 110, 230}
+    2: {200, 60, 50}
+    _: {240, 240, 240}
+  }
+  const nat_blade: Rgb = match season {
+    0: {120, 190, 80}
+    1: {86, 160, 62}
+    2: {176, 160, 70}
+    _: {190, 204, 190}
+  }
+  const nat_bush: Rgb = match season {
+    0: {76, 150, 74}
+    1: {52, 124, 60}
+    2: {150, 120, 48}
+    _: {222, 232, 242}
+  }
 
-  prefab IsleNatureCrystalA { Rgb: {150, 236, 255}; PbrMaterial: {roughness: 0.12}; Emissive: {strength: night ? 0.8 : 0.5, color: {90, 220, 255}} }
-  prefab IsleNatureCrystalB { Rgb: {70, 168, 236}; PbrMaterial: {roughness: 0.12}; Emissive: {strength: night ? 0.65 : 0.4, color: {50, 150, 255}} }
-  prefab IsleNatureCrystalPinkA { Rgb: {255, 170, 236}; PbrMaterial: {roughness: 0.12}; Emissive: {strength: night ? 0.8 : 0.5, color: {255, 120, 220}} }
-  prefab IsleNatureCrystalPinkB { Rgb: {214, 96, 200}; PbrMaterial: {roughness: 0.12}; Emissive: {strength: night ? 0.65 : 0.4, color: {230, 70, 200}} }
+  prefab IsleNatureCrystalA {
+    Rgb: {150, 236, 255}
+    PbrMaterial: {roughness: 0.12}
+    Emissive: {strength: night ? 0.8 : 0.5, color: {90, 220, 255}}
+  }
+
+  prefab IsleNatureCrystalB {
+    Rgb: {70, 168, 236}
+    PbrMaterial: {roughness: 0.12}
+    Emissive: {strength: night ? 0.65 : 0.4, color: {50, 150, 255}}
+  }
+
+  prefab IsleNatureCrystalPinkA {
+    Rgb: {255, 170, 236}
+    PbrMaterial: {roughness: 0.12}
+    Emissive: {strength: night ? 0.8 : 0.5, color: {255, 120, 220}}
+  }
+
+  prefab IsleNatureCrystalPinkB {
+    Rgb: {214, 96, 200}
+    PbrMaterial: {roughness: 0.12}
+    Emissive: {strength: night ? 0.65 : 0.4, color: {230, 70, 200}}
+  }
+
   prefab IsleNatureBirch { Rgb: {232, 228, 216}; PbrMaterial: {roughness: 0.8} }
   prefab IsleNatureStem { Rgb: {70, 130, 60}; PbrMaterial: {roughness: 0.9} }
   prefab IsleNatureBlade { Rgb: nat_blade; PbrMaterial: {roughness: 0.9} }
@@ -31,14 +76,29 @@ assets {
   prefab IsleNatureBerry { Rgb: {210, 40, 60}; PbrMaterial: {roughness: 0.4} }
   prefab IsleNatureShroomStem { Rgb: {238, 228, 206}; PbrMaterial: {roughness: 0.8} }
   prefab IsleNatureShroomCap { Rgb: {206, 52, 44}; PbrMaterial: {roughness: 0.5} }
-  prefab IsleNatureShroomGlow { Rgb: {130, 240, 220}; PbrMaterial: {roughness: 0.4}; Emissive: {strength: night ? 6 : 0.4, color: {80, 255, 210}} }
+  prefab IsleNatureShroomGlow {
+    Rgb: {130, 240, 220}
+    PbrMaterial: {roughness: 0.4}
+    Emissive: {strength: night ? 6 : 0.4, color: {80, 255, 210}}
+  }
+
   prefab IsleNatureReed { Rgb: {120, 150, 70}; PbrMaterial: {roughness: 0.9} }
   prefab IsleNatureReedHead { Rgb: {96, 62, 40}; PbrMaterial: {roughness: 1} }
   prefab IsleNatureLily { Rgb: {64, 140, 76}; PbrMaterial: {roughness: 0.5} }
-  prefab IsleNatureLilyBloom { Rgb: {252, 236, 244}; PbrMaterial: {roughness: 0.6}; Emissive: {strength: 0.15, color: {255, 220, 235}} }
+  prefab IsleNatureLilyBloom {
+    Rgb: {252, 236, 244}
+    PbrMaterial: {roughness: 0.6}
+    Emissive: {strength: 0.15, color: {255, 220, 235}}
+  }
+
   prefab IsleNatureDuck { Rgb: {244, 240, 230}; PbrMaterial: {roughness: 0.7} }
   prefab IsleNatureDuckBrown { Rgb: {140, 100, 66}; PbrMaterial: {roughness: 0.8} }
-  prefab IsleNatureDuckHead { Rgb: {36, 110, 76}; PbrMaterial: {roughness: 0.5}; Sheen: {color: {120, 255, 190}, roughness: 0.4} }
+  prefab IsleNatureDuckHead {
+    Rgb: {36, 110, 76}
+    PbrMaterial: {roughness: 0.5}
+    Sheen: {color: {120, 255, 190}, roughness: 0.4}
+  }
+
   prefab IsleNatureBeak { Rgb: {244, 170, 40}; PbrMaterial: {roughness: 0.5} }
 
   template IsleTreeRound {
@@ -46,36 +106,98 @@ assets {
     prop seed: f32 = 1
     const h = height
     const g = h * 0.055
-    trunk : IsleBark { Position: {0, h * 0.26, 0}; Frustum: {radius_bottom: g * 1.4, radius_top: g * 0.75, length: h * 0.52, segments: 8, smooth: true} }
+    trunk : IsleBark {
+      Position: {0, h * 0.26, 0}
+      Frustum: {
+        radius_bottom: g * 1.4,
+        radius_top: g * 0.75,
+        length: h * 0.52,
+        segments: 8,
+        smooth: true
+      }
+    }
+
     if season == WINTER {
       for i in 0..3 {
         const a = i * 2.094 + seed
         const tilt = 0.7 + rnd(i, seed) * 0.25
-        { (IsA, IsleBark); Position: {sin(a) * h * 0.1, h * 0.6, cos(a) * h * 0.1}; Rotation: {cos(a) * tilt, 0, -sin(a) * tilt}; Frustum: {radius_bottom: g * 0.5, radius_top: g * 0.2, length: h * 0.34, segments: 6} }
-        { (IsA, IsleSnow); Position: {sin(a) * h * 0.2, h * 0.72, cos(a) * h * 0.2}; Scale: {1, 0.7, 1}; IcoSphere: {radius: h * (0.13 + rnd(i, seed + 2) * 0.04), segments: 2, smooth: true} }
+        {
+          (IsA, IsleBark)
+          Position: {sin(a) * h * 0.1, h * 0.6, cos(a) * h * 0.1}
+          Rotation: {cos(a) * tilt, 0, -sin(a) * tilt}
+          Frustum: {radius_bottom: g * 0.5, radius_top: g * 0.2, length: h * 0.34, segments: 6}
+        }
+
+        {
+          (IsA, IsleSnow)
+          Position: {sin(a) * h * 0.2, h * 0.72, cos(a) * h * 0.2}
+          Scale: {1, 0.7, 1}
+          IcoSphere: {radius: h * (0.13 + rnd(i, seed + 2) * 0.04), segments: 2, smooth: true}
+        }
       }
-      { (IsA, IsleLeaf); Position: {0, h * 0.84, 0}; Scale: {1, 0.75, 1}; IcoSphere: {radius: h * 0.17, segments: 2, smooth: true} }
+
+      {
+        (IsA, IsleLeaf)
+        Position: {0, h * 0.84, 0}
+        Scale: {1, 0.75, 1}
+        IcoSphere: {radius: h * 0.17, segments: 2, smooth: true}
+      }
     } else {
       for i in 0..4 {
         const a = i * 1.5708 + seed
         const r = h * (0.17 + rnd(i, seed) * 0.04)
         const s = h * (0.21 + rnd(i, seed + 1) * 0.05)
+
         if i % 2 == 0 {
-          { (IsA, IsleLeaf); Position: {sin(a) * r, h * (0.58 + rnd(i, seed + 2) * 0.08), cos(a) * r}; Scale: {1, 0.86, 1}; IcoSphere: {radius: s, segments: 2, smooth: true} }
+          {
+            (IsA, IsleLeaf)
+            Position: {sin(a) * r, h * (0.58 + rnd(i, seed + 2) * 0.08), cos(a) * r}
+            Scale: {1, 0.86, 1}
+            IcoSphere: {radius: s, segments: 2, smooth: true}
+          }
         } else {
-          { (IsA, IsleLeafAlt); Position: {sin(a) * r, h * (0.6 + rnd(i, seed + 2) * 0.08), cos(a) * r}; Scale: {1, 0.86, 1}; IcoSphere: {radius: s, segments: 2, smooth: true} }
+          {
+            (IsA, IsleLeafAlt)
+            Position: {sin(a) * r, h * (0.6 + rnd(i, seed + 2) * 0.08), cos(a) * r}
+            Scale: {1, 0.86, 1}
+            IcoSphere: {radius: s, segments: 2, smooth: true}
+          }
         }
       }
-      { (IsA, IsleLeaf); Position: {0, h * 0.8, 0}; Scale: {1, 0.88, 1}; IcoSphere: {radius: h * 0.25, segments: 2, smooth: true} }
+
+      {
+        (IsA, IsleLeaf)
+        Position: {0, h * 0.8, 0}
+        Scale: {1, 0.88, 1}
+        IcoSphere: {radius: h * 0.25, segments: 2, smooth: true}
+      }
     }
+
     if season == AUTUMN && rnd(seed, 7) > 0.35 {
       for i in 0..5 {
         const a = i * GOLDEN + seed
         const r = h * (0.14 + i * 0.06)
+
         if i % 2 == 0 {
-          { (IsA, IsleLeaf); Ignore; NoShadow; Position: {sin(a) * r, 0.015 + i * 0.003, cos(a) * r}; Rotation: {0, a, 0}; Scale: {1.4, 1, 0.8}; Cylinder: {radius: h * (0.045 + rnd(i, seed) * 0.03), length: 0.012, segments: 10} }
+          {
+            (IsA, IsleLeaf)
+            Ignore
+            NoShadow
+            Position: {sin(a) * r, 0.015 + i * 0.003, cos(a) * r}
+            Rotation: {0, a, 0}
+            Scale: {1.4, 1, 0.8}
+            Cylinder: {radius: h * (0.045 + rnd(i, seed) * 0.03), length: 0.012, segments: 10}
+          }
         } else {
-          { (IsA, IsleLeafAlt); Ignore; NoShadow; Position: {sin(a) * r, 0.015 + i * 0.003, cos(a) * r}; Rotation: {0, a, 0}; Scale: {1.4, 1, 0.8}; Cylinder: {radius: h * (0.04 + rnd(i, seed) * 0.03), length: 0.012, segments: 10} }
+          {
+            (IsA, IsleLeafAlt)
+            Ignore
+            NoShadow
+            Position: {sin(a) * r, 0.015 + i * 0.003, cos(a) * r}
+            Rotation: {0, a, 0}
+            Scale: {1.4, 1, 0.8}
+            Cylinder: {radius: h * (0.04 + rnd(i, seed) * 0.03), length: 0.012, segments: 10}
+          }
         }
       }
     }
@@ -85,14 +207,29 @@ assets {
     prop height: f32 = 5.5
     prop seed: f32 = 1
     const h = height
-    trunk : IsleBark { Position: {0, h * 0.1, 0}; Cylinder: {radius: h * 0.04, length: h * 0.2, segments: 8, smooth: true} }
+    trunk : IsleBark {
+      Position: {0, h * 0.1, 0}
+      Cylinder: {radius: h * 0.04, length: h * 0.2, segments: 8, smooth: true}
+    }
+
     for k in 0..4 {
       const r = h * (0.25 - k * 0.048)
       const len = h * (0.36 - k * 0.03)
       const y = h * (0.3 + k * 0.185)
-      { (IsA, IsleLeafDark); Position: {0, y, 0}; Rotation: {0, k * 0.7 + seed, 0}; Cone: {radius: r, length: len, segments: 9} }
+      {
+        (IsA, IsleLeafDark)
+        Position: {0, y, 0}
+        Rotation: {0, k * 0.7 + seed, 0}
+        Cone: {radius: r, length: len, segments: 9}
+      }
+
       if season == WINTER && k > 0 {
-        { (IsA, IsleSnow); Position: {0, y + len * 0.21, 0}; Rotation: {0, k * 0.7 + seed, 0}; Cone: {radius: r * 0.63, length: len * 0.6, segments: 9} }
+        {
+          (IsA, IsleSnow)
+          Position: {0, y + len * 0.21, 0}
+          Rotation: {0, k * 0.7 + seed, 0}
+          Cone: {radius: r * 0.63, length: len * 0.6, segments: 9}
+        }
       }
     }
   }
@@ -103,33 +240,85 @@ assets {
     const h = height
     const g = h * 0.035
     const lean = (rnd(seed, 3) - 0.5) * 0.16
-    trunk : IsleNatureBirch { Position: {0, h * 0.3, 0}; Rotation: {lean, 0, lean * 0.6}; Frustum: {radius_bottom: g * 1.3, radius_top: g * 0.7, length: h * 0.62, segments: 8, smooth: true} }
-    band0 : IsleBlack { Position: {0, h * 0.2, 0}; Rotation: {lean, 0, lean * 0.6}; Cylinder: {radius: g * 1.22, length: h * 0.012, segments: 8} }
-    band1 : IsleBlack { Position: {0, h * 0.38, 0}; Rotation: {lean, 0, lean * 0.6}; Cylinder: {radius: g * 1.02, length: h * 0.012, segments: 8} }
+    trunk : IsleNatureBirch {
+      Position: {0, h * 0.3, 0}
+      Rotation: {lean, 0, lean * 0.6}
+      Frustum: {
+        radius_bottom: g * 1.3,
+        radius_top: g * 0.7,
+        length: h * 0.62,
+        segments: 8,
+        smooth: true
+      }
+    }
+
+    band0 : IsleBlack {
+      Position: {0, h * 0.2, 0}
+      Rotation: {lean, 0, lean * 0.6}
+      Cylinder: {radius: g * 1.22, length: h * 0.012, segments: 8}
+    }
+
+    band1 : IsleBlack {
+      Position: {0, h * 0.38, 0}
+      Rotation: {lean, 0, lean * 0.6}
+      Cylinder: {radius: g * 1.02, length: h * 0.012, segments: 8}
+    }
+
     if season == WINTER {
       for i in 0..3 {
         const a = i * 2.094 + seed
         const tilt = 0.55 + rnd(i, seed) * 0.25
-        { (IsA, IsleNatureBirch); Position: {sin(a) * h * 0.09, h * 0.68, cos(a) * h * 0.09}; Rotation: {cos(a) * tilt, 0, -sin(a) * tilt}; Frustum: {radius_bottom: g * 0.5, radius_top: g * 0.2, length: h * 0.36, segments: 6} }
-        { (IsA, IsleLeafAlt); Position: {sin(a) * h * 0.18, h * 0.82, cos(a) * h * 0.18}; Scale: {1, 0.7, 1}; IcoSphere: {radius: h * 0.11, segments: 2, smooth: true} }
+        {
+          (IsA, IsleNatureBirch)
+          Position: {sin(a) * h * 0.09, h * 0.68, cos(a) * h * 0.09}
+          Rotation: {cos(a) * tilt, 0, -sin(a) * tilt}
+          Frustum: {radius_bottom: g * 0.5, radius_top: g * 0.2, length: h * 0.36, segments: 6}
+        }
+
+        {
+          (IsA, IsleLeafAlt)
+          Position: {sin(a) * h * 0.18, h * 0.82, cos(a) * h * 0.18}
+          Scale: {1, 0.7, 1}
+          IcoSphere: {radius: h * 0.11, segments: 2, smooth: true}
+        }
       }
     } else {
       for i in 0..5 {
         const a = i * GOLDEN + seed
         const r = h * (0.1 + rnd(i, seed) * 0.12)
         const s = h * (0.15 + rnd(i, seed + 1) * 0.05)
+
         if i == 2 {
-          { (IsA, IsleLeaf); Position: {sin(a) * r, h * (0.6 + i * 0.06), cos(a) * r}; Scale: {1.1, 0.8, 1.1}; IcoSphere: {radius: s, segments: 2, smooth: true} }
+          {
+            (IsA, IsleLeaf)
+            Position: {sin(a) * r, h * (0.6 + i * 0.06), cos(a) * r}
+            Scale: {1.1, 0.8, 1.1}
+            IcoSphere: {radius: s, segments: 2, smooth: true}
+          }
         } else {
-          { (IsA, IsleLeafAlt); Position: {sin(a) * r, h * (0.6 + i * 0.06), cos(a) * r}; Scale: {1.1, 0.8, 1.1}; IcoSphere: {radius: s, segments: 2, smooth: true} }
+          {
+            (IsA, IsleLeafAlt)
+            Position: {sin(a) * r, h * (0.6 + i * 0.06), cos(a) * r}
+            Scale: {1.1, 0.8, 1.1}
+            IcoSphere: {radius: s, segments: 2, smooth: true}
+          }
         }
       }
     }
+
     if season == AUTUMN || season == SPRING {
       for i in 0..3 {
         const a = i * GOLDEN + seed * 2
         const r = h * (0.14 + i * 0.08)
-        { (IsA, IsleLeafAlt); Ignore; NoShadow; Position: {sin(a) * r, 0.015 + i * 0.003, cos(a) * r}; Rotation: {0, a, 0}; Scale: {1.4, 1, 0.8}; Cylinder: {radius: h * (0.04 + rnd(i, seed) * 0.035), length: 0.012, segments: 10} }
+        {
+          (IsA, IsleLeafAlt)
+          Ignore
+          NoShadow
+          Position: {sin(a) * r, 0.015 + i * 0.003, cos(a) * r}
+          Rotation: {0, a, 0}
+          Scale: {1.4, 1, 0.8}
+          Cylinder: {radius: h * (0.04 + rnd(i, seed) * 0.035), length: 0.012, segments: 10}
+        }
       }
     }
   }
@@ -137,14 +326,27 @@ assets {
   template IsleRockCluster {
     prop size: f32 = 1
     prop seed: f32 = 0
+
     for i in 0..4 {
       const a = i * GOLDEN + seed
       const r = i == 0 ? 0 : size * (0.5 + rnd(i, seed) * 0.35)
       const s = size * (i == 0 ? 0.6 : 0.22 + rnd(i, seed + 1) * 0.22)
-      { (IsA, IsleRock); Position: {sin(a) * r, s * 0.32, cos(a) * r}; Rotation: {rnd(i, seed + 2), a, rnd(i, seed + 3) * 0.6}; Scale: {1.15, 0.72 + rnd(i, seed + 4) * 0.3, 0.9}; IcoSphere: {radius: s, segments: 1} }
+      {
+        (IsA, IsleRock)
+        Position: {sin(a) * r, s * 0.32, cos(a) * r}
+        Rotation: {rnd(i, seed + 2), a, rnd(i, seed + 3) * 0.6}
+        Scale: {1.15, 0.72 + rnd(i, seed + 4) * 0.3, 0.9}
+        IcoSphere: {radius: s, segments: 1}
+      }
     }
+
     if season == WINTER {
-      { (IsA, IsleSnow); Position: {0, size * 0.52, 0}; Scale: {1.1, 0.3, 0.86}; IcoSphere: {radius: size * 0.46, segments: 2, smooth: true} }
+      {
+        (IsA, IsleSnow)
+        Position: {0, size * 0.52, 0}
+        Scale: {1.1, 0.3, 0.86}
+        IcoSphere: {radius: size * 0.46, segments: 2, smooth: true}
+      }
     }
   }
 
@@ -152,16 +354,28 @@ assets {
     prop size: f32 = 0.8
     prop seed: f32 = 0
     Ignore
+
     for i in 0..3 {
       const a = i * 2.094 + seed
       const r = i == 0 ? 0 : size * 0.48
       const s = size * (i == 0 ? 0.55 : 0.36 + rnd(i, seed) * 0.1)
-      { (IsA, IsleNatureBush); Position: {sin(a) * r, s * 0.62, cos(a) * r}; Scale: {1, 0.82, 1}; IcoSphere: {radius: s, segments: 2, smooth: true} }
+      {
+        (IsA, IsleNatureBush)
+        Position: {sin(a) * r, s * 0.62, cos(a) * r}
+        Scale: {1, 0.82, 1}
+        IcoSphere: {radius: s, segments: 2, smooth: true}
+      }
     }
+
     if season == AUTUMN || season == SUMMER {
       for i in 0..3 {
         const a = i * 2.3 + seed * 3
-        { (IsA, IsleNatureBerry); NoShadow; Position: {sin(a) * size * 0.4, size * (0.5 + i * 0.12), cos(a) * size * 0.4}; IcoSphere: {radius: size * 0.07, segments: 1} }
+        {
+          (IsA, IsleNatureBerry)
+          NoShadow
+          Position: {sin(a) * size * 0.4, size * (0.5 + i * 0.12), cos(a) * size * 0.4}
+          IcoSphere: {radius: size * 0.07, segments: 1}
+        }
       }
     }
   }
@@ -170,18 +384,40 @@ assets {
     prop seed: f32 = 0
     prop count: i32 = 6
     Ignore
+
     for i in 0..count {
       const a = i * GOLDEN + seed
       const r = 0.12 + sqrt(i * 1.0) * 0.26
       const t = 0.22 + rnd(i, seed) * 0.22
       const k = (i + seed * 3) % 3
-      { (IsA, IsleNatureStem); NoShadow; Position: {sin(a) * r, t * 0.5, cos(a) * r}; Cylinder: {radius: 0.016, length: t, segments: 5} }
+      {
+        (IsA, IsleNatureStem)
+        NoShadow
+        Position: {sin(a) * r, t * 0.5, cos(a) * r}
+        Cylinder: {radius: 0.016, length: t, segments: 5}
+      }
+
       if k < 1 {
-        { (IsA, IsleNatureFlowerA); Position: {sin(a) * r, t, cos(a) * r}; Scale: {1, 0.7, 1}; IcoSphere: {radius: 0.085, segments: 1} }
+        {
+          (IsA, IsleNatureFlowerA)
+          Position: {sin(a) * r, t, cos(a) * r}
+          Scale: {1, 0.7, 1}
+          IcoSphere: {radius: 0.085, segments: 1}
+        }
       } else if k < 2 {
-        { (IsA, IsleNatureFlowerB); Position: {sin(a) * r, t, cos(a) * r}; Scale: {1, 0.7, 1}; IcoSphere: {radius: 0.075, segments: 1} }
+        {
+          (IsA, IsleNatureFlowerB)
+          Position: {sin(a) * r, t, cos(a) * r}
+          Scale: {1, 0.7, 1}
+          IcoSphere: {radius: 0.075, segments: 1}
+        }
       } else {
-        { (IsA, IsleNatureFlowerC); Position: {sin(a) * r, t + 0.02, cos(a) * r}; Rotation: {3.1416, 0, 0}; Cone: {radius: 0.08, length: 0.12, segments: 6} }
+        {
+          (IsA, IsleNatureFlowerC)
+          Position: {sin(a) * r, t + 0.02, cos(a) * r}
+          Rotation: {3.1416, 0, 0}
+          Cone: {radius: 0.08, length: 0.12, segments: 6}
+        }
       }
     }
   }
@@ -189,10 +425,17 @@ assets {
   template IsleGrassTuft {
     prop seed: f32 = 0
     Ignore
+
     for i in 0..4 {
       const a = i * 1.7 + seed
       const t = 0.3 + rnd(i, seed) * 0.3
-      { (IsA, IsleNatureBlade); NoShadow; Position: {sin(a) * 0.09, t * 0.45, cos(a) * 0.09}; Rotation: {cos(a) * 0.35, 0, -sin(a) * 0.35}; Cone: {radius: 0.05, length: t, segments: 4} }
+      {
+        (IsA, IsleNatureBlade)
+        NoShadow
+        Position: {sin(a) * 0.09, t * 0.45, cos(a) * 0.09}
+        Rotation: {cos(a) * 0.35, 0, -sin(a) * 0.35}
+        Cone: {radius: 0.05, length: t, segments: 4}
+      }
     }
   }
 
@@ -201,19 +444,38 @@ assets {
     prop glow = false
     prop lamp = false
     Ignore
+
     for i in 0..3 {
       const a = i * GOLDEN + seed
       const r = 0.1 + i * 0.16
       const t = 0.16 + rnd(i, seed) * 0.16
       const x = sin(a) * r
       const z = cos(a) * r
-      { (IsA, IsleNatureShroomStem); NoShadow; Position: {x, t * 0.5, z}; Cylinder: {radius: t * 0.2, length: t, segments: 6} }
+      {
+        (IsA, IsleNatureShroomStem)
+        NoShadow
+        Position: {x, t * 0.5, z}
+        Cylinder: {radius: t * 0.2, length: t, segments: 6}
+      }
+
       if glow {
-        { (IsA, IsleNatureShroomGlow); NoShadow; Position: {x, t, z}; Scale: {1, 0.7, 1}; HemiSphere: {radius: t * 0.62, segments: 8, smooth: true} }
+        {
+          (IsA, IsleNatureShroomGlow)
+          NoShadow
+          Position: {x, t, z}
+          Scale: {1, 0.7, 1}
+          HemiSphere: {radius: t * 0.62, segments: 8, smooth: true}
+        }
       } else {
-        { (IsA, IsleNatureShroomCap); Position: {x, t, z}; Scale: {1, 0.7, 1}; HemiSphere: {radius: t * 0.62, segments: 8, smooth: true} }
+        {
+          (IsA, IsleNatureShroomCap)
+          Position: {x, t, z}
+          Scale: {1, 0.7, 1}
+          HemiSphere: {radius: t * 0.62, segments: 8, smooth: true}
+        }
       }
     }
+
     if lamp && glow && night {
       lamp { Position: {0, 0.5, 0}; PointLight: {intensity: 1.2, range: 3.5}; Rgb: {90, 255, 210} }
     }
@@ -222,15 +484,27 @@ assets {
   template IsleReeds {
     prop seed: f32 = 0
     Ignore
+
     for i in 0..5 {
       const a = i * GOLDEN + seed
       const r = 0.08 + i * 0.1
       const t = 0.9 + rnd(i, seed) * 0.6
       const x = sin(a) * r
       const z = cos(a) * r
-      { (IsA, IsleNatureReed); NoShadow; Position: {x, t * 0.5, z}; Rotation: {sin(a * 3) * 0.08, 0, cos(a * 2) * 0.08}; Frustum: {radius_bottom: 0.028, radius_top: 0.012, length: t, segments: 5} }
+      {
+        (IsA, IsleNatureReed)
+        NoShadow
+        Position: {x, t * 0.5, z}
+        Rotation: {sin(a * 3) * 0.08, 0, cos(a * 2) * 0.08}
+        Frustum: {radius_bottom: 0.028, radius_top: 0.012, length: t, segments: 5}
+      }
+
       if i % 2 == 0 {
-        { (IsA, IsleNatureReedHead); Position: {x, t * 0.95, z}; Capsule: {radius: 0.045, length: 0.16, segments: 6} }
+        {
+          (IsA, IsleNatureReedHead)
+          Position: {x, t * 0.95, z}
+          Capsule: {radius: 0.045, length: 0.16, segments: 6}
+        }
       }
     }
   }
@@ -238,45 +512,154 @@ assets {
   template IsleDuck {
     prop brown = false
     Ignore
+
     if brown {
-      body : IsleNatureDuckBrown { Position: {0, 0.06, 0}; Scale: {0.8, 0.7, 1.25}; IcoSphere: {radius: 0.2, segments: 2, smooth: true} }
-      head : IsleNatureDuckBrown { Position: {0, 0.27, -0.2}; IcoSphere: {radius: 0.1, segments: 2, smooth: true} }
+      body : IsleNatureDuckBrown {
+        Position: {0, 0.06, 0}
+        Scale: {0.8, 0.7, 1.25}
+        IcoSphere: {radius: 0.2, segments: 2, smooth: true}
+      }
+
+      head : IsleNatureDuckBrown {
+        Position: {0, 0.27, -0.2}
+        IcoSphere: {radius: 0.1, segments: 2, smooth: true}
+      }
     } else {
-      body : IsleNatureDuck { Position: {0, 0.06, 0}; Scale: {0.8, 0.7, 1.25}; IcoSphere: {radius: 0.2, segments: 2, smooth: true} }
-      head : IsleNatureDuckHead { Position: {0, 0.27, -0.2}; IcoSphere: {radius: 0.1, segments: 2, smooth: true} }
+      body : IsleNatureDuck {
+        Position: {0, 0.06, 0}
+        Scale: {0.8, 0.7, 1.25}
+        IcoSphere: {radius: 0.2, segments: 2, smooth: true}
+      }
+
+      head : IsleNatureDuckHead {
+        Position: {0, 0.27, -0.2}
+        IcoSphere: {radius: 0.1, segments: 2, smooth: true}
+      }
     }
-    neck : IsleNatureDuck { Position: {0, 0.17, -0.18}; Cylinder: {radius: 0.055, length: 0.14, segments: 8, smooth: true} }
-    beak : IsleNatureBeak { Position: {0, 0.25, -0.33}; Rotation: {-1.5708, 0, 0}; Scale: {1.3, 1, 0.6}; Cone: {radius: 0.045, length: 0.13, segments: 6} }
-    tail : IsleNatureDuck { Position: {0, 0.16, 0.24}; Rotation: {0.9, 0, 0}; Cone: {radius: 0.07, length: 0.16, segments: 6} }
+
+    neck : IsleNatureDuck {
+      Position: {0, 0.17, -0.18}
+      Cylinder: {radius: 0.055, length: 0.14, segments: 8, smooth: true}
+    }
+
+    beak : IsleNatureBeak {
+      Position: {0, 0.25, -0.33}
+      Rotation: {-1.5708, 0, 0}
+      Scale: {1.3, 1, 0.6}
+      Cone: {radius: 0.045, length: 0.13, segments: 6}
+    }
+
+    tail : IsleNatureDuck {
+      Position: {0, 0.16, 0.24}
+      Rotation: {0.9, 0, 0}
+      Cone: {radius: 0.07, length: 0.16, segments: 6}
+    }
   }
 
   template IsleRowBoat {
-    hull : IslePaintTeal { Position: {0, 0.3, 0}; Rotation: {3.1416, 0, 0}; Scale: {0.56, 0.46, 1.3}; HemiSphere: {radius: 1, segments: 16, smooth: true} }
-    rim : IslePaintCream { Position: {0, 0.3, 0}; Scale: {0.56, 0.8, 1.3}; Torus: {radius: 1, tube: 0.05, segments: 24, rings: 6, smooth: true} }
-    floor : IsleWood { Position: {0, 0.24, 0}; Scale: {0.52, 1, 1.24}; Cylinder: {radius: 1, length: 0.04, segments: 20}; texture.Mapping: {mode: MappingObject, size: 1.6} }
-    seat0 : IsleWoodDark { Position: {0, 0.3, -0.45}; Box: {1.0, 0.05, 0.22}; texture.Mapping: {mode: MappingObject, size: 1.6} }
-    seat1 : IsleWoodDark { Position: {0, 0.3, 0.4}; Box: {1.02, 0.05, 0.22}; texture.Mapping: {mode: MappingObject, size: 1.6} }
-    oar0 : IsleWood { Position: {0.5, 0.4, 0}; Rotation: {1.45, 0.25, 0}; Cylinder: {radius: 0.025, length: 1.5, segments: 6}; texture.Mapping: {mode: MappingObject, size: 1.6} }
-    oar1 : IsleWood { Position: {-0.5, 0.4, 0}; Rotation: {1.45, -0.25, 0}; Cylinder: {radius: 0.025, length: 1.5, segments: 6}; texture.Mapping: {mode: MappingObject, size: 1.6} }
-    blade0 : IslePaintRed { Position: {0.68, 0.33, 0.72}; Rotation: {1.45, 0.25, 0}; Box: {0.14, 0.34, 0.025} }
-    blade1 : IslePaintRed { Position: {-0.68, 0.33, 0.72}; Rotation: {1.45, -0.25, 0}; Box: {0.14, 0.34, 0.025} }
+    hull : IslePaintTeal {
+      Position: {0, 0.3, 0}
+      Rotation: {3.1416, 0, 0}
+      Scale: {0.56, 0.46, 1.3}
+      HemiSphere: {radius: 1, segments: 16, smooth: true}
+    }
+
+    rim : IslePaintCream {
+      Position: {0, 0.3, 0}
+      Scale: {0.56, 0.8, 1.3}
+      Torus: {radius: 1, tube: 0.05, segments: 24, rings: 6, smooth: true}
+    }
+
+    floor : IsleWood {
+      Position: {0, 0.24, 0}
+      Scale: {0.52, 1, 1.24}
+      Cylinder: {radius: 1, length: 0.04, segments: 20}
+      texture.Mapping: {mode: MappingObject, size: 1.6}
+    }
+
+    seat0 : IsleWoodDark {
+      Position: {0, 0.3, -0.45}
+      Box: {1.0, 0.05, 0.22}
+      texture.Mapping: {mode: MappingObject, size: 1.6}
+    }
+
+    seat1 : IsleWoodDark {
+      Position: {0, 0.3, 0.4}
+      Box: {1.02, 0.05, 0.22}
+      texture.Mapping: {mode: MappingObject, size: 1.6}
+    }
+
+    oar0 : IsleWood {
+      Position: {0.5, 0.4, 0}
+      Rotation: {1.45, 0.25, 0}
+      Cylinder: {radius: 0.025, length: 1.5, segments: 6}
+      texture.Mapping: {mode: MappingObject, size: 1.6}
+    }
+
+    oar1 : IsleWood {
+      Position: {-0.5, 0.4, 0}
+      Rotation: {1.45, -0.25, 0}
+      Cylinder: {radius: 0.025, length: 1.5, segments: 6}
+      texture.Mapping: {mode: MappingObject, size: 1.6}
+    }
+
+    blade0 : IslePaintRed {
+      Position: {0.68, 0.33, 0.72}
+      Rotation: {1.45, 0.25, 0}
+      Box: {0.14, 0.34, 0.025}
+    }
+
+    blade1 : IslePaintRed {
+      Position: {-0.68, 0.33, 0.72}
+      Rotation: {1.45, -0.25, 0}
+      Box: {0.14, 0.34, 0.025}
+    }
   }
 
   template IsleJetty {
     for i in 0..9 {
-      { (IsA, IsleWood); Position: {-1.8 + i * 0.44, 0.12 + rnd(i, 5) * 0.012, 0}; Rotation: {0, (rnd(i, 6) - 0.5) * 0.06, 0}; Box: {0.4, 0.06, 1.3} }
+      {
+        (IsA, IsleWood)
+        Position: {-1.8 + i * 0.44, 0.12 + rnd(i, 5) * 0.012, 0}
+        Rotation: {0, (rnd(i, 6) - 0.5) * 0.06, 0}
+        Box: {0.4, 0.06, 1.3}
+      }
     }
+
     for i in 0..3 {
-      { (IsA, IsleWoodDark); Position: {-1.85 + i * 1.3, -0.3, 0.6}; Cylinder: {radius: 0.07, length: 1.3, segments: 8} }
-      { (IsA, IsleWoodDark); Position: {-1.85 + i * 1.3, -0.3, -0.6}; Cylinder: {radius: 0.07, length: 1.3, segments: 8} }
+      {
+        (IsA, IsleWoodDark)
+        Position: {-1.85 + i * 1.3, -0.3, 0.6}
+        Cylinder: {radius: 0.07, length: 1.3, segments: 8}
+      }
+
+      {
+        (IsA, IsleWoodDark)
+        Position: {-1.85 + i * 1.3, -0.3, -0.6}
+        Cylinder: {radius: 0.07, length: 1.3, segments: 8}
+      }
     }
+
     beam0 : IsleWoodDark { Position: {-0.05, 0.07, 0.52}; Box: {3.9, 0.07, 0.09} }
     beam1 : IsleWoodDark { Position: {-0.05, 0.07, -0.52}; Box: {3.9, 0.07, 0.09} }
-    post : IsleWoodDark { Position: {-1.85, 0.45, 0.6}; Cylinder: {radius: 0.06, length: 0.6, segments: 8} }
-    lamp : IsleLampGlow { Position: {-1.85, 0.82, 0.6}; IcoSphere: {radius: 0.1, segments: 2, smooth: true} }
-    if night {
-      lamp_light { Position: {-1.85, 0.95, 0.6}; PointLight: {intensity: 2.5, range: 6}; Rgb: {255, 196, 120} }
+    post : IsleWoodDark {
+      Position: {-1.85, 0.45, 0.6}
+      Cylinder: {radius: 0.06, length: 0.6, segments: 8}
     }
+
+    lamp : IsleLampGlow {
+      Position: {-1.85, 0.82, 0.6}
+      IcoSphere: {radius: 0.1, segments: 2, smooth: true}
+    }
+
+    if night {
+      lamp_light {
+        Position: {-1.85, 0.95, 0.6}
+        PointLight: {intensity: 2.5, range: 6}
+        Rgb: {255, 196, 120}
+      }
+    }
+
     IsleRowBoat boat() { Position: {-1.2, -0.42, 1.45}; Rotation: {0, 1.45, 0.03} }
   }
 
@@ -285,8 +668,20 @@ assets {
     prop rad: f32 = 0.3
     prop len: f32 = 1.5
     prop sink: f32 = 0.2
-    body { (IsA, mat); NoShadow; Position: {0, len * 0.5 - sink, 0}; Frustum: {radius_bottom: rad, radius_top: rad * 0.8, length: len, segments: 6} }
-    tip { (IsA, mat); NoShadow; Ignore; Position: {0, len - sink + rad * 0.72, 0}; Cone: {radius: rad * 0.8, length: rad * 1.44, segments: 6} }
+    body {
+      (IsA, mat)
+      NoShadow
+      Position: {0, len * 0.5 - sink, 0}
+      Frustum: {radius_bottom: rad, radius_top: rad * 0.8, length: len, segments: 6}
+    }
+
+    tip {
+      (IsA, mat)
+      NoShadow
+      Ignore
+      Position: {0, len - sink + rad * 0.72, 0}
+      Cone: {radius: rad * 0.8, length: rad * 1.44, segments: 6}
+    }
   }
 
   template IsleCrystalCluster {
@@ -297,24 +692,56 @@ assets {
     prop lit = false
     g {
       Rotation: {0, 0, -tilt}
-      root : IsleRock { Position: {0, -size * 0.12, 0}; Rotation: {seed, seed * 2, 0}; Scale: {1.25, 0.55, 1.1}; IcoSphere: {radius: size * 0.5, segments: 1} }
+      root : IsleRock {
+        Position: {0, -size * 0.12, 0}
+        Rotation: {seed, seed * 2, 0}
+        Scale: {1.25, 0.55, 1.1}
+        IcoSphere: {radius: size * 0.5, segments: 1}
+      }
+
       for i in 0..6 {
         const a = i * GOLDEN + seed
         const lean = i == 0 ? 0.0 : 0.4 + rnd(i, seed) * 0.5
         const len = size * (i == 0 ? 1.6 : 0.75 + rnd(i, seed + 1) * 0.75)
         const rad = size * (i == 0 ? 0.34 : 0.17 + rnd(i, seed + 2) * 0.12)
         const r = i == 0 ? 0.0 : size * 0.26
+
         if pink {
-          IsleCrystalShard(mat: i % 2 == 0 ? IsleNatureCrystalPinkA : IsleNatureCrystalPinkB, rad: rad, len: len, sink: size * 0.2) { Position: {sin(a) * r, 0, cos(a) * r}; Rotation: {cos(a) * lean, i * 0.9, -sin(a) * lean} }
+          IsleCrystalShard(
+            mat: i % 2 == 0 ? IsleNatureCrystalPinkA : IsleNatureCrystalPinkB,
+            rad: rad,
+            len: len,
+            sink: size * 0.2
+          ) {
+            Position: {sin(a) * r, 0, cos(a) * r}
+            Rotation: {cos(a) * lean, i * 0.9, -sin(a) * lean}
+          }
         } else {
-          IsleCrystalShard(mat: i % 2 == 0 ? IsleNatureCrystalA : IsleNatureCrystalB, rad: rad, len: len, sink: size * 0.2) { Position: {sin(a) * r, 0, cos(a) * r}; Rotation: {cos(a) * lean, i * 0.9, -sin(a) * lean} }
+          IsleCrystalShard(
+            mat: i % 2 == 0 ? IsleNatureCrystalA : IsleNatureCrystalB,
+            rad: rad,
+            len: len,
+            sink: size * 0.2
+          ) {
+            Position: {sin(a) * r, 0, cos(a) * r}
+            Rotation: {cos(a) * lean, i * 0.9, -sin(a) * lean}
+          }
         }
       }
+
       if lit {
         if pink {
-          glow { Position: {0, size * 1.2, 0}; PointLight: {intensity: night ? 9 : 3, range: 14}; Rgb: {255, 120, 220} }
+          glow {
+            Position: {0, size * 1.2, 0}
+            PointLight: {intensity: night ? 9 : 3, range: 14}
+            Rgb: {255, 120, 220}
+          }
         } else {
-          glow { Position: {0, size * 1.2, 0}; PointLight: {intensity: night ? 9 : 3, range: 14}; Rgb: {90, 220, 255} }
+          glow {
+            Position: {0, size * 1.2, 0}
+            PointLight: {intensity: night ? 9 : 3, range: 14}
+            Rgb: {90, 220, 255}
+          }
         }
       }
     }
@@ -324,68 +751,166 @@ assets {
     if night && season != WINTER {
       fireflies_meadow {
         Position: {0, 1.3, 0}
-        Emitter: {max: 400, rate: 36, shape: EmitterDisc, radius: 28, direction: {0, 1, 0}, spread: 180, speed: {0.1, 0.4}, lifetime: {4, 8}, size: {0.14, 0.24}, opacity: {0.8, 1}, color: {210, 255, 110}, color_variance: {40, 10, 40}, seed: 5}
+        Emitter: {
+          max: 400,
+          rate: 36,
+          shape: EmitterDisc,
+          radius: 28,
+          direction: {0, 1, 0},
+          spread: 180,
+          speed: {0.1, 0.4},
+          lifetime: {4, 8},
+          size: {0.14, 0.24},
+          opacity: {0.8, 1},
+          color: {210, 255, 110},
+          color_variance: {40, 10, 40},
+          seed: 5
+        }
         Appearance: {blend: Additive}
         Curves: {opacity: {keys: [{0, 0}, {0.15, 1}, {0.4, 0.2}, {0.6, 1}, {0.85, 0.3}, {1, 0}]}}
         Forces: {gravity: {0, 0, 0}, turbulence: 0.5, turbulence_scale: 1.5, drag: 0.4}
       }
+
       fireflies_lake {
         Position: {0, 0.5, 0}
-        Emitter: {max: 200, rate: 16, shape: EmitterDisc, radius: 10, direction: {0, 1, 0}, spread: 180, speed: {0.1, 0.35}, lifetime: {4, 8}, size: {0.12, 0.22}, opacity: {0.8, 1}, color: {180, 255, 150}, color_variance: {40, 10, 40}, seed: 6}
+        Emitter: {
+          max: 200,
+          rate: 16,
+          shape: EmitterDisc,
+          radius: 10,
+          direction: {0, 1, 0},
+          spread: 180,
+          speed: {0.1, 0.35},
+          lifetime: {4, 8},
+          size: {0.12, 0.22},
+          opacity: {0.8, 1},
+          color: {180, 255, 150},
+          color_variance: {40, 10, 40},
+          seed: 6
+        }
         Appearance: {blend: Additive}
         Curves: {opacity: {keys: [{0, 0}, {0.15, 1}, {0.4, 0.2}, {0.6, 1}, {0.85, 0.3}, {1, 0}]}}
         Forces: {gravity: {0, 0, 0}, turbulence: 0.5, turbulence_scale: 1.5, drag: 0.4}
       }
     }
+
     if season == WINTER {
       snowfall {
         Position: {0, 22, 0}
-        Emitter: {max: 4000, rate: 300, shape: EmitterDisc, radius: 32, direction: {0, -1, 0}, spread: 10, speed: {1.7, 2.6}, lifetime: {10, 12}, size: {0.12, 0.24}, opacity: {0.75, 1}, color: {night ? 96 : 250, night ? 108 : 252, night ? 140 : 255}, seed: 7}
+        Emitter: {
+          max: 4000,
+          rate: 300,
+          shape: EmitterDisc,
+          radius: 32,
+          direction: {0, -1, 0},
+          spread: 10,
+          speed: {1.7, 2.6},
+          lifetime: {10, 12},
+          size: {0.12, 0.24},
+          opacity: {0.75, 1},
+          color: {night ? 96 : 250, night ? 108 : 252, night ? 140 : 255},
+          seed: 7
+        }
         Curves: {opacity: {keys: [{0, 0}, {0.05, 1}, {1, 1}]}}
         Forces: {gravity: {0, 0, 0}, wind: {wind * 2.5, -2.1, 0.5}, drag: 0.5, turbulence: 0.7}
         Collision: {height: -0.2, die: true}
       }
     }
+
     if season == AUTUMN {
       leaves {
         Position: {0, 7, 0}
-        Emitter: {max: 500, rate: 34, shape: EmitterDisc, radius: 29, direction: {0, -1, 0}, spread: 40, speed: {0.5, 1}, lifetime: {9, 12}, size: {0.14, 0.24}, opacity: {1, 1}, color: {night ? 80 : 226, night ? 44 : 120, night ? 20 : 40}, color_variance: {night ? 10 : 30, night ? 20 : 60, night ? 8 : 20}, seed: 8}
+        Emitter: {
+          max: 500,
+          rate: 34,
+          shape: EmitterDisc,
+          radius: 29,
+          direction: {0, -1, 0},
+          spread: 40,
+          speed: {0.5, 1},
+          lifetime: {9, 12},
+          size: {0.14, 0.24},
+          opacity: {1, 1},
+          color: {night ? 80 : 226, night ? 44 : 120, night ? 20 : 40},
+          color_variance: {night ? 10 : 30, night ? 20 : 60, night ? 8 : 20},
+          seed: 8
+        }
         Curves: {opacity: {keys: [{0, 0}, {0.06, 1}, {1, 1}]}}
-        Forces: {gravity: {0, 0, 0}, wind: {wind * 3 + 0.4, -0.8, 0.6}, drag: 0.8, turbulence: 1.6, turbulence_scale: 0.6}
+        Forces: {
+          gravity: {0, 0, 0},
+          wind: {wind * 3 + 0.4, -0.8, 0.6},
+          drag: 0.8,
+          turbulence: 1.6,
+          turbulence_scale: 0.6
+        }
         Collision: {height: 0, die: true}
       }
     }
+
     if season == SPRING {
       petals {
         Position: {0, 6, 0}
-        Emitter: {max: 500, rate: 34, shape: EmitterDisc, radius: 29, direction: {0, -1, 0}, spread: 40, speed: {0.4, 0.8}, lifetime: {9, 12}, size: {0.1, 0.18}, opacity: {1, 1}, color: {night ? 96 : 255, night ? 74 : 196, night ? 90 : 220}, color_variance: {0, night ? 14 : 40, night ? 10 : 30}, seed: 9}
+        Emitter: {
+          max: 500,
+          rate: 34,
+          shape: EmitterDisc,
+          radius: 29,
+          direction: {0, -1, 0},
+          spread: 40,
+          speed: {0.4, 0.8},
+          lifetime: {9, 12},
+          size: {0.1, 0.18},
+          opacity: {1, 1},
+          color: {night ? 96 : 255, night ? 74 : 196, night ? 90 : 220},
+          color_variance: {0, night ? 14 : 40, night ? 10 : 30},
+          seed: 9
+        }
         Curves: {opacity: {keys: [{0, 0}, {0.06, 1}, {1, 1}]}}
-        Forces: {gravity: {0, 0, 0}, wind: {wind * 3 + 0.4, -0.7, 0.6}, drag: 0.8, turbulence: 1.4, turbulence_scale: 0.6}
+        Forces: {
+          gravity: {0, 0, 0},
+          wind: {wind * 3 + 0.4, -0.7, 0.6},
+          drag: 0.8,
+          turbulence: 1.4,
+          turbulence_scale: 0.6
+        }
         Collision: {height: 0, die: true}
       }
     }
   }
 
-  template IsleNature {
+  template IsleNatureLand {
     const belt_n = 84
     forest {
       for i in 0..belt_n {
         const a = -HALF_PI + (i + rnd(i, 1) * 0.8) / belt_n * TAU
         const r = 25.4 + (i % 3) * 1.25 + rnd(i, 2) * 0.7
-        const ok = a > -1.05 && a < 4.19 && (a < 0.44 || a > 0.76) && (a < 1.65 || a > 2.35) && (a < 3.05 || a > 3.55)
+        const ok = a > -1.05 && a < 4.19 && (a < 0.44 || a > 0.76) && (a < 1.65 || a > 2.35) &&
+          (a < 3.05 || a > 3.55)
+
         if ok {
           const k = rnd(i, 3)
           const yaw = rnd(i, 4) * TAU
+
           if k < 0.42 {
-            IsleTreeRound(height: 3.7 + rnd(i, 5) * 1.8, seed: i) { Position: {px(r, a), 0, pz(r, a)}; Rotation: {0, yaw, 0} }
+            IsleTreeRound(height: 3.7 + rnd(i, 5) * 1.8, seed: i) {
+              Position: {px(r, a), 0, pz(r, a)}
+              Rotation: {0, yaw, 0}
+            }
           } else if k < 0.78 {
-            IsleTreeConifer(height: 4.3 + rnd(i, 5) * 2.4, seed: i) { Position: {px(r, a), 0, pz(r, a)}; Rotation: {0, yaw, 0} }
+            IsleTreeConifer(height: 4.3 + rnd(i, 5) * 2.4, seed: i) {
+              Position: {px(r, a), 0, pz(r, a)}
+              Rotation: {0, yaw, 0}
+            }
           } else {
-            IsleTreeBirch(height: 3.5 + rnd(i, 5) * 1.3, seed: i) { Position: {px(r, a), 0, pz(r, a)}; Rotation: {0, yaw, 0} }
+            IsleTreeBirch(height: 3.5 + rnd(i, 5) * 1.3, seed: i) {
+              Position: {px(r, a), 0, pz(r, a)}
+              Rotation: {0, yaw, 0}
+            }
           }
         }
       }
     }
+
     hill {
       for i in 0..16 {
         const b = i * TAU / 16 + rnd(i, 10) * 0.25
@@ -394,10 +919,14 @@ assets {
         const z = -22 + sin(b) * hr
         const d0 = sqrt(x * x + z * z)
         const stairs = sin(b) > 0.55 && abs(cos(b) * hr) < 1.6
+
         if (d0 < 20.2 || d0 > 23.8) && !stairs {
-          IsleTreeConifer(height: 2.6 + rnd(i, 12) * 1.8, seed: i + 100) { Position: {x, 6.75 - (hr - 4.2) * (hr - 4.2) * 0.36, z} }
+          IsleTreeConifer(height: 2.6 + rnd(i, 12) * 1.8, seed: i + 100) {
+            Position: {x, 6.75 - (hr - 4.2) * (hr - 4.2) * 0.36, z}
+          }
         }
       }
+
       for i in 0..14 {
         const b = i * TAU / 14 + rnd(i, 13) * 0.3
         const hr = 9.3 + rnd(i, 14) * 1.3
@@ -405,21 +934,29 @@ assets {
         const z = -22 + sin(b) * hr
         const d0 = sqrt(x * x + z * z)
         const stairs = sin(b) > 0.5 && abs(cos(b) * hr) < 2.4
+
         if (d0 < 19.2 || d0 > 25.0) && d0 < 28.7 && !stairs {
           IsleTreeConifer(height: 3.8 + rnd(i, 15) * 2.4, seed: i + 140) { Position: {x, 0, z} }
         }
       }
     }
+
     groves {
       for i in 0..5 {
         const a = 0.83 + rnd(i, 21) * 0.2
         const r = 10.8 + i * 1.85 + rnd(i, 22) * 0.6
+
         if i % 2 == 0 {
-          IsleTreeBirch(height: 3.4 + rnd(i, 25) * 1.2, seed: i + 200) { Position: {px(r, a), 0, pz(r, a)} }
+          IsleTreeBirch(height: 3.4 + rnd(i, 25) * 1.2, seed: i + 200) {
+            Position: {px(r, a), 0, pz(r, a)}
+          }
         } else {
-          IsleTreeRound(height: 3.6 + rnd(i, 25) * 1.4, seed: i + 200) { Position: {px(r, a), 0, pz(r, a)} }
+          IsleTreeRound(height: 3.6 + rnd(i, 25) * 1.4, seed: i + 200) {
+            Position: {px(r, a), 0, pz(r, a)}
+          }
         }
       }
+
       for i in 0..19 {
         const a = 3.99 + (i + rnd(i, 23) * 0.7) / 19 * 1.18
         const r = 10.2 + frac(i * 0.618 + 0.2) * 8.4
@@ -427,6 +964,7 @@ assets {
         const z = pz(r, a)
         const hd = sqrt(x * x + (z + 22) * (z + 22))
         const k = i % 4
+
         if hd > 9.6 && !(abs(x) < 2.6 && z < -8) {
           if k == 0 {
             IsleTreeBirch(height: 3.4 + rnd(i, 26) * 1.4, seed: i + 300) { Position: {x, 0, z} }
@@ -438,17 +976,23 @@ assets {
         }
       }
     }
+
     ground {
       for i in 0..64 {
         const a = -HALF_PI + (i + rnd(i, 31) * 0.9) / 64 * TAU
         const r = 24.2 + rnd(i, 32) * 4.9
-        const ok = a > -1.05 && a < 4.19 && (a < 0.44 || a > 0.76) && (a < 1.65 || a > 2.35) && (a < 3.05 || a > 3.55)
+        const ok = a > -1.05 && a < 4.19 && (a < 0.44 || a > 0.76) && (a < 1.65 || a > 2.35) &&
+          (a < 3.05 || a > 3.55)
+
         if ok {
           const k = i % 8
+
           if k == 0 || k == 4 {
             IsleBush(size: 0.6 + rnd(i, 33) * 0.4, seed: i) { Position: {px(r, a), 0, pz(r, a)} }
           } else if k == 1 {
-            IsleRockCluster(size: 0.6 + rnd(i, 33) * 0.7, seed: i) { Position: {px(r, a), 0, pz(r, a)} }
+            IsleRockCluster(size: 0.6 + rnd(i, 33) * 0.7, seed: i) {
+              Position: {px(r, a), 0, pz(r, a)}
+            }
           } else if k == 2 || k == 6 {
             if season != WINTER {
               IsleFlowerPatch(seed: i, count: 6) { Position: {px(r, a), 0, pz(r, a)} }
@@ -460,6 +1004,7 @@ assets {
           }
         }
       }
+
       for i in 0..30 {
         const wedge = i % 5 == 0
         const a = wedge ? 0.82 + rnd(i, 41) * 0.22 : 3.98 + rnd(i, 41) * 1.2
@@ -469,6 +1014,7 @@ assets {
         const y = 0.0
         const hd = sqrt(x * x + (z + 22) * (z + 22))
         const k = hd > 9.4 && !(abs(x) < 1.8 && z < -8) ? i % 6 : 9
+
         if k == 9 {
         } else if k == 0 {
           IsleBush(size: 0.55 + rnd(i, 43) * 0.4, seed: i) { Position: {x, y, z} }
@@ -485,52 +1031,124 @@ assets {
         }
       }
     }
+  }
+
+  template IsleNature : IsleNatureLand {
     shore {
       for i in 0..16 {
         const a = i * TAU / 16 + rnd(i, 51) * 0.2
         const clear = (a < 0.42 || a > 0.78) && (a < 0.82 || a > 1.08)
+
         if clear {
-          IsleReeds(seed: i) { Position: {px(7.75 + rnd(i, 52) * 0.5, a), -0.32, pz(7.75 + rnd(i, 52) * 0.5, a)} }
-          if i % 3 == 0 {
-            IsleRockCluster(size: 0.35 + rnd(i, 53) * 0.25, seed: i) { Position: {px(8.7, a + 0.12), 0, pz(8.7, a + 0.12)} }
+          IsleReeds(seed: i) {
+            Position: {px(7.75 + rnd(i, 52) * 0.5, a), -0.32, pz(7.75 + rnd(i, 52) * 0.5, a)}
           }
+
+          if i % 3 == 0 {
+            IsleRockCluster(size: 0.35 + rnd(i, 53) * 0.25, seed: i) {
+              Position: {px(8.7, a + 0.12), 0, pz(8.7, a + 0.12)}
+            }
+          }
+
           if i % 3 == 1 && season != WINTER {
-            IsleFlowerPatch(seed: i + 50, count: 5) { Position: {px(9.2, a + 0.1), 0, pz(9.2, a + 0.1)} }
+            IsleFlowerPatch(seed: i + 50, count: 5) {
+              Position: {px(9.2, a + 0.1), 0, pz(9.2, a + 0.1)}
+            }
           }
         }
       }
+
       if season != WINTER {
         for i in 0..14 {
           const a = i * GOLDEN
           const r = 4.6 + rnd(i, 54) * 2.7
           const s = 0.2 + rnd(i, 55) * 0.16
-          { (IsA, IsleNatureLily); Ignore; NoShadow; Position: {px(r, a), -0.235, pz(r, a)}; Cylinder: {radius: s, length: 0.02, segments: 9} }
+          {
+            (IsA, IsleNatureLily)
+            Ignore
+            NoShadow
+            Position: {px(r, a), -0.235, pz(r, a)}
+            Cylinder: {radius: s, length: 0.02, segments: 9}
+          }
+
           if i % 4 == 0 {
-            { (IsA, IsleNatureLilyBloom); Ignore; NoShadow; Position: {px(r, a), -0.19, pz(r, a)}; Scale: {1, 0.7, 1}; IcoSphere: {radius: 0.09, segments: 1} }
+            {
+              (IsA, IsleNatureLilyBloom)
+              Ignore
+              NoShadow
+              Position: {px(r, a), -0.19, pz(r, a)}
+              Scale: {1, 0.7, 1}
+              IcoSphere: {radius: 0.09, segments: 1}
+            }
           }
         }
       }
+
       IsleJetty jetty() { Position: {px(7.2, 0.95), 0, pz(7.2, 0.95)}; Rotation: {0, -0.95, 0} }
     }
+
     ducks {
-      d0 { Position: {-2.5, -0.25, 1.5}; AngularVelocity: {0, 0.32, 0}; IsleDuck duck() { Position: {2.2, 0, 0} } }
-      d1 { Position: {-2.5, -0.25, 1.5}; AngularVelocity: {0, 0.32, 0}; IsleDuck duck(brown: true) { Position: {px(2.3, -0.4), 0, pz(2.3, -0.4)}; Rotation: {0, 0.4, 0}; Scale: {0.85, 0.85, 0.85} } }
-      d2 { Position: {2.5, -0.25, -2.5}; AngularVelocity: {0, -0.24, 0}; IsleDuck duck() { Position: {px(1.6, 2.0), 0, pz(1.6, 2.0)}; Rotation: {0, 3.1416 - 2.0, 0} } }
+      d0 {
+        Position: {-2.5, -0.25, 1.5}
+        AngularVelocity: {0, 0.32, 0}
+        IsleDuck duck() { Position: {2.2, 0, 0} }
+      }
+
+      d1 {
+        Position: {-2.5, -0.25, 1.5}
+        AngularVelocity: {0, 0.32, 0}
+        IsleDuck duck(brown: true) {
+          Position: {px(2.3, -0.4), 0, pz(2.3, -0.4)}
+          Rotation: {0, 0.4, 0}
+          Scale: {0.85, 0.85, 0.85}
+        }
+      }
+
+      d2 {
+        Position: {2.5, -0.25, -2.5}
+        AngularVelocity: {0, -0.24, 0}
+        IsleDuck duck() {
+          Position: {px(1.6, 2.0), 0, pz(1.6, 2.0)}
+          Rotation: {0, 3.1416 - 2.0, 0}
+        }
+      }
     }
+
     crystals {
       for i in 0..21 {
         const t = i % 5
         const r = match t { 0: 29.2; 1: 26.7; 2: 21.7; 3: 15.5; _: 9.2 }
         const y = match t { 0: -3.6; 1: -7.5; 2: -12.4; 3: -18.5; _: -25.3 }
         const a = i * GOLDEN + 0.4
-        IsleCrystalCluster(size: 1.1 + rnd(i, 62) * 1.2, seed: i, tilt: 1.25 + rnd(i, 63) * 0.5, pink: i % 3 == 1, lit: i == 7 || i == 13) { Position: {px(r * 0.975, a), y + (rnd(i, 61) - 0.5) * 0.8, pz(r * 0.975, a)}; Rotation: {0, -a, 0} }
+        IsleCrystalCluster(
+          size: 1.1 + rnd(i, 62) * 1.2,
+          seed: i,
+          tilt: 1.25 + rnd(i, 63) * 0.5,
+          pink: i % 3 == 1,
+          lit: i == 7 || i == 13
+        ) {
+          Position: {px(r * 0.975, a), y + (rnd(i, 61) - 0.5) * 0.8, pz(r * 0.975, a)}
+          Rotation: {0, -a, 0}
+        }
       }
+
       IsleCrystalCluster tip(size: 2.6, seed: 77, tilt: 3.1416) { Position: {0, -33.2, 0} }
+
       for i in 0..5 {
         const a = match i { 0: -0.62; 1: 1.32; 2: 2.78; 3: 3.9; _: -0.98 }
-        IsleCrystalCluster(size: 0.45 + rnd(i, 64) * 0.3, seed: i + 30, tilt: 0.35, pink: i % 2 == 1, lit: i == 1) { Position: {px(29.3, a), -0.05, pz(29.3, a)}; Rotation: {0, -a, 0} }
+        IsleCrystalCluster(
+          size: 0.45 + rnd(i, 64) * 0.3,
+          seed: i + 30,
+          tilt: 0.35,
+          pink: i % 2 == 1,
+          lit: i == 1
+        ) {
+          Position: {px(29.3, a), -0.05, pz(29.3, a)}
+          Rotation: {0, -a, 0}
+        }
       }
     }
+
     IsleNatureAir air()
   }
 }

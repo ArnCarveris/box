@@ -54,15 +54,24 @@ sky {
 }
 
 assets {
-  station_stars { EnvironmentImage: {path: "etc/scenes/space_station/assets/space.hdr"}; Environment: {resolution: 1024} }
+  station_stars {
+    EnvironmentImage: {path: "etc/scenes/space_station/assets/space.hdr"}
+    Environment: {resolution: 1024}
+  }
 }
 
 $ {
   box.app.FpsTarget: {60}
-  Scene: {reflections: true, environment: true, blend_modes: true, transmission: true,
-    triplanar: true, clear_coat: true, diffuse_transmission: true}
+  Scene: {reflections: true, environment: true, shader_features: {Extended: {blend_modes: true,
+    transmission: true, triplanar: true, clear_coat: true, diffuse_transmission: true}}}
   AmbientLight: {sky: {128, 150, 190}, ground: {66, 96, 150}, intensity: 0.55}
-  ReflectionBake: {resolution: 128, budget_ms: 2, scene_probe: true, scene_probe_height: 12, environment: assets.station_stars}
+  ReflectionBake: {
+    resolution: 128,
+    budget_ms: 2,
+    scene_probe: true,
+    scene_probe_height: 12,
+    environment: assets.station_stars
+  }
 }
 
 view {
@@ -74,9 +83,18 @@ view {
   View: {
     camera: camera,
     clear: {enabled: true, color: {3, 5, 10, 255}},
-    shadows: {enabled: true, resolution: 4096, max_distance: 180},
-    lighting: {reflections: true, baked: false, environment: {source: assets.station_stars, intensity: 1, background: true}},
-    effects: [{effect: station_contact}, {effect: station_bloom}, {effect: station_film}, {effect: station_edges}]
+    shadows: {enabled: true, cascades: 3, resolution: 2048, interval: [1, 2, 2], max_distance: 180},
+    lighting: {
+      reflections: true,
+      baked: false,
+      environment: {source: assets.station_stars, intensity: 1, background: true}
+    },
+    effects: [
+      {effect: station_contact},
+      {effect: station_bloom},
+      {effect: station_film},
+      {effect: station_edges}
+    ]
   }
 }
 
@@ -87,6 +105,7 @@ space_station {
     Camera: {fov: 42, near_: 0.2, far_: 1500}
     CameraController: {speed: 10}
   }
+
   keel_camera {
     Position: {30, -16, 34}
     Rotation: {0.3, 0.72, 0}
@@ -104,13 +123,13 @@ space_station {
   StationDiorama diorama()
 
   slots {
-    for i in 0..st_slots {
+    for i in 0..st_start_grid.count() {
       StationSlot "slot_{i}"(idx: i)
     }
   }
 
   ships {
-    for i in 0..5 {
+    for i in 0..st_fleet {
       StationShip "shuttle_{i}"(idx: i, cargo: false)
       StationShip "freighter_{i}"(idx: i, cargo: true)
     }

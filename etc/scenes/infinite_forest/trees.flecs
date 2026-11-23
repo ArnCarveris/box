@@ -1,0 +1,262 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.render
+using box.material
+using box.texture
+using box.light
+using trees
+using state
+using assets
+
+// The tree library of the infinite forest: a handful of seeded variants per species, grown once each by
+// the presets of the tree generator (trees/presets.flecs) in the bark and leaf materials of the
+// forest library, as prefabs that stands.flecs scatters over the terrain.
+//
+// A variant (WildTree) grows its preset in a prefab of its own, source, and exposes a lean
+// prefab, tree, with only the two shapes of the Tree, bark and foliage, that inherit the mesh
+// graph shape, its levels of detail and the material from source. An instance is an IsA child of
+// a Scatter, a few entities that share the meshes, so the season recolors and thins every tree of
+// a species through its leaf prefab. Mature trees and snags have an Impostor: beyond
+// WILD_IMPOSTOR_DISTANCE a tree draws as one card from the atlases of its variant, which the
+// season rebakes. Young trees and saplings only grow near the player and fade out by distance
+// (WILD_YOUNG_RANGE) before their cells drop them.
+//
+// The trees stand on terrain at any height, so their WindSway bends the trunk from the foot of
+// the tree (local_base) rather than from a ground at Y 0, with the bend the Tree gives the
+// trees of the forest library: the crowns lean as the gusts roll over hills and valleys alike,
+// the branches swing about their pivots and the leaves and needles flutter. Snags are dead wood
+// and do not bend, impostors stay still. The shapes are NoBake, so the reflection probes that
+// follow the player do not recapture the forest.
+state {
+  // Mature trees draw as impostors beyond WILD_IMPOSTOR_DISTANCE, crossfading over
+  // WILD_IMPOSTOR_FADE on either side; the atlases have WILD_IMPOSTOR_FRAMES by
+  // WILD_IMPOSTOR_FRAMES views of WILD_IMPOSTOR_RESOLUTION pixels
+  export const WILD_IMPOSTOR_DISTANCE: f32 = 100
+  export const WILD_IMPOSTOR_FADE: f32 = 10
+  export const WILD_IMPOSTOR_FRAMES: i32 = 8
+  export const WILD_IMPOSTOR_RESOLUTION: i32 = 128
+  export const WILD_LODS: i32 = 3
+
+  // Young trees and saplings fade out between WILD_YOUNG_RANGE - WILD_YOUNG_FADE and
+  // WILD_YOUNG_RANGE + WILD_YOUNG_FADE, within the near ring of the stands
+  export const WILD_YOUNG_RANGE: f32 = 100
+  export const WILD_YOUNG_FADE: f32 = 12
+
+  // Radians the branches of a tree with a stiffness of 0 swing about their pivots at full wind
+  export const WILD_BRANCH_SWING: f32 = 0.06
+}
+
+assets {
+  // The barks of the trees of the stands: the bark of the species alone, without the moss the
+  // trunks of the forest library blend over their foot, projected on the planes of the object
+  // with V running up from the foot. One set of maps on one projection, so the many trunks,
+  // limbs and twigs of the stands shade with the plain mesh shader
+  prefab WildBark {
+    PbrMaterial: {roughness: 1}
+    texture.Mapping: {mode: MappingObject, size: BARK_MASK_SIZE / BARK_TILES}
+    texture.Transform: {scale_x: 1, scale_y: -1}
+    texture.Layers: {layers: [layer_wet, layer_snow]}
+  }
+
+  prefab WildBarkBeech : WildBark {
+    Rgb: {255, 255, 255}
+    WindSway: {bend: SWAY_BROADLEAF_BEND, height: SWAY_BROADLEAF_HEIGHT, base: 0}
+    PbrTextures: {albedo: bark_beech_albedo, normal: bark_beech_normal, orm: bark_beech_orm}
+  }
+
+  prefab WildBarkOak : WildBark {
+    Rgb: {255, 255, 255}
+    WindSway: {bend: SWAY_BROADLEAF_BEND, height: SWAY_BROADLEAF_HEIGHT, base: 0}
+    PbrTextures: {albedo: bark_oak_albedo, normal: bark_oak_normal, orm: bark_oak_orm}
+  }
+
+  prefab WildBarkBirch : WildBark {
+    Rgb: {255, 255, 255}
+    WindSway: {bend: SWAY_BIRCH_BEND, height: SWAY_BIRCH_HEIGHT, base: 0}
+    PbrTextures: {albedo: bark_birch_albedo, normal: bark_birch_normal, orm: bark_birch_orm}
+  }
+
+  prefab WildBarkSpruce : WildBark {
+    Rgb: {255, 255, 255}
+    WindSway: {bend: SWAY_CONIFER_BEND, height: SWAY_CONIFER_HEIGHT, base: 0}
+    PbrTextures: {albedo: bark_spruce_albedo, normal: bark_spruce_normal, orm: bark_spruce_orm}
+    texture.Mapping: {mode: MappingObject, size: BARK_MASK_SIZE / (BARK_TILES * 1.5)}
+  }
+
+  prefab WildBarkFir : WildBarkBeech {
+    Rgb: {170, 172, 178}
+    WindSway: {bend: SWAY_CONIFER_BEND, height: SWAY_CONIFER_HEIGHT, base: 0}
+  }
+
+  // A variant of a species, height meters tall and slender times as thick as usual, from seed:
+  // the preset at the age of forest_tree_age, scaled to height. late picks the leaves that turn
+  // later in the year. A snag (SPECIES_SNAG) is a ForestSnag, fallen or standing. With impostor
+  // it draws as a card in the distance, else it fades out at WILD_YOUNG_RANGE
+  template WildTree {
+    prop species: i32 = 0
+    prop seed: i32 = 1
+    prop height: f32 = 22
+    prop slender: f32 = 1
+    prop late: bool = false
+    prop fallen: bool = false
+    prop impostor: bool = true
+
+    const snag = species == SPECIES_SNAG
+    const age = snag ? 1 : forest_tree_age(species, height)
+    const hr = snag ? height : forest_preset_height(species) * age
+    const k = snag ? 1 : (height + TRUNK_SINK) / hr
+    const kx = k * (0.75 + 0.25 * slender)
+    const broad_stiff = forest_tree_stiffness(hr, SWAY_BROADLEAF_BEND, SWAY_BROADLEAF_HEIGHT)
+    const conifer_stiff = forest_tree_stiffness(hr, SWAY_CONIFER_BEND, SWAY_CONIFER_HEIGHT)
+    const birch_stiff = forest_tree_stiffness(hr, SWAY_BIRCH_BEND, SWAY_BIRCH_HEIGHT)
+    const conifer = species == SPECIES_SPRUCE || species == SPECIES_FIR
+    const flutter = snag ? 0 : (conifer ? SWAY_NEEDLE_FLUTTER : SWAY_LEAF_FLUTTER)
+    const flutter_frequency = conifer ? SWAY_NEEDLE_FREQUENCY : SWAY_LEAF_FREQUENCY
+    const swing = snag ? 0 : WILD_BRANCH_SWING
+
+    // The bend of the Tree (trees/tree.flecs) from the stiffness of the species as in the forest
+    // library, from the foot of the trunk TRUNK_SINK above the origin of its shapes
+    const stiff = snag ? 1.4 : (conifer ? conifer_stiff : (species == SPECIES_BIRCH ? birch_stiff : broad_stiff))
+    const bend = hr * 0.0028 * (1.4 - stiff)
+    const foot = snag ? 0 : TRUNK_SINK
+
+    // The grown tree, never instanced: its shapes are the bases of those of tree. A template
+    // does not grow under a prefab, so source and its shapes turn into prefabs once grown
+    source {
+      if species == SPECIES_BEECH {
+        TreeBeech tree(seed: seed, age: age, bark_material: WildBarkBeech, leaf_material: late ? ForestLeafBeechB : ForestLeafBeech, stiffness: broad_stiff, flutter: SWAY_LEAF_FLUTTER, lods: WILD_LODS, leaf_lod_skip: 1, leaf_lod_flat: 2) {
+          Position: {0, 0, 0}
+        }
+      } else if species == SPECIES_OAK {
+        TreeOak tree(seed: seed, age: age, bark_material: WildBarkOak, leaf_material: late ? ForestLeafOakB : ForestLeafOak, stiffness: broad_stiff, flutter: SWAY_LEAF_FLUTTER, lods: WILD_LODS, leaf_lod_skip: 1, leaf_lod_flat: 2) {
+          Position: {0, 0, 0}
+        }
+      } else if species == SPECIES_BIRCH {
+        TreeBirch tree(seed: seed, age: age, bark_material: WildBarkBirch, leaf_material: late ? ForestLeafBirchB : ForestLeafBirch, stiffness: birch_stiff, flutter: SWAY_LEAF_FLUTTER, lods: WILD_LODS, leaf_lod_skip: 1, leaf_lod_flat: 2) {
+          Position: {0, 0, 0}
+        }
+      } else if species == SPECIES_SPRUCE {
+        TreeSpruce tree(seed: seed, age: age, bark_material: WildBarkSpruce, leaf_material: ForestNeedleSpruce, stiffness: conifer_stiff, flutter: SWAY_NEEDLE_FLUTTER, lods: WILD_LODS, leaf_lod_skip: 1, leaf_lod_flat: 2) {
+          Position: {0, 0, 0}
+        }
+      } else if species == SPECIES_FIR {
+        TreeFir tree(seed: seed, age: age, bark_material: WildBarkFir, leaf_material: ForestNeedleFir, stiffness: conifer_stiff, flutter: SWAY_NEEDLE_FLUTTER, lods: WILD_LODS, leaf_lod_skip: 1, leaf_lod_flat: 2) {
+          Position: {0, 0, 0}
+        }
+      } else {
+        ForestSnag tree(seed: seed, height: height, fallen: fallen) {
+          Position: {0, 0, 0}
+        }
+      }
+    }
+
+    source {
+      Prefab
+      tree {
+        Prefab
+        tree {
+          Prefab
+          if snag {
+            tree { Prefab; bark { Prefab }; foliage { Prefab } }
+          } else {
+            bark { Prefab }
+            foliage { Prefab }
+          }
+        }
+      }
+    }
+
+    // The shapes of the Tree in source: under the preset, under the TreeSnag of a snag
+    const grown_tree: entity = this.lookup("source").lookup("tree").lookup("tree")
+    const shapes: entity = snag ? grown_tree.lookup("tree") : grown_tree
+    const bark_base: entity = shapes.lookup("bark")
+    const foliage_base: entity = shapes.lookup("foliage")
+
+    // The prefab the stands scatter: the bark and foliage shapes of source, scaled to height
+    prefab tree {
+      if impostor {
+        Impostor: {
+          frames: WILD_IMPOSTOR_FRAMES,
+          resolution: WILD_IMPOSTOR_RESOLUTION,
+          hemisphere: true,
+          distance: WILD_IMPOSTOR_DISTANCE,
+          fade: WILD_IMPOSTOR_FADE
+        }
+      } else {
+        DrawRange: {far_: WILD_YOUNG_RANGE, fade: WILD_YOUNG_FADE}
+      }
+
+      const y = snag ? 0 : 0 - TRUNK_SINK
+
+      bark {
+        (IsA, bark_base)
+        NoBake
+        Position: {0, y, 0}
+        Scale: {kx, k, kx}
+        WindSway: {bend: bend, height: hr, base: foot, pivots: true, branch: swing, local_base: true}
+      }
+
+      foliage {
+        (IsA, foliage_base)
+        NoBake
+        Position: {0, y, 0}
+        Scale: {kx, k, kx}
+        WindSway: {
+          bend: bend, height: hr, base: foot, flutter: flutter,
+          flutter_frequency: flutter_frequency, pivots: true, branch: swing, foliage: true,
+          local_base: true
+        }
+      }
+    }
+  }
+}
+
+// The library: four mature variants per species of different seeds and heights, every other one
+// in the leaves that turn later, two young trees and a sapling per species, and three snags.
+// stands.flecs scatters wild_trees.<variant>.tree
+wild_trees {
+  beech_0 { WildTree: {species: SPECIES_BEECH, seed: 3, height: 24, slender: 1} }
+  beech_1 { WildTree: {species: SPECIES_BEECH, seed: 11, height: 27, slender: 0.95, late: true} }
+  beech_2 { WildTree: {species: SPECIES_BEECH, seed: 19, height: 21, slender: 1.05} }
+  beech_3 { WildTree: {species: SPECIES_BEECH, seed: 26, height: 25, slender: 0.9, late: true} }
+  beech_young_0 { WildTree: {species: SPECIES_BEECH, seed: 33, height: 10, slender: 0.7, impostor: false} }
+  beech_young_1 { WildTree: {species: SPECIES_BEECH, seed: 41, height: 6.5, slender: 0.7, late: true, impostor: false} }
+  beech_sapling { WildTree: {species: SPECIES_BEECH, seed: 47, height: 2.6, slender: 0.7, impostor: false} }
+
+  oak_0 { WildTree: {species: SPECIES_OAK, seed: 5, height: 20, slender: 1.05} }
+  oak_1 { WildTree: {species: SPECIES_OAK, seed: 13, height: 23, slender: 1, late: true} }
+  oak_2 { WildTree: {species: SPECIES_OAK, seed: 22, height: 18, slender: 1.1} }
+  oak_3 { WildTree: {species: SPECIES_OAK, seed: 29, height: 21, slender: 0.95, late: true} }
+  oak_young_0 { WildTree: {species: SPECIES_OAK, seed: 35, height: 9, slender: 0.65, impostor: false} }
+  oak_young_1 { WildTree: {species: SPECIES_OAK, seed: 43, height: 5.5, slender: 0.65, late: true, impostor: false} }
+  oak_sapling { WildTree: {species: SPECIES_OAK, seed: 49, height: 2.2, slender: 0.65, impostor: false} }
+
+  birch_0 { WildTree: {species: SPECIES_BIRCH, seed: 7, height: 17, slender: 0.95} }
+  birch_1 { WildTree: {species: SPECIES_BIRCH, seed: 15, height: 19, slender: 0.9, late: true} }
+  birch_2 { WildTree: {species: SPECIES_BIRCH, seed: 23, height: 14, slender: 1} }
+  birch_3 { WildTree: {species: SPECIES_BIRCH, seed: 31, height: 16, slender: 0.85, late: true} }
+  birch_young_0 { WildTree: {species: SPECIES_BIRCH, seed: 37, height: 8, slender: 0.8, impostor: false} }
+  birch_young_1 { WildTree: {species: SPECIES_BIRCH, seed: 45, height: 5, slender: 0.8, late: true, impostor: false} }
+  birch_sapling { WildTree: {species: SPECIES_BIRCH, seed: 51, height: 2.4, slender: 0.8, impostor: false} }
+
+  spruce_0 { WildTree: {species: SPECIES_SPRUCE, seed: 9, height: 26, slender: 1} }
+  spruce_1 { WildTree: {species: SPECIES_SPRUCE, seed: 17, height: 30, slender: 0.95} }
+  spruce_2 { WildTree: {species: SPECIES_SPRUCE, seed: 25, height: 22, slender: 1.05} }
+  spruce_3 { WildTree: {species: SPECIES_SPRUCE, seed: 34, height: 33, slender: 0.9} }
+  spruce_young_0 { WildTree: {species: SPECIES_SPRUCE, seed: 39, height: 9, slender: 0.8, impostor: false} }
+  spruce_young_1 { WildTree: {species: SPECIES_SPRUCE, seed: 48, height: 5, slender: 0.8, impostor: false} }
+  spruce_sapling { WildTree: {species: SPECIES_SPRUCE, seed: 53, height: 2.2, slender: 0.8, impostor: false} }
+
+  fir_0 { WildTree: {species: SPECIES_FIR, seed: 10, height: 25, slender: 1} }
+  fir_1 { WildTree: {species: SPECIES_FIR, seed: 18, height: 29, slender: 0.95} }
+  fir_2 { WildTree: {species: SPECIES_FIR, seed: 27, height: 22, slender: 1.05} }
+  fir_3 { WildTree: {species: SPECIES_FIR, seed: 36, height: 31, slender: 0.9} }
+  fir_young_0 { WildTree: {species: SPECIES_FIR, seed: 40, height: 8.5, slender: 0.8, impostor: false} }
+  fir_young_1 { WildTree: {species: SPECIES_FIR, seed: 50, height: 4.5, slender: 0.8, impostor: false} }
+  fir_sapling { WildTree: {species: SPECIES_FIR, seed: 55, height: 2, slender: 0.8, impostor: false} }
+
+  snag_0 { WildTree: {species: SPECIES_SNAG, seed: 4, height: 7} }
+  snag_1 { WildTree: {species: SPECIES_SNAG, seed: 12, height: 11} }
+  snag_2 { WildTree: {species: SPECIES_SNAG, seed: 21, height: 5, fallen: true} }
+}

@@ -132,6 +132,7 @@ assets {
         RelicMetal: {}
         Cone: {segments: 6, length: tall, radius: 0.13}
       }
+
       if i % 2 == 0 {
         "gem_{i}" {
           Position: {cos(a) * 0.9, tall - 0.02, sin(a) * 0.9}

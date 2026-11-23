@@ -1,0 +1,281 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using box.light
+using box.particle
+using box.animation
+using state
+using assets
+
+// The insects that bring the forest to life: fireflies blinking over the grass on summer
+// evenings, a few of them real lights, butterflies that fly from flower to flower and settle on
+// them, bees that hover at the flowers, dragonflies that hover and dart over the brook, and
+// swarms of gnats dancing in the sunbeams. Each kind follows the season, the hour, the
+// temperature, the wind and the rain (forest_*_activity): none in winter, in the cold or in
+// heavy rain, and fewer the harder the wind blows.
+//
+// The async block of insect_kinds.flecs turns the activities into counts; the loops below create
+// and delete the insects as the counts change, and Animators fly them, so the script does not run
+// again every frame. The butterflies and the bees visit the wildflowers of scatter.flecs:
+// forest_flower_* mirror where it places them.
+state {
+  // The butterflies and the bees visit the flowers of the flower cells from (VISIT_GX, VISIT_GZ)
+  // on, VISIT_W by VISIT_H cells: the sunny middle of the clearing in front of the start view
+  export const VISIT_GX: i32 = 20
+  export const VISIT_GZ: i32 = 19
+  export const VISIT_W: i32 = 4
+  export const VISIT_H: i32 = 3
+
+  // The dragonflies patrol DRAGON_REACH meters of the brook each, the reaches DRAGON_GAP apart
+  export const DRAGON_REACH: f32 = 6
+  export const DRAGON_GAP: f32 = 4.5
+
+  // X of hover spot k of dragonfly d on its reach of the brook: the even ones upstream of the
+  // bridge, the odd ones downstream, so none flies through it
+  fn forest_dragon_x(d: f64, k: f64) -> f64 {
+    const n = floor(d / 2)
+    const u = DRAGON_REACH * forest_hash(d, 610 + k)
+    d - 2 * n < 0.5 ? CROSSING_X - BRIDGE_HALF_WIDTH - 1.2 - n * DRAGON_GAP - u :
+      CROSSING_X + BRIDGE_HALF_WIDTH + 1.2 + n * DRAGON_GAP + u
+  }
+
+  // The flower spots of scatter.flecs: spot j is spot j % 4 of flower cell floor(j / 4), and
+  // cell i is (floor(i / FLOWER_GRID), i % FLOWER_GRID)
+  fn forest_flower_cell_x(gx: f64) -> f64 {
+    (gx + 0.5) * FLOWER_CELL - UNDER_EDGE
+  }
+
+  fn forest_flower_spot_x(j: f64) -> f64 {
+    const i = floor(j / 4)
+    const k = j - i * 4
+    const gx = floor(i / FLOWER_GRID)
+    (gx + 0.5 * (k - 2 * floor(k / 2)) + 0.05 + 0.4 * forest_hash(j, 311)) * FLOWER_CELL - UNDER_EDGE
+  }
+
+  fn forest_flower_spot_z(j: f64) -> f64 {
+    const i = floor(j / 4)
+    const k = j - i * 4
+    const gz = i - floor(i / FLOWER_GRID) * FLOWER_GRID
+    (gz + 0.5 * floor(k / 2) + 0.05 + 0.4 * forest_hash(j, 312)) * FLOWER_CELL - UNDER_EDGE
+  }
+
+  // A flower grows at spot j, as scatter.flecs decides
+  fn forest_flower_placed(j: f64) -> bool {
+    const i = floor(j / 4)
+    const gx = floor(i / FLOWER_GRID)
+    const cx = forest_flower_cell_x(gx)
+    const cz = forest_flower_cell_x(i - gx * FLOWER_GRID)
+    const dens = forest_under_density(cx, cz)
+    const light = forest_light(cx, cz)
+    const x = forest_flower_spot_x(j)
+    const z = forest_flower_spot_z(j)
+    dens <= 0 ? false : (forest_hash(j, 313) >= dens * light * light * 0.8 ? false : (
+      forest_floor_free(x, z, 0.15) ? !forest_feature_near(x, z, 0.2) : false))
+  }
+
+  // Height of the flower heads of the flower at spot j: its scale by its kind, the heads
+  // stand at about 0.72 of the clump
+  fn forest_flower_top(j: f64) -> f64 {
+    const s = 0.32 + 0.22 * forest_hash(j, 314)
+    const patch = forest_hash2(floor(forest_flower_spot_x(j) / 4), floor(forest_flower_spot_z(j) / 4), 51)
+    0.72 * (patch < 0.45 ? s * 1.1 : (patch < 0.8 ? s : s * 1.3))
+  }
+
+  // A flower of cell (gx, gz): the first one that grows from spot start on, -1 for none
+  fn forest_flower_pick(gx: f64, gz: f64, start: f64) -> f64 {
+    const i = (gx * FLOWER_GRID + gz) * 4
+    const a = i + start - 4 * floor(start / 4)
+    const b = i + (start + 1) - 4 * floor((start + 1) / 4)
+    const c = i + (start + 2) - 4 * floor((start + 2) / 4)
+    const d = i + (start + 3) - 4 * floor((start + 3) / 4)
+    forest_flower_placed(a) ? a : (forest_flower_placed(b) ? b : (
+      forest_flower_placed(c) ? c : (forest_flower_placed(d) ? d : 0 - 1)))
+  }
+
+  // Where an insect visits the flower of cell (gx, gz): the heads of the flower, or the grass
+  // in the middle of the cell when no flower grows in it
+  fn forest_visit_x(gx: f64, gz: f64, start: f64) -> f64 {
+    const j = forest_flower_pick(gx, gz, start)
+    j < 0 ? forest_flower_cell_x(gx) : forest_flower_spot_x(j)
+  }
+
+  fn forest_visit_z(gx: f64, gz: f64, start: f64) -> f64 {
+    const j = forest_flower_pick(gx, gz, start)
+    j < 0 ? forest_flower_cell_x(gz) : forest_flower_spot_z(j)
+  }
+
+  fn forest_visit_y(gx: f64, gz: f64, start: f64) -> f64 {
+    const j = forest_flower_pick(gx, gz, start)
+    j < 0 ? 0.3 : forest_flower_top(j)
+  }
+}
+
+forest {
+  // Nothing picks, collides with or queries the insects, so they stay out of the spatial index
+  insects {
+    box.spatial.Ignore
+
+    // Fireflies over the grass of the clearing: points of yellow-green light that drift and
+    // flash, each its own pattern of flashes over its life
+    fireflies {
+      Position: {4, 0.75, 0.5}
+      Emitter: {
+        max: 900, rate: FIREFLY_RATE * firefly_glow, shape: EmitterBox, extents: {10, 0.55, 9},
+        direction: {0, 1, 0}, spread: 180, speed: {0, 0.12}, lifetime: {6, 10},
+        size: {0.045, 0.065}, opacity: {0.8, 1},
+        color: {178, 255, 62}, color_variance: {30, 0, 24}, seed: 91
+      }
+      Burst: {count: 420 * firefly_glow}
+      Forces: {
+        gravity: {0, 0, 0}, drag: 0.7, turbulence: 0.35, turbulence_scale: 1.3, global_wind: 0.04
+      }
+      Appearance: {shape: Circle, blend: Additive, lit: 0}
+      Curves: {opacity: {keys: [
+        {0, 0}, {0.04, 0}, {0.07, 1}, {0.12, 0}, {0.3, 0}, {0.33, 1}, {0.38, 0}, {0.55, 0},
+        {0.58, 1}, {0.63, 0}, {0.8, 0}, {0.83, 0.9}, {0.88, 0}, {1, 0}
+      ]}}
+    }
+
+    // A few of them light the grass: a glowing tail with a PointLight that flashes with it
+    lanterns {
+      for i in 0..firefly_lights {
+        "firefly_{i}" {
+          Position: {
+            1.5 + 8 * forest_hash(i, 701), 0.35 + 0.7 * forest_hash(i, 702), -2.5 + 7.5 * forest_hash(i, 703)
+          }
+
+          drift {
+            Position: {0, 0, 0}
+            Animator: {clip: forest_firefly_drift, time: forest_hash(i, 704) * 9, speed: 0.85 + 0.3 * forest_hash(i, 705)}
+
+            glow : ForestFireflyGlow {
+              Scale: {0.0035, 0.0035, 0.006}
+              Sphere: {radius: 1, segments: 6}
+              PointLight: {intensity: 0, range: 3, bake: Realtime}
+            }
+          }
+        }
+      }
+    }
+
+    // Butterflies over the flowers of the clearing: each visits four flowers of a square of
+    // flower cells, one way round or the other, and sits on each a while
+    butterflies {
+      for b in 0..butterfly_count {
+        const gx = VISIT_GX + floor(forest_hash(b, 501) * (VISIT_W - 1))
+        const gz = VISIT_GZ + floor(forest_hash(b, 502) * (VISIT_H - 1))
+        const ox = forest_hash(b, 503) < 0.5 ? 1 : 0
+        const oz = 1 - ox
+        const s = floor(forest_hash(b, 504) * 4)
+
+        "butterfly_{b}" {
+          Position: {forest_visit_x(gx, gz, s), forest_visit_y(gx, gz, s), forest_visit_z(gx, gz, s)}
+          Rotation: {0, 0, 0}
+
+          ForestFlight flight(
+            x0: forest_visit_x(gx, gz, s), y0: forest_visit_y(gx, gz, s), z0: forest_visit_z(gx, gz, s),
+            x1: forest_visit_x(gx + ox, gz + oz, s), y1: forest_visit_y(gx + ox, gz + oz, s),
+            z1: forest_visit_z(gx + ox, gz + oz, s),
+            x2: forest_visit_x(gx + 1, gz + 1, s), y2: forest_visit_y(gx + 1, gz + 1, s),
+            z2: forest_visit_z(gx + 1, gz + 1, s),
+            x3: forest_visit_x(gx + oz, gz + ox, s), y3: forest_visit_y(gx + oz, gz + ox, s),
+            z3: forest_visit_z(gx + oz, gz + ox, s),
+            seed: 510 + b, hold: 1.5, hold_var: 3, fly: 2.4, fly_var: 1.8, rise: 0.7, wander: 0.5,
+            turn: 0.3, flap: true)
+
+          Animator: {clip: flight, time: forest_hash(b, 505) * 14, speed: 1}
+          ForestButterfly model(kind: floor(forest_hash(b, 506) * 4.99), phase: forest_hash(b, 507))
+        }
+      }
+    }
+
+    // Bees from flower to flower of one or two cells, a moment over each
+    bees {
+      for b in 0..bee_count {
+        const gx = VISIT_GX + floor(forest_hash(b, 521) * (VISIT_W - 1))
+        const gz = VISIT_GZ + floor(forest_hash(b, 522) * VISIT_H)
+        const ox = forest_hash(b, 523) < 0.5 ? 1 : 0
+        const oz = 1 - ox
+
+        "bee_{b}" {
+          Position: {forest_visit_x(gx, gz, 0), forest_visit_y(gx, gz, 0) + 0.04, forest_visit_z(gx, gz, 0)}
+          Rotation: {0, 0, 0}
+
+          ForestFlight flight(
+            x0: forest_visit_x(gx, gz, 0), y0: forest_visit_y(gx, gz, 0) + 0.04, z0: forest_visit_z(gx, gz, 0),
+            x1: forest_visit_x(gx, gz, 2), y1: forest_visit_y(gx, gz, 2) + 0.04, z1: forest_visit_z(gx, gz, 2),
+            x2: forest_visit_x(gx + ox, gz + oz, 1), y2: forest_visit_y(gx + ox, gz + oz, 1) + 0.04,
+            z2: forest_visit_z(gx + ox, gz + oz, 1),
+            x3: forest_visit_x(gx + ox, gz + oz, 3), y3: forest_visit_y(gx + ox, gz + oz, 3) + 0.04,
+            z3: forest_visit_z(gx + ox, gz + oz, 3),
+            seed: 530 + b, hold: 0.8, hold_var: 1.6, fly: 0.6, fly_var: 0.6, rise: 0.12, wander: 0.2,
+            turn: 0.18)
+
+          Animator: {clip: flight, time: forest_hash(b, 524) * 6, speed: 1}
+          ForestBee model(phase: forest_hash(b, 525))
+        }
+      }
+    }
+
+    // Dragonflies over the brook, each on a reach of its own: they hover over the water, dart
+    // to the next spot and hover again
+    dragonflies {
+      for d in 0..dragonfly_count {
+        const x0 = forest_dragon_x(d, 0)
+        const x1 = forest_dragon_x(d, 1)
+        const x2 = forest_dragon_x(d, 2)
+        const x3 = forest_dragon_x(d, 3)
+
+        "dragonfly_{d}" {
+          Position: {x0, forest_brook_water_y(x0) + 0.5, forest_brook_z(x0)}
+          Rotation: {0, 0, 0}
+
+          ForestFlight flight(
+            x0: x0, y0: forest_brook_water_y(x0) + 0.25 + 0.6 * forest_hash(d, 620),
+            z0: forest_brook_z(x0) + 1.4 * (forest_hash(d, 630) - 0.5),
+            x1: x1, y1: forest_brook_water_y(x1) + 0.25 + 0.6 * forest_hash(d, 621),
+            z1: forest_brook_z(x1) + 1.4 * (forest_hash(d, 631) - 0.5),
+            x2: x2, y2: forest_brook_water_y(x2) + 0.25 + 0.6 * forest_hash(d, 622),
+            z2: forest_brook_z(x2) + 1.4 * (forest_hash(d, 632) - 0.5),
+            x3: x3, y3: forest_brook_water_y(x3) + 0.25 + 0.6 * forest_hash(d, 623),
+            z3: forest_brook_z(x3) + 1.4 * (forest_hash(d, 633) - 0.5),
+            seed: 640 + d, hold: 0.8, hold_var: 2.4, fly: 0.4, fly_var: 0.45, rise: 0.08, wander: 0.15,
+            turn: 0.14)
+
+          Animator: {clip: flight, time: forest_hash(d, 614) * 5, speed: 1}
+          ForestDragonfly model(kind: floor(forest_hash(d, 615) * 2.99), phase: forest_hash(d, 616))
+        }
+      }
+    }
+
+    // Swarms of gnats in the sunbeams of the clearing, toward the low sun: specks that dance
+    // around the middle of the swarm as it rises and sinks, bright where the sun catches them
+    // and dark against the light in the shade; the gusts carry them a little
+    gnats {
+      for g in 0..gnat_swarms {
+        "swarm_{g}" {
+          Position: {2 + 8 * forest_hash(g, 801), 1.3 + 1 * forest_hash(g, 802), -3 + 6.5 * forest_hash(g, 803)}
+
+          dance {
+            Position: {0, 0, 0}
+            Animator: {clip: forest_gnat_bob, time: forest_hash(g, 804) * 4, speed: 0.8 + 0.4 * forest_hash(g, 805)}
+            Emitter: {
+              max: 500, rate: 220, shape: EmitterSphere, radius: 0.35,
+              direction: {0, 1, 0}, spread: 180, speed: {0.3, 0.8}, lifetime: {1.8, 2.2},
+              size: {0.014, 0.019}, opacity: {0.8, 1},
+              color: {120, 108, 88}, color_variance: {16, 14, 12}, seed: 810 + g, local: true
+            }
+            Burst: {count: 400}
+            Forces: {
+              gravity: {0, 0, 0}, drag: 3.5, turbulence: 9, turbulence_scale: 5, global_wind: 0.05
+            }
+            Appearance: {shape: Circle, blend: Alpha, stretch: 0.4, lit: 1}
+            Curves: {opacity: {keys: [{0, 0}, {0.15, 1}, {0.85, 1}, {1, 0}]}}
+          }
+        }
+      }
+    }
+  }
+}

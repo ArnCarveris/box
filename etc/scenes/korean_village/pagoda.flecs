@@ -8,33 +8,81 @@ assets {
   template KoreanPagoda {
     { (IsA, KoreanStone); Position: {0, 0.14, 0}; RoundedBox: {2, 0.28, 2, 0.03} }
     { (IsA, KoreanStone); Position: {0, 0.46, 0}; Box: {1.45, 0.36, 1.45} }
+
     for side in 0..4 {
       {
         Rotation: {0, side * math.PI / 2, 0}
         Position: {}
+
         for panel in 0..2 {
-          { Position: {(panel - 0.5) * 0.66, 0.46, 0.735}; Box: {0.52, 0.24, 0.025}; Rgb: {134, 136, 124} }
+          {
+            Position: {(panel - 0.5) * 0.66, 0.46, 0.735}
+            Box: {0.52, 0.24, 0.025}
+            Rgb: {134, 136, 124}
+          }
         }
+
         { Position: {0, 0.46, 0.74}; Box: {0.05, 0.36, 0.03}; Rgb: {170, 170, 157} }
       }
     }
+
     for tier in 0..3 {
       const scale = 1 - tier * 0.17
       const y = 0.64 + tier * 0.84
-      { (IsA, KoreanStone); Position: {0, y + 0.26 * scale, 0}; Box: {0.74 * scale, 0.52 * scale, 0.74 * scale} }
+      {
+        (IsA, KoreanStone)
+        Position: {0, y + 0.26 * scale, 0}
+        Box: {0.74 * scale, 0.52 * scale, 0.74 * scale}
+      }
+
       for corner in 0..4 {
         const a = corner * math.PI / 2 + math.PI / 4
-        { Position: {math.sin(a) * 0.525 * scale, y + 0.26 * scale, math.cos(a) * 0.525 * scale}; Box: {0.045, 0.52 * scale, 0.045}; Rgb: {170, 170, 157} }
+        {
+          Position: {math.sin(a) * 0.525 * scale, y + 0.26 * scale, math.cos(a) * 0.525 * scale}
+          Box: {0.045, 0.52 * scale, 0.045}
+          Rgb: {170, 170, 157}
+        }
       }
-      { Position: {0, y + 0.55 * scale, 0}; Box: {0.92 * scale, 0.06, 0.92 * scale}; Rgb: {132, 134, 122} }
-      { (IsA, KoreanStone); Position: {0, y + 0.61 * scale, 0}; Box: {1.12 * scale, 0.05, 1.12 * scale} }
-      { (IsA, KoreanStone); Position: {0, y + 0.73 * scale, 0}; Rotation: {0, math.PI / 4, 0}; Frustum: {radius_bottom: 0.96 * scale, radius_top: 0.42 * scale, length: 0.2 * scale, segments: 4} }
+
+      {
+        Position: {0, y + 0.55 * scale, 0}
+        Box: {0.92 * scale, 0.06, 0.92 * scale}
+        Rgb: {132, 134, 122}
+      }
+
+      {
+        (IsA, KoreanStone)
+        Position: {0, y + 0.61 * scale, 0}
+        Box: {1.12 * scale, 0.05, 1.12 * scale}
+      }
+
+      {
+        (IsA, KoreanStone)
+        Position: {0, y + 0.73 * scale, 0}
+        Rotation: {0, math.PI / 4, 0}
+        Frustum: {
+          radius_bottom: 0.96 * scale,
+          radius_top: 0.42 * scale,
+          length: 0.2 * scale,
+          segments: 4
+        }
+      }
     }
+
     { (IsA, KoreanStone); Position: {0, 3.14, 0}; Box: {0.28, 0.12, 0.28} }
     { (IsA, KoreanStone); Position: {0, 3.28, 0}; Sphere: {radius: 0.13, segments: 12} }
-    { (IsA, KoreanStone); Position: {0, 3.48, 0}; Cylinder: {radius: 0.035, length: 0.42, segments: 8} }
+    {
+      (IsA, KoreanStone)
+      Position: {0, 3.48, 0}
+      Cylinder: {radius: 0.035, length: 0.42, segments: 8}
+    }
+
     for ring in 0..3 {
-      { (IsA, KoreanStone); Position: {0, 3.4 + ring * 0.11, 0}; Cylinder: {radius: 0.09 - ring * 0.02, length: 0.03, segments: 10} }
+      {
+        (IsA, KoreanStone)
+        Position: {0, 3.4 + ring * 0.11, 0}
+        Cylinder: {radius: 0.09 - ring * 0.02, length: 0.03, segments: 10}
+      }
     }
   }
 }

@@ -1,0 +1,753 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using box.render
+using box.light
+using box.world
+using trees
+using state
+using assets
+
+// The undergrowth of the infinite forest: a ChunkGrid of small UNDER_CELL cells close around the focus
+// whose template scatters the plants of the forest library (forest/undergrowth.flecs) over the
+// terrain, so the floor is dense near the player and costs a bounded number of cells.
+//
+// Where a plant grows follows the masks of the terrain, the light of the stand and the trees:
+// - the clearings and alpine meadows (mask channel 1): dense grass and the flowers of the
+//   season, shrubs along their rims
+// - the forest floor (channel 0): grass and sedge by the light of the stand, dense under the
+//   birch groves and oaks, sparse under beech and conifers, where ferns, moss, mushrooms and
+//   twigs take over; leaf litter everywhere under the broadleaves; logs, stumps and rocks
+// - the trails (channel 2): bare, shrubs along their edges
+// - the rock walls (channel 3): bare, scree stones below them
+// The light and the share of broadleaves of a cell come from the stand noise of stands.flecs at
+// its middle, so the floor follows the trees above it, and every scatter keeps clear of the
+// trunks of the mature trees with Scatter avoid against their placement (the *Trunks prefabs of
+// stands.flecs).
+//
+// The small plants grow within UNDER_NEAR (level 0), the ferns, shrubs, logs, stumps and rocks
+// out to UNDER_FAR (level 1); a cell keeps them as it changes level. Each size class fades out
+// with a DrawRange before its cells drop it, the grass first and the shrubs and logs last, so
+// the edge of the undergrowth never shows as a ring.
+//
+// Plants have their origin on the ground, like the trees (trees.flecs) they stand on terrain at
+// any height: their WindSway bends them from their own foot (local_base) rather than from a
+// ground at Y 0, with the sway of the forest library, so the gusts roll through the grass and
+// shrubs on hills as in valleys, and their blades, fronds and leaves flutter on top of that.
+state {
+  // Cells of UNDER_CELL meters: level 0 within UNDER_NEAR of the focus, everything, level 1
+  // within UNDER_FAR, the larger plants. UNDER_BUDGET cells load per frame, within
+  // UNDER_BUDGET_MS
+  export const UNDER_CELL: f32 = 16
+  export const UNDER_NEAR: f32 = 36
+  export const UNDER_FAR: f32 = 64
+  export const UNDER_BUDGET: i32 = 12
+  export const UNDER_BUDGET_MS: f32 = 3
+
+  // The size classes fade out between range - fade and range + fade, within the ring of their
+  // level: mushrooms, moss and twigs, grass and flowers, litter, ferns, then shrubs, logs,
+  // stumps and rocks
+  export const UNDER_SMALL_RANGE: f32 = 15
+  export const UNDER_SMALL_FADE: f32 = 4
+  export const UNDER_GRASS_RANGE: f32 = 28
+  export const UNDER_GRASS_FADE: f32 = 7
+  export const UNDER_LITTER_RANGE: f32 = 29
+  export const UNDER_LITTER_FADE: f32 = 6
+  export const UNDER_FERN_RANGE: f32 = 44
+  export const UNDER_FERN_FADE: f32 = 9
+  export const UNDER_LARGE_RANGE: f32 = 54
+  export const UNDER_LARGE_FADE: f32 = 9
+
+  // Grass clumps per 100 m² of the clearings, and of the forest floor in full light
+  export const UNDER_MEADOW: f32 = 300
+  export const UNDER_FLOOR_GRASS: f32 = 110
+}
+
+assets {
+  // The plants of the library with the DrawRange of their class and the WindSway of the library
+  // bending from their foot, one entity an instance
+  prefab WildGrass : ForestGrass {
+    DrawRange: {far_: UNDER_GRASS_RANGE, fade: UNDER_GRASS_FADE}
+    WindSway: {bend: SWAY_GRASS_BEND, height: SWAY_GRASS_HEIGHT, base: 0, flutter: SWAY_GRASS_FLUTTER, flutter_frequency: SWAY_GRASS_FREQUENCY, flutter_reach: 0.25, local_base: true}
+    NoBake
+  }
+
+  prefab WildSedge : ForestSedge {
+    DrawRange: {far_: UNDER_GRASS_RANGE, fade: UNDER_GRASS_FADE}
+    WindSway: {bend: SWAY_GRASS_BEND, height: SWAY_GRASS_HEIGHT, base: 0, flutter: SWAY_GRASS_FLUTTER, flutter_frequency: SWAY_GRASS_FREQUENCY, flutter_reach: 0.25, local_base: true}
+    NoBake
+  }
+
+  prefab WildFlower : ForestFlower {
+    DrawRange: {far_: UNDER_GRASS_RANGE, fade: UNDER_GRASS_FADE}
+    WindSway: {bend: SWAY_FLOWER_BEND, height: SWAY_FLOWER_HEIGHT, base: 0, flutter: SWAY_FLOWER_FLUTTER, flutter_frequency: SWAY_FLOWER_FREQUENCY, flutter_reach: 0.2, local_base: true}
+    NoBake
+  }
+
+  prefab WildFlowerWhite : ForestFlowerWhite {
+    DrawRange: {far_: UNDER_GRASS_RANGE, fade: UNDER_GRASS_FADE}
+    WindSway: {bend: SWAY_FLOWER_BEND, height: SWAY_FLOWER_HEIGHT, base: 0, flutter: SWAY_FLOWER_FLUTTER, flutter_frequency: SWAY_FLOWER_FREQUENCY, flutter_reach: 0.2, local_base: true}
+    NoBake
+  }
+
+  prefab WildFlowerViolet : ForestFlowerViolet {
+    DrawRange: {far_: UNDER_GRASS_RANGE, fade: UNDER_GRASS_FADE}
+    WindSway: {bend: SWAY_FLOWER_BEND, height: SWAY_FLOWER_HEIGHT, base: 0, flutter: SWAY_FLOWER_FLUTTER, flutter_frequency: SWAY_FLOWER_FREQUENCY, flutter_reach: 0.2, local_base: true}
+    NoBake
+  }
+
+  prefab WildLitter : ForestLitter {
+    DrawRange: {far_: UNDER_LITTER_RANGE, fade: UNDER_LITTER_FADE}
+    NoBake
+  }
+
+  prefab WildFern : ForestFern {
+    DrawRange: {far_: UNDER_FERN_RANGE, fade: UNDER_FERN_FADE}
+    WindSway: {bend: SWAY_FERN_BEND, height: SWAY_FERN_HEIGHT, base: 0, flutter: SWAY_FERN_FLUTTER, flutter_frequency: SWAY_FERN_FREQUENCY, flutter_reach: 0.4, local_base: true}
+    NoBake
+  }
+
+  // The parts of the larger plants, bending from the foot of their plant: a part base meters
+  // above it sets base to 0 - its height (WildShrub, WildStump)
+  prefab WildHazelCard : ForestShrubHazel {
+    WindSway: {bend: SWAY_SHRUB_BEND, height: SWAY_SHRUB_HEIGHT, base: 0, flutter: SWAY_SHRUB_FLUTTER, flutter_frequency: SWAY_SHRUB_FREQUENCY, flutter_reach: 0.3, local_base: true}
+    NoBake
+  }
+
+  prefab WildElderCard : ForestShrubElder {
+    WindSway: {bend: SWAY_SHRUB_BEND, height: SWAY_SHRUB_HEIGHT, base: 0, flutter: SWAY_SHRUB_FLUTTER, flutter_frequency: SWAY_SHRUB_FREQUENCY, flutter_reach: 0.3, local_base: true}
+    NoBake
+  }
+
+  prefab WildStumpBeech : ForestBarkBeech {
+    WindSway: {bend: SWAY_BROADLEAF_BEND, height: SWAY_BROADLEAF_HEIGHT, base: 0, local_base: true}
+    NoBake
+  }
+
+  prefab WildStumpOak : ForestBarkOak {
+    WindSway: {bend: SWAY_BROADLEAF_BEND, height: SWAY_BROADLEAF_HEIGHT, base: 0, local_base: true}
+    NoBake
+  }
+
+  prefab WildStumpSpruce : ForestBarkSpruce {
+    WindSway: {bend: SWAY_CONIFER_BEND, height: SWAY_CONIFER_HEIGHT, base: 0, local_base: true}
+    NoBake
+  }
+
+  // Shrubs like ForestShrub, size meters across: 15 leaf cards pointing out and up, written out
+  // as prefabs since a template does not grow in a prefab. They leave out its dark core, which
+  // shows as a black mound under a shrub on the open floor
+  prefab WildShrubHazel {
+    DrawRange: {far_: UNDER_LARGE_RANGE, fade: UNDER_LARGE_FADE}
+    const seed = 0.31
+    const size = 1.5
+
+
+    for c in 0..15 {
+      const a = c * 2.39996 + seed * 6.2832
+      const e = 0.15 + 1.25 * forest_hash(c + 1, seed * 31)
+      const ox = cos(e) * sin(a)
+      const oy = sin(e)
+      const oz = cos(e) * cos(a)
+      const jx = ox + (forest_hash(c + 2, seed * 31) - 0.5) * 0.6
+      const jy = oy + 0.35
+      const jz = oz + (forest_hash(c + 3, seed * 31) - 0.5) * 0.6
+      const jl = sqrt(jx * jx + jy * jy + jz * jz)
+      const b = (forest_hash(c + 4, seed * 31) - 0.5) * 1.8
+      const card = size * (0.62 + 0.3 * forest_hash(c + 5, seed * 31))
+      const py = 0.08 + oy * size * 0.45
+      "card_{c}" : WildHazelCard {
+        Position: {ox * size * 0.28, py, oz * size * 0.28}
+        WindSway: {bend: SWAY_SHRUB_BEND, height: SWAY_SHRUB_HEIGHT, base: 0 - py, flutter: SWAY_SHRUB_FLUTTER, flutter_frequency: SWAY_SHRUB_FREQUENCY, flutter_reach: 0.3, local_base: true}
+        Rotation: {forest_card_pitch(jy / jl, b), forest_card_yaw(jx / jl, jy / jl, jz / jl, b), forest_card_roll(jy / jl, b)}
+        Scale: {card, card, card}
+      }
+    }
+  }
+
+  prefab WildShrubHazelLow {
+    DrawRange: {far_: UNDER_LARGE_RANGE, fade: UNDER_LARGE_FADE}
+    const seed = 0.67
+    const size = 1.2
+
+
+    for c in 0..15 {
+      const a = c * 2.39996 + seed * 6.2832
+      const e = 0.1 + 1.0 * forest_hash(c + 1, seed * 31)
+      const ox = cos(e) * sin(a)
+      const oy = sin(e)
+      const oz = cos(e) * cos(a)
+      const jx = ox + (forest_hash(c + 2, seed * 31) - 0.5) * 0.6
+      const jy = oy + 0.35
+      const jz = oz + (forest_hash(c + 3, seed * 31) - 0.5) * 0.6
+      const jl = sqrt(jx * jx + jy * jy + jz * jz)
+      const b = (forest_hash(c + 4, seed * 31) - 0.5) * 1.8
+      const card = size * (0.62 + 0.3 * forest_hash(c + 5, seed * 31))
+      const py = 0.06 + oy * size * 0.36
+      "card_{c}" : WildHazelCard {
+        Position: {ox * size * 0.34, py, oz * size * 0.34}
+        WindSway: {bend: SWAY_SHRUB_BEND, height: SWAY_SHRUB_HEIGHT, base: 0 - py, flutter: SWAY_SHRUB_FLUTTER, flutter_frequency: SWAY_SHRUB_FREQUENCY, flutter_reach: 0.3, local_base: true}
+        Rotation: {forest_card_pitch(jy / jl, b), forest_card_yaw(jx / jl, jy / jl, jz / jl, b), forest_card_roll(jy / jl, b)}
+        Scale: {card, card, card}
+      }
+    }
+  }
+
+  prefab WildShrubElder {
+    DrawRange: {far_: UNDER_LARGE_RANGE, fade: UNDER_LARGE_FADE}
+    const seed = 0.83
+    const size = 1.7
+
+
+    for c in 0..15 {
+      const a = c * 2.39996 + seed * 6.2832
+      const e = 0.15 + 1.25 * forest_hash(c + 1, seed * 31)
+      const ox = cos(e) * sin(a)
+      const oy = sin(e)
+      const oz = cos(e) * cos(a)
+      const jx = ox + (forest_hash(c + 2, seed * 31) - 0.5) * 0.6
+      const jy = oy + 0.35
+      const jz = oz + (forest_hash(c + 3, seed * 31) - 0.5) * 0.6
+      const jl = sqrt(jx * jx + jy * jy + jz * jz)
+      const b = (forest_hash(c + 4, seed * 31) - 0.5) * 1.8
+      const card = size * (0.62 + 0.3 * forest_hash(c + 5, seed * 31))
+      const py = 0.08 + oy * size * 0.45
+      "card_{c}" : WildElderCard {
+        Position: {ox * size * 0.28, py, oz * size * 0.28}
+        WindSway: {bend: SWAY_SHRUB_BEND, height: SWAY_SHRUB_HEIGHT, base: 0 - py, flutter: SWAY_SHRUB_FLUTTER, flutter_frequency: SWAY_SHRUB_FREQUENCY, flutter_reach: 0.3, local_base: true}
+        Rotation: {forest_card_pitch(jy / jl, b), forest_card_yaw(jx / jl, jy / jl, jz / jl, b), forest_card_roll(jy / jl, b)}
+        Scale: {card, card, card}
+      }
+    }
+  }
+
+  // Fallen logs of dead wood like ForestLog, length meters along local Z, their origin under the
+  // middle so they lie along the slope, sunk a little into the floor, with their cut ends and
+  // shelf fungus along a side
+  prefab WildLog {
+    DrawRange: {far_: UNDER_LARGE_RANGE, fade: UNDER_LARGE_FADE}
+    const length = 3.6
+    const radius = 0.26
+    const y = radius * 0.78
+
+    wood : ForestBarkDead {
+      Position: {0, y, 0}
+      Rotation: {PI / 2, 0, 0}
+      Scale: {radius, length, radius}
+      Frustum: {segments: 12, smooth: true, length: 1, radius_bottom: 1, radius_top: 0.86}
+    }
+
+    cut_a : ForestWoodCut {
+      Position: {0, y, length / 2 - 0.01}
+      Rotation: {PI / 2, 0, 0}
+      Scale: {radius * 0.84, 0.03, radius * 0.84}
+    }
+
+    cut_b : ForestWoodCut {
+      Position: {0, y, 0.01 - length / 2}
+      Rotation: {PI / 2, 0, 0}
+      Scale: {radius * 0.84, 0.03, radius * 0.84}
+    }
+
+    for j in 0..4 {
+      const t = 0.2 + 0.6 * forest_hash(j + 11, 17)
+      const fs = 0.07 + 0.07 * forest_hash(j + 12, 17)
+      "fungus_{j}" : ForestFungus {
+        Position: {radius * 0.88, y + radius * 0.25 * forest_hash(j + 13, 17), length * (t - 0.5)}
+        Rotation: {0.05, PI / 2, 0}
+        Scale: {fs * 1.4, fs * 0.32, fs}
+        Sphere: {radius: 1, segments: 12, smooth: true}
+      }
+    }
+  }
+
+  prefab WildLogLong {
+    DrawRange: {far_: UNDER_LARGE_RANGE, fade: UNDER_LARGE_FADE}
+    const length = 4.6
+    const radius = 0.32
+    const y = radius * 0.76
+
+    wood : ForestBarkDead {
+      Position: {0, y, 0}
+      Rotation: {PI / 2, 0, 0}
+      Scale: {radius, length, radius}
+      Frustum: {segments: 12, smooth: true, length: 1, radius_bottom: 1, radius_top: 0.82}
+    }
+
+    cut_a : ForestWoodCut {
+      Position: {0, y, length / 2 - 0.01}
+      Rotation: {PI / 2, 0, 0}
+      Scale: {radius * 0.8, 0.03, radius * 0.8}
+    }
+
+    cut_b : ForestWoodCut {
+      Position: {0, y, 0.01 - length / 2}
+      Rotation: {PI / 2, 0, 0}
+      Scale: {radius * 0.8, 0.03, radius * 0.8}
+    }
+  }
+
+  prefab WildLogThin {
+    DrawRange: {far_: UNDER_LARGE_RANGE, fade: UNDER_LARGE_FADE}
+    const length = 2.4
+    const radius = 0.16
+    const y = radius * 0.8
+
+    wood : ForestBarkDead {
+      Position: {0, y, 0}
+      Rotation: {PI / 2, 0, 0}
+      Scale: {radius, length, radius}
+      Frustum: {segments: 12, smooth: true, length: 1, radius_bottom: 1, radius_top: 0.88}
+    }
+
+    cut_a : ForestWoodCut {
+      Position: {0, y, length / 2 - 0.01}
+      Rotation: {PI / 2, 0, 0}
+      Scale: {radius * 0.86, 0.03, radius * 0.86}
+    }
+
+    cut_b : ForestWoodCut {
+      Position: {0, y, 0.01 - length / 2}
+      Rotation: {PI / 2, 0, 0}
+      Scale: {radius * 0.86, 0.03, radius * 0.86}
+    }
+
+    for j in 0..3 {
+      const t = 0.15 + 0.7 * forest_hash(j + 11, 23)
+      const fs = 0.05 + 0.05 * forest_hash(j + 12, 23)
+      "fungus_{j}" : ForestFungus {
+        Position: {0 - radius * 0.9, y + radius * 0.2 * forest_hash(j + 13, 23), length * (t - 0.5)}
+        Rotation: {0.05, 0 - PI / 2, 0}
+        Scale: {fs * 1.4, fs * 0.32, fs}
+        Sphere: {radius: 1, segments: 12, smooth: true}
+      }
+    }
+  }
+
+  // Stumps like ForestStump: a stout cut trunk of the species flaring into four roots, its cut
+  // face on top
+  prefab WildStumpBeechCut {
+    DrawRange: {far_: UNDER_LARGE_RANGE, fade: UNDER_LARGE_FADE}
+    const radius = 0.38
+    const height = 0.55
+
+    wood : WildStumpBeech {
+      Position: {0, height / 2 - 0.05, 0}
+      WindSway: {bend: SWAY_BROADLEAF_BEND, height: SWAY_BROADLEAF_HEIGHT, base: 0.05 - height / 2, local_base: true}
+      Scale: {radius, height + 0.1, radius}
+      Frustum: {segments: 12, smooth: true, length: 1, radius_bottom: 1.15, radius_top: 0.95}
+    }
+
+    top : ForestWoodCut {
+      Position: {0, height + 0.005, 0}
+      Rotation: {0.04, 0, 0.03}
+      Scale: {radius * 0.93, 0.03, radius * 0.93}
+    }
+
+    for j in 0..4 {
+      const a = j * 1.5708 + forest_hash(j + 1, 41) * 0.8
+      const rl = radius * (1.3 + 0.8 * forest_hash(j + 2, 41))
+      "root_{j}" : ForestLimbDead {
+        Position: {sin(a) * radius * 0.85, 0.02, cos(a) * radius * 0.85}
+        Rotation: {1.25, a, 0}
+        Scale: {radius * 0.38, rl, radius * 0.38}
+        Cone: {segments: 6, smooth: true, length: 1, radius: 1}
+      }
+    }
+  }
+
+  prefab WildStumpOakCut {
+    DrawRange: {far_: UNDER_LARGE_RANGE, fade: UNDER_LARGE_FADE}
+    const radius = 0.46
+    const height = 0.4
+
+    wood : WildStumpOak {
+      Position: {0, height / 2 - 0.05, 0}
+      WindSway: {bend: SWAY_BROADLEAF_BEND, height: SWAY_BROADLEAF_HEIGHT, base: 0.05 - height / 2, local_base: true}
+      Scale: {radius, height + 0.1, radius}
+      Frustum: {segments: 12, smooth: true, length: 1, radius_bottom: 1.2, radius_top: 0.95}
+    }
+
+    top : ForestWoodCut {
+      Position: {0, height + 0.005, 0}
+      Rotation: {0.06, 0, -0.04}
+      Scale: {radius * 0.93, 0.03, radius * 0.93}
+    }
+
+    for j in 0..4 {
+      const a = j * 1.5708 + forest_hash(j + 1, 43) * 0.8
+      const rl = radius * (1.3 + 0.8 * forest_hash(j + 2, 43))
+      "root_{j}" : ForestLimbDead {
+        Position: {sin(a) * radius * 0.85, 0.02, cos(a) * radius * 0.85}
+        Rotation: {1.25, a, 0}
+        Scale: {radius * 0.38, rl, radius * 0.38}
+        Cone: {segments: 6, smooth: true, length: 1, radius: 1}
+      }
+    }
+  }
+
+  prefab WildStumpSpruceCut {
+    DrawRange: {far_: UNDER_LARGE_RANGE, fade: UNDER_LARGE_FADE}
+    const radius = 0.3
+    const height = 0.7
+
+    wood : WildStumpSpruce {
+      Position: {0, height / 2 - 0.05, 0}
+      WindSway: {bend: SWAY_CONIFER_BEND, height: SWAY_CONIFER_HEIGHT, base: 0.05 - height / 2, local_base: true}
+      Scale: {radius, height + 0.1, radius}
+      Frustum: {segments: 12, smooth: true, length: 1, radius_bottom: 1.15, radius_top: 0.95}
+    }
+
+    top : ForestWoodCut {
+      Position: {0, height + 0.005, 0}
+      Rotation: {-0.05, 0, 0.05}
+      Scale: {radius * 0.93, 0.03, radius * 0.93}
+    }
+
+    for j in 0..4 {
+      const a = j * 1.5708 + forest_hash(j + 1, 47) * 0.8
+      const rl = radius * (1.3 + 0.8 * forest_hash(j + 2, 47))
+      "root_{j}" : ForestLimbDead {
+        Position: {sin(a) * radius * 0.85, 0.02, cos(a) * radius * 0.85}
+        Rotation: {1.25, a, 0}
+        Scale: {radius * 0.38, rl, radius * 0.38}
+        Cone: {segments: 6, smooth: true, length: 1, radius: 1}
+      }
+    }
+  }
+
+  // Rocks one unit across, half sunk into the floor; the scree uses them smaller
+  prefab WildRock {
+    DrawRange: {far_: UNDER_LARGE_RANGE, fade: UNDER_LARGE_FADE}
+
+    stone : ForestRock {
+      Position: {0, 0.08, 0}
+      Scale: {1, 0.58, 0.82}
+    }
+  }
+
+  prefab WildRockFlat {
+    DrawRange: {far_: UNDER_LARGE_RANGE, fade: UNDER_LARGE_FADE}
+
+    stone : ForestRock {
+      Position: {0, 0.02, 0}
+      Rotation: {0.12, 0.7, 0.08}
+      Scale: {1.1, 0.38, 0.75}
+    }
+  }
+
+  // Mushrooms like ForestMushroom in clusters: brown caps and a pair of fly agarics
+  prefab WildMushrooms {
+    DrawRange: {far_: UNDER_SMALL_RANGE, fade: UNDER_SMALL_FADE}
+
+    for m in 0..3 {
+      const size = 0.06 + 0.05 * forest_hash(m + 1, 71)
+      const a = m * 2.1 + forest_hash(m + 2, 71)
+      const d = 0.04 + 0.08 * forest_hash(m + 3, 71)
+      const tilt = (forest_hash(m + 4, 71) - 0.5) * 0.4
+      const cap_r = size * 0.6
+      const stem_r = size * 0.12
+      "stem_{m}" : ForestMushroomStem {
+        Position: {sin(a) * d, size * 0.45, cos(a) * d}
+        Scale: {stem_r, size * 0.95, stem_r}
+      }
+
+      "gills_{m}" : ForestMushroomGills {
+        Position: {sin(a) * d, size * 0.9, cos(a) * d}
+        Rotation: {tilt, a, 0}
+        Scale: {cap_r * 0.95, size * 0.02, cap_r * 0.95}
+      }
+
+      "cap_{m}" : ForestMushroomCap {
+        Position: {sin(a) * d, size * 0.9, cos(a) * d}
+        Rotation: {tilt, a, 0}
+        Scale: {cap_r, cap_r * 0.6, cap_r}
+      }
+    }
+  }
+
+  prefab WildAgarics {
+    DrawRange: {far_: UNDER_SMALL_RANGE, fade: UNDER_SMALL_FADE}
+
+    for m in 0..2 {
+      const size = 0.1 + 0.05 * m
+      const a = m * 2.6 + 0.4
+      const d = 0.07 + 0.05 * m
+      const tilt = 0.12 - 0.2 * m
+      const cap_r = size * 0.7
+      const stem_r = size * 0.12
+      "stem_{m}" : ForestMushroomStem {
+        Position: {sin(a) * d, size * 0.45, cos(a) * d}
+        Scale: {stem_r, size * 0.95, stem_r}
+      }
+
+      "gills_{m}" : ForestMushroomGills {
+        Position: {sin(a) * d, size * 0.9, cos(a) * d}
+        Rotation: {tilt, a, 0}
+        Scale: {cap_r * 0.95, size * 0.02, cap_r * 0.95}
+      }
+
+      "cap_{m}" : ForestAgaricCap {
+        Position: {sin(a) * d, size * 0.9, cos(a) * d}
+        Rotation: {tilt, a, 0}
+        Scale: {cap_r, cap_r * 0.55, cap_r}
+      }
+    }
+  }
+
+  // A twig like ForestFallenTwig lying across its origin, with a side shoot
+  prefab WildTwig {
+    DrawRange: {far_: UNDER_SMALL_RANGE, fade: UNDER_SMALL_FADE}
+    const length = 0.8
+    const r = 0.008 + 0.012 * length
+
+    stick : ForestTwig {
+      Position: {0, r * 0.7, 0}
+      Rotation: {PI / 2, 0, 0}
+      Scale: {r, length, r}
+    }
+
+    shoot : ForestTwig {
+      Position: {0.09, r * 0.6, 0.18}
+      Rotation: {PI / 2, 0.7, 0}
+      Scale: {r * 0.6, 0.3, r * 0.6}
+    }
+  }
+
+  // A cushion of moss on the floor
+  prefab WildMoss {
+    DrawRange: {far_: UNDER_SMALL_RANGE, fade: UNDER_SMALL_FADE}
+
+    cushion : ForestMoss {
+      Position: {0, -0.02, 0}
+      Scale: {0.45, 0.14, 0.36}
+    }
+  }
+
+  // A cell of the undergrowth, its corner at cell_x cell_z cells
+  template WildUnderCell {
+    prop cell_x: i32 = 0
+    prop cell_z: i32 = 0
+    prop level: i32 = 0
+    prop size: f32 = 16
+
+    // The stand over the middle of the cell (stands.flecs): the light on its floor, from the
+    // deep shade of beech and conifers to the open birch groves, and its share of broadleaves,
+    // which drop their litter. Above WILD_BROAD_HEIGHT the conifers of the highland stand
+    const cx = (cell_x + 0.5) * size
+    const cz = (cell_z + 0.5) * size
+    const low = box.terrain.height(infinite_forest.land, cx, cz) < WILD_BROAD_HEIGHT
+    const oakness = wild_oakness(cx, cz)
+    const mixed = wild_mixed(cx, cz)
+    const grove = wild_grove(cx, cz)
+    const light = low ? 0.1 + 0.3 * oakness * (1 - mixed) + 0.55 * grove : 0.3 + 0.4 * grove
+    const broad = low ? 1 - 0.75 * mixed * (1 - grove) : 0.1 + 0.5 * grove
+
+    // Patches of the flowers, a few cells across
+    const w_yellow = 0.2 + wild_noise(cx, cz, 60, 505)
+    const w_white = 0.2 + wild_noise(cx, cz, 60, 606)
+    const w_violet = 0.2 + wild_noise(cx, cz, 60, 707)
+
+    if level == 0 {
+      // Dense grass over the clearings and meadows, thinning toward their rims, and a little
+      // sedge in it
+      meadow {
+        Scatter: {
+          items: [{WildGrass, 1}, {WildSedge, 0.15}],
+          density: UNDER_MEADOW, seed: 8101,
+          ground: infinite_forest.land, mask_channel: 1, mask_min: 0.35, mask_max: 1, mask_edge: 0.3,
+          slope_max: 32, height_min: GROUND_MIN, height_max: SNOW_LINE,
+          scale_min: 0.42, scale_max: 0.8, avoid: [WildEdgeTrunks, WildBroadTrunks],
+          avoid_radius: 0.6, spatial_ignore: true
+        }
+      }
+
+      // Flowers of the season in the clearings, in patches
+      flowers {
+        Scatter: {
+          items: [{WildFlower, w_yellow}, {WildFlowerWhite, w_white}, {WildFlowerViolet, w_violet}],
+          density: 24, seed: 8102,
+          ground: infinite_forest.land, mask_channel: 1, mask_min: 0.5, mask_max: 1, mask_edge: 0.2,
+          slope_max: 30, height_min: GROUND_MIN, height_max: SNOW_LINE - 30,
+          scale_min: 0.32, scale_max: 0.56, avoid: [WildEdgeTrunks], avoid_radius: 0.6,
+          spatial_ignore: true
+        }
+      }
+
+      // Grass in the sunny spots of the forest floor, with the light of the stand
+      sunny {
+        Scatter: {
+          items: [{WildGrass, 1}, {WildSedge, 0.3}],
+          density: 6 + UNDER_FLOOR_GRASS * light * light, seed: 8103,
+          ground: infinite_forest.land, mask_channel: 0, mask_min: 0.3, mask_max: 1, mask_edge: 0.2,
+          slope_max: 32, height_min: GROUND_MIN, height_max: WILD_TREE_LINE + 30,
+          scale_min: 0.34, scale_max: 0.62,
+          avoid: [WildBroadTrunks, WildSlopeTrunks, WildHighlandTrunks], avoid_radius: 0.6,
+          spatial_ignore: true
+        }
+      }
+
+      // Sedge in the shade under the stands
+      sedge {
+        Scatter: {
+          items: [{WildSedge, 1}],
+          density: 6 + 24 * (1 - light), seed: 8104,
+          ground: infinite_forest.land, mask_channel: 0, mask_min: 0.45, mask_max: 1, mask_edge: 0.2,
+          slope_max: 34, height_min: GROUND_MIN, height_max: WILD_TREE_LINE,
+          scale_min: 0.4, scale_max: 0.7,
+          avoid: [WildBroadTrunks, WildSlopeTrunks, WildHighlandTrunks], avoid_radius: 0.6,
+          spatial_ignore: true
+        }
+      }
+
+      // Wood anemones and celandine under the broadleaves
+      anemones {
+        Scatter: {
+          items: [{WildFlowerWhite, 3}, {WildFlower, 1}],
+          density: 1 + 10 * broad, seed: 8105,
+          ground: infinite_forest.land, mask_channel: 0, mask_min: 0.5, mask_max: 1, mask_edge: 0.2,
+          slope_max: 30, height_min: GROUND_MIN, height_max: WILD_BROAD_HEIGHT + 40,
+          scale_min: 0.28, scale_max: 0.46, avoid: [WildBroadTrunks], avoid_radius: 0.5,
+          spatial_ignore: true
+        }
+      }
+
+      // Leaf litter under the broadleaves, lying on the ground
+      litter {
+        Scatter: {
+          items: [{WildLitter, 1}],
+          density: 3 + 40 * broad, seed: 8106,
+          ground: infinite_forest.land, mask_channel: 0, mask_min: 0.4, mask_max: 1, mask_edge: 0.2,
+          slope_max: 36, height_min: GROUND_MIN, height_max: WILD_TREE_LINE,
+          align: 1, scale_min: 0.7, scale_max: 1.3, sink: -0.01, spatial_ignore: true
+        }
+      }
+
+      // Mushrooms, twigs and moss in the stands: twigs under the broadleaves, moss under the
+      // conifers, fly agarics among the birches and spruces
+      small {
+        Scatter: {
+          items: [
+            {WildMushrooms, 0.6}, {WildAgarics, 0.1 + 0.3 * grove + 0.2 * (1 - broad)},
+            {WildTwig, 0.3 + 1.2 * broad}, {WildMoss, 0.3 + 1.4 * (1 - broad)}
+          ],
+          density: 2 + 4 * (1 - light), seed: 8107,
+          ground: infinite_forest.land, mask_channel: 0, mask_min: 0.6, mask_max: 1, mask_edge: 0.15,
+          slope_max: 32, height_min: GROUND_MIN, height_max: WILD_TREE_LINE,
+          align: 0.6, scale_min: 0.8, scale_max: 1.3,
+          avoid: [WildBroadTrunks, WildSlopeTrunks, WildHighlandTrunks], avoid_radius: 0.5,
+          spatial_ignore: true
+        }
+      }
+    }
+
+    // Ferns in the shade under the stands
+    ferns {
+      Scatter: {
+        items: [{WildFern, 1}],
+        density: 3 + 16 * (1 - light), spacing: 0.8, mode: ScatterPoisson, seed: 8201,
+        ground: infinite_forest.land, mask_channel: 0, mask_min: 0.45, mask_max: 1, mask_edge: 0.2,
+        slope_max: 34, height_min: GROUND_MIN, height_max: WILD_TREE_LINE,
+        scale_min: 0.55, scale_max: 1.1,
+        avoid: [WildBroadTrunks, WildSlopeTrunks, WildHighlandTrunks], avoid_radius: 0.9,
+        spatial_ignore: true
+      }
+    }
+
+    // Hazel and elder along the rims of the clearings
+    rims {
+      Scatter: {
+        items: [{WildShrubHazel, 1}, {WildShrubHazelLow, 1}, {WildShrubElder, 0.4 + 0.8 * grove}],
+        density: 5, spacing: 2.4, mode: ScatterPoisson, seed: 8202,
+        ground: infinite_forest.land, mask_channel: 1, mask_min: 0.1, mask_max: 0.42, mask_edge: 0.08,
+        slope_max: 28, height_min: GROUND_MIN, height_max: WILD_BROAD_HEIGHT + 80,
+        scale_min: 0.75, scale_max: 1.25, avoid: [WildEdgeTrunks, WildBroadTrunks],
+        avoid_radius: 1.8, spatial_ignore: true
+      }
+    }
+
+    // Shrubs along the edges of the trails
+    verges {
+      Scatter: {
+        items: [{WildShrubHazel, 1}, {WildShrubHazelLow, 1.4}, {WildShrubElder, 0.6}],
+        density: 6, spacing: 2.2, mode: ScatterPoisson, seed: 8203,
+        ground: infinite_forest.land, mask_channel: 2, mask_min: 0.07, mask_max: 0.32, mask_edge: 0.04,
+        slope_max: 26, height_min: GROUND_MIN, height_max: WILD_TREE_LINE,
+        scale_min: 0.7, scale_max: 1.15,
+        avoid: [WildBroadTrunks, WildSlopeTrunks, WildHighlandTrunks, WildEdgeTrunks],
+        avoid_radius: 1.6, spatial_ignore: true
+      }
+    }
+
+    // Fallen logs on the gentle floor of the stands, along the slope
+    logs {
+      Scatter: {
+        items: [{WildLog, 1}, {WildLogLong, 0.6}, {WildLogThin, 1}],
+        density: 0.4, spacing: 7, mode: ScatterPoisson, seed: 8204,
+        ground: infinite_forest.land, mask_channel: 0, mask_min: 0.65, mask_max: 1, mask_edge: 0.1,
+        slope_max: 14, height_min: GROUND_MIN, height_max: WILD_TREE_LINE,
+        align: 1, scale_min: 0.85, scale_max: 1.15, sink: 0.04,
+        avoid: [WildBroadTrunks, WildSlopeTrunks, WildHighlandTrunks], avoid_radius: 2.8,
+        spatial_ignore: true
+      }
+    }
+
+    // Stumps of the species of the stand
+    stumps {
+      Scatter: {
+        items: [
+          {WildStumpBeechCut, low ? (1 - oakness) * (1 - mixed) : 0},
+          {WildStumpOakCut, low ? oakness * (1 - mixed) : 0},
+          {WildStumpSpruceCut, low ? 0.2 + mixed : 1}
+        ],
+        density: 0.5, spacing: 4, mode: ScatterPoisson, seed: 8205,
+        ground: infinite_forest.land, mask_channel: 0, mask_min: 0.6, mask_max: 1, mask_edge: 0.15,
+        slope_max: 16, height_min: GROUND_MIN, height_max: WILD_TREE_LINE,
+        align: 0.3, scale_min: 0.8, scale_max: 1.2, sink: 0.08,
+        avoid: [WildBroadTrunks, WildSlopeTrunks, WildHighlandTrunks, logs], avoid_radius: 1.4,
+        spatial_ignore: true
+      }
+    }
+
+    // Rocks scattered through the stands
+    rocks {
+      Scatter: {
+        items: [{WildRock, 1}, {WildRockFlat, 1}],
+        density: 1, spacing: 2, mode: ScatterPoisson, seed: 8206,
+        ground: infinite_forest.land, mask_channel: 0, mask_min: 0.35, mask_max: 1, mask_edge: 0.15,
+        slope_max: 38, height_min: GROUND_MIN, height_max: GROUND_MAX,
+        align: 0.6, scale_min: 0.25, scale_max: 0.7, sink: 0.03,
+        avoid: [WildBroadTrunks, WildSlopeTrunks, WildHighlandTrunks], avoid_radius: 1.2,
+        spatial_ignore: true
+      }
+    }
+
+    // Scree stones below the rock walls and on the talus of the mountains
+    scree {
+      Scatter: {
+        items: [{WildRock, 1}, {WildRockFlat, 1.4}],
+        density: 40, spacing: 0.5, mode: ScatterPoisson, seed: 8207,
+        ground: infinite_forest.land, mask_channel: 3, mask_min: 0.22, mask_max: 0.75, mask_edge: 0.1,
+        slope_max: 34, height_min: GROUND_MIN, height_max: GROUND_MAX,
+        align: 0.8, scale_min: 0.12, scale_max: 0.45, sink: 0.02, spatial_ignore: true
+      }
+    }
+  }
+}
+
+infinite_forest {
+  // The undergrowth around the focus
+  undergrowth {
+    ChunkGrid: {
+      template: WildUnderCell,
+      cell_size: {UNDER_CELL, 0, UNDER_CELL},
+      levels: [UNDER_NEAR, UNDER_FAR],
+      hysteresis: 6,
+      budget: UNDER_BUDGET,
+      budget_ms: UNDER_BUDGET_MS,
+      ground: infinite_forest.land
+    }
+  }
+}

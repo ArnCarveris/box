@@ -455,16 +455,21 @@ static void box_shader_changed(
  * may process environments, or it builds atmosphere LUTs and the packet has an atmosphere, or
  * it converts environment images or draws environment backgrounds and the packet carries an
  * image or a view with a background, or it simulates or draws particles
- * and the packet has a particle pool, or it blurs the opaque snapshot and a batch is
- * transmissive, or it raymarches fog volumes or assigns lights to clusters and a view of the
+ * and the packet has a particle pool, or it places or draws grass blades and the packet has a
+ * Grass, or it blurs the opaque snapshot and a batch is
+ * transmissive, or it lights fog volumes or assigns lights to clusters and a view of the
  * packet draws a fog volume, which reads the clusters for its point and spot lights, or it
- * raymarches planet atmosphere shells and a view of the packet draws one, or it draws star
+ * raymarches planet atmosphere shells and a view of the packet draws one, or it steps the fields
+ * of WaterRipples and the packet has one, or it evolves the spectra of WaterSpectrum and the
+ * packet has one, or it draws star
  * fields and a view of the packet draws one, or it
  * draws the debug grid and a view of the packet has it enabled, or it draws the wireframe and
  * a view of the packet has one, or it draws the probe debug views and a view of the packet has
  * one enabled, or it draws the overdraw heat map and a view of the packet has it enabled, or it
  * draws the boxes of the spatial index trees and a view of the packet has some, or it
  * is the extended mesh shader and the scene of a view enables a material feature, or it is the
+ * layers module of a mesh shader and the scene of a view enables Scene.texture_layers (and a
+ * shading feature of the extended mesh shader for its one) or a batch draws with it, or it is the
  * shared code of the texture graph stages and the packet creates a texture graph
  */
 static bool box_shader_used(
@@ -497,6 +502,21 @@ static bool box_shader_used(
         }
     }
 
+    if (box_render_is_mesh_layers(handle)) {
+        const uint32_t shading = BOX_RENDER_FEATURE_MATERIALS &
+            ~(BOX_RENDER_FEATURE_TEXTURE_BLEND | BOX_RENDER_FEATURE_TRANSMISSION |
+                BOX_RENDER_FEATURE_DISTORTION | BOX_RENDER_FEATURE_WATER);
+        for (i = 0; i < ecs_vec_count(&p->views); i ++) {
+            const box_render_view_t *v = ecs_vec_get_t(&p->views, box_render_view_t, i);
+            uint32_t f = v->scene_features;
+            if ((f & BOX_RENDER_FEATURE_TEXTURE_LAYERS) &&
+                (handle == BOX_RENDER_SHADER_MESH_LAYERS || (f & shading)))
+            {
+                result = true;
+            }
+        }
+    }
+
     if (handle == BOX_RENDER_SHADER_ENVIRONMENT && box_render_environment_use(p)) {
         result = true;
     }
@@ -505,7 +525,23 @@ static bool box_shader_used(
         result = true;
     }
 
+    if (box_render_grass_use(p, handle)) {
+        result = true;
+    }
+
     if (handle == BOX_RENDER_SHADER_PLANAR && ecs_vec_count(&p->planar_reflections)) {
+        result = true;
+    }
+
+    if (handle == BOX_RENDER_SHADER_WATER_RIPPLES && ecs_vec_count(&p->water_ripples)) {
+        result = true;
+    }
+
+    if (handle == BOX_RENDER_SHADER_WATER_SPECTRUM && ecs_vec_count(&p->water_spectra)) {
+        result = true;
+    }
+
+    if (handle == BOX_RENDER_SHADER_IMPOSTOR && ecs_vec_count(&p->impostor_blits)) {
         result = true;
     }
 
@@ -588,6 +624,7 @@ static bool box_shader_used(
         const box_render_batch_t *b = ecs_vec_get_t(&p->batches, box_render_batch_t, i);
         if (b->pipeline == pipeline || b->pipeline == also ||
             (meshes && box_render_is_mesh(b->pipeline)) ||
+            (b->texture_layers && handle == box_render_mesh_layers(b->pipeline)) ||
             (handle == BOX_RENDER_SHADER_TRANSMISSION && b->transmissive))
         {
             result = true;
@@ -943,6 +980,15 @@ void BoxShaderImport(
         BOX_RENDER_SHADER_MESH, true);
     box_shader_builtin(world, state, builtin, "mesh_extended", "etc/shaders/mesh_extended.wgsl",
         BOX_RENDER_SHADER_MESH_EXTENDED, true);
+    box_shader_builtin_defines(world, state, builtin, "mesh_layers", "etc/shaders/mesh.wgsl",
+        "BOX_TEXTURE_LAYERS", BOX_RENDER_SHADER_MESH_LAYERS, true);
+    box_shader_builtin_defines(world, state, builtin, "mesh_extended_layers",
+        "etc/shaders/mesh_extended.wgsl", "BOX_TEXTURE_LAYERS",
+        BOX_RENDER_SHADER_MESH_EXTENDED_LAYERS, true);
+    box_shader_builtin(world, state, builtin, "terrain", "etc/shaders/terrain.wgsl",
+        BOX_RENDER_SHADER_TERRAIN, true);
+    box_shader_builtin_defines(world, state, builtin, "terrain_layers",
+        "etc/shaders/terrain.wgsl", "BOX_TEXTURE_LAYERS", BOX_RENDER_SHADER_TERRAIN_LAYERS, true);
     box_shader_builtin(world, state, builtin, "scatter", "etc/shaders/scatter.wgsl",
         BOX_RENDER_SHADER_SCATTER, true);
     box_shader_builtin(world, state, builtin, "compose", "etc/shaders/compose.wgsl",
@@ -965,6 +1011,8 @@ void BoxShaderImport(
         BOX_RENDER_SHADER_BLOOM, true);
     box_shader_builtin(world, state, builtin, "smaa", "etc/shaders/smaa.wgsl",
         BOX_RENDER_SHADER_SMAA, true);
+    box_shader_builtin(world, state, builtin, "fxaa", "etc/shaders/fxaa.wgsl",
+        BOX_RENDER_SHADER_FXAA, true);
     box_shader_builtin(world, state, builtin, "grading", "etc/shaders/grading.wgsl",
         BOX_RENDER_SHADER_GRADING, true);
     box_shader_builtin(world, state, builtin, "vignette", "etc/shaders/vignette.wgsl",
@@ -987,10 +1035,20 @@ void BoxShaderImport(
         BOX_RENDER_SHADER_PARTICLE_SIM, true);
     box_shader_builtin(world, state, builtin, "particle_draw",
         "etc/shaders/particle_draw.wgsl", BOX_RENDER_SHADER_PARTICLE_DRAW, true);
+    box_shader_builtin(world, state, builtin, "grass_place", "etc/shaders/grass_place.wgsl",
+        BOX_RENDER_SHADER_GRASS_PLACE, true);
+    box_shader_builtin(world, state, builtin, "grass", "etc/shaders/grass.wgsl",
+        BOX_RENDER_SHADER_GRASS, true);
     box_shader_builtin(world, state, builtin, "transmission", "etc/shaders/transmission.wgsl",
         BOX_RENDER_SHADER_TRANSMISSION, true);
     box_shader_builtin(world, state, builtin, "planar", "etc/shaders/planar.wgsl",
         BOX_RENDER_SHADER_PLANAR, true);
+    box_shader_builtin(world, state, builtin, "water_ripples",
+        "etc/shaders/water_ripples.wgsl", BOX_RENDER_SHADER_WATER_RIPPLES, true);
+    box_shader_builtin(world, state, builtin, "water_spectrum",
+        "etc/shaders/water_spectrum.wgsl", BOX_RENDER_SHADER_WATER_SPECTRUM, true);
+    box_shader_builtin(world, state, builtin, "impostor", "etc/shaders/impostor.wgsl",
+        BOX_RENDER_SHADER_IMPOSTOR, true);
     box_shader_builtin(world, state, builtin, "fog_volume", "etc/shaders/fog_volume.wgsl",
         BOX_RENDER_SHADER_FOG_VOLUME, true);
     box_shader_builtin(world, state, builtin, "planet_atmosphere",

@@ -1,0 +1,57 @@
+// A terrain of cones for the TerrainQuery tests of test/gpu/render/src/TerrainQuery.c. In every
+// 64 m cell of the world the ground rises from 0 at the center of the cell, half a meter per
+// meter, to 8 m at 16 m from the center; there a cliff rises 6 m over 1.28 m to a flat plateau
+// at 14 m. A walker that is the focus stands at the center of the cell (0, 0), and a template
+// puts a rock on the ground at the center of a ChunkGrid cell.
+
+using box.transform
+using box.material
+using box.texture
+using box.terrain
+using box.camera
+using box.view
+using box.light
+using box.world
+
+query_cones {
+  cells  { nodes.Cells: {jitter: 0, size: 64} }
+  dist   { nodes.Split: {input: cells, channel: ChannelR} }
+  slope  { nodes.Remap: {input: dist, from_min: 0, from_max: 0.25, to_min: 0, to_max: 8,
+                         clamp: true} }
+  cliff  { nodes.Remap: {input: dist, from_min: 0.25, from_max: 0.27, to_min: 0, to_max: 6,
+                         clamp: true} }
+  height { nodes.Add: {a: slope, b: cliff} }
+  Terrain: {height: height, tile_size: 32, resolution: 33, levels: 4, lod_distance: 128,
+            min_height: -1, max_height: 20, budget: 64, query_spacing: 0.5, query_radius: 48}
+  Rgb: {120, 140, 90}
+  PbrMaterial: {roughness: 1}
+}
+
+query_walker {
+  Position: {32, 1.7, 32}
+  Camera: {fov: 60, near_: 0.1, far_: 2000}
+  WorldFocus
+}
+
+query_view {
+  View: {camera: query_walker, clear: {enabled: true, color: {20, 30, 60, 255}}}
+}
+
+query_sun {
+  Rotation: {1.0, 0.6, 0}
+  DirectionalLight: {intensity: 3.14}
+}
+
+// A cell with a rock on the ground at its center
+template QueryRock {
+  prop cell_x: i32 = 0
+  prop cell_z: i32 = 0
+  prop size: f32 = 0
+
+  const x = cell_x * size + size / 2
+  const z = cell_z * size + size / 2
+
+  rock {
+    Position: {size / 2, box.terrain.height(query_cones, x, z), size / 2}
+  }
+}

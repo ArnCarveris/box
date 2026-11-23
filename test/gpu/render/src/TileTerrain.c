@@ -22,7 +22,7 @@ void TileTerrain_corner_variant(void) {
     App *app = ecs_singleton_get_mut(world, App);
     app->headless = true;
     ecs_singleton_modified(world, App);
-    ecs_singleton_set(world, Scene, {.texture_blend = true});
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.texture_blend = true});
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 6});
     ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
@@ -97,7 +97,7 @@ void TileTerrain_kind_order(void) {
     App *app = ecs_singleton_get_mut(world, App);
     app->headless = true;
     ecs_singleton_modified(world, App);
-    ecs_singleton_set(world, Scene, {.texture_blend = true});
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.texture_blend = true});
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 6});
     ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
@@ -171,7 +171,7 @@ void TileTerrain_whole_tile(void) {
     App *app = ecs_singleton_get_mut(world, App);
     app->headless = true;
     ecs_singleton_modified(world, App);
-    ecs_singleton_set(world, Scene, {.texture_blend = true});
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.texture_blend = true});
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 6});
     ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
@@ -245,7 +245,7 @@ void TileTerrain_extended_variant(void) {
     App *app = ecs_singleton_get_mut(world, App);
     app->headless = true;
     ecs_singleton_modified(world, App);
-    ecs_singleton_set(world, Scene, {.texture_blend = true});
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.texture_blend = true});
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 6});
     ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
@@ -315,7 +315,7 @@ void TileTerrain_alpha_over(void) {
     App *app = ecs_singleton_get_mut(world, App);
     app->headless = true;
     ecs_singleton_modified(world, App);
-    ecs_singleton_set(world, Scene, {.texture_blend = true});
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.texture_blend = true});
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 6});
     ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});

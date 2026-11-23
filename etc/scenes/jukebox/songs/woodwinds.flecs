@@ -9,13 +9,18 @@ assets {
     Bus: {output: master, kind: ChannelReturn, volume: 0.32, effects: [ww_hall]}
     Reverb: {decay: 1.9, damping: 0.55, predelay: 0.024, size: 0.8}
   }
+
   ww_winds_eq {
     Equalizer: {bands: [
       {kind: EqLowCut, frequency: 35},
       {kind: EqPeak, frequency: 3200, gain: -1, q: 0.8}
     ]}
   }
-  ww_winds_glue { Compressor: {threshold: -14, ratio: 1.8, attack: 0.03, release: 0.3, knee: 8, makeup: 0.5} }
+
+  ww_winds_glue {
+    Compressor: {threshold: -14, ratio: 1.8, attack: 0.03, release: 0.3, knee: 8, makeup: 0.5}
+  }
+
   ww_winds {
     Bus: {output: master, volume: 0.7, effects: [ww_winds_eq, ww_winds_glue]}
     Meter: {}
@@ -32,6 +37,7 @@ assets {
       Oscillator: {wave: Sine, frequency: 523.25, level: 0.5}
       ww_turbulence { Oscillator: {wave: Noise, color: NoiseBrown, modulation: Ring, index: 0.2} }
     }
+
     ww_h2 {
       Oscillator: {wave: Sine, frequency: 1046.5, level: 0.11}
       ww_register { ModRoute: {source: SourceKey, target: TargetLevel, amount: -1.1} }
@@ -39,23 +45,28 @@ assets {
       ww_force { ModRoute: {source: SourceVelocity, target: TargetLevel, amount: 2} }
       ww_press { ModRoute: {source: SourcePressure, target: TargetLevel, amount: 1.5} }
     }
+
     ww_h3 {
       Oscillator: {wave: Sine, frequency: 1569.75, level: 0.086}
       ww_register { ModRoute: {source: SourceKey, target: TargetLevel, amount: -0.77} }
     }
+
     ww_chiff {
       Oscillator: {wave: Sine, frequency: 1046.5, level: 0.15}
       Envelope: {attack: 0.004, decay: 0.05, curve: 3}
     }
+
     ww_tongue {
       Oscillator: {wave: Noise, level: 0.2}
       Envelope: {attack: 0.002, decay: 0.035, curve: 3}
     }
+
     ww_edge {
       Oscillator: {wave: Saw, frequency: 523.25, level: 0.02}
       ww_register { ModRoute: {source: SourceKey, target: TargetLevel, amount: -2} }
       ww_force { ModRoute: {source: SourceVelocity, target: TargetLevel, amount: 3} }
     }
+
     ww_breath {
       Oscillator: {wave: Noise, color: NoisePink, level: 0.045}
       Envelope: {attack: 0.02, sustain: 1, release: 0.07}
@@ -74,23 +85,28 @@ assets {
       Oscillator: {wave: Sine, frequency: 1046.5, level: 0.45}
       ww_turbulence { Oscillator: {wave: Noise, color: NoiseBrown, modulation: Ring, index: 0.15} }
     }
+
     ww_h2 {
       Oscillator: {wave: Sine, frequency: 2093, level: 0.035}
       ww_register { ModRoute: {source: SourceKey, target: TargetLevel, amount: -0.5} }
       ww_vib { ModRoute: {source: SourceLfo1, target: TargetLevel, amount: 0.6} }
       ww_force { ModRoute: {source: SourceVelocity, target: TargetLevel, amount: 1.5} }
     }
+
     ww_h3 {
       Oscillator: {wave: Sine, frequency: 3139.5, level: 0.02}
     }
+
     ww_chiff {
       Oscillator: {wave: Sine, frequency: 2093, level: 0.1}
       Envelope: {attack: 0.003, decay: 0.04, curve: 3}
     }
+
     ww_tongue {
       Oscillator: {wave: Noise, level: 0.15}
       Envelope: {attack: 0.002, decay: 0.03, curve: 3}
     }
+
     ww_breath {
       Oscillator: {wave: Noise, color: NoisePink, level: 0.022}
       Envelope: {attack: 0.02, sustain: 1, release: 0.06}
@@ -109,16 +125,19 @@ assets {
       Oscillator: {wave: Saw, frequency: 440, level: 1}
       ww_turbulence { Oscillator: {wave: Noise, color: NoiseBrown, modulation: Ring, index: 0.06} }
     }
+
     ww_formant {
       Oscillator: {wave: Sine, frequency: 440, sync: 6.48, level: 0.035}
       ww_fixed { ModRoute: {source: SourceKey, target: TargetHardSync, amount: -12} }
       ww_force { ModRoute: {source: SourceVelocity, target: TargetLevel, amount: 4} }
       ww_press { ModRoute: {source: SourcePressure, target: TargetLevel, amount: 2} }
     }
+
     ww_tongue {
       Oscillator: {wave: Noise, level: 0.2}
       Envelope: {attack: 0.001, decay: 0.015, curve: 3}
     }
+
     ww_breath {
       Oscillator: {wave: Noise, color: NoisePink, level: 0.02}
       Envelope: {attack: 0.02, sustain: 1, release: 0.05}
@@ -129,7 +148,14 @@ assets {
     Sound: {seed: 13, drift: 2}
     Glide: {time: 0.018, legato: true, channel: 13}
     Envelope: {attack: 0.04, decay: 0.1, sustain: 0.9, release: 0.06, curve: 2}
-    Filter: {kind: LowPass, cutoff: 2200, resonance: 0.1, slope: Slope24, keytrack: 0.3, velocity: 1.3}
+    Filter: {
+      kind: LowPass,
+      cutoff: 2200,
+      resonance: 0.1,
+      slope: Slope24,
+      keytrack: 0.3,
+      velocity: 1.3
+    }
     PitchEnvelope: {amount: -0.08, decay: 0.05, curve: 2}
     ww_swell { ModRoute: {source: SourcePressure, target: TargetLevel, amount: 0.6} }
     ww_shine { ModRoute: {source: SourcePressure, target: TargetCutoff, amount: 0.8} }
@@ -138,17 +164,21 @@ assets {
       ww_turbulence { Oscillator: {wave: Noise, color: NoiseBrown, modulation: Ring, index: 0.08} }
       ww_register { ModRoute: {source: SourceKey, target: TargetPulseWidth, amount: -0.025} }
     }
+
     ww_body {
       Oscillator: {wave: Sine, frequency: 164.81, level: 0.05}
     }
+
     ww_formant {
       Oscillator: {wave: Sine, frequency: 164.81, sync: 13.35, level: 0.035}
       ww_fixed { ModRoute: {source: SourceKey, target: TargetHardSync, amount: -12} }
     }
+
     ww_tongue {
       Oscillator: {wave: Noise, level: 0.12}
       Envelope: {attack: 0.001, decay: 0.02, curve: 3}
     }
+
     ww_breath {
       Oscillator: {wave: Noise, color: NoisePink, level: 0.012}
       Envelope: {attack: 0.02, sustain: 1, release: 0.06}
@@ -167,16 +197,19 @@ assets {
       Oscillator: {wave: Saw, frequency: 130.81, level: 1.1}
       ww_turbulence { Oscillator: {wave: Noise, color: NoiseBrown, modulation: Ring, index: 0.06} }
     }
+
     ww_formant {
       Oscillator: {wave: Sine, frequency: 130.81, sync: 9.17, level: 0.04}
       ww_fixed { ModRoute: {source: SourceKey, target: TargetHardSync, amount: -12} }
       ww_force { ModRoute: {source: SourceVelocity, target: TargetLevel, amount: 4} }
       ww_press { ModRoute: {source: SourcePressure, target: TargetLevel, amount: 2} }
     }
+
     ww_tongue {
       Oscillator: {wave: Noise, level: 0.2}
       Envelope: {attack: 0.001, decay: 0.02, curve: 3}
     }
+
     ww_breath {
       Oscillator: {wave: Noise, color: NoisePink, level: 0.022}
       Envelope: {attack: 0.02, sustain: 1, release: 0.06}
@@ -198,13 +231,16 @@ assets {
       Oscillator: {wave: Saw, frequency: 293.66, level: 0.4}
       ww_turbulence { Oscillator: {wave: Noise, color: NoiseBrown, modulation: Ring, index: 0.1} }
     }
+
     ww_body {
       Oscillator: {wave: Sine, frequency: 293.66, level: 0.06}
     }
+
     ww_tongue {
       Oscillator: {wave: Noise, level: 0.12}
       Envelope: {attack: 0.001, decay: 0.02, curve: 3}
     }
+
     ww_breath {
       Oscillator: {wave: Noise, color: NoisePink, level: 0.02}
       Envelope: {attack: 0.02, sustain: 1, release: 0.06}
@@ -234,7 +270,13 @@ assets {
       {start: 4.75, duration: 0.125, pitch: 84, velocity: 0.75},
       {start: 5, duration: 0.5, pitch: 81, velocity: 0.75},
       {start: 5.5, duration: 0.5, pitch: 82, velocity: 0.75},
-      {start: 6, duration: 1.94, pitch: 84, velocity: 0.75, pressure: {kind: CurveCatmullRom, keys: [{0, 0}, {1.1, 0.55}, {2, 0.05}]}}
+      {
+        start: 6,
+        duration: 1.94,
+        pitch: 84,
+        velocity: 0.75,
+        pressure: {kind: CurveCatmullRom, keys: [{0, 0}, {1.1, 0.55}, {2, 0.05}]}
+      }
     ]}
   }
 
@@ -257,7 +299,13 @@ assets {
       {start: 10, duration: 0.94, pitch: 82, velocity: 0.72},
       {start: 11, duration: 0.5, pitch: 81, velocity: 0.72},
       {start: 11.5, duration: 0.44, pitch: 79, velocity: 0.72},
-      {start: 12, duration: 1.94, pitch: 79, velocity: 0.72, pressure: {kind: CurveCatmullRom, keys: [{0, 0}, {1.1, 0.35}, {2, 0.1}]}},
+      {
+        start: 12,
+        duration: 1.94,
+        pitch: 79,
+        velocity: 0.72,
+        pressure: {kind: CurveCatmullRom, keys: [{0, 0}, {1.1, 0.35}, {2, 0.1}]}
+      },
       {start: 14, duration: 0.5, pitch: 76, velocity: 0.72},
       {start: 14.5, duration: 0.5, pitch: 77, velocity: 0.72},
       {start: 15, duration: 0.5, pitch: 79, velocity: 0.72},
@@ -269,7 +317,13 @@ assets {
       {start: 19.5, duration: 0.44, pitch: 82, velocity: 0.72},
       {start: 20, duration: 1, pitch: 81, velocity: 0.72},
       {start: 21, duration: 1, pitch: 79, velocity: 0.72},
-      {start: 22, duration: 3.94, pitch: 77, velocity: 0.72, pressure: {kind: CurveCatmullRom, keys: [{0, 0}, {2.2, 0.4}, {4, 0}]}}
+      {
+        start: 22,
+        duration: 3.94,
+        pitch: 77,
+        velocity: 0.72,
+        pressure: {kind: CurveCatmullRom, keys: [{0, 0}, {2.2, 0.4}, {4, 0}]}
+      }
     ]}
   }
 
@@ -289,7 +343,13 @@ assets {
       {start: 5, duration: 0.5, pitch: 79, velocity: 0.75},
       {start: 5.5, duration: 0.25, pitch: 77, velocity: 0.75},
       {start: 5.75, duration: 0.19, pitch: 76, velocity: 0.75},
-      {start: 6, duration: 1.94, pitch: 74, velocity: 0.75, pressure: {kind: CurveCatmullRom, keys: [{0, 0}, {1.1, 0.5}, {2, 0.05}]}}
+      {
+        start: 6,
+        duration: 1.94,
+        pitch: 74,
+        velocity: 0.75,
+        pressure: {kind: CurveCatmullRom, keys: [{0, 0}, {1.1, 0.5}, {2, 0.05}]}
+      }
     ]}
   }
 
@@ -317,7 +377,13 @@ assets {
       {start: 19, duration: 0.94, pitch: 74, velocity: 0.6},
       {start: 20, duration: 1, pitch: 76, velocity: 0.6},
       {start: 21, duration: 1, pitch: 70, velocity: 0.6},
-      {start: 22, duration: 3.94, pitch: 69, velocity: 0.6, pressure: {kind: CurveCatmullRom, keys: [{0, 0}, {2.2, 0.3}, {4, 0}]}}
+      {
+        start: 22,
+        duration: 3.94,
+        pitch: 69,
+        velocity: 0.6,
+        pressure: {kind: CurveCatmullRom, keys: [{0, 0}, {2.2, 0.3}, {4, 0}]}
+      }
     ]}
   }
 
@@ -336,7 +402,13 @@ assets {
       {start: 4.75, duration: 0.125, pitch: 57, velocity: 0.75},
       {start: 5, duration: 0.5, pitch: 55, velocity: 0.75},
       {start: 5.5, duration: 0.5, pitch: 57, velocity: 0.75},
-      {start: 6, duration: 1.94, pitch: 53, velocity: 0.75, pressure: {kind: CurveCatmullRom, keys: [{0, 0}, {1.1, 0.45}, {2, 0}]}}
+      {
+        start: 6,
+        duration: 1.94,
+        pitch: 53,
+        velocity: 0.75,
+        pressure: {kind: CurveCatmullRom, keys: [{0, 0}, {1.1, 0.45}, {2, 0}]}
+      }
     ]}
   }
 
@@ -386,7 +458,13 @@ assets {
       {start: 20.5, duration: 0.44, pitch: 58, velocity: 0.5},
       {start: 21, duration: 0.5, pitch: 60, velocity: 0.5},
       {start: 21.5, duration: 0.44, pitch: 64, velocity: 0.5},
-      {start: 22, duration: 3.94, pitch: 60, velocity: 0.5, pressure: {kind: CurveCatmullRom, keys: [{0, 0}, {2.2, 0.25}, {4, 0}]}}
+      {
+        start: 22,
+        duration: 3.94,
+        pitch: 60,
+        velocity: 0.5,
+        pressure: {kind: CurveCatmullRom, keys: [{0, 0}, {2.2, 0.25}, {4, 0}]}
+      }
     ]}
   }
 
@@ -404,7 +482,13 @@ assets {
       {start: 4.75, duration: 0.25, pitch: 41, velocity: 0.8},
       {start: 5, duration: 0.5, pitch: 43, velocity: 0.8},
       {start: 5.5, duration: 0.44, pitch: 45, velocity: 0.8},
-      {start: 6, duration: 1.94, pitch: 41, velocity: 0.8, pressure: {kind: CurveCatmullRom, keys: [{0, 0}, {1.1, 0.5}, {2, 0.05}]}}
+      {
+        start: 6,
+        duration: 1.94,
+        pitch: 41,
+        velocity: 0.8,
+        pressure: {kind: CurveCatmullRom, keys: [{0, 0}, {1.1, 0.5}, {2, 0.05}]}
+      }
     ]}
   }
 
@@ -431,7 +515,13 @@ assets {
       {start: 18, duration: 0.94, pitch: 34, velocity: 0.7},
       {start: 19, duration: 0.2, pitch: 41, velocity: 0.55},
       {start: 20, duration: 1.94, pitch: 36, velocity: 0.68},
-      {start: 22, duration: 3.94, pitch: 41, velocity: 0.68, pressure: {kind: CurveCatmullRom, keys: [{0, 0}, {2.2, 0.3}, {4, 0}]}}
+      {
+        start: 22,
+        duration: 3.94,
+        pitch: 41,
+        velocity: 0.68,
+        pressure: {kind: CurveCatmullRom, keys: [{0, 0}, {2.2, 0.3}, {4, 0}]}
+      }
     ]}
   }
 
@@ -450,7 +540,13 @@ assets {
       {start: 4.75, duration: 0.125, pitch: 74, velocity: 0.75},
       {start: 5, duration: 0.5, pitch: 75, velocity: 0.75},
       {start: 5.5, duration: 0.5, pitch: 74, velocity: 0.75},
-      {start: 6, duration: 1.94, pitch: 72, velocity: 0.75, pressure: {kind: CurveCatmullRom, keys: [{0, 0}, {1.1, 0.55}, {2, 0.05}]}}
+      {
+        start: 6,
+        duration: 1.94,
+        pitch: 72,
+        velocity: 0.75,
+        pressure: {kind: CurveCatmullRom, keys: [{0, 0}, {1.1, 0.55}, {2, 0.05}]}
+      }
     ]}
   }
 
@@ -471,7 +567,13 @@ assets {
       {start: 18, duration: 1.94, pitch: 65, velocity: 0.5},
       {start: 20, duration: 1, pitch: 67, velocity: 0.5},
       {start: 21, duration: 1, pitch: 64, velocity: 0.5},
-      {start: 22, duration: 3.94, pitch: 65, velocity: 0.5, pressure: {kind: CurveCatmullRom, keys: [{0, 0}, {2.2, 0.3}, {4, 0}]}}
+      {
+        start: 22,
+        duration: 3.94,
+        pitch: 65,
+        velocity: 0.5,
+        pressure: {kind: CurveCatmullRom, keys: [{0, 0}, {2.2, 0.3}, {4, 0}]}
+      }
     ]}
   }
 
@@ -499,7 +601,13 @@ assets {
       {start: 4.75, duration: 0.125, pitch: 93, velocity: 0.7},
       {start: 5, duration: 0.5, pitch: 94, velocity: 0.7},
       {start: 5.5, duration: 0.44, pitch: 93, velocity: 0.7},
-      {start: 6, duration: 1.94, pitch: 89, velocity: 0.7, pressure: {kind: CurveCatmullRom, keys: [{0, 0}, {1.1, 0.4}, {2, 0.05}]}}
+      {
+        start: 6,
+        duration: 1.94,
+        pitch: 89,
+        velocity: 0.7,
+        pressure: {kind: CurveCatmullRom, keys: [{0, 0}, {1.1, 0.4}, {2, 0.05}]}
+      }
     ]}
   }
 
@@ -512,7 +620,13 @@ assets {
       {start: 3.5, duration: 0.44, pitch: 94, velocity: 0.55},
       {start: 4, duration: 1, pitch: 93, velocity: 0.55},
       {start: 5, duration: 1, pitch: 91, velocity: 0.55},
-      {start: 6, duration: 3.94, pitch: 89, velocity: 0.55, pressure: {kind: CurveCatmullRom, keys: [{0, 0}, {2.2, 0.4}, {4, 0}]}}
+      {
+        start: 6,
+        duration: 3.94,
+        pitch: 89,
+        velocity: 0.55,
+        pressure: {kind: CurveCatmullRom, keys: [{0, 0}, {2.2, 0.4}, {4, 0}]}
+      }
     ]}
   }
 

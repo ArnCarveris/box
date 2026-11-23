@@ -18,6 +18,7 @@ assets {
       RoundedBox: {3.6, 0.36, 3.6, 0.12}
       Rgb: GardenStone
     }
+
     for tier in 0..3 {
       const width = 2.8 - tier * 0.5
       const y = 0.4 + tier * 1.35
@@ -26,9 +27,11 @@ assets {
         Box: {width * 0.63, 1, width * 0.63}
         Rgb: {229, 212, 183}
       }
+
       for side in 0..4 {
         {
           Rotation: {0, side * math.PI / 2, 0}
+
           for post in 0..3 {
             {
               Position: {(post - 1) * width * 0.3, y + 0.5, width * 0.325}
@@ -37,12 +40,14 @@ assets {
               ClearCoat: GardenLacquer
             }
           }
+
           {
             Position: {0, y + 0.53, width * 0.33}
             Box: {width * 0.35, 0.53, 0.03}
             Rgb: GardenPaper
             Emissive: {strength: 3.4, color: {255, 188, 113}}
           }
+
           for bar in 0..4 {
             {
               Position: {(bar - 1.5) * width * 0.09, y + 0.53, width * 0.35}
@@ -52,12 +57,14 @@ assets {
           }
         }
       }
+
       {
         Position: {0, y + 1.12, 0}
         Rotation: {0, math.PI / 4, 0}
         Frustum: {radius_bottom: width * 0.84, radius_top: width * 0.33, length: 0.55, segments: 4}
         Rgb: GardenSlate
       }
+
       for side in 0..4 {
         {
           Rotation: {0, side * math.PI / 2, 0}
@@ -69,11 +76,13 @@ assets {
         }
       }
     }
+
     finial {
       Position: {0, 5.04, 0}
       Cone: {radius: 0.22, length: 0.85, segments: 12}
       Rgb: {192, 153, 90}
     }
+
     for i in 0..5 {
       {
         Position: {0, 4.71 + i * 0.14, 0}

@@ -667,7 +667,7 @@ static bool box_pick_in_range(
 }
 
 /** Narrow phase of the spatial ray: the area of a UI element, the outline of a polygon or the
- * triangles of a shape.
+ * triangles of a shape; a Terrain is hit where the spatial ray found its surface.
  *
  * A hit on a UI element or a 2D shape outside the area of a ClipChildren ancestor is no hit, as
  * it is not drawn there, and an element with PickThrough is never hit. Neither is a disabled
@@ -692,14 +692,18 @@ static bool box_pick_filter(
     bool circle = false;
     float t = 0;
     bool alive = ecs_is_alive(cast->world, e);
-    bool polygon = alive && box_pick_polygon_size(cast->world, e, size);
-    bool ui = polygon || (alive && box_pick_ui_size(cast->world, e, size, &circle));
+    bool terrain = alive && ecs_id(Terrain) && ecs_has(cast->world, e, Terrain);
+    bool polygon = alive && !terrain && box_pick_polygon_size(cast->world, e, size);
+    bool ui = polygon || (alive && !terrain && box_pick_ui_size(cast->world, e, size, &circle));
     bool result;
     if (!alive || ecs_has_id(cast->world, e, PickThrough) ||
         ecs_has_id(cast->world, e, EcsDisabled) ||
         (ui && !polygon && box_pick_ui_bare(cast->world, e)))
     {
         result = false;
+    } else if (terrain) {
+        t = *distance;
+        result = true;
     } else if (ui) {
         mat4 m;
         box_pick_transform(cast->world, e, m);

@@ -65,7 +65,10 @@
 
     return adapter.requestDevice({
       requiredFeatures: features,
-      requiredLimits: { maxTextureArrayLayers: adapter.limits.maxTextureArrayLayers }
+      requiredLimits: {
+        maxTextureArrayLayers: adapter.limits.maxTextureArrayLayers,
+        maxSampledTexturesPerShaderStage: adapter.limits.maxSampledTexturesPerShaderStage
+      }
     });
   }).then(function (device) {
     device.lost.then(function (info) {

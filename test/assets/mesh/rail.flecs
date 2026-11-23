@@ -1,0 +1,17 @@
+// A rail as one MeshGraph shape: a tube along a path with balls instanced on it.
+
+using box.geometry
+using box.mesh
+
+prefab rail_ball { IcoSphere: {segments: 1, smooth: true, radius: 0.2} }
+
+rail {
+  route  { Path3D: {start: {0, 0, 0}, segments: [{kind: Line, end: {4, 0, 0}}]} }
+  curve  { nodes.Path: {path: route, radius: 0.05} }
+  tube   { nodes.Tube: {curves: curve, sides: 12} }
+  points { nodes.PointsOnCurves: {curves: curve, count: 5} }
+  ball   { nodes.Shape: {entity: rail_ball} }
+  balls  { nodes.InstanceOnPoints: {points: points, instance: ball} }
+  all    { nodes.Merge: {inputs: [tube, balls]} }
+  Graph: {output: all}
+}

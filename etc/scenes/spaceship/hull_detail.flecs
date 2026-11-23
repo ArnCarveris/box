@@ -8,74 +8,191 @@ using box.texture
 using box.light
 
 assets {
-  template HullDetail {
+  template HullDetailBays {
     port_service_bay {
       Position: {-7.7, 7.65, 3}
       Rotation: {0.032, 0, 0}
       well : RecessMetal { Position: {}; Box: {5, 0.5, 15} }
+
       for side in 0..2 {
         "rim_{side}" : Titanium { Position: {(side - 0.5) * 5.2, 0.3, 0}; Box: {0.23, 0.6, 15.4} }
-        "manifold_{side}" : ServiceTeal { Position: {(side - 0.5) * 3.5, 0.65, 0}; Rotation: {1.5707963, 0, 0}; Cylinder: {radius: 0.3, length: 13, segments: 12} }
+        "manifold_{side}" : ServiceTeal {
+          Position: {(side - 0.5) * 3.5, 0.65, 0}
+          Rotation: {1.5707963, 0, 0}
+          Cylinder: {radius: 0.3, length: 13, segments: 12}
+        }
       }
+
       for i in 0..5 {
         "exchanger_{i}" : Titanium { Position: {0, 0.65, -5.6 + i * 2.8}; Box: {2.5, 0.7, 1.9} }
         "coupling_{i}" : RustRed { Position: {0, 1.05, -5.6 + i * 2.8}; Box: {0.5, 0.18, 1.9} }
         "indicator_{i}" : IceLight { Position: {0.85, 1.05, -5.6 + i * 2.8}; Box: {0.3, 0.1, 0.6} }
       }
+
       raised_cover {
         Position: {-2.8, 0.2, 0}
         Rotation: {0, 0, 0.85}
         plate : CeramicArmor { Position: {-2, 0, 0}; Box: {4, 0.3, 14.5} }
         stripe : RustRed { Position: {-2, 0.18, -3}; Box: {4, 0.08, 1.8} }
+
         for i in 0..3 {
           "stiffener_{i}" : Titanium { Position: {-2, -0.3, -5 + i * 5}; Box: {3.7, 0.4, 0.25} }
         }
       }
     }
+
     starboard_avionics {
       Position: {7, 7.8, -5}
-      housing : ReplacementArmor { Position: {}; BeveledPrism: {footprint: [{-2, -8}, {2, -8}, {1, 8}, {-2, 8}], depth: 1.4, inset: 0.2, bevel: 0.2} }
+      housing : ReplacementArmor {
+        Position: {}
+        BeveledPrism: {
+          footprint: [{-2, -8}, {2, -8}, {1, 8}, {-2, 8}],
+          depth: 1.4,
+          inset: 0.2,
+          bevel: 0.2
+        }
+      }
+
       radiator { FrigateRadiator: {width: 3.2, length: 7}; Position: {0, 0.8, -3} }
       cover : CeramicArmor { Position: {0, 0.9, 4}; Box: {3.4, 0.3, 4} }
       latch : Titanium { Position: {0, 1.1, 5}; Box: {1, 0.12, 0.3} }
     }
+
     for side in 0..2 {
       const x = (side - 0.5) * 13
-      "forward_recess_{side}" : RecessMetal { Position: {x, 5.85, 36}; Rotation: {0.077, 0, 0}; Box: {3.7, 0.4, 15} }
+      "forward_recess_{side}" : RecessMetal {
+        Position: {x, 5.85, 36}
+        Rotation: {0.077, 0, 0}
+        Box: {3.7, 0.4, 15}
+      }
+
       for i in 0..6 {
-        "louver_{side}_{i}" : Titanium { Position: {x, 6.5 - i * 0.16, 30 + i * 2.2}; Rotation: {-0.3, 0, 0}; Box: {3.3, 0.24, 1.3} }
+        "louver_{side}_{i}" : Titanium {
+          Position: {x, 6.5 - i * 0.16, 30 + i * 2.2}
+          Rotation: {-0.3, 0, 0}
+          Box: {3.3, 0.24, 1.3}
+        }
       }
-      "missile_housing_{side}" : DarkArmor { Position: {(side - 0.5) * 15, 8.45, -61}; BeveledPrism: {footprint: [{-2, -5}, {2, -5}, {2, 5}, {-2, 5}], depth: 1.3, inset: 0.3, bevel: 0.2} }
+
+      "missile_housing_{side}" : DarkArmor {
+        Position: {(side - 0.5) * 15, 8.45, -61}
+        BeveledPrism: {
+          footprint: [{-2, -5}, {2, -5}, {2, 5}, {-2, 5}],
+          depth: 1.3,
+          inset: 0.3,
+          bevel: 0.2
+        }
+      }
+
       for cell in 0..3 {
-        "hatch_{side}_{cell}" : CeramicArmor { Position: {(side - 0.5) * 15, 9.2, -64 + cell * 3}; Box: {3.3, 0.2, 2.6} }
-        "seam_{side}_{cell}" : RustRed { Position: {(side - 0.5) * 15, 9.32, -64 + cell * 3}; Box: {0.15, 0.05, 2.6} }
+        "hatch_{side}_{cell}" : CeramicArmor {
+          Position: {(side - 0.5) * 15, 9.2, -64 + cell * 3}
+          Box: {3.3, 0.2, 2.6}
+        }
+
+        "seam_{side}_{cell}" : RustRed {
+          Position: {(side - 0.5) * 15, 9.32, -64 + cell * 3}
+          Box: {0.15, 0.05, 2.6}
+        }
       }
-      "coolant_{side}" : ServiceTeal { Position: {(side - 0.5) * 13, 8.8, -45}; Rotation: {1.5707963, 0, 0}; Cylinder: {radius: 0.32, length: 17, segments: 12} }
+
+      "coolant_{side}" : ServiceTeal {
+        Position: {(side - 0.5) * 13, 8.8, -45}
+        Rotation: {1.5707963, 0, 0}
+        Cylinder: {radius: 0.32, length: 17, segments: 12}
+      }
+
       for i in 0..5 {
-        "clamp_{side}_{i}" : Titanium { Position: {(side - 0.5) * 13, 8.8, -52 + i * 3.5}; Rotation: {1.5707963, 0, 0}; Tube: {radius: 0.42, thickness: 0.12, length: 0.25, segments: 12} }
+        "clamp_{side}_{i}" : Titanium {
+          Position: {(side - 0.5) * 13, 8.8, -52 + i * 3.5}
+          Rotation: {1.5707963, 0, 0}
+          Tube: {radius: 0.42, thickness: 0.12, length: 0.25, segments: 12}
+        }
       }
     }
-    bow_shield : CeramicArmor { Position: {0, 1.7, 92}; Rotation: {0.074, 0, 0}; BeveledPrism: {footprint: [{-3.5, -6}, {3.5, -6}, {1.7, 9}, {-1.7, 9}], depth: 0.55, inset: 0.15, bevel: 0.15} }
+  }
+
+  template HullDetail : HullDetailBays {
+    bow_shield : CeramicArmor {
+      Position: {0, 1.7, 92}
+      Rotation: {0.074, 0, 0}
+      BeveledPrism: {
+        footprint: [{-3.5, -6}, {3.5, -6}, {1.7, 9}, {-1.7, 9}],
+        depth: 0.55,
+        inset: 0.15,
+        bevel: 0.15
+      }
+    }
+
     bow_stripe : RustRed { Position: {0, 2.1, 91}; Rotation: {0.074, 0, 0}; Box: {1.4, 0.12, 10} }
-    bow_access : ReplacementArmor { Position: {0, 1.35, 99}; Rotation: {0.074, 0, 0}; Cylinder: {radius: 0.9, length: 0.16, segments: 8} }
+    bow_access : ReplacementArmor {
+      Position: {0, 1.35, 99}
+      Rotation: {0.074, 0, 0}
+      Cylinder: {radius: 0.9, length: 0.16, segments: 8}
+    }
+
     patch : RustRed { Position: {4, 4.6, 51}; Rotation: {0.077, 0, 0}; Box: {2.2, 0.18, 4.7} }
-    access_ring : Titanium { Position: {-4.5, 5.05, 45}; Rotation: {0.077, 0, 0}; Tube: {radius: 1.4, thickness: 0.22, length: 0.25, segments: 16} }
-    access_hatch : DarkArmor { Position: {-4.5, 5.05, 45}; Rotation: {0.077, 0, 0}; Cylinder: {radius: 1.15, length: 0.15, segments: 16} }
+    access_ring : Titanium {
+      Position: {-4.5, 5.05, 45}
+      Rotation: {0.077, 0, 0}
+      Tube: {radius: 1.4, thickness: 0.22, length: 0.25, segments: 16}
+    }
+
+    access_hatch : DarkArmor {
+      Position: {-4.5, 5.05, 45}
+      Rotation: {0.077, 0, 0}
+      Cylinder: {radius: 1.15, length: 0.15, segments: 16}
+    }
+
     dorsal_cooling {
       Position: {0, 8.2, 27}
       Rotation: {0.089, 0, 0}
       bed : RecessMetal { Position: {}; Box: {6, 0.3, 17} }
+
       for side in 0..2 {
-        "cover_{side}" : CeramicArmor { Position: {(side - 0.5) * 5.8, 0.4, 0}; Box: {0.5, 0.8, 17} }
-        "pipe_{side}" : RustRed { Position: {(side - 0.5) * 4.5, 0.5, 0}; Rotation: {1.5707963, 0, 0}; Cylinder: {radius: 0.18, length: 15, segments: 8} }
+        "cover_{side}" : CeramicArmor {
+          Position: {(side - 0.5) * 5.8, 0.4, 0}
+          Box: {0.5, 0.8, 17}
+        }
+
+        "pipe_{side}" : RustRed {
+          Position: {(side - 0.5) * 4.5, 0.5, 0}
+          Rotation: {1.5707963, 0, 0}
+          Cylinder: {radius: 0.18, length: 15, segments: 8}
+        }
       }
+
       for i in 0..9 {
-        "fin_{i}" : Titanium { Position: {0, 0.5, -7 + i * 1.75}; Rotation: {-0.25, 0, 0}; Box: {3.6, 0.2, 1.1} }
+        "fin_{i}" : Titanium {
+          Position: {0, 0.5, -7 + i * 1.75}
+          Rotation: {-0.25, 0, 0}
+          Box: {3.6, 0.2, 1.1}
+        }
       }
     }
-    dorsal_hatch : ReplacementArmor { Position: {0, 6.4, 47}; Rotation: {0.089, 0, 0}; BeveledPrism: {footprint: [{-2.7, -7}, {2.7, -7}, {1.8, 6}, {-1.8, 6}], depth: 0.5, inset: 0.2, bevel: 0.15} }
-    hatch_inset : RecessMetal { Position: {0, 6.8, 44}; Rotation: {0.089, 0, 0}; Box: {2.6, 0.12, 3} }
-    hatch_lock : Titanium { Position: {0, 6.75, 48}; Rotation: {0.089, 0, 0}; Box: {1.3, 0.12, 0.3} }
+
+    dorsal_hatch : ReplacementArmor {
+      Position: {0, 6.4, 47}
+      Rotation: {0.089, 0, 0}
+      BeveledPrism: {
+        footprint: [{-2.7, -7}, {2.7, -7}, {1.8, 6}, {-1.8, 6}],
+        depth: 0.5,
+        inset: 0.2,
+        bevel: 0.15
+      }
+    }
+
+    hatch_inset : RecessMetal {
+      Position: {0, 6.8, 44}
+      Rotation: {0.089, 0, 0}
+      Box: {2.6, 0.12, 3}
+    }
+
+    hatch_lock : Titanium {
+      Position: {0, 6.75, 48}
+      Rotation: {0.089, 0, 0}
+      Box: {1.3, 0.12, 0.3}
+    }
 
     aft_bulkhead {
       Position: {0, 0, -77.2}
@@ -84,13 +201,20 @@ assets {
       seal : RecessMetal { Position: {0, 0, -0.38}; Box: {0.15, 5, 0.08} }
       header : DockYellow { Position: {0, 2.7, -0.38}; Box: {9, 0.4, 0.1} }
       lamp : WhiteLight { Position: {0, 3.1, -0.4}; Box: {3, 0.15, 0.15} }
+
       for side in 0..2 {
-        "actuator_{side}" : Titanium { Position: {(side - 0.5) * 10.2, 0, -0.5}; Cylinder: {radius: 0.23, length: 4.5, segments: 12} }
+        "actuator_{side}" : Titanium {
+          Position: {(side - 0.5) * 10.2, 0, -0.5}
+          Cylinder: {radius: 0.23, length: 4.5, segments: 12}
+        }
+
         for i in 0..3 {
-          "lock_{side}_{i}" : RustRed { Position: {(side - 0.5) * 8.5, -1.8 + i * 1.8, -0.5}; Box: {0.8, 0.4, 0.3} }
+          "lock_{side}_{i}" : RustRed {
+            Position: {(side - 0.5) * 8.5, -1.8 + i * 1.8, -0.5}
+            Box: {0.8, 0.4, 0.3}
+          }
         }
       }
     }
-
   }
 }

@@ -1,0 +1,646 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+using box.render
+using box.light
+using box.particle
+using box.world
+using box.terrain
+using state
+using assets
+
+// The water of the brooks that terrain.flecs carves along the edges of cells of BROOK_SIZE
+// meters, placed by a ChunkGrid of BROOK_CELL cells around the focus. A cell reads the distance
+// to the middle of the brook, the bed and the height of the land from the infinite_forest.brooks
+// terrain at absolute positions, so its water is where it was each time it loads and meets the
+// water of the cells beside it.
+//
+// The bed steps down in terraces of BROOK_STEP meters, the floor of the terrace at
+// floor(bed / BROOK_STEP) * BROOK_STEP, and the water stands BROOK_DEPTH over it. A cell lays
+// the water in tiles of BROOK_TILE meters along the brook: a square where the tile is on one
+// terrace, and where a step crosses it, a length for each terrace turned down the bed, the
+// upper one ending at the step and the lower one starting just under the bed above. The water of
+// a terrace is level and every step is down along the bed, so the water only steps down where it
+// flows, and white water pours over every step. Each tile flows down the bed at a speed of its
+// slope (WaterFlow), its ripples and foam with it.
+//
+// A tile has water only where the land is carved down to its terrace at its corners and middle,
+// so no water hangs where the land drops away from the bed. Close to the focus the cells add
+// churning foam at the foot of the steps, pebbles on the bed, mossy stones that break the
+// surface and shed foam, lumps of wet earth at the water line, reeds on the banks and mossy
+// boulders above them.
+//
+// The field of ripples and foam (WaterRipples) follows the player at the height of the terrace
+// of the brook nearest to it. With state.brook_start (infinite_forest_brooks.flecs) the player starts
+// on the bank of the brook nearest to the start, looking downstream.
+state {
+  // Cells of BROOK_CELL meters within BROOK_RANGE of the focus, the stones, the plants and the
+  // cascades within BROOK_DETAIL_RANGE, BROOK_BUDGET a frame within BROOK_BUDGET_MS
+  export const BROOK_CELL: f32 = 32
+  export const BROOK_DETAIL_RANGE: f32 = 64
+  export const BROOK_RANGE: f32 = 120
+  export const BROOK_BUDGET: i32 = 2
+  export const BROOK_BUDGET_MS: f32 = 4
+
+  // A cell looks at blocks of BROOK_BLOCK meters within BROOK_BLOCK_NEAR of the middle of a
+  // brook and at tiles of BROOK_TILE meters in them within BROOK_TILE_NEAR. Tiles whose middle
+  // is within BROOK_WET get water, half the diagonal of a length of water BROOK_HALF
+  export const BROOK_BLOCK: f32 = 8
+  export const BROOK_BLOCK_NEAR: f32 = 11.5
+  export const BROOK_TILE: f32 = 2
+  export const BROOK_TILE_NEAR: f32 = 5.5
+  export const BROOK_WET: f32 = 3.1
+  export const BROOK_HALF: f32 = 1.42
+
+  // Meters the land may be under the floor of its terrace where a tile has water
+  export const BROOK_HELD: f32 = 0.1
+
+  // Speed of the water in m/s: at least BROOK_FLOW_MIN, more by BROOK_FLOW_SLOPE per unit of
+  // the slope of the bed, at most BROOK_FLOW_MAX
+  export const BROOK_FLOW_MIN: f32 = 0.12
+  export const BROOK_FLOW_SLOPE: f32 = 4
+  export const BROOK_FLOW_MAX: f32 = 0.9
+
+  // White water pours over the steps within BROOK_FALL_NEAR of the middle of the brook, BROOK_RUN
+  // meters along the flow
+  export const BROOK_FALL_NEAR: f32 = 2.2
+  export const BROOK_RUN: f32 = 0.32
+
+  // The field of ripples and foam: BROOK_RIPPLES_SIZE meters around the player in cells of
+  // about 6 cm, at the height of the brook within BROOK_RIPPLES_NEAR of the player
+  export const BROOK_RIPPLES_SIZE: f32 = 32
+  export const BROOK_RIPPLES_RESOLUTION: i32 = 512
+  export const BROOK_RIPPLES_NEAR: f32 = 40
+
+  // The start by a brook: the nearest brook within BROOK_START_REACH of the start, on its bank
+  // BROOK_START_BANK meters from its middle
+  export const BROOK_START_REACH: f32 = 400
+  export const BROOK_START_BANK: f32 = 3.4
+
+  // Where the field of ripples is, and whether the player starts by a brook
+  export mut brook_ripple_x: f32 = 0
+  export mut brook_ripple_y: f32 = -1000
+  export mut brook_ripple_z: f32 = 0
+  export mut brook_start: bool = false
+  export mut brook_best: f32 = 1000000
+  export mut brook_best_x: f32 = 0
+  export mut brook_best_z: f32 = 0
+
+  // Meters from the middle of the brook, the bed under it and the height of the land
+  fn wild_brook_d(x: f64, z: f64) -> f64 {
+    box.terrain.mask(infinite_forest.brooks, x, z, 0)
+  }
+
+  fn wild_brook_bed(x: f64, z: f64) -> f64 {
+    box.terrain.mask(infinite_forest.brooks, x, z, 1)
+  }
+
+  fn wild_brook_land(x: f64, z: f64) -> f64 {
+    box.terrain.height(infinite_forest.brooks, x, z) + BROOK_DATA_DROP
+  }
+
+  // The terrace of a bed, and the height of the water over a terrace
+  fn wild_brook_k(bed: f64) -> f64 {
+    floor(bed / BROOK_STEP)
+  }
+
+  fn wild_brook_level(k: f64) -> f64 {
+    k * BROOK_STEP + BROOK_DEPTH
+  }
+
+  // Whether the land at x z is carved down to its terrace
+  fn wild_brook_held(x: f64, z: f64) -> bool {
+    wild_brook_land(x, z) >= wild_brook_k(wild_brook_bed(x, z)) * BROOK_STEP - BROOK_HELD
+  }
+
+  // Seeded hash of two indices, 0..1
+  fn wild_brook_hash(i: f64, j: f64, seed: f64) -> f64 {
+    forest_hash(i * 1.731 + forest_hash(j, seed + 7) * 917.3, seed)
+  }
+
+  // v modulo 3, 0..2 for any sign
+  fn wild_brook_mod3(v: f64) -> f64 {
+    v - 3 * floor(v / 3)
+  }
+
+  // The parameters where the line p + t v enters and leaves -1..1 along one axis
+  fn wild_brook_t0(p: f64, v: f64) -> f64 {
+    abs(v) < 0.000001 ? (abs(p) <= 1 ? -100 : 100) : min((-1 - p) / v, (1 - p) / v)
+  }
+
+  fn wild_brook_t1(p: f64, v: f64) -> f64 {
+    abs(v) < 0.000001 ? (abs(p) <= 1 ? 100 : -100) : max((-1 - p) / v, (1 - p) / v)
+  }
+
+  // How good a place at x z is to stand by a brook: the distance to sx sz, much more where it is
+  // not on the bank or above the tree line
+  fn wild_brook_stand(x: f64, z: f64, sx: f64, sz: f64) -> f64 {
+    const d = wild_brook_d(x, z)
+    const far = sqrt((x - sx) * (x - sx) + (z - sz) * (z - sz))
+    const bank = d > BROOK_START_BANK - 0.6 && d < BROOK_START_BANK + 0.6 &&
+      wild_brook_land(x, z) < WILD_TREE_LINE
+    bank ? far : 1000000
+  }
+}
+
+assets {
+  // The ripples of the water and the foam that breaks up its edges, as the brook of the forest
+  wild_brook_ripple_h {
+    Gen: {
+      width: 256,
+      height: 256,
+      seed: 61,
+      layers: [
+        {kind: GenNoise, frequency: 6, octaves: 4, amount: 1},
+        {kind: GenNoise, frequency: 24, octaves: 2, amount: 0.25, seed: 1}
+      ]
+    }
+  }
+
+  wild_brook_ripple_n { Gen: {source: wild_brook_ripple_h, output: GenNormal, strength: 1.4} }
+
+  wild_brook_foam_h {
+    Gen: {
+      width: 512,
+      height: 512,
+      seed: 64,
+      layers: [
+        {kind: GenCells, count: 26, amount: 0.5},
+        {kind: GenCells, count: 380, distance: GenEdge, edge: 0.45, amount: -0.45, seed: 1},
+        {kind: GenCells, count: 1500, distance: GenEdge, edge: 0.5, amount: -0.15, seed: 2},
+        {kind: GenNoise, frequency: 6, octaves: 3, amount: 0.4, seed: 3}
+      ]
+    }
+  }
+
+  // The water of the brooks: clear and brownish green, the bed shows through it, foam where it
+  // is shallow and around the stones, caustics on the bed in the sun. The tiles share the
+  // texture space of the world, so the ripples and the foam run on across their seams
+  prefab WildBrookWater {
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 0.04}
+    Water: {
+      shallow_color: {92, 122, 96},
+      deep_color: {28, 52, 44},
+      depth: 0.7,
+      visibility: 3.2,
+      absorption: {150, 162, 118},
+      refraction: 0.012,
+      foam_color: {204, 210, 202},
+      foam_width: 0.018,
+      foam_texture: wild_brook_foam_h,
+      foam_scale: 1.5,
+      ripple_scale: 2.6,
+      ripple_velocity: {0.02, 0.08}
+    }
+    WaterCaustics: {strength: 1.3, scale: 0.3, speed: 0.6, depth: 0.7}
+    PbrTextures: {normal: wild_brook_ripple_n}
+    texture.Mapping: {mode: MappingWorld, size: 1}
+    texture.Layers: {layers: [layer_rain_rings]}
+    NoShadow
+  }
+
+  // White water over the steps: streaks of foam and clear greenish water pouring down along
+  // local +X (-V on the top of a Box)
+  wild_brook_streaks {
+    Gen: {
+      source: wild_brook_ripple_h,
+      output: GenAlbedo,
+      colors: [
+        {0, {120, 150, 140}}, {0.4, {170, 196, 188}}, {0.6, {236, 242, 240}}, {1, {252, 252, 250}}
+      ]
+    }
+  }
+
+  prefab WildFallWater {
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 0.3}
+    PbrTextures: {albedo: wild_brook_streaks, normal: wild_brook_ripple_n}
+    texture.Mapping: {mode: MappingObject, size: 1}
+    texture.Transform: {scale_x: 3, scale_y: 0.35}
+    texture.Scroll: {velocity: {0, 1.6}}
+    Opacity: {0.6}
+    NoShadow
+  }
+
+  // Wet pebbles of the bed, wet earth at the water line, and reeds on the banks, the stones, the
+  // earth and the reeds fading out by BROOK_DETAIL_RANGE
+  prefab WildBedStone {
+    Rgb: {150, 146, 136}
+    PbrMaterial: {roughness: 0.6}
+    ClearCoat: {strength: 0.7, roughness: 0.12}
+    PbrTextures: {albedo: rock_albedo, normal: rock_normal, orm: rock_orm}
+    texture.Mapping: {mode: MappingObject, size: 1.5, blend: 0.35}
+    texture.Layers: {layers: [layer_wet]}
+    DrawRange: {far_: BROOK_DETAIL_RANGE, fade: 8}
+    IcoSphere: {radius: 1, segments: 1, smooth: true}
+  }
+
+  prefab WildWetBank {
+    Rgb: {110, 96, 82}
+    PbrMaterial: {roughness: 0.55}
+    ClearCoat: {strength: 0.6, roughness: 0.18}
+    PbrTextures: {albedo: litter_albedo, normal: litter_normal, orm: litter_orm}
+    texture.Mapping: {mode: MappingWorld, size: 4, blend: 0.4}
+    texture.Layers: {layers: [layer_wet, layer_snow]}
+    DrawRange: {far_: BROOK_DETAIL_RANGE, fade: 8}
+    IcoSphere: {radius: 1, segments: 2, smooth: true}
+  }
+
+  // The reeds bend with the sway of the forest library from the bank, 0.03 above their origin
+  prefab WildReed : ForestReed {
+    DrawRange: {far_: BROOK_DETAIL_RANGE, fade: 8}
+    WindSway: {bend: SWAY_REED_BEND, height: SWAY_REED_HEIGHT, base: 0.03, flutter: SWAY_REED_FLUTTER, flutter_frequency: SWAY_REED_FREQUENCY, flutter_reach: 0.4, local_base: true}
+    NoBake
+  }
+
+  // A mossy stone that breaks the surface, its local origin on the water, as the stones of the
+  // brook of the forest: small standing ripples form around it and foam streams off it
+  template WildBrookStone {
+    prop size: f32 = 0.6
+    prop sy: f32 = 0.7
+    prop top: f32 = 0.1
+    prop tilt_x: f32 = 0
+    prop tilt_z: f32 = 0
+
+    const ry = size * sy * 0.5
+    const k = clamp((ry - top) / ry, 0, 0.98)
+    const wl = sqrt(1 - k * k)
+
+    rock : ForestBoulder {
+      Position: {0, top - ry, 0}
+      Rotation: {tilt_x, 0, tilt_z}
+      Scale: {size * 0.55, ry, size * 0.45}
+      IcoSphere: {radius: 1, segments: 2, smooth: true}
+    }
+
+    wake {
+      Position: {0, 0, 0}
+      RippleSource: {extents: {size * 0.55 * wl, size * 0.45 * wl}, strength: 0.25, foam: 1.4}
+    }
+  }
+
+  // White water over a step, its local +X down the bed and its middle on the step: a sheet
+  // from just over the water above to the water below, width meters across. Close to the focus
+  // foam churns at its foot
+  template WildBrookFall {
+    prop width: f32 = 1
+    prop churn: bool = false
+
+    const tilt = atan2(BROOK_STEP, BROOK_RUN)
+
+    sheet : WildFallWater {
+      Position: {BROOK_RUN / 2, 0.01 - BROOK_STEP / 2, 0}
+      Rotation: {0, 0, 0 - tilt}
+      Box: {sqrt(BROOK_RUN * BROOK_RUN + BROOK_STEP * BROOK_STEP) + 0.04, 0.01, width}
+    }
+
+    if churn {
+      foot {
+        Position: {BROOK_RUN + 0.12, 0 - BROOK_STEP, 0}
+        RippleSource: {extents: {0.25, width * 0.4}, strength: 0.4, foam: 0.5}
+      }
+
+      foam {
+        Position: {BROOK_RUN + 0.05, 0.02 - BROOK_STEP, 0}
+        Emitter: {
+          max: 70, rate: 36, shape: EmitterBox, extents: {0.12, 0.02, width * 0.35},
+          direction: {1, 0.7, 0}, spread: 55, speed: {0.15, 0.5},
+          lifetime: {0.5, 1}, size: {0.05, 0.14}, opacity: {0.5, 0.9},
+          acceleration: {0, -2.5, 0}, color: {236, 242, 240}, seed: 21
+        }
+        Appearance: {softness: 0.06, lit: 1}
+        Curves: {
+          opacity: {keys: [{0, 0}, {0.1, 1}, {0.6, 0.7}, {1, 0}]}
+          size: {keys: [{0, 0.6}, {1, 1.6}]}
+        }
+      }
+    }
+  }
+
+  // A cell of the brooks, its corner at cell_x cell_z cells; level 0 has the stones, the plants
+  // and the churning foam
+  template WildBrookCell {
+    prop cell_x: i32 = 0
+    prop cell_z: i32 = 0
+    prop level: i32 = 0
+    prop size: f32 = 32
+
+    const x0 = cell_x * size
+    const z0 = cell_z * size
+    const tiles = floor(size / BROOK_TILE + 0.5)
+    const blocks = floor(BROOK_BLOCK / BROOK_TILE + 0.5)
+
+    for bi in 0..4 {
+      for bj in 0..4 {
+        const bx = x0 + (bi + 0.5) * BROOK_BLOCK
+        const bz = z0 + (bj + 0.5) * BROOK_BLOCK
+
+        if wild_brook_d(bx, bz) < BROOK_BLOCK_NEAR {
+          for ti in 0..4 {
+            for tj in 0..4 {
+              const ix = bi * blocks + ti
+              const iz = bj * blocks + tj
+              const gi = cell_x * tiles + ix
+              const gj = cell_z * tiles + iz
+              const tx = x0 + ix * BROOK_TILE
+              const tz = z0 + iz * BROOK_TILE
+              const cx = tx + BROOK_TILE / 2
+              const cz = tz + BROOK_TILE / 2
+              const dc = wild_brook_d(cx, cz)
+
+              if dc < BROOK_TILE_NEAR {
+                // The bed at the corners and the middle, its slope and the way down it
+                const b00 = wild_brook_bed(tx, tz)
+                const b10 = wild_brook_bed(tx + BROOK_TILE, tz)
+                const b01 = wild_brook_bed(tx, tz + BROOK_TILE)
+                const b11 = wild_brook_bed(tx + BROOK_TILE, tz + BROOK_TILE)
+                const bc = wild_brook_bed(cx, cz)
+                const gx = (b10 + b11 - b00 - b01) / (2 * BROOK_TILE)
+                const gz = (b01 + b11 - b00 - b10) / (2 * BROOK_TILE)
+                const g = max(sqrt(gx * gx + gz * gz), 0.0005)
+                const ux = 0 - gx / g
+                const uz = 0 - gz / g
+                const yaw = atan2(0 - uz, ux)
+                const speed = clamp(BROOK_FLOW_MIN + BROOK_FLOW_SLOPE * g, BROOK_FLOW_MIN,
+                  BROOK_FLOW_MAX)
+
+                const kc = wild_brook_k(bc)
+                const kmin = min(min(min(wild_brook_k(b00), wild_brook_k(b10)),
+                  min(wild_brook_k(b01), wild_brook_k(b11))), kc)
+                const kmax = max(max(max(wild_brook_k(b00), wild_brook_k(b10)),
+                  max(wild_brook_k(b01), wild_brook_k(b11))), kc)
+
+                // Neighboring tiles overlap: 9 heights a millimeter apart keep them from
+                // fighting
+                const lift = (wild_brook_mod3(gi) + 3 * wild_brook_mod3(gj)) * 0.001 - 0.005
+
+                const wet = dc < BROOK_WET && kmax - kmin < 4 && wild_brook_held(cx, cz) &&
+                  wild_brook_held(tx, tz) && wild_brook_held(tx + BROOK_TILE, tz) &&
+                  wild_brook_held(tx, tz + BROOK_TILE) &&
+                  wild_brook_held(tx + BROOK_TILE, tz + BROOK_TILE)
+
+                if wet && kmin == kmax {
+                  "water_{bi}_{bj}_{ti}_{tj}" : WildBrookWater {
+                    Position: {cx - x0, wild_brook_level(kc) + lift, cz - z0}
+                    Box: {BROOK_TILE + 0.02, 0.01, BROOK_TILE + 0.02}
+                    WaterFlow: {velocity: {ux * speed, uz * speed}, textures: true}
+                  }
+                }
+
+                // A length for each terrace across the tile, from the step above it (a little
+                // under the bed there) to the step below it, BROOK_HALF to either side
+                if wet && kmin < kmax {
+                  for n in 0..4 {
+                    const k = kmax - n
+                    const sa = (bc - (k + 1) * BROOK_STEP) / g
+                    const sb = (bc - k * BROOK_STEP) / g
+                    const lo = sa > 0 - BROOK_HALF ? sa - 0.06 : 0 - BROOK_HALF
+                    const hi = min(sb, BROOK_HALF)
+                    const mid = (lo + hi) / 2
+
+                    if k >= kmin && hi > lo + 0.08 {
+                      "run_{bi}_{bj}_{ti}_{tj}_{n}" : WildBrookWater {
+                        Position: {cx + ux * mid - x0, wild_brook_level(k) + lift, cz + uz * mid - z0}
+                        Rotation: {0, yaw, 0}
+                        Box: {hi - lo, 0.01, 2 * BROOK_HALF}
+                        WaterFlow: {velocity: {ux * speed, uz * speed}, textures: true}
+                      }
+                    }
+
+                    // The white water over the step down from terrace k, the part of the step
+                    // line inside the tile
+                    const sf = (bc - k * BROOK_STEP) / g
+                    const px = ux * sf * 2 / BROOK_TILE
+                    const pz = uz * sf * 2 / BROOK_TILE
+                    const t0 = max(wild_brook_t0(px, 0 - uz), wild_brook_t0(pz, ux))
+                    const t1 = min(wild_brook_t1(px, 0 - uz), wild_brook_t1(pz, ux))
+                    const tm = (t0 + t1) / 2 * BROOK_TILE / 2
+                    const fx = cx + ux * sf - uz * tm
+                    const fz = cz + uz * sf + ux * tm
+
+                    if k > kmin && k <= kmax && t1 > t0 + 0.05 {
+                      if wild_brook_d(fx, fz) < BROOK_FALL_NEAR {
+                        "fall_{bi}_{bj}_{ti}_{tj}_{n}" {
+                          Position: {fx - x0, wild_brook_level(k), fz - z0}
+                          Rotation: {0, yaw, 0}
+                          WildBrookFall: {
+                            width: (t1 - t0) * BROOK_TILE / 2 + 0.04,
+                            churn: level == 0 && wild_brook_d(fx, fz) < 1.2
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+
+                // Stones, earth, reeds and boulders at three points of the tile, by how far each
+                // is from the middle of the brook
+                if level == 0 {
+                  for p in 0..3 {
+                    const qx = tx + BROOK_TILE * wild_brook_hash(gi, gj, 40 + p)
+                    const qz = tz + BROOK_TILE * wild_brook_hash(gi, gj, 50 + p)
+                    const dq = wild_brook_d(qx, qz)
+                    const lq = wild_brook_land(qx, qz)
+                    const wq = wild_brook_level(wild_brook_k(wild_brook_bed(qx, qz)))
+                    const r = wild_brook_hash(gi, gj, 60 + p)
+                    const s = wild_brook_hash(gi, gj, 70 + p)
+                    const turn = 6.2832 * wild_brook_hash(gi, gj, 80 + p)
+                    const under = wet && dq < 1.1 && lq < wq - 0.05 && lq > wq - BROOK_DEPTH - 0.15
+
+                    if under && r < 0.06 && dq < 0.8 {
+                      "stone_{bi}_{bj}_{ti}_{tj}_{p}" {
+                        Position: {qx - x0, wq, qz - z0}
+                        Rotation: {0, turn, 0}
+                        WildBrookStone: {
+                          size: 0.45 + 0.35 * s,
+                          sy: 0.6 + 0.2 * wild_brook_hash(gi, gj, 90 + p),
+                          top: 0.06 + 0.06 * wild_brook_hash(gi, gj, 100 + p),
+                          tilt_x: 0.3 * wild_brook_hash(gi, gj, 110 + p) - 0.15,
+                          tilt_z: 0.3 * wild_brook_hash(gi, gj, 120 + p) - 0.15
+                        }
+                      }
+                    } else if under && r < 0.85 {
+                      const ps = 0.05 + 0.2 * s * s
+                      "pebble_{bi}_{bj}_{ti}_{tj}_{p}" : WildBedStone {
+                        Position: {qx - x0, lq + ps * 0.12, qz - z0}
+                        Rotation: {0.4 * r - 0.2, turn, 0.4 * s - 0.2}
+                        Scale: {ps, ps * (0.45 + 0.2 * r), ps * (0.7 + 0.3 * s)}
+                      }
+                    } else if wet && dq > 1.3 && dq < 2.1 && r < 0.8 {
+                      "wet_{bi}_{bj}_{ti}_{tj}_{p}" : WildWetBank {
+                        Position: {qx - x0, wq - 0.03, qz - z0}
+                        Rotation: {0, yaw + 0.3 * s - 0.15, 0}
+                        Scale: {0.6 + 0.5 * s, 0.07 + 0.04 * r, 0.3}
+                      }
+                    } else if dq > 2.3 && dq < 3.8 && r < 0.7 && lq < WILD_TREE_LINE {
+                      const rs = 0.35 + 0.3 * s
+                      "reed_{bi}_{bj}_{ti}_{tj}_{p}" : WildReed {
+                        Position: {qx - x0, lq - 0.03, qz - z0}
+                        Rotation: {0, turn, 0}
+                        Scale: {rs, 0.7 + 0.7 * r, rs}
+                      }
+                    } else if dq > 3.8 && dq < BROOK_TILE_NEAR && r < 0.035 {
+                      const bs = 0.6 + 0.8 * s
+                      "boulder_{bi}_{bj}_{ti}_{tj}_{p}" {
+                        Position: {qx - x0, lq - 0.12 * bs, qz - z0}
+                        Rotation: {0, turn, 0}
+                        ForestBoulderStone: {size: bs, seed: 1 + p + floor(97 * r)}
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+infinite_forest {
+  // The water of the brooks around the focus, on the heights of their terrain
+  brook_cells {
+    ChunkGrid: {
+      template: WildBrookCell,
+      cell_size: {BROOK_CELL, 0, BROOK_CELL},
+      levels: [BROOK_DETAIL_RANGE, BROOK_RANGE],
+      hysteresis: 8,
+      budget: BROOK_BUDGET,
+      budget_ms: BROOK_BUDGET_MS,
+      ground: infinite_forest.brooks
+    }
+  }
+
+  // The field of ripples and foam of the brooks around the player: its own water is a speck at
+  // the height of the brook nearest to the player, so the water of that terrace and the ones
+  // next to it ripples and the RippleSources on them stir it
+  brook_ripples : WildBrookWater {
+    Position: {brook_ripple_x, brook_ripple_y, brook_ripple_z}
+    Box: {0.01, 0.01, 0.01}
+    WaterRipples: {
+      size: BROOK_RIPPLES_SIZE,
+      resolution: BROOK_RIPPLES_RESOLUTION,
+      follow: player,
+      wave_speed: 1.2,
+      damping: 0.7,
+      strength: 0.5,
+      foam_decay: 0.25,
+      foam_spread: 0.006
+    }
+  }
+}
+
+// Keep the field of ripples at the height of the brook nearest to the player, and out of the
+// way where there is none
+async {
+  while true {
+    await delay(0.25)
+    const o = WorldOrigin[WorldOrigin]
+    const p = player[Position]
+    const x = p.x + o.x
+    const z = p.z + o.z
+
+    if box.terrain.known(infinite_forest.brooks, x, z) {
+      const near = wild_brook_d(x, z) < BROOK_RIPPLES_NEAR
+      state.brook_ripple_x = p.x
+      state.brook_ripple_z = p.z
+      state.brook_ripple_y = near ?
+        wild_brook_level(wild_brook_k(wild_brook_bed(x, z))) - o.y - 0.01 : GROUND_MIN - 100
+    }
+  }
+}
+
+// With state.brook_start: once the player stands at the start, find the brook nearest to it,
+// carry the player there, and stand it on the bank looking downstream
+async {
+  while !state.started {
+    await next_frame()
+  }
+
+  if state.brook_start {
+    const o = WorldOrigin[WorldOrigin]
+    const sx = state.start_x + o.x
+    const sz = state.start_z + o.z
+    const r = BROOK_START_REACH
+    while !box.terrain.known(infinite_forest.brooks, sx - r, sz - r) ||
+      !box.terrain.known(infinite_forest.brooks, sx + r, sz - r) ||
+      !box.terrain.known(infinite_forest.brooks, sx - r, sz + r) ||
+      !box.terrain.known(infinite_forest.brooks, sx + r, sz + r)
+    {
+      await next_frame()
+    }
+
+    // The nearest point on the middle of a brook, from the coarse heights
+    const n = floor(2 * r / 8) + 1
+    for i in 0..n {
+      for j in 0..n {
+        const x = sx - r + i * 8
+        const z = sz - r + j * 8
+        const far = sqrt((x - sx) * (x - sx) + (z - sz) * (z - sz))
+        if wild_brook_d(x, z) < 3 && wild_brook_land(x, z) < WILD_TREE_LINE &&
+          far < state.brook_best
+        {
+          state.brook_best = far
+          state.brook_best_x = x
+          state.brook_best_z = z
+        }
+      }
+    }
+
+    // Carry the player there in the air and wait for the fine heights around it
+    const cx = state.brook_best_x
+    const cz = state.brook_best_z
+    state.scripted = true
+    while !box.terrain.resident(infinite_forest.brooks, cx - 24, cz - 24) ||
+      !box.terrain.resident(infinite_forest.brooks, cx + 24, cz - 24) ||
+      !box.terrain.resident(infinite_forest.brooks, cx - 24, cz + 24) ||
+      !box.terrain.resident(infinite_forest.brooks, cx + 24, cz + 24) ||
+      !box.terrain.resident(infinite_forest.land, cx, cz)
+    {
+      const oc = WorldOrigin[WorldOrigin]
+      state.start_x = cx - oc.x
+      state.start_y = wild_brook_land(cx, cz) + 30 - oc.y
+      state.start_z = cz - oc.z
+      await next_frame()
+    }
+
+    // The nearest place on the bank
+    state.brook_best = 1000000
+    for i in 0..41 {
+      for j in 0..41 {
+        const x = cx - 20 + i
+        const z = cz - 20 + j
+        const score = wild_brook_stand(x, z, cx, cz)
+        if score < state.brook_best {
+          state.brook_best = score
+          state.brook_best_x = x
+          state.brook_best_z = z
+        }
+      }
+    }
+
+    // Look down the bed, a little toward the water
+    const bx = state.brook_best_x
+    const bz = state.brook_best_z
+    const gx = wild_brook_bed(bx + 1, bz) - wild_brook_bed(bx - 1, bz)
+    const gz = wild_brook_bed(bx, bz + 1) - wild_brook_bed(bx, bz - 1)
+    const dx = wild_brook_d(bx + 1, bz) - wild_brook_d(bx - 1, bz)
+    const dz = wild_brook_d(bx, bz + 1) - wild_brook_d(bx, bz - 1)
+    const gl = max(sqrt(gx * gx + gz * gz), 0.0001)
+    const dl = max(sqrt(dx * dx + dz * dz), 0.0001)
+    const lx = 0 - gx / gl - 0.6 * dx / dl
+    const lz = 0 - gz / gl - 0.6 * dz / dl
+    const ob = WorldOrigin[WorldOrigin]
+    state.start_x = bx - ob.x
+    state.start_z = bz - ob.z
+    state.start_y = box.terrain.height(infinite_forest.land, bx, bz) + EYE + 0.05 - ob.y
+    state.start_yaw = atan2(0 - lx, 0 - lz)
+    state.start_pitch = -0.2
+    state.scripted = false
+  }
+}

@@ -73,13 +73,19 @@ assets {
       Rect: {1, 1}
       Image: {texture: tex_panel}
       Rgb: {hue.r * 0.14 + 8, hue.g * 0.14 + 8, hue.b * 0.14 + 14}
+
       if hover {
-        Border: {width: 2, radius: 6, color: {min(255, hue.r + 70), min(255, hue.g + 70), min(255, hue.b + 70), 255}}
+        Border: {
+          width: 2,
+          radius: 6,
+          color: {min(255, hue.r + 70), min(255, hue.g + 70), min(255, hue.b + 70), 255}
+        }
       } else if equipped {
         Border: {width: 2, radius: 6, color: {ui_pale.r, ui_pale.g, ui_pale.b, 255}}
       } else {
         Border: {width: 1, radius: 6, color: {hue.r * 0.7, hue.g * 0.7, hue.b * 0.7, 255}}
       }
+
       ClipChildren
       box.spatial.Ignore
 
@@ -125,6 +131,7 @@ assets {
         Emissive: {strength: 1.4, color: {255, 196, 104}}
         box.spatial.Ignore
       }
+
       Sparkle sparkle(hue: hue)
     }
   }
@@ -191,6 +198,7 @@ assets {
     Layout: {direction: Row, h: Center, v: Middle}
     Item: {width: {mode: Grow}, height: {mode: Grow}}
     Rect: {1, 1}
+
     if active {
       Rgb: {ui_gold.r * 0.24, ui_gold.g * 0.2, ui_gold.b * 0.14}
       Border: {width: 1, radius: 4, color: {ui_gold.r, ui_gold.g, ui_gold.b, 255}}
@@ -201,6 +209,7 @@ assets {
       Rgb: {8, 10, 22}
       Border: {width: 1, radius: 4, color: {ui_gold.r * 0.3, ui_gold.g * 0.3, ui_gold.b * 0.3, 255}}
     }
+
     Transition: [Rgb: {duration: 0.15}]
     box.spatial.Ignore
 
@@ -240,6 +249,7 @@ assets {
     gap {
       Item: {width: {mode: Grow}}
     }
+
     Caption amount(text: "{value}", size: 14, font: font_display, color: ui_pale)
     shift {
       Item: {width: {min: 34, max: 34}}
@@ -259,7 +269,16 @@ assets {
     const a = armory_tip_on ? 1 : 0
 
     Position: {0, 0, 30}
-    Float: {anchor: armory_tip, h: Right, v: Top, anchor_h: Left, anchor_v: Top, x: -12, y: 8, flip: true}
+    Float: {
+      anchor: armory_tip,
+      h: Right,
+      v: Top,
+      anchor_h: Left,
+      anchor_v: Top,
+      x: -12,
+      y: 8,
+      flip: true
+    }
     Item: {width: {mode: Fixed, value: 270}}
     Layout: {direction: Column, padding: {14, 14, 16, 16}, spacing: 7}
     Rect: {1, 1}
@@ -274,7 +293,12 @@ assets {
     box.spatial.Ignore
 
     Caption name(text: it.name, size: 20, font: font_display, color: hue)
-    Caption kind(text: "{rarity_name(it.rarity)} {slot_name(it.slot)}", size: 13, font: font_italic, color: ui_muted)
+    Caption kind(
+      text: "{rarity_name(it.rarity)} {slot_name(it.slot)}",
+      size: 13,
+      font: font_italic,
+      color: ui_muted
+    )
     Divider rule()
     ComparisonRow might(stat: 0, value: it.might, delta: preview[0])
     ComparisonRow ward(stat: 1, value: it.ward, delta: preview[1])
@@ -300,7 +324,10 @@ assets {
       Position: {0, 0, 0}
       Circle: {31}
       Rgb: {hue.r * 0.14 + 8, hue.g * 0.14 + 8, hue.b * 0.14 + 16}
-      Border: {width: 1.5, color: {min(255, hue.r + 30), min(255, hue.g + 30), min(255, hue.b + 30), 255}}
+      Border: {
+        width: 1.5,
+        color: {min(255, hue.r + 30), min(255, hue.g + 30), min(255, hue.b + 30), 255}
+      }
     }
 
     art {
@@ -369,11 +396,64 @@ assets {
       Item: {h: Center, v: Bottom, y: 6, width: {mode: Fixed, value: 420}}
       Layout: {direction: Column, h: Center, spacing: 2}
       box.spatial.Ignore
-      Caption line(text: relic_line, size: 14, font: font_italic, color: {relic_r, relic_g, relic_b})
+      Caption line(
+        text: relic_line,
+        size: 14,
+        font: font_italic,
+        color: {relic_r, relic_g, relic_b}
+      )
       Caption name(text: relic_name, size: 28, font: font_display, color: ui_pale) {
         Emissive: {strength: 0.22, color: {255, 200, 120}}
       }
     }
+  }
+
+  template SatchelRow3 {
+    Layout: {direction: Row, spacing: 10}
+    ArmoryItem ash_dirk(
+      order: 12,
+      name: "Ash Dirk",
+      slot: 0,
+      rarity: 0,
+      might: 6,
+      start: true,
+      icon: tex_ash_dirk,
+      model_hue: {190, 190, 200},
+      flavor: "Plain, reliable, and rarely thanked."
+    )
+    ArmoryItem moth_blade(
+      order: 13,
+      name: "Moth Blade",
+      slot: 0,
+      rarity: 2,
+      might: 18,
+      haste: 14,
+      icon: tex_moth_blade,
+      model_hue: {170, 110, 255},
+      flavor: "It only ever moves toward the light."
+    )
+    ArmoryItem star_compass(
+      order: 14,
+      name: "Star Compass",
+      slot: 1,
+      rarity: 1,
+      aether: 8,
+      haste: 10,
+      icon: tex_star_compass,
+      model_hue: {255, 196, 80},
+      flavor: "North is a matter of opinion, up here."
+    )
+    ArmoryItem iron_vow(
+      order: 15,
+      name: "Iron Vow",
+      slot: 3,
+      rarity: 0,
+      ward: 4,
+      start: true,
+      icon: tex_iron_vow,
+      model_hue: {180, 180, 192},
+      flavor: "Worth exactly what you promised on it."
+    )
   }
 
   template Satchel {
@@ -393,51 +473,151 @@ assets {
 
       row_0 {
         Layout: {direction: Row, spacing: 10}
-        ArmoryItem ember_fang(order: 0, name: "Ember Fang", slot: 0, rarity: 3, might: 34, haste: 8, icon: tex_ember_fang, model_hue: {255, 110, 40},
-          flavor: "Cut from the tooth of a sun that bit the wrong god.")
-        ArmoryItem drowned_heart(order: 1, name: "Drowned Heart", slot: 1, rarity: 3, aether: 36, ward: 6, icon: tex_drowned_heart, model_hue: {255, 120, 40},
-          flavor: "It still beats, slowly, in time with no tide you know.")
-        ArmoryItem nine_comets(order: 2, name: "Nine Comets", slot: 2, rarity: 2, might: 8, aether: 18, icon: tex_nine_comets, model_hue: {190, 110, 255},
-          flavor: "Each point was once a promise made to the sky.")
-        ArmoryItem last_light(order: 3, name: "Band of Last Light", slot: 3, rarity: 3, might: 12, haste: 16, icon: tex_last_light, model_hue: {255, 96, 36},
-          flavor: "The final thing the old world ever saw, set in gold.")
+        ArmoryItem ember_fang(
+          order: 0,
+          name: "Ember Fang",
+          slot: 0,
+          rarity: 3,
+          might: 34,
+          haste: 8,
+          icon: tex_ember_fang,
+          model_hue: {255, 110, 40},
+          flavor: "Cut from the tooth of a sun that bit the wrong god."
+        )
+        ArmoryItem drowned_heart(
+          order: 1,
+          name: "Drowned Heart",
+          slot: 1,
+          rarity: 3,
+          aether: 36,
+          ward: 6,
+          icon: tex_drowned_heart,
+          model_hue: {255, 120, 40},
+          flavor: "It still beats, slowly, in time with no tide you know."
+        )
+        ArmoryItem nine_comets(
+          order: 2,
+          name: "Nine Comets",
+          slot: 2,
+          rarity: 2,
+          might: 8,
+          aether: 18,
+          icon: tex_nine_comets,
+          model_hue: {190, 110, 255},
+          flavor: "Each point was once a promise made to the sky."
+        )
+        ArmoryItem last_light(
+          order: 3,
+          name: "Band of Last Light",
+          slot: 3,
+          rarity: 3,
+          might: 12,
+          haste: 16,
+          icon: tex_last_light,
+          model_hue: {255, 96, 36},
+          flavor: "The final thing the old world ever saw, set in gold."
+        )
       }
 
       row_1 {
         Layout: {direction: Row, spacing: 10}
-        ArmoryItem tidecaller(order: 4, name: "Tidecaller", slot: 0, rarity: 2, might: 22, aether: 10, icon: tex_tidecaller, model_hue: {80, 170, 255},
-          flavor: "Point it at the horizon, and the horizon comes.")
-        ArmoryItem moon_prism(order: 5, name: "Moon Prism", slot: 1, rarity: 2, aether: 24, haste: 6, icon: tex_moon_prism, model_hue: {180, 120, 255},
-          flavor: "Bends the moonlight until it confesses.")
-        ArmoryItem vesper(order: 6, name: "Circlet of Vesper", slot: 2, rarity: 1, ward: 8, aether: 8, start: true, icon: tex_vesper, model_hue: {90, 170, 255},
-          flavor: "Worn by the first star to arrive, and the last to leave.")
-        ArmoryItem serpent_loop(order: 7, name: "Serpent Loop", slot: 3, rarity: 1, ward: 6, haste: 8, icon: tex_serpent_loop, model_hue: {80, 230, 150},
-          flavor: "It has been swallowing itself for a very long time.")
+        ArmoryItem tidecaller(
+          order: 4,
+          name: "Tidecaller",
+          slot: 0,
+          rarity: 2,
+          might: 22,
+          aether: 10,
+          icon: tex_tidecaller,
+          model_hue: {80, 170, 255},
+          flavor: "Point it at the horizon, and the horizon comes."
+        )
+        ArmoryItem moon_prism(
+          order: 5,
+          name: "Moon Prism",
+          slot: 1,
+          rarity: 2,
+          aether: 24,
+          haste: 6,
+          icon: tex_moon_prism,
+          model_hue: {180, 120, 255},
+          flavor: "Bends the moonlight until it confesses."
+        )
+        ArmoryItem vesper(
+          order: 6,
+          name: "Circlet of Vesper",
+          slot: 2,
+          rarity: 1,
+          ward: 8,
+          aether: 8,
+          start: true,
+          icon: tex_vesper,
+          model_hue: {90, 170, 255},
+          flavor: "Worn by the first star to arrive, and the last to leave."
+        )
+        ArmoryItem serpent_loop(
+          order: 7,
+          name: "Serpent Loop",
+          slot: 3,
+          rarity: 1,
+          ward: 6,
+          haste: 8,
+          icon: tex_serpent_loop,
+          model_hue: {80, 230, 150},
+          flavor: "It has been swallowing itself for a very long time."
+        )
       }
 
       row_2 {
         Layout: {direction: Row, spacing: 10}
-        ArmoryItem thornreaver(order: 8, name: "Thornreaver", slot: 0, rarity: 1, might: 14, ward: 6, icon: tex_thornreaver, model_hue: {70, 220, 130},
-          flavor: "Grown, not forged. It would like some water.")
-        ArmoryItem sun_lens(order: 9, name: "Sun Lens", slot: 1, rarity: 1, aether: 14, might: 2, start: true, icon: tex_sun_lens, model_hue: {80, 190, 255},
-          flavor: "Hold it to the light, and the light holds you.")
-        ArmoryItem thorn_circlet(order: 10, name: "Thorn Circlet", slot: 2, rarity: 2, ward: 22, might: 4, icon: tex_thorn_circlet, model_hue: {70, 230, 140},
-          flavor: "Everything that would harm you must first ask it.")
-        ArmoryItem mirror_loop(order: 11, name: "Mirror Loop", slot: 3, rarity: 2, aether: 12, haste: 12, icon: tex_mirror_loop, model_hue: {120, 210, 255},
-          flavor: "Look through it, and something looks through too.")
+        ArmoryItem thornreaver(
+          order: 8,
+          name: "Thornreaver",
+          slot: 0,
+          rarity: 1,
+          might: 14,
+          ward: 6,
+          icon: tex_thornreaver,
+          model_hue: {70, 220, 130},
+          flavor: "Grown, not forged. It would like some water."
+        )
+        ArmoryItem sun_lens(
+          order: 9,
+          name: "Sun Lens",
+          slot: 1,
+          rarity: 1,
+          aether: 14,
+          might: 2,
+          start: true,
+          icon: tex_sun_lens,
+          model_hue: {80, 190, 255},
+          flavor: "Hold it to the light, and the light holds you."
+        )
+        ArmoryItem thorn_circlet(
+          order: 10,
+          name: "Thorn Circlet",
+          slot: 2,
+          rarity: 2,
+          ward: 22,
+          might: 4,
+          icon: tex_thorn_circlet,
+          model_hue: {70, 230, 140},
+          flavor: "Everything that would harm you must first ask it."
+        )
+        ArmoryItem mirror_loop(
+          order: 11,
+          name: "Mirror Loop",
+          slot: 3,
+          rarity: 2,
+          aether: 12,
+          haste: 12,
+          icon: tex_mirror_loop,
+          model_hue: {120, 210, 255},
+          flavor: "Look through it, and something looks through too."
+        )
       }
 
-      row_3 {
-        Layout: {direction: Row, spacing: 10}
-        ArmoryItem ash_dirk(order: 12, name: "Ash Dirk", slot: 0, rarity: 0, might: 6, start: true, icon: tex_ash_dirk, model_hue: {190, 190, 200},
-          flavor: "Plain, reliable, and rarely thanked.")
-        ArmoryItem moth_blade(order: 13, name: "Moth Blade", slot: 0, rarity: 2, might: 18, haste: 14, icon: tex_moth_blade, model_hue: {170, 110, 255},
-          flavor: "It only ever moves toward the light.")
-        ArmoryItem star_compass(order: 14, name: "Star Compass", slot: 1, rarity: 1, aether: 8, haste: 10, icon: tex_star_compass, model_hue: {255, 196, 80},
-          flavor: "North is a matter of opinion, up here.")
-        ArmoryItem iron_vow(order: 15, name: "Iron Vow", slot: 3, rarity: 0, ward: 4, start: true, icon: tex_iron_vow, model_hue: {180, 180, 192},
-          flavor: "Worth exactly what you promised on it.")
-      }
+      SatchelRow3 row_3()
     }
   }
 
@@ -457,6 +637,7 @@ assets {
     gap {
       Item: {width: {mode: Grow}}
     }
+
     Caption amount(text: "{value:.0}{unit}", size: 15, font: font_display, color: ui_pale)
   }
 
@@ -482,14 +663,27 @@ assets {
         Item: {width: {mode: Grow}}
         Vital hp(label: "Vitality", value: hero_hp_max, tex: tex_heart, hue: {255, 96, 106})
         Vital mp(label: "Aether", value: hero_mp_max, tex: tex_stat_aether, hue: {120, 190, 255})
-        Vital cd(label: "Recharge", value: 100 * haste_scale(stat_haste), unit: "%", tex: tex_stat_haste, hue: {196, 160, 255})
+        Vital cd(
+          label: "Recharge",
+          value: 100 * haste_scale(stat_haste),
+          unit: "%",
+          tex: tex_stat_haste,
+          hue: {196, 160, 255}
+        )
       }
 
       gap_b {
         Item: {height: {mode: Grow}}
       }
 
-      Caption hint(text: "Hover an item to weigh it against what you wear. Click to equip.", size: 14, font: font_italic, width: 234, align: Center, color: ui_muted) {
+      Caption hint(
+        text: "Hover an item to weigh it against what you wear. Click to equip.",
+        size: 14,
+        font: font_italic,
+        width: 234,
+        align: Center,
+        color: ui_muted
+      ) {
         Item: {width: {mode: Grow}}
       }
     }

@@ -41,8 +41,10 @@ template HeadlessToggle : HeadlessPressable {
   async {
     while true {
       const e = await on.activate(this)
+
       if ui.activation(e) == this {
         down = false
+
         if !disabled {
           current = !current
           await ui.changed(this)
@@ -71,7 +73,6 @@ template Checkbox : HeadlessToggle {
     Rect: {1, 1}
     Rgb: current ? t.accent : down ? t.pressed : hover ? t.hover : t.surface_alt
 
-    // Checked, the box lightens while hovered and darkens while pressed, as a filled button
     Tint: current && down ? {0, 0, 0, 60} : {255, 255, 255, current && hover ? 40 : 0}
     Transition: [Rgb: WidgetFade, Tint: WidgetFade]
 
@@ -127,7 +128,6 @@ template Switch : HeadlessToggle {
     Rect: {1, 1}
     Rgb: current ? t.accent : down ? t.pressed : hover ? t.hover : t.surface_alt
 
-    // On, the track lightens while hovered and darkens while pressed, as a filled button
     Tint: current && down ? {0, 0, 0, 60} : {255, 255, 255, current && hover ? 40 : 0}
     Transition: [Rgb: WidgetFade, Tint: WidgetFade]
 

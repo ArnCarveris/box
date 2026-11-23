@@ -7,7 +7,7 @@ using box.view
 using box.light
 
 $ {
-  Scene: {reflections: true, clear_coat: true}
+  Scene: {reflections: true, shader_features: {Extended: {clear_coat: true}}}
 }
 
 // Clear coat (ClearCoat) over rough bases in a room open at the top, lit by a sun from above
@@ -19,7 +19,7 @@ $ {
 // coat next to the same metal without one, and two normal mapped panels, the right one coated,
 // whose coat reflects the window smoothly over the bumps.
 room {
-  Scene: {reflections: true, clear_coat: true}
+  Scene: {reflections: true, shader_features: {Extended: {clear_coat: true}}}
   ReflectionBake: {resolution: 128}
   AmbientLight: {intensity: 0.15}
 

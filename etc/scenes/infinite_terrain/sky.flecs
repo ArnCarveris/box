@@ -1,0 +1,101 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.material
+using box.light
+using box.effects
+using box.atmosphere
+using state
+using assets
+
+state {
+  export const LATITUDE: f32 = 47
+  export const NORTH: f32 = 48
+  export const CLOUD_SIZE: f32 = 5000
+  export const CLOUD_ALTITUDE: f32 = 1800
+  export const CLOUD_THRESHOLD: f32 = 0.63
+  export const CLOUD_VELOCITY_X: f32 = 5
+  export const CLOUD_VELOCITY_Z: f32 = -4
+}
+
+sun {
+  DirectionalLight: {intensity: 2.8 * PI}
+  Rgb: {255, 249, 236}
+  Cookie: {
+    texture: terrain_clouds,
+    size: CLOUD_SIZE,
+    height: CLOUD_ALTITUDE,
+    threshold: CLOUD_THRESHOLD,
+    softness: 0.14,
+    strength: 0.4,
+    velocity: {CLOUD_VELOCITY_X, CLOUD_VELOCITY_Z}
+  }
+}
+
+moon {
+  DirectionalLight: {intensity: 0.4 * PI}
+  Rgb: {190, 210, 255}
+}
+
+sky {
+  Atmosphere: {
+    sun: sun,
+    moon: moon,
+    units_per_km: 1000,
+    sea_level: 0,
+    ground_altitude: 0.4,
+    rayleigh: {scale_height: 8, scattering_scale: 1},
+    mie: {scale_height: 1.2, anisotropy: 0.78, scattering_scale: 1.45, tint: {255, 240, 222}},
+    ozone_scale: 1,
+    ground_albedo: {58, 80, 46},
+    night_intensity: 0.03,
+    sun_disk_intensity: 6,
+    sun_radius: 0.6,
+    moon_disk_intensity: 12,
+    moon_radius: 0.6
+  }
+  TimeOfDay: {
+    hour: HOUR,
+    day_of_year: DAY_OF_YEAR,
+    latitude: LATITUDE,
+    north: NORTH,
+    sun: sun,
+    moon: moon
+  }
+  HeightFog: {
+    density: 0.0025,
+    falloff: 0.09,
+    base_height: 0,
+    max_opacity: 0.38,
+    atmosphere: sky
+  }
+}
+
+cloud_low {
+  CloudLayer: {
+    texture: terrain_clouds,
+    size: CLOUD_SIZE,
+    altitude: CLOUD_ALTITUDE,
+    threshold: CLOUD_THRESHOLD,
+    softness: 0.14,
+    density: 0.85,
+    velocity: {CLOUD_VELOCITY_X, CLOUD_VELOCITY_Z}
+  }
+}
+
+cloud_high {
+  CloudLayer: {
+    texture: terrain_clouds,
+    size: 16000,
+    altitude: 7000,
+    threshold: 0.7,
+    softness: 0.18,
+    density: 0.45,
+    offset: {900, 400},
+    velocity: {CLOUD_VELOCITY_X * 2, CLOUD_VELOCITY_Z * 2}
+  }
+}
+
+$ {
+  AmbientLight: {sky: {118, 130, 149}, ground: {79, 74, 68}, intensity: 1}
+}

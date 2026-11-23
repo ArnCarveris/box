@@ -11,44 +11,99 @@ assets {
   template KoreanGate {
     for side in 0..2 {
       const x = (side - 0.5) * 3.7
-      { (IsA, KoreanStone); Position: {x, 0.17, 0}; Cylinder: {radius: 0.32, length: 0.34, segments: 12} }
-      { (IsA, KoreanRed); Position: {x, 1.55, 0}; Cylinder: {radius: 0.2, length: 2.8, segments: 16, smooth: true} }
-      { (IsA, KoreanGreen); Position: {x, 2.72, 0}; Cylinder: {radius: 0.208, length: 0.14, segments: 16, smooth: true} }
-      for ring in 0..2 {
-        { (IsA, KoreanGold); Position: {x, 2.65 + ring * 0.14, 0}; Torus: {radius: 0.206, tube: 0.013, segments: 18, rings: 5} }
+      {
+        (IsA, KoreanStone)
+        Position: {x, 0.17, 0}
+        Cylinder: {radius: 0.32, length: 0.34, segments: 12}
       }
+
+      {
+        (IsA, KoreanRed)
+        Position: {x, 1.55, 0}
+        Cylinder: {radius: 0.2, length: 2.8, segments: 16, smooth: true}
+      }
+
+      {
+        (IsA, KoreanGreen)
+        Position: {x, 2.72, 0}
+        Cylinder: {radius: 0.208, length: 0.14, segments: 16, smooth: true}
+      }
+
+      for ring in 0..2 {
+        {
+          (IsA, KoreanGold)
+          Position: {x, 2.65 + ring * 0.14, 0}
+          Torus: {radius: 0.206, tube: 0.013, segments: 18, rings: 5}
+        }
+      }
+
       { KoreanBracket: {}; Position: {x, 2.98, 0} }
       {
         Position: {x, 0, 0}
         Rotation: {0, (side * 2 - 1) * -0.75, 0}
         { (IsA, KoreanRed); Position: {(1 - side * 2) * 0.65, 1.25, 0}; Box: {1.3, 2.2, 0.1} }
+
         for plank in 0..5 {
-          { Position: {(1 - side * 2) * (0.13 + plank * 0.26), 1.25, 0.052}; Box: {0.012, 2.2, 0.008}; Rgb: {120, 40, 30} }
-        }
-        for band in 0..3 {
-          { (IsA, KoreanIron); Position: {(1 - side * 2) * 0.65, 0.3 + band * 0.95, 0.056}; Box: {1.3, 0.06, 0.012} }
-        }
-        for row in 0..4 {
-          for stud in 0..4 {
-            { Position: {(1 - side * 2) * (0.18 + stud * 0.29), 0.45 + row * 0.53, 0.07}; Sphere: {radius: 0.035, segments: 8}; Rgb: {59, 58, 47} }
+          {
+            Position: {(1 - side * 2) * (0.13 + plank * 0.26), 1.25, 0.052}
+            Box: {0.012, 2.2, 0.008}
+            Rgb: {120, 40, 30}
           }
         }
-        { Position: {(1 - side * 2) * 1.08, 1.2, 0.1}; Rotation: {math.PI / 2, 0, 0}; Torus: {radius: 0.09, tube: 0.018, segments: 16, rings: 6}; Rgb: {58, 57, 46} }
+
+        for band in 0..3 {
+          {
+            (IsA, KoreanIron)
+            Position: {(1 - side * 2) * 0.65, 0.3 + band * 0.95, 0.056}
+            Box: {1.3, 0.06, 0.012}
+          }
+        }
+
+        for row in 0..4 {
+          for stud in 0..4 {
+            {
+              Position: {(1 - side * 2) * (0.18 + stud * 0.29), 0.45 + row * 0.53, 0.07}
+              Sphere: {radius: 0.035, segments: 8}
+              Rgb: {59, 58, 47}
+            }
+          }
+        }
+
+        {
+          Position: {(1 - side * 2) * 1.08, 1.2, 0.1}
+          Rotation: {math.PI / 2, 0, 0}
+          Torus: {radius: 0.09, tube: 0.018, segments: 16, rings: 6}
+          Rgb: {58, 57, 46}
+        }
       }
     }
+
     { (IsA, KoreanGreen); Position: {0, 2.92, 0}; Box: {4.35, 0.38, 0.32} }
+
     for stripe in 0..2 {
       { (IsA, KoreanMint); Position: {0, 2.92 + (stripe - 0.5) * 0.3, 0}; Box: {4.4, 0.03, 0.35} }
     }
+
     for i in 0..9 {
       { KoreanLotus: {}; Position: {(i - 4) * 0.45, 2.92, 0.18}; Scale: {0.8, 0.8, 0.8} }
-      { KoreanLotus: {}; Position: {(i - 4) * 0.45, 2.92, -0.18}; Rotation: {0, math.PI, 0}; Scale: {0.8, 0.8, 0.8} }
+      {
+        KoreanLotus: {}
+        Position: {(i - 4) * 0.45, 2.92, -0.18}
+        Rotation: {0, math.PI, 0}
+        Scale: {0.8, 0.8, 0.8}
+      }
     }
+
     { KoreanSignboard: {}; Position: {0, 2.92, 0.28}; Scale: {0.8, 0.8, 0.8} }
     { KoreanGlyphGreat: {}; Position: {-0.19, 2.92, 0.28}; Scale: {0.8, 0.8, 0.8} }
     { KoreanGlyphGate: {}; Position: {0.19, 2.92, 0.28}; Scale: {0.8, 0.8, 0.8} }
     { KoreanSilkLantern: {drop: 0.12}; Position: {0, 2.72, 0} }
-    { KoreanRoof: {ornate: true, rafter: {56, 124, 96}, rafter_end: {226, 170, 72}}; Position: {0, 3.4, 0}; Scale: {0.65, 0.64, 0.52} }
+    {
+      KoreanRoof: {ornate: true, rafter: {56, 124, 96}, rafter_end: {226, 170, 72}}
+      Position: {0, 3.4, 0}
+      Scale: {0.65, 0.64, 0.52}
+    }
+
     { (IsA, KoreanStone); Position: {0, 0.08, 0}; Box: {4.4, 0.16, 1} }
     { (IsA, KoreanTimber); Position: {0, 0.2, 0}; Box: {3.3, 0.1, 0.16} }
   }

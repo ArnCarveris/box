@@ -20,8 +20,8 @@
 /** Height of the surface of the tests in points */
 #define EDITOR_H (180)
 
-/** Background of the body of the panel in the dark theme */
-static const unsigned char editor_background[3] = {32, 35, 41};
+/** Background of the scroll views of the panel, surface_alt of the dark theme */
+static const unsigned char editor_background[3] = {38, 41, 48};
 
 /** Test whether an entity is a scope or below it.
  *
@@ -281,7 +281,7 @@ void Editor_pick_panel_and_console(void) {
     test_assert(console != 0);
 
     ecs_entity_t s = ecs_shell_session_init(world, NULL);
-    ecs_os_free(box_command_run(world, s, "mouse_move [600, 200]", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_move [600, 300]", NULL));
     while (box_input_pending(world)) {
         ecs_progress(world, 0);
     }
@@ -289,8 +289,9 @@ void Editor_pick_panel_and_console(void) {
     ecs_progress(world, 0);
     const PickStatus *status = ecs_singleton_get(world, PickStatus);
     test_uint(status->view, editor);
-    test_uint(status->target, ecs_lookup(world, BOX_EDITOR_PANEL ".body"));
-    test_uint(status->handler, panel);
+    test_uint(status->target, ecs_lookup(world, BOX_EDITOR_PANEL ".inspector_view"));
+    test_uint(status->handler, status->target);
+    test_assert(editor_in_scope(world, status->handler, BOX_EDITOR_PANEL));
     test_assert(!editor_in_scope(world, status->hit, BOX_CONSOLE_UI ".screen.stack"));
 
     ecs_os_free(box_command_run(world, s, "mouse_move [100, 200]", NULL));
@@ -318,7 +319,7 @@ void Editor_panel_blocks_game(void) {
     ecs_entity_t panel = ecs_lookup(world, BOX_EDITOR_PANEL);
 
     ecs_entity_t s = ecs_shell_session_init(world, NULL);
-    ecs_os_free(box_command_run(world, s, "mouse_move [600, 200]", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_move [600, 300]", NULL));
     ecs_os_free(box_command_run(world, s, "mouse_scroll 0 3", NULL));
     while (box_input_pending(world)) {
         ecs_progress(world, 0);
@@ -327,7 +328,8 @@ void Editor_panel_blocks_game(void) {
     ecs_progress(world, 0);
     const PickStatus *status = ecs_singleton_get(world, PickStatus);
     test_uint(status->view, editor);
-    test_uint(status->handler, panel);
+    test_uint(status->handler, ecs_lookup(world, BOX_EDITOR_PANEL ".inspector_view"));
+    test_assert(editor_in_scope(world, status->handler, BOX_EDITOR_PANEL));
 
     ecs_os_free(box_command_run(world, s, "mouse_move [100, 200]", NULL));
     while (box_input_pending(world)) {

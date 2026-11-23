@@ -90,8 +90,9 @@ view {
     },
     shadows: {
       enabled: hud.screen.options.body.shadows[Checkbox.mut].current,
-      cascades: 4,
+      cascades: 3,
       resolution: 2048,
+      interval: [1, 2, 2],
       max_distance: 200,
       split_lambda: 0.7,
       depth_bias: 2,
@@ -112,5 +113,13 @@ view {
 }
 
 $ {
-  Bake: {environment: sky, probe_spacing: 1, bounds_padding: -0.3, capture_size: 16, bounces: 0, budget_ms: 8, compute: hud.screen.options.body.baked[Checkbox.mut].current}
+  Bake: {
+    environment: sky,
+    probe_spacing: 1,
+    bounds_padding: -0.3,
+    capture_size: 16,
+    bounces: 0,
+    budget_ms: 8,
+    compute: hud.screen.options.body.baked[Checkbox.mut].current
+  }
 }

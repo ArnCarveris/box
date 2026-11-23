@@ -7,9 +7,9 @@
  * by its hash; slot 0, the default material, is never freed. A material change hashes its owners
  * in the next extract, and a frame without one hashes nothing (box_draws_materials_resolve).
  *
- * Prefabs, shapes of DynamicMaterial batches, with a TextureScroll (packed every frame, see
- * box_materials_scroll) or a running material transition own a private slot, packed from its
- * owner in the send that uploads it, so transitions.c can patch the record by slot.
+ * Prefabs, shapes of DynamicMaterial batches, with a TextureScroll, a WindSway, WaterWaves or
+ * moving WaterCaustics (box_materials_scroll) or a running transition own a private slot, packed
+ * from its owner in the send that uploads it, so transitions.c can patch it by slot.
  */
 
 #include "draw.h"
@@ -242,8 +242,9 @@ static uint32_t box_materials_features(
     return box_render_scene_features(world, box_render_scene_of(world, owner));
 }
 
-/** Check whether a Water moves its ripples over time: a ripple_scale above 0 with a ripple
- * velocity, the only part of its record that changes with the time.
+/** Check whether a Water changes over time: a ripple_scale above 0 with a ripple velocity, or
+ * waves lapping at the shore (a shore_period above 0), the parts of its record that change with
+ * the time.
  *
  * @param water The component, NULL for none
  * @return Whether its record changes every frame
@@ -251,8 +252,21 @@ static uint32_t box_materials_features(
 static bool box_materials_water_moves(
     const Water *water)
 {
-    return water && isfinite(water->ripple_scale) && water->ripple_scale > 0.0f &&
-        (water->ripple_velocity[0] != 0.0f || water->ripple_velocity[1] != 0.0f);
+    return water && ((isfinite(water->ripple_scale) && water->ripple_scale > 0.0f &&
+        (water->ripple_velocity[0] != 0.0f || water->ripple_velocity[1] != 0.0f)) ||
+        (isfinite(water->shore_period) && water->shore_period > 0.0f));
+}
+
+/** Check whether the WaterFlow of a Water moves its textures (WaterFlow.textures), whose flow
+ * mapping phase changes with the time.
+ *
+ * @param flow The WaterFlow of the Water, NULL for none
+ * @return Whether its record changes every frame
+ */
+static bool box_materials_water_flows(
+    const WaterFlow *flow)
+{
+    return flow && flow->textures;
 }
 
 /** Check whether a Distortion changes its noise over time: a speed that is not 0, the phase
@@ -271,31 +285,55 @@ static bool box_materials_distortion_moves(
  * TextureScroll offsets and Distortion phase at the time of the table. The ones its scene does
  * not enable (Scene.texture_scroll, Scene.water, Scene.distortion) are left out.
  *
+ * The WaterWaves of its Water get a set of the wave table here if they have none yet, and its
+ * WaterCaustics the water frame of its WaterFlow.
+ *
  * @param world The world
  * @param m The table
  * @param owner The owner, 0 for the default material
  * @param out The record
  * @return Whether the record changes with the time: the owner has or inherits a TextureScroll,
- * a Water whose ripples move (box_materials_water_moves) or a Distortion that moves
+ * a WindSway, a Water whose ripples move or whose shore waves roll in
+ * (box_materials_water_moves), that has WaterWaves, WaterCaustics that move
+ * (box_draws_water_caustics_moves) or a WaterFlow that moves its textures
+ * (box_materials_water_flows), or a Distortion that moves
  * (box_materials_distortion_moves) without Water
  */
 static bool box_materials_pack(
     const ecs_world_t *world,
-    const box_draw_materials_t *m,
+    box_draw_materials_t *m,
     ecs_entity_t owner,
     box_render_material_t *out)
 {
     box_draw_material_t material;
     box_draws_material_of(world, owner, m->time, &material);
+    if (material.waves) {
+        material.water_waves = box_draws_water_waves_set(m, owner, material.waves,
+            material.flow);
+    }
+
+    if (material.caustics) {
+        box_draws_water_caustics_frame(m, owner, material.caustics, material.flow,
+            material.caustics_frame);
+    }
+
     box_draws_material_pack(out, &material);
 
-    return material.scroll != NULL || box_materials_water_moves(material.water) ||
+    return material.scroll != NULL || material.sway != NULL ||
+        box_materials_water_moves(material.water) || material.waves != NULL ||
+        box_draws_water_caustics_moves(material.caustics, material.flow) ||
+        box_materials_water_flows(material.flow) ||
         (!material.water && box_materials_distortion_moves(material.distortion));
 }
 
-/** Check whether an entity has or inherits a TextureScroll, a Water whose ripples move or a
- * Distortion that moves, whose record changes every frame, in a scene that enables it
- * (Scene.texture_scroll, Scene.water, Scene.distortion).
+/** Check whether an entity has or inherits a component whose record changes every frame.
+ *
+ * Those are a TextureScroll, a WindSway, a Water whose ripples move or whose shore waves roll
+ * in, that has WaterWaves, WaterCaustics that move or a WaterFlow with textures, or a
+ * Distortion that moves.
+ *
+ * Only in a scene that enables it (Scene.texture_scroll, Scene.wind, Scene.water,
+ * Scene.distortion).
  *
  * @param world The world
  * @param e The entity
@@ -306,16 +344,22 @@ static bool box_materials_scrolls(
     ecs_entity_t e)
 {
     const TextureScroll *scroll = ecs_get(world, e, TextureScroll);
+    const WindSway *sway = ecs_get(world, e, WindSway);
     const Water *water = ecs_get(world, e, Water);
-    bool moves = box_materials_water_moves(water);
+    bool moves = box_materials_water_moves(water) ||
+        (water && ecs_get(world, e, WaterWaves) != NULL) ||
+        (water && box_draws_water_caustics_moves(ecs_get(world, e, WaterCaustics),
+            ecs_get(world, e, WaterFlow))) ||
+        (water && box_materials_water_flows(ecs_get(world, e, WaterFlow)));
     bool distorts = box_materials_distortion_moves(ecs_get(world, e, Distortion));
     bool result = false;
-    if (!scroll && !moves && !distorts) {
+    if (!scroll && !sway && !moves && !distorts) {
         goto done;
     }
 
     uint32_t features = box_materials_features(world, e);
     result = (scroll && (features & BOX_RENDER_FEATURE_TEXTURE_SCROLL)) ||
+        (sway && (features & BOX_RENDER_FEATURE_WIND)) ||
         (moves && (features & BOX_RENDER_FEATURE_WATER)) ||
         (distorts && (features & BOX_RENDER_FEATURE_DISTORTION) &&
             !(water && (features & BOX_RENDER_FEATURE_WATER)));
@@ -543,12 +587,17 @@ void box_draws_materials_fini(
     ecs_vec_fini_t(NULL, &m->uploaded, box_draw_material_upload_t);
     ecs_map_fini(&m->owned);
     ecs_map_fini(&m->contents);
+    box_draws_water_waves_fini(m);
+    box_draws_water_caustics_fini(m);
 }
 
 void box_draws_materials_reset(
     box_render_draws_t *d)
 {
     d->materials.capacity = 0;
+    if (d->materials.waves) {
+        d->materials.waves->created = false;
+    }
 }
 
 bool box_draws_material_changed(
@@ -651,12 +700,53 @@ static void box_materials_transitions_end(
     ecs_vec_set_count_t(NULL, &m->transiting, uint32_t, kept);
 }
 
+/** Pack every owner again when the absolute position of the local origin changed since the
+ * records were packed, for the world space patterns of the records: the WaterCaustics frame and
+ * the WindSway base.
+ *
+ * An owner whose record does not depend on the origin hashes to the slot it has.
+ *
+ * @param world The world
+ * @param d The state
+ */
+static void box_materials_origin(
+    const ecs_world_t *world,
+    box_render_draws_t *d)
+{
+    box_draw_materials_t *m = &d->materials;
+    double origin[3];
+    box_render_origin(world, origin);
+    if (origin[0] == m->origin[0] && origin[1] == m->origin[1] && origin[2] == m->origin[2]) {
+        goto done;
+    }
+
+    m->origin[0] = origin[0];
+    m->origin[1] = origin[1];
+    m->origin[2] = origin[2];
+    ecs_vec_t owners;
+    int32_t i;
+    ecs_vec_init_t(NULL, &owners, ecs_entity_t, 0);
+    ecs_map_iter_t it = ecs_map_iter(&m->owned);
+    while (ecs_map_next(&it)) {
+        *ecs_vec_append_t(NULL, &owners, ecs_entity_t) = (ecs_entity_t)ecs_map_key(&it);
+    }
+
+    for (i = 0; i < ecs_vec_count(&owners); i ++) {
+        box_draws_material_changed(d, *ecs_vec_get_t(&owners, ecs_entity_t, i));
+    }
+
+    ecs_vec_fini_t(NULL, &owners, ecs_entity_t);
+done:
+    return;
+}
+
 void box_draws_materials_resolve(
     ecs_world_t *world,
     box_render_draws_t *d)
 {
     box_draw_materials_t *m = &d->materials;
     int32_t i;
+    box_materials_origin(world, d);
     box_materials_transitions_end(world, d);
     for (i = 0; i < ecs_vec_count(&m->pending); i ++) {
         ecs_entity_t e = *ecs_vec_get_t(&m->pending, ecs_entity_t, i);
@@ -854,8 +944,8 @@ static void BoxMaterialsOnIsA(
 }
 
 /** Check whether adding or removing a material component moves the mesh shapes that own their
- * material between a shared and a private slot: TextureScroll, Water and Distortion, whose
- * records change every frame.
+ * material between a shared and a private slot: TextureScroll, Water, WaterWaves,
+ * WaterCaustics, WaterFlow and Distortion, whose records change every frame.
  *
  * @param component The component
  * @return Whether its OnAdd and OnRemove make the shapes take their slot again
@@ -864,12 +954,16 @@ static bool box_materials_slotted(
     ecs_entity_t component)
 {
     return component == ecs_id(TextureScroll) || component == ecs_id(Water) ||
-        component == ecs_id(Distortion);
+        component == ecs_id(WaterWaves) || component == ecs_id(Distortion) ||
+        component == ecs_id(WindSway) || component == ecs_id(WaterCaustics) ||
+        component == ecs_id(WaterFlow);
 }
 
 /** Check whether adding or removing a material component changes the batch key of the shapes
- * that have it: the alpha test, transmission, distortion, water, a PlanarReflection and the
- * material features of the extended mesh shader. A TextureMapping changes it when set too.
+ * that have it: the alpha test (AlphaCutoff, VertexReveal), transmission, distortion, water, a
+ * PlanarReflection and the material features of the extended mesh shader.
+ *
+ * A TextureMapping changes it when set too.
  *
  * @param component The component
  * @return Whether its OnAdd and OnRemove move the shapes to a new key
@@ -881,7 +975,8 @@ static bool box_materials_keyed(
         component == ecs_id(Sheen) || component == ecs_id(ClearCoat) ||
         component == ecs_id(SpecularAnisotropy) || component == ecs_id(DiffuseTransmission) ||
         component == ecs_id(Fresnel) || component == ecs_id(Water) ||
-        component == ecs_id(Distortion) || component == ecs_id(PlanarReflection);
+        component == ecs_id(Distortion) || component == ecs_id(PlanarReflection) ||
+        component == ecs_id(WindSway) || component == ecs_id(VertexReveal);
 }
 
 /** Follow a set or removal of a material component on its owner, or on a base that propagates
@@ -892,8 +987,8 @@ static bool box_materials_keyed(
  * changed field is left alone. 2D shapes and texts write their shading again.
  *
  * Mesh shapes write nothing, unless their batch changes (an added or removed component of
- * box_materials_keyed, or a set TextureMapping, Water or Distortion), they move between a shared
- * and a private slot (box_materials_slotted) or the owner of a shared slot moves.
+ * box_materials_keyed, a set TextureMapping, Water, Distortion or WaterFlow), they change
+ * slot (box_materials_slotted) or the owner of a shared slot moves.
  *
  * @param it The iterator of the observer
  */
@@ -915,7 +1010,8 @@ static void BoxMaterialsOnComponent(
         ecs_table_has_id(world, table, ecs_id(Text));
     bool keyed = ((box_materials_keyed(it->event_id) || box_materials_slotted(it->event_id)) &&
         it->event != EcsOnSet) || it->event_id == ecs_id(TextureMapping) ||
-        it->event_id == ecs_id(Water) || it->event_id == ecs_id(Distortion);
+        it->event_id == ecs_id(Water) || it->event_id == ecs_id(Distortion) ||
+        it->event_id == ecs_id(WaterFlow);
     bool mark = !prefab && (inline_ || keyed);
     for (i = 0; i < it->count; i ++) {
         if (owners) {
@@ -935,18 +1031,22 @@ void box_draws_materials_observers(
     ecs_world_t *world,
     box_render_draws_t *d)
 {
-    ecs_entity_t components[16] = {
+    ecs_entity_t components[23] = {
         ecs_id(Rgb), ecs_id(PbrMaterial), ecs_id(Emissive), ecs_id(TextureTransform),
         ecs_id(AlphaCutoff), ecs_id(Transmission), ecs_id(ClearCoat), ecs_id(SpecularAnisotropy),
         ecs_id(Sheen), ecs_id(DiffuseTransmission), ecs_id(TextureMapping), ecs_id(TextureScroll),
-        ecs_id(Fresnel), ecs_id(Water), ecs_id(PlanarReflection), ecs_id(Distortion)
+        ecs_id(Fresnel), ecs_id(Water), ecs_id(PlanarReflection), ecs_id(Distortion),
+        ecs_id(WaterWaves), ecs_id(WindSway), ecs_id(VertexReveal), ecs_id(WaterCaustics),
+        ecs_id(WaterFlow), ecs_id(WaterSpectrum), ecs_id(VertexOcclusion)
     };
-    const char *names[16] = {
+    const char *names[23] = {
         "DrawsOnColor", "DrawsOnPbrMaterial", "DrawsOnEmissive", "DrawsOnTextureTransform",
         "DrawsOnAlphaCutoff", "DrawsOnTransmission", "DrawsOnClearCoat",
         "DrawsOnSpecularAnisotropy", "DrawsOnSheen", "DrawsOnDiffuseTransmission",
         "DrawsOnTextureMapping", "DrawsOnTextureScroll", "DrawsOnFresnel", "DrawsOnWater",
-        "DrawsOnPlanarReflection", "DrawsOnDistortion"
+        "DrawsOnPlanarReflection", "DrawsOnDistortion", "DrawsOnWaterWaves",
+        "DrawsOnWindSway", "DrawsOnVertexReveal", "DrawsOnWaterCaustics", "DrawsOnWaterFlow",
+        "DrawsOnWaterSpectrum", "DrawsOnVertexOcclusion"
     };
     int32_t i;
     box_draws_observer(world, d, "MaterialsOnPrefab", (ecs_observer_desc_t){
@@ -971,8 +1071,9 @@ void box_draws_materials_observers(
         .query.flags = EcsQueryMatchPrefab,
         .events = { EcsOnAdd, EcsOnRemove } }, BoxMaterialsOnIsA);
 
-    for (i = 0; i < 16; i ++) {
-        bool keyed = box_materials_keyed(components[i]) || box_materials_slotted(components[i]);
+    for (i = 0; i < 23; i ++) {
+        bool keyed = box_materials_keyed(components[i]) || box_materials_slotted(components[i]) ||
+            components[i] == ecs_id(WaterSpectrum);
         bool owned = components[i] == ecs_id(PlanarReflection);
         box_draws_observer(world, d, names[i], (ecs_observer_desc_t){
             .query.terms = {{
@@ -993,6 +1094,7 @@ void box_draws_material_of(
     box_draw_material_t *out)
 {
     *out = (box_draw_material_t){ .fade = 1.0f, .time = time };
+    box_render_origin(world, out->origin);
     if (owner) {
         out->color = ecs_get(world, owner, Rgb);
         out->pbr = ecs_get(world, owner, PbrMaterial);
@@ -1009,12 +1111,30 @@ void box_draws_material_of(
         out->fresnel = ecs_get(world, owner, Fresnel);
         out->water = ecs_get(world, owner, Water);
         out->distortion = ecs_get(world, owner, Distortion);
+        out->sway = ecs_get(world, owner, WindSway);
+        out->reveal = ecs_get(world, owner, VertexReveal);
+        out->occlusion = ecs_get(world, owner, VertexOcclusion);
+        if (out->water) {
+            out->waves = ecs_get(world, owner, WaterWaves);
+            out->flow = ecs_get(world, owner, WaterFlow);
+            out->caustics = ecs_get(world, owner, WaterCaustics);
+            out->spectrum = ecs_get(world, owner, WaterSpectrum);
+        }
     }
 
-    if (out->scroll || out->water || out->distortion) {
+    if (out->scroll || out->water || out->distortion || out->sway) {
         uint32_t features = box_materials_features(world, owner);
         out->scroll = features & BOX_RENDER_FEATURE_TEXTURE_SCROLL ? out->scroll : NULL;
+        out->sway = features & BOX_RENDER_FEATURE_WIND ? out->sway : NULL;
+        if (out->sway) {
+            box_render_wind_frame(world, &out->wind);
+        }
+
         out->water = features & BOX_RENDER_FEATURE_WATER ? out->water : NULL;
+        out->waves = out->water ? out->waves : NULL;
+        out->flow = out->water ? out->flow : NULL;
+        out->caustics = out->water ? out->caustics : NULL;
+        out->spectrum = out->water ? out->spectrum : NULL;
         out->distortion = features & BOX_RENDER_FEATURE_DISTORTION && !out->water
             ? out->distortion : NULL;
     }
@@ -1122,6 +1242,8 @@ void box_draws_materials_send(
 {
     box_draw_materials_t *m = &d->materials;
     m->time = p->time;
+    box_draws_water_waves_advance(world, m);
+    box_draws_water_caustics_advance(world, m);
     box_materials_scroll(world, m);
     int32_t i, j, count = ecs_vec_count(&m->dirty);
     uint32_t *dirty = ecs_vec_first_t(&m->dirty, uint32_t);
@@ -1164,7 +1286,8 @@ void box_draws_materials_send(
             if (!sharp &&
                 (records[i].transmission_factor > 0 || records[i].water_depth > 0))
             {
-                float r = records[i].diffuse_blur > 0 ? 1.0f : records[i].roughness;
+                float r = records[i].water_depth == 0 && records[i].diffuse_blur > 0
+                    ? 1.0f : records[i].roughness;
                 if (r > m->transmission_roughness) {
                     m->transmission_roughness = r;
                 }
@@ -1213,5 +1336,6 @@ void box_draws_materials_send(
     }
 
 done:
+    box_draws_water_waves_upload(m, p);
     ecs_vec_clear(&m->dirty);
 }

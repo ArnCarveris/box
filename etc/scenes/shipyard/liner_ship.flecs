@@ -75,10 +75,8 @@ assets {
     }
   }
 
-  // The segment of kind k in slot idx of a liner, in the frame of its slot. A lifted segment
-  // floats above its slot and settles into it when lifted goes back to false, a tinted one takes
-  // tint. The rotor of a jump drive spins up and down over about 2 s when its power (live)
-  // changes.
+  // The segment of kind k in slot idx of a liner, in the frame of its slot. The rotor of a jump
+  // drive spins up and down over about 2 s when its power (live) changes.
   template LinerPart {
     prop idx: i32 = 0
     prop k: i32 = 0
@@ -98,10 +96,23 @@ assets {
       Position: {0, lifted ? 2.5 : 0, 0}
       Rotation: {0, 0, lane_angle(l)}
       Transition: [Position: {duration: 0.45, timing_function: EaseOut}]
+
       if tinted {
         Tint: tint
       }
-      LinerSegment part(k: k, l: l, z: slot_of(idx), seed: idx, n: n, live: live, heat: heat, trip: trip, cool: cool, spin: k == L_JUMP ? spin : 0)
+
+      LinerSegment part(
+        k: k,
+        l: l,
+        z: slot_of(idx),
+        seed: idx,
+        n: n,
+        live: live,
+        heat: heat,
+        trip: trip,
+        cool: cool,
+        spin: k == L_JUMP ? spin : 0
+      )
     }
 
     // A change of live restarts the block, which steps spin to it and stops.
@@ -113,14 +124,9 @@ assets {
     }
   }
 
-  // A liner with the segments of its design, in meters as a rig. The segments are authored at
-  // about 10 m to the unit and drawn under model, which scales them by LINER_SCALE. The origin is
-  // on the axis of the core spine, halfway along the slots, and the bow points to +z.
-  //
-  // power holds the power level of each slot (0 to 1), shield the level of the shield bubble
-  // that the ship raises when it has shield generators, and burning fires the drives. heat holds
-  // the heat level of each slot, radiator_heat that of the radiators, which show cooling while the
-  // ship cools down, and trip the reactors that tripped.
+  // A liner in meters as a rig. The segments are authored at about 10 m to the unit and drawn
+  // under model, which scales them by LINER_SCALE. The origin is on the axis of the core spine,
+  // halfway along the slots, and the bow points to +z.
   //
   // The segments of lane skip are left out, for an editor that draws the lane it works on itself
   // (with LinerPart).
@@ -144,6 +150,7 @@ assets {
         const k = design[i]
         const l = lane_of(i)
         const z = slot_of(i)
+
         if k != 0 && l != skip {
           LinerPart "slot_{i}"(
             idx: i, k: k, n: liner_near(design, l, z), live: liner_live(k, power[i], burning),
@@ -167,7 +174,11 @@ assets {
           Emissive: {strength: 0.004 * shield, color: {110, 170, 255}}
           Fresnel: {color: {120, 190, 255}, strength: 0.8 * shield, power: 3, bias: 0}
           Distortion: {strength: 0.003 * shield, scale: 10, speed: 0.3}
-          Transition: [Emissive: {duration: 1, timing_function: EaseInOut}, Fresnel: {duration: 1, timing_function: EaseInOut}, Distortion: {duration: 1, timing_function: EaseInOut}]
+          Transition: [
+            Emissive: {duration: 1, timing_function: EaseInOut},
+            Fresnel: {duration: 1, timing_function: EaseInOut},
+            Distortion: {duration: 1, timing_function: EaseInOut}
+          ]
           Ignore
         }
       }

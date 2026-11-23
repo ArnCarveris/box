@@ -8,13 +8,19 @@
 // speed from the seed and its spawn index, each from its own stream, and adds the velocity it
 // inherits from the emitter; the C twin is box_particle_* in src/particle/simulate.h. A local
 // emitter spawns, moves and keeps its particles in its space, under its world forces turned
-// into that space.
+// into that space. A ParticleCard pool keeps a card word per particle after its slots, which
+// integrate sets once the card comes to rest on the ground plane and spawn clears. A pool with
+// ParticleForces.global_wind adds the velocity of the Wind at each particle to its wind, with
+// the gust read from the field the wind sway of the meshes reads (wind_gust.wgsl).
 #include "include/lights.wgsl"
 #include "include/particle.wgsl"
+#include "include/wind_gust.wgsl"
+#define TERRAIN_SAMPLE_GROUP 1
+#include "include/terrain_sample.wgsl"
 
 // The blocks of the pools of the packet, BOX_GPU_PARTICLE_STRIDE apart
 struct EmitterBlock {
-    @size(512) emitter: Emitter,
+    @size(544) emitter: Emitter,
 };
 
 // The first work item of the batch of a dispatch
@@ -37,6 +43,56 @@ struct Batch {
 @group(0) @binding(9) var<storage, read> work: array<vec2u>;
 @group(0) @binding(10) var<uniform> batch: Batch;
 
+// Write the card word of the particle in slot i of a ParticleCard pool, as particle_card_word
+// reads it. Every invocation writes a member of its own, so neighbours share the slot safely.
+fn particle_card_store(base: u32, cards: u32, i: u32, word: u32) {
+    let k = base + cards + i / CARD_WORDS;
+    switch (i % CARD_WORDS) {
+        case 0u: { particles[k].position.x = bitcast<f32>(word); }
+        case 1u: { particles[k].position.y = bitcast<f32>(word); }
+        case 2u: { particles[k].position.z = bitcast<f32>(word); }
+        case 3u: { particles[k].remaining = word; }
+        case 4u: { particles[k].velocity.x = bitcast<f32>(word); }
+        case 5u: { particles[k].velocity.y = bitcast<f32>(word); }
+        case 6u: { particles[k].velocity.z = bitcast<f32>(word); }
+        default: { particles[k].index = word; }
+    }
+}
+
+// Have a card in the air that came to rest on the ground plane after its step remember the age
+// it came to rest at, 1 plus its microseconds, so the draw stops turning it and lays it flat.
+fn card_rest(emitter: Emitter, i: u32, p: Particle, height: f32) {
+    let base = emitter.gradient_max.z;
+    if (particle_card_word(base, emitter.life.w, i) != 0u) {
+        return;
+    }
+
+    var position = p.position;
+    var velocity = p.velocity;
+    if (emitter.gradient_max.w != 0u) {
+        position = (emitter.model * vec4f(p.position, 1.0)).xyz;
+        velocity = (emitter.model * vec4f(p.velocity, 0.0)).xyz;
+    }
+
+    if (particle_card_rests(emitter.collide, position.y, length(velocity), height,
+        emitter.turbulence.z))
+    {
+        let life = particle_life(emitter.spawn.y, p.index, emitter.life.y, emitter.life.z);
+        particle_card_store(base, emitter.life.w, i, life - p.remaining + 1u);
+    }
+}
+
+// World velocity the Wind pulls a particle at a world position toward, the share of the
+// emitter: its velocity along X and Z times the gust factor there, as box_particle_global_wind.
+fn particle_global_wind(emitter: Emitter, world: vec3f) -> vec3f {
+    let g = emitter.global_wind;
+    let offset = vec2f(emitter.wander.w, emitter.inherit.w);
+    let speed = length(g.xy);
+    let dir = select(vec2f(1.0, 0.0), g.xy / speed, speed > 0.0);
+    let factor = wind_gust(world.xz, offset, dir, emitter.turbulence.w, g.z);
+    return vec3f(g.x * factor, 0.0, g.y * factor);
+}
+
 @compute @workgroup_size(256)
 fn integrate(@builtin(workgroup_id) group: vec3u, @builtin(local_invocation_id) local: vec3u) {
     let item = work[batch.first + group.x];
@@ -51,6 +107,7 @@ fn integrate(@builtin(workgroup_id) group: vec3u, @builtin(local_invocation_id) 
         return;
     }
 
+    p.position += vec3f(emitter.color.w, emitter.variance.w, emitter.ground.w);
     p.remaining = particle_age(p.remaining, emitter.life.x);
     if (p.remaining != 0u) {
         // Keep one integrate after the check: a second call in an else branch can change the
@@ -67,6 +124,18 @@ fn integrate(@builtin(workgroup_id) group: vec3u, @builtin(local_invocation_id) 
         var forces = LocalForces(emitter.acceleration.xyz, emitter.wind, emitter.turbulence.xy,
             emitter.drift);
         let local = emitter.gradient_max.w != 0u;
+        // The Wind of a pool with global wind, at the world position of the particle; a uniform
+        // branch that leaves the wind of every other pool as it is.
+        if (emitter.turbulence.w != 0.0) {
+            var world = p.position;
+            if (local) {
+                world = (emitter.model * vec4f(p.position, 1.0)).xyz;
+            }
+
+            forces.wind = vec4f(forces.wind.xyz + particle_global_wind(emitter, world),
+                forces.wind.w);
+        }
+
         var inverse = mat3x3f();
         if (local) {
             inverse = particle_inverse(emitter.model);
@@ -77,15 +146,24 @@ fn integrate(@builtin(workgroup_id) group: vec3u, @builtin(local_invocation_id) 
         particle_integrate(&p, forces.acceleration, forces.wind, forces.turbulence,
             emitter.wander.xyz, forces.drift, motion, emitter.acceleration.w);
         var alive = true;
+        var ground = emitter.ground.xyz;
         if (local) {
-            alive = particle_collide_local(&p, emitter.model, inverse, emitter.ground.xyz,
-                emitter.collide);
+            alive = particle_collide_local(&p, emitter.model, inverse, ground, emitter.collide);
         } else {
-            alive = particle_collide(&p, emitter.ground.xyz, emitter.collide);
+            if ((emitter.sampled.x & SAMPLED_COLLIDE_TERRAIN) != 0u) {
+                let surface = terrain_sample_local(world_origin(emitter.origin), p.position.xz);
+                if (surface.found) {
+                    ground.x = surface.y;
+                }
+            }
+
+            alive = particle_collide(&p, ground, emitter.collide);
         }
 
         if (!alive) {
             p.remaining = 0u;
+        } else if (emitter.life.w != 0u) {
+            card_rest(emitter, i, p, ground.x);
         }
     }
 
@@ -139,7 +217,16 @@ fn spawn(@builtin(workgroup_id) group: vec3u, @builtin(local_invocation_id) lane
         // A local emitter keeps its particles in its space; its inherit is zero
         p.position = local;
         p.velocity = particle_inverse(emitter.model) * p.velocity;
+    } else if ((emitter.sampled.x & SAMPLED_SPAWN_GROUND) != 0u) {
+        let surface = terrain_sample_local(world_origin(emitter.origin), p.position.xz);
+        p.position.y += surface.y;
+        if (!surface.found) {
+            p.remaining = 0u;
+        }
     }
 
     particles[emitter.gradient_max.z + slot] = p;
+    if (emitter.life.w != 0u) {
+        particle_card_store(emitter.gradient_max.z, emitter.life.w, slot, 0u);
+    }
 }

@@ -70,9 +70,40 @@ void box_draws_transition_target(
     if (material->water) {
         out->watered = true;
         out->water = *material->water;
+        out->water_waves = material->water_waves;
+        if (material->flow) {
+            out->flowed = true;
+            out->flow = *material->flow;
+        }
+
+        if (material->caustics) {
+            out->causticked = true;
+            out->caustics = *material->caustics;
+            out->caustics_frame[0] = material->caustics_frame[0];
+            out->caustics_frame[1] = material->caustics_frame[1];
+        }
+    }
+
+    if (material->sway) {
+        out->swayed = true;
+        out->sway = *material->sway;
+        out->wind = material->wind;
+    }
+
+    if (material->reveal) {
+        out->revealed = true;
+        out->reveal = *material->reveal;
+    }
+
+    if (material->occlusion) {
+        out->occluded = true;
+        out->occlusion = *material->occlusion;
     }
 
     out->time = material->time;
+    out->origin[0] = material->origin[0];
+    out->origin[1] = material->origin[1];
+    out->origin[2] = material->origin[2];
 
     if (material->transmission) {
         out->present |= 1u << BOX_RENDER_TRANSITION_TRANSMISSION;
@@ -224,6 +255,7 @@ static void box_draws_transition_parts(
         .mapping = material->mapped ? &material->mapping : NULL,
         .scroll = material->scrolled ? &material->scroll : NULL,
         .time = material->time,
+        .origin = { material->origin[0], material->origin[1], material->origin[2] },
         .transmission = box_draws_transition_part(material, BOX_RENDER_TRANSITION_TRANSMISSION,
             &material->transmission),
         .clear_coat = box_draws_transition_part(material, BOX_RENDER_TRANSITION_CLEAR_COAT,
@@ -239,6 +271,14 @@ static void box_draws_transition_parts(
         .distortion = box_draws_transition_part(material, BOX_RENDER_TRANSITION_DISTORTION,
             &material->distortion),
         .water = material->watered ? &material->water : NULL,
+        .water_waves = material->watered ? material->water_waves : 0u,
+        .flow = material->watered && material->flowed ? &material->flow : NULL,
+        .caustics = material->watered && material->causticked ? &material->caustics : NULL,
+        .caustics_frame = { material->caustics_frame[0], material->caustics_frame[1] },
+        .sway = material->swayed ? &material->sway : NULL,
+        .wind = material->wind,
+        .reveal = material->revealed ? &material->reveal : NULL,
+        .occlusion = material->occluded ? &material->occlusion : NULL,
         .tint = box_draws_transition_part(material, BOX_RENDER_TRANSITION_TINT,
             &material->tint),
         .inherited = material->tinted ? &material->inherited : NULL,

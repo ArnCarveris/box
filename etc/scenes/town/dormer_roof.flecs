@@ -18,11 +18,13 @@ assets {
       Window(width: 1.18, height: 0.6, panes: 3) {
         Position: {0, 0.04, 0.64}
       }
+
       {
         Position: {0, 0.65, 0}
         TrianglePrism: {1.85, 0.5, 1.55}
         Rgb: color
       }
+
       {
         Position: {0, 0.93, 0}
         Rotation: {math.PI / 2, 0, 0}

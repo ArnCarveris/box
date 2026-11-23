@@ -50,8 +50,8 @@ assets {
   template CastFx : OneShot {
     prop spell: i32 = 0
 
-    const hue: Rgb = {spell_r(spell), spell_g(spell), spell_b(spell)}
-    const x = (spell - 2.5) * 80
+    const hue: Rgb = spells[spell].hue
+    const x = (spell - (spells.count() - 1) / 2.0) * 80
 
     Position: {x, 0, 0}
 
@@ -103,7 +103,15 @@ assets {
   template LevelFx {
     Position: {0, 0, 0}
 
-    Burst sparks(hue: {255, 214, 140}, count: 180, slow: 120, fast: 620, size: 6, life: 1.5, lift: 30) {
+    Burst sparks(
+      hue: {255, 214, 140},
+      count: 180,
+      slow: 120,
+      fast: 620,
+      size: 6,
+      life: 1.5,
+      lift: 30
+    ) {
       Position: {0, 240, 0}
     }
 
@@ -125,7 +133,13 @@ assets {
         Layout: {}
 
         deck_anchor {
-          Item: {h: Center, v: Bottom, y: 57, width: {mode: Fixed, value: 1}, height: {mode: Fixed, value: 1}}
+          Item: {
+            h: Center,
+            v: Bottom,
+            y: 57,
+            width: {mode: Fixed, value: 1},
+            height: {mode: Fixed, value: 1}
+          }
 
           if fx_cast_serial > 0 {
             CastFx "cast_{fx_cast_serial}"(spell: fx_cast)

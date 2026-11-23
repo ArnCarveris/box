@@ -1,0 +1,36 @@
+// A small conifer: a straight trunk with whorled limbs that shorten toward the top and level
+// twigs, dressed with spruce fronds of two banked cards along the limbs and twigs, their normals
+// bent toward the density of the fronds and their indirect light occluded by the fronds outside
+// them. The bark and the needles are two shapes of one graph.
+
+using box.mesh
+
+conifer {
+  trunk { nodes.Stem: {length: 4, segments: 10, radius: 0.14, taper: 0.9, seed: 5} }
+  limbs {
+    nodes.Branches: {
+      curves: trunk, count: 32, start: 0.15, end: 0.95, distribution: Whorled, whorl: 4,
+      down_angle: 1.6, length: 0.5, length_curve: [1, 0.85, 0.65, 0.45, 0.2],
+      radius_exponent: 1.6, segments: 4, gravity: 0.2, seed: 6
+    }
+  }
+  twigs {
+    nodes.Branches: {
+      curves: limbs, count: 6, start: 0.15, distribution: Opposite, down_angle: 0.9,
+      length: 0.45, radius_exponent: 1.2, taper: 0.7, segments: 2, seed: 7
+    }
+  }
+  bark_mesh { nodes.Tube: {curves: twigs, sides: 5} }
+  fronds {
+    nodes.Needles: {
+      curves: twigs, placement: Levels, level: 1, style: Spruce, cards: 3, width: 0.7,
+      bank: 0.6, droop: 0.15, tilt: 0.1, seed: 8
+    }
+  }
+  cards { nodes.Cards: {points: fronds, shape: Bent, bend: 0.1, double_sided: true, flutter: 0.6} }
+  normals { nodes.CrownNormals: {mesh: cards, shape: Density, strength: 0.7} }
+  foliage { nodes.CrownOcclusion: {mesh: normals, shape: Density, strength: 0.7} }
+
+  bark { Graph: {output: bark_mesh} }
+  crown { Graph: {output: foliage} }
+}

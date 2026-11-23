@@ -1,0 +1,175 @@
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+using box.camera
+using box.view
+using box.light
+using box.atmosphere
+
+// Vertex wind (WindSway) 1 s into a strong gusty Wind toward +x, lit by a sun from the left.
+// Red poles lean downwind in turn; a trunk and two branch shapes with the same bend move as one
+// with a fluttering leaf card; alpha tested grass waves; a grey box without WindSway stays still.
+//
+// frames: 60
+$ {
+  Scene: {shader_features: {Extended: {alpha_cutout: true, wind: true}}}
+  Wind: {direction: {1, 0.2}, speed: 8, gust: 0.6, gust_scale: 5}
+}
+
+camera {
+  Position: {0, 3.2, 8.5}
+  Rotation: {-0.3, 0, 0}
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {120, 160, 210, 255}},
+    shadows: {enabled: true}}
+}
+
+sun {
+  Rotation: {0.8, 0.9, 0}
+  DirectionalLight: {intensity: 1.5 * flecs.script.math.PI}
+  Rgb: {255, 245, 230}
+}
+
+leaf_tex {
+  Path: {path: "test/integration/visual/assets/leaf.png"}
+}
+
+floor {
+  Position: {0, -0.1, 0}
+  Box: {18, 0.2, 12}
+  Rgb: {150, 170, 120}
+}
+
+prefab Pole {
+  Box: {0.15, 3, 0.15}
+  Rgb: {200, 70, 50}
+  WindSway: {bend: 0.05, height: 3, base: 0}
+}
+
+pole_1 : Pole {
+  Position: {-3.0, 1.5, -2.0}
+}
+pole_2 : Pole {
+  Position: {-1.8, 1.5, -2.0}
+}
+pole_3 : Pole {
+  Position: {-0.6, 1.5, -2.0}
+}
+pole_4 : Pole {
+  Position: {0.6, 1.5, -2.0}
+}
+pole_5 : Pole {
+  Position: {1.8, 1.5, -2.0}
+}
+pole_6 : Pole {
+  Position: {3.0, 1.5, -2.0}
+}
+
+tree {
+  Position: {-4.8, 0, 0}
+
+  trunk {
+    Position: {0, 1.2, 0}
+    Cylinder: {segments: 12, smooth: true, length: 2.4, radius: 0.1}
+    Rgb: {104, 74, 48}
+    WindSway: {bend: 0.03, height: 3, base: 0}
+  }
+
+  branch_left {
+    Position: {-0.35, 2.0, 0}
+    Rotation: {0, 0, 0.9}
+    Cylinder: {segments: 8, smooth: true, length: 0.9, radius: 0.05}
+    Rgb: {104, 74, 48}
+    WindSway: {bend: 0.03, height: 3, base: 0}
+  }
+
+  branch_right {
+    Position: {0.35, 2.2, 0}
+    Rotation: {0, 0, -0.9}
+    Cylinder: {segments: 8, smooth: true, length: 0.9, radius: 0.05}
+    Rgb: {104, 74, 48}
+    WindSway: {bend: 0.03, height: 3, base: 0}
+  }
+
+  leaf {
+    Position: {0.75, 2.75, 0.05}
+    Quad: {0.8, 0.8}
+    Rgb: {170, 225, 150}
+    PbrTextures: {albedo: leaf_tex}
+    BackFaceMode: {BackFacePlain}
+    AlphaCutoff: {value: 0.5}
+    WindSway: {bend: 0.03, height: 3, base: 0, flutter: 0.08, flutter_frequency: 3,
+      flutter_reach: 0.4}
+  }
+}
+
+prefab Blade {
+  Quad: {0.25, 0.7}
+  Rgb: {120, 190, 90}
+  PbrTextures: {albedo: leaf_tex}
+  BackFaceMode: {BackFacePlain}
+  AlphaCutoff: {value: 0.5}
+  WindSway: {bend: 0.03, height: 0.7, base: 0, flutter: 0.03, flutter_frequency: 2,
+    flutter_reach: 0.3}
+}
+
+grass {
+  blade_1 : Blade {
+    Position: {-2.4, 0.35, 1.6}
+    Rotation: {0, 0.3, 0}
+  }
+  blade_2 : Blade {
+    Position: {-2.0, 0.35, 1.9}
+    Rotation: {0, -0.5, 0}
+  }
+  blade_3 : Blade {
+    Position: {-1.6, 0.35, 1.5}
+    Rotation: {0, 0.9, 0}
+  }
+  blade_4 : Blade {
+    Position: {-1.2, 0.35, 2.0}
+    Rotation: {0, -0.2, 0}
+  }
+  blade_5 : Blade {
+    Position: {-0.8, 0.35, 1.6}
+    Rotation: {0, 0.6, 0}
+  }
+  blade_6 : Blade {
+    Position: {-0.4, 0.35, 1.9}
+    Rotation: {0, -0.8, 0}
+  }
+  blade_7 : Blade {
+    Position: {0.0, 0.35, 1.5}
+    Rotation: {0, 0.1, 0}
+  }
+  blade_8 : Blade {
+    Position: {0.4, 0.35, 2.0}
+    Rotation: {0, -0.4, 0}
+  }
+  blade_9 : Blade {
+    Position: {0.8, 0.35, 1.6}
+    Rotation: {0, 0.7, 0}
+  }
+  blade_10 : Blade {
+    Position: {1.2, 0.35, 1.9}
+    Rotation: {0, -0.6, 0}
+  }
+  blade_11 : Blade {
+    Position: {1.6, 0.35, 1.5}
+    Rotation: {0, 0.4, 0}
+  }
+  blade_12 : Blade {
+    Position: {2.0, 0.35, 2.0}
+    Rotation: {0, -0.1, 0}
+  }
+}
+
+still_box {
+  Position: {4.8, 0.6, 0}
+  Box: {1.2, 1.2, 1.2}
+  Rgb: {150, 150, 160}
+}

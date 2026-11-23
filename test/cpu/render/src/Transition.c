@@ -319,6 +319,7 @@ void Transition_query_write_starts(void) {
         }
     }
 
+    ecs_modified(world, e, Position);
     tr_frame(world);
     test_int(tr_records(null, BOX_RENDER_TRANSITION_START), 1);
     test_flt(tr_position(world, e).x, 0);
@@ -1851,7 +1852,7 @@ void Transition_record_sizes(void) {
     test_int(ECS_SIZEOF(box_render_transform_t), 48);
     test_int(ECS_SIZEOF(box_render_mesh_shading_t), 16);
     test_int(ECS_SIZEOF(box_render_shading_t), 64);
-    test_int(ECS_SIZEOF(box_render_material_t), 192);
+    test_int(ECS_SIZEOF(box_render_material_t), 272);
 }
 
 void Transition_idle_no_work(void) {

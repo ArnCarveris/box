@@ -7,6 +7,12 @@
             "box"
         ]
     },
+    "lang.c": {
+        "include": [
+            "../../../src/texture",
+            "../../../src/terrain"
+        ]
+    },
     "test": {
         "testsuites": [
             {
@@ -215,6 +221,15 @@
                     "open_water_turns",
                     "autopilot_rejoins",
                     "walker_rides"
+                ]
+            },
+            {
+                "id": "TerrainWalk",
+                "testcases": [
+                    "walks_up_slope",
+                    "stops_at_cliff",
+                    "lands_on_terrain",
+                    "camera_collides"
                 ]
             }
         ]

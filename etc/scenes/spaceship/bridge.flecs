@@ -13,63 +13,164 @@ assets {
   template FrigateBridge {
     root { AttachmentFrame: {} }
     neck : DarkArmor { Position: {};
-      BeveledPrism: {footprint: [{-5, -13}, {5, -13}, {3.5, 5}, {-3.5, 5}], depth: 11, inset: 0.5, offset: {0, -3}, bevel: 0.8}
+      BeveledPrism: {
+        footprint: [{-5, -13}, {5, -13}, {3.5, 5}, {-3.5, 5}],
+        depth: 11,
+        inset: 0.5,
+        offset: {0, -3},
+        bevel: 0.8
+      }
     }
+
     base : HullArmor {
       Position: {0, 7, -3}
-      BeveledPrism: {footprint: [{-9, -11}, {9, -11}, {7, 10}, {-7, 10}], depth: 3, inset: 0.8, bevel: 0.4}
+      BeveledPrism: {
+        footprint: [{-9, -11}, {9, -11}, {7, 10}, {-7, 10}],
+        depth: 3,
+        inset: 0.8,
+        bevel: 0.4
+      }
     }
+
     cockpit { FrigateCockpit: {}; Position: {0, 8.5, -3} }
     rearwall : DarkArmor { Position: {0, 10, -12}; Box: {14, 4.4, 0.7} }
-    windshield : WindshieldGlass { Position: {0, 10.3, 4.7}; Rotation: {-0.19, 0, 0}; Box: {12.5, 2.8, 0.12} }
+    windshield : WindshieldGlass {
+      Position: {0, 10.3, 4.7}
+      Rotation: {-0.19, 0, 0}
+      Box: {12.5, 2.8, 0.12}
+    }
+
     for side in 0..2 {
-    "glass_{side}" : WindshieldGlass { Position: {(side - 0.5) * 14.1, 10.3, -3}; Box: {0.1, 2.8, 14} }
-    for i in 0..6 {
-    "mullion_{side}_{i}" : Titanium { Position: {(side - 0.5) * 14.2, 10.3, -9.5 + i * 2.65}; Box: {0.2, 3.3, 0.22} }
-  }
-    "bridge_rail_{side}" : PaleArmor { Position: {(side - 0.5) * 14.5, 8.7, -3}; Box: {0.4, 0.5, 15} }
-  }
+      "glass_{side}" : WindshieldGlass {
+        Position: {(side - 0.5) * 14.1, 10.3, -3}
+        Box: {0.1, 2.8, 14}
+      }
+
+      for i in 0..6 {
+        "mullion_{side}_{i}" : Titanium {
+          Position: {(side - 0.5) * 14.2, 10.3, -9.5 + i * 2.65}
+          Box: {0.2, 3.3, 0.22}
+        }
+      }
+
+      "bridge_rail_{side}" : PaleArmor {
+        Position: {(side - 0.5) * 14.5, 8.7, -3}
+        Box: {0.4, 0.5, 15}
+      }
+    }
+
     for i in 0..7 {
-    "front_mullion_{i}" : Titanium { Position: {-6 + i * 2, 10.3, 4.8}; Rotation: {-0.19, 0, 0}; Box: {0.18, 3, 0.25} }
-  }
+      "front_mullion_{i}" : Titanium {
+        Position: {-6 + i * 2, 10.3, 4.8}
+        Rotation: {-0.19, 0, 0}
+        Box: {0.18, 3, 0.25}
+      }
+    }
+
     brow : PaleArmor {
       Position: {0, 12.5, -3}
-      BeveledPrism: {footprint: [{-9, -11}, {9, -11}, {6.5, 11}, {-6.5, 11}], depth: 1.8, inset: 0.4, offset: {0, 1}, bevel: 0.3}
+      BeveledPrism: {
+        footprint: [{-9, -11}, {9, -11}, {6.5, 11}, {-6.5, 11}],
+        depth: 1.8,
+        inset: 0.4,
+        offset: {0, 1},
+        bevel: 0.3
+      }
     }
 
     sensor { FrigateSensor: {}; Position: {0, 13.4, -9} }
-    roof_panels { Array: {axis: Z, count: 6, spacing: 2.3}; Position: {0, 13.45, -8}; tile { HullPanel: {width: 8, length: 2.1} } }
+    roof_panels {
+      Array: {axis: Z, count: 6, spacing: 2.3}
+      Position: {0, 13.45, -8}
+      tile { HullPanel: {width: 8, length: 2.1} }
+    }
+
     for side in 0..2 {
-    "windowline_{side}" : IceLight { Position: {(side - 0.5) * 15.2, 7.6, -3}; Box: {0.12, 0.14, 14} }
-    "armor_{side}" : HullArmor { Position: {(side - 0.5) * 8.5, 1.2, -5}; Rotation: {0, 0, (side - 0.5) * 0.32}; Box: {0.7, 7.5, 7} }
-    "windows_{side}" { Position: {(side - 0.5) * 9.3, 1.2, -8}; Array: {axis: Z, count: 8, spacing: 0.85}; slit : WhiteLight { Position: {}; Box: {0.1, 0.25, 0.38} } }
-  }
+      "windowline_{side}" : IceLight {
+        Position: {(side - 0.5) * 15.2, 7.6, -3}
+        Box: {0.12, 0.14, 14}
+      }
+
+      "armor_{side}" : HullArmor {
+        Position: {(side - 0.5) * 8.5, 1.2, -5}
+        Rotation: {0, 0, (side - 0.5) * 0.32}
+        Box: {0.7, 7.5, 7}
+      }
+
+      "windows_{side}" {
+        Position: {(side - 0.5) * 9.3, 1.2, -8}
+        Array: {axis: Z, count: 8, spacing: 0.85}
+        slit : WhiteLight { Position: {}; Box: {0.1, 0.25, 0.38} }
+      }
+    }
 
     for side in 0..2 {
       "haunch_{side}" : HullArmor {
         Position: {(side - 0.5) * 10, 3, -8}
-        BeveledPrism: {footprint: [{-1.8, -6}, {1.8, -6}, {0.8, 4}, {-0.8, 4}], depth: 6, inset: 0.4, offset: {0, -1.8}, bevel: 0.35}
+        BeveledPrism: {
+          footprint: [{-1.8, -6}, {1.8, -6}, {0.8, 4}, {-0.8, 4}],
+          depth: 6,
+          inset: 0.4,
+          offset: {0, -1.8},
+          bevel: 0.35
+        }
       }
+
       "cheek_{side}" : PaleArmor {
         Position: {(side - 0.5) * 15.4, 8.8, 1}
         Rotation: {0, (side - 0.5) * 0.18, 0}
-        BeveledPrism: {footprint: [{-0.65, -6}, {0.65, -6}, {0.28, 4}, {-0.28, 4}], depth: 1.7, inset: 0.18, offset: {0, -0.8}, bevel: 0.15}
+        BeveledPrism: {
+          footprint: [{-0.65, -6}, {0.65, -6}, {0.28, 4}, {-0.28, 4}],
+          depth: 1.7,
+          inset: 0.18,
+          offset: {0, -0.8},
+          bevel: 0.15
+        }
       }
-      "neck_inset_{side}" : RecessMetal { Position: {(side - 0.5) * 10.8, 3.2, -8}; Box: {0.12, 3.3, 4.6} }
+
+      "neck_inset_{side}" : RecessMetal {
+        Position: {(side - 0.5) * 10.8, 3.2, -8}
+        Box: {0.12, 3.3, 4.6}
+      }
+
       "neck_vanes_{side}" {
         Position: {(side - 0.5) * 11, 1.8, -8}
         Array: {axis: Y, count: 8, spacing: 0.4}
         vane : Titanium { Rotation: {0, 0, (side - 0.5) * 0.7}; Box: {0.23, 0.13, 4.2} }
       }
-      "navigation_{side}" : RustRed { Position: {(side - 0.5) * 17.1, 11.9, -10.5}; Box: {0.6, 0.55, 1.4} }
-      "navigation_light_{side}" : AmberLight { Position: {(side - 0.5) * 17.7, 11.9, -10.5}; Box: {0.12, 0.18, 0.65} }
+
+      "navigation_{side}" : RustRed {
+        Position: {(side - 0.5) * 17.1, 11.9, -10.5}
+        Box: {0.6, 0.55, 1.4}
+      }
+
+      "navigation_light_{side}" : AmberLight {
+        Position: {(side - 0.5) * 17.7, 11.9, -10.5}
+        Box: {0.12, 0.18, 0.65}
+      }
     }
+
     rear_access : RecessMetal { Position: {0, 10, -12.4}; Box: {2, 3.7, 0.15} }
     rear_door : Titanium { Position: {0, 9.9, -12.5}; Box: {1.7, 3.2, 0.12} }
     rear_seal : RecessMetal { Position: {0, 9.9, -12.58}; Box: {0.045, 3.2, 0.025} }
-    rear_lamp : WhiteLight { Align: {target: rear_door, self: {y: Min}, other: {y: Max}, offset: {0, 0.12, -0.08}}; Box: {1.6, 0.1, 0.1} }
-    roof_hatch : DarkArmor { Position: {0, 13.5, 3}; BeveledPrism: {footprint: [{-1.2, -1}, {1.2, -1}, {1.2, 1}, {-1.2, 1}], depth: 0.2, inset: 0.1, bevel: 0.08} }
-    roof_hatch_inset : Titanium { Align: {target: roof_hatch, self: {y: Min}, other: {y: Max}, offset: {0, 0.03, 0}}; Box: {1, 0.08, 0.1} }
+    rear_lamp : WhiteLight {
+      Align: {target: rear_door, self: {y: Min}, other: {y: Max}, offset: {0, 0.12, -0.08}}
+      Box: {1.6, 0.1, 0.1}
+    }
 
+    roof_hatch : DarkArmor {
+      Position: {0, 13.5, 3}
+      BeveledPrism: {
+        footprint: [{-1.2, -1}, {1.2, -1}, {1.2, 1}, {-1.2, 1}],
+        depth: 0.2,
+        inset: 0.1,
+        bevel: 0.08
+      }
+    }
+
+    roof_hatch_inset : Titanium {
+      Align: {target: roof_hatch, self: {y: Min}, other: {y: Max}, offset: {0, 0.03, 0}}
+      Box: {1, 0.08, 0.1}
+    }
   }
 }

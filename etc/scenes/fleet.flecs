@@ -1,7 +1,5 @@
-// A stress test: a giant space station with four liner gates (N, E, S, W) that liners line up
-// for and berth at, and twenty rig bays on its outer deck, with traffic that never stops.
-// Liners and rigs are the shipyard's preset designs (1 unit = 1 m). Gates clamp and refuel the
-// liners and light their hazard beacons as the ships come and go.
+// Fleet: a stress test, a giant space station with four liner gates and twenty rig bays.
+// Its traffic never stops. Liners and rigs are the shipyard's preset designs (1 unit = 1 m).
 include shipyard/ships
 include fleet/materials
 include fleet/kit
@@ -30,12 +28,16 @@ using state
 using assets
 
 assets {
-  fleet_stars { EnvironmentImage: {path: "etc/scenes/shipyard/assets/space.hdr"}; Environment: {resolution: 1024} }
+  fleet_stars {
+    EnvironmentImage: {path: "etc/scenes/shipyard/assets/space.hdr"}
+    Environment: {resolution: 1024}
+  }
 }
 
 $ {
   box.app.FpsTarget: {60}
-  Scene: {environment: true, blend_modes: true, transmission: true, fresnel: true, distortion: true}
+  Scene: {environment: true, shader_features: {Extended: {blend_modes: true, transmission: true,
+    fresnel: true, distortion: true}}}
   AmbientLight: {sky: {120, 140, 180}, ground: {50, 60, 84}, intensity: 0.4}
 }
 
@@ -71,25 +73,42 @@ view {
   View: {
     camera: camera,
     clear: {enabled: true, color: {3, 5, 10, 255}},
-    shadows: {enabled: true, cascades: 4, resolution: 2048, max_distance: 14000, filter_size: 2},
-    lighting: {reflections: true, baked: false, environment: {source: assets.fleet_stars, intensity: 0.7, background: true}},
-    effects: [{effect: fleet_contact}, {effect: fleet_bloom}, {effect: fleet_film}, {effect: fleet_edges}]
+    shadows: {
+      enabled: true,
+      cascades: 3,
+      resolution: 2048,
+      interval: [1, 2, 2],
+      max_distance: 14000,
+      filter_size: 2
+    },
+    lighting: {
+      reflections: true,
+      baked: false,
+      environment: {source: assets.fleet_stars, intensity: 0.7, background: true}
+    },
+    effects: [
+      {effect: fleet_contact},
+      {effect: fleet_bloom},
+      {effect: fleet_film},
+      {effect: fleet_edges}
+    ]
   }
 }
 
 station {
   HarborStation body
 
-  // The liner gates on the rim, 1020 m out, with the liners berthed radially in front of them.
   for g in 0..4 {
     const a = g * HALF_PI
-    LinerGate "gate_{g}"(idx: g, label: g == 0 ? "NORTH GATE" : g == 1 ? "EAST GATE" : g == 2 ? "SOUTH GATE" : "WEST GATE") {
+    LinerGate "gate_{g}"(
+      idx: g,
+      label: g == 0 ? "NORTH GATE" : g == 1 ? "EAST GATE" : g == 2 ? "SOUTH GATE" : "WEST GATE"
+    ) {
       Position: {sin(a) * 1020, 0, cos(a) * 1020}
       Rotation: {0, a, 0}
     }
   }
 
-  // The rig bays on the outer deck, five between each pair of gates.
   for q in 0..4 {
     for b in 0..5 {
       const a = q * HALF_PI + (25 + b * 10) * PI / 180

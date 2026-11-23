@@ -21,6 +21,7 @@ assets {
       Rgb: MarketSage
       PbrMaterial: {metallic: 0.4, roughness: 0.3}
     }
+
     column {
       Position: {0, 0.4, 0}
       Frustum: {radius_bottom: 0.12, radius_top: 0.07, length: 0.65, segments: 12}
@@ -28,12 +29,14 @@ assets {
       PbrMaterial: {metallic: 0.7, roughness: 0.3}
       SpecularAnisotropy: {strength: 0.6, rotation: 0}
     }
+
     arm {
       Position: {0, 0.73, 0}
       Rotation: {0, 0, 0.06}
       Box: {1.1, 0.045, 0.055}
       Rgb: {171, 133, 65}
     }
+
     for side in 0..2 {
       {
         Position: {(side - 0.5) * 0.98, 0.35 + side * 0.06, 0}
@@ -42,6 +45,7 @@ assets {
         PbrMaterial: {metallic: 0.65, roughness: 0.3}
         SpecularAnisotropy: {strength: 0.6, rotation: 0}
       }
+
       for chain in 0..3 {
         const a = chain * math.PI * 2 / 3
         MarketBeam(ax: (side - 0.5) * 0.98, ay: 0.7 + side * 0.06,
@@ -49,15 +53,18 @@ assets {
           bz: math.cos(a) * 0.22, radius: 0.009, tint: {171, 133, 65})
       }
     }
+
     CheeseWedge() {
       Position: {-0.49, 0.38, 0}
       Scale: {0.37, 0.37, 0.37}
     }
+
     weight {
       Position: {0.49, 0.48, 0}
       Frustum: {radius_bottom: 0.09, radius_top: 0.06, length: 0.13, segments: 12}
       Rgb: MarketIron
     }
+
     weight_handle {
       Position: {0.49, 0.57, 0}
       Rotation: {math.PI / 2, 0, 0}

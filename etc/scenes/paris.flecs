@@ -1,0 +1,26 @@
+include paris/state
+include paris/clock
+include paris/materials
+include paris/world
+include paris/building
+include paris/city
+include paris/street
+include paris/eiffel
+include paris/landmarks
+include paris/liberty
+include paris/raccoon
+include paris/raccoons
+include paris/hunt
+include paris/charm
+using flecs.script
+using box.view
+using box.surface
+
+$ {
+  box.app.FpsTarget: {60}
+  Scene: {baked: true, reflections: true, punctual_shadows: true, environment: true,
+    aerial_perspective: true, planar_reflections: true, shader_features: {Extended: {sheen: true,
+    clear_coat: true, water: true, texture_scroll: true, blend_modes: true}}}
+}
+
+window { Surface: {width: 1600, height: 1000, vsync: true} }

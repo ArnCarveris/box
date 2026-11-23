@@ -62,11 +62,12 @@ static void box_textures_free(
         box_texture_t *tex = ecs_map_ptr(&it);
         ecs_os_free(tex->pixels);
         ecs_os_free(tex->source_name);
-        box_texture_graph_clear(tex);
+        box_texture_graph_clear(t, tex);
         ecs_os_free(tex);
     }
 
     box_texture_graphs_fini(t);
+    box_texture_readbacks_fini(t);
     ecs_map_fini(&t->textures);
     ecs_vec_fini_t(NULL, &t->queued, ecs_entity_t);
     ecs_vec_fini_t(NULL, &t->released, uint32_t);
@@ -788,7 +789,7 @@ static void box_texture_forget(
         box_texture_graphs_touch(t, e);
         ecs_os_free(tex->pixels);
         ecs_os_free(tex->source_name);
-        box_texture_graph_clear(tex);
+        box_texture_graph_clear(t, tex);
         ecs_os_free(tex);
     }
 
@@ -984,6 +985,32 @@ static void box_texture_flow_ctor(
     }
 }
 
+/** Construct TexErosion components with frequency 4, five octaves, lacunarity 2, gain 0.5,
+ * scale 1, branch 1 and the other members zero.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_texture_erosion_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    TexErosion *erosion = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        ecs_os_memset_t(&erosion[i], 0, TexErosion);
+        erosion[i].frequency = 4;
+        erosion[i].octaves = 5;
+        erosion[i].lacunarity = 2;
+        erosion[i].gain = 0.5f;
+        erosion[i].scale = 1;
+        erosion[i].branch = 1;
+    }
+}
+
 /** Construct TexTransmittance components with 64 steps and the other members zero.
  *
  * @param ptr The components
@@ -1073,6 +1100,31 @@ static void box_texture_cells_ctor(
         cells[i].count = 64;
         cells[i].jitter = 1;
         cells[i].edge = 0.25f;
+    }
+}
+
+/** Construct TexRipples components with 64 cells, a speed of 1, a lifetime of 1, a width of
+ * 0.15, a density of 1 and the other members zero.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_texture_ripples_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    TexRipples *ripples = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        ecs_os_memset_t(&ripples[i], 0, TexRipples);
+        ripples[i].count = 64;
+        ripples[i].speed = 1;
+        ripples[i].lifetime = 1;
+        ripples[i].width = 0.15f;
+        ripples[i].density_value = 1;
     }
 }
 
@@ -1221,7 +1273,7 @@ static void BoxTextureGraphOnRemove(
                 *ecs_vec_append_t(NULL, &t->graph_released, uint32_t) = tex->handle;
             }
 
-            box_texture_graph_clear(tex);
+            box_texture_graph_clear(t, tex);
             *ecs_vec_append_t(NULL, &t->reload, ecs_entity_t) = e;
             continue;
         }
@@ -1413,6 +1465,7 @@ static void box_texture_register(
     ecs_set_name_prefix(world, NULL);
     BOX_TEXTURE_COMPONENT(world, TextureGraphDomain, "Domain");
     BOX_TEXTURE_COMPONENT(world, TextureGraphFormat, "Format");
+    BOX_TEXTURE_COMPONENT(world, TextureGraphWindow, "Window");
     BOX_TEXTURE_COMPONENT(world, TextureGraphCache, "Cache");
     BOX_TEXTURE_COMPONENT(world, TextureNodePort, "Port");
     BOX_TEXTURE_COMPONENT(world, TextureNodeParam, "Param");
@@ -1425,6 +1478,7 @@ static void box_texture_register(
     ecs_set_name_prefix(world, "Tex");
     ECS_META_COMPONENT(world, TexConstant);
     ECS_META_COMPONENT(world, TexCoords);
+    ECS_META_COMPONENT(world, TexCenter);
     ECS_META_COMPONENT(world, TexAdd);
     ECS_META_COMPONENT(world, TexSubtract);
     ECS_META_COMPONENT(world, TexMultiply);
@@ -1451,6 +1505,7 @@ static void box_texture_register(
     ECS_META_COMPONENT(world, TexNoise);
     BOX_TEXTURE_COMPONENT(world, TextureCellsDistance, "CellsDistance");
     ECS_META_COMPONENT(world, TexCells);
+    ECS_META_COMPONENT(world, TexRipples);
     ECS_META_COMPONENT(world, TexBlocks);
     BOX_TEXTURE_COMPONENT(world, TextureChannel, "Channel");
     ECS_META_COMPONENT(world, TexSplit);
@@ -1472,6 +1527,7 @@ static void box_texture_register(
     ECS_META_COMPONENT(world, TexSlope);
     ECS_META_COMPONENT(world, TexGradient);
     ECS_META_COMPONENT(world, TexFlow);
+    ECS_META_COMPONENT(world, TexErosion);
     ECS_META_COMPONENT(world, TexTransmittance);
 
     ecs_set_scope(world, module);
@@ -1482,6 +1538,9 @@ static void box_texture_register(
     ECS_META_COMPONENT(world, TextureGraph);
     ECS_META_COMPONENT(world, TextureState);
     ECS_META_COMPONENT(world, TextureStatus);
+    ECS_META_COMPONENT(world, TextureReadbackFormat);
+    ECS_META_COMPONENT(world, TextureReadback);
+    ECS_META_COMPONENT(world, TextureReadbackStatus);
     ECS_COMPONENT_DEFINE(world, TextureRegistry);
     ECS_COMPONENT_DEFINE(world, TexturePixels);
     ecs_set_name_prefix(world, NULL);
@@ -1514,10 +1573,12 @@ void BoxTextureImport(
     ecs_set_hooks(world, TexSlope, { .ctor = box_texture_slope_ctor });
     ecs_set_hooks(world, TexGradient, { .ctor = box_texture_gradient_ctor });
     ecs_set_hooks(world, TexFlow, { .ctor = box_texture_flow_ctor });
+    ecs_set_hooks(world, TexErosion, { .ctor = box_texture_erosion_ctor });
     ecs_set_hooks(world, TexTransmittance, { .ctor = box_texture_transmittance_ctor });
     ecs_set_hooks(world, TexNoise, { .ctor = box_texture_noise_ctor });
     ecs_set_hooks(world, TexBlocks, { .ctor = box_texture_blocks_ctor });
     ecs_set_hooks(world, TexCells, { .ctor = box_texture_cells_ctor });
+    ecs_set_hooks(world, TexRipples, { .ctor = box_texture_ripples_ctor });
     box_owned_hooks(world, TextureNodePort, BOX_OWNED_STR(TextureNodePort, name),
         BOX_OWNED_STR(TextureNodePort, value));
     box_owned_hooks(world, TextureNodeParam, BOX_OWNED_STR(TextureNodeParam, name));
@@ -1573,6 +1634,7 @@ void BoxTextureImport(
     t->watch = box_file_watch_kind(world, "texture", box_texture_changed, NULL);
     ecs_singleton_ensure(world, TextureRegistry)->textures = t;
     box_texture_graphs_init(world, t);
+    box_texture_readbacks_init(world, t);
     ecs_entity_t module = ecs_get_scope(world);
     ecs_entity_t gen = ecs_lookup_child(world, module, "gen");
     ecs_entity_t graph = ecs_lookup_child(world, module, "graph");

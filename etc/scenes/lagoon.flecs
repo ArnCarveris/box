@@ -1,10 +1,13 @@
 include lagoon/state
 include lagoon/materials
 include lagoon/world
+include lagoon/wake
 include lagoon/canoe
 include lagoon/scenery
+include lagoon/riverbed
 include lagoon/play
 include lagoon/hazards
+include lagoon/life
 include lagoon/hud
 
 using flecs.script
@@ -16,8 +19,9 @@ using state
 
 $ {
   box.app.FpsTarget: {60}
-  Scene: {environment: true, aerial_perspective: true, blend_modes: true, sheen: true,
-    diffuse_transmission: true, texture_scroll: true, water: true}
+  Scene: {environment: true, aerial_perspective: true, planar_reflections: true,
+    shader_features: {Extended: {blend_modes: true, sheen: true, diffuse_transmission: true,
+    texture_scroll: true, water: true}}}
 }
 
 window { Surface: {width: 1280, height: 800, vsync: true} }

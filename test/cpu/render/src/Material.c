@@ -167,11 +167,14 @@ void Material_alpha_cutoff_batches(void) {
     // materials/cutout
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
-    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
-        .punctual_shadows = true, .cookies = true, .environment = true,
-        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
-        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
-        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true, .punctual_shadows = true,
+        .cookies = true, .environment = true, .aerial_perspective = true,
+        .shader_features.Extended.alpha_cutout = true, .shader_features.Extended.blend_modes = true,
+        .shader_features.Extended.transmission = true,
+        .shader_features.Extended.texture_blend = true, .shader_features.Extended.triplanar = true,
+        .shader_features.Extended.sheen = true, .shader_features.Extended.clear_coat = true,
+        .shader_features.Extended.anisotropy = true,
+        .shader_features.Extended.diffuse_transmission = true});
     box_render_null_t *null = box_render_null_new();
     box_render_backend_t backend = box_render_null_backend(null);
     box_render_set_backend(world, &backend);
@@ -232,11 +235,14 @@ void Material_alpha_cutoff_prefab_and_dynamic(void) {
     // materials/cutout
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
-    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
-        .punctual_shadows = true, .cookies = true, .environment = true,
-        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
-        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
-        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true, .punctual_shadows = true,
+        .cookies = true, .environment = true, .aerial_perspective = true,
+        .shader_features.Extended.alpha_cutout = true, .shader_features.Extended.blend_modes = true,
+        .shader_features.Extended.transmission = true,
+        .shader_features.Extended.texture_blend = true, .shader_features.Extended.triplanar = true,
+        .shader_features.Extended.sheen = true, .shader_features.Extended.clear_coat = true,
+        .shader_features.Extended.anisotropy = true,
+        .shader_features.Extended.diffuse_transmission = true});
     box_render_null_t *null = box_render_null_new();
     box_render_backend_t backend = box_render_null_backend(null);
     box_render_set_backend(world, &backend);
@@ -330,7 +336,7 @@ static void oreelse_cutout(
 {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
-    ecs_singleton_set(world, Scene, {.alpha_cutout = true});
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.alpha_cutout = true});
     box_render_null_t *null = box_render_null_new();
     box_render_backend_t backend = box_render_null_backend(null);
     box_render_set_backend(world, &backend);
@@ -542,11 +548,14 @@ void Material_transmission_override_permutations(void) {
     // materials/transmission
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
-    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
-        .punctual_shadows = true, .cookies = true, .environment = true,
-        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
-        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
-        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true, .punctual_shadows = true,
+        .cookies = true, .environment = true, .aerial_perspective = true,
+        .shader_features.Extended.alpha_cutout = true, .shader_features.Extended.blend_modes = true,
+        .shader_features.Extended.transmission = true,
+        .shader_features.Extended.texture_blend = true, .shader_features.Extended.triplanar = true,
+        .shader_features.Extended.sheen = true, .shader_features.Extended.clear_coat = true,
+        .shader_features.Extended.anisotropy = true,
+        .shader_features.Extended.diffuse_transmission = true});
     box_render_null_t *null = box_render_null_new();
     box_render_backend_t backend = box_render_null_backend(null);
     box_render_set_backend(world, &backend);
@@ -641,11 +650,14 @@ void Material_transmission_dynamic_material_keeps_batch(void) {
     // materials/transmission
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
-    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
-        .punctual_shadows = true, .cookies = true, .environment = true,
-        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
-        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
-        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true, .punctual_shadows = true,
+        .cookies = true, .environment = true, .aerial_perspective = true,
+        .shader_features.Extended.alpha_cutout = true, .shader_features.Extended.blend_modes = true,
+        .shader_features.Extended.transmission = true,
+        .shader_features.Extended.texture_blend = true, .shader_features.Extended.triplanar = true,
+        .shader_features.Extended.sheen = true, .shader_features.Extended.clear_coat = true,
+        .shader_features.Extended.anisotropy = true,
+        .shader_features.Extended.diffuse_transmission = true});
     box_render_null_t *null = box_render_null_new();
     box_render_backend_t backend = box_render_null_backend(null);
     box_render_set_backend(world, &backend);
@@ -839,7 +851,7 @@ void Material_specular_anisotropy_pack(void) {
     box_draws_material_pack(&record, &(box_draw_material_t){ .fade = 1 });
     test_uint(record.anisotropy, 0);
     plain = record;
-    test_int(ECS_SIZEOF(box_render_material_t), 192);
+    test_int(ECS_SIZEOF(box_render_material_t), 272);
 
     SpecularAnisotropy full = { .strength = 1, .rotation = 0 };
     box_draws_material_pack(&record, &(box_draw_material_t){ .anisotropy = &full, .fade = 1 });
@@ -955,7 +967,7 @@ void Material_sheen_pack(void) {
     test_uint(record.diffuse_transmission, 0);
     test_flt(record.thickness, 0);
     plain = record;
-    test_int(ECS_SIZEOF(box_render_material_t), 192);
+    test_int(ECS_SIZEOF(box_render_material_t), 272);
 
     Sheen white = { .color = {255, 255, 255}, .roughness = 1 };
     box_draws_material_pack(&record, &(box_draw_material_t){ .sheen = &white, .fade = 1 });
@@ -1070,7 +1082,7 @@ void Material_diffuse_transmission_defaults(void) {
 void Material_diffuse_transmission_pack(void) {
     // materials/pbr
     box_render_material_t record, plain;
-    test_int(ECS_SIZEOF(box_render_material_t), 192);
+    test_int(ECS_SIZEOF(box_render_material_t), 272);
     test_int(offsetof(box_render_material_t, diffuse_transmission), 76);
     test_int(offsetof(box_render_material_t, thickness), 80);
     ecs_os_memset_t(&record, 0x55, box_render_material_t);
@@ -1184,7 +1196,7 @@ void Material_diffuse_transmission_blur_defaults(void) {
 void Material_diffuse_transmission_blur_pack(void) {
     // materials/pbr
     box_render_material_t record, plain;
-    test_int(ECS_SIZEOF(box_render_material_t), 192);
+    test_int(ECS_SIZEOF(box_render_material_t), 272);
     test_int(offsetof(box_render_material_t, diffuse_blur), 84);
     ecs_os_memset_t(&record, 0x55, box_render_material_t);
     box_draws_material_pack(&record, &(box_draw_material_t){ .fade = 1 });
@@ -2317,11 +2329,14 @@ void Material_texture_blend_batches(void) {
     // materials/texture_blend
     box_render_null_t *null;
     ecs_world_t *world = blend_world(&null);
-    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
-        .punctual_shadows = true, .cookies = true, .environment = true,
-        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
-        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
-        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true, .punctual_shadows = true,
+        .cookies = true, .environment = true, .aerial_perspective = true,
+        .shader_features.Extended.alpha_cutout = true, .shader_features.Extended.blend_modes = true,
+        .shader_features.Extended.transmission = true,
+        .shader_features.Extended.texture_blend = true, .shader_features.Extended.triplanar = true,
+        .shader_features.Extended.sheen = true, .shader_features.Extended.clear_coat = true,
+        .shader_features.Extended.anisotropy = true,
+        .shader_features.Extended.diffuse_transmission = true});
     ecs_entity_t a = blend_texture(world, BLEND_RGB_PNG);
     ecs_entity_t g = blend_texture(world, BLEND_GRAY_PNG);
     ecs_entity_t grass = ecs_new(world);
@@ -2393,11 +2408,14 @@ void Material_texture_blend_prefab(void) {
     // materials/texture_blend
     box_render_null_t *null;
     ecs_world_t *world = blend_world(&null);
-    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
-        .punctual_shadows = true, .cookies = true, .environment = true,
-        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
-        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
-        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true, .punctual_shadows = true,
+        .cookies = true, .environment = true, .aerial_perspective = true,
+        .shader_features.Extended.alpha_cutout = true, .shader_features.Extended.blend_modes = true,
+        .shader_features.Extended.transmission = true,
+        .shader_features.Extended.texture_blend = true, .shader_features.Extended.triplanar = true,
+        .shader_features.Extended.sheen = true, .shader_features.Extended.clear_coat = true,
+        .shader_features.Extended.anisotropy = true,
+        .shader_features.Extended.diffuse_transmission = true});
     ecs_entity_t a = blend_texture(world, BLEND_RGB_PNG);
     ecs_entity_t mask = blend_texture(world, BLEND_MASK_PNG);
     ecs_entity_t grass = ecs_new(world);
@@ -2446,11 +2464,14 @@ void Material_texture_blend_layer_changes(void) {
     // materials/texture_blend
     box_render_null_t *null;
     ecs_world_t *world = blend_world(&null);
-    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
-        .punctual_shadows = true, .cookies = true, .environment = true,
-        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
-        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
-        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true, .punctual_shadows = true,
+        .cookies = true, .environment = true, .aerial_perspective = true,
+        .shader_features.Extended.alpha_cutout = true, .shader_features.Extended.blend_modes = true,
+        .shader_features.Extended.transmission = true,
+        .shader_features.Extended.texture_blend = true, .shader_features.Extended.triplanar = true,
+        .shader_features.Extended.sheen = true, .shader_features.Extended.clear_coat = true,
+        .shader_features.Extended.anisotropy = true,
+        .shader_features.Extended.diffuse_transmission = true});
     ecs_entity_t a = blend_texture(world, BLEND_RGB_PNG);
     ecs_entity_t g = blend_texture(world, BLEND_GRAY_PNG);
     ecs_entity_t layer = ecs_new(world);
@@ -2503,11 +2524,14 @@ void Material_texture_blend_layer_deleted(void) {
     // materials/texture_blend
     box_render_null_t *null;
     ecs_world_t *world = blend_world(&null);
-    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
-        .punctual_shadows = true, .cookies = true, .environment = true,
-        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
-        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
-        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true, .punctual_shadows = true,
+        .cookies = true, .environment = true, .aerial_perspective = true,
+        .shader_features.Extended.alpha_cutout = true, .shader_features.Extended.blend_modes = true,
+        .shader_features.Extended.transmission = true,
+        .shader_features.Extended.texture_blend = true, .shader_features.Extended.triplanar = true,
+        .shader_features.Extended.sheen = true, .shader_features.Extended.clear_coat = true,
+        .shader_features.Extended.anisotropy = true,
+        .shader_features.Extended.diffuse_transmission = true});
     ecs_entity_t a = blend_texture(world, BLEND_RGB_PNG);
     ecs_entity_t g = blend_texture(world, BLEND_GRAY_PNG);
     ecs_entity_t grass = ecs_new(world);
@@ -2553,11 +2577,14 @@ void Material_texture_blend_height_record(void) {
     // materials/texture_blend
     box_render_null_t *null;
     ecs_world_t *world = blend_world(&null);
-    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
-        .punctual_shadows = true, .cookies = true, .environment = true,
-        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
-        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
-        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true, .punctual_shadows = true,
+        .cookies = true, .environment = true, .aerial_perspective = true,
+        .shader_features.Extended.alpha_cutout = true, .shader_features.Extended.blend_modes = true,
+        .shader_features.Extended.transmission = true,
+        .shader_features.Extended.texture_blend = true, .shader_features.Extended.triplanar = true,
+        .shader_features.Extended.sheen = true, .shader_features.Extended.clear_coat = true,
+        .shader_features.Extended.anisotropy = true,
+        .shader_features.Extended.diffuse_transmission = true});
     ecs_entity_t a = blend_texture(world, BLEND_RGB_PNG);
     ecs_entity_t g = blend_texture(world, BLEND_GRAY_PNG);
     ecs_entity_t h = blend_texture(world, BLEND_GRAY_PNG);
@@ -2638,11 +2665,14 @@ void Material_texture_blend_height_key(void) {
     // materials/texture_blend
     box_render_null_t *null;
     ecs_world_t *world = blend_world(&null);
-    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
-        .punctual_shadows = true, .cookies = true, .environment = true,
-        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
-        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
-        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true, .punctual_shadows = true,
+        .cookies = true, .environment = true, .aerial_perspective = true,
+        .shader_features.Extended.alpha_cutout = true, .shader_features.Extended.blend_modes = true,
+        .shader_features.Extended.transmission = true,
+        .shader_features.Extended.texture_blend = true, .shader_features.Extended.triplanar = true,
+        .shader_features.Extended.sheen = true, .shader_features.Extended.clear_coat = true,
+        .shader_features.Extended.anisotropy = true,
+        .shader_features.Extended.diffuse_transmission = true});
     ecs_entity_t a = blend_texture(world, BLEND_RGB_PNG);
     ecs_entity_t g = blend_texture(world, BLEND_GRAY_PNG);
     ecs_entity_t grass = ecs_new(world);
@@ -2738,11 +2768,14 @@ void Material_texture_blend_every_shape(void) {
     // materials/texture_blend
     box_render_null_t *null;
     ecs_world_t *world = blend_world(&null);
-    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
-        .punctual_shadows = true, .cookies = true, .environment = true,
-        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
-        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
-        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true, .punctual_shadows = true,
+        .cookies = true, .environment = true, .aerial_perspective = true,
+        .shader_features.Extended.alpha_cutout = true, .shader_features.Extended.blend_modes = true,
+        .shader_features.Extended.transmission = true,
+        .shader_features.Extended.texture_blend = true, .shader_features.Extended.triplanar = true,
+        .shader_features.Extended.sheen = true, .shader_features.Extended.clear_coat = true,
+        .shader_features.Extended.anisotropy = true,
+        .shader_features.Extended.diffuse_transmission = true});
     ecs_entity_t a = blend_texture(world, BLEND_RGB_PNG);
     ecs_entity_t g = blend_texture(world, BLEND_GRAY_PNG);
     ecs_entity_t layer = ecs_new(world);
@@ -2876,7 +2909,7 @@ void Material_texture_scroll_pack(void) {
     test_uint(record.fresnel_color[0], 0);
     test_uint(record.fresnel_color[1], 0);
     plain = record;
-    test_int(ECS_SIZEOF(box_render_material_t), 192);
+    test_int(ECS_SIZEOF(box_render_material_t), 272);
 
     box_draws_material_pack(&record, &(box_draw_material_t){
         .uv = &uv, .fade = 1, .time = 1000 });
@@ -3057,7 +3090,7 @@ void Material_fresnel_pack(void) {
     test_flt(record.fresnel_bias, 0);
     test_flt(record.fresnel_opacity, 0);
     plain = record;
-    test_int(ECS_SIZEOF(box_render_material_t), 192);
+    test_int(ECS_SIZEOF(box_render_material_t), 272);
     test_int(ECS_SIZEOF(box_render_material_t) % 16, 0);
     test_int(offsetof(box_render_material_t, fresnel_color), 104);
     test_int(offsetof(box_render_material_t, fresnel_strength), 112);
@@ -3180,6 +3213,12 @@ void Material_water_defaults(void) {
     test_flt(w->depth, BOX_MATERIAL_WATER_DEPTH);
     test_flt(w->depth, 3);
     test_flt(w->visibility, 2);
+    test_uint(w->absorption.r, 255);
+    test_uint(w->absorption.g, 255);
+    test_uint(w->absorption.b, 255);
+    test_uint(w->absorption.r, BOX_MATERIAL_WATER_ABSORPTION_R);
+    test_uint(w->absorption.g, BOX_MATERIAL_WATER_ABSORPTION_G);
+    test_uint(w->absorption.b, BOX_MATERIAL_WATER_ABSORPTION_B);
     test_flt(w->refraction, 0.02f);
     test_uint(w->foam_color.r, 240);
     test_uint(w->foam_color.g, 245);
@@ -3197,6 +3236,8 @@ void Material_water_defaults(void) {
     test_flt(w->depth, 5);
     test_flt(w->foam_width, 0);
     test_flt(w->visibility, 2);
+    test_uint(w->absorption.r, 255);
+    test_uint(w->absorption.b, 255);
     test_uint(w->shallow_color.g, 170);
     test_bool(ecs_owns(world, ecs_lookup(world, "pond"), MaterialId), true);
 
@@ -3245,7 +3286,7 @@ void Material_water_pack(void) {
     test_flt(record.water_ripple_scale, 0);
     test_uint(record.water_flags, 0);
     plain = record;
-    test_int(ECS_SIZEOF(box_render_material_t), 192);
+    test_int(ECS_SIZEOF(box_render_material_t), 272);
     test_int(offsetof(box_render_material_t, water_ripple_offset), 128);
     test_int(offsetof(box_render_material_t, water_shallow), 136);
     test_int(offsetof(box_render_material_t, water_depth), 148);
@@ -3290,6 +3331,23 @@ void Material_water_pack(void) {
     test_flt(record.water_ripple_offset[1], 0.5f);
     test_flt(record.water_foam_scale, 8);
     test_uint(record.water_flags, BOX_RENDER_WATER_FOAM_TEXTURE);
+
+    /* The absorption fills the bytes above the flags, display encoded */
+    Water tinted = rippled;
+    tinted.absorption = (Rgb){20, 140, 230};
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .water = &tinted, .time = 3, .fade = 1 });
+    test_uint(record.water_flags, BOX_RENDER_WATER_FOAM_TEXTURE | (20u << 8) | (140u << 16) |
+        (230u << 24));
+    test_uint(record.water_shallow, 60u | (170u << 8) | (160u << 16));
+    test_uint(record.water_deep, 8u | (40u << 8) | (64u << 16));
+    test_uint(record.water_foam, 240u | (245u << 8) | (245u << 16));
+    tinted.foam_texture = 0;
+    tinted.absorption = (Rgb){255, 255, 255};
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .water = &tinted, .time = 3, .fade = 1 });
+    test_uint(record.water_flags, 0xFFFFFFu << BOX_RENDER_WATER_ABSORPTION_SHIFT);
+    test_uint(record.water_flags & 0xFFu, 0);
 
     /* The ripple offset wraps like TextureScroll, in double precision */
     float scroll[4];
@@ -3383,6 +3441,39 @@ void Material_water_transmittance(void) {
     test_assert(box_draws_water_transmittance(0.01f, 0) < 0.01f);
 }
 
+/** The C twin of water_absorbed of material.wgsl: the absorption to the power of the ray length
+ * over the visibility, 1 at the surface, the absorption itself at the visibility, falling with
+ * the ray length; white keeps the scene behind as it is and nothing behind is not tinted. */
+void Material_water_absorption(void) {
+    // materials/water
+    test_flt(box_draws_water_absorption(0.25f, 0, 2), 1);
+    test_assert(fabsf(box_draws_water_absorption(0.25f, 2, 2) - 0.25f) < 1e-5f);
+    test_assert(fabsf(box_draws_water_absorption(0.25f, 1, 2) - 0.5f) < 1e-5f);
+    test_assert(fabsf(box_draws_water_absorption(0.25f, 4, 2) - 0.0625f) < 1e-5f);
+    test_assert(fabsf(box_draws_water_absorption(0.5f, 3, 1) - 0.125f) < 1e-5f);
+    test_assert(box_draws_water_absorption(0.25f, 0.5f, 2) >
+        box_draws_water_absorption(0.25f, 1, 2));
+
+    /* A larger visibility tints less over the same ray */
+    test_assert(box_draws_water_absorption(0.25f, 1, 4) >
+        box_draws_water_absorption(0.25f, 1, 2));
+
+    /* White keeps every channel at any ray length */
+    test_flt(box_draws_water_absorption(1, 0, 2), 1);
+    test_flt(box_draws_water_absorption(1, 3, 2), 1);
+    test_flt(box_draws_water_absorption(1, 1e6f, 0.001f), 1);
+
+    /* Black removes the channel past the surface, keeps it at the surface */
+    test_flt(box_draws_water_absorption(0, 0, 2), 1);
+    test_assert(box_draws_water_absorption(0, 1, 2) < 1e-2f);
+
+    /* Above the surface it is not tinted, the sky behind is not tinted */
+    test_flt(box_draws_water_absorption(0.25f, -1, 2), 1);
+    test_flt(box_draws_water_absorption(0.25f, INFINITY, 2), 1);
+    test_flt(box_draws_water_absorption(0.25f, NAN, 2), 1);
+    test_assert(box_draws_water_absorption(0.25f, 0.01f, 0) < 0.01f);
+}
+
 /** The C twin of water_foam of material.wgsl: a band from 1 at the shore to 0 at foam_width,
  * none at a width of 0 or over the sky; a texture cuts the band at its red. */
 void Material_water_foam(void) {
@@ -3457,13 +3548,14 @@ void Material_distortion_defaults(void) {
     test_flt(ecs_get(world, instance, Distortion)->scale, 4);
     test_bool(ecs_owns(world, instance, MaterialId), false);
 
-    /* Scene.distortion is a member of Scene, off by default */
+    /* distortion is a member of the shader features of Scene, off by default */
     ecs_singleton_add(world, Scene);
-    test_bool(ecs_singleton_get(world, Scene)->distortion, false);
+    test_bool(ecs_singleton_get(world, Scene)->shader_features.Extended.distortion, false);
     test_assert(ecs_script_run(world, "scene",
         "using box.view\n"
-        "world_scene { Scene: {distortion: true} }\n", NULL) == 0);
-    test_bool(ecs_get(world, ecs_lookup(world, "world_scene"), Scene)->distortion, true);
+        "world_scene { Scene: {shader_features: {Extended: {distortion: true}}} }\n", NULL) == 0);
+    test_bool(ecs_get(world, ecs_lookup(world, "world_scene"), Scene)->
+        shader_features.Extended.distortion, true);
 
     ecs_fini(world);
 }
@@ -3483,7 +3575,7 @@ void Material_distortion_pack(void) {
     test_uint(record.distortion_flags, 0);
     test_flt(record.transmission_factor, 0);
     plain = record;
-    test_int(ECS_SIZEOF(box_render_material_t), 192);
+    test_int(ECS_SIZEOF(box_render_material_t), 272);
     test_int(offsetof(box_render_material_t, distortion_strength), 176);
     test_int(offsetof(box_render_material_t, distortion_flags), 188);
 
@@ -3581,5 +3673,364 @@ void Material_distortion_phase(void) {
     for (i = 0; i < 100; i ++) {
         float p = box_draws_distortion_phase(0.37f, 1e6 + (double)i * 0.01);
         test_assert(p >= 0.0f && p < 1.0f);
+    }
+}
+
+/** A constructed Water has a turquoise scatter color and no scatter; a script sets both, and an
+ * instance inherits them. */
+void Material_water_scatter_defaults(void) {
+    // materials/water
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    test_assert(ecs_script_run(world, "water_scatter",
+        "using box.material\n"
+        "sea { Water: {scatter_color: {30, 180, 150}, scatter: 1.5} }\n"
+        "lake { Water: {scatter: 0.5} }\n", NULL) == 0);
+
+    ecs_entity_t added = ecs_new(world);
+    ecs_add(world, added, Water);
+    const Water *w = ecs_get(world, added, Water);
+    test_assert(w != NULL);
+    test_uint(w->scatter_color.r, BOX_MATERIAL_WATER_SCATTER_R);
+    test_uint(w->scatter_color.g, BOX_MATERIAL_WATER_SCATTER_G);
+    test_uint(w->scatter_color.b, BOX_MATERIAL_WATER_SCATTER_B);
+    test_uint(w->scatter_color.r, 40);
+    test_uint(w->scatter_color.g, 200);
+    test_uint(w->scatter_color.b, 170);
+    test_flt(w->scatter, BOX_MATERIAL_WATER_SCATTER);
+    test_flt(w->scatter, 0);
+
+    w = ecs_get(world, ecs_lookup(world, "sea"), Water);
+    test_assert(w != NULL);
+    test_uint(w->scatter_color.r, 30);
+    test_uint(w->scatter_color.g, 180);
+    test_uint(w->scatter_color.b, 150);
+    test_flt(w->scatter, 1.5f);
+    test_flt(w->depth, 3);
+
+    w = ecs_get(world, ecs_lookup(world, "lake"), Water);
+    test_assert(w != NULL);
+    test_uint(w->scatter_color.g, 200);
+    test_flt(w->scatter, 0.5f);
+
+    /* Script access through the reflection data */
+    ecs_entity_t sea = ecs_lookup(world, "sea");
+    Water *mw = ecs_get_mut(world, sea, Water);
+    ecs_meta_cursor_t cur = ecs_meta_cursor(world, ecs_id(Water), mw);
+    test_int(ecs_meta_push(&cur), 0);
+    test_int(ecs_meta_member(&cur, "scatter"), 0);
+    test_int(ecs_meta_set_float(&cur, 2.0), 0);
+    test_int(ecs_meta_member(&cur, "scatter_color"), 0);
+    test_int(ecs_meta_push(&cur), 0);
+    test_int(ecs_meta_member(&cur, "g"), 0);
+    test_int(ecs_meta_set_uint(&cur, 99), 0);
+    test_int(ecs_meta_pop(&cur), 0);
+    test_int(ecs_meta_pop(&cur), 0);
+    ecs_modified(world, sea, Water);
+    w = ecs_get(world, sea, Water);
+    test_flt(w->scatter, 2.0f);
+    test_uint(w->scatter_color.g, 99);
+
+    ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
+    ecs_add(world, prefab, Water);
+    ecs_get_mut(world, prefab, Water)->scatter = 0.75f;
+    ecs_modified(world, prefab, Water);
+    ecs_entity_t instance = ecs_new_w_pair(world, EcsIsA, prefab);
+    test_bool(ecs_owns(world, instance, Water), false);
+    test_flt(ecs_get(world, instance, Water)->scatter, 0.75f);
+    test_uint(ecs_get(world, instance, Water)->scatter_color.b, 170);
+
+    ecs_fini(world);
+}
+
+/** The scatter of a Water takes the Sheen and DiffuseTransmission words of its record: its color
+ * display encoded and its strength when positive and finite, both 0 without one, so a Water
+ * without scatter packs the same words whatever its scatter color; a record without Water keeps
+ * its Sheen and DiffuseTransmission. */
+void Material_water_scatter_pack(void) {
+    // materials/water
+    box_render_material_t record, base;
+    box_draws_tables_init();
+    test_int(offsetof(box_render_material_t, water_scatter_color),
+        offsetof(box_render_material_t, sheen));
+    test_int(offsetof(box_render_material_t, water_scatter),
+        offsetof(box_render_material_t, diffuse_transmission));
+    test_int(ECS_SIZEOF(box_render_material_t), 272);
+
+    Water sea = {
+        .shallow_color = {60, 170, 160}, .deep_color = {8, 40, 64},
+        .depth = 3, .visibility = 2, .refraction = 0.02f, .foam_color = {240, 245, 245},
+        .foam_width = 0.3f, .foam_scale = 1, .scatter_color = {40, 200, 170}, .scatter = 0
+    };
+    box_draws_material_pack(&base, &(box_draw_material_t){ .water = &sea, .fade = 1 });
+    test_uint(base.water_scatter_color, 0);
+    test_flt(base.water_scatter, 0);
+
+    /* Without scatter the color does not change the record */
+    Water other = sea;
+    other.scatter_color = (Rgb){1, 2, 3};
+    box_draws_material_pack(&record, &(box_draw_material_t){ .water = &other, .fade = 1 });
+    test_assert(!ecs_os_memcmp_t(&record, &base, box_render_material_t));
+
+    Water lit = sea;
+    lit.scatter = 1;
+    box_draws_material_pack(&record, &(box_draw_material_t){ .water = &lit, .fade = 1 });
+    test_uint(record.water_scatter_color, 40u | (200u << 8) | (170u << 16));
+    test_flt(record.water_scatter, 1);
+
+    /* The scatter words differ, the rest is the record without scatter */
+    record.water_scatter_color = 0;
+    record.water_scatter = 0;
+    test_assert(!ecs_os_memcmp_t(&record, &base, box_render_material_t));
+
+    /* A Water ignores Sheen and DiffuseTransmission: their words hold the scatter */
+    Sheen sheen = { .color = {255, 255, 255}, .roughness = 1 };
+    DiffuseTransmission dt = { .factor = 1, .color = {255, 255, 255} };
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .water = &lit, .sheen = &sheen, .diffuse_transmission = &dt, .fade = 1 });
+    test_uint(record.water_scatter_color, 40u | (200u << 8) | (170u << 16));
+    test_flt(record.water_scatter, 1);
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .water = &sea, .sheen = &sheen, .diffuse_transmission = &dt, .fade = 1 });
+    test_uint(record.water_scatter_color, 0);
+    test_flt(record.water_scatter, 0);
+
+    /* Without Water they pack as before */
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .sheen = &sheen, .diffuse_transmission = &dt, .fade = 1 });
+    test_assert(record.sheen != 0);
+    test_assert(record.diffuse_transmission != 0);
+
+    /* Negative or non finite strengths are none */
+    Water broken = sea;
+    broken.scatter = -1;
+    box_draws_material_pack(&record, &(box_draw_material_t){ .water = &broken, .fade = 1 });
+    test_flt(record.water_scatter, 0);
+    test_uint(record.water_scatter_color, 0);
+    broken.scatter = NAN;
+    box_draws_material_pack(&record, &(box_draw_material_t){ .water = &broken, .fade = 1 });
+    test_flt(record.water_scatter, 0);
+    broken.scatter = INFINITY;
+    box_draws_material_pack(&record, &(box_draw_material_t){ .water = &broken, .fade = 1 });
+    test_flt(record.water_scatter, 0);
+
+    /* A transition encodes the scatter like the rest of the Water */
+    PbrMaterial pbr = { .metallic = 0, .roughness = 0.05f };
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .water = &lit, .pbr = &pbr, .time = 2, .fade = 1 });
+    box_draw_transition_material_t target;
+    box_render_material_t encoded;
+    box_draws_transition_target(&target, &(box_draw_material_t){
+        .water = &lit, .pbr = &pbr, .time = 2, .fade = 1 }, BOX_DRAW_TRANSITION_TABLE);
+    box_draws_transition_encode(&target, &encoded);
+    test_assert(!ecs_os_memcmp_t(&encoded, &record, box_render_material_t));
+}
+
+/** A constructed Water has no shore waves and a shore reach of 0.3; a script sets both, they
+ * are reachable through the reflection data, and an instance inherits them. */
+void Material_water_shore_defaults(void) {
+    // materials/water
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    test_assert(ecs_script_run(world, "water_shore",
+        "using box.material\n"
+        "beach { Water: {shore_period: 6, shore_reach: 0.8} }\n"
+        "lagoon { Water: {shore_period: 4} }\n", NULL) == 0);
+
+    ecs_entity_t added = ecs_new(world);
+    ecs_add(world, added, Water);
+    const Water *w = ecs_get(world, added, Water);
+    test_assert(w != NULL);
+    test_flt(w->shore_period, BOX_MATERIAL_WATER_SHORE_PERIOD);
+    test_flt(w->shore_period, 0);
+    test_flt(w->shore_reach, BOX_MATERIAL_WATER_SHORE_REACH);
+    test_flt(w->shore_reach, 0.3f);
+    test_flt(w->foam_width, BOX_MATERIAL_WATER_FOAM_WIDTH);
+
+    w = ecs_get(world, ecs_lookup(world, "beach"), Water);
+    test_assert(w != NULL);
+    test_flt(w->shore_period, 6);
+    test_flt(w->shore_reach, 0.8f);
+    test_flt(w->depth, 3);
+    test_flt(w->scatter, 0);
+
+    w = ecs_get(world, ecs_lookup(world, "lagoon"), Water);
+    test_assert(w != NULL);
+    test_flt(w->shore_period, 4);
+    test_flt(w->shore_reach, 0.3f);
+
+    /* Script access through the reflection data */
+    ecs_entity_t beach = ecs_lookup(world, "beach");
+    Water *mw = ecs_get_mut(world, beach, Water);
+    ecs_meta_cursor_t cur = ecs_meta_cursor(world, ecs_id(Water), mw);
+    test_int(ecs_meta_push(&cur), 0);
+    test_int(ecs_meta_member(&cur, "shore_period"), 0);
+    test_int(ecs_meta_set_float(&cur, 3.5), 0);
+    test_int(ecs_meta_member(&cur, "shore_reach"), 0);
+    test_int(ecs_meta_set_float(&cur, 0.45), 0);
+    test_int(ecs_meta_pop(&cur), 0);
+    ecs_modified(world, beach, Water);
+    w = ecs_get(world, beach, Water);
+    test_flt(w->shore_period, 3.5f);
+    test_flt(w->shore_reach, 0.45f);
+
+    ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
+    ecs_add(world, prefab, Water);
+    ecs_get_mut(world, prefab, Water)->shore_period = 5;
+    ecs_modified(world, prefab, Water);
+    ecs_entity_t instance = ecs_new_w_pair(world, EcsIsA, prefab);
+    test_bool(ecs_owns(world, instance, Water), false);
+    test_flt(ecs_get(world, instance, Water)->shore_period, 5);
+    test_flt(ecs_get(world, instance, Water)->shore_reach, 0.3f);
+
+    ecs_fini(world);
+}
+
+/** The shore waves of a Water take the DiffuseTransmission thickness and blur words of its
+ * record: the phase at the time and the reach with a shore_period above 0, both 0 without one,
+ * so a Water without shore waves packs the same words whatever its reach and time; a record
+ * without Water keeps its DiffuseTransmission. */
+void Material_water_shore_pack(void) {
+    // materials/water
+    box_render_material_t record, base;
+    box_draws_tables_init();
+    test_int(offsetof(box_render_material_t, water_shore_phase),
+        offsetof(box_render_material_t, thickness));
+    test_int(offsetof(box_render_material_t, water_shore_reach),
+        offsetof(box_render_material_t, diffuse_blur));
+    test_int(ECS_SIZEOF(box_render_material_t), 272);
+
+    Water sea = {
+        .shallow_color = {60, 170, 160}, .deep_color = {8, 40, 64},
+        .depth = 3, .visibility = 2, .refraction = 0.02f, .foam_color = {240, 245, 245},
+        .foam_width = 0.3f, .foam_scale = 1, .shore_period = 0, .shore_reach = 0.3f
+    };
+    box_draws_material_pack(&base, &(box_draw_material_t){
+        .water = &sea, .time = 1.25, .fade = 1 });
+    test_flt(base.water_shore_phase, 0);
+    test_flt(base.water_shore_reach, 0);
+
+    /* Without a period neither the reach nor the time change the record */
+    Water other = sea;
+    other.shore_reach = 2;
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .water = &other, .time = 7.5, .fade = 1 });
+    test_assert(!ecs_os_memcmp_t(&record, &base, box_render_material_t));
+
+    /* With a period: the reach and the time over the period wrapped to 0..1 */
+    Water beach = sea;
+    beach.shore_period = 4;
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .water = &beach, .time = 9, .fade = 1 });
+    test_assert(fabsf(record.water_shore_phase - 0.25f) < 1e-6f);
+    test_flt(record.water_shore_reach, 0.3f);
+
+    /* The shore words differ, the rest is the record without shore waves */
+    record.water_shore_phase = 0;
+    record.water_shore_reach = 0;
+    test_assert(!ecs_os_memcmp_t(&record, &base, box_render_material_t));
+
+    /* A whole period later the record is the same */
+    box_render_material_t later;
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .water = &beach, .time = 9, .fade = 1 });
+    box_draws_material_pack(&later, &(box_draw_material_t){
+        .water = &beach, .time = 13, .fade = 1 });
+    test_assert(!ecs_os_memcmp_t(&record, &later, box_render_material_t));
+
+    /* A Water ignores DiffuseTransmission: its words hold the shore waves */
+    DiffuseTransmission dt = { .factor = 1, .color = {255, 255, 255}, .thickness = 0.5f,
+        .blur = 0.25f };
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .water = &sea, .diffuse_transmission = &dt, .time = 9, .fade = 1 });
+    test_flt(record.water_shore_phase, 0);
+    test_flt(record.water_shore_reach, 0);
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .water = &beach, .diffuse_transmission = &dt, .time = 9, .fade = 1 });
+    test_assert(fabsf(record.water_shore_phase - 0.25f) < 1e-6f);
+    test_flt(record.water_shore_reach, 0.3f);
+
+    /* Without Water they pack as before */
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .diffuse_transmission = &dt, .fade = 1 });
+    test_flt(record.thickness, 0.5f);
+    test_flt(record.diffuse_blur, 0.25f);
+
+    /* Negative or non finite periods and reaches are none */
+    Water broken = beach;
+    broken.shore_period = -1;
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .water = &broken, .time = 9, .fade = 1 });
+    test_flt(record.water_shore_phase, 0);
+    test_flt(record.water_shore_reach, 0);
+    broken.shore_period = NAN;
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .water = &broken, .time = 9, .fade = 1 });
+    test_flt(record.water_shore_reach, 0);
+    broken.shore_period = INFINITY;
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .water = &broken, .time = 9, .fade = 1 });
+    test_flt(record.water_shore_reach, 0);
+    broken = beach;
+    broken.shore_reach = -0.5f;
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .water = &broken, .time = 9, .fade = 1 });
+    test_flt(record.water_shore_phase, 0);
+    test_flt(record.water_shore_reach, 0);
+    broken.shore_reach = NAN;
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .water = &broken, .time = 9, .fade = 1 });
+    test_flt(record.water_shore_reach, 0);
+
+    /* A transition encodes the shore waves like the rest of the Water */
+    PbrMaterial pbr = { .metallic = 0, .roughness = 0.05f };
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .water = &beach, .pbr = &pbr, .time = 2, .fade = 1 });
+    box_draw_transition_material_t target;
+    box_render_material_t encoded;
+    box_draws_transition_target(&target, &(box_draw_material_t){
+        .water = &beach, .pbr = &pbr, .time = 2, .fade = 1 }, BOX_DRAW_TRANSITION_TABLE);
+    box_draws_transition_encode(&target, &encoded);
+    test_assert(!ecs_os_memcmp_t(&encoded, &record, box_render_material_t));
+}
+
+/** The phase of the shore waves is the time over the period wrapped to [0, 1) in double
+ * precision: it moves on smoothly after hours of render time and is 0 for a period or a time
+ * that is not usable. */
+void Material_water_shore_wrap(void) {
+    // materials/water
+    test_flt(box_draws_water_shore_phase(0, 10), 0);
+    test_flt(box_draws_water_shore_phase(-2, 10), 0);
+    test_flt(box_draws_water_shore_phase(NAN, 10), 0);
+    test_flt(box_draws_water_shore_phase(INFINITY, 10), 0);
+    test_flt(box_draws_water_shore_phase(4, NAN), 0);
+    test_flt(box_draws_water_shore_phase(4, INFINITY), 0);
+    test_flt(box_draws_water_shore_phase(4, 0), 0);
+    test_assert(fabsf(box_draws_water_shore_phase(4, 1) - 0.25f) < 1e-6f);
+    test_assert(fabsf(box_draws_water_shore_phase(4, 6) - 0.5f) < 1e-6f);
+    test_flt(box_draws_water_shore_phase(4, 8), 0);
+
+    /* A negative time wraps to a positive phase */
+    test_assert(fabsf(box_draws_water_shore_phase(4, -1) - 0.75f) < 1e-6f);
+
+    /* After hours the phase still advances by a frame over the period every frame */
+    float period = 5.5f;
+    double starts[3] = { 1e6, 4.0 * 3600.0, 1e6 + 12345.678 };
+    int32_t s, f;
+    for (s = 0; s < 3; s ++) {
+        for (f = 0; f < 600; f ++) {
+            double t = starts[s] + (double)f / 60.0;
+            float a = box_draws_water_shore_phase(period, t);
+            float b = box_draws_water_shore_phase(period, t + 1.0 / 60.0);
+            test_assert(a >= 0.0f && a < 1.0f);
+            float d = b - a;
+            if (d < -0.5f) {
+                d += 1.0f;
+            }
+
+            test_assert(fabsf(d - 1.0f / (60.0f * period)) < 1e-4f);
+        }
     }
 }

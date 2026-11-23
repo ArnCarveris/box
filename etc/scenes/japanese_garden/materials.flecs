@@ -29,6 +29,7 @@ assets {
       closed: true
     }
   }
+
   prefab GardenRoundProfile { Profile2D: {outer: GardenRoundShape} }
 
   prefab GardenDeckShape {
@@ -42,5 +43,6 @@ assets {
       closed: true
     }
   }
+
   prefab GardenDeckProfile { Profile2D: {outer: GardenDeckShape} }
 }

@@ -1,0 +1,226 @@
+using flecs.script
+using flecs.script.math
+using box.input
+using trees
+
+// The state of the forest that the HUD writes and the other parts of the scene read. The season,
+// precipitation, wind and hour are set by the sliders (or over REST); temperature and
+// precip_kind follow them, see the async block at the end.
+state {
+  actions {
+    toggle_hud {
+      Action: {description: "Hide or show the panel"}
+      Binding: {key: H}
+    }
+
+    toggle_mute {
+      Action: {description: "Mute or unmute the sound"}
+      Binding: {key: M}
+    }
+  }
+
+  // Season, 0..4, continuous and cyclic: 0 the start of spring, 1 of summer, 2 of autumn, 3 of
+  // winter and 4 spring again
+  export const SEASON_SPRING: f32 = 0
+  export const SEASON_SUMMER: f32 = 1
+  export const SEASON_AUTUMN: f32 = 2
+  export const SEASON_WINTER: f32 = 3
+  export const SEASON_CYCLE: f32 = 4
+
+  // The hours the time of day slider spans
+  export const HOUR_MIN: f32 = 5
+  export const HOUR_MAX: f32 = 22
+
+  // Wind in m/s
+  export const WIND_MAX: f32 = 20
+
+  // What precipitation falls as, by temperature (forest_precip_kind)
+  export const PRECIP_RAIN: i32 = 0
+  export const PRECIP_SLEET: i32 = 1
+  export const PRECIP_SNOW: i32 = 2
+
+  // Below SNOW_BELOW °C precipitation falls as snow, below SLEET_BELOW as sleet, above as rain
+  export const SNOW_BELOW: f32 = 0
+  export const SLEET_BELOW: f32 = 2
+
+  export const START_SEASON: f32 = 1.6
+  export const START_PRECIPITATION: f32 = 0
+  export const START_WIND: f32 = 3
+  export const START_HOUR: f32 = 17
+  export const START_VOLUME: f32 = 0.8
+
+  fn forest_fract(v: f64) -> f64 {
+    v - floor(v)
+  }
+
+  // Season wrapped to 0..4
+  fn forest_season_wrap(s: f64) -> f64 {
+    s - SEASON_CYCLE * floor(s / SEASON_CYCLE)
+  }
+
+  // Mean temperature in °C at the middle of season k (0 spring .. 3 winter)
+  fn forest_season_mean(k: f64) -> f64 {
+    k < 0.5 ? 10 : (k < 1.5 ? 22 : (k < 2.5 ? 9 : -6))
+  }
+
+  // Temperature in °C at a season and an hour: the means of the seasons at their middles, eased
+  // between them, plus a day cycle that peaks at 15:00 (+3) and bottoms out before dawn (-4)
+  fn forest_temperature(season: f64, hour: f64) -> f32 {
+    const w = forest_season_wrap(season - 0.5)
+    const k = floor(w)
+    const f = w - k
+    const a = forest_season_mean(k)
+    const b = forest_season_mean(k > 2.5 ? 0 : k + 1)
+    const ease = 0.5 - 0.5 * cos(f * PI)
+    a + (b - a) * ease + 3.5 * cos((hour - 15) * PI / 12) - 0.5
+  }
+
+  // What precipitation falls as at a temperature: PRECIP_SNOW, PRECIP_SLEET or PRECIP_RAIN
+  fn forest_precip_kind(t: f64) -> i32 {
+    t < SNOW_BELOW ? PRECIP_SNOW : (t < SLEET_BELOW ? PRECIP_SLEET : PRECIP_RAIN)
+  }
+
+  // Precipitation falls as snow at a temperature
+  fn forest_snowing(t: f64) -> bool {
+    t < SNOW_BELOW
+  }
+
+  // Day of the year of a season for TimeOfDay: 0 the spring equinox (day 79), 1 the summer
+  // solstice, 2 the autumn equinox, 3 the winter solstice
+  fn forest_day_of_year(season: f64) -> f64 {
+    const d = floor(79 + forest_season_wrap(season) * 91.25)
+    d > 365 ? d - 365 : d
+  }
+
+  // A value that follows the seasons: sp, su, au and wi in the middle of spring, summer, autumn
+  // and winter (season 0.5, 1.5, 2.5 and 3.5), eased between them and wrapping from winter to
+  // spring. The shared prefab materials, the sky and the grade read it
+  fn forest_seasonal(season: f64, sp: f64, su: f64, au: f64, wi: f64) -> f64 {
+    const w = forest_season_wrap(season - 0.5)
+    const k = floor(w)
+    const f = w - k
+    const ease = 0.5 - 0.5 * cos(f * PI)
+    const a = k < 0.5 ? sp : (k < 1.5 ? su : (k < 2.5 ? au : wi))
+    const b = k < 0.5 ? su : (k < 1.5 ? au : (k < 2.5 ? wi : sp))
+    a + (b - a) * ease
+  }
+
+  // The cutoffs of a broadleaf card (TreeLeafAlbedo): at LEAF_FULL all its leaves show, from
+  // LEAF_KEEP_MIN up they drop one by one, at LEAF_BARE none is left
+  export const LEAF_FULL: f32 = 0.3
+  export const LEAF_KEEP_MIN: f32 = TREE_LEAF_KEEP_MIN
+  export const LEAF_BARE: f32 = 1.02
+
+  // The color of deciduous leaves through the year: sp, su and au in the middle of spring,
+  // summer and autumn, turning to dead toward winter. The leaves are gone in the middle of
+  // winter (forest_leaf_cutoff), and come out fresh: from there to spring they are sp
+  fn forest_foliage(season: f64, sp: f64, su: f64, au: f64, dead: f64) -> f64 {
+    const w = forest_season_wrap(season - 0.5)
+    const k = floor(w)
+    const ease = 0.5 - 0.5 * cos((w - k) * PI)
+    const a = k < 0.5 ? sp : (k < 1.5 ? su : (k < 2.5 ? au : sp))
+    const b = k < 0.5 ? su : (k < 1.5 ? au : (k < 2.5 ? dead : sp))
+    a + (b - a) * ease
+  }
+
+  // Names the HUD shows
+  fn forest_season_name(season: f64) -> string {
+    const s = forest_season_wrap(season)
+    match floor(s * 2 + 0.001) {
+      0: s < 0.4 ? "Early spring" : "Spring"
+      1: "Spring"
+      2: "Summer"
+      3: "Late summer"
+      4: "Autumn"
+      5: "Late autumn"
+      6: "Winter"
+      _: s < 3.7 ? "Winter" : "Late winter"
+    }
+  }
+
+  fn forest_precip_name(t: f64) -> string {
+    match forest_precip_kind(t) {
+      0: "Rain"
+      1: "Sleet"
+      _: "Snow"
+    }
+  }
+
+  fn forest_precip_text(p: f64, t: f64) -> string {
+    const name = forest_precip_name(t)
+    const pct = p * 100
+    p < 0.01 ? "Dry" : "{name} {pct:.0}%"
+  }
+
+  fn forest_wind_name(w: f64) -> string {
+    w < 1.5 ? "Calm" : (w < 7 ? "Breeze" : (w < 13 ? "Windy" : "Gale"))
+  }
+
+  fn forest_wind_text(w: f64) -> string {
+    const name = forest_wind_name(w)
+    "{w:.1} m/s {name}"
+  }
+
+  // Hour as hh:mm
+  fn forest_clock(hour: f64) -> string {
+    const total = floor(hour * 60 + 0.5)
+    const hh = floor(total / 60)
+    const mm = total - hh * 60
+    const hs = hh < 10 ? "0{hh:.0}" : "{hh:.0}"
+    const ms = mm < 10 ? "0{mm:.0}" : "{mm:.0}"
+    "{hs}:{ms}"
+  }
+
+  fn forest_volume_text(v: f64, muted: bool) -> string {
+    const pct = v * 100
+    muted ? "Muted" : "{pct:.0}%"
+  }
+
+  fn forest_fog_name(f: f64) -> string {
+    f < 0.25 ? "Haze" : (f < 0.5 ? "Mist" : (f < 0.8 ? "Fog" : "Dense fog"))
+  }
+
+  fn forest_fog_text(f: f64) -> string {
+    const name = forest_fog_name(f)
+    const pct = f * 100
+    f < 0.01 ? "Clear" : "{name} {pct:.0}%"
+  }
+
+  fn forest_temperature_text(t: f64) -> string {
+    const r = round(t)
+    const shown = r == 0 ? 0 : r
+    "{shown:.0} °C"
+  }
+
+  export mut season: f32 = START_SEASON
+  export mut precipitation: f32 = START_PRECIPITATION
+  export mut wind: f32 = START_WIND
+  export mut hour: f32 = START_HOUR
+
+  // Derived from season and hour, kept up to date every frame
+  export mut temperature: f32 = forest_temperature(START_SEASON, START_HOUR)
+  export mut precip_kind: i32 = forest_precip_kind(forest_temperature(START_SEASON, START_HOUR))
+
+  export mut hud_shown: bool = true
+
+  // The master volume of the sound, 0..1, and whether M muted it
+  export mut volume: f32 = START_VOLUME
+  export mut muted: bool = false
+}
+
+async {
+  while true {
+    await next_frame()
+    const t: f32 = state.forest_temperature(state.season, state.hour)
+
+    if abs(t - state.temperature) > 0.0001 {
+      state.temperature = t
+    }
+
+    const k: i32 = state.forest_precip_kind(t)
+
+    if k != state.precip_kind {
+      state.precip_kind = k
+    }
+  }
+}

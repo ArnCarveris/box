@@ -8,13 +8,31 @@
 #pragma once
 
 // The TextureTransform of each layer (scale in xy, offset in zw), the slices of the arrays, the
-// BLEND_MASKED, BLEND_SINGLE and BLEND_HEIGHT flags and the contrast of the height based
-// transitions, 0 for the linear blend.
+// BLEND_MASKED, BLEND_SINGLE, BLEND_HEIGHT, BLEND_TILES and BLEND_TERRAIN flags, the contrast of
+// the height based transitions, 0 for the linear blend, and of a BLEND_TERRAIN blend with a mask
+// atlas the texels along an edge of the masks of a tile | the cells across the atlas << 16, and
+// the same of its bake atlas, 0 without one, and how far its albedo varies over the world
+// (TextureBlend.variation). The grass_* of a BLEND_TERRAIN blend are the far
+// field of the Grass on the terrain (box_render_grass_far_t), all zero without one.
 struct BlendUniforms {
     transforms: array<vec4f, 4>,
     count: u32,
     flags: u32,
     contrast: f32,
+    terrain: u32,
+    bake: u32,
+    variation: f32,
+    pad1: u32,
+    pad2: u32,
+    grass_base: vec4f,          // Linear color at the base of the blades, variation
+    grass_tip: vec4f,           // Linear color at the tip, share of the ground covered from
+                                // above
+    grass_range: vec4f,         // Distances the far field starts to fade in and is full, the
+                                // blades end, tallest blade
+    grass_wind_field: vec4f,    // GrassWind.field (grass_wind.wgsl)
+    grass_wind_strength: vec4f, // GrassWind.strength
+    grass_wind_time: vec4f,     // GrassWind.time
+    grass_config: vec4u,        // Mask channel plus one, 0 for none; 1 with a Grass
 };
 
 // The mask is loaded; without it layer 0 shows alone.
@@ -27,6 +45,11 @@ const BLEND_SINGLE: u32 = 2u;
 const BLEND_HEIGHT: u32 = 4u;
 
 const BLEND_TILES: u32 = 256u;
+
+// The tiles of a Terrain with masks (BOX_GPU_BLEND_TERRAIN): the mask is the mask atlas of their
+// grid mesh, read at the cell of the tile of a fragment (terrain_mask of mesh_blend.wgsl); the
+// fragment carries its grid uv in uv.xy and its mapping offset in flat4.w.
+const BLEND_TERRAIN: u32 = 512u;
 
 // Share of the shaped weights below which a layer of a blend with a contrast is dropped, under a
 // step of an 8 bit channel, so the fragments past a border sample the maps of one layer only.
@@ -107,7 +130,7 @@ fn blend_alpha(albedo: texture_2d_array<f32>, mask: texture_2d<f32>,
     heights: texture_2d_array<f32>, smp: sampler, u: BlendUniforms, uv: vec2f, mapped: f32,
     object: vec4f, normal: vec3f) -> f32 {
     var alpha = 0.0;
-    if ((u.flags & BLEND_TILES) != 0u) {
+    if ((u.flags & (BLEND_TILES | BLEND_TERRAIN)) != 0u) {
         alpha = 1.0;
     } else if (mapped > 1.0) {
         let dx = dpdx(object);

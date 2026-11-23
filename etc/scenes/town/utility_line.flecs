@@ -12,6 +12,7 @@ assets {
 
     for i in 0..poles {
       PowerPole() { Position: {i * spacing, 0, 0} }
+
       if i < poles - 1 {
         PowerSpan(length: spacing) { Position: {i * spacing, 0, 0} }
       }

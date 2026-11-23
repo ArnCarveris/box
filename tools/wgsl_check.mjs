@@ -14,8 +14,11 @@ const keep = {};
 // device feature the variant needs, requested from the validator when its adapter has it.
 const VARIANTS = {
   'shadow.wgsl': [{ define: 'BOX_SHADOW_CLIP_DISTANCES', feature: 'clip-distances' }],
+  'mesh.wgsl': [{ define: 'BOX_TEXTURE_LAYERS' }],
+  'mesh_extended.wgsl': [{ define: 'BOX_TEXTURE_LAYERS' }],
 };
-const FEATURES = [...new Set(Object.values(VARIANTS).flat().map((v) => v.feature))];
+const FEATURES = [...new Set(Object.values(VARIANTS).flat().map((v) => v.feature)
+  .filter(Boolean))];
 const USAGE = `Validates WGSL with Tint, the browser's compiler, through Dawn's node binding.
 
   node tools/wgsl_check.mjs --install          install the validator when it is missing
@@ -27,7 +30,7 @@ const USAGE = `Validates WGSL with Tint, the browser's compiler, through Dawn's 
 Files go through the engine's preprocessor rules (#include "file", #pragma once, #define,
 #undef, #ifdef, #ifndef, #else, #endif) before Tint sees them, and errors point at the
 original file and line. A file the engine also compiles with a define (shadow.wgsl with
-BOX_SHADOW_CLIP_DISTANCES) is validated in both variants; a variant that needs a device feature
+BOX_SHADOW_CLIP_DISTANCES, the mesh shaders with BOX_TEXTURE_LAYERS) is validated in both variants; a variant that needs a device feature
 (clip-distances) is skipped, and reported, when the validator's adapter lacks it. Tint runs the WGSL uniformity analysis that native wgpu skips. The
 validator is installed in $BOX_WGSL_HOME, ~/.cache/box/wgsl when unset, which every worktree
 shares. Exits 0 when every shader compiles, 1 when one fails and 2 when the validator cannot

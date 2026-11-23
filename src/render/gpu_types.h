@@ -19,6 +19,253 @@
 #include <wgpu.h>
 #endif
 
+#if defined(_MSC_VER)
+/** Storage of a variable of which every thread has its own */
+#define BOX_GPU_THREAD_LOCAL __declspec(thread)
+#else
+/** Storage of a variable of which every thread has its own */
+#define BOX_GPU_THREAD_LOCAL _Thread_local
+#endif
+
+/** Commands a thread recorded through the webgpu API since box_gpu_stats_publish last took
+ * them on that thread. The macros below count every call of the backend sources, which include
+ * this header, so a new call site counts without changes. */
+typedef struct box_gpu_api_t {
+    int32_t render_passes;          /**< wgpuCommandEncoderBeginRenderPass */
+    int32_t compute_passes;         /**< wgpuCommandEncoderBeginComputePass */
+    int32_t pipelines;              /**< SetPipeline of passes and bundles */
+    int32_t bind_groups;            /**< SetBindGroup of passes and bundles */
+    int32_t buffer_binds;           /**< SetVertexBuffer and SetIndexBuffer */
+    int32_t draws;                  /**< Draw calls, direct and indirect */
+    int64_t triangles;              /**< Vertices or indices of direct draws times their
+                                     *   instances, over 3 */
+    int32_t dispatches;             /**< Dispatches, direct and indirect */
+    int64_t workgroups;             /**< Workgroups of direct dispatches */
+    int32_t copies;                 /**< Copies of command encoders */
+    int64_t copy_bytes;             /**< Bytes of buffer to buffer copies */
+    int32_t writes;                 /**< wgpuQueueWriteBuffer and wgpuQueueWriteTexture */
+    int64_t write_bytes;            /**< Bytes of those writes */
+    int32_t submits;                /**< wgpuQueueSubmit */
+    int32_t command_buffers;        /**< Command buffers submitted */
+    int32_t bundles;                /**< Render bundles executed */
+} box_gpu_api_t;
+
+/** The webgpu commands this thread recorded, defined in gpu.c */
+extern BOX_GPU_THREAD_LOCAL box_gpu_api_t box_gpu_api;
+
+/** Count a direct draw of a render pass and record it.
+ *
+ * @param pass The render pass
+ * @param vertices Vertices per instance
+ * @param instances Instances
+ * @param first_vertex First vertex
+ * @param first_instance First instance
+ */
+static inline void box_gpu_api_draw(
+    WGPURenderPassEncoder pass,
+    uint32_t vertices,
+    uint32_t instances,
+    uint32_t first_vertex,
+    uint32_t first_instance)
+{
+    box_gpu_api.draws ++;
+    box_gpu_api.triangles += (int64_t)vertices * instances / 3;
+    wgpuRenderPassEncoderDraw(pass, vertices, instances, first_vertex, first_instance);
+}
+
+/** Count a direct draw of a render bundle and record it.
+ *
+ * @param bundle The render bundle encoder
+ * @param vertices Vertices per instance
+ * @param instances Instances
+ * @param first_vertex First vertex
+ * @param first_instance First instance
+ */
+static inline void box_gpu_api_bundle_draw(
+    WGPURenderBundleEncoder bundle,
+    uint32_t vertices,
+    uint32_t instances,
+    uint32_t first_vertex,
+    uint32_t first_instance)
+{
+    box_gpu_api.draws ++;
+    box_gpu_api.triangles += (int64_t)vertices * instances / 3;
+    wgpuRenderBundleEncoderDraw(bundle, vertices, instances, first_vertex, first_instance);
+}
+
+/** Count a direct indexed draw of a render pass and record it.
+ *
+ * @param pass The render pass
+ * @param indices Indices per instance
+ * @param instances Instances
+ * @param first_index First index
+ * @param base_vertex Added to every index
+ * @param first_instance First instance
+ */
+static inline void box_gpu_api_draw_indexed(
+    WGPURenderPassEncoder pass,
+    uint32_t indices,
+    uint32_t instances,
+    uint32_t first_index,
+    int32_t base_vertex,
+    uint32_t first_instance)
+{
+    box_gpu_api.draws ++;
+    box_gpu_api.triangles += (int64_t)indices * instances / 3;
+    wgpuRenderPassEncoderDrawIndexed(pass, indices, instances, first_index, base_vertex,
+        first_instance);
+}
+
+/** Count a direct dispatch and record it.
+ *
+ * @param pass The compute pass
+ * @param x Workgroups across
+ * @param y Workgroups down
+ * @param z Workgroups deep
+ */
+static inline void box_gpu_api_dispatch(
+    WGPUComputePassEncoder pass,
+    uint32_t x,
+    uint32_t y,
+    uint32_t z)
+{
+    box_gpu_api.dispatches ++;
+    box_gpu_api.workgroups += (int64_t)x * y * z;
+    wgpuComputePassEncoderDispatchWorkgroups(pass, x, y, z);
+}
+
+/** Count a submit and make it.
+ *
+ * @param queue The queue
+ * @param count Command buffers
+ * @param buffers The command buffers
+ */
+static inline void box_gpu_api_submit(
+    WGPUQueue queue,
+    size_t count,
+    WGPUCommandBuffer const *buffers)
+{
+    box_gpu_api.submits ++;
+    box_gpu_api.command_buffers += (int32_t)count;
+    wgpuQueueSubmit(queue, count, buffers);
+}
+
+/** Count a buffer write and make it.
+ *
+ * @param queue The queue
+ * @param buffer The buffer
+ * @param offset Byte offset in the buffer
+ * @param data The bytes
+ * @param size Bytes to write
+ */
+static inline void box_gpu_api_write_buffer(
+    WGPUQueue queue,
+    WGPUBuffer buffer,
+    uint64_t offset,
+    void const *data,
+    size_t size)
+{
+    box_gpu_api.writes ++;
+    box_gpu_api.write_bytes += (int64_t)size;
+    wgpuQueueWriteBuffer(queue, buffer, offset, data, size);
+}
+
+/** Count a texture write and make it.
+ *
+ * @param queue The queue
+ * @param dst The texture region written
+ * @param data The bytes
+ * @param size Bytes of data
+ * @param layout Layout of the bytes
+ * @param extent Texels written
+ */
+static inline void box_gpu_api_write_texture(
+    WGPUQueue queue,
+    WGPUTexelCopyTextureInfo const *dst,
+    void const *data,
+    size_t size,
+    WGPUTexelCopyBufferLayout const *layout,
+    WGPUExtent3D const *extent)
+{
+    box_gpu_api.writes ++;
+    box_gpu_api.write_bytes += (int64_t)size;
+    wgpuQueueWriteTexture(queue, dst, data, size, layout, extent);
+}
+
+/** Count a copy between buffers and record it.
+ *
+ * @param encoder The command encoder
+ * @param src The source buffer
+ * @param src_offset Byte offset in the source
+ * @param dst The destination buffer
+ * @param dst_offset Byte offset in the destination
+ * @param size Bytes to copy
+ */
+static inline void box_gpu_api_copy_buffer(
+    WGPUCommandEncoder encoder,
+    WGPUBuffer src,
+    uint64_t src_offset,
+    WGPUBuffer dst,
+    uint64_t dst_offset,
+    uint64_t size)
+{
+    box_gpu_api.copies ++;
+    box_gpu_api.copy_bytes += (int64_t)size;
+    wgpuCommandEncoderCopyBufferToBuffer(encoder, src, src_offset, dst, dst_offset, size);
+}
+
+/** Count a pass, a bind, a draw or a copy whose arguments are not counted, then call the API */
+#define BOX_GPU_API_COUNT(field, call) (box_gpu_api.field ++, call)
+
+#define wgpuCommandEncoderBeginRenderPass(...) \
+    BOX_GPU_API_COUNT(render_passes, wgpuCommandEncoderBeginRenderPass(__VA_ARGS__))
+#define wgpuCommandEncoderBeginComputePass(...) \
+    BOX_GPU_API_COUNT(compute_passes, wgpuCommandEncoderBeginComputePass(__VA_ARGS__))
+#define wgpuRenderPassEncoderSetPipeline(...) \
+    BOX_GPU_API_COUNT(pipelines, wgpuRenderPassEncoderSetPipeline(__VA_ARGS__))
+#define wgpuRenderBundleEncoderSetPipeline(...) \
+    BOX_GPU_API_COUNT(pipelines, wgpuRenderBundleEncoderSetPipeline(__VA_ARGS__))
+#define wgpuComputePassEncoderSetPipeline(...) \
+    BOX_GPU_API_COUNT(pipelines, wgpuComputePassEncoderSetPipeline(__VA_ARGS__))
+#define wgpuRenderPassEncoderSetBindGroup(...) \
+    BOX_GPU_API_COUNT(bind_groups, wgpuRenderPassEncoderSetBindGroup(__VA_ARGS__))
+#define wgpuRenderBundleEncoderSetBindGroup(...) \
+    BOX_GPU_API_COUNT(bind_groups, wgpuRenderBundleEncoderSetBindGroup(__VA_ARGS__))
+#define wgpuComputePassEncoderSetBindGroup(...) \
+    BOX_GPU_API_COUNT(bind_groups, wgpuComputePassEncoderSetBindGroup(__VA_ARGS__))
+#define wgpuRenderPassEncoderSetVertexBuffer(...) \
+    BOX_GPU_API_COUNT(buffer_binds, wgpuRenderPassEncoderSetVertexBuffer(__VA_ARGS__))
+#define wgpuRenderPassEncoderSetIndexBuffer(...) \
+    BOX_GPU_API_COUNT(buffer_binds, wgpuRenderPassEncoderSetIndexBuffer(__VA_ARGS__))
+#define wgpuRenderBundleEncoderSetVertexBuffer(...) \
+    BOX_GPU_API_COUNT(buffer_binds, wgpuRenderBundleEncoderSetVertexBuffer(__VA_ARGS__))
+#define wgpuRenderBundleEncoderSetIndexBuffer(...) \
+    BOX_GPU_API_COUNT(buffer_binds, wgpuRenderBundleEncoderSetIndexBuffer(__VA_ARGS__))
+#define wgpuRenderPassEncoderDraw box_gpu_api_draw
+#define wgpuRenderBundleEncoderDraw box_gpu_api_bundle_draw
+#define wgpuRenderPassEncoderDrawIndexed box_gpu_api_draw_indexed
+#define wgpuRenderPassEncoderDrawIndirect(...) \
+    BOX_GPU_API_COUNT(draws, wgpuRenderPassEncoderDrawIndirect(__VA_ARGS__))
+#define wgpuRenderPassEncoderDrawIndexedIndirect(...) \
+    BOX_GPU_API_COUNT(draws, wgpuRenderPassEncoderDrawIndexedIndirect(__VA_ARGS__))
+#define wgpuRenderBundleEncoderDrawIndexedIndirect(...) \
+    BOX_GPU_API_COUNT(draws, wgpuRenderBundleEncoderDrawIndexedIndirect(__VA_ARGS__))
+#define wgpuComputePassEncoderDispatchWorkgroups box_gpu_api_dispatch
+#define wgpuComputePassEncoderDispatchWorkgroupsIndirect(...) \
+    BOX_GPU_API_COUNT(dispatches, wgpuComputePassEncoderDispatchWorkgroupsIndirect(__VA_ARGS__))
+#define wgpuRenderPassEncoderExecuteBundles(...) \
+    BOX_GPU_API_COUNT(bundles, wgpuRenderPassEncoderExecuteBundles(__VA_ARGS__))
+#define wgpuQueueSubmit box_gpu_api_submit
+#define wgpuQueueWriteBuffer box_gpu_api_write_buffer
+#define wgpuQueueWriteTexture box_gpu_api_write_texture
+#define wgpuCommandEncoderCopyBufferToBuffer box_gpu_api_copy_buffer
+#define wgpuCommandEncoderCopyBufferToTexture(...) \
+    BOX_GPU_API_COUNT(copies, wgpuCommandEncoderCopyBufferToTexture(__VA_ARGS__))
+#define wgpuCommandEncoderCopyTextureToBuffer(...) \
+    BOX_GPU_API_COUNT(copies, wgpuCommandEncoderCopyTextureToBuffer(__VA_ARGS__))
+#define wgpuCommandEncoderCopyTextureToTexture(...) \
+    BOX_GPU_API_COUNT(copies, wgpuCommandEncoderCopyTextureToTexture(__VA_ARGS__))
+
 /** Color format of offscreen targets */
 #define BOX_GPU_OFFSCREEN_FORMAT (WGPUTextureFormat_RGBA8UnormSrgb)
 
@@ -53,20 +300,43 @@
 #define BOX_GPU_DEPTH_FORMAT (WGPUTextureFormat_Depth32FloatStencil8)
 
 /** Bytes between the uniforms of two views, a multiple of the dynamic offset alignment */
-#define BOX_GPU_VIEW_STRIDE (1024)
+#define BOX_GPU_VIEW_STRIDE (1280)
+
+/** Sampled textures per shader stage of the WebGPU default limits, which the device raises to
+ * what the adapter offers */
+#define BOX_GPU_SAMPLED_TEXTURES (16u)
 
 /** Bytes between the matrices of two cascades, the dynamic offset alignment of webgpu */
 #define BOX_GPU_CASCADE_STRIDE (256)
 
 /** Bytes of the uniforms of one cascade, tile or octant of the shadow pass, Cascade of
  * etc/shaders/shadow.wgsl: the matrix, the light of a point light tile and its octant, its near
- * and far plane */
-#define BOX_GPU_SHADOW_UNIFORM_SIZE (sizeof(mat4) + 2 * sizeof(vec4))
+ * and far plane, then the absolute position of the local origin (BOX_GPU_SHADOW_ORIGIN) */
+#define BOX_GPU_SHADOW_UNIFORM_SIZE (sizeof(mat4) + 3 * sizeof(vec4))
+
+/** Byte offset of the absolute position of the local origin in the uniforms of a cascade, tile
+ * or octant, as box_gpu_origin_split packs it */
+#define BOX_GPU_SHADOW_ORIGIN (sizeof(mat4) + 2 * sizeof(vec4))
 
 /** Depth format of the shadow maps, cleared to 0 and compared with greater for reversed Z */
 #define BOX_GPU_SHADOW_FORMAT (WGPUTextureFormat_Depth32Float)
 
-#define BOX_GPU_SHADOW_VARIANTS (4)
+/** Shadow pipelines made on first use per kind of tile (box_gpu_shadow_variant): the alpha
+ * tested one with a TextureBlend and the three of the parametric surfaces, then the same six of
+ * the casters with a WindSway (plain, alpha tested, with a TextureBlend, of meshes then of
+ * surfaces).
+ *
+ * Then those twelve of the casters with a DrawRange (draw_range).
+ *
+ * Then the alpha tested ones of the meshes with per vertex data, which read it for a
+ * VertexReveal (with and without a TextureBlend, of meshes then of surfaces, without then with
+ * a WindSway), without then with a DrawRange.
+ *
+ * Then the plain ones of the swaying meshes with per vertex data, which read it for the pivots of
+ * a WindSway (of meshes then of surfaces, without then with a DrawRange).
+ *
+ * Then those of the impostor cards, without then with a DrawRange */
+#define BOX_GPU_SHADOW_VARIANTS (44)
 
 /** Color format of the HDR target a view with effects renders into */
 #define BOX_GPU_HDR_FORMAT (WGPUTextureFormat_RGBA16Float)
@@ -105,6 +375,12 @@ typedef struct box_gpu_atmos_t box_gpu_atmos_t;
 
 /** Pipelines and frame buffers of the particle passes */
 typedef struct box_gpu_particles_t box_gpu_particles_t;
+
+/** Pipelines, textures and frame buffers of the fields of WaterRipples */
+typedef struct box_gpu_ripples_t box_gpu_ripples_t;
+
+/** Pipelines, buffers and texture arrays of the spectra of WaterSpectrum */
+typedef struct box_gpu_spectra_t box_gpu_spectra_t;
 
 /** Pipelines and the buffer of the draws of the fog volumes */
 typedef struct box_gpu_fog_volumes_t box_gpu_fog_volumes_t;
@@ -166,19 +442,72 @@ typedef struct box_gpu_mesh_t {
     uint64_t vertex_size;           /**< Bytes of the vertices */
     uint64_t index_offset;          /**< Offset of the indices in the page buffer */
     uint64_t index_size;            /**< Bytes of the indices */
+    uint64_t data_offset;           /**< Offset of the per vertex data stream in the page
+                                     *   buffer, two vec4 per vertex, after the vertices */
+    uint64_t data_size;             /**< Bytes of the per vertex data stream, 0 for a mesh
+                                     *   without data, whose draws bind no data stream */
     uint64_t id;                    /**< Id unique to this mesh, unlike its reusable handle */
     uint32_t index_count;           /**< Indices to draw */
     WGPUBindGroup wire;             /**< Vertices and indices as the storage buffers of a wire
                                      *   draw (debug_wire.wgsl), NULL until the first one */
-    WGPUBuffer adjacency;           /**< Edge adjacency of the wire draws, one uint32_t per
-                                     *   index (box_gpu_debug_adjacency), NULL when the mesh is
-                                     *   not wireable */
+    WGPUBindGroup wire_data;        /**< wire with the per vertex data, of the wire draws of
+                                     *   vs_wind_data, NULL until the first one or without data */
+    WGPUBuffer adjacency;           /**< Indices then edge adjacency of the wire draws, one
+                                     *   uint32_t each per index (box_gpu_debug_adjacency),
+                                     *   NULL when the mesh is not wireable */
     bool wireable;                  /**< The vertices and the adjacency fit in a storage buffer
                                      *   binding, so the mesh can be wired */
     bool wire_reported;             /**< The error of a mesh that is not wireable was logged */
     float center[3];                /**< Center of the box around the vertex positions */
     float extent[3];                /**< Half size of the box around the vertex positions */
+    uint32_t *terrain_serials;      /**< Grid mesh of terrain tiles: serials of the heights and
+                                     *   of the rough heights copied into each slot of its
+                                     *   surface assets, two per slot, 0 for none */
+    int32_t terrain_slots;          /**< Slots its surface assets hold */
+    uint64_t terrain_slot_size;     /**< Bytes of a slot */
+    WGPUTexture terrain_masks;      /**< Grid mesh of terrain tiles with masks: the mask atlas,
+                                     *   a cell per slot (box_render_terrain_height_t), NULL
+                                     *   until a tile has masks */
+    WGPUTextureView terrain_mask_view; /**< View of the mask atlas */
+    uint32_t *terrain_mask_serials; /**< Serials of the masks and the coarse masks copied into
+                                     *   each cell, two per slot, 0 for none */
+    uint32_t terrain_mask_texels;   /**< Texels along an edge of the masks of a tile, the height
+                                     *   of a cell, half its width */
+    uint32_t terrain_mask_columns;  /**< Cells across the atlas */
+    uint32_t terrain_mask_rows;     /**< Cells down the atlas */
+    WGPUTextureFormat terrain_mask_format; /**< Format of the atlas, that of the masks */
+    uint32_t terrain_mask_version;  /**< Texture serial taken when the atlas is made again, so
+                                     *   the blend groups that bound it bind the new one */
+    WGPUTexture terrain_bake;       /**< Grid mesh of terrain tiles with masks: the bake atlas,
+                                     *   BOX_GPU_TERRAIN_BAKE_LAYERS layers, a cell per slot
+                                     *   (box_render_terrain_bake_t), NULL until a tile bakes */
+    WGPUTextureView terrain_bake_view; /**< Array view of the bake atlas */
+    struct box_gpu_terrain_bake_key_t *terrain_bake_keys; /**< What each cell was baked from,
+                                     *   one per slot */
+    uint32_t terrain_bake_texels;   /**< Texels along an edge of the bake of a tile, the height
+                                     *   of a cell; the coarse bake right of it has half as many
+                                     *   intervals */
+    uint32_t terrain_bake_columns;  /**< Cells across the bake atlas */
+    uint32_t terrain_bake_rows;     /**< Cells down the bake atlas */
+    uint32_t terrain_bake_version;  /**< Texture serial taken when the bake atlas is made again,
+                                     *   so the blend groups that bound it bind the new one */
 } box_gpu_mesh_t;
+
+/** Layers of the bake atlas of a terrain grid mesh: the albedo with the occlusion, the normal
+ * with the roughness and metallic, and the sun and the ambient occlusion of the heights */
+#define BOX_GPU_TERRAIN_BAKE_LAYERS (3)
+
+/** Format of the layers of the bake atlas of a terrain grid mesh */
+#define BOX_GPU_TERRAIN_BAKE_FORMAT (WGPUTextureFormat_RGBA8Unorm)
+
+/** What a cell of the bake atlas of a terrain grid mesh was baked from */
+typedef struct box_gpu_terrain_bake_key_t {
+    uint32_t serials[4];            /**< Serials of the heights, the rough heights, the masks
+                                     *   and the coarse masks copied into the slot */
+    uint64_t material;              /**< Hash of the material group and the layer values */
+    uint32_t sun;                   /**< Quantized direction of the sun, 0 for none */
+    uint32_t baked;                 /**< 1 once the cell holds a bake */
+} box_gpu_terrain_bake_key_t;
 
 /** Frames the CPU may submit before it waits for the GPU to finish the oldest */
 #define BOX_GPU_FRAMES_IN_FLIGHT (2)
@@ -220,15 +549,26 @@ typedef struct box_gpu_material_t {
     struct box_gpu_material_t *next; /**< Next material with the same hash */
 } box_gpu_material_t;
 
+/** Slices a texture array of the blends and layers holds at most: the heights of the kinds of
+ * a TileTerrain followed by the maps of the layers of a TextureLayers */
+#define BOX_GPU_ARRAY_SLICES (BOX_RENDER_BLEND_SLICES + BOX_RENDER_LAYERS * BOX_RENDER_LAYER_MAPS)
+
+/** Map of a texture array of the layers of a TextureLayers, the maps of each layer (and the
+ * heights of a TextureBlend before them) as stored, a slice default of white or a flat normal */
+#define BOX_GPU_LAYER_MAP (BOX_RENDER_BLEND_SOURCES)
+
 /** A texture array of one map of the layers of TextureBlend batches, a slice per layer, shared
- * by every blend with the same sources */
+ * by every blend with the same sources; or of the maps of the layers of TextureLayers batches */
 typedef struct box_gpu_blend_array_t {
-    uint32_t map;                   /**< BOX_RENDER_BLEND_ALBEDO, _ORM, _NORMAL or _HEIGHT */
+    uint32_t map;                   /**< BOX_RENDER_BLEND_ALBEDO, _ORM, _NORMAL, _HEIGHT or
+                                     *   BOX_GPU_LAYER_MAP */
     uint32_t count;                 /**< Slices */
     uint32_t quality;               /**< Largest dimension of a slice */
-    uint32_t sources[BOX_RENDER_BLEND_SLICES]; /**< Texture handle of each slice, 0 for the
-                                     *   default of the map */
-    uint32_t serials[BOX_RENDER_BLEND_SLICES]; /**< Serial of the image of each source it was
+    uint32_t flat;                  /**< Slices whose default is a flat normal, bit per slice,
+                                     *   else white */
+    uint32_t sources[BOX_GPU_ARRAY_SLICES]; /**< Texture handle of each slice, 0 for the
+                                     *   default of the slice */
+    uint32_t serials[BOX_GPU_ARRAY_SLICES]; /**< Serial of the image of each source it was
                                      *   built from, 0 for none: another serial rebuilds it */
     uint32_t version;               /**< Builds of the array, which the bind groups compare */
     WGPUTexture texture;            /**< The array, BOX_GPU_TEXTURE_FORMAT */
@@ -253,18 +593,75 @@ typedef struct box_gpu_blend_group_t {
     uint32_t versions[BOX_RENDER_BLEND_SOURCES]; /**< Versions of the arrays it binds */
     uint32_t mask_serial;           /**< Serial of the image of the mask it binds */
     uint32_t emissive_serial;       /**< Serial of the image of the emissive layer it binds */
+    uint32_t bake_serial;           /**< Version of the bake atlas of a terrain blend it binds */
+    box_render_grass_far_t grass;   /**< Far field of the Grass on a terrain blend its uniforms
+                                     *   hold, all zero without one */
     WGPUBuffer uniforms;            /**< BlendUniforms of mesh.wgsl */
     WGPUBindGroup group;            /**< The bind group, NULL until made */
     int64_t used;                   /**< Frame of the last packet that drew with it */
     int64_t checked;                /**< Frame its arrays and images were last checked */
+    int64_t bound;                  /**< Frame its bind group was last made, which the layers
+                                     *   groups that extend it compare */
     struct box_gpu_blend_group_t *next; /**< Next group */
 } box_gpu_blend_group_t;
+
+/** Uniform buffer of the values of one TextureLayer entity (TextureLayer of mesh_layers.wgsl),
+ * shared by every layers group that binds the entity, written when its values change */
+typedef struct box_gpu_layer_buffer_t {
+    ecs_entity_t entity;            /**< The layer entity */
+    box_render_texture_layer_t values; /**< Values last written */
+    WGPUBuffer buffer;              /**< The uniform buffer */
+    int64_t used;                   /**< Frame of the last packet that drew with it */
+    struct box_gpu_layer_buffer_t *next; /**< Next buffer */
+} box_gpu_layer_buffer_t;
+
+/** What a layers group binds: the group of the batch without its layers (its textures or its
+ * TextureBlend) and its layers, zeroed before it is filled so it compares as bytes */
+typedef struct box_gpu_layer_key_t {
+    uint32_t blend;                 /**< 1 for a TextureBlend batch, whose blend group it extends,
+                                     *   0 for the material group of the plain variant */
+    uint32_t textures[BOX_GPU_MATERIAL_TEXTURES]; /**< Texture handles of the plain variant */
+    uint32_t wrap;                  /**< TextureWrap of the sampler */
+    uint32_t anisotropy;            /**< Anisotropic samples of the sampler */
+    box_render_texture_blend_t record; /**< The TextureBlend of a blend batch */
+    uint32_t emissive;              /**< Emissive handle of a blend batch */
+    uint32_t pad;                   /**< Unused, zero */
+    ecs_entity_t entities[BOX_RENDER_LAYERS]; /**< Layer entities of the slots, 0 for none */
+    uint32_t maps[BOX_RENDER_LAYERS][BOX_RENDER_LAYER_MAPS]; /**< Texture handles of the maps */
+    uint32_t count;                 /**< Slots of the layers */
+    uint32_t quality;               /**< Largest dimension of a slice */
+} box_gpu_layer_key_t;
+
+/** Bind group of the layers variant of the mesh pipelines: the entries of the material or blend
+ * group of the batch, the texture array of the layer maps and the uniform buffer of each layer */
+typedef struct box_gpu_layer_group_t {
+    box_gpu_layer_key_t key;        /**< What it binds */
+    box_gpu_blend_array_t *array;   /**< Array of the layer maps (after the heights of a blend),
+                                     *   referenced */
+    uint32_t version;               /**< Version of the array it binds */
+    int64_t base;                   /**< Frame the blend group whose entries it binds was
+                                     *   bound (box_gpu_blend_group_t.bound), 0 for the plain
+                                     *   variant */
+    uint32_t serials[BOX_GPU_MATERIAL_TEXTURES]; /**< Serials of the images of the textures of
+                                     *   the plain variant it binds */
+    WGPUBuffer buffers[BOX_RENDER_LAYERS]; /**< Layer buffers it binds */
+    WGPUBindGroup group;            /**< The bind group, NULL until made */
+    int64_t used;                   /**< Frame of the last packet that drew with it */
+    int64_t checked;                /**< Frame it was last checked */
+    struct box_gpu_layer_group_t *next; /**< Next group */
+} box_gpu_layer_group_t;
+
+/** Streams an instance bind group binds, by its layout */
+typedef enum box_gpu_instance_binds_t {
+    BOX_GPU_INSTANCE_TRANSFORMS = 0, /**< transform_layout: transforms, surface assets, surfaces */
+    BOX_GPU_INSTANCE_ALL = 1,       /**< instance_layout: every stream and the material table */
+    BOX_GPU_INSTANCE_MATERIALS = 2  /**< material_instance_layout: all but the frame stream */
+} box_gpu_instance_binds_t;
 
 /** Bind group of an instance page with the surface assets of a mesh that has them */
 typedef struct box_gpu_instance_group_t {
     uint32_t mesh;                  /**< Handle of the mesh */
-    bool shading;                   /**< It binds the shading stream, instance_layout, else
-                                     *   transform_layout */
+    int32_t binds;                  /**< box_gpu_instance_binds_t, the layout it is made for */
     WGPUBuffer assets;              /**< Surface assets of the mesh it binds, held */
     WGPUBindGroup group;            /**< The bind group */
 } box_gpu_instance_group_t;
@@ -279,6 +676,8 @@ typedef struct box_gpu_buffer_t {
                                      *   assets (instance_layout), made on use */
     WGPUBindGroup transforms;       /**< The same without the shading stream, for the passes
                                      *   that read no material (transform_layout) */
+    WGPUBindGroup materials;        /**< The same without the frame stream, for the wire draws
+                                     *   of the batches with a WindSway (material_instance_layout) */
     ecs_vec_t mesh_groups;          /**< box_gpu_instance_group_t, binds the page with the
                                      *   surface assets of a mesh that has them, made on use */
     int64_t counted;                /**< History ranges pass that last counted its words */
@@ -519,7 +918,12 @@ typedef struct box_gpu_cull_job_t {
     uint32_t exclude;               /**< Page slot plus one of the instance no frustum of the
                                      *   group draws, the shape of a planar reflection, 0 for
                                      *   none */
-    uint32_t pad;                   /**< Pads the job to the size of Job in cull.wgsl */
+    uint32_t reach;                 /**< Bits of the float world distance the vertices of a
+                                     *   batch with a WindSway move at most, which the world box
+                                     *   of each instance grows by; 0 for other batches */
+    float range[4];                 /**< DrawRange near, far and fade of the batch, all 0 for
+                                     *   none, w unused: the instances out of range from the
+                                     *   camera of the uniforms are culled */
 } box_gpu_cull_job_t;
 
 /** Workgroups along x of a cull_lod dispatch at most; each one strides over the instances */
@@ -535,8 +939,9 @@ typedef struct box_gpu_cull_job_t {
  * arguments, center and extent the bounds of its mesh, mask its levels; base is the first
  * visible entry of its level runs, history the entries of a run and list the first draw
  * arguments of its levels. fixture is the first merged arguments plus one, 0 for none, and for
- * a late job exclude is the first entry of the early runs plus one and pad their entries, which
- * it appends to at the merged count. */
+ * a late job exclude is the first entry of the early runs plus one and reach their entries, which
+ * it appends to at the merged count. range is the DrawRange of a batch with one, whose passes
+ * dither, so its instances crossfade between levels (LodSettings.fade); 0 for the others. */
 typedef struct box_gpu_cull_lod_job_t {
     box_gpu_cull_job_t job;         /**< The job as the shader reads it */
     int32_t group;                  /**< Index of its cull group */
@@ -593,8 +998,11 @@ typedef struct box_gpu_cull_uniforms_t {
     uint32_t hiz[4];                /**< Pyramid width, height and levels, 0 levels for none */
     uint32_t scan[4];               /**< Table entries, their count, workgroup list, workgroups */
     float camera[4];                /**< World position of the camera that picks the levels of
-                                     *   detail, w unused */
-    float lod[4];                   /**< Distance at which level i starts, LodSettings.distances */
+                                     *   detail and that the draw ranges are measured from, w 1,
+                                     *   w 0 for a group without a camera, which culls no
+                                     *   instance by its range */
+    float lod[4];                   /**< LodSettings.fade, then the distance at which level i
+                                     *   starts for levels 1 to 3, LodSettings.distances */
 } box_gpu_cull_uniforms_t;
 
 /** The frustums one pass of the cull shader tests together: a view of a target and the
@@ -624,6 +1032,16 @@ typedef struct box_gpu_cull_record_t {
     uint32_t counter;               /**< Index of its counters */
 } box_gpu_cull_record_t;
 
+/** The transmissive instances of a view in a frame and how many of them its cull pass kept */
+typedef struct box_gpu_cull_glass_t {
+    ecs_entity_t view;              /**< Entity of the view */
+    int64_t frame;                  /**< Frame of the packet */
+    int32_t tested;                 /**< Transmissive instances the view tested */
+    int32_t visible;                /**< Those its cull pass drew */
+    int32_t first;                  /**< First of its draw arguments in glass_args of a copy */
+    int32_t count;                  /**< Its draw arguments there */
+} box_gpu_cull_glass_t;
+
 /** A copy of the cull counters of a target on its way back to the main thread */
 typedef struct box_gpu_cull_readback_t {
     WGPUBuffer buffer;              /**< Mappable copy of the counters */
@@ -634,6 +1052,13 @@ typedef struct box_gpu_cull_readback_t {
     ecs_vec_t records;              /**< box_gpu_cull_record_t of the views */
     uint64_t stamp_offset;          /**< Byte offset of the timestamps after the counters */
     uint32_t stamps;                /**< Timestamp pairs of its cull passes, 0 for none */
+    ecs_vec_t view_args;            /**< uint32_t, draw arguments the views drew with */
+    ecs_vec_t shadow_args;          /**< uint32_t, draw arguments the cascades drew with */
+    ecs_vec_t glass;                /**< box_gpu_cull_glass_t of the views with transmissive
+                                     *   draws, visible not yet counted */
+    ecs_vec_t glass_args;           /**< uint32_t, draw arguments of those draws, by view */
+    uint64_t args_offset;           /**< Byte offset of the draw arguments after the timestamps */
+    uint32_t args_words;            /**< Words of draw arguments copied, 0 for none */
 } box_gpu_cull_readback_t;
 
 /** The cluster buffer of a view in a target and the read back of the entries its pass allocated */
@@ -725,7 +1150,12 @@ typedef struct box_gpu_cull_t {
     uint32_t next_hiz;              /**< Id of the next pyramid */
     int64_t stamp;                  /**< Cull passes begun, ages histories and pyramids */
     box_gpu_cull_readback_t readbacks[BOX_GPU_CULL_READBACKS]; /**< Counter copies */
+    bool detail;                    /**< Copies also read back the draw arguments of the views
+                                     *   and cascades, gpu->stats_detail at the begin */
+    int64_t triangle_frame;         /**< Frame of the last read back whose triangles counted */
     ecs_vec_t status;               /**< box_render_cull_status_t, under the lock of the gpu */
+    ecs_vec_t glass;                /**< box_gpu_cull_glass_t, the last counts read back of each
+                                     *   view with transmissive draws (box_gpu_cull_glass_hidden) */
     int64_t frame;                  /**< Frame of the packet of the target being rendered */
     ecs_vec_t views;                /**< box_gpu_cull_view_t of the target */
     ecs_vec_t draws;                /**< box_gpu_cull_draw_t of the target */
@@ -778,7 +1208,8 @@ typedef struct box_gpu_view_uniforms_t {
     vec4 ambient_sky;               /**< Linear ambient light from above */
     vec4 ambient_ground;            /**< Linear ambient light from below */
     vec4 cluster;                   /**< Inverse projection scale of x and y, slice near, far */
-    uint32_t lights[4];             /**< Directional lights, lights, lit, orthographic */
+    uint32_t lights[4];             /**< Directional lights, lights, 1 lit or 0 unlit (an
+                                     *   impostor channel plus one), orthographic */
     uint32_t grid[4];               /**< Clusters per axis, reflection probes the clusters list */
     mat4 shadow_matrix[BOX_RENDER_SHADOW_CASCADES]; /**< World to shadow clip per cascade */
     vec4 shadow_depth;              /**< Clip depth range of each cascade over its half
@@ -822,6 +1253,27 @@ typedef struct box_gpu_view_uniforms_t {
                                      *   instance of the shape of each slot */
     uint32_t planar_slots[4];       /**< Page slot plus one of the instance of the shape of
                                      *   each slot, 0 for none */
+    vec4 ripple_a;                  /**< Field of WaterRipples of the scene (gpu_ripples.c):
+                                     *   world XZ of the window corner, 1 / cell, strength */
+    vec4 ripple_b;                  /**< World Y of its Water, tolerance, border cells, cell */
+    uint32_t ripple_c[4];           /**< Resolution, texel of the window corner X and Z, 1 for a
+                                     *   field and 0 without one */
+    vec4 spectrum_a;                /**< Spectrum of WaterSpectrum of the scene
+                                     *   (gpu_spectrum.c): world XZ offset of its tiles,
+                                     *   detail, height scale */
+    vec4 spectrum_b;                /**< 1 / world units of the tile of each cascade, unused */
+    uint32_t spectrum_c[4];         /**< Cascades, 0 without a spectrum, three unused */
+    int32_t origin[4];              /**< Absolute position of the local origin (WorldOrigin)
+                                     *   as box_gpu_origin_split packs it */
+    mat4 prev_view_proj;            /**< view_proj of the previous frame the view rendered,
+                                     *   view_proj without a valid history (temporal.c) */
+    uint32_t temporal[4];           /**< Frames since the last reset of the history, 1 when it
+                                     *   is valid, two unused */
+    vec4 fog_grid;                  /**< Froxel grid of the fog volumes (gpu_fog_volume.c): the
+                                     *   share of the grid the render size covers across and
+                                     *   down, slices, 1 when the view has fog volumes */
+    vec4 fog_range;                 /**< View depth of the near plane and of the far end of
+                                     *   the grid, 1 for orthographic, unused */
 } box_gpu_view_uniforms_t;
 
 _Static_assert(sizeof(box_gpu_view_uniforms_t) <= BOX_GPU_VIEW_STRIDE,
@@ -883,13 +1335,49 @@ typedef struct box_gpu_atlas_read_t {
  * planet light slot */
 #define BOX_GPU_PLANET_LIGHTS_BINDING (22)
 
+/** Binding of the view group of the wave table of the Water materials
+ * (BOX_RENDER_BUFFER_WATER_WAVES), water_wave_sets of mesh_extended.wgsl */
+#define BOX_GPU_WATER_WAVES_BINDING (24)
+
+/** Binding of the view group of the heights of the field of WaterRipples of the scene of the
+ * view, an r32float read only storage texture, water_ripple_heights of mesh_extended.wgsl; a 1x1
+ * zero texture without one. Its record is in the View uniform (ripple_a, ripple_b, ripple_c). */
+#define BOX_GPU_RIPPLES_HEIGHTS_BINDING (25)
+
+/** Binding of the view group of the foam of the field of WaterRipples of the scene of the view,
+ * an r32float read only storage texture, water_ripple_foam of mesh_extended.wgsl; the 1x1 zero
+ * texture without one. */
+#define BOX_GPU_RIPPLES_FOAM_BINDING (26)
+
+/** Binding of the view group of the velocity of the field of WaterRipples of the scene of the
+ * view, a read-only rgba32float storage texture in the addressing of the heights, water_ripple_flow of
+ * mesh_extended.wgsl: the world velocity of the water of a cell (xy) and its velocity relative
+ * to the frame of the field (zw); the 1x1 zero texture without one. */
+#define BOX_GPU_RIPPLES_FLOW_BINDING (27)
+
+/** Binding of the view group of the slopes of the spectrum of WaterSpectrum of the scene of the
+ * view, an rgba16float 2D array with mips sampled through the cookie sampler (binding 18),
+ * water_spectrum of mesh_extended.wgsl: a layer per cascade of the slope along X and Z, the
+ * height and the square of the slope; a 1x1 zero array without one. Its record is in the View
+ * uniform (spectrum_a, spectrum_b, spectrum_c). */
+#define BOX_GPU_SPECTRUM_BINDING (28)
+
+/** Binding of the view group of the integrated froxel grid of the fog volumes of the view
+ * (gpu_fog_volume.c), a 3D texture sampled through the aerial perspective sampler (binding 10),
+ * fog_grid of fog_blend.wgsl, which blended draws fog themselves with; a texel of no light and
+ * full transmittance without one. Its slicing is in the View uniform (fog_grid, fog_range). */
+#define BOX_GPU_FOG_GRID_BINDING (29)
+
+/** Bindings of the view group, the highest binding plus one */
+#define BOX_GPU_VIEW_BINDINGS (31)
+
 /** Binding of the transmittance and sky irradiance LUT array of the planet lights in the view
  * group */
 #define BOX_GPU_PLANET_LUTS_BINDING (23)
 
 /** Binding of the shading block of the areas of a view in the view group, area_block of
  * areas.wgsl */
-#define BOX_GPU_AREAS_BINDING (24)
+#define BOX_GPU_AREAS_BINDING (30)
 
 /** Bytes of the shading block of a view, BOX_PORTAL_SHADE_MAX vec4, the uniform array the
  * forward pass binds; a multiple of the uniform offset alignment */
@@ -960,6 +1448,49 @@ typedef struct box_gpu_reflect_t {
     uint32_t mips;                  /**< Mip levels */
 } box_gpu_reflect_t;
 
+/** A level of the uniforms of a sampled terrain (TerrainSampleLevel of terrain_sample.wgsl),
+ * 32 bytes */
+typedef struct box_gpu_terrain_sample_level_t {
+    int32_t whole[2];               /**< Absolute x and z of the corner of the window of the
+                                     *   level, whole meters */
+    float rest[2];                  /**< The rest of the corner below a meter */
+    float size;                     /**< Edge of a tile of the level in meters */
+    float morph[2];                 /**< Distances of the focus from the center of a tile where
+                                     *   its morph starts and ends */
+    uint32_t first;                 /**< Index of the first cell of the level in the grid */
+} box_gpu_terrain_sample_level_t;
+
+/** The uniforms of a sampled terrain (TerrainSampleParams of terrain_sample.wgsl), 640 bytes */
+typedef struct box_gpu_terrain_sample_params_t {
+    uint32_t counts[4];             /**< Levels, cells along an edge of a window, vertices along
+                                     *   an edge of a tile, foci */
+    uint32_t layout[4];             /**< Floats of a row of the heights of a slot, floats of a
+                                     *   slot, texels along an edge of the masks of a tile (0
+                                     *   without masks), cells across the mask atlas */
+    int32_t origin_whole[4];        /**< Absolute x and z of the frame of the terrain, whole
+                                     *   meters, then 1 when the terrain is bounded */
+    float origin[4];                /**< The rest of x and z, the extent of a bounded terrain and
+                                     *   the local y of the frame of the terrain */
+    float foci[4][4];               /**< Two foci per vec4, x and z relative to the corner of the
+                                     *   window of level 0 */
+    box_gpu_terrain_sample_level_t levels[BOX_RENDER_TERRAIN_LEVELS]; /**< The levels */
+} box_gpu_terrain_sample_params_t;
+
+/** The bindings of a terrain with TerrainSampled (box_gpu_terrain_samples) */
+typedef struct box_gpu_terrain_sample_t {
+    WGPUBuffer params;              /**< Uniform buffer of the params */
+    WGPUBuffer grid;                /**< Storage buffer of the cells */
+    uint64_t grid_size;             /**< Bytes of grid */
+    box_gpu_terrain_sample_params_t written; /**< The params params holds */
+    uint32_t *cells;                /**< The cells grid holds */
+    int32_t cell_count;             /**< Cells in cells */
+    WGPUBindGroup group;            /**< The bind group of terrain_sample_layout */
+    WGPUBuffer group_heights;       /**< Surface assets the group binds */
+    WGPUTextureView group_masks;    /**< Mask atlas view the group binds */
+    WGPUBuffer group_grid;          /**< Grid the group binds */
+    int64_t frame;                  /**< Frame of the last packet that sampled the terrain */
+} box_gpu_terrain_sample_t;
+
 /** The webgpu backend: device, shared objects and targets */
 typedef struct box_gpu_t {
     WGPUInstance instance;          /**< The instance */
@@ -991,6 +1522,36 @@ typedef struct box_gpu_t {
                                      *   the forward pass: mesh_layout with blend_layout */
     box_gpu_blend_array_t *blend_arrays; /**< Texture arrays of the TextureBlend layers */
     box_gpu_blend_group_t *blend_groups; /**< Bind groups of the TextureBlend batches */
+    WGPUBindGroupLayout layer_layout; /**< Bind group layout of the layers variant of the
+                                     *   plain mesh pipelines, made on first use */
+    WGPUBindGroupLayout blend_layer_layout; /**< Bind group layout of the layers variant of the
+                                     *   texture_blend pipelines, made on first use */
+    WGPUPipelineLayout layer_mesh_layout; /**< mesh_layout with layer_layout */
+    WGPUPipelineLayout blend_layer_mesh_layout; /**< mesh_layout with blend_layer_layout */
+    WGPUBuffer layer_none;          /**< Zero TextureLayer of the slots without a layer */
+    WGPUBindGroupLayout terrain_bake_layout; /**< Group 3 of the terrain bake pipelines: the
+                                     *   terrain indices and the parameters of a bake, made on
+                                     *   first use */
+    WGPUPipelineLayout terrain_bake_layouts[2]; /**< Pipeline layouts of the terrain bakes of
+                                     *   the blend and the blend layers variants */
+    WGPUBuffer terrain_bake_params; /**< Parameters of the bakes of a packet, one per draw at
+                                     *   a dynamic offset */
+    uint64_t terrain_bake_params_size; /**< Bytes of terrain_bake_params */
+    WGPUBuffer terrain_bake_index;  /**< Terrain indices of the bakes of a packet */
+    uint64_t terrain_bake_index_size; /**< Bytes of terrain_bake_index */
+    WGPUBuffer terrain_bake_slots;  /**< Instance slots of the bakes of a packet */
+    uint64_t terrain_bake_slots_size; /**< Bytes of terrain_bake_slots */
+    WGPUTexture terrain_bake_scratch; /**< Image the bakes of a packet render into before
+                                     *   they are copied into the bake atlases, which the
+                                     *   material groups of the bakes sample */
+    WGPUTextureView terrain_bake_scratch_layers[3]; /**< View of each layer of the scratch */
+    uint32_t terrain_bake_scratch_texels; /**< Texels of the bakes of a cell of the scratch */
+    uint32_t terrain_bake_scratch_columns; /**< Cells across the scratch */
+    WGPUTexture terrain_bake_empty; /**< One texel array the terrain blends without a bake
+                                     *   atlas bind */
+    WGPUTextureView terrain_bake_empty_view; /**< Array view of terrain_bake_empty */
+    box_gpu_layer_buffer_t *layer_buffers; /**< Buffers of the layer entities */
+    box_gpu_layer_group_t *layer_groups; /**< Bind groups of the TextureLayers batches */
     uint64_t blend_bytes;           /**< Bytes of the blend arrays */
     int64_t blend_frame;            /**< Packets the blend caches have seen */
     WGPUPipelineLayout mesh_layout; /**< Pipeline layout of the forward pass */
@@ -1037,6 +1598,10 @@ typedef struct box_gpu_t {
     ecs_vec_t area_views;           /**< const box_render_view_t*, the view of each slot of the
                                      *   area buffer in this target */
     ecs_vec_t view_data;            /**< Bytes of the view uniforms of a target */
+    ecs_vec_t view_unfogged;        /**< int32_t per view slot, the slot of a copy of its
+                                     *   uniforms whose blended draws are not fogged, which the
+                                     *   draws before the fog in front of its glass bind, -1 for
+                                     *   a view without fog volumes */
     WGPUBindGroupLayout shadow_layout; /**< Bind group layout of the shadow pass */
     WGPUPipelineLayout shadow_pipeline_layout; /**< Pipeline layout of the shadow pass: the
                                      *   cascade, the instance and the material group */
@@ -1070,6 +1635,8 @@ typedef struct box_gpu_t {
     WGPUBuffer shadow_buffer;       /**< Cascade matrices of the views of a target */
     int32_t shadow_capacity;        /**< Views the cascade buffer holds */
     ecs_vec_t shadow_data;          /**< Bytes of the cascade matrices of a target */
+    double origin[3];               /**< Absolute position of the local origin of the packet
+                                     *   the views are written for, which the cascades take */
     WGPUTexture capture_shadow;     /**< Shadow map of the probe captures, one cascade */
     WGPUTextureView capture_shadow_view; /**< Array view the captures sample */
     WGPUTextureView capture_shadow_layer; /**< View the casters render into */
@@ -1100,6 +1667,9 @@ typedef struct box_gpu_t {
                                      *   tested casters */
     WGPUBindGroupLayout transform_layout; /**< instance_layout without the shading stream: the
                                      *   cull, the shadow casters and the capture cull */
+    WGPUBindGroupLayout material_instance_layout; /**< instance_layout without the frame
+                                     *   stream: the wire draws of the batches with a WindSway,
+                                     *   whose wire mesh group leaves no room for more */
     WGPUBuffer no_assets;           /**< One zero vec4, the surface assets of the draws of
                                      *   meshes without any */
     WGPUBuffer no_surfaces;         /**< One zero box_render_surface_t, the surface stream of
@@ -1108,6 +1678,8 @@ typedef struct box_gpu_t {
                                      *   the pages without one, all but the frame pages */
     WGPUBuffer no_materials;        /**< One default material record, the material table of
                                      *   the draws before the main thread sent one */
+    WGPUBuffer no_water_waves;      /**< A zero wave table, bound by the view groups before
+                                     *   the main thread sent one: no waves */
     box_gpu_cull_t cull;            /**< Cull pass state */
     WGPUBindGroupLayout scatter_layout; /**< Bind group layout of the scatter pass */
     WGPUPipelineLayout scatter_pipeline_layout; /**< Pipeline layout of the scatter pass */
@@ -1153,6 +1725,8 @@ typedef struct box_gpu_t {
                                      *   under the lock */
     bool shadow_core_request;       /**< Point light tiles discard instead of clipping from the
                                      *   next packet, under the lock */
+    bool stats_detail;              /**< The read back of the cull counters also copies the
+                                     *   draw arguments to count triangles, under the lock */
     uint64_t buffer_writes;         /**< Writes to buffers, the version of the last one */
     box_render_gpu_stats_t stats;   /**< Counters read by the main thread */
     box_render_gpu_stats_t pending; /**< Counter changes not yet published, render thread only */
@@ -1160,6 +1734,9 @@ typedef struct box_gpu_t {
     uint32_t canvas;                /**< Target presented on the page canvas, 0 for none */
     box_gpu_effects_t *effects;     /**< Effect passes of the views */
     box_gpu_gtao_t *gtao;           /**< Ambient occlusion of the views */
+    ecs_vec_t histories;            /**< box_render_history_t of the views of the targets */
+    ecs_vec_t history_pairs;        /**< box_gpu_history_pair_t*, the history textures of the
+                                     *   temporal passes (gpu_history.c) */
     box_gpu_transmission_t *transmission; /**< Opaque snapshots of transmission */
     box_gpu_portal_stencil_t *portal_stencil; /**< Portal marks of the views */
     uint32_t rendering;             /**< Target that is rendering, materials cannot sample it */
@@ -1171,6 +1748,10 @@ typedef struct box_gpu_t {
     struct box_gpu_env_image_t *environment_image; /**< Conversion of environment images,
                                                     *   created by the first image */
     box_gpu_particles_t *particles; /**< Particle passes */
+    struct box_gpu_grass_t *grass;  /**< Grass passes and the blades of the Grass entities */
+    box_gpu_ripples_t *ripples;     /**< Fields of WaterRipples */
+    box_gpu_spectra_t *spectra;     /**< Spectra of WaterSpectrum */
+    struct box_gpu_impostor_t *impostor; /**< Impostor frame copies, created by the first */
     box_gpu_fog_volumes_t *fog_volumes; /**< Fog volume draws */
     box_gpu_star_fields_t *star_fields; /**< Star field draws */
     box_gpu_planets_t *planets;     /**< Planet atmosphere shell draws */
@@ -1202,6 +1783,10 @@ typedef struct box_gpu_t {
     uint64_t texture_graph_key_bytes; /**< Bytes of the key images of interpolated graphs */
     uint64_t texture_graph_cached_bytes; /**< Bytes of the cached texture graph values */
     int32_t texture_graph_cached;   /**< Cached texture graph values */
+    WGPUBindGroupLayout terrain_sample_layout; /**< Bind group layout of a sampled terrain
+                                     *   (terrain_sample.wgsl), compute, vertex and fragment */
+    ecs_map_t terrain_samples;      /**< Terrain entity to its box_gpu_terrain_sample_t, the
+                                     *   terrains the last packet sampled */
     bool lost;                      /**< The device was lost, the ring recreates it */
     bool lose;                      /**< box_render_gpu_lose_device asked to destroy it */
 } box_gpu_t;
@@ -1242,6 +1827,7 @@ typedef enum box_gpu_stat_t {
     BOX_GPU_STAT_FORWARD_PASS,      /**< A forward render pass of a view was begun */
     BOX_GPU_STAT_SCATTER,           /**< A scatter dispatch was recorded */
     BOX_GPU_STAT_INSTANCE_BIND,     /**< An instance bind group was set in a pass or bundle */
+    BOX_GPU_STAT_DATA_BIND,         /**< A per vertex data stream was bound in a pass or bundle */
     BOX_GPU_STAT_CULL_DISPATCH,     /**< A dispatch of the cull pass of a view was recorded */
     BOX_GPU_STAT_CULL_INSTANCES,    /**< A cull_instances dispatch of a view was recorded */
     BOX_GPU_STAT_SHADOW_TILE,       /**< A shadow atlas tile was rendered */

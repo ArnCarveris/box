@@ -761,6 +761,14 @@ void box_mesh_gen_mesh3(
     const vec2 *uvs = ecs_vec_count(&src->uvs) == count ? ecs_vec_first(&src->uvs) : NULL;
     const rgba *colors = ecs_vec_count(&src->colors) == count ?
         ecs_vec_first(&src->colors) : NULL;
+    const vec4 *data0 = ecs_vec_count(&src->data0) == count ?
+        ecs_vec_first(&src->data0) : NULL;
+    const vec4 *data1 = ecs_vec_count(&src->data1) == count ?
+        ecs_vec_first(&src->data1) : NULL;
+    const vec4 *data2 = ecs_vec_count(&src->data2) == count ?
+        ecs_vec_first(&src->data2) : NULL;
+    const vec4 *data3 = ecs_vec_count(&src->data3) == count ?
+        ecs_vec_first(&src->data3) : NULL;
     for (int32_t i = 0; i < count; i ++) {
         vec3 n = {0};
         if (normals && glm_vec3_norm2((float*)normals[i]) > 0.0f) {
@@ -768,6 +776,15 @@ void box_mesh_gen_mesh3(
         }
 
         box_mesh_vertex(mesh, positions[i], n, uvs ? uvs[i][0] : 0.0f, uvs ? uvs[i][1] : 0.0f);
+        if (data0 || data1) {
+            box_mesh_vertex_data(mesh, i, data0 ? data0[i] : GLM_VEC4_ZERO,
+                data1 ? data1[i] : GLM_VEC4_ZERO);
+        }
+
+        if (data2 || data3) {
+            box_mesh_vertex_data_upper(mesh, i, data2 ? data2[i] : GLM_VEC4_ZERO,
+                data3 ? data3[i] : GLM_VEC4_ZERO);
+        }
     }
 
     if (colors && count) {

@@ -1,0 +1,29 @@
+// A small three level tree as one MeshGraph shape: a trunk, limbs in a spiral, opposite
+// twigs, the crown pruned to an ellipsoid and tubed into fluted bark with wind data.
+
+using box.mesh
+
+tree {
+  trunk { nodes.Stem: {length: 4, segments: 10, radius: 0.22, taper: 0.85, noise: 0.15, seed: 1} }
+  limbs {
+    nodes.Branches: {
+      curves: trunk, count: 7, start: 0.35, end: 0.95, distribution: Spiral,
+      down_angle: 1.1, down_angle_change: -0.5, length: 0.45,
+      length_curve: [0.8, 1, 0.9, 0.7, 0.5], radius_exponent: 1.4, segments: 6, gravity: 0.15,
+      phototropism: 0.1, angle_variation: 0.1, length_variation: 0.15, seed: 2
+    }
+  }
+  twigs {
+    nodes.Branches: {
+      curves: limbs, count: 4, start: 0.3, distribution: Opposite, down_angle: 0.7,
+      length: 0.5, radius_exponent: 1.2, taper: 0.7, segments: 3, noise: 0.3,
+      roll_variation: 0.3, seed: 3
+    }
+  }
+  crown {
+    nodes.Prune: {curves: twigs, shape: Ellipsoid, center: {0, 3.2, 0}, size: {2, 1.8, 2},
+      shorten: true, min_radius: 0.004}
+  }
+  bark { nodes.Tube: {curves: crown, sides: 8, caps: true, square_uv: true, flutes: 5, flute_depth: 0.35} }
+  Graph: {output: bark}
+}

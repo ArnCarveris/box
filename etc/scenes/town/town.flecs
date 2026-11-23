@@ -58,11 +58,13 @@ assets {
       Box: {columns * 8 + 2, 0.8, rows * 8 + 2}
       Rgb: {170, 190, 168}
     }
+
     asphalt {
       Position: {0, 0, 0}
       Box: {columns * 8 + 1.5, 0.08, rows * 8 + 1.5}
       Rgb: {101, 112, 115}
     }
+
     for row in 0..rows {
       for col in 0..columns {
         "lot_{row}_{col}" {
@@ -94,22 +96,27 @@ assets {
         }
       }
     }
+
     RoadMarkings markings(rows: rows, columns: columns) { Position: {} }
+
     for row in 0..rows {
       UtilityLine(poles: columns) {
         Position: {-halfColumns * 8 - 2.85, 0.22, (row - halfRows) * 8 + 2.8}
       }
     }
+
     for col in 0..columns {
       if col % 2 == 0 {
         Bench() { Position: {(col - halfColumns) * 8, 0.22, halfRows * 8 + 2.7} }
       }
     }
+
     for i in 0..3 {
       Bollard() {
         Position: {(middleColumn - halfColumns) * 8 - 1 + i, 0.46, halfRows * 8 + 3.08}
       }
     }
+
     for i in 0..2 {
       TrafficCone() {
         Position: {halfColumns * 8 + 3.15, 0.2, (middleRow - halfRows) * 8 - 0.5 + i * 0.8}

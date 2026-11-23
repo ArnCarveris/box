@@ -231,17 +231,17 @@ done:
     return;
 }
 
-void box_gpu_capture_write(
+/** Map the buffer of a capture whose copy was submitted, which writes its PNG file.
+ *
+ * @param gpu The backend
+ * @param capture The capture
+ * @param path File the PNG is written to
+ */
+static void box_gpu_capture_map(
     box_gpu_t *gpu,
-    box_gpu_target_t *t,
+    box_gpu_capture_t *capture,
     const char *path)
 {
-    box_gpu_capture_t *capture = t->capture;
-    if (!capture) {
-        goto done;
-    }
-
-    t->capture = NULL;
     capture->path = ecs_os_strdup(path);
     ecs_os_mutex_lock(gpu->lock);
     ecs_vec_append_t(NULL, &gpu->captures, box_gpu_capture_t*)[0] = capture;
@@ -252,8 +252,57 @@ void box_gpu_capture_write(
             .callback = box_gpu_capture_on_map,
             .userdata1 = capture
         });
-done:
-    return;
+}
+
+void box_gpu_capture_write(
+    box_gpu_t *gpu,
+    box_gpu_target_t *t,
+    const char *path)
+{
+    box_gpu_capture_t *capture = t->capture;
+    if (capture) {
+        t->capture = NULL;
+        box_gpu_capture_map(gpu, capture, path);
+    }
+}
+
+box_gpu_capture_t* box_gpu_capture_texture(
+    box_gpu_t *gpu,
+    WGPUCommandEncoder encoder,
+    WGPUTexture texture)
+{
+    uint32_t width = wgpuTextureGetWidth(texture);
+    uint32_t height = wgpuTextureGetHeight(texture);
+    uint32_t stride = (width * 4 + BOX_GPU_ROW_ALIGN - 1) & ~(uint32_t)(BOX_GPU_ROW_ALIGN - 1);
+    box_gpu_capture_t *result = ecs_os_calloc_t(box_gpu_capture_t);
+    result->gpu = gpu;
+    result->size = (uint64_t)stride * height;
+    result->width = width;
+    result->height = height;
+    result->stride = stride;
+    result->bgra = box_gpu_is_bgra(wgpuTextureGetFormat(texture));
+    result->buffer = wgpuDeviceCreateBuffer(gpu->device, &(WGPUBufferDescriptor){
+        .usage = WGPUBufferUsage_MapRead | WGPUBufferUsage_CopyDst,
+        .size = result->size
+    });
+
+    WGPUTexelCopyTextureInfo src = { .texture = texture, .aspect = WGPUTextureAspect_All };
+    WGPUTexelCopyBufferInfo dst = {
+        .layout = { .bytesPerRow = stride, .rowsPerImage = height },
+        .buffer = result->buffer
+    };
+    WGPUExtent3D extent = { width, height, 1 };
+    wgpuCommandEncoderCopyTextureToBuffer(encoder, &src, &dst, &extent);
+
+    return result;
+}
+
+void box_gpu_capture_texture_write(
+    box_gpu_t *gpu,
+    box_gpu_capture_t *capture,
+    const char *path)
+{
+    box_gpu_capture_map(gpu, capture, path);
 }
 
 void box_gpu_capture_fini(

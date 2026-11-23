@@ -9,12 +9,15 @@ isle_audio {
     Bus: {output: master, kind: ChannelReturn, effects: [hall]}
     Reverb: {decay: 2.8, damping: 0.45, predelay: 0.025, size: 0.65}
   }
+
   music {
     Bus: {output: master, volume: 0.5, sends: [{bus: hall, level: night ? 0.55 : 0.3}]}
   }
+
   sfx {
     Bus: {output: master, kind: ChannelSfx, volume: 0.65, sends: [{bus: hall, level: 0.3}]}
   }
+
   air {
     Bus: {output: master, kind: ChannelSfx, volume: 1}
   }
@@ -29,10 +32,12 @@ isle_audio {
         Envelope: {attack: 0.001, decay: 0.22, curve: 4}
       }
     }
+
     ring {
       Oscillator: {frequency: 880, level: 0.09}
       Envelope: {attack: 0.001, decay: 0.8, curve: 5}
     }
+
     pin {
       Oscillator: {wave: Noise, level: 0.025}
       Envelope: {attack: 0.0005, decay: 0.012}
@@ -55,6 +60,7 @@ isle_audio {
       Oscillator: {wave: Triangle, frequency: 440, level: 0.16}
       Unison: {voices: 3, detune: 14, width: 0.8}
     }
+
     glow { Oscillator: {frequency: 880, level: 0.03} }
   }
 
@@ -64,111 +70,245 @@ isle_audio {
 
   prefab tune_a {
     NoteClip: {length: 32, notes: [
-      {start: 0, duration: 1, pitch: 88, velocity: 0.9}, {start: 1, duration: 0.5, pitch: 91, velocity: 0.72}, {start: 1.5, duration: 0.5, pitch: 88, velocity: 0.58},
-      {start: 2, duration: 1, pitch: 84, velocity: 0.72}, {start: 3, duration: 1, pitch: 79, velocity: 0.72}, {start: 4, duration: 1, pitch: 81, velocity: 0.9},
-      {start: 5, duration: 0.5, pitch: 84, velocity: 0.72}, {start: 5.5, duration: 0.5, pitch: 88, velocity: 0.58}, {start: 6, duration: 1.5, pitch: 86, velocity: 0.72},
-      {start: 7.5, duration: 0.5, pitch: 84, velocity: 0.58}, {start: 8, duration: 1, pitch: 81, velocity: 0.9}, {start: 9, duration: 0.5, pitch: 84, velocity: 0.72},
-      {start: 9.5, duration: 0.5, pitch: 89, velocity: 0.58}, {start: 10, duration: 1, pitch: 88, velocity: 0.72}, {start: 11, duration: 1, pitch: 84, velocity: 0.72},
-      {start: 12, duration: 2, pitch: 86, velocity: 0.9}, {start: 14, duration: 0.5, pitch: 83, velocity: 0.72}, {start: 14.5, duration: 0.5, pitch: 86, velocity: 0.58},
-      {start: 15, duration: 1, pitch: 91, velocity: 0.72}, {start: 16, duration: 1, pitch: 88, velocity: 0.9}, {start: 17, duration: 0.5, pitch: 91, velocity: 0.72},
-      {start: 17.5, duration: 0.5, pitch: 88, velocity: 0.58}, {start: 18, duration: 1, pitch: 84, velocity: 0.72}, {start: 19, duration: 1, pitch: 79, velocity: 0.72},
-      {start: 20, duration: 1, pitch: 81, velocity: 0.9}, {start: 21, duration: 0.5, pitch: 84, velocity: 0.72}, {start: 21.5, duration: 0.5, pitch: 88, velocity: 0.58},
-      {start: 22, duration: 1, pitch: 93, velocity: 0.72}, {start: 23, duration: 1, pitch: 91, velocity: 0.72}, {start: 24, duration: 0.5, pitch: 89, velocity: 0.9},
-      {start: 24.5, duration: 0.5, pitch: 88, velocity: 0.58}, {start: 25, duration: 1, pitch: 86, velocity: 0.72}, {start: 26, duration: 0.5, pitch: 86, velocity: 0.72},
-      {start: 26.5, duration: 0.5, pitch: 84, velocity: 0.58}, {start: 27, duration: 1, pitch: 83, velocity: 0.72}, {start: 28, duration: 1, pitch: 84, velocity: 0.9},
-      {start: 29, duration: 1, pitch: 79, velocity: 0.72}, {start: 30, duration: 1, pitch: 76, velocity: 0.72}, {start: 31, duration: 1, pitch: 79, velocity: 0.72}
+      {start: 0, duration: 1, pitch: 88, velocity: 0.9},
+      {start: 1, duration: 0.5, pitch: 91, velocity: 0.72},
+      {start: 1.5, duration: 0.5, pitch: 88, velocity: 0.58},
+      {start: 2, duration: 1, pitch: 84, velocity: 0.72},
+      {start: 3, duration: 1, pitch: 79, velocity: 0.72},
+      {start: 4, duration: 1, pitch: 81, velocity: 0.9},
+      {start: 5, duration: 0.5, pitch: 84, velocity: 0.72},
+      {start: 5.5, duration: 0.5, pitch: 88, velocity: 0.58},
+      {start: 6, duration: 1.5, pitch: 86, velocity: 0.72},
+      {start: 7.5, duration: 0.5, pitch: 84, velocity: 0.58},
+      {start: 8, duration: 1, pitch: 81, velocity: 0.9},
+      {start: 9, duration: 0.5, pitch: 84, velocity: 0.72},
+      {start: 9.5, duration: 0.5, pitch: 89, velocity: 0.58},
+      {start: 10, duration: 1, pitch: 88, velocity: 0.72},
+      {start: 11, duration: 1, pitch: 84, velocity: 0.72},
+      {start: 12, duration: 2, pitch: 86, velocity: 0.9},
+      {start: 14, duration: 0.5, pitch: 83, velocity: 0.72},
+      {start: 14.5, duration: 0.5, pitch: 86, velocity: 0.58},
+      {start: 15, duration: 1, pitch: 91, velocity: 0.72},
+      {start: 16, duration: 1, pitch: 88, velocity: 0.9},
+      {start: 17, duration: 0.5, pitch: 91, velocity: 0.72},
+      {start: 17.5, duration: 0.5, pitch: 88, velocity: 0.58},
+      {start: 18, duration: 1, pitch: 84, velocity: 0.72},
+      {start: 19, duration: 1, pitch: 79, velocity: 0.72},
+      {start: 20, duration: 1, pitch: 81, velocity: 0.9},
+      {start: 21, duration: 0.5, pitch: 84, velocity: 0.72},
+      {start: 21.5, duration: 0.5, pitch: 88, velocity: 0.58},
+      {start: 22, duration: 1, pitch: 93, velocity: 0.72},
+      {start: 23, duration: 1, pitch: 91, velocity: 0.72},
+      {start: 24, duration: 0.5, pitch: 89, velocity: 0.9},
+      {start: 24.5, duration: 0.5, pitch: 88, velocity: 0.58},
+      {start: 25, duration: 1, pitch: 86, velocity: 0.72},
+      {start: 26, duration: 0.5, pitch: 86, velocity: 0.72},
+      {start: 26.5, duration: 0.5, pitch: 84, velocity: 0.58},
+      {start: 27, duration: 1, pitch: 83, velocity: 0.72},
+      {start: 28, duration: 1, pitch: 84, velocity: 0.9},
+      {start: 29, duration: 1, pitch: 79, velocity: 0.72},
+      {start: 30, duration: 1, pitch: 76, velocity: 0.72},
+      {start: 31, duration: 1, pitch: 79, velocity: 0.72}
     ]}
   }
 
   prefab tune_b {
     NoteClip: {length: 32, notes: [
-      {start: 0, duration: 1, pitch: 84, velocity: 0.9}, {start: 1, duration: 0.5, pitch: 81, velocity: 0.72}, {start: 1.5, duration: 0.5, pitch: 84, velocity: 0.58},
-      {start: 2, duration: 2, pitch: 89, velocity: 0.72}, {start: 4, duration: 1, pitch: 86, velocity: 0.9}, {start: 5, duration: 0.5, pitch: 83, velocity: 0.72},
-      {start: 5.5, duration: 0.5, pitch: 86, velocity: 0.58}, {start: 6, duration: 2, pitch: 91, velocity: 0.72}, {start: 8, duration: 1, pitch: 91, velocity: 0.9},
-      {start: 9, duration: 0.5, pitch: 88, velocity: 0.72}, {start: 9.5, duration: 0.5, pitch: 83, velocity: 0.58}, {start: 10, duration: 2, pitch: 88, velocity: 0.72},
-      {start: 12, duration: 1, pitch: 88, velocity: 0.9}, {start: 13, duration: 0.5, pitch: 84, velocity: 0.72}, {start: 13.5, duration: 0.5, pitch: 81, velocity: 0.58},
-      {start: 14, duration: 2, pitch: 84, velocity: 0.72}, {start: 16, duration: 0.5, pitch: 81, velocity: 0.9}, {start: 16.5, duration: 0.5, pitch: 84, velocity: 0.58},
-      {start: 17, duration: 1, pitch: 89, velocity: 0.72}, {start: 18, duration: 0.5, pitch: 88, velocity: 0.72}, {start: 18.5, duration: 0.5, pitch: 89, velocity: 0.58},
-      {start: 19, duration: 1, pitch: 93, velocity: 0.72}, {start: 20, duration: 1.5, pitch: 91, velocity: 0.9}, {start: 21.5, duration: 0.5, pitch: 89, velocity: 0.58},
-      {start: 22, duration: 1, pitch: 86, velocity: 0.72}, {start: 23, duration: 1, pitch: 83, velocity: 0.72}, {start: 24, duration: 1, pitch: 84, velocity: 0.9},
-      {start: 25, duration: 0.5, pitch: 88, velocity: 0.72}, {start: 25.5, duration: 0.5, pitch: 91, velocity: 0.58}, {start: 26, duration: 2, pitch: 96, velocity: 0.72},
-      {start: 28, duration: 0.5, pitch: 91, velocity: 0.9}, {start: 28.5, duration: 0.5, pitch: 88, velocity: 0.58}, {start: 29, duration: 1, pitch: 84, velocity: 0.72},
-      {start: 30, duration: 1, pitch: 79, velocity: 0.72}, {start: 31, duration: 1, pitch: 76, velocity: 0.72}
+      {start: 0, duration: 1, pitch: 84, velocity: 0.9},
+      {start: 1, duration: 0.5, pitch: 81, velocity: 0.72},
+      {start: 1.5, duration: 0.5, pitch: 84, velocity: 0.58},
+      {start: 2, duration: 2, pitch: 89, velocity: 0.72},
+      {start: 4, duration: 1, pitch: 86, velocity: 0.9},
+      {start: 5, duration: 0.5, pitch: 83, velocity: 0.72},
+      {start: 5.5, duration: 0.5, pitch: 86, velocity: 0.58},
+      {start: 6, duration: 2, pitch: 91, velocity: 0.72},
+      {start: 8, duration: 1, pitch: 91, velocity: 0.9},
+      {start: 9, duration: 0.5, pitch: 88, velocity: 0.72},
+      {start: 9.5, duration: 0.5, pitch: 83, velocity: 0.58},
+      {start: 10, duration: 2, pitch: 88, velocity: 0.72},
+      {start: 12, duration: 1, pitch: 88, velocity: 0.9},
+      {start: 13, duration: 0.5, pitch: 84, velocity: 0.72},
+      {start: 13.5, duration: 0.5, pitch: 81, velocity: 0.58},
+      {start: 14, duration: 2, pitch: 84, velocity: 0.72},
+      {start: 16, duration: 0.5, pitch: 81, velocity: 0.9},
+      {start: 16.5, duration: 0.5, pitch: 84, velocity: 0.58},
+      {start: 17, duration: 1, pitch: 89, velocity: 0.72},
+      {start: 18, duration: 0.5, pitch: 88, velocity: 0.72},
+      {start: 18.5, duration: 0.5, pitch: 89, velocity: 0.58},
+      {start: 19, duration: 1, pitch: 93, velocity: 0.72},
+      {start: 20, duration: 1.5, pitch: 91, velocity: 0.9},
+      {start: 21.5, duration: 0.5, pitch: 89, velocity: 0.58},
+      {start: 22, duration: 1, pitch: 86, velocity: 0.72},
+      {start: 23, duration: 1, pitch: 83, velocity: 0.72},
+      {start: 24, duration: 1, pitch: 84, velocity: 0.9},
+      {start: 25, duration: 0.5, pitch: 88, velocity: 0.72},
+      {start: 25.5, duration: 0.5, pitch: 91, velocity: 0.58},
+      {start: 26, duration: 2, pitch: 96, velocity: 0.72},
+      {start: 28, duration: 0.5, pitch: 91, velocity: 0.9},
+      {start: 28.5, duration: 0.5, pitch: 88, velocity: 0.58},
+      {start: 29, duration: 1, pitch: 84, velocity: 0.72},
+      {start: 30, duration: 1, pitch: 79, velocity: 0.72},
+      {start: 31, duration: 1, pitch: 76, velocity: 0.72}
     ]}
   }
 
   prefab hush_a {
     NoteClip: {length: 32, notes: [
-      {start: 0, duration: 2, pitch: 88, velocity: 0.8}, {start: 2, duration: 2, pitch: 84, velocity: 0.6}, {start: 4, duration: 2, pitch: 81, velocity: 0.8},
-      {start: 6, duration: 2, pitch: 86, velocity: 0.6}, {start: 8, duration: 2, pitch: 81, velocity: 0.8}, {start: 10, duration: 2, pitch: 88, velocity: 0.6},
-      {start: 12, duration: 2, pitch: 86, velocity: 0.8}, {start: 14, duration: 2, pitch: 83, velocity: 0.6}, {start: 16, duration: 2, pitch: 88, velocity: 0.8},
-      {start: 18, duration: 2, pitch: 84, velocity: 0.6}, {start: 20, duration: 2, pitch: 81, velocity: 0.8}, {start: 22, duration: 2, pitch: 93, velocity: 0.6},
-      {start: 24, duration: 2, pitch: 89, velocity: 0.8}, {start: 26, duration: 2, pitch: 86, velocity: 0.6}, {start: 28, duration: 2, pitch: 84, velocity: 0.8},
+      {start: 0, duration: 2, pitch: 88, velocity: 0.8},
+      {start: 2, duration: 2, pitch: 84, velocity: 0.6},
+      {start: 4, duration: 2, pitch: 81, velocity: 0.8},
+      {start: 6, duration: 2, pitch: 86, velocity: 0.6},
+      {start: 8, duration: 2, pitch: 81, velocity: 0.8},
+      {start: 10, duration: 2, pitch: 88, velocity: 0.6},
+      {start: 12, duration: 2, pitch: 86, velocity: 0.8},
+      {start: 14, duration: 2, pitch: 83, velocity: 0.6},
+      {start: 16, duration: 2, pitch: 88, velocity: 0.8},
+      {start: 18, duration: 2, pitch: 84, velocity: 0.6},
+      {start: 20, duration: 2, pitch: 81, velocity: 0.8},
+      {start: 22, duration: 2, pitch: 93, velocity: 0.6},
+      {start: 24, duration: 2, pitch: 89, velocity: 0.8},
+      {start: 26, duration: 2, pitch: 86, velocity: 0.6},
+      {start: 28, duration: 2, pitch: 84, velocity: 0.8},
       {start: 30, duration: 2, pitch: 76, velocity: 0.6}
     ]}
   }
 
   prefab hush_b {
     NoteClip: {length: 32, notes: [
-      {start: 0, duration: 2, pitch: 84, velocity: 0.8}, {start: 2, duration: 2, pitch: 89, velocity: 0.6}, {start: 4, duration: 2, pitch: 86, velocity: 0.8},
-      {start: 6, duration: 2, pitch: 91, velocity: 0.6}, {start: 8, duration: 2, pitch: 91, velocity: 0.8}, {start: 10, duration: 2, pitch: 88, velocity: 0.6},
-      {start: 12, duration: 2, pitch: 88, velocity: 0.8}, {start: 14, duration: 2, pitch: 84, velocity: 0.6}, {start: 16, duration: 2, pitch: 81, velocity: 0.8},
-      {start: 18, duration: 2, pitch: 88, velocity: 0.6}, {start: 20, duration: 2, pitch: 91, velocity: 0.8}, {start: 22, duration: 2, pitch: 86, velocity: 0.6},
-      {start: 24, duration: 2, pitch: 84, velocity: 0.8}, {start: 26, duration: 2, pitch: 96, velocity: 0.6}, {start: 28, duration: 2, pitch: 91, velocity: 0.8},
+      {start: 0, duration: 2, pitch: 84, velocity: 0.8},
+      {start: 2, duration: 2, pitch: 89, velocity: 0.6},
+      {start: 4, duration: 2, pitch: 86, velocity: 0.8},
+      {start: 6, duration: 2, pitch: 91, velocity: 0.6},
+      {start: 8, duration: 2, pitch: 91, velocity: 0.8},
+      {start: 10, duration: 2, pitch: 88, velocity: 0.6},
+      {start: 12, duration: 2, pitch: 88, velocity: 0.8},
+      {start: 14, duration: 2, pitch: 84, velocity: 0.6},
+      {start: 16, duration: 2, pitch: 81, velocity: 0.8},
+      {start: 18, duration: 2, pitch: 88, velocity: 0.6},
+      {start: 20, duration: 2, pitch: 91, velocity: 0.8},
+      {start: 22, duration: 2, pitch: 86, velocity: 0.6},
+      {start: 24, duration: 2, pitch: 84, velocity: 0.8},
+      {start: 26, duration: 2, pitch: 96, velocity: 0.6},
+      {start: 28, duration: 2, pitch: 91, velocity: 0.8},
       {start: 30, duration: 2, pitch: 79, velocity: 0.6}
     ]}
   }
 
   prefab low_a {
     NoteClip: {length: 32, notes: [
-      {start: 0, duration: 2, pitch: 48, velocity: 0.8}, {start: 2, duration: 1, pitch: 55, velocity: 0.55}, {start: 3, duration: 1, pitch: 60, velocity: 0.5},
-      {start: 4, duration: 2, pitch: 45, velocity: 0.8}, {start: 6, duration: 1, pitch: 52, velocity: 0.55}, {start: 7, duration: 1, pitch: 57, velocity: 0.5},
-      {start: 8, duration: 2, pitch: 41, velocity: 0.8}, {start: 10, duration: 1, pitch: 48, velocity: 0.55}, {start: 11, duration: 1, pitch: 53, velocity: 0.5},
-      {start: 12, duration: 2, pitch: 43, velocity: 0.8}, {start: 14, duration: 1, pitch: 50, velocity: 0.55}, {start: 15, duration: 1, pitch: 55, velocity: 0.5},
-      {start: 16, duration: 2, pitch: 48, velocity: 0.8}, {start: 18, duration: 1, pitch: 55, velocity: 0.55}, {start: 19, duration: 1, pitch: 60, velocity: 0.5},
-      {start: 20, duration: 2, pitch: 45, velocity: 0.8}, {start: 22, duration: 1, pitch: 52, velocity: 0.55}, {start: 23, duration: 1, pitch: 57, velocity: 0.5},
-      {start: 24, duration: 2, pitch: 41, velocity: 0.8}, {start: 26, duration: 2, pitch: 43, velocity: 0.75}, {start: 28, duration: 2, pitch: 48, velocity: 0.8},
-      {start: 30, duration: 1, pitch: 55, velocity: 0.55}, {start: 31, duration: 1, pitch: 60, velocity: 0.5}
+      {start: 0, duration: 2, pitch: 48, velocity: 0.8},
+      {start: 2, duration: 1, pitch: 55, velocity: 0.55},
+      {start: 3, duration: 1, pitch: 60, velocity: 0.5},
+      {start: 4, duration: 2, pitch: 45, velocity: 0.8},
+      {start: 6, duration: 1, pitch: 52, velocity: 0.55},
+      {start: 7, duration: 1, pitch: 57, velocity: 0.5},
+      {start: 8, duration: 2, pitch: 41, velocity: 0.8},
+      {start: 10, duration: 1, pitch: 48, velocity: 0.55},
+      {start: 11, duration: 1, pitch: 53, velocity: 0.5},
+      {start: 12, duration: 2, pitch: 43, velocity: 0.8},
+      {start: 14, duration: 1, pitch: 50, velocity: 0.55},
+      {start: 15, duration: 1, pitch: 55, velocity: 0.5},
+      {start: 16, duration: 2, pitch: 48, velocity: 0.8},
+      {start: 18, duration: 1, pitch: 55, velocity: 0.55},
+      {start: 19, duration: 1, pitch: 60, velocity: 0.5},
+      {start: 20, duration: 2, pitch: 45, velocity: 0.8},
+      {start: 22, duration: 1, pitch: 52, velocity: 0.55},
+      {start: 23, duration: 1, pitch: 57, velocity: 0.5},
+      {start: 24, duration: 2, pitch: 41, velocity: 0.8},
+      {start: 26, duration: 2, pitch: 43, velocity: 0.75},
+      {start: 28, duration: 2, pitch: 48, velocity: 0.8},
+      {start: 30, duration: 1, pitch: 55, velocity: 0.55},
+      {start: 31, duration: 1, pitch: 60, velocity: 0.5}
     ]}
   }
 
   prefab low_b {
     NoteClip: {length: 32, notes: [
-      {start: 0, duration: 2, pitch: 41, velocity: 0.8}, {start: 2, duration: 1, pitch: 48, velocity: 0.55}, {start: 3, duration: 1, pitch: 53, velocity: 0.5},
-      {start: 4, duration: 2, pitch: 43, velocity: 0.8}, {start: 6, duration: 1, pitch: 50, velocity: 0.55}, {start: 7, duration: 1, pitch: 55, velocity: 0.5},
-      {start: 8, duration: 2, pitch: 40, velocity: 0.8}, {start: 10, duration: 1, pitch: 47, velocity: 0.55}, {start: 11, duration: 1, pitch: 52, velocity: 0.5},
-      {start: 12, duration: 2, pitch: 45, velocity: 0.8}, {start: 14, duration: 1, pitch: 52, velocity: 0.55}, {start: 15, duration: 1, pitch: 57, velocity: 0.5},
-      {start: 16, duration: 2, pitch: 41, velocity: 0.8}, {start: 18, duration: 1, pitch: 48, velocity: 0.55}, {start: 19, duration: 1, pitch: 53, velocity: 0.5},
-      {start: 20, duration: 2, pitch: 43, velocity: 0.8}, {start: 22, duration: 1, pitch: 50, velocity: 0.55}, {start: 23, duration: 1, pitch: 55, velocity: 0.5},
-      {start: 24, duration: 2, pitch: 48, velocity: 0.8}, {start: 26, duration: 1, pitch: 55, velocity: 0.55}, {start: 27, duration: 1, pitch: 60, velocity: 0.5},
-      {start: 28, duration: 2, pitch: 48, velocity: 0.8}, {start: 30, duration: 1, pitch: 55, velocity: 0.55}, {start: 31, duration: 1, pitch: 60, velocity: 0.5}
+      {start: 0, duration: 2, pitch: 41, velocity: 0.8},
+      {start: 2, duration: 1, pitch: 48, velocity: 0.55},
+      {start: 3, duration: 1, pitch: 53, velocity: 0.5},
+      {start: 4, duration: 2, pitch: 43, velocity: 0.8},
+      {start: 6, duration: 1, pitch: 50, velocity: 0.55},
+      {start: 7, duration: 1, pitch: 55, velocity: 0.5},
+      {start: 8, duration: 2, pitch: 40, velocity: 0.8},
+      {start: 10, duration: 1, pitch: 47, velocity: 0.55},
+      {start: 11, duration: 1, pitch: 52, velocity: 0.5},
+      {start: 12, duration: 2, pitch: 45, velocity: 0.8},
+      {start: 14, duration: 1, pitch: 52, velocity: 0.55},
+      {start: 15, duration: 1, pitch: 57, velocity: 0.5},
+      {start: 16, duration: 2, pitch: 41, velocity: 0.8},
+      {start: 18, duration: 1, pitch: 48, velocity: 0.55},
+      {start: 19, duration: 1, pitch: 53, velocity: 0.5},
+      {start: 20, duration: 2, pitch: 43, velocity: 0.8},
+      {start: 22, duration: 1, pitch: 50, velocity: 0.55},
+      {start: 23, duration: 1, pitch: 55, velocity: 0.5},
+      {start: 24, duration: 2, pitch: 48, velocity: 0.8},
+      {start: 26, duration: 1, pitch: 55, velocity: 0.55},
+      {start: 27, duration: 1, pitch: 60, velocity: 0.5},
+      {start: 28, duration: 2, pitch: 48, velocity: 0.8},
+      {start: 30, duration: 1, pitch: 55, velocity: 0.55},
+      {start: 31, duration: 1, pitch: 60, velocity: 0.5}
     ]}
   }
 
   prefab pad_a {
     NoteClip: {length: 32, notes: [
-      {start: 0, duration: 4, pitch: 60, velocity: 0.7}, {start: 0, duration: 4, pitch: 64, velocity: 0.7}, {start: 0, duration: 4, pitch: 67, velocity: 0.7},
-      {start: 4, duration: 4, pitch: 57, velocity: 0.7}, {start: 4, duration: 4, pitch: 60, velocity: 0.7}, {start: 4, duration: 4, pitch: 64, velocity: 0.7},
-      {start: 8, duration: 4, pitch: 57, velocity: 0.7}, {start: 8, duration: 4, pitch: 60, velocity: 0.7}, {start: 8, duration: 4, pitch: 65, velocity: 0.7},
-      {start: 12, duration: 4, pitch: 59, velocity: 0.7}, {start: 12, duration: 4, pitch: 62, velocity: 0.7}, {start: 12, duration: 4, pitch: 67, velocity: 0.7},
-      {start: 16, duration: 4, pitch: 60, velocity: 0.7}, {start: 16, duration: 4, pitch: 64, velocity: 0.7}, {start: 16, duration: 4, pitch: 67, velocity: 0.7},
-      {start: 20, duration: 4, pitch: 57, velocity: 0.7}, {start: 20, duration: 4, pitch: 60, velocity: 0.7}, {start: 20, duration: 4, pitch: 64, velocity: 0.7},
-      {start: 24, duration: 2, pitch: 57, velocity: 0.7}, {start: 24, duration: 2, pitch: 60, velocity: 0.7}, {start: 24, duration: 2, pitch: 65, velocity: 0.7},
-      {start: 26, duration: 2, pitch: 59, velocity: 0.7}, {start: 26, duration: 2, pitch: 62, velocity: 0.7}, {start: 26, duration: 2, pitch: 67, velocity: 0.7},
-      {start: 28, duration: 4, pitch: 60, velocity: 0.7}, {start: 28, duration: 4, pitch: 64, velocity: 0.7}, {start: 28, duration: 4, pitch: 67, velocity: 0.7}
+      {start: 0, duration: 4, pitch: 60, velocity: 0.7},
+      {start: 0, duration: 4, pitch: 64, velocity: 0.7},
+      {start: 0, duration: 4, pitch: 67, velocity: 0.7},
+      {start: 4, duration: 4, pitch: 57, velocity: 0.7},
+      {start: 4, duration: 4, pitch: 60, velocity: 0.7},
+      {start: 4, duration: 4, pitch: 64, velocity: 0.7},
+      {start: 8, duration: 4, pitch: 57, velocity: 0.7},
+      {start: 8, duration: 4, pitch: 60, velocity: 0.7},
+      {start: 8, duration: 4, pitch: 65, velocity: 0.7},
+      {start: 12, duration: 4, pitch: 59, velocity: 0.7},
+      {start: 12, duration: 4, pitch: 62, velocity: 0.7},
+      {start: 12, duration: 4, pitch: 67, velocity: 0.7},
+      {start: 16, duration: 4, pitch: 60, velocity: 0.7},
+      {start: 16, duration: 4, pitch: 64, velocity: 0.7},
+      {start: 16, duration: 4, pitch: 67, velocity: 0.7},
+      {start: 20, duration: 4, pitch: 57, velocity: 0.7},
+      {start: 20, duration: 4, pitch: 60, velocity: 0.7},
+      {start: 20, duration: 4, pitch: 64, velocity: 0.7},
+      {start: 24, duration: 2, pitch: 57, velocity: 0.7},
+      {start: 24, duration: 2, pitch: 60, velocity: 0.7},
+      {start: 24, duration: 2, pitch: 65, velocity: 0.7},
+      {start: 26, duration: 2, pitch: 59, velocity: 0.7},
+      {start: 26, duration: 2, pitch: 62, velocity: 0.7},
+      {start: 26, duration: 2, pitch: 67, velocity: 0.7},
+      {start: 28, duration: 4, pitch: 60, velocity: 0.7},
+      {start: 28, duration: 4, pitch: 64, velocity: 0.7},
+      {start: 28, duration: 4, pitch: 67, velocity: 0.7}
     ]}
   }
 
   prefab pad_b {
     NoteClip: {length: 32, notes: [
-      {start: 0, duration: 4, pitch: 57, velocity: 0.7}, {start: 0, duration: 4, pitch: 60, velocity: 0.7}, {start: 0, duration: 4, pitch: 65, velocity: 0.7},
-      {start: 4, duration: 4, pitch: 59, velocity: 0.7}, {start: 4, duration: 4, pitch: 62, velocity: 0.7}, {start: 4, duration: 4, pitch: 67, velocity: 0.7},
-      {start: 8, duration: 4, pitch: 59, velocity: 0.7}, {start: 8, duration: 4, pitch: 64, velocity: 0.7}, {start: 8, duration: 4, pitch: 67, velocity: 0.7},
-      {start: 12, duration: 4, pitch: 57, velocity: 0.7}, {start: 12, duration: 4, pitch: 60, velocity: 0.7}, {start: 12, duration: 4, pitch: 64, velocity: 0.7},
-      {start: 16, duration: 4, pitch: 57, velocity: 0.7}, {start: 16, duration: 4, pitch: 60, velocity: 0.7}, {start: 16, duration: 4, pitch: 65, velocity: 0.7},
-      {start: 20, duration: 4, pitch: 59, velocity: 0.7}, {start: 20, duration: 4, pitch: 62, velocity: 0.7}, {start: 20, duration: 4, pitch: 67, velocity: 0.7},
-      {start: 24, duration: 4, pitch: 60, velocity: 0.7}, {start: 24, duration: 4, pitch: 64, velocity: 0.7}, {start: 24, duration: 4, pitch: 67, velocity: 0.7},
-      {start: 28, duration: 4, pitch: 60, velocity: 0.7}, {start: 28, duration: 4, pitch: 64, velocity: 0.7}, {start: 28, duration: 4, pitch: 67, velocity: 0.7}
+      {start: 0, duration: 4, pitch: 57, velocity: 0.7},
+      {start: 0, duration: 4, pitch: 60, velocity: 0.7},
+      {start: 0, duration: 4, pitch: 65, velocity: 0.7},
+      {start: 4, duration: 4, pitch: 59, velocity: 0.7},
+      {start: 4, duration: 4, pitch: 62, velocity: 0.7},
+      {start: 4, duration: 4, pitch: 67, velocity: 0.7},
+      {start: 8, duration: 4, pitch: 59, velocity: 0.7},
+      {start: 8, duration: 4, pitch: 64, velocity: 0.7},
+      {start: 8, duration: 4, pitch: 67, velocity: 0.7},
+      {start: 12, duration: 4, pitch: 57, velocity: 0.7},
+      {start: 12, duration: 4, pitch: 60, velocity: 0.7},
+      {start: 12, duration: 4, pitch: 64, velocity: 0.7},
+      {start: 16, duration: 4, pitch: 57, velocity: 0.7},
+      {start: 16, duration: 4, pitch: 60, velocity: 0.7},
+      {start: 16, duration: 4, pitch: 65, velocity: 0.7},
+      {start: 20, duration: 4, pitch: 59, velocity: 0.7},
+      {start: 20, duration: 4, pitch: 62, velocity: 0.7},
+      {start: 20, duration: 4, pitch: 67, velocity: 0.7},
+      {start: 24, duration: 4, pitch: 60, velocity: 0.7},
+      {start: 24, duration: 4, pitch: 64, velocity: 0.7},
+      {start: 24, duration: 4, pitch: 67, velocity: 0.7},
+      {start: 28, duration: 4, pitch: 60, velocity: 0.7},
+      {start: 28, duration: 4, pitch: 64, velocity: 0.7},
+      {start: 28, duration: 4, pitch: 67, velocity: 0.7}
     ]}
   }
 
@@ -178,18 +318,21 @@ isle_audio {
     a { ClipPlacement: {clip: tune_a, start: 0} }
     b { ClipPlacement: {clip: tune_b, start: 32} }
   }
+
   hush {
     Track: {instrument: music_box, humanize: {timing: 8, velocity: 0.1}}
     Bus: {output: music, volume: night ? 0.9 : 0}
     a { ClipPlacement: {clip: hush_a, start: 0, transpose: -12} }
     b { ClipPlacement: {clip: hush_b, start: 32, transpose: -12} }
   }
+
   low {
     Track: {instrument: low_box}
     Bus: {output: music, volume: night ? 0.55 : 0.85}
     a { ClipPlacement: {clip: low_a, start: 0} }
     b { ClipPlacement: {clip: low_b, start: 32} }
   }
+
   pad {
     Track: {instrument: pad_voice}
     Bus: {output: music, volume: night ? 1 : 0.8}
@@ -207,6 +350,7 @@ isle_audio {
       Oscillator: {wave: Triangle, frequency: 554, level: 0.3}
       Unison: {voices: 2, detune: 16}
     }
+
     high { Oscillator: {wave: Triangle, frequency: 667, level: 0.26} }
     reed { Oscillator: {wave: Square, frequency: 835, level: 0.045} }
     breath {
@@ -214,6 +358,7 @@ isle_audio {
       Envelope: {attack: 0.02, decay: 0.25, sustain: 0.45, release: 0.3}
     }
   }
+
   whistle { Instrument: {sound: whistle_tone, velocity_curve: 1} }
 
   prefab bell_strike {
@@ -224,15 +369,18 @@ isle_audio {
       Oscillator: {frequency: 196, level: 0.2}
       Envelope: {attack: 0.01, decay: 6, curve: 3}
     }
+
     prime { Oscillator: {frequency: 392, level: 0.28} }
     tierce {
       Oscillator: {frequency: 466.6, level: 0.15}
       Envelope: {attack: 0.002, decay: 3.2, curve: 4}
     }
+
     quint {
       Oscillator: {frequency: 588.5, level: 0.09}
       Envelope: {attack: 0.002, decay: 2.3, curve: 4}
     }
+
     nominal {
       Oscillator: {frequency: 785, level: 0.2}
       Envelope: {attack: 0.001, decay: 2.6, curve: 4}
@@ -241,10 +389,12 @@ isle_audio {
         Envelope: {attack: 0.001, decay: 0.2, curve: 4}
       }
     }
+
     upper {
       Oscillator: {frequency: 1181, level: 0.07}
       Envelope: {attack: 0.001, decay: 1.3, curve: 4}
     }
+
     clap {
       Oscillator: {wave: Noise, level: 0.1}
       Envelope: {attack: 0.0005, decay: 0.03}
@@ -321,6 +471,7 @@ async {
     await Fireworks
     box.audio.play(isle_audio.rocket_rise, 0.7)
     await delay(0.85)
+
     for i in 0..5 {
       box.audio.play(isle_audio.rocket_boom, 0.9 - i * 0.07)
       await delay(0.09)

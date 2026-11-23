@@ -4,6 +4,7 @@
  */
 
 #include "texture.h"
+#include <math.h>
 
 /** WGSL of the TexNoise node: fbm, ridged or billow gradient noise per channel.
  *
@@ -11,7 +12,8 @@
  * with w 0 needs only the eight corners at w 0, so without evolve the noise is three dimensional.
  *
  * At w 0 that noise is the evolved noise, so it continues into it. On the plane x and y wrap
- * with the whole number of cells across of each octave. */
+ * with the whole number of cells across of each octave. On the world each octave starts at the
+ * fraction of the cell of the window origin and hashes its corners shifted by that cell. */
 static const char *box_texture_noise_wgsl =
     "// Gradient of a corner of the noise lattice dotted with the offset d from it\n"
     "fn box_tex_noise_grad(h: u32, d: vec4f) -> f32 {\n"
@@ -41,13 +43,15 @@ static const char *box_texture_noise_wgsl =
     "        box_texgraph_hash(bitcast<u32>(c.z) ^ box_texgraph_hash(bitcast<u32>(c.w))))));\n"
     "}\n"
     "\n"
-    "// Noise of the eight corners of the cell i at the layer iw, d.w the offset from the layer\n"
+    "// Noise of the eight corners of the cell i at the layer iw, d.w the offset from the\n"
+    "// layer; the corners are hashed shifted by shift in x and y, the cell of the origin of a\n"
+    "// world window\n"
     "fn box_tex_noise_layer(seed: u32, i: vec3i, f: vec3f, u: vec3f, iw: i32, dw: f32,\n"
-    "    period: vec2i) -> f32 {\n"
+    "    period: vec2i, shift: vec2i) -> f32 {\n"
     "    var v: array<f32, 8>;\n"
     "    for (var c = 0; c < 8; c ++) {\n"
     "        let o = vec3i(c & 1, (c >> 1) & 1, (c >> 2) & 1);\n"
-    "        let h = box_tex_noise_hash(seed, vec4i(i + o, iw), period);\n"
+    "        let h = box_tex_noise_hash(seed, vec4i(i + o + vec3i(shift, 0), iw), period);\n"
     "        v[c] = box_tex_noise_grad(h, vec4f(f - vec3f(o), dw));\n"
     "    }\n"
     "    let y0 = mix(mix(v[0], v[1], u.x), mix(v[2], v[3], u.x), u.y);\n"
@@ -56,25 +60,25 @@ static const char *box_texture_noise_wgsl =
     "}\n"
     "\n"
     "// Gradient noise at a point, about -1..1, three dimensional where w is 0\n"
-    "fn box_tex_noise_gradient(seed: u32, p: vec4f, period: vec2i) -> f32 {\n"
+    "fn box_tex_noise_gradient(seed: u32, p: vec4f, period: vec2i, shift: vec2i) -> f32 {\n"
     "    let b = floor(p.xyz);\n"
     "    let i = vec3i(b);\n"
     "    let f = p.xyz - b;\n"
     "    let u = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);\n"
     "    if (p.w == 0.0) {\n"
-    "        return box_tex_noise_layer(seed, i, f, u, 0, 0.0, period);\n"
+    "        return box_tex_noise_layer(seed, i, f, u, 0, 0.0, period, shift);\n"
     "    }\n"
     "    let bw = floor(p.w);\n"
     "    let iw = i32(bw);\n"
     "    let fw = p.w - bw;\n"
     "    let uw = fw * fw * fw * (fw * (fw * 6.0 - 15.0) + 10.0);\n"
-    "    return mix(box_tex_noise_layer(seed, i, f, u, iw, fw, period),\n"
-    "        box_tex_noise_layer(seed, i, f, u, iw + 1, fw - 1.0, period), uw);\n"
+    "    return mix(box_tex_noise_layer(seed, i, f, u, iw, fw, period, shift),\n"
+    "        box_tex_noise_layer(seed, i, f, u, iw + 1, fw - 1.0, period, shift), uw);\n"
     "}\n"
     "\n"
     "// Fractal of the octaves of one channel, 0..1\n"
-    "fn box_tex_noise_fractal(p: array<vec4u, 4>, seed: u32, coords: vec4f, evolve: f32)\n"
-    "    -> f32 {\n"
+    "fn box_tex_noise_fractal(p: array<vec4u, 4>, seed: u32, coords: vec4f, evolve: f32,\n"
+    "    window: u32) -> f32 {\n"
     "    let frequency = bitcast<f32>(p[0].x);\n"
     "    let octaves = clamp(bitcast<i32>(p[0].y), 1, 16);\n"
     "    let lacunarity = bitcast<f32>(p[0].z);\n"
@@ -82,6 +86,7 @@ static const char *box_texture_noise_wgsl =
     "    let fractal = bitcast<i32>(p[1].y);\n"
     "    let offset = bitcast<f32>(p[1].z);\n"
     "    let plane = box_texgraph_stage.domain == 0u;\n"
+    "    let world = box_texgraph_stage.domain == 2u;\n"
     "    let size = vec2f(box_texgraph_stage.size);\n"
     "    var f = frequency;\n"
     "    var time = evolve;\n"
@@ -95,15 +100,20 @@ static const char *box_texture_noise_wgsl =
     "        }\n"
     "        var q = coords.xyz * f;\n"
     "        var period = vec2i(0);\n"
+    "        var shift = vec2i(0);\n"
     "        if (plane) {\n"
     "            let px = select(clamp(i32(floor(f + 0.5)), 1, 4096), 0, f <= 0.0);\n"
     "            let py = select(clamp(i32(floor(f32(px) * size.y / size.x + 0.5)), 1, 4096), 0,\n"
     "                px == 0);\n"
     "            period = vec2i(px, py);\n"
     "            q = coords.xyz * vec3f(f32(px), f32(py), f32(px));\n"
+    "        } else if (world) {\n"
+    "            let w = box_texgraph_params[window + u32(o)];\n"
+    "            shift = bitcast<vec2i>(w.xy);\n"
+    "            q = vec3f(q.xy + bitcast<vec2f>(w.zw), q.z);\n"
     "        }\n"
     "        let s = box_texgraph_hash(seed ^ box_texgraph_hash(u32(o) + 0x68e31da4u));\n"
-    "        let n = clamp(box_tex_noise_gradient(s, vec4f(q, time), period), -1.0, 1.0);\n"
+    "        let n = clamp(box_tex_noise_gradient(s, vec4f(q, time), period, shift), -1.0, 1.0);\n"
     "        switch fractal {\n"
     "            case 1: {\n"
     "                var signal = offset - abs(n);\n"
@@ -127,10 +137,11 @@ static const char *box_texture_noise_wgsl =
     "    return clamp(select(v, 0.5 + 0.5 * v, fractal != 1 && fractal != 2), 0.0, 1.0);\n"
     "}\n"
     "\n"
-    "fn box_tex_noise(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f) -> vec4f {\n"
+    "fn box_tex_noise(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f, window: u32)\n"
+    "    -> vec4f {\n"
     "    let channels = bitcast<i32>(p[1].w);\n"
     "    if (channels <= 1) {\n"
-    "        let n = box_tex_noise_fractal(p, box_texgraph_hash(p[1].x), i[0], i[1].x);\n"
+    "        let n = box_tex_noise_fractal(p, box_texgraph_hash(p[1].x), i[0], i[1].x, window);\n"
     "        return vec4f(n, n, n, 1.0);\n"
     "    }\n"
     "    var r = vec4f(0.0, 0.0, 0.0, 1.0);\n"
@@ -139,7 +150,7 @@ static const char *box_texture_noise_wgsl =
     "            break;\n"
     "        }\n"
     "        r[c] = box_tex_noise_fractal(p, box_texgraph_hash(p[1].x + u32(c) * 0x9e3779b9u),\n"
-    "            i[0], i[1].x);\n"
+    "            i[0], i[1].x, window);\n"
     "    }\n"
     "    return r;\n"
     "}\n";
@@ -158,6 +169,46 @@ static TextureValueType box_texture_noise_type(
     (void)inputs;
 
     return noise->channels > 1 ? TexVector : TexScalar;
+}
+
+/** Write the window elements of a TexNoise node: per octave the lattice cell of the origin of
+ * the window as two i32 and its fraction as two f32, (x, z) at the frequency the shader steps
+ * through in single precision, multiplied in double precision.
+ *
+ * @param node The TexNoise
+ * @param origin World x and z of the origin of the window
+ * @param out Receives BOX_TEXTURE_NODE_WINDOW_MAX vec4
+ */
+static void box_texture_noise_window(
+    const void *node,
+    const double origin[2],
+    uint32_t *out)
+{
+    const TexNoise *noise = node;
+    int32_t octaves = noise->octaves < 1 ? 1 : noise->octaves > BOX_TEXTURE_NODE_WINDOW_MAX
+        ? BOX_TEXTURE_NODE_WINDOW_MAX : noise->octaves, o, k;
+    float f = noise->frequency;
+    for (o = 0; o < octaves; o ++) {
+        for (k = 0; k < 2; k ++) {
+            double at = origin[k] * (double)f;
+            double cell = floor(at);
+            float frac = (float)(at - cell);
+            if (!(frac < 1.0f)) {
+                frac = 0;
+                cell += 1;
+            }
+
+            if (!isfinite(cell) || f <= 0) {
+                cell = 0;
+                frac = 0;
+            }
+
+            out[o * 4 + k] = (uint32_t)(int64_t)fmod(cell, 4294967296.0);
+            ecs_os_memcpy(&out[o * 4 + 2 + k], &frac, ECS_SIZEOF(float));
+        }
+
+        f *= noise->lacunarity;
+    }
 }
 
 void box_texture_noise_register(
@@ -182,6 +233,8 @@ void box_texture_noise_register(
             { "channels", offsetof(TexNoise, channels), 4, BOX_TEXTURE_PARAM_I32 }
         },
         .function = "box_tex_noise",
-        .source = box_texture_noise_wgsl
+        .source = box_texture_noise_wgsl,
+        .window = box_texture_noise_window,
+        .window_size = BOX_TEXTURE_NODE_WINDOW_MAX
     });
 }

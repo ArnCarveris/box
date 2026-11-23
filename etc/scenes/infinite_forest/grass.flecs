@@ -1,0 +1,50 @@
+using flecs.script
+using flecs.script.math
+using box.grass
+using state
+
+state {
+  export const GRASS_DENSITY: f32 = 36
+  export const GRASS_LOD_0: f32 = 16
+  export const GRASS_LOD_1: f32 = 48
+  export const GRASS_LOD_2: f32 = 160
+  export const GRASS_SHADOW: f32 = 20
+  export const GRASS_SNOW_MAX: f32 = 0.9
+
+  fn forest_grass_tall(season: f64, snow: f64) -> f64 {
+    forest_seasonal(season, 0.75, 1, 0.9, 0.6) * (1 - 0.75 * forest_snow_amount(snow))
+  }
+}
+
+infinite_forest {
+  meadow {
+    if forest_snow_amount(snow) < GRASS_SNOW_MAX {
+      Grass: {
+        terrain: infinite_forest.land,
+        mask: 1,
+        density: GRASS_DENSITY,
+        min_height: 0.3 * forest_grass_tall(season, snow),
+        max_height: 0.75 * forest_grass_tall(season, snow),
+        fold_height: 0.3,
+        min_width: 0.03,
+        max_width: 0.06,
+        base_color: {
+          forest_seasonal(season, 32, 26, 56, 60),
+          forest_seasonal(season, 60, 50, 56, 52),
+          forest_seasonal(season, 16, 13, 22, 30)
+        },
+        tip_color: {
+          forest_seasonal(season, 102, 88, 140, 124),
+          forest_seasonal(season, 134, 112, 128, 110),
+          forest_seasonal(season, 44, 36, 68, 78)
+        },
+        clump_size: 1.4,
+        clump_follow: 0.7,
+        variation: 0.7,
+        lod: [GRASS_LOD_0, GRASS_LOD_1, GRASS_LOD_2],
+        shadow_distance: GRASS_SHADOW,
+        seed: 4
+      }
+    }
+  }
+}

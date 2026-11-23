@@ -1,0 +1,95 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.particle
+
+$ {
+  Scene: {shader_features: {Extended: {blend_modes: true}}}
+}
+
+// Particles and translucent shapes fogged at their own depth: on the left a gray smoke column
+// and a red translucent panel stand inside a gray fog bank, on the right the same smoke and
+// panel stand in clear air. The smoke and the panel in the bank fade into the fog with the depth
+// of each particle and pixel; those on the right draw at full strength. A post behind the bank shows the fog on opaque
+// shapes for comparison.
+// frames: 90
+
+camera {
+  Position: {0, 2.2, 9}
+  Rotation: {-0.12, 0, 0}
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {70, 84, 104, 255}}, shadows: {enabled: true}}
+}
+
+$ {
+  AmbientLight: {sky: {120, 130, 150}, ground: {50, 46, 40}}
+}
+
+sun {
+  Rotation: {0.8, 0.6, 0}
+  DirectionalLight: {intensity: 1.5 * flecs.script.math.PI}
+  Rgb: {255, 242, 222}
+}
+
+ground {
+  Position: {0, -0.1, -1}
+  Box: {16, 0.2, 12}
+  Rgb: {96, 104, 80}
+}
+
+post_fogged {
+  Position: {-3, 1.5, -3.5}
+  Box: {0.4, 3, 0.4}
+  Rgb: {150, 110, 80}
+}
+
+post_clear {
+  Position: {3, 1.5, -3.5}
+  Box: {0.4, 3, 0.4}
+  Rgb: {150, 110, 80}
+}
+
+fog_bank {
+  Position: {-3, 1.25, -1}
+  FogVolume: {extent: {2.6, 1.25, 2.6}, density: 0.3, color: {150, 156, 166}, edge_fade: 0.4}
+}
+
+panel_fogged {
+  Position: {-2.4, 1, -1.2}
+  Box: {1.6, 1.6, 0.05}
+  Rgb: {220, 40, 30}
+  Opacity: {0.55}
+}
+
+panel_clear {
+  Position: {3.6, 1, -1.2}
+  Box: {1.6, 1.6, 0.05}
+  Rgb: {220, 40, 30}
+  Opacity: {0.55}
+}
+
+smoke_fogged {
+  Position: {-3.8, 0.2, -0.6}
+  Emitter: {
+    max: 600, rate: 120, shape: EmitterDisc, radius: 0.3, spread: 14,
+    speed: {0.9, 1.3}, lifetime: {4, 5}, size: {0.35, 0.8}, opacity: {0.35, 0.55},
+    color: {90, 90, 96}, seed: 5
+  }
+  Appearance: {blend: Alpha, softness: 0.3, lit: 0.6}
+}
+
+smoke_clear {
+  Position: {2.2, 0.2, -0.6}
+  Emitter: {
+    max: 600, rate: 120, shape: EmitterDisc, radius: 0.3, spread: 14,
+    speed: {0.9, 1.3}, lifetime: {4, 5}, size: {0.35, 0.8}, opacity: {0.35, 0.55},
+    color: {90, 90, 96}, seed: 5
+  }
+  Appearance: {blend: Alpha, softness: 0.3, lit: 0.6}
+}

@@ -651,9 +651,9 @@ static float box_atmos_cloud_wrap(
  *
  * @param world The world
  * @param s The LUTs of the scene
- * @param x World X of the point
- * @param y World Y of the point
- * @param z World Z of the point
+ * @param x Absolute world X of the point
+ * @param y Absolute world Y of the point
+ * @param z Absolute world Z of the point
  * @param out Receives the layers, BOX_CLOUD_LAYER_MAX at most
  * @return The layers written
  */
@@ -661,7 +661,7 @@ static int32_t box_atmos_clouds_from(
     const ecs_world_t *world,
     const box_atmos_scene_t *s,
     double x,
-    float y,
+    double y,
     double z,
     box_render_cloud_layer_t *out)
 {
@@ -681,7 +681,7 @@ static int32_t box_atmos_clouds_from(
         double size = value->size;
         l->texture = handle;
         l->inv_size = 1.0f / value->size;
-        l->height = value->altitude - y;
+        l->height = (float)((double)value->altitude - y);
         l->altitude = value->altitude;
         l->offset[0] = c->offset[0];
         l->offset[1] = c->offset[1];
@@ -711,8 +711,12 @@ static void box_atmos_view_clouds(
     box_render_view_t *v)
 {
     box_render_view_atmos_t *out = &v->atmos;
-    out->cloud_count = box_atmos_clouds_from(world, s, v->camera_transform[3][0],
-        v->camera_transform[3][1], v->camera_transform[3][2], out->clouds);
+    double origin[3];
+    box_render_origin(world, origin);
+    out->cloud_count = box_atmos_clouds_from(world, s,
+        origin[0] + (double)v->camera_transform[3][0],
+        origin[1] + (double)v->camera_transform[3][1],
+        origin[2] + (double)v->camera_transform[3][2], out->clouds);
 }
 
 /** Write the inputs of the sky view and aerial perspective of a view of a scene with LUTs.
@@ -733,7 +737,9 @@ static void box_atmos_view(
         ? ecs_get(world, v->view, View)
         : NULL;
     box_render_view_atmos_t *out = &v->atmos;
-    float camera_y = v->camera_transform[3][1];
+    double origin[3];
+    box_render_origin(world, origin);
+    float camera_y = (float)(origin[1] + (double)v->camera_transform[3][1]);
     float scale = value->night_intensity;
     ecs_os_memset_t(out, 0, box_render_view_atmos_t);
     v->atmosphere = s->handle;

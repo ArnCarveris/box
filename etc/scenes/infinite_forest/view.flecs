@@ -1,0 +1,110 @@
+using flecs.script
+using flecs.script.math
+using box.view
+using box.effects
+using box.light
+using box.world
+using box.transform
+using box.terrain
+using state
+
+// The view of the player, set up like the forest's (forest/view.flecs) without its ambient
+// occlusion and bloom, which cost more of a 4K frame than they show here: the height fog of the
+// sky, auto exposure into the Tony McMapface tone map, the grade of the season and the weather,
+// a vignette and FXAA. The aerial perspective of the sky hazes the terrain over the kilometers
+// so it fades into the sky instead of ending. The trees draw at coarser levels of detail with
+// the distance, two shadow cascades reach over the near forest, each rendered every fourth
+// frame, and the small casters stay out of them; the mountains need none.
+view {
+  exposure {
+    AutoExposure: {min_log_luma: -10.8, exposure_compensation: 0.35, max_exposure: 20}
+  }
+
+  film { Tonemap: {auto_exposure: exposure, operator_: TonyMcMapface} }
+  grade {
+    ColorGrading: {
+      temperature: forest_seasonal(season, -0.02, 0.03, 0.05, -0.1) - 0.06 * precipitation,
+      tint: forest_seasonal(season, -0.04, 0, 0.02, 0.01),
+      contrast: forest_seasonal(season, 1.04, 1.06, 1.08, 1.02),
+      saturation: forest_seasonal(season, 1.1, 1.06, 1.04, 0.84) * (1 - 0.22 * precipitation),
+      vibrance: forest_seasonal(season, 0.18, 0.12, 0.1, 0.02),
+      lift: {0, 0, forest_seasonal(season, 0, 0, 0, 0.012)}
+    }
+  }
+  vignette { Vignette: {intensity: 0.2, radius: 0.8, smoothness: 0.5} }
+  edges { Fxaa: {} }
+
+  View: {
+    camera: player,
+    lod: {levels: 4, distances: [0, 6, 18, 40], fade: 0.25},
+    clear: {enabled: true, color: {120, 140, 160, 255}},
+    lighting: {
+      enabled: true,
+      baked: false,
+      reflections: true,
+      atmosphere: true,
+      fog_distance: FOG_DISTANCE,
+      environment: {source: sky, intensity: forest_seasonal(season, 1.04, 1, 0.97, 1.08), background: false}
+    },
+    shadows: {
+      enabled: true,
+      cascades: 2,
+      resolution: 1024,
+      interval: [4, 4],
+      sway_interval: 4,
+      max_distance: 120,
+      split_lambda: 0.85,
+      filter_size: 3,
+      fade: 0.2,
+      blend: 0.15,
+      min_caster_texels: 12
+    },
+    effects: [
+      {effect: sky},
+      {effect: film},
+      {effect: grade},
+      {effect: vignette},
+      {effect: edges}
+    ]
+  }
+}
+
+async {
+  while true {
+    await delay(0.1)
+    const o = WorldOrigin[WorldOrigin]
+    const p = player[Position]
+    const x = p.x + o.x
+    const z = p.z + o.z
+
+    if box.terrain.known(infinite_forest.land, x, z) {
+      const ground: f32 = box.terrain.height(infinite_forest.land, x, z) - o.y
+      const y: f32 = state.fog_y + (ground - state.fog_y) * 0.15
+
+      if abs(y - state.fog_y) > 0.02 {
+        state.fog_y = y
+      }
+    }
+  }
+}
+
+// The local origin follows the player, so the far walk stays precise
+$ {
+  WorldOrigin: {enabled: true}
+}
+
+// The scene probe of the forest library (sky.flecs) follows the player and recaptures as it
+// moves on, ignoring the churn of far tiles
+$ {
+  ReflectionBake: {
+    resolution: 128,
+    budget_ms: 1,
+    scene_probe: true,
+    scene_probe_height: 2.4,
+    follow_focus: true,
+    follow_distance: PROBE_FOLLOW,
+    follow_radius: TERRAIN_QUERY_RADIUS,
+    environment: sky,
+    light_threshold: 4
+  }
+}

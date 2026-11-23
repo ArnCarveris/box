@@ -1,0 +1,80 @@
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+using box.camera
+using box.view
+using box.light
+
+$ {
+  Scene: {shader_features: {Extended: {water: true, texture_scroll: true}}}
+}
+
+// Deep open water (Water over nothing, so the body is fully deep) under a swell, seen toward a
+// late afternoon sun low ahead of the camera. Water.scatter lights the body with the sunlight
+// scattered inside it: the crests of the swell seen against the sun glow turquoise
+// (scatter_color), the faces turned to the camera a little, while the troughs stay dark. A fine
+// generated normal map scrolled by texture.Scroll adds detail on top at half weight.
+// frames: 60
+water_scatter {
+  Scene: {shader_features: {Extended: {water: true, texture_scroll: true}}}
+  AmbientLight: {sky: {120, 140, 180}, ground: {40, 46, 52}, intensity: 0.4}
+
+  sun {
+    Rotation: {0.12, 0.1, 0}
+    DirectionalLight: {intensity: 3}
+    Rgb: {255, 220, 180}
+  }
+
+  camera {
+    Position: {0, 4, 14}
+    Rotation: {-0.18, 0, 0}
+    Camera: {fov: 50, far_: 2000}
+  }
+
+  main_view {
+    View: {camera: camera, clear: {enabled: true, color: {200, 180, 160, 255}}}
+  }
+
+  detail_height {
+    Gen: {
+      width: 256, height: 256, seed: 5
+      layers: [
+        {kind: GenNoise, frequency: 8, octaves: 3, amount: 1}
+      ]
+    }
+  }
+
+  detail {
+    Gen: {source: detail_height, output: GenNormal, strength: 1}
+  }
+
+  sea {
+    Position: {0, 0, 0}
+    Rotation: {-1.5708, 0, 0}
+    Quad: {1000, 1000}
+    Rgb: {255, 255, 255}
+    PbrMaterial: {metallic: 0, roughness: 0.08}
+    PbrTextures: {normal: detail}
+    texture.Transform: {scale_x: 200, scale_y: 200, offset_x: 0, offset_y: 0}
+    texture.Scroll: {velocity: {0, 0}, normal_velocity: {0.0005, 0.0003}}
+    Water: {
+      shallow_color: {10, 50, 70}
+      deep_color: {6, 30, 52}
+      depth: 3
+      visibility: 2
+      refraction: 0.02
+      foam_width: 0
+      scatter_color: {40, 200, 170}
+      scatter: 1
+    }
+    WaterWaves: {
+      waves: [
+        {direction: {0.1, 1}, wavelength: 9, amplitude: 0.35, steepness: 0.6},
+        {direction: {0.8, 0.6}, wavelength: 4.5, amplitude: 0.12, steepness: 0.4},
+        {direction: {-0.6, 0.8}, wavelength: 2.2, amplitude: 0.05, steepness: 0.3}
+      ]
+      detail: 0.5
+    }
+  }
+}

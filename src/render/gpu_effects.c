@@ -4,7 +4,10 @@
  *
  * A view with effects renders into an HDR image; its effects run in order as fullscreen passes
  * between two HDR images and the last pass writes the target. State kept across frames, such
- * as an adapted exposure or bloom history, is keyed by target, view and effect entity.
+ * as an adapted exposure, is keyed by target, view and effect entity.
+ *
+ * The history of a bloom is a pair of history textures (gpu_history.c), which a reset of the
+ * view invalidates.
  */
 
 #include "gpu_effects.h"
@@ -319,19 +322,6 @@ void box_gpu_effects_init(
     gpu->effects = fx;
 }
 
-/** Release the history images of a bloom.
- *
- * @param s The state
- */
-static void box_gpu_fx_history_free(
-    box_gpu_fx_state_t *s)
-{
-    box_gpu_fx_release(&s->history[0], &s->history_views[0]);
-    box_gpu_fx_release(&s->history[1], &s->history_views[1]);
-    s->history_valid = false;
-    s->history_index = 0;
-}
-
 /** Release the mip chain and the prefilter levels of a bloom.
  *
  * @param s The state
@@ -391,7 +381,6 @@ static void box_gpu_fx_state_free(
     box_gpu_fx_state_t *s)
 {
     box_gpu_fx_mips_free(s);
-    box_gpu_fx_history_free(s);
     if (s->uniforms) {
         wgpuBufferRelease(s->uniforms);
     }
@@ -651,12 +640,14 @@ done:
 
 /** Record a fullscreen pass with its pipeline and bind group, and release the bind group.
  *
+ * @param gpu The backend
  * @param ctx The chain
  * @param pass The pass
  * @param pipeline The pipeline of the pass
  * @param group The bind group of the pass
  */
 static void box_gpu_fx_record(
+    box_gpu_t *gpu,
     const box_gpu_fx_ctx_t *ctx,
     const box_gpu_fx_pass_t *pass,
     WGPURenderPipeline pipeline,
@@ -672,7 +663,8 @@ static void box_gpu_fx_record(
         .colorAttachmentCount = 1,
         .colorAttachments = &attachment
     };
-    WGPURenderPassEncoder rp = wgpuCommandEncoderBeginRenderPass(ctx->encoder, &desc);
+    WGPURenderPassEncoder rp = box_gpu_profile_render_pass(gpu, ctx->encoder, &desc,
+        box_gpu_shader_label(gpu, box_gpu_shader_get(gpu, pass->shader)));
     wgpuRenderPassEncoderSetPipeline(rp, pipeline);
     wgpuRenderPassEncoderSetBindGroup(rp, 0, group, 0, NULL);
     if (pass->blend == BOX_GPU_FX_ADD) {
@@ -713,7 +705,7 @@ bool box_gpu_fx_draw(
         .entryCount = 7,
         .entries = entries
     });
-    box_gpu_fx_record(ctx, pass, pipeline, group);
+    box_gpu_fx_record(gpu, ctx, pass, pipeline, group);
 done:
     return pipeline != NULL;
 }
@@ -877,7 +869,7 @@ static WGPUBuffer box_gpu_fx_measure(
     });
     w = (w + stride - 1) / stride;
     h = (h + stride - 1) / stride;
-    WGPUComputePassEncoder cp = wgpuCommandEncoderBeginComputePass(ctx->encoder, NULL);
+    WGPUComputePassEncoder cp = box_gpu_profile_compute_pass(gpu, ctx->encoder, "auto exposure");
     wgpuComputePassEncoderSetBindGroup(cp, 0, group, 0, NULL);
     wgpuComputePassEncoderSetPipeline(cp, fx->histogram);
     wgpuComputePassEncoderDispatchWorkgroups(cp,
@@ -893,21 +885,103 @@ done:
     return result;
 }
 
+/** Fill the uniforms of the color grading of a pass.
+ *
+ * @param gpu The backend
+ * @param e The pass
+ * @param u Receives the uniforms
+ * @return The view of its LUT, NULL without one
+ */
+static WGPUTextureView box_gpu_fx_grading_fill(
+    box_gpu_t *gpu,
+    const box_render_effect_t *e,
+    box_gpu_grading_uniforms_t *u)
+{
+    const box_render_grading_t *g = &e->grading;
+    const ColorGrading *c = &g->settings;
+    WGPUTextureView lut = g->lut && g->lut_size > 1 ? box_gpu_texture_cookie(gpu, g->lut) : NULL;
+    float balance[3][3];
+    bool curve = false;
+    int32_t i, j;
+    ecs_os_memset_t(u, 0, box_gpu_grading_uniforms_t);
+    box_render_grading_balance(c, balance);
+    for (i = 0; i < 3; i ++) {
+        for (j = 0; j < 3; j ++) {
+            u->balance[i][j] = balance[i][j];
+        }
+
+        u->lift[i] = c->lift[i];
+        u->gain[i] = c->gain[i];
+        u->inv_gamma[i] = 1.0f / c->gamma[i];
+        curve = curve || c->lift[i] != 0.0f || c->gamma[i] != 1.0f;
+    }
+
+    u->params[0] = c->contrast;
+    u->params[1] = c->saturation;
+    u->params[2] = c->vibrance;
+    u->params[3] = g->display ? 1.0f : 0.0f;
+    u->lift[3] = c->lut_strength;
+    u->gain[3] = lut ? (float)g->lut_size : 0.0f;
+    u->inv_gamma[3] = curve ? 1.0f : 0.0f;
+
+    return lut;
+}
+
+/** Fill the uniforms of the vignette of a pass.
+ *
+ * @param ctx The chain
+ * @param e The pass
+ * @param u Receives the uniforms
+ */
+static void box_gpu_fx_vignette_fill(
+    const box_gpu_fx_ctx_t *ctx,
+    const box_render_effect_t *e,
+    box_gpu_vignette_uniforms_t *u)
+{
+    const Vignette *v = &e->vignette;
+    ecs_os_memset_t(u, 0, box_gpu_vignette_uniforms_t);
+    u->params[0] = v->intensity;
+    u->params[1] = v->radius;
+    u->params[2] = v->smoothness;
+    u->params[3] = v->roundness;
+    u->shape[0] = v->center[0];
+    u->shape[1] = v->center[1];
+    u->shape[2] = ctx->ft->height > 0 ? (float)ctx->ft->width / (float)ctx->ft->height : 1.0f;
+    u->color[0] = box_gpu_fx_linear(v->color.r);
+    u->color[1] = box_gpu_fx_linear(v->color.g);
+    u->color[2] = box_gpu_fx_linear(v->color.b);
+}
+
 /** Record a tone map or exposure pass, or a copy of the image when the pass is NULL.
  *
  * @param gpu The backend
  * @param ctx The chain
  * @param e The pass, NULL to copy the image
+ * @param grading The color grading pass it applies after the tone map, NULL for none
+ * @param vignette The vignette pass it applies last, NULL for none
  * @return Whether the pass was recorded
  */
 static bool box_gpu_fx_tonemap(
     box_gpu_t *gpu,
     const box_gpu_fx_ctx_t *ctx,
-    const box_render_effect_t *e)
+    const box_render_effect_t *e,
+    const box_render_effect_t *grading,
+    const box_render_effect_t *vignette)
 {
-    box_gpu_tonemap_uniforms_t u = {{0}};
+    box_gpu_tonemap_uniforms_t u;
     WGPUBuffer exposure = e && e->exposure ? box_gpu_fx_measure(gpu, ctx, e) : NULL;
-    WGPUTextureView lut = NULL;
+    WGPUTextureView lut = NULL, grading_lut = NULL;
+    ecs_os_memset_t(&u, 0, box_gpu_tonemap_uniforms_t);
+    if (grading) {
+        grading_lut = box_gpu_fx_grading_fill(gpu, grading, &u.grading);
+        u.flags[2] |= BOX_GPU_TONEMAP_GRADING;
+    }
+
+    if (vignette) {
+        box_gpu_fx_vignette_fill(ctx, vignette, &u.vignette);
+        u.flags[2] |= BOX_GPU_TONEMAP_VIGNETTE;
+    }
+
     box_gpu_fx_state_t *s = box_gpu_fx_state(gpu, ctx, e ? e->entity : 0,
         e ? (int32_t)e->kind : BOX_GPU_FX_COPY);
     u.flags[0] = exposure ? 1u : 0u;
@@ -925,6 +999,7 @@ static bool box_gpu_fx_tonemap(
         .shader = BOX_RENDER_SHADER_TONEMAP,
         .entry = "fs",
         .input = ctx->input,
+        .aux = grading_lut,
         .uniforms = s->uniforms,
         .exposure = exposure,
         .lut = lut,
@@ -1000,7 +1075,6 @@ static void box_gpu_fx_bloom_mips(
     }
 
     box_gpu_fx_mips_free(s);
-    box_gpu_fx_history_free(s);
     if (w != hw || h != hh) {
         uint32_t edge = w > h ? w : h;
         level = hw > hh ? hw : hh;
@@ -1048,11 +1122,13 @@ done:
  *
  * @param s The state, with its mip chain
  * @param b The settings
+ * @param history Whether the history of the first mip holds the previous frame
  * @param out Receives the uniforms
  */
 static void box_gpu_fx_bloom_settings(
     const box_gpu_fx_state_t *s,
     const Bloom *b,
+    bool history,
     box_gpu_bloom_uniforms_t *out)
 {
     float knee = b->threshold * b->threshold_softness;
@@ -1063,16 +1139,44 @@ static void box_gpu_fx_bloom_settings(
     out->threshold[3] = 0.25f / (knee + 1e-5f);
     out->params[0] = b->firefly_clamp;
     out->params[1] = box_gpu_fx_bloom_blend(b, 0, (float)(s->mip_count - 1));
-    out->params[2] = s->history_valid ? b->temporal : 0.0f;
+    out->params[2] = history ? b->temporal : 0.0f;
     out->first[0] = 1.0f / (float)s->width;
     out->first[1] = 1.0f / (float)s->height;
 }
 
-/** Blend the first mip of a bloom with the previous frame.
+/** Describe the history of the first mip of a bloom.
+ *
+ * @param ctx The chain
+ * @param e The pass
+ * @param s The state, with its mip chain
+ * @param out Receives the key and shape of the history pair
+ */
+static void box_gpu_fx_bloom_history_desc(
+    const box_gpu_fx_ctx_t *ctx,
+    const box_render_effect_t *e,
+    const box_gpu_fx_state_t *s,
+    box_gpu_history_desc_t *out)
+{
+    *out = (box_gpu_history_desc_t){
+        .target = ctx->t->handle,
+        .view = ctx->v->view,
+        .consumer = BOX_GPU_HISTORY_BLOOM,
+        .entity = e->entity,
+        .dimension = WGPUTextureDimension_2D,
+        .width = s->width,
+        .height = s->height,
+        .depth = 1,
+        .format = BOX_GPU_HDR_FORMAT
+    };
+}
+
+/** Blend the first mip of a bloom with the previous frame into the write image of its history.
  *
  * @param gpu The backend
  * @param ctx The chain
  * @param s The state
+ * @param desc The key of the history pair
+ * @param h The history images of the frame
  * @param first The first mip of the bloom
  * @return The image the composite reads, the first mip when the history pass did not run
  */
@@ -1080,31 +1184,25 @@ static WGPUTextureView box_gpu_fx_bloom_history(
     box_gpu_t *gpu,
     const box_gpu_fx_ctx_t *ctx,
     box_gpu_fx_state_t *s,
+    const box_gpu_history_desc_t *desc,
+    const box_gpu_history_t *h,
     WGPUTextureView first)
 {
     WGPUTextureView result = first;
-    int32_t i, next = s->history_index ^ 1;
-    for (i = 0; i < 2; i ++) {
-        if (!s->history[i]) {
-            s->history[i] = box_gpu_fx_texture(gpu, s->width, s->height, BOX_GPU_HDR_FORMAT, 1);
-            s->history_views[i] = wgpuTextureCreateView(s->history[i], NULL);
-        }
-    }
-
     bool drawn = box_gpu_fx_draw(gpu, ctx, &(box_gpu_fx_pass_t){
         .shader = BOX_RENDER_SHADER_BLOOM,
         .entry = "history",
         .input = first,
-        .aux = s->history_views[s->history_index],
+        .aux = h->read,
         .uniforms = s->uniforms,
-        .output = s->history_views[next],
+        .output = h->write,
         .format = BOX_GPU_HDR_FORMAT,
         .blend = BOX_GPU_FX_REPLACE
     });
     if (drawn) {
-        s->history_index = next;
-        s->history_valid = true;
-        result = s->history_views[next];
+        result = h->write;
+    } else {
+        box_gpu_history_discard(gpu, desc);
     }
 
     return result;
@@ -1250,14 +1348,12 @@ static bool box_gpu_fx_bloom(
     float steps[BOX_GPU_BLOOM_MIPS * BOX_GPU_BLOOM_STEP / sizeof(float)] = {0};
     uint32_t hw, hh;
     int32_t i, last;
-    bool result = false;
+    box_gpu_history_desc_t desc;
+    box_gpu_history_t h = {0};
+    bool result = false, temporal = false;
     box_gpu_fx_bloom_mips(gpu, ctx, s, b);
     hw = s->render_width >> 1;
     hh = s->render_height >> 1;
-    if (b->temporal <= 0) {
-        box_gpu_fx_history_free(s);
-    }
-
     if (!box_gpu_fx_bloom_pipelines(gpu)) {
         goto done;
     }
@@ -1267,7 +1363,9 @@ static bool box_gpu_fx_bloom(
             WGPUBufferUsage_Uniform);
     }
 
-    box_gpu_fx_bloom_settings(s, b, &u);
+    box_gpu_fx_bloom_history_desc(ctx, e, s, &desc);
+    temporal = b->temporal > 0 && box_gpu_history_acquire(gpu, ctx->packet, &desc, &h);
+    box_gpu_fx_bloom_settings(s, b, h.valid, &u);
     box_gpu_fx_uniforms(gpu, s, &u, sizeof(u));
     last = s->mip_count - 1;
     for (i = 1; i <= last; i ++) {
@@ -1278,7 +1376,7 @@ static bool box_gpu_fx_bloom(
     wgpuQueueWriteBuffer(gpu->queue, s->steps, 0, steps,
         (size_t)s->mip_count * BOX_GPU_BLOOM_STEP);
 
-    WGPUComputePassEncoder cp = wgpuCommandEncoderBeginComputePass(ctx->encoder, NULL);
+    WGPUComputePassEncoder cp = box_gpu_profile_compute_pass(gpu, ctx->encoder, "bloom");
     if (s->prefilter_count) {
         box_gpu_fx_bloom_dispatch(gpu, cp, s, s->prefilter_count > 1 ? 1 : 0, ctx->input,
             NULL, s->prefilter_mips[0], 0, hw, hh);
@@ -1308,7 +1406,9 @@ static bool box_gpu_fx_bloom(
     wgpuComputePassEncoderRelease(cp);
 
     WGPUTextureView first = last > 0 ? s->up_mips[0] : s->mips[0];
-    WGPUTextureView glow = b->temporal > 0 ? box_gpu_fx_bloom_history(gpu, ctx, s, first) : first;
+    WGPUTextureView glow = temporal
+        ? box_gpu_fx_bloom_history(gpu, ctx, s, &desc, &h, first)
+        : first;
     result = box_gpu_fx_draw(gpu, ctx, &(box_gpu_fx_pass_t){
         .shader = BOX_RENDER_SHADER_BLOOM,
         .entry = "composite",
@@ -1448,7 +1548,7 @@ static bool box_gpu_fx_smaa_draw(
         .entryCount = BOX_GPU_SMAA_BINDINGS,
         .entries = entries
     });
-    box_gpu_fx_record(ctx, pass, pipeline, group);
+    box_gpu_fx_record(gpu, ctx, pass, pipeline, group);
 done:
     return pipeline != NULL;
 }
@@ -1639,34 +1739,9 @@ static bool box_gpu_fx_grading(
     const box_gpu_fx_ctx_t *ctx,
     const box_render_effect_t *e)
 {
-    const box_render_grading_t *g = &e->grading;
-    const ColorGrading *c = &g->settings;
     box_gpu_grading_uniforms_t u;
     box_gpu_fx_state_t *s = box_gpu_fx_state(gpu, ctx, e->entity, (int32_t)e->kind);
-    WGPUTextureView lut = g->lut && g->lut_size > 1 ? box_gpu_texture_cookie(gpu, g->lut) : NULL;
-    float balance[3][3];
-    bool curve = false;
-    int32_t i, j;
-    ecs_os_memset_t(&u, 0, box_gpu_grading_uniforms_t);
-    box_render_grading_balance(c, balance);
-    for (i = 0; i < 3; i ++) {
-        for (j = 0; j < 3; j ++) {
-            u.balance[i][j] = balance[i][j];
-        }
-
-        u.lift[i] = c->lift[i];
-        u.gain[i] = c->gain[i];
-        u.inv_gamma[i] = 1.0f / c->gamma[i];
-        curve = curve || c->lift[i] != 0.0f || c->gamma[i] != 1.0f;
-    }
-
-    u.params[0] = c->contrast;
-    u.params[1] = c->saturation;
-    u.params[2] = c->vibrance;
-    u.params[3] = g->display ? 1.0f : 0.0f;
-    u.lift[3] = c->lut_strength;
-    u.gain[3] = lut ? (float)g->lut_size : 0.0f;
-    u.inv_gamma[3] = curve ? 1.0f : 0.0f;
+    WGPUTextureView lut = box_gpu_fx_grading_fill(gpu, e, &u);
     box_gpu_fx_uniforms(gpu, s, &u, sizeof(u));
 
     return box_gpu_fx_draw(gpu, ctx, &(box_gpu_fx_pass_t){
@@ -1693,62 +1768,13 @@ static bool box_gpu_fx_vignette(
     const box_gpu_fx_ctx_t *ctx,
     const box_render_effect_t *e)
 {
-    const Vignette *v = &e->vignette;
     box_gpu_vignette_uniforms_t u;
     box_gpu_fx_state_t *s = box_gpu_fx_state(gpu, ctx, e->entity, (int32_t)e->kind);
-    ecs_os_memset_t(&u, 0, box_gpu_vignette_uniforms_t);
-    u.params[0] = v->intensity;
-    u.params[1] = v->radius;
-    u.params[2] = v->smoothness;
-    u.params[3] = v->roundness;
-    u.shape[0] = v->center[0];
-    u.shape[1] = v->center[1];
-    u.shape[2] = ctx->ft->height > 0 ? (float)ctx->ft->width / (float)ctx->ft->height : 1.0f;
-    u.color[0] = box_gpu_fx_linear(v->color.r);
-    u.color[1] = box_gpu_fx_linear(v->color.g);
-    u.color[2] = box_gpu_fx_linear(v->color.b);
+    box_gpu_fx_vignette_fill(ctx, e, &u);
     box_gpu_fx_uniforms(gpu, s, &u, sizeof(u));
 
     return box_gpu_fx_draw(gpu, ctx, &(box_gpu_fx_pass_t){
         .shader = BOX_RENDER_SHADER_VIGNETTE,
-        .entry = "fs",
-        .input = ctx->input,
-        .uniforms = s->uniforms,
-        .output = ctx->output,
-        .format = ctx->format,
-        .blend = ctx->blend
-    });
-}
-
-/** Record a chromatic aberration pass.
- *
- * @param gpu The backend
- * @param ctx The chain
- * @param e The pass
- * @return Whether the pass was recorded
- */
-static bool box_gpu_fx_chromatic_aberration(
-    box_gpu_t *gpu,
-    const box_gpu_fx_ctx_t *ctx,
-    const box_render_effect_t *e)
-{
-    const ChromaticAberration *ca = &e->chromatic_aberration;
-    box_gpu_chromatic_aberration_uniforms_t u;
-    box_gpu_fx_state_t *s = box_gpu_fx_state(gpu, ctx, e->entity, (int32_t)e->kind);
-    float w = (float)glm_imax(ctx->ft->width, 1), h = (float)glm_imax(ctx->ft->height, 1);
-    ecs_os_memset_t(&u, 0, box_gpu_chromatic_aberration_uniforms_t);
-    u.params[0] = ca->intensity * w;
-    u.params[1] = (float)ca->samples;
-    u.params[2] = ca->falloff;
-    u.params[3] = 1.0f / box_render_chromatic_aberration_corner(ca, w, h);
-    u.shape[0] = ca->center[0] * w;
-    u.shape[1] = ca->center[1] * h;
-    u.shape[2] = 1.0f / w;
-    u.shape[3] = 1.0f / h;
-    box_gpu_fx_uniforms(gpu, s, &u, sizeof(u));
-
-    return box_gpu_fx_draw(gpu, ctx, &(box_gpu_fx_pass_t){
-        .shader = BOX_RENDER_SHADER_CHROMATIC_ABERRATION,
         .entry = "fs",
         .input = ctx->input,
         .uniforms = s->uniforms,
@@ -1774,7 +1800,7 @@ static bool box_gpu_fx_effect(
     switch (e->kind) {
     case BOX_RENDER_EFFECT_TONEMAP:
     case BOX_RENDER_EFFECT_EXPOSURE:
-        result = box_gpu_fx_tonemap(gpu, ctx, e);
+        result = box_gpu_fx_tonemap(gpu, ctx, e, NULL, NULL);
         break;
     case BOX_RENDER_EFFECT_BLOOM:
         result = box_gpu_fx_bloom(gpu, ctx, e);
@@ -1784,6 +1810,9 @@ static bool box_gpu_fx_effect(
         break;
     case BOX_RENDER_EFFECT_SMAA:
         result = box_gpu_fx_smaa(gpu, ctx, e);
+        break;
+    case BOX_RENDER_EFFECT_FXAA:
+        result = box_gpu_fx_fxaa(gpu, ctx, e);
         break;
     case BOX_RENDER_EFFECT_GRADING:
         result = box_gpu_fx_grading(gpu, ctx, e);
@@ -1801,6 +1830,44 @@ static bool box_gpu_fx_effect(
         break;
     }
 
+    return result;
+}
+
+/** Get the color grading and vignette passes that follow a tone map pass of a view, which the
+ * tone map pass applies itself.
+ *
+ * @param packet The packet
+ * @param v The view
+ * @param i Index of the pass among the effects of the view
+ * @param grading Receives the grading pass, NULL for none
+ * @param vignette Receives the vignette pass, NULL for none
+ * @return Passes after the pass that it applies
+ */
+static int32_t box_gpu_fx_fused(
+    const box_render_packet_t *packet,
+    const box_render_view_t *v,
+    int32_t i,
+    const box_render_effect_t **grading,
+    const box_render_effect_t **vignette)
+{
+    const box_render_effect_t *e = ecs_vec_get_t(
+        &packet->effects, box_render_effect_t, v->effect_first + i);
+    int32_t result = 0;
+    if (e->kind != BOX_RENDER_EFFECT_TONEMAP) {
+        goto done;
+    }
+
+    if (i + result + 1 < v->effect_count && e[result + 1].kind == BOX_RENDER_EFFECT_GRADING) {
+        result ++;
+        *grading = &e[result];
+    }
+
+    if (i + result + 1 < v->effect_count && e[result + 1].kind == BOX_RENDER_EFFECT_VIGNETTE) {
+        result ++;
+        *vignette = &e[result];
+    }
+
+done:
     return result;
 }
 
@@ -1826,11 +1893,19 @@ void box_gpu_effects_run(
         const box_render_effect_t *e = ecs_vec_get_t(
             &packet->effects, box_render_effect_t, v->effect_first + i);
         bool last = i == v->effect_count - 1;
+        const box_render_effect_t *grading = NULL, *vignette = NULL;
+        int32_t fused = box_gpu_fx_fused(packet, v, i, &grading, &vignette);
+        if (fused) {
+            last = i + fused == v->effect_count - 1;
+        }
+
         ctx.input = ft->hdr_views[current];
         ctx.output = last ? color : ft->hdr_views[current ^ 1];
         ctx.format = last ? t->format : BOX_GPU_HDR_FORMAT;
         ctx.blend = last ? final : BOX_GPU_FX_REPLACE;
-        if (!box_gpu_fx_effect(gpu, &ctx, e)) {
+        if (fused && box_gpu_fx_tonemap(gpu, &ctx, e, grading, vignette)) {
+            i += fused;
+        } else if (fused || !box_gpu_fx_effect(gpu, &ctx, e)) {
             continue;
         }
 
@@ -1846,7 +1921,7 @@ void box_gpu_effects_run(
         ctx.output = color;
         ctx.format = t->format;
         ctx.blend = final;
-        box_gpu_fx_tonemap(gpu, &ctx, NULL);
+        box_gpu_fx_tonemap(gpu, &ctx, NULL, NULL, NULL);
     }
 
     fx->current = NULL;

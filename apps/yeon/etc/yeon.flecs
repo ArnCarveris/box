@@ -18,8 +18,8 @@ using box.surface
 using box.atmosphere
 
 $ {
-  Scene: {environment: true, aerial_perspective: true, blend_modes: true,
-    diffuse_transmission: true}
+  Scene: {environment: true, aerial_perspective: true,
+    shader_features: {Extended: {blend_modes: true, diffuse_transmission: true}}}
 }
 
 window {

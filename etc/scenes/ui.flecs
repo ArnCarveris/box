@@ -1,7 +1,6 @@
-// UI example: a UI is content (layout, 2D shapes, text) in a scene, seen through a camera and
-// rendered by a view. Shows a screen space HUD and a menu stacked over the 3D view, a nameplate
-// placed by projecting a 3D entity, a world space panel and a curved render-to-texture screen.
-// Fly with WASD (QE for down/up), hold the right mouse button to look around.
+// UI example: a screen space HUD and menu over the 3D view, a nameplate projected from a 3D
+// entity, a world space panel and a curved render-to-texture screen. Fly with WASD (QE for
+// down/up), hold the right mouse button to look around.
 
 using box.transform
 using box.geometry
@@ -18,7 +17,7 @@ using flecs.script.math
 
 $ {
   box.app.FpsTarget: {60}
-  Scene: {blend_modes: true}
+  Scene: {shader_features: {Extended: {blend_modes: true}}}
   AmbientLight: {sky: {90, 110, 140}, ground: {40, 36, 30}, intensity: 0.6}
 }
 
@@ -39,7 +38,7 @@ view {
   View: {
     camera: camera,
     clear: {enabled: true, color: {120, 150, 190, 255}},
-    shadows: {enabled: true}
+    shadows: {enabled: true, cascades: 3, resolution: 2048, interval: [1, 2, 2]}
   }
 }
 
@@ -142,7 +141,7 @@ ui {
   // slices of a curved screen sample that texture
 
   screen_ui {
-    Scene: {blend_modes: true}
+    Scene: {shader_features: {Extended: {blend_modes: true}}}
 
     camera {
       Position: {0, 0, 100}
@@ -203,7 +202,7 @@ ui {
 // pixel is one point, drawn by a view after the 3D view without clear, lighting or culling
 
 hud {
-  Scene: {blend_modes: true}
+  Scene: {shader_features: {Extended: {blend_modes: true}}}
 
   camera {
     Position: {0, 0, 100}
@@ -267,7 +266,7 @@ hud {
   // A menu is another UI scene, stacked over the HUD because its view comes later
 
   menu {
-    Scene: {blend_modes: true}
+    Scene: {shader_features: {Extended: {blend_modes: true}}}
 
     camera {
       Position: {0, 0, 100}

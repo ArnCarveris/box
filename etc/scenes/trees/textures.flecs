@@ -1,0 +1,4 @@
+// The textures of the tree library without its templates: the leaf and needle cards and the
+// barks, for a scene that builds its own trees from them, such as the forest.
+include cards
+include bark

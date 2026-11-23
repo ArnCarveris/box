@@ -1,0 +1,36 @@
+// A small broadleaf: a trunk, spiral limbs and alternate twigs, as tree.flecs, dressed with bent
+// leaf cards that face out of the crown, their normals bent toward the crown ellipsoid and their
+// indirect light occluded by the depth in it. The bark and the leaves are two shapes of one graph.
+
+using box.mesh
+
+broadleaf {
+  trunk { nodes.Stem: {length: 3, segments: 8, radius: 0.15, taper: 0.85, noise: 0.1, seed: 1} }
+  limbs {
+    nodes.Branches: {
+      curves: trunk, count: 6, start: 0.4, end: 0.95, distribution: Spiral,
+      down_angle: 1.0, down_angle_change: -0.4, length: 0.45, radius_exponent: 1.4,
+      segments: 5, gravity: 0.1, seed: 2
+    }
+  }
+  twigs {
+    nodes.Branches: {
+      curves: limbs, count: 4, start: 0.3, distribution: Alternate, down_angle: 0.7,
+      length: 0.45, radius_exponent: 1.2, taper: 0.7, segments: 3, noise: 0.3, seed: 3
+    }
+  }
+  bark_mesh { nodes.Tube: {curves: twigs, sides: 6, caps: true} }
+  leaves {
+    nodes.Leaves: {
+      curves: twigs, placement: Twigs, count: 5, per_node: 2, phyllotaxis: 1.5708, angle: 0.8,
+      orientation: FaceOut, tilt: 0.3, bank: 0.4, size: 0.35, size_tip: 0.8,
+      size_variation: 0.2, seed: 4
+    }
+  }
+  cards { nodes.Cards: {points: leaves, shape: Bent, bend: 0.15, double_sided: true, flutter: 1} }
+  normals { nodes.CrownNormals: {mesh: cards, shape: Ellipsoid, strength: 0.8} }
+  foliage { nodes.CrownOcclusion: {mesh: normals, shape: Ellipsoid, strength: 0.8} }
+
+  bark { Graph: {output: bark_mesh} }
+  crown { Graph: {output: foliage} }
+}

@@ -1,0 +1,88 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.camera
+using box.input
+using box.controllers
+using box.world
+using box.terrain
+using state
+
+state {
+  export mut start_x: f32 = cos(ISLAND_START_ANGLE) * ISLAND_COAST
+  export mut start_y: f32 = 60
+  export mut start_z: f32 = sin(ISLAND_START_ANGLE) * ISLAND_COAST
+  export mut start_yaw: f32 = atan2(cos(ISLAND_START_ANGLE), sin(ISLAND_START_ANGLE))
+  export mut start_pitch: f32 = 0.12
+  export mut started: bool = false
+}
+
+walk_keys {
+  Forward { Action: {description: "Walk forward"}; Binding: {key: W} }
+  Back { Action: {description: "Walk back"}; Binding: {key: S} }
+  Left { Action: {description: "Walk left"}; Binding: {key: A} }
+  Right { Action: {description: "Walk right"}; Binding: {key: D} }
+  Fast { Action: {description: "Run while held"}; Binding: {key: ShiftLeft} }
+  Look { Action: {description: "Turn with the cursor while held"}; Binding: {key: MouseRight} }
+  Jump { Action: {description: "Jump"}; Binding: {key: Space} }
+  Crouch { Action: {description: "Crouch while held"}; Binding: {key: CtrlLeft} }
+  TurnLeft { Action: {description: "Turn left while held"}; Binding: {key: Left} }
+  TurnRight { Action: {description: "Turn right while held"}; Binding: {key: Right} }
+  TurnUp { Action: {description: "Look up while held"}; Binding: {key: Up} }
+  TurnDown { Action: {description: "Look down while held"}; Binding: {key: Down} }
+}
+
+player {
+  Position: {start_x, start_y, start_z}
+  Rotation: {start_pitch, start_yaw, 0}
+  Camera: {fov: 62, near_: 0.1, far_: VIEW_FAR}
+  WorldFocus
+
+  if flying && !scripted {
+    CameraController: {speed: FLY_SPEED, boost: 8}
+  } else if started && !scripted {
+    FirstPersonController: {
+      speed: WALK_SPEED,
+      eye: EYE,
+      ground: GROUND_MIN - 100,
+      actions: walk_keys
+    }
+  }
+}
+
+async {
+  const ux = cos(ISLAND_START_ANGLE)
+  const uz = sin(ISLAND_START_ANGLE)
+  const far = ISLAND_COAST + min(720, 720 * ISLAND_K)
+  const near = ISLAND_COAST - min(720, 720 * ISLAND_K)
+
+  while !box.terrain.known(island.land, ux * far, uz * far) ||
+    !box.terrain.known(island.land, ux * near, uz * near)
+  {
+    await next_frame()
+  }
+
+  const n = floor((far - near) / ISLAND_START_STEP)
+
+  for i in 0..n {
+    const d = far - i * ISLAND_START_STEP
+    const h = box.terrain.height(island.land, ux * d, uz * d)
+
+    if !state.started && h > 0.7 {
+      state.start_x = ux * d
+      state.start_z = uz * d
+      state.started = true
+    }
+  }
+
+  if !state.started {
+    state.flying = true
+    state.started = true
+  }
+
+  while !box.terrain.resident(island.land, state.start_x, state.start_z) {
+    await next_frame()
+  }
+
+  state.start_y = box.terrain.height(island.land, state.start_x, state.start_z) + EYE + 0.05
+}

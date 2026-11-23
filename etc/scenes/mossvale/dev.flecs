@@ -11,18 +11,21 @@ state {
 
 async {
   mut seen: i32 = 0
+
   while true {
     await next_frame()
     const c = state.dev[state.DevCmd]
+
     if c.n != seen {
       seen = c.n
+
       if c.op == 0 {
         px = c.x
         pz = c.z
         cam_x = c.x
         cam_z = c.z
       } else if c.op == 1 {
-        for s in 1..7 {
+        for s in 1..MV_SPELLS.count() {
           known[s] = true
         }
       } else if c.op == 2 {

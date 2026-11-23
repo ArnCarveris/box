@@ -11,6 +11,8 @@
 
 #ifdef BOX_RENDER_WGPU
 
+BOX_GPU_THREAD_LOCAL box_gpu_api_t box_gpu_api;
+
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 #else
@@ -255,7 +257,9 @@ done:
 
 #else
 
-/** Request the device from the adapter and get its queue.
+/** Request the device from the adapter and get its queue, with the texture array layers and
+ * the sampled textures per shader stage the adapter offers: the forward pass samples more
+ * textures in its fragment stage than the 16 of the default limits (box_gpu_draw_init).
  *
  * @param gpu The backend
  */
@@ -286,11 +290,18 @@ static void box_gpu_device_init(
     desc.requiredFeatureCount = feature_count;
     desc.requiredFeatures = feature_count ? features : NULL;
 
-    if (wgpuAdapterGetLimits(gpu->adapter, &adapter) == WGPUStatus_Success &&
-        adapter.maxTextureArrayLayers != WGPU_LIMIT_U32_UNDEFINED)
-    {
-        limits.maxTextureArrayLayers = adapter.maxTextureArrayLayers;
-        desc.requiredLimits = &limits;
+    if (wgpuAdapterGetLimits(gpu->adapter, &adapter) == WGPUStatus_Success) {
+        if (adapter.maxTextureArrayLayers != WGPU_LIMIT_U32_UNDEFINED) {
+            limits.maxTextureArrayLayers = adapter.maxTextureArrayLayers;
+            desc.requiredLimits = &limits;
+        }
+
+        if (adapter.maxSampledTexturesPerShaderStage != WGPU_LIMIT_U32_UNDEFINED &&
+            adapter.maxSampledTexturesPerShaderStage > BOX_GPU_SAMPLED_TEXTURES)
+        {
+            limits.maxSampledTexturesPerShaderStage = adapter.maxSampledTexturesPerShaderStage;
+            desc.requiredLimits = &limits;
+        }
     }
 
     desc.uncapturedErrorCallbackInfo.callback = box_gpu_on_error;
@@ -396,6 +407,8 @@ static int box_gpu_init(
     box_gpu_texture_init(gpu);
     box_gpu_draw_init(gpu);
     box_gpu_scatter_init(gpu);
+    box_gpu_terrain_init(gpu);
+    box_gpu_grass_init(gpu);
     box_gpu_compose_init(gpu);
     ecs_map_init(&gpu->targets, NULL);
     ecs_map_init(&gpu->shaders, NULL);
@@ -468,6 +481,27 @@ static void box_gpu_pace(
 #endif
 }
 
+/** Count a packet and the commands of the main thread it holds.
+ *
+ * @param gpu The backend
+ * @param packet The packet
+ */
+static void box_gpu_packet_count(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet)
+{
+    box_render_gpu_stats_t *p = &gpu->pending;
+    p->packets ++;
+    p->packet_resources += ecs_vec_count(&packet->resources);
+    p->packet_uploads += ecs_vec_count(&packet->uploads);
+    p->packet_scatters += ecs_vec_count(&packet->scatters);
+    p->packet_copies += ecs_vec_count(&packet->copies);
+    p->packet_composes += ecs_vec_count(&packet->composes);
+    p->packet_batches += ecs_vec_count(&packet->batches);
+    p->packet_views += ecs_vec_count(&packet->views);
+    p->packet_bytes += ecs_vec_count(&packet->data);
+}
+
 /** Apply the resources of a packet, build its atmosphere LUTs, write and process its
  * environments, capture its probes, render its shadow atlases and render its targets.
  *
@@ -480,6 +514,7 @@ static void box_gpu_render(
 {
     box_gpu_t *gpu = ctx;
     int32_t i, count = ecs_vec_count(&packet->resources);
+    box_gpu_packet_count(gpu, packet);
     box_gpu_pipelines_deliver(gpu, packet);
     box_gpu_shader_deliver(gpu);
     for (i = 0; i < count; i ++) {
@@ -543,7 +578,9 @@ static void box_gpu_render(
     }
 
     box_gpu_texture_graphs_evaluate(gpu, packet);
+    box_gpu_terrain_heights(gpu, packet);
     box_gpu_texture_mips(gpu, packet);
+    box_gpu_terrain_samples(gpu, packet);
     box_gpu_copy(gpu, packet);
     box_gpu_upload(gpu, packet);
     box_gpu_scatter(gpu, packet);
@@ -554,16 +591,23 @@ static void box_gpu_render(
     box_gpu_atmosphere_environment(gpu, packet);
     box_gpu_environment_process(gpu, packet);
     box_gpu_particles_simulate(gpu, packet);
+    box_gpu_ripples_simulate(gpu, packet);
+    box_gpu_spectra_evolve(gpu, packet);
     box_gpu_fog_volumes_begin(gpu);
     box_gpu_star_fields_begin(gpu);
     box_gpu_planets_begin(gpu);
     box_gpu_debug_begin(gpu);
+    box_gpu_grass_begin(gpu, packet);
     box_gpu_bake_capture(gpu, packet);
     box_gpu_atlas_render(gpu, packet);
     box_gpu_targets_render(gpu, packet);
+    box_gpu_grass_end(gpu, packet);
+    box_gpu_impostor_render(gpu, packet);
+    box_gpu_profile_frame(gpu);
     box_gpu_pace(gpu);
 
     box_gpu_effects_sweep(gpu, packet);
+    box_gpu_history_sweep(gpu, packet);
     box_gpu_atmosphere_sweep(gpu, packet);
     box_gpu_planar_sweep(gpu, packet);
     box_gpu_stats_publish(gpu);
@@ -619,6 +663,7 @@ static void box_gpu_fini(
     box_gpu_pipelines_fini(gpu);
     if (gpu->device) {
         box_gpu_texture_graphs_fini(gpu);
+        box_gpu_impostor_fini(gpu);
         box_gpu_target_fini(gpu);
         ecs_map_fini(&gpu->targets);
         box_gpu_shader_fini(gpu);
@@ -626,6 +671,8 @@ static void box_gpu_fini(
         box_gpu_draw_fini(gpu);
         box_gpu_texture_fini(gpu);
         box_gpu_scatter_fini(gpu);
+        box_gpu_grass_fini(gpu);
+        box_gpu_terrain_fini(gpu);
         box_gpu_compose_fini(gpu);
     }
 
@@ -771,6 +818,9 @@ void box_gpu_count(
     case BOX_GPU_STAT_INSTANCE_BIND:
         gpu->pending.instance_binds ++;
         break;
+    case BOX_GPU_STAT_DATA_BIND:
+        gpu->pending.data_binds ++;
+        break;
     case BOX_GPU_STAT_CULL_DISPATCH:
         gpu->pending.cull_dispatches ++;
         break;
@@ -813,6 +863,59 @@ void box_gpu_count(
     }
 }
 
+/** Add the webgpu commands this thread recorded to the counters and start counting again.
+ *
+ * @param gpu The backend
+ * @param s The counters the main thread reads, under the lock
+ */
+static void box_gpu_api_publish(
+    box_gpu_t *gpu,
+    box_render_gpu_stats_t *s)
+{
+    box_gpu_api_t *a = &box_gpu_api;
+    s->pipelines_cached = box_gpu_pipelines_cached(gpu);
+    s->api_render_passes += a->render_passes;
+    s->api_compute_passes += a->compute_passes;
+    s->api_pipelines += a->pipelines;
+    s->api_bind_groups += a->bind_groups;
+    s->api_buffer_binds += a->buffer_binds;
+    s->api_draws += a->draws;
+    s->api_triangles += a->triangles;
+    s->api_dispatches += a->dispatches;
+    s->api_workgroups += a->workgroups;
+    s->api_copies += a->copies;
+    s->api_copy_bytes += a->copy_bytes;
+    s->api_writes += a->writes;
+    s->api_write_bytes += a->write_bytes;
+    s->api_submits += a->submits;
+    s->api_command_buffers += a->command_buffers;
+    s->api_bundles += a->bundles;
+    ecs_os_memset_t(a, 0, box_gpu_api_t);
+}
+
+/** Add the counters of the packets and their triangles read back to the published counters.
+ *
+ * @param p The counter changes
+ * @param s The counters the main thread reads, under the lock
+ */
+static void box_gpu_packet_publish(
+    const box_render_gpu_stats_t *p,
+    box_render_gpu_stats_t *s)
+{
+    s->packets += p->packets;
+    s->view_triangles += p->view_triangles;
+    s->shadow_triangles += p->shadow_triangles;
+    s->triangle_reads += p->triangle_reads;
+    s->packet_resources += p->packet_resources;
+    s->packet_uploads += p->packet_uploads;
+    s->packet_scatters += p->packet_scatters;
+    s->packet_copies += p->packet_copies;
+    s->packet_composes += p->packet_composes;
+    s->packet_batches += p->packet_batches;
+    s->packet_views += p->packet_views;
+    s->packet_bytes += p->packet_bytes;
+}
+
 void box_gpu_stats_publish(
     box_gpu_t *gpu)
 {
@@ -820,6 +923,8 @@ void box_gpu_stats_publish(
     box_render_gpu_stats_t *s = &gpu->stats;
     int32_t i;
     ecs_os_mutex_lock(gpu->lock);
+    box_gpu_api_publish(gpu, s);
+    box_gpu_packet_publish(p, s);
     s->targets += p->targets;
     s->created += p->created;
     s->configured += p->configured;
@@ -838,11 +943,19 @@ void box_gpu_stats_publish(
     s->prepass_draws += p->prepass_draws;
     s->debug_passes += p->debug_passes;
     s->fog_volumes += p->fog_volumes;
+    s->fog_dispatches += p->fog_dispatches;
+    if (p->fog_grid[0] > 0) {
+        for (i = 0; i < 3; i ++) {
+            s->fog_grid[i] = p->fog_grid[i];
+        }
+    }
+
     s->star_fields += p->star_fields;
     s->transmission_snapshots += p->transmission_snapshots;
     s->transmission_textures += p->transmission_textures;
     s->forward_passes += p->forward_passes;
     s->instance_binds += p->instance_binds;
+    s->data_binds += p->data_binds;
     s->cull_dispatches += p->cull_dispatches;
     s->cull_instance_dispatches += p->cull_instance_dispatches;
     if (p->cull_page_slots > 0) {
@@ -896,6 +1009,19 @@ void box_gpu_stats_publish(
         s->atmosphere_passes[i] += p->atmosphere_passes[i];
     }
 
+    s->grass_passes += p->grass_passes;
+    s->grass_ns += p->grass_ns;
+    s->grass_timed += p->grass_timed;
+    s->grass_cascades += p->grass_cascades;
+    s->grass_tiles += p->grass_tiles;
+    s->grass_reads += p->grass_reads;
+    s->grass_culled_patches += p->grass_culled_patches;
+    s->grass_culled_blades += p->grass_culled_blades;
+    for (i = 0; i < BOX_GRASS_LODS; i ++) {
+        s->grass_generated[i] += p->grass_generated[i];
+        s->grass_drawn[i] += p->grass_drawn[i];
+    }
+
     ecs_os_mutex_unlock(gpu->lock);
     ecs_os_memset_t(p, 0, box_render_gpu_stats_t);
 }
@@ -933,6 +1059,22 @@ bool box_render_gpu_stats(
         box_gpu_t *gpu = backend->ctx;
         ecs_os_mutex_lock(gpu->lock);
         *stats = gpu->stats;
+        ecs_os_mutex_unlock(gpu->lock);
+    }
+
+    return result;
+}
+
+bool box_render_gpu_stats_detail(
+    ecs_world_t *world,
+    bool detail)
+{
+    const box_render_backend_t *backend = box_render_get_backend(world);
+    bool result = backend->render == box_gpu_render;
+    if (result) {
+        box_gpu_t *gpu = backend->ctx;
+        ecs_os_mutex_lock(gpu->lock);
+        gpu->stats_detail = detail;
         ecs_os_mutex_unlock(gpu->lock);
     }
 
@@ -1077,6 +1219,16 @@ bool box_render_gpu_stats(
 {
     (void)world;
     ecs_os_memset_t(stats, 0, box_render_gpu_stats_t);
+
+    return false;
+}
+
+bool box_render_gpu_stats_detail(
+    ecs_world_t *world,
+    bool detail)
+{
+    (void)world;
+    (void)detail;
 
     return false;
 }

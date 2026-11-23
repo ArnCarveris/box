@@ -26,6 +26,7 @@ assets {
         bx: math.cos(angle) * 0.47, by: 0.025, bz: math.sin(angle) * 0.47,
         base: 0.1, tip: 0.018)
     }
+
     trunk_path {
       Path3D: {
         start: {0, 0.04, 0},
@@ -37,20 +38,35 @@ assets {
         ]
       }
     }
+
     trunk {
       Position: {0, 0, 0}
-      Sweep: {path: trunk_path, profile: GardenRoundProfile, scale: {0.235, 0.235}, taper: 0.11, rings: 48}
+      Sweep: {
+        path: trunk_path,
+        profile: GardenRoundProfile,
+        scale: {0.235, 0.235},
+        taper: 0.11,
+        rings: 48
+      }
       Rgb: {119, 85, 74}
       PbrMaterial: {roughness: 0.95}
     }
+
     for i in 0..24 {
       const v = 0.03 + i * 0.03
       {
-        SurfaceAttachment: {target: trunk, region: SurfaceOuter, u: i * 0.382 - math.floor(i * 0.382), v: v, offset: -0.002}
+        SurfaceAttachment: {
+          target: trunk,
+          region: SurfaceOuter,
+          u: i * 0.382 - math.floor(i * 0.382),
+          v: v,
+          offset: -0.002
+        }
         Box: {0.17 * (1 - v * 0.89), 0.012, 0.008}
         Rgb: {151, 112, 95}
       }
     }
+
     for i in 0..6 {
       const angle = i * 2.4 + phase
       const shoulder_x = 0.08 + math.cos(angle) * 0.62
@@ -63,6 +79,7 @@ assets {
         bx: shoulder_x, by: shoulder_y, bz: shoulder_z, base: 0.095, tip: 0.063, markings: true)
       TreeLimb(ax: shoulder_x, ay: shoulder_y, az: shoulder_z,
         bx: elbow_x, by: elbow_y, bz: elbow_z, base: 0.066, tip: 0.038)
+
       for j in 0..3 {
         const twig_angle = angle + (j - 1) * 0.5
         const tip_x = elbow_x + math.cos(twig_angle) * (0.36 + j * 0.08)
@@ -76,6 +93,7 @@ assets {
           Scale: {0.9 + j * 0.06, 1, 0.9 + j * 0.06}
         }
       }
+
       TreeLimb(ax: 0, ay: 2.58, az: 0.1,
         bx: math.cos(angle) * 0.46, by: 2.76 + i % 3 * 0.2, bz: math.sin(angle) * 0.46,
         base: 0.026, tip: 0.006)
@@ -88,7 +106,11 @@ assets {
     for i in 0..32 {
       const angle = i * 2.4 + phase
       {
-        Position: {math.cos(angle) * (0.25 + i * 0.042), 0.018, math.sin(angle) * (0.25 + i * 0.042)}
+        Position: {
+          math.cos(angle) * (0.25 + i * 0.042),
+          0.018,
+          math.sin(angle) * (0.25 + i * 0.042)
+        }
         Rotation: {0, angle, 0}
         Scale: {1, 0.16, 0.65}
         Sphere: {radius: 0.045, segments: 6, smooth: true}

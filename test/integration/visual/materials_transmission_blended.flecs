@@ -12,7 +12,7 @@ using box.view
 using box.light
 
 $ {
-  Scene: {blend_modes: true, transmission: true}
+  Scene: {shader_features: {Extended: {blend_modes: true, transmission: true}}}
 }
 
 camera {

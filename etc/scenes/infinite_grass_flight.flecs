@@ -1,0 +1,382 @@
+// The flight over the infinite grass: the scene of infinite_grass.flecs on a window of 3974x2514,
+// with a course that walks 3 km through the grass from the start, then flies 5 km low over the
+// hills and 8 km high above them, on legs that turn from the one before. Every frame moves the
+// player by COURSE_FRAME seconds of the world, as a frame at 60 FPS would, however long the frame
+// took, with the frames capped at 120 FPS: the grass and the streaming have a real walk's and
+// flight's work per frame, while the frames may run faster than real time.
+//
+// The course stands still at the start until the perf run measures, so the course and the
+// measured frames start together and its parts are fixed spans of the frames: the walk the first
+// 45000 (4 m/s, eye height), the low flight the next 15000 (20 m/s, 10 m over the ground ahead)
+// and the high flight the last 9600 (50 m/s, 150 m over the highest ground ahead). The perf run
+// writes infinite_grass_flight.json: the frame time percentiles, the GPU time of the grass passes
+// and the blades placed and drawn per level over the whole course, and per measured frame the
+// frame interval (intervals_ms), the GPU time of a grass pass (grass_ms) and the blades drawn
+// (grass_drawn). The course panel (top right, H hides it) shows where the player is and a row
+// every COURSE_MARK meters with the measured frame it starts at.
+include infinite_grass
+
+using flecs.script
+using flecs.script.math
+using box.app
+using box.world
+using box.terrain
+using box.layout
+using box.text
+using box.geometry
+using box.material
+using box.perf
+using box.surface
+using state
+
+window {
+  Surface: {width: 3974, height: 2514, vsync: false}
+}
+
+state {
+  // Meters the walk, the low flight and the high flight end at, and the meters between two rows
+  // of the panel
+  export const COURSE_WALK: f32 = 3000
+  export const COURSE_LOW: f32 = 8000
+  export const COURSE_LENGTH: f32 = 16000
+  export const COURSE_MARK: f32 = 500
+
+  // World seconds a frame moves the player by, and the frames the run measures: the frames of
+  // the three parts at their speeds
+  export const COURSE_FRAME: f32 = 1.0 / 60
+  export const COURSE_FRAMES: i32 = 69600
+
+  // The walk: meters per second are WALK_SPEED, the meters ahead whose slope it weighs, the
+  // radians between the directions it weighs, the weight of keeping to its leg, the steepest
+  // ground it takes without a detour and the most it turns per meter
+  export const COURSE_LOOK: f32 = 10
+  export const COURSE_FAN: f32 = 0.12
+  export const COURSE_HOLD: f32 = 0.6
+  export const COURSE_STEEP: f32 = 0.3
+  export const COURSE_WALK_CURVE: f32 = 0.05
+  export const COURSE_WALK_PITCH: f32 = -0.06
+
+  // The low flight: meters per second, meters over the highest ground of the meters ahead and
+  // the pitch of the view
+  export const COURSE_LOW_SPEED: f32 = 20
+  export const COURSE_LOW_CLEARANCE: f32 = 10
+  export const COURSE_LOW_AHEAD: f32 = 60
+  export const COURSE_LOW_PITCH: f32 = -0.1
+
+  // The high flight, the ground ahead it looks at kept within the radius the terrain answers
+  // queries in (QUERY_RADIUS)
+  export const COURSE_HIGH_SPEED: f32 = 50
+  export const COURSE_HIGH_CLEARANCE: f32 = 150
+  export const COURSE_HIGH_AHEAD: f32 = 120
+  export const COURSE_HIGH_PITCH: f32 = -0.3
+  export const COURSE_FLY_CURVE: f32 = 0.004
+
+  // Frame intervals in milliseconds over which a frame misses 120 FPS and 60 FPS
+  export const COURSE_SLOW_MS: f32 = 9.2
+  export const COURSE_HITCH_MS: f32 = 16.7
+
+  // The course as it runs, in absolute meters
+  export mut course_started: bool = false
+  export mut course_done: bool = false
+  export mut course_x: f64 = 0
+  export mut course_y: f64 = 0
+  export mut course_z: f64 = 0
+  export mut course_yaw: f64 = 0
+  export mut course_pitch: f64 = COURSE_WALK_PITCH
+  export mut course_leg_yaw: f64 = 0
+  export mut course_leg: i32 = 0
+  export mut course_leg_end: f64 = 0
+  export mut course_distance: f64 = 0
+  export mut course_seconds: f64 = 0
+
+  // What the panel shows: the line of the player and a row per mark
+  export mut course_now: string = "Waiting for the ground at the start"
+  export mut course_log: string = ""
+
+  // The legs of the course: the radians each turns from the leg before and its meters
+  export const COURSE_LEGS: i32 = 8
+
+  fn course_turn(i: i32) -> f64 {
+    match i {
+      0: 0
+      1: 0.8
+      2: -1.2
+      3: 0.6
+      4: 0.9
+      5: -0.7
+      6: -0.9
+      _: 0.5
+    }
+  }
+
+  fn course_leg_length(i: i32) -> f64 {
+    match i {
+      0: 1100
+      1: 1000
+      2: 1300
+      3: 1600
+      4: 2000
+      5: 2500
+      6: 3000
+      _: 4000
+    }
+  }
+
+  // An angle in -PI..PI
+  fn course_wrap(a: f64) -> f64 {
+    a - 2 * PI * floor((a + PI) / (2 * PI))
+  }
+
+  // The height of the ground where the terrain knows it, else the fallback
+  fn course_ground(x: f64, z: f64, fallback: f64) -> f64 {
+    box.terrain.known(infinite_grass.land, x, z) ?
+      box.terrain.height(infinite_grass.land, x, z) : fallback
+  }
+
+  // The part of the course at a distance: 0 walking, 1 flying low, 2 flying high
+  fn course_part(d: f64) -> i32 {
+    d < COURSE_WALK ? 0 : (d < COURSE_LOW ? 1 : 2)
+  }
+
+  fn course_speed(part: i32) -> f64 {
+    part == 0 ? WALK_SPEED : (part == 1 ? COURSE_LOW_SPEED : COURSE_HIGH_SPEED)
+  }
+}
+
+// Wait for the player to stand at the start and the perf run to measure, then take the player off
+// its controllers and move it along the course every frame
+async {
+  while !state.started {
+    await next_frame()
+  }
+
+  const o0 = WorldOrigin[WorldOrigin]
+  state.course_x = state.start_x + o0.x
+  state.course_y = state.start_y + o0.y
+  state.course_z = state.start_z + o0.z
+  state.course_yaw = state.start_yaw
+  state.course_leg_yaw = state.start_yaw
+  state.course_leg_end = course_leg_length(0)
+  state.scripted = true
+  state.course_started = true
+  state.course_now = "Waiting for the perf run to measure"
+
+  while box.perf.Status[box.perf.Status].frame < 1 {
+    await next_frame()
+  }
+
+  mut next_mark: f64 = 0
+  mut next_line: f64 = 0
+  mut worst: f64 = 0
+  mut sum_ms: f64 = 0
+  mut frames: i32 = 0
+  mut slow: i32 = 0
+  mut hitches: i32 = 0
+  mut all_worst: f64 = 0
+  mut all_worst_km: f64 = 0
+  mut all_slow: i32 = 0
+  mut all_hitches: i32 = 0
+  mut last_y: f64 = state.course_y
+
+  while true {
+    // Every mark, a row of the frames since the mark before
+    if state.course_distance >= next_mark {
+      const km = next_mark / 1000
+      const frame = box.perf.Status[box.perf.Status].frame
+      const mark_part = course_part(next_mark)
+      const mode = mark_part == 0 ? "Walk" : (mark_part == 1 ? "Low flight" : "High flight")
+      const ground = course_ground(state.course_x, state.course_z, state.course_y)
+      const above = state.course_y - ground
+      const mean = frames > 0 ? sum_ms / frames : 0
+      const shifts = WorldOriginStatus[WorldOriginStatus].shifts
+      state.course_log = state.course_log +
+        "{km:.1} km  frame {frame}  {mode} {above:.0} m  mean {mean:.2} ms  " +
+        "worst {worst:.1} ms  slow {slow}  hitch {hitches}  shifts {shifts}\n"
+      next_mark = next_mark + COURSE_MARK
+      worst = 0
+      sum_ms = 0
+      frames = 0
+      slow = 0
+      hitches = 0
+    }
+
+    if state.course_distance >= COURSE_LENGTH {
+      break
+    }
+
+    await next_frame()
+
+    // The interval of the frame before
+    const dt = COURSE_FRAME
+    const frame_ms = box.app.FrameTiming[box.app.FrameTiming].interval_ms
+    worst = max(worst, frame_ms)
+    sum_ms = sum_ms + frame_ms
+    frames = frames + 1
+    if frame_ms > all_worst {
+      all_worst = frame_ms
+      all_worst_km = state.course_distance / 1000
+    }
+
+    if frame_ms > COURSE_SLOW_MS {
+      slow = slow + 1
+      all_slow = all_slow + 1
+    }
+
+    if frame_ms > COURSE_HITCH_MS {
+      hitches = hitches + 1
+      all_hitches = all_hitches + 1
+    }
+
+    state.course_seconds = state.course_seconds + dt
+
+    const part = course_part(state.course_distance)
+    const step = min(course_speed(part) * dt, COURSE_LENGTH - state.course_distance)
+    const x = state.course_x
+    const z = state.course_z
+    const yaw = state.course_yaw
+
+    // The next leg
+    if state.course_distance >= state.course_leg_end && state.course_leg < COURSE_LEGS - 1 {
+      state.course_leg = state.course_leg + 1
+      state.course_leg_yaw = course_wrap(state.course_leg_yaw + course_turn(state.course_leg))
+      state.course_leg_end = state.course_leg_end + course_leg_length(state.course_leg)
+    }
+
+    // The heading: walking, the best of a fan of directions, around the scarps; flying, the
+    // heading of the leg
+    mut goal: f64 = state.course_leg_yaw
+    if part == 0 {
+      mut best: f64 = -1000000
+      for k in 0..9 {
+        const a = yaw + (k - 4) * COURSE_FAN
+        const off = course_wrap(a - state.course_leg_yaw)
+        const dx = 0 - sin(a)
+        const dz = 0 - cos(a)
+        const near_ = box.terrain.slope(infinite_grass.land, x + dx * COURSE_LOOK / 2,
+          z + dz * COURSE_LOOK / 2)
+        const far_ = box.terrain.slope(infinite_grass.land, x + dx * COURSE_LOOK,
+          z + dz * COURSE_LOOK)
+        const score = 0 - 4 * max(0, near_ - COURSE_STEEP) - 3 * max(0, far_ - COURSE_STEEP) -
+          COURSE_HOLD * off * off - 0.04 * abs(k - 4)
+        if score > best {
+          best = score
+          goal = a
+        }
+      }
+    }
+
+    const curve = part == 0 ? COURSE_WALK_CURVE : COURSE_FLY_CURVE
+    const turn = clamp(course_wrap(goal - yaw), 0 - curve * step, curve * step)
+    const new_yaw = course_wrap(yaw + turn)
+    const nx = x - sin(new_yaw) * step
+    const nz = z - cos(new_yaw) * step
+    state.course_x = nx
+    state.course_z = nz
+    state.course_yaw = new_yaw
+    state.course_distance = state.course_distance + step
+
+    // The height: walking, eye height over the ground, eased over a meter or so of the walk;
+    // flying, over the highest ground ahead, climbing sooner than it sinks
+    const ground = course_ground(nx, nz, state.course_y - EYE)
+    mut target_pitch: f64 = COURSE_WALK_PITCH
+    if part == 0 {
+      const target = ground + EYE
+      state.course_y = max(state.course_y + (target - state.course_y) * min(1, step * 0.8),
+        ground + 0.6)
+    } else {
+      const ahead = part == 1 ? COURSE_LOW_AHEAD : COURSE_HIGH_AHEAD
+      const clearance = part == 1 ? COURSE_LOW_CLEARANCE : COURSE_HIGH_CLEARANCE
+      mut top: f64 = ground
+      for k in 1..7 {
+        const d = k * ahead / 6
+        top = max(top, course_ground(nx - sin(new_yaw) * d, nz - cos(new_yaw) * d, ground))
+      }
+
+      const target = top + clearance
+      const ease = target > state.course_y ? 0.8 : 0.25
+      state.course_y = max(state.course_y + (target - state.course_y) * min(1, dt * ease),
+        ground + 2)
+      const climb = dt > 0 ? (state.course_y - last_y) / dt : 0
+      const base = part == 1 ? COURSE_LOW_PITCH : COURSE_HIGH_PITCH
+      target_pitch = base + 0.5 * atan2(climb, course_speed(part))
+    }
+
+    // The pitch eases into that of the part, so the view tilts down as the flight climbs
+    state.course_pitch = state.course_pitch + (target_pitch - state.course_pitch) * min(1, dt)
+    last_y = state.course_y
+
+    // The pose of the player in the frame of the origin
+    const o = WorldOrigin[WorldOrigin]
+    state.start_x = state.course_x - o.x
+    state.start_y = state.course_y - o.y
+    state.start_z = state.course_z - o.z
+    state.start_yaw = state.course_yaw
+    state.start_pitch = state.course_pitch
+
+    if state.course_distance >= next_line {
+      const km = state.course_distance / 1000
+      const total = COURSE_LENGTH / 1000
+      const t = state.course_seconds
+      const frame = box.perf.Status[box.perf.Status].frame
+      const mode = part == 0 ? "Walk" : (part == 1 ? "Low flight" : "High flight")
+      const leg = state.course_leg + 1
+      const above = state.course_y - ground
+      state.course_now = "{mode} {km:.2} km of {total:.0} in {t:.0} s, leg {leg}, " +
+        "{above:.0} m over the ground, measured frame {frame}\n" +
+        "worst frame {all_worst:.1} ms at {all_worst_km:.2} km, over 9.2 ms {all_slow}, " +
+        "over 16.7 ms {all_hitches}"
+      next_line = next_line + 25
+    }
+  }
+
+  const t = state.course_seconds
+  const total = COURSE_LENGTH / 1000
+  state.course_now = "Course done: {total:.0} km in {t:.0} s\nworst frame {all_worst:.1} ms " +
+    "at {all_worst_km:.2} km, over 9.2 ms {all_slow}, over 16.7 ms {all_hitches}"
+  state.course_done = true
+}
+
+// The keys the perf run holds (forward and left) reach no controller: the course moves the
+// player itself
+$ {
+  if state.course_started {
+    box.perf.Run: {
+      fps: 120,
+      frames: COURSE_FRAMES,
+      warmup: 120,
+      period: 0,
+      camera: player,
+      fly: true,
+      report: "infinite_grass_flight.json"
+    }
+  }
+}
+
+// The course panel, top right over the view
+hud {
+  screen {
+    course {
+      Layout: {direction: Column, spacing: 8, padding: {12, 14, 12, 14}}
+      Item: {h: Right, v: Top, x: state.hud_shown ? -18 : 4000, y: -18}
+      Rect: {1, 1}
+      Rgb: {24, 30, 25}
+      Opacity: {0.88}
+      Border: {width: 1, radius: 10, color: {84, 98, 76, 255}}
+
+      title {
+        Text: {value: "Grass flight", size: 18}
+        Rgb: {236, 232, 216}
+      }
+
+      now {
+        Text: {value: state.course_now, size: 13}
+        Rgb: {214, 186, 112}
+      }
+
+      marks {
+        Text: {value: state.course_log, size: 11}
+        Rgb: {196, 200, 184}
+      }
+    }
+  }
+}

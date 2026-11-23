@@ -775,11 +775,14 @@ void MaterialIds_transmission_prefab_slot(void) {
     // materials/transmission
     box_render_null_t *null;
     ecs_world_t *world = world_new(&null);
-    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
-        .punctual_shadows = true, .cookies = true, .environment = true,
-        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
-        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
-        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true, .punctual_shadows = true,
+        .cookies = true, .environment = true, .aerial_perspective = true,
+        .shader_features.Extended.alpha_cutout = true, .shader_features.Extended.blend_modes = true,
+        .shader_features.Extended.transmission = true,
+        .shader_features.Extended.texture_blend = true, .shader_features.Extended.triplanar = true,
+        .shader_features.Extended.sheen = true, .shader_features.Extended.clear_coat = true,
+        .shader_features.Extended.anisotropy = true,
+        .shader_features.Extended.diffuse_transmission = true});
     ecs_entity_t prefab = prefab_new(world);
     ecs_set(world, prefab, Transmission, {.transmission_factor = 1, .ior = 1.45f,
         .thickness_factor = 0.5f, .attenuation_distance = 2,
@@ -1457,11 +1460,14 @@ void MaterialIds_shared_cutoff_change_records_shadow(void) {
     // gpu_instance_data/material_dedup
     box_render_null_t *null;
     ecs_world_t *world = world_new(&null);
-    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
-        .punctual_shadows = true, .cookies = true, .environment = true,
-        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
-        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
-        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true, .punctual_shadows = true,
+        .cookies = true, .environment = true, .aerial_perspective = true,
+        .shader_features.Extended.alpha_cutout = true, .shader_features.Extended.blend_modes = true,
+        .shader_features.Extended.transmission = true,
+        .shader_features.Extended.texture_blend = true, .shader_features.Extended.triplanar = true,
+        .shader_features.Extended.sheen = true, .shader_features.Extended.clear_coat = true,
+        .shader_features.Extended.anisotropy = true,
+        .shader_features.Extended.diffuse_transmission = true});
     ecs_vec_t *regions = regions_of(world);
     ecs_entity_t a = shape_new(world, 0, 10, 200, 30);
     ecs_entity_t b = shape_new(world, 6, 10, 200, 30);
@@ -1730,7 +1736,7 @@ void MaterialIds_texture_scroll_private_slot(void) {
     // materials/material_ids
     box_render_null_t *null;
     ecs_world_t *world = world_new(&null);
-    ecs_singleton_set(world, Scene, {.texture_scroll = true});
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.texture_scroll = true});
     ecs_entity_t a = ecs_new(world);
     ecs_set(world, a, Box, {1, 1, 1});
     ecs_set(world, a, Position, {0, 0, 0});
@@ -1771,7 +1777,7 @@ void MaterialIds_texture_scroll_repacks_only_scrolling(void) {
     // materials/material_ids
     box_render_null_t *null;
     ecs_world_t *world = world_new(&null);
-    ecs_singleton_set(world, Scene, {.texture_scroll = true});
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.texture_scroll = true});
     ecs_entity_t prefab = prefab_new(world);
     ecs_set(world, prefab, Rgb, {200, 100, 50});
     int32_t i;
@@ -1854,7 +1860,7 @@ void MaterialIds_texture_scroll_prefab_repacks(void) {
     // materials/material_ids
     box_render_null_t *null;
     ecs_world_t *world = world_new(&null);
-    ecs_singleton_set(world, Scene, {.texture_scroll = true});
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.texture_scroll = true});
     ecs_entity_t prefab = prefab_new(world);
     ecs_set(world, prefab, Rgb, {40, 80, 120});
     ecs_set(world, prefab, TextureScroll, {.velocity = {0.25f, 0}});
@@ -1909,7 +1915,7 @@ void MaterialIds_texture_scroll_off_shares_slot(void) {
     }
 
     /* Turning the flag on gives the scrolling shape its own slot, packed every frame */
-    ecs_singleton_set(world, Scene, {.texture_scroll = true});
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.texture_scroll = true});
     frame_dt(world, 1.0f / 60.0f);
     frame_dt(world, 1.0f / 60.0f);
     uint32_t own = id_of(world, a);
@@ -1923,7 +1929,7 @@ void MaterialIds_texture_scroll_off_shares_slot(void) {
     }
 
     /* Off again, it shares the slot of its content */
-    ecs_singleton_set(world, Scene, {.texture_scroll = false});
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.texture_scroll = false});
     frame_dt(world, 1.0f / 60.0f);
     frame_dt(world, 1.0f / 60.0f);
     test_uint(id_of(world, a), id_of(world, b));
@@ -1941,7 +1947,7 @@ void MaterialIds_still_water_shares_slot(void) {
     // materials/material_ids
     box_render_null_t *null;
     ecs_world_t *world = world_new(&null);
-    ecs_singleton_set(world, Scene, {.water = true});
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.water = true});
     ecs_entity_t a = ecs_new(world);
     ecs_set(world, a, Box, {1, 1, 1});
     ecs_set(world, a, Position, {0, 0, 0});
@@ -2054,7 +2060,7 @@ void MaterialIds_distortion_shares_slot(void) {
     // materials/material_ids
     box_render_null_t *null;
     ecs_world_t *world = world_new(&null);
-    ecs_singleton_set(world, Scene, {.distortion = true});
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.distortion = true});
     ecs_entity_t a = ecs_new(world);
     ecs_set(world, a, Box, {1, 1, 1});
     ecs_set(world, a, Position, {0, 0, 0});

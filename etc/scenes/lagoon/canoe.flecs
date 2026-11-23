@@ -6,32 +6,76 @@ using box.material
 using state
 using assets
 
-// The outrigger canoe, bow toward -Z, the float on the left (-X). It bobs on the water, rolls by
-// lean (positive rolls the top toward -X) and, while capsize > 0, rolls over toward 180 degrees
-// and sinks a little. While invulnerable after a hit it blinks red.
+// The outrigger canoe, bow toward -Z, the float on the left (-X). It bobs, pitches and rocks a
+// little on the swell (swell_phase), rolls by lean (positive rolls the top toward -X) and, while
+// capsize > 0, rolls over toward 180 degrees and sinks a little. While invulnerable after a hit it blinks red.
 canoe {
-  Position: {canoe_x, 0.035 * sin(clock * 1.7) - capsize * 0.35, CANOE_Z}
-  Rotation: {0.018 * sin(clock * 1.3 + 0.6), 0, lean + capsize * PI}
-  Tint: {255, 90, 70, game_state == GS_PLAYING && invulnerable > 0 && fract(invulnerable * 6) > 0.5 ? 170 : 0}
+  Position: {canoe_x, 0.05 * sin(0 - swell_phase) - capsize * 0.35, CANOE_Z}
+  Rotation: {0.025 * cos(swell_phase), 0, lean + 0.01 * sin(1.1 - swell_phase) + capsize * PI}
+  Tint: {
+    255,
+    90,
+    70,
+    game_state == GS_PLAYING && invulnerable > 0 && fract(invulnerable * 6) > 0.5 ? 170 : 0
+  }
 
-  hull : LgCanoeWood { Position: {0, 0.02, 0}; Scale: {0.42, 0.36, 3.3}; Sphere: {radius: 1, segments: 24, smooth: true} }
+  hull : LgCanoeWood {
+    Position: {0, 0.02, 0}
+    Scale: {0.42, 0.36, 3.3}
+    Sphere: {radius: 1, segments: 24, smooth: true}
+  }
+
   well : LgCanoeDark { Position: {0, 0.3, 0}; Box: {0.5, 0.04, 4.4} }
   gunwale_l : LgCanoeWood { Position: {-0.27, 0.33, 0}; Box: {0.06, 0.06, 4.2} }
   gunwale_r : LgCanoeWood { Position: {0.27, 0.33, 0}; Box: {0.06, 0.06, 4.2} }
-  bow : LgCanoeWood { Position: {0, 0.34, -2.95}; Rotation: {-1.05, 0, 0}; Scale: {0.7, 1, 1}; Cone: {length: 1.0, radius: 0.24, segments: 12} }
-  stern : LgCanoeWood { Position: {0, 0.34, 2.95}; Rotation: {1.05, 0, 0}; Scale: {0.7, 1, 1}; Cone: {length: 1.0, radius: 0.24, segments: 12} }
+  bow : LgCanoeWood {
+    Position: {0, 0.34, -2.95}
+    Rotation: {-1.05, 0, 0}
+    Scale: {0.7, 1, 1}
+    Cone: {length: 1.0, radius: 0.24, segments: 12}
+  }
+
+  stern : LgCanoeWood {
+    Position: {0, 0.34, 2.95}
+    Rotation: {1.05, 0, 0}
+    Scale: {0.7, 1, 1}
+    Cone: {length: 1.0, radius: 0.24, segments: 12}
+  }
+
   bow_tip : LgLashing { Position: {0, 0.62, -3.4}; Sphere: {radius: 0.07, segments: 8} }
   stern_tip : LgLashing { Position: {0, 0.62, 3.4}; Sphere: {radius: 0.07, segments: 8} }
 
   // Two cross booms to the float on the left side
   for b in 0..2 {
     const bz = b == 0 ? -1.3 : 1.5
-    "boom_{b}" : LgCanoeWood { Position: {-1.25, 0.42, bz}; Rotation: {0, 0, -0.04}; Box: {2.7, 0.08, 0.09} }
+    "boom_{b}" : LgCanoeWood {
+      Position: {-1.25, 0.42, bz}
+      Rotation: {0, 0, -0.04}
+      Box: {2.7, 0.08, 0.09}
+    }
+
     "lash_{b}" : LgLashing { Position: {-0.27, 0.4, bz}; Box: {0.12, 0.12, 0.14} }
     "strut_{b}" : LgCanoeDark { Position: {-2.45, 0.24, bz}; Box: {0.06, 0.36, 0.06} }
     "strut_lash_{b}" : LgLashing { Position: {-2.45, 0.42, bz}; Box: {0.1, 0.1, 0.12} }
   }
-  float : LgCanoeWood { Position: {-2.45, 0.04, 0.1}; Rotation: {HALF_PI, 0, 0}; Capsule: {length: 3.4, radius: 0.13, segments: 12, smooth: true} }
+
+  float : LgCanoeWood {
+    Position: {-2.45, 0.04, 0.1}
+    Rotation: {HALF_PI, 0, 0}
+    Capsule: {length: 3.4, radius: 0.13, segments: 12, smooth: true}
+  }
+
+  // The hull and the float push the water aside as it flows past and leave a foaming wake in the
+  // WaterRipples of the water (wake.flecs)
+  wake_hull {
+    Position: {0, 0, 0}
+    RippleSource: {extents: {0.4, 3.1}, strength: 1.6, foam: 0.15}
+  }
+
+  wake_float {
+    Position: {-2.45, 0, 0.1}
+    RippleSource: {extents: {0.15, 1.8}, strength: 0.8, foam: 0.25}
+  }
 
   // The paddler sits behind the middle, facing the bow
   paddler {
@@ -39,34 +83,77 @@ canoe {
     seat : LgCanoeDark { Position: {0, -0.02, 0.05}; Box: {0.5, 0.06, 0.3} }
     sarong : LgCloth { Position: {0, 0.08, 0}; Box: {0.38, 0.16, 0.34} }
     legs : LgSkin { Position: {0, 0.06, -0.35}; Box: {0.3, 0.1, 0.5} }
-    torso : LgSkin { Position: {0, 0.36, 0}; Scale: {1.15, 1, 0.8}; Capsule: {length: 0.3, radius: 0.16, segments: 12, smooth: true} }
+    torso : LgSkin {
+      Position: {0, 0.36, 0}
+      Scale: {1.15, 1, 0.8}
+      Capsule: {length: 0.3, radius: 0.16, segments: 12, smooth: true}
+    }
+
     neck : LgSkin { Position: {0, 0.64, 0}; Cylinder: {length: 0.1, radius: 0.05, segments: 8} }
     head : LgSkin { Position: {0, 0.78, -0.01}; Sphere: {radius: 0.12, segments: 16, smooth: true} }
-    hair : LgCanoeDark { Position: {0, 0.8, 0.03}; Sphere: {radius: 0.118, segments: 16, smooth: true} }
+    hair : LgCanoeDark {
+      Position: {0, 0.8, 0.03}
+      Sphere: {radius: 0.118, segments: 16, smooth: true}
+    }
+
     hat {
       Position: {0, 0.88, 0}
       Rotation: {0.08, 0, 0}
       brim : LgStraw { Position: {0, 0, 0}; Cylinder: {length: 0.02, radius: 0.32, segments: 20} }
       crown : LgStraw { Position: {0, 0.09, 0}; Cone: {length: 0.18, radius: 0.2, segments: 16} }
-      band : LgCloth { Position: {0, 0.02, 0}; Cylinder: {length: 0.03, radius: 0.15, segments: 16} }
+      band : LgCloth {
+        Position: {0, 0.02, 0}
+        Cylinder: {length: 0.03, radius: 0.15, segments: 16}
+      }
     }
 
     // Shoulders, arms and paddle swing together with paddle_phase, the blade dips on the right
     stroke {
       Position: {0, 0.56, 0}
-      Rotation: {0.55 * sin(paddle_phase), 0.15 * cos(paddle_phase), -0.3 + 0.12 * cos(paddle_phase)}
-      arm_r : LgSkin { Position: {0.31, -0.12, 0}; Rotation: {0, 0, 0.82}; Capsule: {length: 0.24, radius: 0.045, segments: 8} }
-      arm_l : LgSkin { Position: {0.12, 0.17, 0}; Rotation: {0, 0, -1.04}; Capsule: {length: 0.5, radius: 0.045, segments: 8} }
+      Rotation: {
+        0.55 * sin(paddle_phase),
+        0.15 * cos(paddle_phase),
+        -0.3 + 0.12 * cos(paddle_phase)
+      }
+      arm_r : LgSkin {
+        Position: {0.31, -0.12, 0}
+        Rotation: {0, 0, 0.82}
+        Capsule: {length: 0.24, radius: 0.045, segments: 8}
+      }
+
+      arm_l : LgSkin {
+        Position: {0.12, 0.17, 0}
+        Rotation: {0, 0, -1.04}
+        Capsule: {length: 0.5, radius: 0.045, segments: 8}
+      }
+
       paddle {
         Position: {0.45, 0, 0}
-        shaft : LgCanoeWood { Position: {0, -0.3, 0}; Cylinder: {length: 1.7, radius: 0.025, segments: 8} }
+        shaft : LgCanoeWood {
+          Position: {0, -0.3, 0}
+          Cylinder: {length: 1.7, radius: 0.025, segments: 8}
+        }
+
         grip : LgCanoeDark { Position: {0, 0.57, 0}; Box: {0.14, 0.04, 0.04} }
-        blade : LgCanoeWood { Position: {0, -1.12, 0}; Scale: {1, 2.2, 0.22}; Sphere: {radius: 0.1, segments: 12} }
+        blade : LgCanoeWood {
+          Position: {0, -1.12, 0}
+          Scale: {1, 2.2, 0.22}
+          Sphere: {radius: 0.1, segments: 12}
+        }
       }
     }
   }
 
   // A rolled sail and its spar lashed along the booms
-  spar : LgCanoeWood { Position: {-0.9, 0.52, 0.1}; Rotation: {HALF_PI, 0, 0}; Cylinder: {length: 3, radius: 0.03, segments: 8} }
-  sail : LgSail { Position: {-0.9, 0.58, 0.1}; Rotation: {HALF_PI, 0, 0}; Capsule: {length: 2.2, radius: 0.07, segments: 10, smooth: true} }
+  spar : LgCanoeWood {
+    Position: {-0.9, 0.52, 0.1}
+    Rotation: {HALF_PI, 0, 0}
+    Cylinder: {length: 3, radius: 0.03, segments: 8}
+  }
+
+  sail : LgSail {
+    Position: {-0.9, 0.58, 0.1}
+    Rotation: {HALF_PI, 0, 0}
+    Capsule: {length: 2.2, radius: 0.07, segments: 10, smooth: true}
+  }
 }

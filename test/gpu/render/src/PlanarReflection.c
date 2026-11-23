@@ -470,8 +470,8 @@ void PlanarReflection_sky_mirrored(void) {
 
 void PlanarReflection_water_hidden(void) {
     ecs_world_t *world = pr_world();
-    ecs_singleton_set(world, Scene, {.transmission = true, .water = true,
-        .planar_reflections = true});
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.transmission = true,
+        .shader_features.Extended.water = true, .planar_reflections = true});
     ecs_entity_t view = pr_view(world, 2);
     pr_mirror(world);
 
@@ -762,8 +762,8 @@ static ecs_entity_t pr_tilt(
 
 void PlanarReflection_shading_water(void) {
     ecs_world_t *world = pr_world();
-    ecs_singleton_set(world, Scene, {.transmission = true, .water = true,
-        .planar_reflections = true});
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.transmission = true,
+        .shader_features.Extended.water = true, .planar_reflections = true});
     pr_view(world, 2);
 
     // A black, opaque bodied Water plane that reflects a bright red box above it, turned about
@@ -775,7 +775,7 @@ void PlanarReflection_shading_water(void) {
     ecs_set(world, water, Rgb, {255, 255, 255});
     ecs_set(world, water, PbrMaterial, {.metallic = 0, .roughness = 0.05f});
     ecs_set(world, water, Water, {.shallow_color = {0, 0, 0}, .deep_color = {0, 0, 0},
-        .depth = 1, .visibility = 0.001f, .foam_scale = 1});
+        .depth = 1, .visibility = 0.001f, .absorption = {255, 255, 255}, .foam_scale = 1});
     ecs_set(world, water, PlanarReflection, {.resolution = 1, .clip_offset = 0.02f,
         .distortion = 0.2f});
     ecs_entity_t box = pr_red_box(world, 0, 1.5f, 0, 2);

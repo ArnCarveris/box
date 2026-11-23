@@ -1,0 +1,41 @@
+using flecs.script
+using flecs.script.math
+using box.texture
+using state
+
+state {
+  export const STREAM_STEP: f32 = 0.3
+  export const STREAM_DEPTH: f32 = 0.2
+  export const STREAM_SINK: f32 = 4.5
+  export const STREAM_POOL: f32 = 1.5
+  export const STREAM_DATA_DROP: f32 = 2000
+  export const FAR_DATA_DROP: f32 = 4000
+}
+
+assets {
+  template IslandStreamRay {
+    prop coords: entity = 0
+    prop prev: entity = 0
+    prop angle: f32 = 0
+    prop spring: f32 = 800
+
+    const ux = cos(angle)
+    const uz = sin(angle)
+
+    across { nodes.Dot: {a: coords, b_value: {0 - uz, ux, 0, 0}} }
+    along { nodes.Dot: {a: coords, b_value: {ux, uz, 0, 0}} }
+    side { nodes.Abs: {input: across} }
+    above {
+      nodes.Remap: {input: along, from_min: spring - 160, from_max: spring, to_min: 300,
+        to_max: 0, clamp: true}
+    }
+
+    behind {
+      nodes.Remap: {input: along, from_min: 0, from_max: 80, to_min: 800, to_max: 0, clamp: true}
+    }
+
+    d1 { nodes.Add: {a: side, b: above} }
+    d2 { nodes.Add: {a: d1, b: behind} }
+    nodes.Min: {a: prev, b: d2, a_value: {10000, 10000, 10000, 10000}}
+  }
+}

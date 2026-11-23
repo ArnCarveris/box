@@ -2,7 +2,7 @@
     "id": "bench_scene",
     "type": "application",
     "value": {
-        "description": "Benchmarks for the spatial index of box.spatial with one million shapes, for SpatialLayout and for ProjectedAnchor",
+        "description": "Benchmarks for the spatial index of box.spatial with one million shapes, for SpatialLayout, for ProjectedAnchor and for Scatter",
         "public": false,
         "use": [
             "box"
@@ -58,6 +58,13 @@
                 "benchcases": [
                     "anchors_1k_moving",
                     "bars_1k_zooming"
+                ]
+            },
+            {
+                "id": "Scatter",
+                "benchcases": [
+                    "place_10k",
+                    "place_10k_spatial_ignore"
                 ]
             }
         ]

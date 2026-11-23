@@ -1,0 +1,109 @@
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+using box.camera
+using box.view
+using box.light
+
+$ {
+  Scene: {shader_features: {Extended: {water: true, texture_scroll: true}}}
+}
+
+// A pond (Water) in a sandy terrain bowl turned on a Lathe, seen from above at an angle against
+// a low sun ahead of the camera. Its waves are WaterWaves: a long swell that rolls toward the
+// camera and two shorter waves that cross it, whose crests catch the sun as a band of glints;
+// a fine generated normal map scrolled by texture.Scroll adds detail on top at half weight. The
+// swell travels at its deep water speed, the short waves ride a slow WaterFlow along +x.
+// frames: 60
+water_waves {
+  Scene: {shader_features: {Extended: {water: true, texture_scroll: true}}}
+  AmbientLight: {sky: {140, 165, 205}, ground: {70, 64, 52}, intensity: 0.6}
+
+  sun {
+    Rotation: {0.3, 0.2, 0}
+    DirectionalLight: {intensity: 3}
+    Rgb: {255, 236, 205}
+  }
+
+  camera {
+    Position: {0, 6, 12}
+    Rotation: {-0.45, 0, 0}
+    Camera: {fov: 50}
+  }
+
+  main_view {
+    View: {camera: camera, clear: {enabled: true, color: {150, 165, 190, 255}}}
+  }
+
+  detail_height {
+    Gen: {
+      width: 256, height: 256, seed: 11
+      layers: [
+        {kind: GenNoise, frequency: 8, octaves: 3, amount: 1}
+      ]
+    }
+  }
+
+  detail {
+    Gen: {source: detail_height, output: GenNormal, strength: 1}
+  }
+
+  bowl_profile {
+    Path2D: {
+      start: {0, -2.4},
+      segments: [
+        {kind: CubicBezier, end: {10, 0.9}, control1: {4.5, -2.4}, control2: {7.8, -0.4}}
+      ],
+      closed: false
+    }
+  }
+
+  bowl {
+    Position: {0, 0, 0}
+    Lathe: {profile: bowl_profile, segments: 96, rings: 32}
+    BackFaceMode: BackFacePlain
+    Rgb: {196, 176, 136}
+    PbrMaterial: {roughness: 0.95}
+  }
+
+  rock {
+    Position: {-2.6, -0.3, 1.4}
+    Rotation: {0.2, 1.2, 0.1}
+    Scale: {1.2, 0.9, 1}
+    IcoSphere: {segments: 1, radius: 0.7}
+    Rgb: {104, 100, 94}
+    PbrMaterial: {roughness: 0.9}
+  }
+
+  pond {
+    Position: {0, 0, 0}
+    Rotation: {-1.5708, 0, 0}
+    NGon: {sides: 64, radius: 9.6}
+    Rgb: {255, 255, 255}
+    PbrMaterial: {metallic: 0, roughness: 0.06}
+    PbrTextures: {normal: detail}
+    texture.Transform: {scale_x: 4, scale_y: 4, offset_x: 0, offset_y: 0}
+    texture.Scroll: {velocity: {0, 0}, normal_velocity: {0.015, 0.008}}
+    Water: {
+      shallow_color: {60, 165, 160}
+      deep_color: {8, 38, 62}
+      depth: 2
+      visibility: 1.5
+      refraction: 0.03
+      foam_color: {240, 245, 245}
+      foam_width: 0.2
+      foam_scale: 2
+    }
+    WaterWaves: {
+      waves: [
+        {direction: {0.25, 1}, wavelength: 5.5, amplitude: 0.14, steepness: 0.5},
+        {direction: {1, -0.35}, wavelength: 1.6, amplitude: 0.035, steepness: 0.3},
+        {direction: {-0.7, -0.6}, wavelength: 1.1, amplitude: 0.022, steepness: 0.2,
+          speed: 0.9}
+      ]
+      detail: 0.5
+    }
+    WaterFlow: {velocity: {0.2, 0}}
+  }
+}

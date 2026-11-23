@@ -197,6 +197,26 @@ void box_render_texture_previews_filter(
     }
 }
 
+void box_render_texture_previews_return(
+    ecs_world_t *world,
+    ecs_vec_t *reads)
+{
+    box_render_previews_t *p = box_render_previews_get(world);
+    int32_t i;
+    for (i = 0; i < ecs_vec_count(reads); i ++) {
+        box_render_texture_read_t *r = ecs_vec_get_t(reads, box_render_texture_read_t, i);
+        if (!p) {
+            ecs_os_free(r->texels);
+        } else if (r->ticket & BOX_RENDER_PREVIEW_TICKET) {
+            *ecs_vec_append_t(NULL, &p->delivered, box_render_texture_read_t) = *r;
+        } else {
+            *ecs_vec_append_t(NULL, &p->kept, box_render_texture_read_t) = *r;
+        }
+    }
+
+    ecs_vec_clear(reads);
+}
+
 /** Find the index of a node in the compiled graph of a texture.
  *
  * @param tex The texture, may be NULL
@@ -488,7 +508,7 @@ static void box_render_preview_encode(
     height = height > 0 ? height : 1;
     index = box_render_preview_index(tex, preview->node);
     output = r->index < 0 || r->index == tex->graph->node_count - 1;
-    gray = tex->graph->format == GraphSingle ||
+    gray = tex->graph->format == GraphSingle || tex->graph->format == GraphFloat ||
         (!output && index >= 0 && tex->graph->nodes[index].output == TexScalar);
     encode = !output && (tex->graph->format == GraphColor || tex->graph->format == GraphHdr);
     mode = (gray ? 1 : 0) | (encode ? 2 : 0);

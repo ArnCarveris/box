@@ -16,12 +16,25 @@ assets {
   template IslandOlive {
     IslandPot(size: 1.8) { Position: {} }
     IslandBeam(ay: 0.5, bx: 0.1, by: 2.1, radius: 0.095) {}
+
     for i in 0..7 {
       const a = i * 2.4
-      IslandBeam(ax: 0.06, ay: 1.3, bx: math.sin(a) * 0.6, by: 2.1 + i % 3 * 0.2, bz: math.cos(a) * 0.6, radius: 0.04) {}
+      IslandBeam(
+        ax: 0.06,
+        ay: 1.3,
+        bx: math.sin(a) * 0.6,
+        by: 2.1 + i % 3 * 0.2,
+        bz: math.cos(a) * 0.6,
+        radius: 0.04
+      ) {}
+
       for j in 0..5 {
         {
-          Position: {math.sin(a) * 0.65 + math.sin(j * 2.4) * 0.28, 2.08 + i % 3 * 0.2 + math.cos(j * 3) * 0.2, math.cos(a) * 0.65 + math.cos(j * 2.4) * 0.27}
+          Position: {
+            math.sin(a) * 0.65 + math.sin(j * 2.4) * 0.28,
+            2.08 + i % 3 * 0.2 + math.cos(j * 3) * 0.2,
+            math.cos(a) * 0.65 + math.cos(j * 2.4) * 0.27
+          }
           Scale: {1, 0.65, 0.85}
           IcoSphere: {radius: 0.32, segments: 1}
           Rgb: {117 + j % 3 * 9, 141 + j % 3 * 8, 94 + j % 3 * 9}

@@ -19,10 +19,28 @@ assets {
     prop height: f32 = 2.8
     prop tint: Rgb = {220, 52, 132}
     IslandPot(size: 1.25) { Position: {-width * 0.42, 0, 0.18} }
+
     for stem in 0..3 {
-      IslandBeam(ax: -width * 0.42, ay: 0.4, az: 0.1, bx: -width * 0.4 + stem * 0.14, by: height, bz: 0.08, radius: 0.035) {}
-      IslandBeam(ax: -width * 0.4 + stem * 0.14, ay: height, az: 0.08, bx: width * 0.42, by: height - stem * 0.13, bz: 0.08, radius: 0.024) {}
+      IslandBeam(
+        ax: -width * 0.42,
+        ay: 0.4,
+        az: 0.1,
+        bx: -width * 0.4 + stem * 0.14,
+        by: height,
+        bz: 0.08,
+        radius: 0.035
+      ) {}
+      IslandBeam(
+        ax: -width * 0.4 + stem * 0.14,
+        ay: height,
+        az: 0.08,
+        bx: width * 0.42,
+        by: height - stem * 0.13,
+        bz: 0.08,
+        radius: 0.024
+      ) {}
     }
+
     for i in 0..42 {
       const t = i / 41.0
       const x = -width * 0.48 + t * width
@@ -33,15 +51,21 @@ assets {
         IcoSphere: {radius: 0.23, segments: 1}
         Rgb: IslandLeaf
       }
+
       for j in 0..5 {
         {
-          Position: {x + math.sin(j * 2.4 + i) * 0.18, y + math.cos(j * 3 + i) * 0.23, 0.29 + math.sin(j * 7) * 0.16}
+          Position: {
+            x + math.sin(j * 2.4 + i) * 0.18,
+            y + math.cos(j * 3 + i) * 0.23,
+            0.29 + math.sin(j * 7) * 0.16
+          }
           Scale: {1, 0.7, 0.8}
           IcoSphere: {radius: 0.095 + j % 2 * 0.035, segments: 1}
           Rgb: tint
         }
       }
     }
+
     for i in 0..18 {
       {
         Position: {-width * 0.44 + math.sin(i * 2.4) * 0.19, 0.7 + i * (height - 0.7) / 18, 0.2}

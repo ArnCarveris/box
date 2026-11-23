@@ -653,7 +653,8 @@ static void box_gpu_blit(
         .colorAttachmentCount = 1,
         .colorAttachments = &attachment
     };
-    WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &desc);
+    WGPURenderPassEncoder pass = box_gpu_profile_render_pass(gpu, encoder, &desc,
+        "target blit");
     if (pipeline) {
         wgpuRenderPassEncoderSetPipeline(pass, pipeline);
         wgpuRenderPassEncoderSetBindGroup(pass, 0, t->blit_group, 0, NULL);

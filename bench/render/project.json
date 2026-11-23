@@ -2,7 +2,7 @@
     "id": "bench_render",
     "type": "application",
     "value": {
-        "description": "Benchmarks for the packet data, the extract of the instanced batches and lights, the shadow pass, the frustum and occlusion cull passes, the effect passes, the fragment cost of the texture mappings, the fog volumes, the star fields, the baked lighting, prefab instantiation, the atmosphere extract, the GPU cost of the cloud layers of the sky, the cost of the planet surface light without planets, the particle passes, the transitions, the GPU cost of Polygon2D next to the other 2D shapes and a scene with parametric surfaces and the levels of detail of round shapes of box.render",
+        "description": "Benchmarks for the packet data, the extract of the instanced batches and lights, the shadow pass, the frustum, occlusion and draw range cull passes, the effect passes, the fragment cost of the texture mappings, the fog volumes, the star fields, the baked lighting, prefab instantiation, 10k prefab instances drawn as impostor cards against their full hierarchy, streaming a ChunkGrid of forest cells, the atmosphere extract, the GPU cost of the cloud layers of the sky, the cost of the planet surface light without planets, the particle passes, the transitions, the GPU cost of Polygon2D next to the other 2D shapes, the cost of TextureLayers for the shapes without them and a scene with parametric surfaces and the levels of detail of round shapes of box.render, a 300 shape hierarchy against the same content as one MeshGraph, and the frame cost and memory of an unbounded Terrain of 6 levels",
         "public": false,
         "use": [
             "box"
@@ -72,6 +72,14 @@
                 ]
             },
             {
+                "id": "TextureLayers",
+                "benchcases": [
+                    "plain_off_frame",
+                    "plain_on_animating_frame",
+                    "all_layered_frame"
+                ]
+            },
+            {
                 "id": "TextureMapping",
                 "benchcases": [
                     "none",
@@ -138,6 +146,7 @@
                     "offscreen_100k",
                     "offscreen_100k_unculled",
                     "shadows_100k",
+                    "range_100k_shadows",
                     "occluded_city_100k",
                     "occluded_city_100k_frustum_only",
                     "many_batches_shadows",
@@ -177,7 +186,9 @@
                     "one",
                     "sixteen",
                     "lights_off",
-                    "lights"
+                    "lights",
+                    "screen",
+                    "unbounded"
                 ]
             },
             {
@@ -219,10 +230,32 @@
                 ]
             },
             {
+                "id": "MeshGraph",
+                "benchcases": [
+                    "hierarchy_300",
+                    "graph_300"
+                ]
+            },
+            {
+                "id": "ChunkSpawn",
+                "benchcases": [
+                    "walk",
+                    "fly",
+                    "fly_budget_4ms"
+                ]
+            },
+            {
                 "id": "Prefab",
                 "benchcases": [
                     "mesh3_instantiate",
                     "box_instantiate"
+                ]
+            },
+            {
+                "id": "Impostor",
+                "benchcases": [
+                    "cards_10k",
+                    "full_10k"
                 ]
             },
             {
@@ -239,6 +272,12 @@
                     "gpu_100_no_glass",
                     "gpu_100_glass_one_layer",
                     "gpu_100_glass_budget_layers"
+                ]
+            },
+            {
+                "id": "Terrain",
+                "benchcases": [
+                    "unbounded_6_levels"
                 ]
             },
             {

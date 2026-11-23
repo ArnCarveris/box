@@ -1,0 +1,90 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.material
+using box.light
+using box.effects
+using box.atmosphere
+using state
+using assets
+
+state {
+  export const LATITUDE: f32 = 50
+  export const NORTH: f32 = 30
+  export const CLOUD_SIZE: f32 = 5000
+  export const CLOUD_ALTITUDE: f32 = 1800
+  export const CLOUD_THRESHOLD: f32 = 0.66
+}
+
+$ {
+  Wind: {direction: {WIND_X, WIND_Z}, speed: wind_speed, gust: gust, gust_scale: 14}
+}
+
+sun {
+  DirectionalLight: {intensity: 2.8 * PI}
+  Rgb: {255, 249, 236}
+  Cookie: {
+    texture: grass_clouds,
+    size: CLOUD_SIZE,
+    height: CLOUD_ALTITUDE,
+    threshold: CLOUD_THRESHOLD,
+    softness: 0.14,
+    strength: 0.4,
+    velocity: {WIND_X * wind_speed, WIND_Z * wind_speed}
+  }
+}
+
+moon {
+  DirectionalLight: {intensity: 0.4 * PI}
+  Rgb: {190, 210, 255}
+}
+
+sky {
+  Atmosphere: {
+    sun: sun,
+    moon: moon,
+    units_per_km: 1000,
+    sea_level: 0,
+    ground_altitude: 0.2,
+    rayleigh: {scale_height: 8, scattering_scale: 1},
+    mie: {scale_height: 1.2, anisotropy: 0.78, scattering_scale: 1.3, tint: {255, 240, 222}},
+    ozone_scale: 1,
+    ground_albedo: {60, 84, 40},
+    night_intensity: 0.03,
+    sun_disk_intensity: 6,
+    sun_radius: 0.6,
+    moon_disk_intensity: 12,
+    moon_radius: 0.6
+  }
+  TimeOfDay: {
+    hour: hour,
+    day_of_year: DAY_OF_YEAR,
+    latitude: LATITUDE,
+    north: NORTH,
+    sun: sun,
+    moon: moon
+  }
+  HeightFog: {
+    density: 0.0012,
+    falloff: 0.05,
+    base_height: 0,
+    max_opacity: 0.3,
+    atmosphere: sky
+  }
+}
+
+clouds {
+  CloudLayer: {
+    texture: grass_clouds,
+    size: CLOUD_SIZE,
+    altitude: CLOUD_ALTITUDE,
+    threshold: CLOUD_THRESHOLD,
+    softness: 0.14,
+    density: 0.8,
+    velocity: {WIND_X * wind_speed, WIND_Z * wind_speed}
+  }
+}
+
+$ {
+  AmbientLight: {sky: {118, 130, 149}, ground: {72, 78, 58}, intensity: 1}
+}

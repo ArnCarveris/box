@@ -1,0 +1,203 @@
+using flecs.script
+using flecs.script.math
+using box.app
+using box.transform
+using box.light
+using box.particle
+using state
+
+// The air of the forest: light shafts through the canopy, mist over the brook and in the low
+// ground, and motes and pollen in the sunbeams, all following the sun of the season and hour:
+// shafts in the low morning and evening sun, clear air at noon, mist at dawn.
+//
+// The shafts are a thin FogVolume lit by the sun through the shadows of the trees and the cloud
+// cookie (sky.flecs), barely by the ambient, so the shade stays dark; the motes are lit additive
+// particles that the same shadows make sparkle in the beams.
+state {
+  // The shafts fill SHAFT_HALF meters to either side of the clearing, up to SHAFT_TOP
+  export const SHAFT_HALF: f32 = 30
+  export const SHAFT_TOP: f32 = 16
+
+  // The brook mist: MIST_SEGS boxes along the brook, MIST_SEG meters of X each, from MIST_X0
+  export const MIST_SEGS: i32 = 7
+  export const MIST_SEG: f32 = 12
+  export const MIST_X0: f32 = -42
+
+  // Mist, 0..1: thick before and after sunrise, burnt off some five hours after it, rising
+  // again a little in the evening
+  fn forest_mist(season: f64, hour: f64) -> f64 {
+    const rise = forest_sunrise(season)
+    const dawn = 1 - forest_smooth(rise + 1.5, rise + 5.5, hour)
+    const dusk = 0.22 * forest_smooth(forest_sunset(season) - 1.5, forest_sunset(season) + 1, hour)
+    max(dawn, dusk)
+  }
+
+  // Extinction per meter of the shafts: dusty in summer, moist in autumn, crisp in winter;
+  // rain and snow fill the air, but the overcast takes the beams away
+  fn forest_shaft_density(season: f64, hour: f64, p: f64) -> f64 {
+    0.0075 * forest_beam(season, hour) * forest_seasonal(season, 0.9, 1, 1.15, 0.75) * (1 + 1.5 * p) *
+      (1 - 0.9 * min(1, p * 1.6))
+  }
+
+  // Extinction per meter of the brook mist at its thickest: autumn mornings are the mistiest,
+  // summer the least; rain keeps a mist over the water all day
+  fn forest_mist_density(season: f64, hour: f64, p: f64) -> f64 {
+    const m = max(forest_mist(season, hour), 0.4 * p)
+    0.5 * m * forest_seasonal(season, 1, 0.7, 1.3, 0.9)
+  }
+
+  // The values the weather drives, kept up to date from the sliders by the async block at the
+  // end: the mist (ForestPrecipitation) and the shafts; cloud_velocity_x and _z in sky.flecs
+  // move the cookie and the cumulus, fog_wind_x and _z in air.flecs the fog and the motes
+  export mut mist_density: f32 = forest_mist_density(START_SEASON, START_HOUR, START_PRECIPITATION)
+  export mut shaft_density: f32 =
+    forest_shaft_density(START_SEASON, START_HOUR, START_PRECIPITATION)
+}
+
+forest {
+  atmosphere {
+    // The air under and between the trees that the sun beams light
+    shafts {
+      Position: {0, SHAFT_TOP / 2 - 0.5, 0}
+      FogVolume: {
+        extent: {SHAFT_HALF, SHAFT_TOP / 2, SHAFT_HALF},
+        density: shaft_density,
+        color: {
+          255,
+          forest_seasonal(season, 246, 240, 228, 244),
+          forest_seasonal(season, 232, 222, 200, 236)
+        },
+        asymmetry: 0.62,
+        edge_fade: 4,
+        sun_inscatter: 1.3,
+        ambient_inscatter: 0.15,
+        light_inscatter: 0,
+        noise_strength: 0.45,
+        noise_scale: 9,
+        wind: {fog_wind_x, 0.02, fog_wind_z}
+      }
+    }
+
+    // Mist over the water, one box along each reach
+    brook_mist {
+      for i in 0..MIST_SEGS {
+        const x0 = MIST_X0 + i * MIST_SEG
+        const x1 = x0 + MIST_SEG
+        const xm = (x0 + x1) / 2
+        const zm = (forest_brook_z(x0) + forest_brook_z(x1)) / 2
+        "reach_{i}" {
+          Position: {xm, forest_brook_water_y(xm) + 0.45, zm}
+          Rotation: {0, forest_brook_chord_yaw(x0, x1), 0}
+          FogVolume: {
+            extent: {forest_brook_chord(x0, x1) / 2 + 0.8, 0.85, 2.6},
+            density: mist_density,
+            color: {216, 226, 238},
+            asymmetry: 0.45,
+            edge_fade: 1.1,
+            sun_inscatter: 1.1,
+            ambient_inscatter: 1.2,
+            light_inscatter: 0,
+            noise_strength: 0.85,
+            noise_scale: 2.5,
+            wind: {fog_wind_x, 0.03, fog_wind_z}
+          }
+        }
+      }
+    }
+
+    // Ground mist that settles in the low ground among the trees, in patches
+    hollow_mist {
+      Position: {0, 0.05, 0}
+      FogVolume: {
+        extent: {SHAFT_HALF, 0.75, SHAFT_HALF},
+        density: mist_density * 0.2,
+        color: {218, 226, 236},
+        asymmetry: 0.45,
+        edge_fade: 0.7,
+        sun_inscatter: 1.1,
+        ambient_inscatter: 1.2,
+        light_inscatter: 0,
+        noise_strength: 1,
+        noise_scale: 7,
+        wind: {fog_wind_x, 0, fog_wind_z}
+      }
+    }
+
+    const glow = forest_mote_light(season, hour, precipitation)
+
+    // Dust motes floating over the clearing: tiny additive specks that the sun makes sparkle
+    motes {
+      Position: {2, 2.8, 0}
+      Emitter: {
+        max: 6000, rate: 520, shape: EmitterBox, extents: {12, 2.6, 12},
+        direction: {0, 0, 0}, lifetime: {9, 12}, size: {0.012, 0.026},
+        opacity: {0.5 * glow, glow},
+        color: {255, 238, 206}, color_variance: {0, 16, 30}, seed: 71
+      }
+      Burst: {count: 5400}
+      Forces: {
+        gravity: {0, -0.015, 0},
+        wind: {fog_wind_x, 0, fog_wind_z},
+        drag: 0.6,
+        turbulence: 0.06,
+        turbulence_scale: 1.4,
+        global_wind: 0.08
+      }
+      Appearance: {shape: Circle, blend: Additive, lit: 1}
+      Curves: {opacity: {keys: [{0, 0}, {0.15, 1}, {0.85, 1}, {1, 0}]}}
+    }
+
+    // Pollen in spring and early summer: fewer, larger, golden
+    pollen {
+      Position: {2, 2.6, -1}
+      Emitter: {
+        max: 900, rate: 70 * forest_pollen(season), shape: EmitterBox, extents: {14, 2.4, 14},
+        direction: {0, 1, 0}, spread: 180, speed: {0, 0.05}, lifetime: {9, 12},
+        size: {0.026, 0.042},
+        opacity: {0.5 * glow, 0.9 * glow},
+        color: {255, 222, 120}, color_variance: {0, 18, 30}, seed: 72
+      }
+      Burst: {count: 760 * forest_pollen(season)}
+      Forces: {
+        gravity: {0, -0.03, 0},
+        wind: {fog_wind_x * 1.5, 0, fog_wind_z * 1.5},
+        drag: 0.8,
+        turbulence: 0.1,
+        turbulence_scale: 0.9,
+        global_wind: 0.12
+      }
+      Appearance: {shape: Circle, blend: Additive, lit: 1}
+      Curves: {opacity: {keys: [{0, 0}, {0.15, 1}, {0.85, 1}, {1, 0}]}}
+    }
+  }
+}
+
+// The driven values follow the sliders
+async {
+  while true {
+    await next_frame()
+    const s = state.season
+    const h = state.hour
+    const p = state.precipitation
+    const cx: f32 = state.forest_cloud_drift_x(state.wind)
+    const cz: f32 = state.forest_cloud_drift_z(state.wind)
+    const md: f32 = state.forest_mist_density(s, h, p)
+    const sd: f32 = state.forest_shaft_density(s, h, p)
+
+    if abs(cx - state.cloud_velocity_x) > 0.0001 {
+      state.cloud_velocity_x = cx
+    }
+
+    if abs(cz - state.cloud_velocity_z) > 0.0001 {
+      state.cloud_velocity_z = cz
+    }
+
+    if abs(md - state.mist_density) > 0.0001 {
+      state.mist_density = md
+    }
+
+    if abs(sd - state.shaft_density) > 0.00001 {
+      state.shaft_density = sd
+    }
+  }
+}

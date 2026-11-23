@@ -1,0 +1,436 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using box.animation
+using box.curve
+using box.particle
+using state
+using assets
+
+state {
+  // Flotsam drifting on the water scrolls with the world over LF_SPAN units, jumps back up the
+  // lagoon once it passes LF_BEHIND and grows in over LF_FADE units at the far end. Each pass
+  // through the span is a cycle that places an item anew, LF_MARGIN inside the waterlines
+  export const LF_SPAN: f32 = 120
+  export const LF_BEHIND: f32 = 16
+  export const LF_FADE: f32 = 18
+  export const LF_MARGIN: f32 = 0.9
+  export const FLOTSAM: i32 = 9
+  export const LF_SIZE: f32 = 1.4
+
+  // Jumping fish: every FISH_WAIT_MIN..+FISH_WAIT_RANGE seconds a fish leaps FISH_LEAP units in an
+  // arc FISH_HEIGHT high over FISH_TIME seconds, landing FISH_NEAR..FISH_FAR ahead of the canoe
+  // while the water carries it toward the canoe.
+  //
+  // It keeps FISH_CLEAR from the canoe's path (the hull to the float) and from hazards and
+  // coconuts, a rejected spot is tried again FISH_RETRY seconds later
+  export const FISH_FIRST: f32 = 2.5
+  export const FISH_WAIT_MIN: f32 = 2.5
+  export const FISH_WAIT_RANGE: f32 = 4
+  export const FISH_RETRY: f32 = 0.25
+  export const FISH_TIME: f32 = 0.8
+  export const FISH_LEAP: f32 = 2.6
+  export const FISH_HEIGHT: f32 = 1.2
+  export const FISH_NEAR: f32 = 16
+  export const FISH_FAR: f32 = 38
+  export const FISH_CLEAR: f32 = 1.6
+  export const SEED_LIFE: i32 = 5309
+
+  // Seabirds circle high over the lagoon ahead, a lap of BIRD_LAP seconds at speed 1, and rise
+  // and sink BIRD_BOB units over BIRD_BOB_TIME seconds
+  export const BIRDS: i32 = 3
+  export const WING_FLAP_TIME: f32 = 3
+  export const BIRD_BOB: f32 = 0.5
+  export const BIRD_BOB_TIME: f32 = 12.6
+
+  // The fish in the air: x and z (z in the scrolled world, like the hazards), its heading and
+  // how far along its arc it is (0..1)
+  export mut fish_live: bool = false
+  export mut fish_x: f32 = 0
+  export mut fish_z: f32 = 0
+  export mut fish_yaw: f32 = 0
+  export mut fish_t: f32 = 0
+
+  // Z of flotsam placed at base along the lagoon, scrolled by distance and wrapped
+  fn lf_z(base: f64, d: f64) -> f64 {
+    LF_BEHIND - LF_SPAN * fract((base - d) / LF_SPAN)
+  }
+
+  // The pass of an item through the span, one less every time it wraps
+  fn lf_cycle(base: f64, d: f64) -> f64 {
+    floor((base - d) / LF_SPAN)
+  }
+
+  // Scale of an item at z: 0 at the far end of the span, 1 once LF_FADE nearer
+  fn lf_fade(z: f64) -> f64 {
+    const t = clamp((z - LF_BEHIND + LF_SPAN) / LF_FADE, 0, 1)
+    max(0.01, t * t * (3 - 2 * t))
+  }
+
+  // Whether x, wz (world z) is within r of a live hazard or coconut
+  fn lf_near_item(x: f64, wz: f64, r: f64) -> bool {
+    mut near: bool = false
+
+    for i in 0..rocks.count() {
+      if rocks[i].live && abs(rocks[i].x - x) < r && abs(rocks[i].z + distance - wz) < r {
+        near = true
+      }
+    }
+
+    for i in 0..logs.count() {
+      if logs[i].live && abs(logs[i].x - x) < r + 1 && abs(logs[i].z + distance - wz) < r {
+        near = true
+      }
+    }
+
+    for i in 0..nuts.count() {
+      if nuts[i].live && abs(nuts[i].x - x) < r && abs(nuts[i].z + distance - wz) < r {
+        near = true
+      }
+    }
+
+    near
+  }
+}
+
+assets {
+  prefab LgLeafFloat {
+    Rgb: {92, 150, 58}
+    PbrMaterial: {roughness: 0.6}
+    BackFaceMode: {BackFacePlain}
+    NoShadow
+  }
+
+  prefab LgFlowerHeart { Rgb: {255, 226, 120}; PbrMaterial: {roughness: 0.7}; NoShadow }
+  prefab LgFoamPatch {
+    Rgb: {240, 250, 248}
+    PbrMaterial: {roughness: 0.9}
+    Opacity: {0.6}
+    NoShadow
+  }
+
+  prefab LgJumpFish {
+    Rgb: {196, 216, 226}
+    PbrMaterial: {roughness: 0.35}
+    NoShadow
+  }
+
+  prefab LgBird { Rgb: {244, 242, 236}; PbrMaterial: {roughness: 0.8}; NoShadow }
+  prefab LgBirdTip { Rgb: {52, 54, 60}; PbrMaterial: {roughness: 0.8}; NoShadow }
+  prefab LgBirdBeak { Rgb: {232, 168, 50}; PbrMaterial: {roughness: 0.6}; NoShadow }
+
+  // Two strong beats of the wings, then a long glide with the wings held level. The right wing
+  // (+X) lifts with +Z rotation, the left one mirrors it
+  prefab lg_wing_flap_r {
+    Clip: {duration: WING_FLAP_TIME}
+    beat { Track: {component: Rotation, member: "z", curve: {kind: CurveCatmullRom, keys: [
+      {0, 0}, {0.22, 0.55}, {0.45, -0.4}, {0.68, 0.55}, {0.9, -0.4}, {1.15, 0.08}, {2.7, 0.06},
+      {3, 0}
+    ]}} }
+  }
+
+  prefab lg_wing_flap_l {
+    Clip: {duration: WING_FLAP_TIME}
+    beat { Track: {component: Rotation, member: "z", curve: {kind: CurveCatmullRom, keys: [
+      {0, 0}, {0.22, -0.55}, {0.45, 0.4}, {0.68, -0.55}, {0.9, 0.4}, {1.15, -0.08},
+      {2.7, -0.06}, {3, 0}
+    ]}} }
+  }
+
+  // A seabird circles: a parent at the center of its circle turns once a lap and carries the
+  // bird out on the rim. Turning by -a puts the rim at angle a, so the bird flies with rising a
+  prefab lg_bird_circle {
+    Clip: {duration: 1}
+    turn { Track: {component: Rotation, member: "y", curve: {keys: [{0, 0}, {1, -6.2832}]}} }
+  }
+
+  prefab lg_bird_bob {
+    Clip: {duration: BIRD_BOB_TIME}
+    rise { Track: {component: Position, member: "y", curve: {kind: CurveCatmullRom, keys: [
+      {0, 0}, {BIRD_BOB_TIME * 0.25, BIRD_BOB}, {BIRD_BOB_TIME * 0.5, 0},
+      {BIRD_BOB_TIME * 0.75, 0 - BIRD_BOB}, {BIRD_BOB_TIME, 0}
+    ]}} }
+  }
+
+  // A hibiscus flower floating face up: five flat petals around a yellow heart
+  template LgFloatFlower {
+    prop yellow: bool = false
+
+    for k in 0..5 {
+      const a = k * 1.2566
+
+      if yellow {
+        "petal_{k}" : LgHibiscusYellow {
+          Position: {0.1 * sin(a), 0, 0.1 * cos(a)}
+          Rotation: {0, a, 0}
+          Scale: {0.085, 0.018, 0.13}
+          Sphere: {radius: 1, segments: 8}
+          NoShadow
+        }
+      } else {
+        "petal_{k}" : LgHibiscusRed {
+          Position: {0.1 * sin(a), 0, 0.1 * cos(a)}
+          Rotation: {0, a, 0}
+          Scale: {0.085, 0.018, 0.13}
+          Sphere: {radius: 1, segments: 8}
+          NoShadow
+        }
+      }
+    }
+
+    heart : LgFlowerHeart {
+      Position: {0, 0.012, 0}
+      Scale: {1, 0.4, 1}
+      Sphere: {radius: 0.045, segments: 6}
+    }
+  }
+
+  // A torn palm leaflet spray: three slim leaves fanned from a stalk, lying flat
+  template LgFloatLeaf {
+    for k in 0..3 {
+      const a = (k - 1) * 0.45
+      "leaf_{k}" : LgLeafFloat {
+        Position: {0.3 * sin(a), 0, 0.3 * cos(a) - 0.1}
+        Rotation: {0, a, 0}
+        Scale: {0.07, 0.012, 0.34 - 0.06 * abs(k - 1)}
+        Sphere: {radius: 1, segments: 8}
+      }
+    }
+
+    stalk : LgLeafFloat {
+      Position: {0, 0, -0.2}
+      Rotation: {HALF_PI, 0, 0}
+      Cylinder: {length: 0.3, radius: 0.015, segments: 4}
+    }
+  }
+
+  // A loose patch of foam: a few thin, flat blobs
+  template LgFloatFoam {
+    prop seed: f32 = 0
+
+    for k in 0..3 {
+      const a = seed + k * 2.1
+      "blob_{k}" : LgFoamPatch {
+        Position: {0.3 * cos(a), 0, 0.2 * sin(a)}
+        Rotation: {0, a, 0}
+        Scale: {0.38 - 0.08 * k, 0.008, 0.24 - 0.04 * k}
+        Sphere: {radius: 1, segments: 8}
+      }
+    }
+  }
+
+  // A small silver fish, nose toward -Z
+  template LgFish {
+    body : LgJumpFish {
+      Scale: {0.1, 0.15, 0.4}
+      Sphere: {radius: 1, segments: 8, smooth: true}
+    }
+
+    tail : LgJumpFish {
+      Position: {0, 0, 0.46}
+      Rotation: {HALF_PI, 0, 0}
+      Scale: {0.3, 1, 1}
+      Cone: {length: 0.2, radius: 0.16, segments: 4}
+    }
+  }
+
+  // A gull: a slim white body and long wings with dark tips that beat now and then and glide
+  template LgSeabird {
+    prop phase: f32 = 0
+
+    body : LgBird {
+      Scale: {0.15, 0.13, 0.48}
+      Sphere: {radius: 1, segments: 8}
+    }
+
+    head : LgBird {
+      Position: {0, 0.06, -0.48}
+      Sphere: {radius: 0.1, segments: 6}
+    }
+
+    beak : LgBirdBeak {
+      Position: {0, 0.05, -0.62}
+      Rotation: {0 - HALF_PI, 0, 0}
+      Cone: {length: 0.12, radius: 0.03, segments: 4}
+    }
+
+    tail : LgBird {
+      Position: {0, 0.01, 0.52}
+      Box: {0.22, 0.02, 0.24}
+    }
+
+    wing_r {
+      Position: {0.1, 0.05, -0.05}
+      Rotation: {0, 0, 0}
+      Animator: {clip: lg_wing_flap_r, time: phase * WING_FLAP_TIME, speed: 1}
+      inner : LgBird { Position: {0.32, 0, 0}; Box: {0.64, 0.025, 0.3} }
+      outer : LgBirdTip {
+        Position: {0.9, 0, 0.06}
+        Rotation: {0, -0.2, 0}
+        Box: {0.56, 0.02, 0.2}
+      }
+    }
+
+    wing_l {
+      Position: {-0.1, 0.05, -0.05}
+      Rotation: {0, 0, 0}
+      Animator: {clip: lg_wing_flap_l, time: phase * WING_FLAP_TIME, speed: 1}
+      inner : LgBird { Position: {-0.32, 0, 0}; Box: {0.64, 0.025, 0.3} }
+      outer : LgBirdTip {
+        Position: {-0.9, 0, 0.06}
+        Rotation: {0, 0.2, 0}
+        Box: {0.56, 0.02, 0.2}
+      }
+    }
+  }
+
+  // A tiny splash where a fish leaves or enters the water
+  prefab LgFishSplash {
+    drops {
+      Position: {0, 0, 0}
+      box.particle.Emitter: {
+        max: 20, rate: 0, shape: EmitterSphere, radius: 0.12,
+        direction: {0, 1, 0}, spread: 30, speed: {1.4, 2.6},
+        lifetime: {0.35, 0.55}, size: {0.06, 0.12}, opacity: {0.7, 0.95},
+        color: {220, 246, 242}, seed: 43
+      }
+      Burst: {count: 12}
+      Forces: {gravity: {0, -12, 0}}
+    }
+
+    ring {
+      Position: {0, 0, 0}
+      box.particle.Emitter: {
+        max: 3, rate: 0, shape: EmitterPoint,
+        direction: {0, 0, 0}, speed: {0, 0},
+        lifetime: {0.6, 0.6}, size: {0.7, 0.7}, opacity: {0.45, 0.45},
+        color: {236, 250, 248}, seed: 44
+      }
+      Burst: {count: 1}
+      Curves: {size: {keys: [{0, 0.4}, {1, 1.6}]}, opacity: {keys: [{0, 1}, {1, 0}]}}
+    }
+  }
+}
+
+// Flowers, palm leaves and foam patches drifting on the water with the world. Pooled: each slot
+// wraps back up the lagoon and is placed anew. Flat and small, in colors no hazard or coconut has.
+// They bob on the swell (swell_phase) and turn with the distance they drifted, not the clock, so
+// they update once a frame
+flotsam {
+  for i in 0..FLOTSAM {
+    const base = (i + 0.1 + 0.8 * hash(SEED_LIFE + i * 5 + 1)) * LF_SPAN / FLOTSAM
+    const z = lf_z(base, distance)
+    const c = lf_cycle(base, distance)
+    const x = (WATER_HALF - LF_MARGIN) * (2 * hash(i * 5.17 + c * 11.3 + 9) - 1)
+    const g = lf_fade(z)
+    "drift_{i}" {
+      Position: {x, 0.025 + 0.012 * sin(0 - z * SWELL_K - swell_phase), z}
+      Rotation: {0, 6.28 * hash(i * 13 + c) + 0.15 * sin(z * 0.05 + i), 0}
+      Scale: {LF_SIZE * g, LF_SIZE * g, LF_SIZE * g}
+
+      if i % 3 == 0 {
+        LgFloatFlower item(yellow: hash(i * 3 + c) > 0.6)
+      } else if i % 3 == 1 {
+        LgFloatLeaf item
+      } else {
+        LgFloatFoam item(seed: i + c)
+      }
+    }
+  }
+}
+
+// The fish in the air, its model only exists during a jump. It drifts with the water while it
+// leaps along its heading in an arc and pitches with the arc
+fish_jump {
+  const s = FISH_LEAP * (fish_t - 0.5)
+  Position: {
+    fish_x - sin(fish_yaw) * s,
+    4 * FISH_HEIGHT * fish_t * (1 - fish_t) - 0.12,
+    fish_z + distance - cos(fish_yaw) * s
+  }
+  Rotation: {0, fish_yaw, 0}
+
+  if fish_live {
+    pitch {
+      Rotation: {atan(4 * FISH_HEIGHT * (1 - 2 * fish_t) / FISH_LEAP), 0, 0}
+      LgFish model
+    }
+  }
+}
+
+// Gulls gliding in slow circles high over the lagoon ahead, each on its own circle and beat.
+// Animators fly them, so the script does not run again every frame
+seabirds {
+  for b in 0..BIRDS {
+    const w = 0.22 - b * 0.03
+    "circle_{b}" {
+      Position: {-7 + b * 8.5, 10 + b * 1.6, -48 - b * 9}
+      Rotation: {0, 0, 0}
+      Animator: {clip: lg_bird_circle, time: fract(b * 2.3 / 6.2832), speed: w / 6.2832}
+
+      bird {
+        Position: {9 + b * 2.5, 0, 0}
+        Rotation: {0, PI, 0}
+        Animator: {clip: lg_bird_bob, time: b * 0.16 * BIRD_BOB_TIME, speed: 1}
+
+        bank {
+          Rotation: {0, 0, -0.22}
+          LgSeabird gull(phase: b * 0.37)
+        }
+      }
+    }
+  }
+}
+
+async {
+  const rng: flecs.script.math.Rng = {seed: SEED_LIFE}
+  mut wait: f32 = FISH_FIRST
+
+  while true {
+    await next_frame()
+
+    if fish_live {
+      fish_t = min(1, fish_t + dt / FISH_TIME)
+
+      if fish_t >= 1 {
+        fish_live = false
+        const s = FISH_LEAP * 0.5
+        const b = box.particle.burst_at(assets.LgFishSplash, {
+          fish_x - sin(fish_yaw) * s, 0.05, fish_z + distance - cos(fish_yaw) * s
+        }, 1)
+        const r = box.material.ripple_at(lagoon.water, {
+          fish_x - sin(fish_yaw) * s, 0, fish_z + distance - cos(fish_yaw) * s
+        }, RING_FISH_R, RING_FISH)
+      }
+    } else if game_state == GS_PLAYING {
+      wait -= dt
+
+      if wait <= 0 {
+        wait = FISH_RETRY
+        const wz = CANOE_Z - FISH_NEAR - speed * FISH_TIME - rng.f(FISH_FAR - FISH_NEAR)
+        const yaw = rng.f(6.2832)
+        const x = (2 * rng.f(1) - 1) * (WATER_HALF - FISH_LEAP - 0.5)
+        // The canoe's path runs from the float to the hull; the arc reaches FISH_LEAP / 2 from x
+        const reach = FISH_LEAP * 0.5 + FISH_CLEAR
+        const in_path = x + reach > canoe_x + FLOAT_X - FLOAT_HALF_W &&
+          x - reach < canoe_x + HULL_HALF_W
+
+        if !in_path && !lf_near_item(x, wz, reach + 1) {
+          fish_x = x
+          fish_z = wz - distance
+          fish_yaw = yaw
+          fish_t = 0
+          fish_live = true
+          wait = FISH_WAIT_MIN + rng.f(FISH_WAIT_RANGE)
+          const s = FISH_LEAP * 0.5
+          const b = box.particle.burst_at(assets.LgFishSplash,
+            {x + sin(yaw) * s, 0.05, wz + cos(yaw) * s}, 1)
+          const r = box.material.ripple_at(lagoon.water,
+            {x + sin(yaw) * s, 0, wz + cos(yaw) * s}, RING_FISH_R, RING_FISH)
+        }
+      }
+    }
+  }
+}

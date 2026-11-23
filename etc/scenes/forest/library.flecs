@@ -1,0 +1,28 @@
+// The forest library: what a forest scene reuses, without placing any trees, plants, ground or
+// water. The state the sliders write (season, precipitation, wind, hour), the helpers, the wind
+// the plants sway in, the weather on the surfaces (wet, puddles, snow), the materials and
+// texture maps, the bark, leaves and trees (beech, oak, birch, spruce, fir and snag), the
+// undergrowth (grass, ferns, flowers, shrubs, logs, stumps, rocks, mushrooms and litter), the
+// boulders, the sky and the sun, the drift of the motes and their light, what the wind strips
+// from the trees, the kinds of insects and how active they are, and the window and the HUD with
+// its sliders.
+//
+// A scene includes ui/widgets (the HUD uses it) and trees/generator (the tree presets with
+// their leaf card and bark textures), then this, then places the things and sets up its camera and view, such as
+// forest.flecs.
+include state
+include helpers
+include wind
+include weather
+include materials
+include bark
+include leaves
+include trees
+include undergrowth
+include boulders
+include sky
+include air
+include shedding
+include insect_kinds
+include hud
+

@@ -193,7 +193,7 @@ static void bench_render_fade(
 {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
-    ecs_singleton_set(world, Scene, {.blend_modes = true});
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.blend_modes = true});
     box_render_backend_t backend = { .render = bench_render_drop };
     box_render_set_backend(world, &backend);
     ecs_entity_t camera = ecs_new(world);

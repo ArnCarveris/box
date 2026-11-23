@@ -18,7 +18,7 @@ settings in `box.texture.graph` (`graph.Cache`, `graph.Stats`, `graph.Preview`);
 |---|---|---|
 | `Path` | `path`, `width`/`height` 0 (source size), `linear` false, `single_channel` false | stb_image raster or resvg `.svg` (one dimension keeps aspect). `linear` for linear-light color images (encoded to sRGB on load); leave off for ORM/normal maps. `single_channel` = R8 with mips, a quarter of RGBA8 (masks, cookies) |
 | `Gen` | `width` 0 = 512, `height` 0 = width, `seed`, `layers`, `source`, `output` GenHeight/GenAlbedo/GenNormal, `colors` (ramp keys `{pos, {r,g,b}}`), `palette`, `palette_layer` 0, `strength` 1 | Seamless, deterministic CPU generator on the job system |
-| `Graph` | `output` (node), `width` 0 = 512, `height` 0 = width, `domain` DomainPlane/DomainSphere, `format` GraphColor/GraphLinear/GraphSingle/GraphHdr, `rate` 0, `interpolate` false | Per texel evaluation of a node graph on the render backend |
+| `Graph` | `output` (node), `width` 0 = 512, `height` 0 = width, `domain` DomainPlane/DomainSphere/DomainWorld, `window` {`x`, `z` (f64), `width`, `depth` meters} on DomainWorld, `format` GraphColor/GraphLinear/GraphSingle/GraphHdr/GraphFloat (R32Float)/GraphFloat4 (RGBA32Float), `rate` 0, `interpolate` false | Per texel evaluation of a node graph on the render backend |
 
 The texture entity of a `Surface` (`Surface.texture`, box/surface.h) is also a texture entity:
 materials sample its image of the same frame.
@@ -64,7 +64,7 @@ Each input is an entity member (`a`, `input`, ...) or, when 0, its constant (`a_
 | Math | `Add`, `Subtract`, `Multiply`, `Divide` (0 where b = 0), `Min`, `Max`, `Power`, `Dot`, `Cross`, `Mix {a, b, factor}`, `Clamp {input, min, max}`, `Step {input, edge}`, `Smoothstep {input, edge0, edge1}`, `Abs`, `Negate`, `Floor`, `Fract`, `Sin`, `Cos`, `Length`, `Normalize`, `Remap {input, from_min, from_max, to_min, to_max, clamp}` |
 | Channels | `Split {input, channel}` (Scalar), `Combine {r, g, b, a}` |
 | Coordinates | `Warp {coords, offset, amount}` (offset centered at 0.5), `Transform {coords, angle (deg), axis, translate, scale}` |
-| Patterns | `Noise {coords, evolve, frequency 4, octaves 1, lacunarity 2, gain 0.5, seed, fractal NoiseFbm/NoiseRidged/NoiseBillow, offset 1, channels 1/3/4}`, `Cells {distance CellsNearest/CellsSecond/CellsEdge, count 64, jitter 1, seed, edge 0.25, coords, evolve}` -> (dist, id, rand, rand), `Blocks {courses 8, per_course 4, gap, jitter, stagger, softness, tones, tone_order, seed, layer_seed}` -> (mask, id, tone, rand), plane only |
+| Patterns | `Noise {coords, evolve, frequency 4, octaves 1, lacunarity 2, gain 0.5, seed, fractal NoiseFbm/NoiseRidged/NoiseBillow, offset 1, channels 1/3/4}`, `Cells {distance CellsNearest/CellsSecond/CellsEdge, count 64, jitter 1, seed, edge 0.25, coords, evolve}` -> (dist, id, rand, rand), `Blocks {courses 8, per_course 4, gap, jitter, stagger, softness, tones, tone_order, seed, layer_seed}` -> (mask, id, tone, rand), plane only, `Ripples {count 64, speed 1, lifetime 1, width 0.15, seed, coords, time, density 1}` -> raindrop ring height (Scalar, 0 flat), plane only |
 | Lookup | `Ramp {input, keys}` (max 32 keys, linear color out), `Curve {input, curve}` (box/curve.h, max 32 keys), `Image {texture, coords, address, linear}`, `Lut {texture, u, v, linear}` |
 | Neighbourhood | `Blur {input, radius}`, `Distance {input, range}` (signed distance to 0.5 contour), `Normal {height, strength}` (for GraphLinear), `Slope {height, strength}`, `Gradient {height, strength}` (uphill vector in the space of `Coords`), `Flow {input, field, length, reach}`, `Transmittance {density, light, absorption, range, steps}` |
 
@@ -89,6 +89,24 @@ clouds {
 }
 ```
 
+Raindrop ripples: `Ripples` puts one drop per cell (`count` cells over the domain, so scale it with
+the area a layer mapping repeats over to keep the ring size; about one drop per cell per
+`lifetime` at `density` 1) at a random place and phase each cycle; its ring grows by `speed` cell
+sizes per second and fades out over `lifetime` seconds. `density` (0..1, a node or
+`density_value`) is the share of drops that fall, to follow the rain intensity; `time` is usually
+a `Time`, which animates the graph. Keep `speed * lifetime + width` below 3 cells. Feed the height
+to `Normal` and use the graph as the normal of a `texture.Layer` (puddles, water, see material.md).
+`Cells`, `Time` and math nodes give only one clipped ring per Voronoi cell, so use `Ripples`.
+
+```flecs
+rain {
+  t       { nodes.Time: {} }
+  ripples { nodes.Ripples: {count: 64, speed: 0.8, time: t, density_value: 0.6} }
+  normal  { nodes.Normal: {height: ripples, strength: 2} }
+  Graph: {output: normal, width: 512, format: GraphLinear, rate: 30, interpolate: true}
+}
+```
+
 Wait for a graph or load in script: `const ready: bool = tex[box.texture.Status].revision > 0`.
 
 ## Behavior rules
@@ -103,7 +121,7 @@ Wait for a graph or load in script: `const ready: bool = tex[box.texture.Status]
 - Gen: a `source` that has no `Gen` by the next frame fails it; `width`/`height` are ignored
   with a source. `palette_layer` must exist and not be GenNoise.
 - Graph fails (`Status.error`) on a cycle, a deleted node, a child without a node component by
-  the next frame, an input of the wrong type, `Blocks` on DomainSphere, more than 32 Ramp/Curve
+  the next frame, an input of the wrong type, `Blocks` or `Ripples` on DomainSphere or DomainWorld, `Transmittance` on DomainWorld, more than 32 Ramp/Curve
   keys or an invalid curve.
 - Graph tiling: DomainPlane tiles when noise frequencies and Transform scales are whole numbers
   and rotations are multiples of 90 degrees. DomainSphere outputs an equirectangular image
@@ -111,13 +129,20 @@ Wait for a graph or load in script: `const ready: bool = tex[box.texture.Status]
 - DomainSphere `longitude_start/end`, `latitude_start/end` (radians, equal = whole) make the
   image a full resolution crop of the whole sphere graph that lines up on an `EllipsoidShell` of
   the same ranges; node radii keep their angular units, reads past the range clamp to its edge.
+- DomainWorld evaluates a window of the world in meters at any absolute position: `Coords` is
+  (x, z, 0, 1) in meters from the window origin, texel i at `x + i * width / (w - 1)` so
+  adjacent windows share edge texels. `Noise` (`frequency` in cells per meter) and `Cells`
+  (`size` meters) hash absolute cells (offsets in f64 on the CPU), so they do not repeat and stay
+  precise far from the origin. Neighbourhood nodes take radii/ranges/reaches in meters (slopes per
+  meter) and evaluate over the window grown by their reach, so adjacent windows match. Float
+  formats are unfilterable: read them with `textureLoad`; one mip level, no `interpolate`.
 - `Image` nodes wait (TextureLoading) for their texture, evaluate after the graph they sample
   and again when its image changes; rebinding to another texture compiles nothing.
 - Animated graphs (a `Time` with scale != 0) update `rate` times per second (0 = every frame)
   and skip updates while no draw sampled the image in the previous frame. A paused world clock
   shows a fixed image.
 - `interpolate` crossfades two key images (doubles memory for the graph); ignored for
-  GraphSingle and static graphs.
+  GraphSingle, the float formats and static graphs.
 
 ## Cost
 

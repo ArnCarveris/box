@@ -7,6 +7,19 @@ enable clip_distances;
 #include "include/instance.wgsl"
 #include "include/material.wgsl"
 #include "include/blend.wgsl"
+#include "include/wind.wgsl"
+#include "include/draw_range.wgsl"
+#include "include/impostor_card.wgsl"
+
+// The casters of a WindSway material move by the Wind (Scene.wind) as the mesh shaders move
+// them, set per pipeline for the batches whose shapes have one (caster_wind).
+override material_wind: bool = false;
+
+// The casters of the batch have a DrawRange (box_render_batch_t.range), set per pipeline of the
+// cascades: the vertex stages pass the dither code the cull pass of the view packed above the
+// slot of the caster (range_of), and the fragment stages discard the texels the dither drops, so
+// the shadow fades with the shape.
+override draw_range: bool = false;
 
 // Uniforms of a cascade, a spot light tile or an octant of a point light tile.
 struct Cascade {
@@ -16,6 +29,9 @@ struct Cascade {
     light: vec4f,
     // A point light tile: x the near plane, y the far plane
     planes: vec4f,
+    // The absolute position of the local origin (WorldOrigin) as box_gpu_origin_split packs it
+    // (world_origin.wgsl)
+    origin: vec4i,
 };
 
 // 1 / sqrt(3), the length of the axis of an octant of a point light tile
@@ -32,6 +48,8 @@ const OCTANT_AXIS: f32 = 0.57735026919;
 @group(1) @binding(5) var<storage, read> frames: array<InstanceTransform>;
 
 @group(2) @binding(0) var albedo_map: texture_2d<f32>;
+// The depth atlas of the impostor cards (fs_impostor only), at the binding of the ORM map
+@group(2) @binding(2) var orm_map: texture_2d<f32>;
 @group(2) @binding(4) var material_sampler: sampler;
 
 // The blend group of an alpha tested caster with a TextureBlend (fs_cutout_blend and
@@ -53,6 +71,8 @@ struct VertexIn {
 // The UV of a vertex, or for a MappingObject, MappingWorld or MappingFrame material (mapped 1 plus
 // its blend) the offset of its projection, with the object (world, frame) position and normal
 // mapping_uv projects, as mesh.wgsl has them.
+// reveal is the reveal edge of a VertexReveal material read from the per vertex data of the
+// _data entry points (reveal_edge), REVEAL_NONE without one or without data.
 struct CasterOut {
     @builtin(position) pos: vec4f,
     @location(0) uv: vec2f,
@@ -61,6 +81,9 @@ struct CasterOut {
     @location(3) @interpolate(flat) mapped: f32,
     @location(4) object: vec4f,
     @location(5) object_normal: vec3f,
+    @location(8) reveal: f32,
+    // Dither code of the DrawRange of the caster with draw_range, 0 without
+    @location(7) @interpolate(flat) range: u32,
 };
 
 // A vertex of a caster in an octant of a point light tile, with the 3 half space distances of
@@ -73,15 +96,20 @@ struct PointOut {
     @location(3) @interpolate(flat) mapped: f32,
     @location(4) object: vec4f,
     @location(5) object_normal: vec3f,
+    @location(8) reveal: f32,
 #ifdef BOX_SHADOW_CLIP_DISTANCES
     @builtin(clip_distances) clip: array<f32, 3>,
 #else
     @location(6) clip: vec3f,
 #endif
+    // 0: a point light tile draws its casters whole
+    @location(7) @interpolate(flat) range: u32,
 };
 
 struct ShadowOut {
     @builtin(position) pos: vec4f,
+    // Dither code of the DrawRange of the caster with draw_range, 0 without
+    @location(0) @interpolate(flat) range: u32,
 };
 
 struct PointShadowOut {
@@ -93,8 +121,22 @@ struct PointShadowOut {
 #endif
 };
 
+// A world position of a vertex of a caster moved by the WindSway of its material with
+// material_wind, as place_wind of place.wgsl moves it; the position otherwise.
+fn caster_wind(slot: u32, world: vec3f, model: mat4x4f) -> vec3f {
+    var result = world;
+    if (material_wind) {
+        let m = material_fetch(shadings[slot].material & 0xFFFFFFu);
+        if (wind_sways(m)) {
+            result = world + wind_move(world, model, m, world_origin(cascade.origin)).offset;
+        }
+    }
+    return result;
+}
+
 fn caster_world_mesh(slot: u32, vertex: vec3f) -> vec3f {
-    return (instance_model(transforms[slot]) * vec4f(vertex, 1.0)).xyz;
+    let model = instance_model(transforms[slot]);
+    return caster_wind(slot, (model * vec4f(vertex, 1.0)).xyz, model);
 }
 
 // World position of a vertex of a caster; sets surface_data. A plain mesh page binds one zero
@@ -109,10 +151,12 @@ fn caster_world(slot: u32, vertex: vec3f) -> vec3f {
         position = vertex;
     } else if (surface_data.p[0].x == 7.0) {
         position.y *= surface_data.p[1].y;
+    } else if (surface_data.p[0].x == TERRAIN_SURFACE) {
+        position = terrain_vertex(vertex).position;
     } else if (surface_data.p[0].x != 0.0) {
         position = surface_position(i32(position.z), position.x, position.y);
     }
-    return (model * vec4f(position, 1.0)).xyz;
+    return caster_wind(slot, (model * vec4f(position, 1.0)).xyz, model);
 }
 
 // Object position and normal of a vertex of a parametric surface caster, as place of place.wgsl
@@ -131,6 +175,10 @@ fn caster_local(v: VertexIn) -> CasterLocal {
         position = v.position;
     } else if (surface_data.p[0].x == 7.0) {
         position.y *= surface_data.p[1].y;
+    } else if (surface_data.p[0].x == TERRAIN_SURFACE) {
+        let t = terrain_vertex(v.position);
+        position = t.position;
+        normal = t.normal;
     } else if (surface_data.p[0].x == 1.0 && v.position.z < 2.0) {
         let sample = surface_sweep_sample(i32(v.position.z), v.position.x, v.position.y);
         position = sample.position;
@@ -145,6 +193,19 @@ fn caster_local(v: VertexIn) -> CasterLocal {
         normal = surface_normal(i32(v.position.z), v.position.x, v.position.y);
     }
     return CasterLocal(position, normal);
+}
+
+// Dither code of the DrawRange of a caster from its visible slot, 0 without draw_range. The
+// casters of a tile have none: its cull group has no camera.
+fn caster_range(slot: u32) -> u32 {
+    return select(0u, range_of(slot), draw_range);
+}
+
+// Discard a texel the dither of the DrawRange of its caster drops, with draw_range.
+fn caster_dither(range: u32, pos: vec4f) {
+    if (draw_range && !range_keeps(range, pos.xy)) {
+        discard;
+    }
 }
 
 // Position of a vertex of a caster in the clip space of the cascade.
@@ -192,7 +253,7 @@ fn octant_distances(world: vec3f) -> vec3f {
 // The alpha test attributes of a vertex, with the UV transformed as vs of mesh.wgsl does. Reads
 // surface_data, so the position comes first.
 fn cutout_attributes(v: VertexIn, o: ptr<function, CasterOut>) {
-    let shading = shadings[v.slot];
+    let shading = shadings[slot_of(v.slot)];
     let material = material_fetch(shading.material & 0xFFFFFFu);
     (*o).uv = v.uv * material.uv.xy + material.uv.zw;
     if (surface_data.p[0].x == 7.0 && v.uv.x >= 2.0 &&
@@ -214,18 +275,19 @@ fn cutout_attributes(v: VertexIn, o: ptr<function, CasterOut>) {
     }
     (*o).alpha = shading.alpha;
     (*o).cutoff = material.cutoff;
+    (*o).reveal = REVEAL_NONE;
 }
 
 // position and normal: the object position and normal of the vertex.
 fn cutout_mapping(v: VertexIn, material: Material, position: vec3f, normal: vec3f,
     o: ptr<function, CasterOut>) {
-    let model = instance_model(transforms[v.slot]);
+    let model = instance_model(transforms[slot_of(v.slot)]);
     let c0 = model[0].xyz;
     let c1 = model[1].xyz;
     let c2 = model[2].xyz;
     var scaled = model;
-    if (v.slot < arrayLength(&frames)) {
-        scaled = instance_frame(frames[v.slot], model);
+    if (slot_of(v.slot) < arrayLength(&frames)) {
+        scaled = instance_frame(frames[slot_of(v.slot)], model);
     }
     let scale = vec3f(length(scaled[0].xyz), length(scaled[1].xyz), length(scaled[2].xyz));
     (*o).mapped = 1.0 + material_blend(material);
@@ -234,23 +296,29 @@ fn cutout_mapping(v: VertexIn, material: Material, position: vec3f, normal: vec3
     (*o).object_normal = normal;
     if (material_world(material)) {
         let flip = select(1.0, -1.0, dot(c0, cross(c1, c2)) < 0.0);
-        (*o).object = mapping_object(material, (model * vec4f(position, 1.0)).xyz,
-            vec3f(1.0));
+        (*o).object = mapping_world(material, (model * vec4f(position, 1.0)).xyz,
+            world_origin(cascade.origin));
         (*o).object_normal = mat3x3f(cross(c1, c2), cross(c2, c0), cross(c0, c1)) *
             normal * flip;
     } else if (material_frame(material)) {
         var relative = model;
-        if (v.slot < arrayLength(&frames)) {
-            relative = instance_frame(frames[v.slot], model);
+        var framed = false;
+        if (slot_of(v.slot) < arrayLength(&frames)) {
+            relative = instance_frame(frames[slot_of(v.slot)], model);
+            framed = instance_framed(frames[slot_of(v.slot)], transforms[slot_of(v.slot)]);
         }
         let f = mapping_frame(material, relative, position, normal);
         (*o).object = f.object;
+        if (!framed) {
+            (*o).object += mapping_origin(material,
+                world_origin(cascade.origin));
+        }
         (*o).object_normal = f.normal;
     }
 }
 
 fn cutout_attributes_mesh(v: VertexIn, o: ptr<function, CasterOut>) {
-    let shading = shadings[v.slot];
+    let shading = shadings[slot_of(v.slot)];
     let material = material_fetch(shading.material & 0xFFFFFFu);
     (*o).uv = v.uv * material.uv.xy + material.uv.zw;
     (*o).mapped = 0.0;
@@ -261,27 +329,74 @@ fn cutout_attributes_mesh(v: VertexIn, o: ptr<function, CasterOut>) {
     }
     (*o).alpha = shading.alpha;
     (*o).cutoff = material.cutoff;
+    (*o).reveal = REVEAL_NONE;
 }
 
 @vertex fn vs(v: VertexIn) -> ShadowOut {
-    return ShadowOut(cascade.matrix * vec4f(caster_world_mesh(v.slot, v.position), 1.0));
+    return ShadowOut(cascade.matrix * vec4f(caster_world_mesh(slot_of(v.slot), v.position), 1.0),
+        caster_range(v.slot));
 }
 
 @vertex fn vs_surface(v: VertexIn) -> ShadowOut {
-    return ShadowOut(caster_position(v.slot, v.position));
+    return ShadowOut(caster_position(slot_of(v.slot), v.position), caster_range(v.slot));
 }
 
-@vertex fn vs_cutout(v: VertexIn) -> CasterOut {
+fn caster_cutout(v: VertexIn) -> CasterOut {
     var o: CasterOut;
-    o.pos = cascade.matrix * vec4f(caster_world_mesh(v.slot, v.position), 1.0);
+    o.range = caster_range(v.slot);
+    o.pos = cascade.matrix * vec4f(caster_world_mesh(slot_of(v.slot), v.position), 1.0);
     cutout_attributes_mesh(v, &o);
     return o;
 }
 
-@vertex fn vs_cutout_surface(v: VertexIn) -> CasterOut {
+fn caster_cutout_surface(v: VertexIn) -> CasterOut {
     var o: CasterOut;
-    o.pos = caster_position(v.slot, v.position);
+    o.range = caster_range(v.slot);
+    o.pos = caster_position(slot_of(v.slot), v.position);
     cutout_attributes(v, &o);
+    return o;
+}
+
+// Reveal edge of a vertex of an alpha tested caster with per vertex data (reveal_edge).
+fn caster_reveal(v: VertexIn, d: VertexData) -> f32 {
+    return reveal_edge(material_fetch(shadings[slot_of(v.slot)].material & 0xFFFFFFu), d.data0,
+        d.data1);
+}
+
+// The plain swaying casters with per vertex data (box_gpu_vertex_data), which a WindSway with
+// pivots reads.
+@vertex fn vs_data(v: VertexIn, d: VertexData) -> ShadowOut {
+    wind_vertex_data(d.data0, d.data2, d.data3);
+    return ShadowOut(cascade.matrix * vec4f(caster_world_mesh(slot_of(v.slot), v.position), 1.0),
+        caster_range(v.slot));
+}
+
+@vertex fn vs_surface_data(v: VertexIn, d: VertexData) -> ShadowOut {
+    wind_vertex_data(d.data0, d.data2, d.data3);
+    return ShadowOut(caster_position(slot_of(v.slot), v.position), caster_range(v.slot));
+}
+
+@vertex fn vs_cutout(v: VertexIn) -> CasterOut {
+    return caster_cutout(v);
+}
+
+@vertex fn vs_cutout_surface(v: VertexIn) -> CasterOut {
+    return caster_cutout_surface(v);
+}
+
+// The alpha tested casters with per vertex data (box_gpu_vertex_data), which a VertexReveal
+// hides parts of.
+@vertex fn vs_cutout_data(v: VertexIn, d: VertexData) -> CasterOut {
+    wind_vertex_data(d.data0, d.data2, d.data3);
+    var o = caster_cutout(v);
+    o.reveal = caster_reveal(v, d);
+    return o;
+}
+
+@vertex fn vs_cutout_surface_data(v: VertexIn, d: VertexData) -> CasterOut {
+    wind_vertex_data(d.data0, d.data2, d.data3);
+    var o = caster_cutout_surface(v);
+    o.reveal = caster_reveal(v, d);
     return o;
 }
 
@@ -296,10 +411,24 @@ fn cutout_test(uv: vec2f, alpha: f32, cutoff: f32, mapped: f32, object: vec4f,
     }
 }
 
+// Discard where a VertexReveal hides the caster, as the alpha tested mesh pipelines do.
+fn reveal_test(reveal: f32, pixel: vec2f) {
+    if (!revealed(reveal, pixel)) {
+        discard;
+    }
+}
+
 @fragment fn fs() {
 }
 
+// fs of the casters with a DrawRange (draw_range).
+@fragment fn fs_range(f: ShadowOut) {
+    caster_dither(f.range, f.pos);
+}
+
 @fragment fn fs_cutout(f: CasterOut) {
+    reveal_test(f.reveal, f.pos.xy);
+    caster_dither(f.range, f.pos);
     cutout_test(f.uv, f.alpha, f.cutoff, f.mapped, f.object, f.object_normal);
 }
 
@@ -315,6 +444,8 @@ fn cutout_test_blend(uv: vec2f, alpha: f32, cutoff: f32, mapped: f32, object: ve
 }
 
 @fragment fn fs_cutout_blend(f: CasterOut) {
+    reveal_test(f.reveal, f.pos.xy);
+    caster_dither(f.range, f.pos);
     cutout_test_blend(f.uv, f.alpha, f.cutoff, f.mapped, f.object, f.object_normal);
 }
 
@@ -338,41 +469,79 @@ fn point_out(world: vec3f, c: CasterOut) -> PointOut {
     o.mapped = c.mapped;
     o.object = c.object;
     o.object_normal = c.object_normal;
+    o.reveal = c.reveal;
+    o.range = 0u;
     o.clip = octant_clip(world);
     return o;
 }
 
 @vertex fn vs_point(v: VertexIn) -> PointShadowOut {
-    let world = caster_world_mesh(v.slot, v.position);
+    let world = caster_world_mesh(slot_of(v.slot), v.position);
     return PointShadowOut(octant_position(world), octant_clip(world));
 }
 
 @vertex fn vs_point_surface(v: VertexIn) -> PointShadowOut {
-    let world = caster_world(v.slot, v.position);
+    let world = caster_world(slot_of(v.slot), v.position);
     return PointShadowOut(octant_position(world), octant_clip(world));
 }
 
-@vertex fn vs_point_cutout(v: VertexIn) -> PointOut {
-    let world = caster_world_mesh(v.slot, v.position);
+fn point_cutout(v: VertexIn) -> PointOut {
+    let world = caster_world_mesh(slot_of(v.slot), v.position);
     var c: CasterOut;
     cutout_attributes_mesh(v, &c);
     return point_out(world, c);
 }
 
-@vertex fn vs_point_cutout_surface(v: VertexIn) -> PointOut {
-    let world = caster_world(v.slot, v.position);
+fn point_cutout_surface(v: VertexIn) -> PointOut {
+    let world = caster_world(slot_of(v.slot), v.position);
     var c: CasterOut;
     cutout_attributes(v, &c);
     return point_out(world, c);
 }
 
+@vertex fn vs_point_data(v: VertexIn, d: VertexData) -> PointShadowOut {
+    wind_vertex_data(d.data0, d.data2, d.data3);
+    let world = caster_world_mesh(slot_of(v.slot), v.position);
+    return PointShadowOut(octant_position(world), octant_clip(world));
+}
+
+@vertex fn vs_point_surface_data(v: VertexIn, d: VertexData) -> PointShadowOut {
+    wind_vertex_data(d.data0, d.data2, d.data3);
+    let world = caster_world(slot_of(v.slot), v.position);
+    return PointShadowOut(octant_position(world), octant_clip(world));
+}
+
+@vertex fn vs_point_cutout(v: VertexIn) -> PointOut {
+    return point_cutout(v);
+}
+
+@vertex fn vs_point_cutout_surface(v: VertexIn) -> PointOut {
+    return point_cutout_surface(v);
+}
+
+@vertex fn vs_point_cutout_data(v: VertexIn, d: VertexData) -> PointOut {
+    wind_vertex_data(d.data0, d.data2, d.data3);
+    var o = point_cutout(v);
+    o.reveal = caster_reveal(v, d);
+    return o;
+}
+
+@vertex fn vs_point_cutout_surface_data(v: VertexIn, d: VertexData) -> PointOut {
+    wind_vertex_data(d.data0, d.data2, d.data3);
+    var o = point_cutout_surface(v);
+    o.reveal = caster_reveal(v, d);
+    return o;
+}
+
 #ifdef BOX_SHADOW_CLIP_DISTANCES
 // The clip distances already kept the fragment to its octant.
 @fragment fn fs_point_cutout(f: CasterOut) {
+    reveal_test(f.reveal, f.pos.xy);
     cutout_test(f.uv, f.alpha, f.cutoff, f.mapped, f.object, f.object_normal);
 }
 
 @fragment fn fs_point_cutout_blend(f: CasterOut) {
+    reveal_test(f.reveal, f.pos.xy);
     cutout_test_blend(f.uv, f.alpha, f.cutoff, f.mapped, f.object, f.object_normal);
 }
 #else
@@ -388,12 +557,93 @@ fn octant_discard(clip: vec3f) {
 }
 
 @fragment fn fs_point_cutout(f: PointOut) {
+    reveal_test(f.reveal, f.pos.xy);
     cutout_test(f.uv, f.alpha, f.cutoff, f.mapped, f.object, f.object_normal);
     octant_discard(f.clip);
 }
 
 @fragment fn fs_point_cutout_blend(f: PointOut) {
+    reveal_test(f.reveal, f.pos.xy);
     cutout_test_blend(f.uv, f.alpha, f.cutoff, f.mapped, f.object, f.object_normal);
     octant_discard(f.clip);
 }
 #endif
+
+// An impostor card in a cascade or a spot light tile (box_render_batch_t.impostor): the card
+// faces the light and shows the view of the atlases nearest the direction toward the light,
+// alpha tested, at the depth of the depth atlas. The image coordinates of the view are affine
+// across the card; the rest is the same for the whole card.
+struct ImpostorCasterOut {
+    @builtin(position) pos: vec4f,
+    @location(0) plane: vec2f,
+    // x the packed cell of the view, y the views per axis, 1 << 16 for a hemisphere grid, z the
+    // dither code of the DrawRange with draw_range
+    @location(1) @interpolate(flat) cell: vec4u,
+    // xyz the direction toward the light in the frame of the root, w the half size of the card
+    @location(2) @interpolate(flat) eye: vec4f,
+    // xyz the center of the sphere in the frame of the root, w its radius over the half size
+    @location(3) @interpolate(flat) center: vec4f,
+    @location(4) @interpolate(flat) row0: vec4f,
+    @location(5) @interpolate(flat) row1: vec4f,
+    @location(6) @interpolate(flat) row2: vec4f,
+};
+
+// Direction toward the light at a world position: the gradient of the depth of the cascade or
+// tile there, which grows toward the light.
+fn impostor_light_direction(world: vec4f) -> vec3f {
+    let m = cascade.matrix;
+    let c = m * world;
+    let row2 = vec3f(m[0].z, m[1].z, m[2].z);
+    let row3 = vec3f(m[0].w, m[1].w, m[2].w);
+    return row2 * c.w - row3 * c.z;
+}
+
+@vertex fn vs_impostor(v: VertexIn, d: VertexData) -> ImpostorCasterOut {
+    let slot = slot_of(v.slot);
+    let model = instance_model(transforms[slot]);
+    let grid = impostor_grid(d);
+    let center = model * vec4f(grid.center, 1.0);
+    let e = impostor_local_direction(model, impostor_light_direction(center), grid.hemisphere);
+    let q = impostor_corner(e, v.uv, grid.half, abs(v.position - grid.center));
+    let cell = impostor_nearest(grid.frames, grid.hemisphere, e);
+    let dir = impostor_frame_direction(grid.frames, grid.hemisphere, impostor_unpack(cell));
+    var o: ImpostorCasterOut;
+    o.pos = cascade.matrix * (model * vec4f(grid.center + q, 1.0));
+    o.plane = impostor_plane(q, e, dir, grid.half);
+    o.cell = vec4u(cell, grid.frames | select(0u, 1u << 16u, grid.hemisphere),
+        caster_range(v.slot), 0u);
+    o.eye = vec4f(e, grid.half);
+    o.center = vec4f(grid.center, grid.ratio);
+    o.row0 = transforms[slot].rows[0];
+    o.row1 = transforms[slot].rows[1];
+    o.row2 = transforms[slot].rows[2];
+    return o;
+}
+
+@fragment fn fs_impostor(f: ImpostorCasterOut) -> @builtin(frag_depth) f32 {
+    let frames = f.cell.y & 0xFFFFu;
+    let hemisphere = (f.cell.y >> 16u) != 0u;
+    let half = f.eye.w;
+    let res = f32(textureDimensions(albedo_map).x) / f32(frames);
+    let lod = impostor_lod(f.plane, res);
+    caster_dither(f.cell.z, f.pos);
+    let cell = impostor_unpack(f.cell.x);
+    let d = impostor_frame_direction(frames, hemisphere, cell);
+    let first = textureSampleLevel(orm_map, material_sampler, impostor_uv(frames, cell, f.plane),
+        lod).r;
+    let a = impostor_parallax(f.plane, f.eye.xyz, d, impostor_height(first, half, f.center.w),
+        half);
+    let uv = impostor_uv(frames, cell, a);
+    let alpha = textureSampleLevel(albedo_map, material_sampler, uv, lod).a;
+    let depth = textureSampleLevel(orm_map, material_sampler, uv, lod).r;
+    if (alpha < IMPOSTOR_CUTOFF || any(abs(a) > vec2f(1.0))) {
+        discard;
+    }
+
+    let axes = impostor_axes(d);
+    let point = f.center.xyz + (axes[0] * a.x + axes[1] * a.y) * half +
+        d * impostor_height(depth, half, f.center.w);
+    let model = impostor_model(f.row0, f.row1, f.row2);
+    let clip = cascade.matrix * (model * vec4f(point, 1.0));
+    return clip.z / clip.w;
+}

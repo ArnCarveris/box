@@ -1,0 +1,132 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.camera
+using box.input
+using box.controllers
+using box.world
+using box.terrain
+using state
+
+// The player: the camera of the view and the focus the terrain, the reflections and the world
+// origin follow. It walks on the terrain with a FirstPersonController and flies with a
+// CameraController while state.flying (F) is set; both move the same entity, so the view and
+// the focus stay with it. It waits in the air above the start until the terrain there is known,
+// then stands on the trail in a clearing nearest to the start. While state.scripted is set it
+// has no controller and a script moves it by writing its pose (course.flecs).
+state {
+  // Where the player starts and whether it stands on the ground yet
+  export mut start_x: f32 = START_X
+  export mut start_y: f32 = 120
+  export mut start_z: f32 = START_Z
+  export mut start_yaw: f32 = 0
+  export mut start_pitch: f32 = -0.04
+  export mut started: bool = false
+
+  // The best place for the start found so far, and the best direction along its trail
+  export mut search_score: f32 = 0
+  export mut search_x: f32 = START_X
+  export mut search_z: f32 = START_Z
+  export mut search_along: f32 = 0
+  export mut search_angle: f32 = 0
+
+  // The masks of the terrain (terrain.flecs)
+  export const MASK_GRASS: i32 = 1
+  export const MASK_DIRT: i32 = 2
+
+  fn infinite_forest_mask(x: f64, z: f64, channel: i32) -> f64 {
+    box.terrain.mask(infinite_forest.land, x, z, channel)
+  }
+
+  // How much a place is on a trail in a clearing: on the dirt, with grass on either side, and
+  // near the center of the search
+  fn infinite_forest_start_score(x: f64, z: f64) -> f64 {
+    const dirt = infinite_forest_mask(x, z, MASK_DIRT)
+    const grass = infinite_forest_mask(x + 7, z, MASK_GRASS) + infinite_forest_mask(x - 7, z, MASK_GRASS) +
+      infinite_forest_mask(x, z + 7, MASK_GRASS) + infinite_forest_mask(x, z - 7, MASK_GRASS)
+    const d = sqrt((x - START_X) * (x - START_X) + (z - START_Z) * (z - START_Z))
+    dirt > 0.6 ? dirt * grass * (1 - 0.5 * d / START_SEARCH) : 0
+  }
+}
+
+// The walking keys of the first person controller, without its own Fly toggle: F switches to the
+// camera controller instead (state.actions.toggle_fly)
+walk_keys {
+  Forward { Action: {description: "Walk forward"}; Binding: {key: W} }
+  Back { Action: {description: "Walk back"}; Binding: {key: S} }
+  Left { Action: {description: "Walk left"}; Binding: {key: A} }
+  Right { Action: {description: "Walk right"}; Binding: {key: D} }
+  Fast { Action: {description: "Run while held"}; Binding: {key: ShiftLeft} }
+  Look { Action: {description: "Turn with the cursor while held"}; Binding: {key: MouseRight} }
+  Jump { Action: {description: "Jump"}; Binding: {key: Space} }
+  Crouch { Action: {description: "Crouch while held"}; Binding: {key: CtrlLeft} }
+  TurnLeft { Action: {description: "Turn left while held"}; Binding: {key: Left} }
+  TurnRight { Action: {description: "Turn right while held"}; Binding: {key: Right} }
+  TurnUp { Action: {description: "Look up while held"}; Binding: {key: Up} }
+  TurnDown { Action: {description: "Look down while held"}; Binding: {key: Down} }
+}
+
+player {
+  Position: {start_x, start_y, start_z}
+  Rotation: {start_pitch, start_yaw, 0}
+  Camera: {fov: 62, near_: 0.1, far_: VIEW_FAR}
+  WorldFocus
+
+  if flying && !scripted {
+    CameraController: {speed: FLY_SPEED, boost: 8}
+  } else if started && !scripted {
+    FirstPersonController: {
+      speed: WALK_SPEED,
+      eye: EYE,
+      ground: GROUND_MIN - 100,
+      actions: walk_keys
+    }
+  }
+}
+
+// Wait until the terrain around the start is known, find the trail in a clearing, look along
+// the trail and stand on the ground
+async {
+  const r = START_SEARCH
+  while !box.terrain.resident(infinite_forest.land, START_X, START_Z) ||
+    !box.terrain.known(infinite_forest.land, START_X - r, START_Z - r) ||
+    !box.terrain.known(infinite_forest.land, START_X + r, START_Z - r) ||
+    !box.terrain.known(infinite_forest.land, START_X - r, START_Z + r) ||
+    !box.terrain.known(infinite_forest.land, START_X + r, START_Z + r)
+  {
+    await next_frame()
+  }
+
+  const n = floor(2 * r / START_STEP) + 1
+  for i in 0..n {
+    for j in 0..n {
+      const x = START_X - r + i * START_STEP
+      const z = START_Z - r + j * START_STEP
+      const score = infinite_forest_start_score(x, z)
+      if score > state.search_score {
+        state.search_score = score
+        state.search_x = x
+        state.search_z = z
+      }
+    }
+  }
+
+  // The trail runs where the dirt continues 12 m away; of its two ways, the one with more grass
+  for k in 0..24 {
+    const a = k * PI / 12
+    const ax = state.search_x + 12 * cos(a)
+    const az = state.search_z + 12 * sin(a)
+    const along = infinite_forest_mask(ax, az, MASK_DIRT) +
+      0.3 * infinite_forest_mask(state.search_x + 30 * cos(a), state.search_z + 30 * sin(a), MASK_GRASS)
+    if along > state.search_along {
+      state.search_along = along
+      state.search_angle = a
+    }
+  }
+
+  state.start_x = state.search_x
+  state.start_z = state.search_z
+  state.start_yaw = atan2(0 - cos(state.search_angle), 0 - sin(state.search_angle))
+  state.start_y = box.terrain.height(infinite_forest.land, state.search_x, state.search_z) + EYE + 0.05
+  state.started = true
+}

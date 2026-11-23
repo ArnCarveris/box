@@ -1,0 +1,109 @@
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+using box.camera
+using box.view
+using box.light
+
+// texture.Layers: puddles on cobbles from texture graphs under a low sun: a noise mask with
+// cavity 0.8 fills the occluded joints first, facing 0.95 keeps them off the tilted ramp, the
+// albedo darkens, roughness mixes to 0.02 and the normal flattens fully, so the puddles are
+// flat dark pools that mirror the sun. The box on the right has no layers.
+//
+// frames: 10
+$ {
+  Scene: {shader_features: {Extended: {texture_layers: true}}}
+}
+
+camera {
+  Position: {0, 3, 7}
+  Rotation: {-0.4, 0, 0}
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {130, 150, 180, 255}},
+    shadows: {enabled: true}}
+}
+
+$ {
+  AmbientLight: {sky: {150, 165, 190}, ground: {60, 56, 50}, intensity: 0.6}
+}
+
+sun {
+  Rotation: {0.3, 0.2, 0}
+  DirectionalLight: {intensity: 1.5 * flecs.script.math.PI}
+  Rgb: {255, 235, 210}
+}
+
+// Cobbles from texture graphs: Voronoi stones with dark joints, their normal and an ORM whose
+// occlusion is low in the joints, so the cavity of the puddles finds them
+cobble_albedo {
+  cells { nodes.Cells: {distance: CellsEdge, count: 40, jitter: 0.8, edge: 0.3, seed: 4} }
+  face { nodes.Split: {input: cells, channel: ChannelR} }
+  tone { nodes.Split: {input: cells, channel: ChannelB} }
+  stone { nodes.Mix: {a_value: {0.36, 0.33, 0.3, 1}, b_value: {0.62, 0.57, 0.5, 1}, factor: tone} }
+  joint { nodes.Mix: {a_value: {0.16, 0.14, 0.12, 1}, b: stone, factor: face} }
+  Graph: {output: joint, width: 512}
+}
+
+cobble_normal {
+  cells { nodes.Cells: {distance: CellsEdge, count: 40, jitter: 0.8, edge: 0.3, seed: 4} }
+  face { nodes.Split: {input: cells, channel: ChannelR} }
+  normal { nodes.Normal: {height: face, strength: 3} }
+  Graph: {output: normal, width: 512, format: GraphLinear}
+}
+
+cobble_orm {
+  cells { nodes.Cells: {distance: CellsEdge, count: 40, jitter: 0.8, edge: 0.3, seed: 4} }
+  face { nodes.Split: {input: cells, channel: ChannelR} }
+  occlusion {
+    nodes.Remap: {input: face, from_min: 0, from_max: 1, to_min: 0.3, to_max: 1, clamp: true}
+  }
+  orm { nodes.Combine: {r: occlusion, g_value: 0.85, b_value: 0, a_value: 1} }
+  Graph: {output: orm, width: 512, format: GraphLinear}
+}
+
+puddle_mask {
+  n { nodes.Noise: {frequency: 2, octaves: 3, seed: 11} }
+  wide { nodes.Remap: {input: n, from_min: 0.3, from_max: 0.7, to_min: 0, to_max: 1, clamp: true} }
+  Graph: {output: wide, width: 256, format: GraphSingle}
+}
+
+puddles {
+  texture.Layer: {amount: 0.5, direction: {0, 1, 0}, facing: 0.95, mask: puddle_mask,
+    cavity: 0.8, contrast: 16, albedo: LayerMultiply, roughness: LayerMix, metallic: LayerKeep,
+    occlusion: LayerKeep, normal: 1}
+  Rgb: {110, 110, 110}
+  PbrMaterial: {roughness: 0.02}
+  texture.Mapping: {mode: MappingWorld, size: 4}
+}
+
+ground {
+  Position: {0, -0.1, 0}
+  Box: {12, 0.2, 9}
+  Rgb: {255, 255, 255}
+  PbrMaterial: {roughness: 1}
+  PbrTextures: {albedo: cobble_albedo, orm: cobble_orm, normal: cobble_normal}
+  texture.Transform: {scale_x: 4, scale_y: 3}
+  texture.Layers: {layers: [puddles]}
+}
+
+ramp {
+  Position: {-3, 0.6, -1}
+  Rotation: {0.35, 0, 0}
+  Box: {2.5, 0.2, 3}
+  Rgb: {255, 255, 255}
+  PbrMaterial: {roughness: 1}
+  PbrTextures: {albedo: cobble_albedo, orm: cobble_orm, normal: cobble_normal}
+  texture.Transform: {scale_x: 1, scale_y: 1}
+  texture.Layers: {layers: [puddles]}
+}
+
+plain {
+  Position: {3, 0.5, -0.5}
+  Box: {1, 1, 1}
+  Rgb: {200, 80, 60}
+  PbrMaterial: {roughness: 0.5}
+}

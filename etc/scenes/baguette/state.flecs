@@ -1,0 +1,40 @@
+using flecs.script
+using box.input
+
+state {
+  actions {
+    randomize {
+      Action: {description: "Pick another seed"}
+      Binding: {key: R}
+    }
+
+    reset {
+      Action: {description: "Reset the loaf"}
+      Binding: {key: Backspace}
+    }
+  }
+
+  export const START_LENGTH: f32 = 1.2
+  export const START_THICKNESS: f32 = 0.085
+  export const START_HEIGHT: f32 = 0.8
+  export const START_TAPER: f32 = 0.5
+  export const START_CUTS: i32 = 5
+  export const START_ANGLE: f32 = 25
+  export const START_OPENING: f32 = 0.36
+  export const START_BAKE: f32 = 0.6
+  export const START_FLOUR: f32 = 0.15
+  export const START_CRUST: f32 = 2
+  export const START_SEED: i32 = 3
+
+  export mut length: f32 = START_LENGTH
+  export mut thickness: f32 = START_THICKNESS
+  export mut height: f32 = START_HEIGHT
+  export mut taper: f32 = START_TAPER
+  export mut cuts: i32 = START_CUTS
+  export mut angle: f32 = START_ANGLE
+  export mut opening: f32 = START_OPENING
+  export mut bake: f32 = START_BAKE
+  export mut flour: f32 = START_FLOUR
+  export mut crust: f32 = START_CRUST
+  export mut seed: i32 = START_SEED
+}

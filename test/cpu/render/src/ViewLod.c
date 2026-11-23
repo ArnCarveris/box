@@ -116,6 +116,30 @@ void ViewLod_resolve(void) {
     test_flt(out.distances[2], 0.0f);
 }
 
+void ViewLod_resolve_fade(void) {
+    // renderer/views
+    LodSettings out;
+    LodSettings set = { .levels = 3, .distances = { 0, 10, 30 }, .fade = 0.2f };
+    box_render_lod_settings(&set, &out);
+    test_flt(out.fade, 0.2f);
+
+    LodSettings wide = { .levels = 3, .distances = { 0, 10, 30 }, .fade = 2.0f };
+    box_render_lod_settings(&wide, &out);
+    test_flt(out.fade, 0.5f);
+
+    LodSettings negative = { .levels = 3, .distances = { 0, 10, 30 }, .fade = -1.0f };
+    box_render_lod_settings(&negative, &out);
+    test_flt(out.fade, 0.0f);
+
+    LodSettings nan = { .levels = 3, .distances = { 0, 10, 30 }, .fade = NAN };
+    box_render_lod_settings(&nan, &out);
+    test_flt(out.fade, 0.0f);
+
+    LodSettings none = { .levels = 1, .distances = { 0, 10, 30 }, .fade = 0.2f };
+    box_render_lod_settings(&none, &out);
+    test_flt(out.fade, 0.0f);
+}
+
 void ViewLod_packet(void) {
     // renderer/views
     ecs_world_t *world = ecs_init();

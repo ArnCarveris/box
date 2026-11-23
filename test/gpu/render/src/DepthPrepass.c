@@ -397,11 +397,14 @@ void DepthPrepass_equal_matches_unlit(void) {
 void DepthPrepass_cutout_prepass_holes(void) {
     // render_quality/depth_prepass
     ecs_world_t *world = prepass_world();
-    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
-        .punctual_shadows = true, .cookies = true, .environment = true,
-        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
-        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
-        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true, .punctual_shadows = true,
+        .cookies = true, .environment = true, .aerial_perspective = true,
+        .shader_features.Extended.alpha_cutout = true, .shader_features.Extended.blend_modes = true,
+        .shader_features.Extended.transmission = true,
+        .shader_features.Extended.texture_blend = true, .shader_features.Extended.triplanar = true,
+        .shader_features.Extended.sheen = true, .shader_features.Extended.clear_coat = true,
+        .shader_features.Extended.anisotropy = true,
+        .shader_features.Extended.diffuse_transmission = true});
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 6});
     ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f, .far_ = 1000});
@@ -462,11 +465,14 @@ void DepthPrepass_cutout_prepass_holes(void) {
 void DepthPrepass_blended_and_2d_after_prepass(void) {
     // render_quality/depth_prepass
     ecs_world_t *world = prepass_world();
-    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
-        .punctual_shadows = true, .cookies = true, .environment = true,
-        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
-        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
-        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true, .punctual_shadows = true,
+        .cookies = true, .environment = true, .aerial_perspective = true,
+        .shader_features.Extended.alpha_cutout = true, .shader_features.Extended.blend_modes = true,
+        .shader_features.Extended.transmission = true,
+        .shader_features.Extended.texture_blend = true, .shader_features.Extended.triplanar = true,
+        .shader_features.Extended.sheen = true, .shader_features.Extended.clear_coat = true,
+        .shader_features.Extended.anisotropy = true,
+        .shader_features.Extended.diffuse_transmission = true});
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 6});
     ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f, .far_ = 1000});

@@ -1,0 +1,48 @@
+include materials
+include state
+include street
+include eiffel
+using flecs.script
+using flecs.script.math
+using box.transform
+using state
+using assets
+
+paris {
+  // On the far bank, beyond the blocks across the river, turned a little toward the city.
+  ParisEiffelTower eiffel() { Position: {-30, 0, -136}; Rotation: {0, 0.25, 0} }
+
+  landmarks {
+    // The café on the square off the boulevard, against the shop front of block_18.
+    ParisCafeTerrace cafe(width: 8, depth: 3.4) {
+      Position: {22.5, 0.15, 33.5}
+      Rotation: {0, 0 - math.PI / 2, 0}
+    }
+
+    // The Métro entrance on the square, opening toward the boulevard side of the square.
+    ParisMetroEntrance metro() { Position: {14, 0.15, 36.5}; Rotation: {0, math.PI, 0} }
+    // The newspaper kiosk and two benches on the far bank square, facing the river.
+    ParisKiosk kiosk() { Position: {-8, 0, -58} }
+    ParisBench bench_far_0() { Position: {-15, 0, -57.5} }
+    ParisBench bench_far_1() { Position: {15, 0, -57.5} }
+    // Bollards along the boulevard edge of the square.
+    const bollard_z: f32[] = [31.5, 33, 34.5, 36]
+
+    for (i, z) in bollard_z {
+      ParisBollard "bollard_{i}"() { Position: {5.45, 0.15, z} }
+    }
+  }
+
+  // The raccoon hideouts of state.pr_hideouts; hideout_<i> has a child `cover` that opens.
+  hideouts {
+    for (i, h) in pr_hideouts {
+      if h.kind == PR_HIDE_BIN {
+        ParisBin "hideout_{i}"(id: i) { Position: {h.x, h.y, h.z}; Rotation: {0, h.yaw, 0} }
+      } else if h.kind == PR_HIDE_MANHOLE {
+        ParisManhole "hideout_{i}"(id: i) { Position: {h.x, h.y, h.z}; Rotation: {0, h.yaw, 0} }
+      } else {
+        ParisStormDrain "hideout_{i}"(id: i) { Position: {h.x, h.y, h.z}; Rotation: {0, h.yaw, 0} }
+      }
+    }
+  }
+}

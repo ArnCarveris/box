@@ -1,0 +1,35 @@
+using flecs.script
+using box.transform
+using box.geometry
+using assets
+using flecs.script.math
+using state
+using box.material
+using box.render
+
+island {
+  ocean : IslandOceanWater {
+    Position: {0, 0, 0}
+    Box: {90000, 0.01, 90000}
+  }
+
+  seabed {
+    Position: {0, GROUND_MIN, 0}
+    Box: {90000, 1, 90000}
+    Rgb: {150, 140, 110}
+    PbrMaterial: {roughness: 1}
+    NoShadow
+  }
+
+  if island_snow_line(season, snow) < CRATER_LAKE {
+    crater_ice : IslandLakeIce {
+      Position: {0, CRATER_LAKE, 0}
+      Box: {420 * ISLAND_K, 0.02, 420 * ISLAND_K}
+    }
+  } else {
+    crater_lake : IslandLakeWater {
+      Position: {0, CRATER_LAKE, 0}
+      Box: {420 * ISLAND_K, 0.02, 420 * ISLAND_K}
+    }
+  }
+}

@@ -56,10 +56,15 @@ ECS_STRUCT(ParticleRange, {
  * scrolls past a fixed camera: velocities, forces, curves and the wander field are relative to
  * it. The ground plane of ParticleCollision stays put.
  *
+ * The global_wind adds a share of the velocity of the Wind singleton to wind, with the gust at
+ * each particle from the gust field of WindSway, so leaves move with the gusts that bend trees;
+ * only X and Z, through drag. A share of 0 or a world without a Wind leaves particles as is.
+ *
  * The forces follow the uniform world scale of the emitter they act on, as its speeds do: the
- * gravity, wind, turbulence and drift are multiplied by it and the turbulence_scale divided by
- * it, so a plume under a Scale 10 hull moves as the unscaled plume, 10 times larger. The drag
- * is a rate and does not scale. The values below are those of an emitter of scale 1.
+ * gravity, wind, global_wind, turbulence and drift are multiplied by it and the
+ * turbulence_scale divided by it, so a plume under a Scale 10 hull moves as the unscaled plume,
+ * 10 times larger. The drag is a rate and does not scale. The values below are those of an
+ * emitter of scale 1.
  */
 ECS_STRUCT(ParticleForces, {
     vec3 gravity;           /**< Acceleration in units per second squared, times the world
@@ -77,6 +82,9 @@ ECS_STRUCT(ParticleForces, {
     vec3 drift;             /**< Velocity in units per second, times the world scale, of the
                              *   frame of reference that moves the live particles from the next
                              *   frame without entering their velocity, default {0, 0, 0} */
+    float global_wind;      /**< Share of the velocity of the Wind singleton, with its gusts at
+                             *   each particle, times the world scale, added to wind, default 0
+                             *   for none */
 });
 
 /** Collision of the particles of the emitter entity with the horizontal plane at height.
@@ -93,6 +101,12 @@ ECS_STRUCT(ParticleCollision, {
     float friction;         /**< Share of the speed along the plane a hit loses, 0 to 1,
                              *   default 0.2 */
     bool die;               /**< Kill a particle that hits the plane instead, default false */
+    ecs_entity_t terrain;   /**< Terrain whose height below the emitter the plane takes every
+                             *   frame instead of height, where the terrain is resident there;
+                             *   0 for the plane at height. A world space emitter on a terrain
+                             *   with TerrainSampled meets its surface under each particle
+                             *   instead, where a tile draws, as long as ParticleEmitter.ground
+                             *   is 0 or the same terrain */
 });
 
 /** An emitter that spawns rate times the frame delta particles a frame, carrying the fraction.
@@ -136,9 +150,10 @@ ECS_STRUCT(ParticleEmitter, {
     ParticleRange lifetime; /**< Seconds a particle lives, default {1, 2} */
     ParticleRange size;     /**< Diameter of the drawn circle in world units, default
                              *   {0.1, 0.1} */
-    ParticleRange rotation; /**< Initial rotation in degrees around the view axis, default
-                             *   {0, 0} */
-    ParticleRange spin;     /**< Rotation in degrees per second, default {0, 0} */
+    ParticleRange rotation; /**< Initial rotation in degrees around the view axis, or around
+                             *   the axis of a ParticleCard, default {0, 0} */
+    ParticleRange spin;     /**< Rotation in degrees per second, the angular speed around the
+                             *   axis of a ParticleCard, default {0, 0} */
     ParticleRange opacity;  /**< Opacity the color is drawn with, default {1, 1} */
     vec3 acceleration;      /**< Acceleration in world units per second squared, default
                              *   {0, 0, 0} */
@@ -163,6 +178,18 @@ ECS_STRUCT(ParticleEmitter, {
                              *   keep acting in world directions and world units at the
                              *   world position of a particle; inherit_velocity does nothing,
                              *   as the particles already move with the emitter */
+    ecs_entity_t follow;    /**< Entity whose world position moves the emitter, as a parent
+                             *   that neither turns nor scales it would: the spawn volume is
+                             *   the WorldTransform of the emitter offset by the translation
+                             *   of the WorldTransform of follow, along X and Z only with a
+                             *   ground. The emitter stays where it is when the world origin
+                             *   shifts, its live particles move with follow. Default 0 for
+                             *   none */
+    ecs_entity_t ground;    /**< Terrain with TerrainSampled whose surface the spawn volume of
+                             *   a world space emitter stands on: a spawn is raised by the
+                             *   height of the surface at its X and Z, so the Y of the emitter
+                             *   is its height above the ground; a spawn where no tile of the
+                             *   terrain draws dies at once. Default 0 for none */
 });
 
 /** What an emitter with ParticlePlayback does this frame */
@@ -352,7 +379,20 @@ ECS_STRUCT(ParticleMotion, {
 /** What a particle is drawn as */
 ECS_ENUM(ParticleShape, {
     ParticleCircle = 0,     /**< A soft round sprite, the look without an appearance */
-    ParticleSprite = 1      /**< The texture of the appearance over a sheet of frames */
+    ParticleSprite = 1,     /**< The texture of the appearance over a sheet of frames */
+    ParticleCard = 2        /**< The texture of the appearance, as a sprite, on a quad in world
+                             *   space that tumbles around an axis of its own: each particle
+                             *   draws its initial orientation and its axis from streams of its
+                             *   own, ParticleEmitter.rotation is its initial angle around the
+                             *   axis and spin with the rotation and spin curves turns it, so it
+                             *   shows its face and its edge. Both sides are shaded, with the
+                             *   normal toward the camera, and a card seen edge on keeps a width
+                             *   of 1.5 pixels. With a ground plane of ParticleCollision a card that
+                             *   comes to rest on it, slower than half a world unit a second
+                             *   times the world scale, stops turning and eases to lie flat on
+                             *   it until it dies, for leaves, petals and needles. Its pool keeps
+                             *   4 bytes more per particle and max is clamped to half
+                             *   BOX_PARTICLE_MAX; stretch does not apply */
 });
 
 /** How the particles of an emitter blend with the image */
@@ -371,7 +411,8 @@ ECS_ENUM(ParticleBlend, {
 ECS_STRUCT(ParticleAppearance, {
     ParticleShape shape;    /**< What a particle is drawn as, default ParticleCircle */
     ParticleBlend blend;    /**< How it blends, default ParticleAlpha */
-    ecs_entity_t texture;   /**< TexturePath or Texture entity a sprite reads, white without */
+    ecs_entity_t texture;   /**< TexturePath or Texture entity a sprite or card reads, white
+                             *   without */
     int32_t columns;        /**< Frames across the texture, 0 and 1 for one */
     int32_t rows;           /**< Frames down the texture, 0 and 1 for one, read row by row */
     float fps;              /**< Frames a second, 0 to play the sheet once over the life */

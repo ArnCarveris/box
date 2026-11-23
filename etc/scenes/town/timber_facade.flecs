@@ -13,6 +13,7 @@ assets {
       Box: {width, height - 0.08, 0.18}
       Rgb: color
     }
+
     for i in 0..3 {
       {
         Position: {(i - 1) * (width / 2 - 0.1), height / 2, 0.13}
@@ -20,16 +21,19 @@ assets {
         Rgb: TownTimber
       }
     }
+
     for i in 0..2 {
       {
         Position: {0, 0.15 + i * (height - 0.3), 0.13}
         Box: {width, 0.15, 0.17}
         Rgb: TownTimber
       }
+
       Window(width: width * 0.35, height: height * 0.5, panes: 4) {
         Position: {(i - 0.5) * width * 0.5, height * 0.56, 0.17}
       }
     }
+
     for i in 0..12 {
       {
         Position: {-width / 2 + (i + 0.5) * width / 12, 0.42, 0.14}

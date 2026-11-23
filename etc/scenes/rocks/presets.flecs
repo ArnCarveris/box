@@ -1,0 +1,51 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using box.mesh
+using rocks
+
+// The presets of the rock library: the props of a Rock, RockScree or RockCluster for a kind of
+// rock, with a seed and a size to vary it.
+rocks {
+  // A massive granite boulder: rounded by weather, a joint or two split off, no layers
+  template RockGraniteBoulder {
+    prop seed: i32 = 1
+    prop size: f32 = 2
+
+    Rock body(seed: seed, size: size, roundness: 0.45, strata: 0, cracks: 0.5, flatness: 0.3, octaves: 6, strength: 0.75, moss: 0, stone: ROCK_GRANITE) { Position: {0, 0, 0} }
+  }
+
+  // A slab of bedded sandstone: flat, wide, stepped in layers, with a flat top
+  template RockSandstoneSlab {
+    prop seed: i32 = 1
+    prop size: f32 = 2.6
+
+    Rock body(seed: seed, size: size, roundness: 0.3, strata: 0.9, cracks: 0.55, flatness: 0.7, octaves: 4, strength: 0.4, moss: 0, stone: ROCK_SANDSTONE) { Position: {0, 0, 0} }
+  }
+
+  // A mossy forest boulder: worn round, half buried, moss over its top
+  template RockMossyBoulder {
+    prop seed: i32 = 1
+    prop size: f32 = 2
+
+    Rock body(seed: seed, size: size, roundness: 0.8, strata: 0, cracks: 0.25, flatness: 0.45, octaves: 5, strength: 0.7, moss: 0.55, stone: ROCK_FOREST) { Position: {0, 0, 0} }
+  }
+
+  // A pile of granite scree
+  template RockScreePile {
+    prop seed: i32 = 1
+    prop size: f32 = 2.4
+
+    RockScree body(seed: seed, radius: size * 0.5, height: 0.6, stones: 220, stone_size: 0.12, mound: true, moss: 0, stone: ROCK_GRANITE) { Position: {0, 0, 0} }
+  }
+
+  // A granite outcrop split along its joints, with scree around it
+  template RockOutcrop {
+    prop seed: i32 = 1
+    prop size: f32 = 2.4
+
+    RockCluster body(seed: seed, size: size, roundness: 0.2, strata: 0.15, cracks: 0.75, moss: 0, stone: ROCK_GRANITE) { Position: {0, 0, 0} }
+  }
+}

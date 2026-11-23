@@ -439,6 +439,9 @@ int32_t box_gpu_planar_add(
         r->viewport[2] = 1.0f / (float)pass->width;
         r->viewport[3] = 1.0f / (float)pass->height;
         glm_vec4_zero(r->aerial);
+        glm_vec4_zero(r->fog_grid);
+        glm_mat4_copy(r->view_proj, r->prev_view_proj);
+        ecs_os_memset_n(r->temporal, 0, uint32_t, 4);
         box_gpu_cull_reflect_add(gpu, packet, index, pass->slot, r->view_proj, rec->camera,
             oblique[1][1] * (float)pass->height * 0.5f, rec->exclude_page, rec->exclude_slot);
         result += 2;
@@ -851,7 +854,7 @@ static void box_gpu_planar_draws(
             bound = pipeline;
         }
 
-        WGPUBindGroup layers = box_gpu_material_group(gpu, packet, b);
+        WGPUBindGroup layers = box_gpu_forward_group(gpu, packet, b);
         uint32_t kind = box_gpu_draw_kind(b, false);
         if (layers != material || kind != material_kind) {
             wgpuRenderPassEncoderSetBindGroup(rp, 1, layers, 1, &kind);

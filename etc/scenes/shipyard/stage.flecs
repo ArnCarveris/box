@@ -18,13 +18,63 @@ assets {
 
   // Drydock surfaces: weathered plating at the 10 m per unit scale of the liner, emissive dot
   // textures for windows and running lights so they read from the default camera distance
-  prefab DockHull { Rgb: {134, 132, 126}; PbrMaterial: {metallic: 0.55, roughness: 0.62}; PbrTextures: {albedo: assets.yard_tex_hull, normal: assets.yard_tex_hull_normal, orm: assets.yard_tex_hull_orm}; texture.Mapping: {MappingFrame, size: 3.5, blend: 0.3} }
-  prefab DockHullDark { Rgb: {78, 82, 88}; PbrMaterial: {metallic: 0.65, roughness: 0.58}; PbrTextures: {albedo: assets.yard_tex_hull, normal: assets.yard_tex_hull_normal, orm: assets.yard_tex_hull_orm}; texture.Mapping: {MappingFrame, size: 2.5, blend: 0.3} }
-  prefab DockGrime { Rgb: {98, 84, 70}; PbrMaterial: {metallic: 0.4, roughness: 0.8}; PbrTextures: {albedo: assets.yard_tex_hull, normal: assets.yard_tex_hull_normal, orm: assets.yard_tex_hull_orm}; texture.Mapping: {MappingFrame, size: 2, blend: 0.3} }
+  prefab DockHull {
+    Rgb: {134, 132, 126}
+    PbrMaterial: {metallic: 0.55, roughness: 0.62}
+    PbrTextures: {
+      albedo: assets.yard_tex_hull,
+      normal: assets.yard_tex_hull_normal,
+      orm: assets.yard_tex_hull_orm
+    }
+    texture.Mapping: {MappingFrame, size: 3.5, blend: 0.3}
+  }
+
+  prefab DockHullDark {
+    Rgb: {78, 82, 88}
+    PbrMaterial: {metallic: 0.65, roughness: 0.58}
+    PbrTextures: {
+      albedo: assets.yard_tex_hull,
+      normal: assets.yard_tex_hull_normal,
+      orm: assets.yard_tex_hull_orm
+    }
+    texture.Mapping: {MappingFrame, size: 2.5, blend: 0.3}
+  }
+
+  prefab DockGrime {
+    Rgb: {98, 84, 70}
+    PbrMaterial: {metallic: 0.4, roughness: 0.8}
+    PbrTextures: {
+      albedo: assets.yard_tex_hull,
+      normal: assets.yard_tex_hull_normal,
+      orm: assets.yard_tex_hull_orm
+    }
+    texture.Mapping: {MappingFrame, size: 2, blend: 0.3}
+  }
+
   prefab DockPipe { Rgb: {150, 134, 104}; PbrMaterial: {metallic: 0.6, roughness: 0.55} }
-  prefab DockWindows { Rgb: {30, 33, 38}; PbrMaterial: {metallic: 0.5, roughness: 0.4}; Emissive: {strength: 1.4, color: {255, 220, 175}}; PbrTextures: {emissive: assets.yard_tex_windows}; texture.Mapping: {MappingObject, size: 1.2} }
-  prefab DockRunLights { Rgb: {40, 44, 52}; PbrMaterial: {metallic: 0.5, roughness: 0.5}; Emissive: {strength: 7, color: {255, 196, 120}}; PbrTextures: {emissive: assets.yard_tex_dots}; texture.Mapping: {MappingObject, size: 1.5} }
-  prefab DockRunLightsCyan { Rgb: {40, 44, 52}; PbrMaterial: {metallic: 0.5, roughness: 0.5}; Emissive: {strength: 7, color: {90, 214, 255}}; PbrTextures: {emissive: assets.yard_tex_dots}; texture.Mapping: {MappingObject, size: 1.5} }
+  prefab DockWindows {
+    Rgb: {30, 33, 38}
+    PbrMaterial: {metallic: 0.5, roughness: 0.4}
+    Emissive: {strength: 1.4, color: {255, 220, 175}}
+    PbrTextures: {emissive: assets.yard_tex_windows}
+    texture.Mapping: {MappingObject, size: 1.2}
+  }
+
+  prefab DockRunLights {
+    Rgb: {40, 44, 52}
+    PbrMaterial: {metallic: 0.5, roughness: 0.5}
+    Emissive: {strength: 7, color: {255, 196, 120}}
+    PbrTextures: {emissive: assets.yard_tex_dots}
+    texture.Mapping: {MappingObject, size: 1.5}
+  }
+
+  prefab DockRunLightsCyan {
+    Rgb: {40, 44, 52}
+    PbrMaterial: {metallic: 0.5, roughness: 0.5}
+    Emissive: {strength: 7, color: {90, 214, 255}}
+    PbrTextures: {emissive: assets.yard_tex_dots}
+    texture.Mapping: {MappingObject, size: 1.5}
+  }
 
   template HoloLine {
     prop len: f32 = 1
@@ -41,16 +91,29 @@ assets {
     prop level: i32 = 0
 
     const y = level * CH + 0.14
+
     for i in 0..GX + 1 {
-      HoloLine "z_{i}"(len: GZ * CW, glow: i == 0 || i == GX ? 2.4 : 0.9) { Position: {(i - GX / 2.0) * CW, y, 0}; Rotation: {0, HALF_PI, 0} }
+      HoloLine "z_{i}"(len: GZ * CW, glow: i == 0 || i == GX ? 2.4 : 0.9) {
+        Position: {(i - GX / 2.0) * CW, y, 0}
+        Rotation: {0, HALF_PI, 0}
+      }
     }
+
     for i in 0..GZ + 1 {
-      HoloLine "x_{i}"(len: GX * CW, glow: i == 0 || i == GZ ? 2.4 : 0.9) { Position: {0, y, (i - GZ / 2.0) * CW} }
+      HoloLine "x_{i}"(len: GX * CW, glow: i == 0 || i == GZ ? 2.4 : 0.9) {
+        Position: {0, y, (i - GZ / 2.0) * CW}
+      }
     }
+
     for i in 0..4 {
       const sx = i % 2 == 0 ? -1 : 1
       const sz = i < 2 ? -1 : 1
-      "corner_{i}" : YardHolo { Position: {sx * GX * CW / 2, y + 0.02, sz * GZ * CW / 2}; Cylinder: {radius: 0.22, length: 0.04, segments: 16}; NoShadow; Ignore }
+      "corner_{i}" : YardHolo {
+        Position: {sx * GX * CW / 2, y + 0.02, sz * GZ * CW / 2}
+        Cylinder: {radius: 0.22, length: 0.04, segments: 16}
+        NoShadow
+        Ignore
+      }
     }
   }
 
@@ -60,6 +123,7 @@ assets {
     const r = lane_r(l)
     Position: {lane_x(l), AXIS_Y + lane_y(l), 0}
     HoloLine axis(len: SLOTS * SEG + 6, glow: 1.6) { Rotation: {0, HALF_PI, 0} }
+
     for i in 0..SLOTS + 1 {
       "tick_{i}" : YardHolo {
         Position: {0, 0, (i - SLOTS / 2.0) * SEG}
@@ -75,12 +139,20 @@ assets {
     const hx = GX * CW / 2 + 0.6
     const hz = GZ * CW / 2 + 0.6
     const top = GY * CH + 0.6
+
     for i in 0..4 {
       const sx = i % 2 == 0 ? -1 : 1
       const sz = i < 2 ? -1 : 1
-      HoloLine "post_{i}"(len: top + 2.2, glow: 0.6) { Position: {sx * hx, top / 2 - 1.1, sz * hz}; Rotation: {0, 0, HALF_PI} }
+      HoloLine "post_{i}"(len: top + 2.2, glow: 0.6) {
+        Position: {sx * hx, top / 2 - 1.1, sz * hz}
+        Rotation: {0, 0, HALF_PI}
+      }
+
       HoloLine "cap_x_{i}"(len: 2.4, glow: 2) { Position: {sx * (hx - 1.2), top, sz * hz} }
-      HoloLine "cap_z_{i}"(len: 2.4, glow: 2) { Position: {sx * hx, top, sz * (hz - 1.2)}; Rotation: {0, HALF_PI, 0} }
+      HoloLine "cap_z_{i}"(len: 2.4, glow: 2) {
+        Position: {sx * hx, top, sz * (hz - 1.2)}
+        Rotation: {0, HALF_PI, 0}
+      }
     }
   }
 
@@ -92,24 +164,38 @@ assets {
     rim_b : YardGirder { Position: {w / 2, -2.84, 0}; Box: {0.5, 0.18, l + 0.4} }
     rim_c : YardGirder { Position: {0, -2.84, 0 - l / 2}; Box: {w + 0.4, 0.18, 0.5} }
     rim_d : YardGirder { Position: {0, -2.84, l / 2}; Box: {w + 0.4, 0.18, 0.5} }
+
     for s in 0..2 {
       const sx = s == 0 ? -1 : 1
-      "edge_light_{s}" : ShipCyanLight { Position: {sx * (w / 2 + 0.1), -2.9, 0}; Box: {0.06, 0.08, l - 0.4} }
+      "edge_light_{s}" : ShipCyanLight {
+        Position: {sx * (w / 2 + 0.1), -2.9, 0}
+        Box: {0.06, 0.08, l - 0.4}
+      }
+
       for r in 0..2 {
-        "rail_{s}_{r}" : ShipHullDark { Position: {sx * (r == 0 ? 6 : 14), -2.85, 0}; Box: {0.5, 0.2, l - 9} }
+        "rail_{s}_{r}" : ShipHullDark {
+          Position: {sx * (r == 0 ? 6 : 14), -2.85, 0}
+          Box: {0.5, 0.2, l - 9}
+        }
       }
     }
+
     for i in 0..GZ {
       "cradle_{i}" {
         Position: {0, -2.9, (i - GZ / 2.0 + 0.5) * CW}
         beam : YardGirder { Position: {0, 0.2, 0}; Box: {GX * CW - 10, 0.4, 0.5} }
+
         for s in 0..4 {
           "pad_{s}" : ShipHazard { Position: {(s - 1.5) * 8, 0.42, 0}; Box: {1.6, 0.06, 0.6} }
         }
       }
     }
+
     for i in 0..2 {
-      "end_light_{i}" : ShipAmberLight { Position: {0, -2.9, i == 0 ? -0.1 - l / 2 : l / 2 + 0.1}; Box: {w - 1, 0.08, 0.06} }
+      "end_light_{i}" : ShipAmberLight {
+        Position: {0, -2.9, i == 0 ? -0.1 - l / 2 : l / 2 + 0.1}
+        Box: {w - 1, 0.08, 0.06}
+      }
     }
   }
 
@@ -120,8 +206,12 @@ assets {
     for r in 0..2 {
       "rail_{r}" : ShipSteel { Position: {0, r == 0 ? 0.11 : 0.06, 0}; Box: {0.016, 0.016, len} }
     }
+
     for i in 0..n + 1 {
-      "post_{i}" : ShipSteel { Position: {0, 0.055, (i - n / 2.0) * len / n}; Box: {0.014, 0.11, 0.014} }
+      "post_{i}" : ShipSteel {
+        Position: {0, 0.055, (i - n / 2.0) * len / n}
+        Box: {0.014, 0.11, 0.014}
+      }
     }
   }
 
@@ -129,8 +219,17 @@ assets {
     prop seed: i32 = 0
 
     hull { Scale: {0.1, 0.1, 0.1}; MiniShuttle body(paint: seed % 2) }
-    plume : ShipPlasma { Position: {0, 0.15, -0.34}; Sphere: {radius: 0.07, segments: 3, smooth: true}; NoShadow }
-    beacon : ShipBeaconRed { Position: {0, 0.33, -0.1}; Sphere: {radius: 0.03, segments: 3, smooth: true} }
+    plume : ShipPlasma {
+      Position: {0, 0.15, -0.34}
+      Sphere: {radius: 0.07, segments: 3, smooth: true}
+      NoShadow
+    }
+
+    beacon : ShipBeaconRed {
+      Position: {0, 0.33, -0.1}
+      Sphere: {radius: 0.03, segments: 3, smooth: true}
+    }
+
     glow { Position: {0, 0.15, -0.6}; PointLight: {intensity: 1.5, range: 2}; Rgb: {120, 180, 255} }
   }
 
@@ -156,20 +255,50 @@ assets {
 
   template DockWinch {
     skid : DockHullDark { Position: {0, 0.12, 0}; Box: {2.4, 0.24, 3.2} }
-    drum : ShipSteel { Position: {0, 0.8, -0.25}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.48, length: 1.7, segments: 20, smooth: true} }
-    for f in 0..9 {
-      "winding_{f}" : ShipRubber { Position: {0, 0.8, -0.95 + f * 0.175}; Rotation: {HALF_PI, 0, 0}; Torus: {radius: 0.5, tube: 0.045, segments: 20, rings: 6} }
+    drum : ShipSteel {
+      Position: {0, 0.8, -0.25}
+      Rotation: {HALF_PI, 0, 0}
+      Cylinder: {radius: 0.48, length: 1.7, segments: 20, smooth: true}
     }
+
+    for f in 0..9 {
+      "winding_{f}" : ShipRubber {
+        Position: {0, 0.8, -0.95 + f * 0.175}
+        Rotation: {HALF_PI, 0, 0}
+        Torus: {radius: 0.5, tube: 0.045, segments: 20, rings: 6}
+      }
+    }
+
     for e in 0..2 {
       const z = e == 0 ? -1.2 : 0.7
-      "flange_{e}" : ShipOrange { Position: {0, 0.8, z}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.64, length: 0.12, segments: 20} }
+      "flange_{e}" : ShipOrange {
+        Position: {0, 0.8, z}
+        Rotation: {HALF_PI, 0, 0}
+        Cylinder: {radius: 0.64, length: 0.12, segments: 20}
+      }
+
       "bearing_{e}" : DockHull { Position: {0, 0.5, z}; Box: {1.5, 0.6, 0.28} }
-      "hub_{e}" : ShipTrim { Position: {0, 0.8, z + (e == 0 ? -0.1 : 0.1)}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.22, length: 0.14, segments: 12} }
+      "hub_{e}" : ShipTrim {
+        Position: {0, 0.8, z + (e == 0 ? -0.1 : 0.1)}
+        Rotation: {HALF_PI, 0, 0}
+        Cylinder: {radius: 0.22, length: 0.14, segments: 12}
+      }
     }
-    motor : ShipTeal { Position: {0, 0.7, 1.15}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.35, length: 0.55, segments: 16} }
+
+    motor : ShipTeal {
+      Position: {0, 0.7, 1.15}
+      Rotation: {HALF_PI, 0, 0}
+      Cylinder: {radius: 0.35, length: 0.55, segments: 16}
+    }
+
     for r in 0..4 {
-      "cooling_{r}" : ShipTrim { Position: {0, 0.7, 0.94 + r * 0.13}; Rotation: {HALF_PI, 0, 0}; Torus: {radius: 0.36, tube: 0.025, segments: 16, rings: 4} }
+      "cooling_{r}" : ShipTrim {
+        Position: {0, 0.7, 0.94 + r * 0.13}
+        Rotation: {HALF_PI, 0, 0}
+        Torus: {radius: 0.36, tube: 0.025, segments: 16, rings: 4}
+      }
     }
+
     cabinet : DockHull { Position: {0.85, 0.62, 0.5}; Box: {0.4, 0.8, 0.7} }
     panel : ShipRecess { Position: {0.85, 0.7, 0.87}; Box: {0.28, 0.4, 0.04} }
     status : ShipGreenLight { Position: {0.85, 0.83, 0.9}; Box: {0.16, 0.04, 0.02} }
@@ -181,73 +310,176 @@ assets {
 
     const w = 3.2
     const tier = h / 4
+
     for c in 0..4 {
       const x = c < 2 ? 0 - w / 2 : w / 2
       const z = c % 2 == 0 ? 0 - d / 2 : d / 2
       "shoe_{c}" : DockHullDark { Position: {x, 0.22, z}; Box: {1.1, 0.44, 1.1} }
       "leg_{c}" : DockHull { Position: {x, h / 2, z}; Box: {0.38, h, 0.38} }
       "cap_{c}" : ShipOrange { Position: {x, h - 0.5, z}; Box: {0.48, 1.4, 0.48} }
+
       for t in 0..4 {
         const y = t * tier
         "joint_{c}_{t}" : ShipTrim { Position: {x, y + 0.45, z}; Box: {0.48, 0.75, 0.48} }
-        "bolt_{c}_{t}" : ShipSteel { Position: {x + (c < 2 ? -0.26 : 0.26), y + 0.45, z}; Box: {0.06, 0.3, 0.12} }
+        "bolt_{c}_{t}" : ShipSteel {
+          Position: {x + (c < 2 ? -0.26 : 0.26), y + 0.45, z}
+          Box: {0.06, 0.3, 0.12}
+        }
       }
     }
+
     for t in 0..4 {
       const y = t * tier
+
       for f in 0..2 {
         const x = (f - 0.5) * w
         const z = (f - 0.5) * d
         "tie_z_{t}_{f}" : DockHullDark { Position: {x, y + 0.25, 0}; Box: {0.3, 0.4, d} }
         "tie_x_{t}_{f}" : DockHullDark { Position: {0, y + 0.25, z}; Box: {w - 0.4, 0.4, 0.3} }
-        DockStrut "web_z_{t}_{f}"(ax: x, ay: y + 0.5, az: t % 2 == 0 ? 0 - d / 2 : d / 2, bx: x, by: y + tier - 0.15, bz: t % 2 == 0 ? d / 2 : 0 - d / 2, width: 0.19)
-        DockStrut "web_x_{t}_{f}"(ax: 0 - w / 2, ay: y + 0.5, az: z, bx: w / 2, by: y + tier - 0.15, bz: z, width: 0.14)
+        DockStrut "web_z_{t}_{f}"(
+          ax: x,
+          ay: y + 0.5,
+          az: t % 2 == 0 ? 0 - d / 2 : d / 2,
+          bx: x,
+          by: y + tier - 0.15,
+          bz: t % 2 == 0 ? d / 2 : 0 - d / 2,
+          width: 0.19
+        )
+        DockStrut "web_x_{t}_{f}"(
+          ax: 0 - w / 2,
+          ay: y + 0.5,
+          az: z,
+          bx: w / 2,
+          by: y + tier - 0.15,
+          bz: z,
+          width: 0.14
+        )
       }
-      "landing_{t}" : YardDeckFine { Position: {0, y + 0.36, d / 2 - 0.55}; Box: {w - 0.4, 0.08, 0.7} }
-      YardRailing "guard_{t}"(len: w - 0.5, n: 8) { Position: {0, y + 0.4, d / 2 - 0.9}; Rotation: {0, HALF_PI, 0} }
+
+      "landing_{t}" : YardDeckFine {
+        Position: {0, y + 0.36, d / 2 - 0.55}
+        Box: {w - 0.4, 0.08, 0.7}
+      }
+
+      YardRailing "guard_{t}"(len: w - 0.5, n: 8) {
+        Position: {0, y + 0.4, d / 2 - 0.9}
+        Rotation: {0, HALF_PI, 0}
+      }
+
       "lamp_{t}" : ShipAmberLight { Position: {-1.84, y + 0.6, d / 2}; Box: {0.06, 0.07, 0.22} }
     }
+
     for r in 0..2 {
-      "ladder_rail_{r}" : ShipSteel { Position: {(r - 0.5) * 0.09, h / 2, d / 2 + 0.28}; Box: {0.012, h, 0.012} }
+      "ladder_rail_{r}" : ShipSteel {
+        Position: {(r - 0.5) * 0.09, h / 2, d / 2 + 0.28}
+        Box: {0.012, h, 0.012}
+      }
+
       "lift_rail_{r}" : ShipSteel { Position: {(r - 0.5) * 0.7, h / 2, 0}; Box: {0.05, h, 0.06} }
     }
+
     const rungs: i32 = h / 0.035
+
     for r in 0..rungs {
       "rung_{r}" : ShipSteel { Position: {0, r * 0.035, d / 2 + 0.28}; Box: {0.09, 0.008, 0.014} }
     }
+
     lift : ShipOrange { Position: {0, h * 0.42, 0}; Box: {0.9, 0.5, 0.8} }
     lift_glass : ShipCanopy { Position: {-0.47, h * 0.42 + 0.08, 0}; Box: {0.04, 0.2, 0.6} }
     crown : DockHullDark { Position: {0, h + 0.08, -0.075 * d - 0.4}; Box: {1.4, 0.16, d * 0.85} }
     DockWinch winding_house() { Position: {0, h + 0.16, -0.5} }
+
     for f in 0..2 {
-      "crown_walk_{f}" : DockHullDark { Position: {(f - 0.5) * 2.6, h + 0.08, 0}; Box: {1.2, 0.16, d + 0.8} }
-      YardRailing "crown_guard_{f}"(len: d + 0.6, n: 16) { Position: {(f - 0.5) * (w + 0.4), h + 0.16, 0} }
-      "runway_{f}" : ShipOrange { Position: {(f - 0.5) * 2.2, h + 1.8, 0}; Box: {0.25, 0.55, d + 1.2} }
-      "runway_post_{f}" : DockHull { Position: {(f - 0.5) * 2.2, h + 0.9, 0}; Box: {0.22, 1.8, 0.3} }
-      "beacon_{f}" : ShipBeaconRed { Position: {(f - 0.5) * 2.2, h + 2.15, d / 2}; Sphere: {radius: 0.09, segments: 3, smooth: true} }
+      "crown_walk_{f}" : DockHullDark {
+        Position: {(f - 0.5) * 2.6, h + 0.08, 0}
+        Box: {1.2, 0.16, d + 0.8}
+      }
+
+      YardRailing "crown_guard_{f}"(len: d + 0.6, n: 16) {
+        Position: {(f - 0.5) * (w + 0.4), h + 0.16, 0}
+      }
+
+      "runway_{f}" : ShipOrange {
+        Position: {(f - 0.5) * 2.2, h + 1.8, 0}
+        Box: {0.25, 0.55, d + 1.2}
+      }
+
+      "runway_post_{f}" : DockHull {
+        Position: {(f - 0.5) * 2.2, h + 0.9, 0}
+        Box: {0.22, 1.8, 0.3}
+      }
+
+      "beacon_{f}" : ShipBeaconRed {
+        Position: {(f - 0.5) * 2.2, h + 2.15, d / 2}
+        Sphere: {radius: 0.09, segments: 3, smooth: true}
+      }
     }
+
     hoist : ShipTrim { Position: {0, h + 1.65, d * 0.35}; Box: {2.6, 0.3, 0.8} }
-    cable : ShipSteel { Position: {0, h * 0.74 + 0.8625, d * 0.35}; Cylinder: {radius: 0.025, length: h * 0.52 + 1.275, segments: 6} }
+    cable : ShipSteel {
+      Position: {0, h * 0.74 + 0.8625, d * 0.35}
+      Cylinder: {radius: 0.025, length: h * 0.52 + 1.275, segments: 6}
+    }
+
     hook_block : ShipHazard { Position: {0, h * 0.48, d * 0.35}; Box: {0.55, 0.45, 0.35} }
-    hook : ShipSteel { Position: {0, h * 0.48 - 0.35, d * 0.35}; Rotation: {HALF_PI, 0, 0}; Torus: {radius: 0.16, tube: 0.035, segments: 12, rings: 6} }
+    hook : ShipSteel {
+      Position: {0, h * 0.48 - 0.35, d * 0.35}
+      Rotation: {HALF_PI, 0, 0}
+      Torus: {radius: 0.16, tube: 0.035, segments: 12, rings: 6}
+    }
   }
 
   template DockPumpSkid {
     base : DockHullDark { Position: {0, 0.12, 0}; Box: {2.6, 0.24, 4.4} }
+
     for t in 0..2 {
       const x = (t - 0.5) * 1.15
-      "vessel_{t}" : ShipTankSkin { Position: {x, 0.9, 0}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.42, length: 2.8, segments: 16, smooth: true} }
+      "vessel_{t}" : ShipTankSkin {
+        Position: {x, 0.9, 0}
+        Rotation: {HALF_PI, 0, 0}
+        Cylinder: {radius: 0.42, length: 2.8, segments: 16, smooth: true}
+      }
+
       for e in 0..2 {
         const z = (e - 0.5) * 2.8
-        "cap_{t}_{e}" : ShipTankSkin { Position: {x, 0.9, z}; Scale: {1, 1, 0.5}; Sphere: {radius: 0.42, segments: 16, smooth: true} }
-        "strap_{t}_{e}" : ShipTrim { Position: {x, 0.9, z * 0.7}; Rotation: {HALF_PI, 0, 0}; Tube: {radius: 0.46, thickness: 0.05, length: 0.12, segments: 16} }
+        "cap_{t}_{e}" : ShipTankSkin {
+          Position: {x, 0.9, z}
+          Scale: {1, 1, 0.5}
+          Sphere: {radius: 0.42, segments: 16, smooth: true}
+        }
+
+        "strap_{t}_{e}" : ShipTrim {
+          Position: {x, 0.9, z * 0.7}
+          Rotation: {HALF_PI, 0, 0}
+          Tube: {radius: 0.46, thickness: 0.05, length: 0.12, segments: 16}
+        }
+
         "saddle_{t}_{e}" : DockHull { Position: {x, 0.48, z * 0.7}; Box: {0.85, 0.48, 0.3} }
       }
-      "valve_stem_{t}" : ShipSteel { Position: {x, 1.48, 0.8}; Cylinder: {radius: 0.05, length: 0.35, segments: 8} }
-      "valve_{t}" : ShipRed { Position: {x, 1.66, 0.8}; Torus: {radius: 0.17, tube: 0.025, segments: 12, rings: 6} }
-      "outlet_{t}" : DockPipe { Position: {x, 0.9, -1.8}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.09, length: 0.7, segments: 8} }
+
+      "valve_stem_{t}" : ShipSteel {
+        Position: {x, 1.48, 0.8}
+        Cylinder: {radius: 0.05, length: 0.35, segments: 8}
+      }
+
+      "valve_{t}" : ShipRed {
+        Position: {x, 1.66, 0.8}
+        Torus: {radius: 0.17, tube: 0.025, segments: 12, rings: 6}
+      }
+
+      "outlet_{t}" : DockPipe {
+        Position: {x, 0.9, -1.8}
+        Rotation: {HALF_PI, 0, 0}
+        Cylinder: {radius: 0.09, length: 0.7, segments: 8}
+      }
     }
-    manifold : ShipTeal { Position: {0, 0.9, -2.1}; Rotation: {0, 0, HALF_PI}; Cylinder: {radius: 0.15, length: 1.8, segments: 12} }
+
+    manifold : ShipTeal {
+      Position: {0, 0.9, -2.1}
+      Rotation: {0, 0, HALF_PI}
+      Cylinder: {radius: 0.15, length: 1.8, segments: 12}
+    }
+
     controller : DockHull { Position: {0, 0.55, 1.85}; Box: {1.6, 0.6, 0.4} }
     screen : ShipScreen { Position: {0, 0.6, 2.08}; Box: {0.7, 0.3, 0.04} }
   }
@@ -263,57 +495,126 @@ assets {
     const fa = atan2(wy - ey, wx - ex)
     const fl = sqrt((wx - ex) * (wx - ex) + (wy - ey) * (wy - ey))
 
-    base : DockHullDark { Position: {0, 0.5, 0}; Cylinder: {radius: 1.8, length: 1, segments: 24, smooth: true} }
-    base_band : ShipHazard { Position: {0, 0.75, 0}; Tube: {radius: 1.88, thickness: 0.06, length: 0.3, segments: 24} }
+    base : DockHullDark {
+      Position: {0, 0.5, 0}
+      Cylinder: {radius: 1.8, length: 1, segments: 24, smooth: true}
+    }
+
+    base_band : ShipHazard {
+      Position: {0, 0.75, 0}
+      Tube: {radius: 1.88, thickness: 0.06, length: 0.3, segments: 24}
+    }
+
     turret : DockHull { Position: {0, 1.5, 0}; Box: {2.4, 1.4, 2.6} }
-    shoulder : ShipTrim { Position: {0, sy, 0}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.9, length: 2.2, segments: 20, smooth: true} }
+    shoulder : ShipTrim {
+      Position: {0, sy, 0}
+      Rotation: {HALF_PI, 0, 0}
+      Cylinder: {radius: 0.9, length: 2.2, segments: 20, smooth: true}
+    }
+
     upper {
       Position: {ex / 2, (sy + ey) / 2, 0}
       Rotation: {0, 0, ua}
       beam : DockHull { Box: {ul, 1.2, 1.2} }
       band : ShipHazard { Position: {ul * 0.38, 0, 0}; Box: {0.8, 1.36, 1.36} }
       lights : DockRunLights { Position: {0, 0.72, 0}; Box: {ul - 1.6, 0.04, 0.16} }
+
       for s in 0..2 {
-        "ram_{s}" : ShipChrome { Position: {0, -0.92, (s - 0.5) * 0.8}; Rotation: {0, 0, HALF_PI}; Cylinder: {radius: 0.1, length: ul * 0.78, segments: 12} }
-        "barrel_{s}" : ShipTeal { Position: {0 - ul * 0.2, -0.92, (s - 0.5) * 0.8}; Rotation: {0, 0, HALF_PI}; Cylinder: {radius: 0.18, length: ul * 0.4, segments: 12} }
-        "clevis_{s}" : ShipTrim { Position: {(s - 0.5) * ul * 0.78, -0.72, 0}; Box: {0.28, 0.65, 1.25} }
-        "cable_duct_{s}" : ShipTrim { Position: {0, 0.25, (s - 0.5) * 1.45}; Box: {ul * 0.75, 0.22, 0.12} }
+        "ram_{s}" : ShipChrome {
+          Position: {0, -0.92, (s - 0.5) * 0.8}
+          Rotation: {0, 0, HALF_PI}
+          Cylinder: {radius: 0.1, length: ul * 0.78, segments: 12}
+        }
+
+        "barrel_{s}" : ShipTeal {
+          Position: {0 - ul * 0.2, -0.92, (s - 0.5) * 0.8}
+          Rotation: {0, 0, HALF_PI}
+          Cylinder: {radius: 0.18, length: ul * 0.4, segments: 12}
+        }
+
+        "clevis_{s}" : ShipTrim {
+          Position: {(s - 0.5) * ul * 0.78, -0.72, 0}
+          Box: {0.28, 0.65, 1.25}
+        }
+
+        "cable_duct_{s}" : ShipTrim {
+          Position: {0, 0.25, (s - 0.5) * 1.45}
+          Box: {ul * 0.75, 0.22, 0.12}
+        }
+
         for p in 0..5 {
-          "cover_{s}_{p}" : DockGrime { Position: {(p - 2) * ul * 0.13, -0.1, (s - 0.5) * 1.4}; Box: {ul * 0.1, 0.3, 0.12} }
+          "cover_{s}_{p}" : DockGrime {
+            Position: {(p - 2) * ul * 0.13, -0.1, (s - 0.5) * 1.4}
+            Box: {ul * 0.1, 0.3, 0.12}
+          }
         }
       }
     }
-    elbow : ShipTrim { Position: {ex, ey, 0}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.75, length: 1.8, segments: 20, smooth: true} }
-    elbow_beacon : ShipBeaconRed { Position: {ex, ey + 0.85, 0}; Sphere: {radius: 0.14, segments: 3, smooth: true} }
+
+    elbow : ShipTrim {
+      Position: {ex, ey, 0}
+      Rotation: {HALF_PI, 0, 0}
+      Cylinder: {radius: 0.75, length: 1.8, segments: 20, smooth: true}
+    }
+
+    elbow_beacon : ShipBeaconRed {
+      Position: {ex, ey + 0.85, 0}
+      Sphere: {radius: 0.14, segments: 3, smooth: true}
+    }
+
     fore {
       Position: {(ex + wx) / 2, (ey + wy) / 2, 0}
       Rotation: {0, 0, fa}
       beam : DockHullDark { Box: {fl, 0.9, 0.9} }
       lights : DockRunLightsCyan { Position: {0, 0.56, 0}; Box: {fl - 1.4, 0.04, 0.14} }
       cable : DockPipe { Position: {0, -0.62, 0.3}; Box: {fl - 0.6, 0.14, 0.14} }
+
       for c in 0..7 {
         const x = (c - 3) * fl * 0.12
         "conduit_clip_{c}" : ShipTrim { Position: {x, -0.58, 0.3}; Box: {0.12, 0.3, 0.26} }
         "access_plate_{c}" : DockHull { Position: {x, 0, 0.53}; Box: {fl * 0.09, 0.6, 0.08} }
       }
     }
+
     for f in 0..2 {
       const z = (f - 0.5) * 2.04
-      "elbow_cover_{f}" : ShipOrange { Position: {ex, ey, z}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.58, length: 0.16, segments: 20} }
-      "elbow_hub_{f}" : ShipTrim { Position: {ex, ey, z + (f - 0.5) * 0.24}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.25, length: 0.12, segments: 16} }
+      "elbow_cover_{f}" : ShipOrange {
+        Position: {ex, ey, z}
+        Rotation: {HALF_PI, 0, 0}
+        Cylinder: {radius: 0.58, length: 0.16, segments: 20}
+      }
+
+      "elbow_hub_{f}" : ShipTrim {
+        Position: {ex, ey, z + (f - 0.5) * 0.24}
+        Rotation: {HALF_PI, 0, 0}
+        Cylinder: {radius: 0.25, length: 0.12, segments: 16}
+      }
+
       for b in 0..8 {
         const a = b * PI / 4
-        "elbow_bolt_{f}_{b}" : ShipSteel { Position: {ex + cos(a) * 0.44, ey + sin(a) * 0.44, z + (f - 0.5) * 0.2}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.055, length: 0.12, segments: 6} }
+        "elbow_bolt_{f}_{b}" : ShipSteel {
+          Position: {ex + cos(a) * 0.44, ey + sin(a) * 0.44, z + (f - 0.5) * 0.2}
+          Rotation: {HALF_PI, 0, 0}
+          Cylinder: {radius: 0.055, length: 0.12, segments: 6}
+        }
       }
     }
-    wrist : ShipTrim { Position: {wx, wy, 0}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.55, length: 1.2, segments: 16, smooth: true} }
+
+    wrist : ShipTrim {
+      Position: {wx, wy, 0}
+      Rotation: {HALF_PI, 0, 0}
+      Cylinder: {radius: 0.55, length: 1.2, segments: 16, smooth: true}
+    }
+
     hand {
       Position: {wx, wy, 0}
       Rotation: {0, 0, fa}
       palm : DockHull { Position: {0.9, 0, 0}; Box: {1, 0.8, 1} }
+
       for s in 0..2 {
         "finger_{s}" : ShipSteel { Position: {1.9, (s - 0.5) * 0.6, 0}; Box: {1.1, 0.18, 0.3} }
       }
+
       lamp : ShipWhiteLight { Position: {1.41, 0, 0}; Box: {0.02, 0.3, 0.5} }
     }
   }
@@ -326,7 +627,12 @@ assets {
     const bl = sqrt(hx * hx + (hy - 1) * (hy - 1))
 
     pedestal : DockHullDark { Position: {0, 0.5, 0}; Box: {1.8, 1, 1.8} }
-    pivot : ShipTrim { Position: {0, 1, 0}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.55, length: 1.4, segments: 16, smooth: true} }
+    pivot : ShipTrim {
+      Position: {0, 1, 0}
+      Rotation: {HALF_PI, 0, 0}
+      Cylinder: {radius: 0.55, length: 1.4, segments: 16, smooth: true}
+    }
+
     boom {
       Position: {hx / 2, (hy + 1) / 2, 0}
       Rotation: {0, 0, ba}
@@ -335,12 +641,31 @@ assets {
       hose_b : ShipTeal { Position: {0, -0.5, -0.28}; Box: {bl - 0.4, 0.16, 0.16} }
       lights : DockRunLightsCyan { Position: {0, 0.5, 0}; Box: {bl - 0.8, 0.04, 0.14} }
     }
+
     head : DockHullDark { Position: {hx, hy, 0}; Box: {1.2, 1.6, 1.6} }
     head_band : ShipHazard { Position: {hx, hy - 0.55, 0}; Box: {1.36, 0.25, 1.76} }
-    collar : ShipTrim { Position: {hx - 0.75, hy, 0}; Rotation: {0, 0, HALF_PI}; Cylinder: {radius: 0.6, length: 0.3, segments: 20, smooth: true} }
-    collar_ring : ShipAmberLight { Position: {hx - 0.92, hy, 0}; Rotation: {0, 0, HALF_PI}; Cylinder: {radius: 0.62, length: 0.04, segments: 20, smooth: true} }
-    seal : ShipRecess { Position: {hx - 1.0, hy, 0}; Rotation: {0, 0, HALF_PI}; Cylinder: {radius: 0.42, length: 0.04, segments: 20, smooth: true} }
-    beacon : ShipBeaconWhite { Position: {hx, hy + 0.95, 0}; Sphere: {radius: 0.14, segments: 3, smooth: true} }
+    collar : ShipTrim {
+      Position: {hx - 0.75, hy, 0}
+      Rotation: {0, 0, HALF_PI}
+      Cylinder: {radius: 0.6, length: 0.3, segments: 20, smooth: true}
+    }
+
+    collar_ring : ShipAmberLight {
+      Position: {hx - 0.92, hy, 0}
+      Rotation: {0, 0, HALF_PI}
+      Cylinder: {radius: 0.62, length: 0.04, segments: 20, smooth: true}
+    }
+
+    seal : ShipRecess {
+      Position: {hx - 1.0, hy, 0}
+      Rotation: {0, 0, HALF_PI}
+      Cylinder: {radius: 0.42, length: 0.04, segments: 20, smooth: true}
+    }
+
+    beacon : ShipBeaconWhite {
+      Position: {hx, hy + 0.95, 0}
+      Sphere: {radius: 0.14, segments: 3, smooth: true}
+    }
   }
 
   // Floodlight pylon of about 50 m on the inner ledge, its lamp bank tilted up toward the ship
@@ -353,9 +678,14 @@ assets {
       Position: {-0.2, 4.4, 0}
       Rotation: {0, 0, -0.35}
       housing : ShipTrim { Position: {0.15, 0, 0}; Box: {0.4, 1.0, 2.2} }
+
       for r in 0..2 {
-        "lamp_{r}" : ShipWhiteLight { Position: {-0.06, (r - 0.5) * 0.46, 0}; Box: {0.04, 0.36, 2.0} }
+        "lamp_{r}" : ShipWhiteLight {
+          Position: {-0.06, (r - 0.5) * 0.46, 0}
+          Box: {0.04, 0.36, 2.0}
+        }
       }
+
       if lit {
         beam {
           Rotation: {0, 0 - HALF_PI, 0}
@@ -364,13 +694,108 @@ assets {
         }
       }
     }
-    beacon : ShipBeaconRed { Position: {0, 5.05, 0}; Sphere: {radius: 0.1, segments: 3, smooth: true} }
+
+    beacon : ShipBeaconRed {
+      Position: {0, 5.05, 0}
+      Sphere: {radius: 0.1, segments: 3, smooth: true}
+    }
   }
 
-  // One side structure of the liner drydock, built for the starboard side (x > 0) and turned by
-  // PI for port. Nothing reaches inside |x| < 24 or past |z| = 46, so the liner and its shield
-  // bubble stay clear. The structure rises away from the ship, so from the default camera the
-  // near wing stays below the lower half of the hab rings.
+  template DockWingGlacis {
+    const len = 88
+    const bay = 11
+    const rib_a = atan2(11.0, 8.0)
+    const rib_l = sqrt(185.0)
+    const gx = 40 - 0.6 * sin(rib_a)
+    const gy = -4.5 + 0.6 * cos(rib_a)
+
+    Position: {gx, gy, 0}
+    Rotation: {0, 0, rib_a}
+    plate : DockHull { Box: {rib_l - 1, 0.4, len - 2} }
+
+    for b in 0..8 {
+      const bz = (b - 3.5) * bay
+      "gallery_a_{b}" : DockWindows { Position: {2.6, 0.32, bz}; Box: {1.4, 0.12, bay - 2.5} }
+      "gallery_b_{b}" : DockWindows { Position: {-1.8, 0.32, bz}; Box: {0.9, 0.12, bay - 2.5} }
+      "lights_top_{b}" : DockRunLights { Position: {5.4, 0.32, bz}; Box: {0.14, 0.12, bay - 3} }
+      "lights_low_{b}" : DockRunLightsCyan {
+        Position: {-5.4, 0.32, bz}
+        Box: {0.14, 0.12, bay - 3}
+      }
+
+      for h in 0..2 {
+        const z = bz + (h - 0.5) * 4
+        "hatch_{b}_{h}" : DockGrime { Position: {-3.7, 0.34, z}; Box: {1, 0.16, 1} }
+        "hatch_lamp_{b}_{h}" : ShipAmberLight {
+          Position: {-3.05, 0.34, z}
+          Box: {0.08, 0.12, 0.5}
+        }
+
+        for f in 0..2 {
+          "hinge_{b}_{h}_{f}" : ShipSteel {
+            Position: {-4.24, 0.4, z + (f - 0.5) * 0.6}
+            Box: {0.12, 0.16, 0.18}
+          }
+        }
+      }
+
+      "service_trunk_{b}" : DockPipe {
+        Position: {0.4, 0.48, bz}
+        Rotation: {0, 0, HALF_PI}
+        Cylinder: {radius: 0.1, length: rib_l - 2.6, segments: 8}
+      }
+
+      for c in 0..3 {
+        "clamp_{b}_{c}" : ShipTrim { Position: {(c - 1) * 4, 0.4, bz}; Box: {0.15, 0.4, 0.32} }
+      }
+    }
+  }
+
+  template DockWingHangar {
+    Position: {36.5, -4.5, 38.5}
+    back : DockHull { Position: {3.9, -0.1, 0}; Box: {1.2, 6, 7.4} }
+    ceiling : DockHull { Position: {0, 3.2, 0}; Box: {9, 0.6, 9} }
+    floor : DockHullDark { Position: {0, -3.3, 0}; Box: {9, 0.4, 9} }
+
+    for f in 0..2 {
+      "wall_{f}" : DockHull { Position: {0, -0.1, (f - 0.5) * 8.2}; Box: {9, 6, 0.8} }
+      "track_{f}" : ShipSteel { Position: {-0.5, -3.04, (f - 0.5) * 4}; Box: {7.5, 0.12, 0.08} }
+      "ceiling_light_{f}" : ShipWhiteLight {
+        Position: {-0.5, 2.84, (f - 0.5) * 5.8}
+        Box: {6.5, 0.08, 0.08}
+      }
+    }
+
+    for r in 0..5 {
+      "roof_fin_{r}" : ShipTrim { Position: {0.8, 4.44, (r - 2) * 1.1}; Box: {3.2, 0.32, 0.12} }
+    }
+
+    roof_kit : DockHullDark { Position: {1.5, 3.9, 0}; Box: {4, 0.8, 6} }
+    interior : ShipLounge { Position: {3.22, -0.1, 0}; Box: {0.08, 5.6, 7.2} }
+    bay_lights : ShipWhiteLight { Position: {-4.62, 1.1, 0}; Box: {0.04, 0.08, 6.6} }
+    door : DockHullDark { Position: {-4.62, 1.9, 0}; Box: {0.14, 1.4, 7.4} }
+    door_band : ShipHazard { Position: {-4.76, 1.4, 0}; Box: {0.02, 0.24, 7.4} }
+    gallery : DockWindows { Position: {-4.62, 3.0, 0}; Box: {0.04, 0.6, 8} }
+
+    for s in 0..2 {
+      const sz = s == 0 ? -1 : 1
+      "jamb_{s}" : DockHullDark { Position: {-4.6, -0.9, sz * 3.7}; Box: {0.3, 4.8, 0.4} }
+      "airlock_{s}" : DockHullDark { Position: {-4.62, -2.75, sz * 4.1}; Box: {0.03, 0.3, 0.2} }
+      "airlock_lamp_{s}" : ShipAmberLight {
+        Position: {-4.65, -2.55, sz * 4.1}
+        Box: {0.03, 0.03, 0.14}
+      }
+
+      "corner_beacon_{s}" : ShipBeaconWhite {
+        Position: {-4.3, 3.65, sz * 4.3}
+        Sphere: {radius: 0.15, segments: 3, smooth: true}
+      }
+    }
+  }
+
+  // One side structure of the liner drydock, built for starboard (x > 0) and turned by PI for
+  // port. Nothing reaches inside |x| < 24 or past |z| = 46, so the liner and its shield bubble
+  // stay clear.
   template DockWing {
     prop side: i32 = 1
     prop high: f32 = 13
@@ -387,11 +812,16 @@ assets {
     keel_inner : DockHullDark { Position: {28.5, -9, 0}; Box: {3, 2, len - 6} }
     keel_foot : DockHullDark { Position: {45.6, -12.6, 0}; Box: {2.4, 2.4, len} }
     stringer : DockHull { Position: {45.8, -6, 0}; Box: {1.4, 1.4, len} }
+
     for b in 0..8 {
       for f in 0..2 {
-        "spine_windows_{b}_{f}" : DockWindows { Position: {f == 0 ? 41.88 : 46.12, 0.7, (b - 3.5) * bay}; Box: {0.12, 2.2, bay - 3.4} }
+        "spine_windows_{b}_{f}" : DockWindows {
+          Position: {f == 0 ? 41.88 : 46.12, 0.7, (b - 3.5) * bay}
+          Box: {0.12, 2.2, bay - 3.4}
+        }
       }
     }
+
     upper_deck : YardDeckFine { Position: {44.4, 3.56, 0}; Box: {5.2, 0.12, len} }
 
     for k in 0..9 {
@@ -403,15 +833,23 @@ assets {
         node_low : DockHullDark { Position: {36, -10, 0}; Box: {6, 5, 3} }
         node_high : DockHullDark { Position: {44.2, 1, 0}; Box: {5, 5, 3} }
         lamp : ShipAmberLight { Position: {46.72, 2.6, 0}; Box: {0.04, 0.3, 1.6} }
+
         if k > 0 && k < 8 {
           beam : DockHullDark { Position: {31.5, -9.3, 0}; Box: {9, 1.6, 1.4} }
         } else {
           band_low : ShipHazard { Position: {36, -8.1, 0}; Box: {6.2, 0.6, 3.2} }
           band_high : ShipHazard { Position: {44.2, 2.9, 0}; Box: {5.2, 0.6, 3.2} }
+
           if side == 0 {
-            beacon : ShipBeaconRed { Position: {46, 3.8, 0}; Sphere: {radius: 0.3, segments: 3, smooth: true} }
+            beacon : ShipBeaconRed {
+              Position: {46, 3.8, 0}
+              Sphere: {radius: 0.3, segments: 3, smooth: true}
+            }
           } else {
-            beacon : ShipBeaconGreen { Position: {46, 3.8, 0}; Sphere: {radius: 0.3, segments: 3, smooth: true} }
+            beacon : ShipBeaconGreen {
+              Position: {46, 3.8, 0}
+              Sphere: {radius: 0.3, segments: 3, smooth: true}
+            }
           }
         }
       }
@@ -419,68 +857,73 @@ assets {
 
     for b in 0..8 {
       const bz = (b - 3.5) * bay
+
       for d in 0..2 {
-        "brace_{b}_{d}" : DockHullDark { Position: {45.6 + (d - 0.5) * 1.05, -6, bz}; Rotation: {d == 0 ? 0.907 : -0.907, 0, 0}; Box: {0.9, 0.9, 14} }
+        "brace_{b}_{d}" : DockHullDark {
+          Position: {45.6 + (d - 0.5) * 1.05, -6, bz}
+          Rotation: {d == 0 ? 0.907 : -0.907, 0, 0}
+          Box: {0.9, 0.9, 14}
+        }
       }
+
       if b == 1 || b == 2 || b == 5 || b == 6 {
         "radiator_root_{b}" : DockHullDark { Position: {41, -13.9, bz}; Box: {1.2, 0.8, 9.4} }
-        "radiator_{b}" : ShipRadiatorPanel { Position: {41, -17.4, bz}; Box: {0.25, 6.8, 9}; NoShadow }
+        "radiator_{b}" : ShipRadiatorPanel {
+          Position: {41, -17.4, bz}
+          Box: {0.25, 6.8, 9}
+          NoShadow
+        }
       }
     }
 
-    glacis {
-      Position: {gx, gy, 0}
-      Rotation: {0, 0, rib_a}
-      plate : DockHull { Box: {rib_l - 1, 0.4, len - 2} }
-      for b in 0..8 {
-        const bz = (b - 3.5) * bay
-        "gallery_a_{b}" : DockWindows { Position: {2.6, 0.32, bz}; Box: {1.4, 0.12, bay - 2.5} }
-        "gallery_b_{b}" : DockWindows { Position: {-1.8, 0.32, bz}; Box: {0.9, 0.12, bay - 2.5} }
-        "lights_top_{b}" : DockRunLights { Position: {5.4, 0.32, bz}; Box: {0.14, 0.12, bay - 3} }
-        "lights_low_{b}" : DockRunLightsCyan { Position: {-5.4, 0.32, bz}; Box: {0.14, 0.12, bay - 3} }
-        for h in 0..2 {
-          const z = bz + (h - 0.5) * 4
-          "hatch_{b}_{h}" : DockGrime { Position: {-3.7, 0.34, z}; Box: {1, 0.16, 1} }
-          "hatch_lamp_{b}_{h}" : ShipAmberLight { Position: {-3.05, 0.34, z}; Box: {0.08, 0.12, 0.5} }
-          for f in 0..2 {
-            "hinge_{b}_{h}_{f}" : ShipSteel { Position: {-4.24, 0.4, z + (f - 0.5) * 0.6}; Box: {0.12, 0.16, 0.18} }
-          }
-        }
-        "service_trunk_{b}" : DockPipe { Position: {0.4, 0.48, bz}; Rotation: {0, 0, HALF_PI}; Cylinder: {radius: 0.1, length: rib_l - 2.6, segments: 8} }
-        for c in 0..3 {
-          "clamp_{b}_{c}" : ShipTrim { Position: {(c - 1) * 4, 0.4, bz}; Box: {0.15, 0.4, 0.32} }
-        }
-      }
-    }
+    DockWingGlacis glacis()
 
     ledge : YardDeckFine { Position: {29.75, -7.9, 0}; Box: {7.5, 0.2, len - 6} }
     ledge_lip : DockHullDark { Position: {25.88, -8.1, 0}; Box: {0.16, 0.6, len - 6} }
     ledge_lights : DockRunLights { Position: {25.72, -8.15, 0}; Box: {0.04, 0.14, len - 7} }
     YardRailing ledge_rail(len: len - 6, n: 82) { Position: {26.1, -7.8, 0} }
     tray : DockGrime { Position: {28.5, -10.15, 0}; Box: {1.6, 0.3, len - 8} }
+
     for p in 0..3 {
-      "pipe_{p}" : DockPipe { Position: {33.1, -9.6 - p * 0.75, 0}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: p == 0 ? 0.36 : 0.24, length: len - 2, segments: 12, smooth: true} }
+      "pipe_{p}" : DockPipe {
+        Position: {33.1, -9.6 - p * 0.75, 0}
+        Rotation: {HALF_PI, 0, 0}
+        Cylinder: {radius: p == 0 ? 0.36 : 0.24, length: len - 2, segments: 12, smooth: true}
+      }
     }
+
     keel_lights : DockRunLightsCyan { Position: {33.48, -11.75, 0}; Box: {0.04, 0.14, len - 2} }
 
     walk : YardDeckFine { Position: {42.6, 3.72, 0}; Box: {1.2, 0.08, len} }
     YardRailing walk_rail(len: len, n: 88) { Position: {42.05, 3.76, 0} }
     walk_lights : DockRunLights { Position: {41.88, 2.5, 0}; Box: {0.04, 0.14, len - 2} }
     outer_lights : DockRunLightsCyan { Position: {46.12, -0.75, 0}; Box: {0.04, 0.14, len - 2} }
+
     for p in 0..2 {
-      "deck_conduit_{p}" : DockPipe { Position: {46.65, 3.85 + p * 0.24, 0}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.075, length: len - 2, segments: 8} }
+      "deck_conduit_{p}" : DockPipe {
+        Position: {46.65, 3.85 + p * 0.24, 0}
+        Rotation: {HALF_PI, 0, 0}
+        Cylinder: {radius: 0.075, length: len - 2, segments: 8}
+      }
     }
+
     for b in 0..8 {
       const z = (b - 3.5) * bay
       "pipe_support_{b}" : ShipTrim { Position: {46.65, 3.86, z}; Box: {0.25, 0.48, 0.18} }
       "deck_hatch_{b}" : DockHullDark { Position: {43.5, 3.68, z + 2.8}; Box: {0.7, 0.12, 1.1} }
       "hatch_handle_{b}" : ShipSteel { Position: {43.5, 3.77, z + 2.8}; Box: {0.18, 0.06, 0.03} }
+
       for k in 0..5 {
-        "walk_marker_{b}_{k}" : ShipYellow { Position: {43.16, 3.8, z + (k - 2) * 1.8}; Box: {0.04, 0.04, 0.5} }
+        "walk_marker_{b}_{k}" : ShipYellow {
+          Position: {43.16, 3.8, z + (k - 2) * 1.8}
+          Box: {0.04, 0.04, 0.5}
+        }
       }
     }
+
     for g in 0..8 {
       const z = (g - 3.5) * bay
+
       if g == 1 || g == 6 {
         DockPumpSkid "plant_{g}"() { Position: {44.6, 3.62, z} }
       } else if g == 3 || g == 7 {
@@ -494,52 +937,40 @@ assets {
 
     DockManipulator arm_a() { Position: {43.4, 3.62, -16.5} }
     DockManipulator arm_b() { Position: {43.4, 3.62, 33} }
+
     for u in 0..3 {
       DockUmbilical "umbilical_{u}"() { Position: {30.6, -7.8, (u * 2 - 2.5) * bay} }
     }
+
     for k in 1..8 {
       DockFlood "flood_{k}"(lit: k % 2 == 0) { Position: {27.2, -7.8, (k - 4) * bay} }
     }
+
     for group in 0..4 {
       const z = -19 + group * 12
       "cargo_pad_{group}" : ShipTrim { Position: {31.4, -7.73, z}; Box: {2.5, 0.14, 3.4} }
+
       for c in 0..8 {
-        "container_{group}_{c}" : ShipContainers { Position: {30.9 + (c % 4) * 0.31, -7.53 + (c < 4 ? 0 : 0.27), z - 0.65}; Box: {0.24, 0.26, 1.2}; Rgb: cargo_tint(side * 5 + c + group) }
+        "container_{group}_{c}" : ShipContainers {
+          Position: {30.9 + (c % 4) * 0.31, -7.53 + (c < 4 ? 0 : 0.27), z - 0.65}
+          Box: {0.24, 0.26, 1.2}
+          Rgb: cargo_tint(side * 5 + c + group)
+        }
       }
+
       "cart_{group}" : ShipOrange { Position: {31.3, -7.48, z + 0.85}; Box: {0.38, 0.24, 0.64} }
       "cart_cab_{group}" : ShipCanopy { Position: {31.3, -7.3, z + 1.04}; Box: {0.3, 0.14, 0.2} }
+
       for w in 0..4 {
-        "wheel_{group}_{w}" : ShipRubber { Position: {31.3 + (w % 2 == 0 ? -0.2 : 0.2), -7.55, z + 0.85 + (w < 2 ? -0.2 : 0.2)}; Rotation: {0, 0, HALF_PI}; Cylinder: {radius: 0.09, length: 0.06, segments: 10} }
+        "wheel_{group}_{w}" : ShipRubber {
+          Position: {31.3 + (w % 2 == 0 ? -0.2 : 0.2), -7.55, z + 0.85 + (w < 2 ? -0.2 : 0.2)}
+          Rotation: {0, 0, HALF_PI}
+          Cylinder: {radius: 0.09, length: 0.06, segments: 10}
+        }
       }
     }
 
-    hangar {
-      Position: {36.5, -4.5, 38.5}
-      back : DockHull { Position: {3.9, -0.1, 0}; Box: {1.2, 6, 7.4} }
-      ceiling : DockHull { Position: {0, 3.2, 0}; Box: {9, 0.6, 9} }
-      floor : DockHullDark { Position: {0, -3.3, 0}; Box: {9, 0.4, 9} }
-      for f in 0..2 {
-        "wall_{f}" : DockHull { Position: {0, -0.1, (f - 0.5) * 8.2}; Box: {9, 6, 0.8} }
-        "track_{f}" : ShipSteel { Position: {-0.5, -3.04, (f - 0.5) * 4}; Box: {7.5, 0.12, 0.08} }
-        "ceiling_light_{f}" : ShipWhiteLight { Position: {-0.5, 2.84, (f - 0.5) * 5.8}; Box: {6.5, 0.08, 0.08} }
-      }
-      for r in 0..5 {
-        "roof_fin_{r}" : ShipTrim { Position: {0.8, 4.44, (r - 2) * 1.1}; Box: {3.2, 0.32, 0.12} }
-      }
-      roof_kit : DockHullDark { Position: {1.5, 3.9, 0}; Box: {4, 0.8, 6} }
-      interior : ShipLounge { Position: {3.22, -0.1, 0}; Box: {0.08, 5.6, 7.2} }
-      bay_lights : ShipWhiteLight { Position: {-4.62, 1.1, 0}; Box: {0.04, 0.08, 6.6} }
-      door : DockHullDark { Position: {-4.62, 1.9, 0}; Box: {0.14, 1.4, 7.4} }
-      door_band : ShipHazard { Position: {-4.76, 1.4, 0}; Box: {0.02, 0.24, 7.4} }
-      gallery : DockWindows { Position: {-4.62, 3.0, 0}; Box: {0.04, 0.6, 8} }
-      for s in 0..2 {
-        const sz = s == 0 ? -1 : 1
-        "jamb_{s}" : DockHullDark { Position: {-4.6, -0.9, sz * 3.7}; Box: {0.3, 4.8, 0.4} }
-        "airlock_{s}" : DockHullDark { Position: {-4.62, -2.75, sz * 4.1}; Box: {0.03, 0.3, 0.2} }
-        "airlock_lamp_{s}" : ShipAmberLight { Position: {-4.65, -2.55, sz * 4.1}; Box: {0.03, 0.03, 0.14} }
-        "corner_beacon_{s}" : ShipBeaconWhite { Position: {-4.3, 3.65, sz * 4.3}; Sphere: {radius: 0.15, segments: 3, smooth: true} }
-      }
-    }
+    DockWingHangar hangar()
 
     MiniTug tug_dock(seed: side) { Position: {29.4, -7.8, 38.5}; Rotation: {0, HALF_PI, 0} }
     MiniTug tug_hover(seed: side + 1) { Position: {29.6, -4.6, 30.5}; Rotation: {0, -0.8, 0} }
@@ -566,6 +997,7 @@ assets {
       NoShadow
       Ignore
     }
+
     clouds {
       Position: {0, 0, 0}
       Rotation: {0, 0, 0.3}

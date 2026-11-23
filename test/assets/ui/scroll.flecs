@@ -51,6 +51,11 @@ fn scroll_track(size: f64, edge: f64, other: f64) -> f64 {
 // end. The wheel goes to the innermost scroll view under the cursor, the first Interactive element
 // on its path. drag is the thumb held and over the thumb under the pointer: 1 vertical,
 // 2 horizontal, 0 none.
+// With overlay the bars draw over the content and are hidden until there is activity: shown is
+// set while the scroll offset changes, by any path, while the pointer is over the strip of a bar
+// the content needs (hot, 1 vertical, 2 horizontal, 0 none) or a thumb is dragged, and cleared
+// hide_delay seconds after the last of these. A press in the strip of a hidden bar is no bar
+// press, so it reaches the content under it.
 // Without focusable the view is only Interactive: it is no Tab stop and a press on it clears the
 // focus, as for a page that scrolls the widgets in it into view while Tab moves through them.
 template HeadlessScrollView {
@@ -63,6 +68,8 @@ template HeadlessScrollView {
   prop step: f32 = 40
   prop keys: bool = true
   prop focusable: bool = true
+  prop overlay: bool = false
+  prop hide_delay: f32 = 1
 
   mut x: f32 = 0
   mut y: f32 = 0
@@ -70,6 +77,11 @@ template HeadlessScrollView {
   mut grab: f32 = 0
   mut over: i32 = 0
   mut focused = false
+  mut shown = false
+  mut hot: i32 = 0
+  mut seen_x: f32 = 0
+  mut seen_y: f32 = 0
+  mut idle: f32 = 0
 
   // The body reads no component: flecs script restarts the async blocks of a template when a
   // component it reads changes, in the body or in an async block. The blocks read Bounds
@@ -81,6 +93,33 @@ template HeadlessScrollView {
   }
   ClipChildren
   Scroll: {x: x, y: y, horizontal: horizontal, vertical: vertical}
+
+  // The bars of an overlay view: each frame, a change of the offset since the last one, the
+  // pointer over a strip or a held thumb shows them, and idle counts the seconds of world time
+  // since; they hide once it reaches hide_delay. A change of a mut restarts no block, so the
+  // block looks every frame, which catches each path that sets x or y.
+  async {
+    if overlay {
+      seen_x = x
+      seen_y = y
+      while true {
+        const passed = await ui.delay(0)
+        if x != seen_x || y != seen_y || hot != 0 || drag != 0 {
+          seen_x = x
+          seen_y = y
+          idle = 0
+          if !shown {
+            shown = true
+          }
+        } else if shown {
+          idle = idle + passed
+          if idle >= hide_delay {
+            shown = false
+          }
+        }
+      }
+    }
+  }
 
   async {
     while true {
@@ -161,8 +200,9 @@ template HeadlessScrollView {
       const e = await on.press(this)
       const b = this[layout.Bounds]
       const content = this[Content]
-      const on_v = vertical && content.max_y > 0
-      const on_h = horizontal && content.max_x > 0
+      const live = !overlay || shown
+      const on_v = live && vertical && content.max_y > 0
+      const on_h = live && horizontal && content.max_x > 0
       const vtrack = scroll_track(b.height, edge, match on_h { true: bar; _: 0 })
       const htrack = scroll_track(b.width, edge, match on_v { true: bar; _: 0 })
       const vthumb = scroll_thumb(vtrack, b.height, content.height)
@@ -213,6 +253,20 @@ template HeadlessScrollView {
         down <= vat + vthumb
       const in_h = on_h && e.local_y <= edge + bar - b.height / 2 && right >= hat &&
         right <= hat + hthumb
+      const strip_v = overlay && on_v && e.local_x >= b.width / 2 - edge - bar && down < vtrack
+      const strip_h = overlay && on_h && e.local_y <= edge + bar - b.height / 2 &&
+        right < htrack
+      if strip_v {
+        if hot != 1 {
+          hot = 1
+        }
+      } else if strip_h {
+        if hot != 2 {
+          hot = 2
+        }
+      } else if hot != 0 {
+        hot = 0
+      }
       if in_v {
         if over != 1 {
           over = 1
@@ -231,6 +285,9 @@ template HeadlessScrollView {
     while true {
       await on.leave(this)
       over = 0
+      if hot != 0 {
+        hot = 0
+      }
     }
   }
 
@@ -369,6 +426,8 @@ template ScrollBar {
 // A scroll view: a surface whose children are laid out in a column and scroll, with scroll bars
 // inside the right and bottom edges while the content does not fit; the padding leaves room for a
 // bar while it shows. width and height fix the view, 0 grows it to the space its parent gives.
+// With overlay the padding leaves no room for the bars, which draw over the content, and the bars
+// only exist while shown.
 //
 // The bars are in scrollbars, a clipped overlay (Float with clip) of no size on the center
 // of the view: the column leaves it out of its flow and the scroll offset does not move it, yet
@@ -386,8 +445,8 @@ template ScrollView : HeadlessScrollView {
   const vbar = vertical && c.max_y > 0
   const hbar = horizontal && c.max_x > 0
   const bars = vbar || hbar
-  const pad_right = pad + match vbar { true: bar; _: 0 }
-  const pad_bottom = pad + match hbar { true: bar; _: 0 }
+  const pad_right = pad + match vbar && !overlay { true: bar; _: 0 }
+  const pad_bottom = pad + match hbar && !overlay { true: bar; _: 0 }
 
   Layout: {direction: Column, spacing: t.spacing, padding: {pad, pad_bottom, pad, pad_right}}
   Item: {}
@@ -413,7 +472,7 @@ template ScrollView : HeadlessScrollView {
     Border: {width: 1, radius: t.radius, color: {t.border.r, t.border.g, t.border.b, 255}}
   }
 
-  if bars {
+  if bars && (!overlay || shown) {
     const vtrack = scroll_track(b.height, edge, match hbar { true: bar; _: 0 })
     const htrack = scroll_track(b.width, edge, match vbar { true: bar; _: 0 })
     const vthumb = scroll_thumb(vtrack, b.height, c.height)

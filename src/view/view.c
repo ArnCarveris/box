@@ -6,6 +6,8 @@
 #define BOX_VIEW_IMPL
 #include <box.h>
 
+ECS_TAG_DECLARE(HistoryReset);
+
 /** Construct View values that are lit, sample the baked lighting and the reflection probes of
  * their scene, render its atmosphere and fog volumes, light with an environment at intensity 1,
  * have the documented shadow and grid defaults and cull with occlusion down to one pixel.
@@ -37,6 +39,7 @@ static void box_view_ctor(
         values[i].lighting.depth_prepass = true;
         values[i].lighting.atmosphere = true;
         values[i].lighting.fog_volumes = true;
+        values[i].lighting.fog_distance = 100.0f;
         values[i].lighting.environment.intensity = 1.0f;
         values[i].shadows = (ShadowSettings){
             .cascades = 4,
@@ -48,7 +51,8 @@ static void box_view_ctor(
             .filter_size = 3,
             .fade = 0.2f,
             .blend = 0.1f,
-            .interval = {1, 1, 1, 1}
+            .interval = {1, 1, 1, 1},
+            .sway_interval = 1
         };
         values[i].culling = (CullSettings){
             .enabled = true,
@@ -131,5 +135,8 @@ void BoxViewImport(
     ECS_META_COMPONENT(world, View);
     box_owned_hooks(world, View, BOX_OWNED_VEC(View, effects, ViewEffect));
     ecs_set_hooks(world, View, { .ctor = box_view_ctor });
+    ECS_META_COMPONENT(world, ShaderFeatures);
+    ECS_META_COMPONENT(world, SceneShaderFeatures);
     ECS_META_COMPONENT(world, Scene);
+    ECS_TAG_DEFINE(world, HistoryReset);
 }

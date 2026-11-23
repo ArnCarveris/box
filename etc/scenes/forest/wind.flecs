@@ -1,0 +1,92 @@
+using flecs.script
+using flecs.script.math
+using box.atmosphere
+using state
+
+// The wind of the forest, from the Wind slider (state.wind, m/s). The Wind singleton blows
+// along WIND_DIR, its gusts travelling with it as patches over the forest; the plants bend in it
+// by the WindSway of their prefabs (bark.flecs, leaves.flecs, undergrowth.flecs,
+// materials.flecs), with the sway constants below. The bend of a vertex grows with its height
+// over the ground, so every shape of a plant with the same sway (trunk, limbs, leaf cards)
+// moves together: trunks stay put at the foot, canopies and grass bend, and the leaf cards and
+// blades flutter on top of that around their stems. Conifers are stiffer than broadleaves,
+// birches more limber, dead wood does not sway. The fog, mist, motes and clouds drift along the
+// same direction (atmosphere.flecs, sky.flecs), and leaves, petals, needles and seeds fall in
+// it (fall.flecs).
+state {
+  // The direction the wind blows toward, world X and Z: from the west, a little south of it
+  export const WIND_DIR_X: f32 = 0.94
+  export const WIND_DIR_Z: f32 = 0.34
+
+  // World size of a gust patch: broad enough that a gust rolls over the grass as a wave, its
+  // front narrower than the crown of a large tree
+  export const WIND_GUST_SCALE: f32 = 26
+
+  // The sway of a plant kind: the bend (meters a vertex at full height moves per m/s) and the
+  // height over the ground (Y 0) it is full at; the branch swing of a tree (radians at full
+  // wind) and the frequency of its limbs (Hz, twigs faster by their level)
+  //
+  // The flutter (meters at a full wind of 10 m/s), its frequency and its reach from the stem of
+  // a card or the foot of a clump. The flutter and the branches run slower in a light wind and
+  // grow with the gust, so leaves barely tremble in a breeze and rustle as a gust passes.
+  export const SWAY_BROADLEAF_BEND: f32 = 0.05
+  export const SWAY_BROADLEAF_HEIGHT: f32 = 24
+  export const SWAY_BROADLEAF_BRANCH: f32 = 0.14
+  export const SWAY_BROADLEAF_BRANCH_FREQUENCY: f32 = 0.4
+  export const SWAY_BIRCH_BEND: f32 = 0.06
+  export const SWAY_BIRCH_HEIGHT: f32 = 18
+  export const SWAY_BIRCH_BRANCH: f32 = 0.2
+  export const SWAY_BIRCH_BRANCH_FREQUENCY: f32 = 0.5
+  export const SWAY_CONIFER_BEND: f32 = 0.03
+  export const SWAY_CONIFER_HEIGHT: f32 = 26
+  export const SWAY_CONIFER_BRANCH: f32 = 0.08
+  export const SWAY_CONIFER_BRANCH_FREQUENCY: f32 = 0.3
+  export const SWAY_LEAF_FLUTTER: f32 = 0.07
+  export const SWAY_LEAF_FREQUENCY: f32 = 2.6
+  export const SWAY_LEAF_REACH: f32 = 0.5
+  export const SWAY_NEEDLE_FLUTTER: f32 = 0.03
+  export const SWAY_NEEDLE_FREQUENCY: f32 = 2
+  export const SWAY_NEEDLE_REACH: f32 = 0.6
+  export const SWAY_SHRUB_BEND: f32 = 0.022
+  export const SWAY_SHRUB_HEIGHT: f32 = 1.8
+  export const SWAY_SHRUB_FLUTTER: f32 = 0.045
+  export const SWAY_SHRUB_FREQUENCY: f32 = 2.6
+  export const SWAY_GRASS_BEND: f32 = 0.015
+  export const SWAY_GRASS_HEIGHT: f32 = 0.7
+  export const SWAY_GRASS_FLUTTER: f32 = 0.02
+  export const SWAY_GRASS_FREQUENCY: f32 = 2.4
+  export const SWAY_FLOWER_BEND: f32 = 0.013
+  export const SWAY_FLOWER_HEIGHT: f32 = 0.5
+  export const SWAY_FLOWER_FLUTTER: f32 = 0.02
+  export const SWAY_FLOWER_FREQUENCY: f32 = 2.8
+  export const SWAY_REED_BEND: f32 = 0.022
+  export const SWAY_REED_HEIGHT: f32 = 1.4
+  export const SWAY_REED_FLUTTER: f32 = 0.035
+  export const SWAY_REED_FREQUENCY: f32 = 2
+  // The reeds stand on the step of the brook (BROOK_STEP_Y of layout.flecs)
+  export const SWAY_REED_BASE: f32 = -0.14
+  export const SWAY_FERN_BEND: f32 = 0.014
+  export const SWAY_FERN_HEIGHT: f32 = 0.9
+  export const SWAY_FERN_FLUTTER: f32 = 0.03
+  export const SWAY_FERN_FREQUENCY: f32 = 2.2
+  // The far canopy cards lean like the near trees and rustle slowly as a gust passes
+  export const SWAY_FAR_BEND: f32 = 0.045
+  export const SWAY_FAR_FLUTTER: f32 = 0.12
+  export const SWAY_FAR_FREQUENCY: f32 = 1.4
+
+  // How much the gusts vary the wind, 0..1: little in a breeze, so it stays soft and even, and
+  // much in a gale, so the gusts roll through as waves between lulls
+  fn forest_wind_gust(w: f64) -> f64 {
+    0.35 + 0.025 * min(w, WIND_MAX)
+  }
+}
+
+// The Wind the plants and the falling cards follow
+$ {
+  Wind: {
+    direction: {WIND_DIR_X, WIND_DIR_Z},
+    speed: wind,
+    gust: forest_wind_gust(wind),
+    gust_scale: WIND_GUST_SCALE
+  }
+}

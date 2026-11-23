@@ -1,0 +1,110 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.texture
+using box.particle
+using state
+using assets
+using trees
+
+state {
+  export const WILD_FALL_HALF: f32 = 34
+  export const WILD_FALL_LOW: f32 = 4
+  export const WILD_FALL_HIGH: f32 = 19
+  export const WILD_PETAL_HALF: f32 = 22
+  export const WILD_PETAL_HIGH: f32 = 6
+}
+
+assets {
+  prefab WildFall : ForestFall {
+    Collision: {
+      ground: true, height: 0, bounce: 0.05, friction: 0.25, terrain: infinite_forest.land
+    }
+  }
+}
+
+infinite_forest {
+  falling {
+    if started {
+      for s in 0..3 {
+        const amount = forest_leaf_fall(season - (s == 1 ? LEAF_LAG : 0)) * forest_shed(wind)
+
+        "leaves_{s}" : assets.WildFall {
+          Position: {0, (WILD_FALL_LOW + WILD_FALL_HIGH) / 2, 0}
+          Emitter: {
+            max: 24000, rate: 950 * amount, shape: EmitterBox,
+            extents: {WILD_FALL_HALF, (WILD_FALL_HIGH - WILD_FALL_LOW) / 2, WILD_FALL_HALF},
+            direction: {0, 0, 0}, lifetime: {16, 24}, size: {0.1, 0.16},
+            rotation: {0, 360}, spin: {-260, 260}, opacity: {1, 1},
+            color: {forest_fall_r(s, season), forest_fall_g(s, season), forest_fall_b(s, season)},
+            color_variance: {26, 22, 12}, seed: 300 + s,
+            follow: player, ground: infinite_forest.land
+          }
+          Forces: {
+            gravity: {0, -3.2, 0}, drag: 2.4, turbulence: 1.5, turbulence_scale: 1.4,
+            global_wind: 0.7
+          }
+
+          if s == 0 {
+            Appearance: {shape: Card, blend: Alpha, texture: assets.fall_beech_albedo, lit: 1}
+          } else if s == 1 {
+            Appearance: {shape: Card, blend: Alpha, texture: assets.fall_oak_albedo, lit: 1}
+          } else {
+            Appearance: {shape: Card, blend: Alpha, texture: assets.fall_birch_albedo, lit: 1}
+          }
+        }
+      }
+
+      petals : assets.WildFall {
+        Position: {0, (0.4 + WILD_PETAL_HIGH) / 2, 0}
+        Emitter: {
+          max: 8000, rate: 420 * forest_petal_fall(season) * forest_shed(wind), shape: EmitterBox,
+          extents: {WILD_PETAL_HALF, (WILD_PETAL_HIGH - 0.4) / 2, WILD_PETAL_HALF},
+          direction: {0, 0, 0}, lifetime: {12, 18}, size: {0.035, 0.055},
+          rotation: {0, 360}, spin: {-300, 300}, opacity: {1, 1},
+          color: {255, 246, 242}, color_variance: {0, 14, 10}, seed: 310,
+          follow: player, ground: infinite_forest.land
+        }
+        Forces: {
+          gravity: {0, -1.6, 0}, drag: 2.6, turbulence: 1.4, turbulence_scale: 1.8,
+          global_wind: 0.8
+        }
+        Appearance: {shape: Card, blend: Alpha, texture: assets.fall_petal_albedo, lit: 1}
+      }
+
+      needles : assets.WildFall {
+        Position: {0, (WILD_FALL_LOW + WILD_FALL_HIGH) / 2, 0}
+        Emitter: {
+          max: 10000, rate: 380 * forest_needle_fall(season) * forest_shed(wind), shape: EmitterBox,
+          extents: {WILD_FALL_HALF, (WILD_FALL_HIGH - WILD_FALL_LOW) / 2, WILD_FALL_HALF},
+          direction: {0, 0, 0}, lifetime: {10, 16}, size: {0.05, 0.07},
+          rotation: {0, 360}, spin: {-500, 500}, opacity: {1, 1},
+          color: {150, 104, 62}, color_variance: {20, 18, 12}, seed: 311,
+          follow: player, ground: infinite_forest.land
+        }
+        Forces: {
+          gravity: {0, -6, 0}, drag: 2.4, turbulence: 0.8, turbulence_scale: 1.4,
+          global_wind: 0.5
+        }
+        Appearance: {shape: Card, blend: Alpha, texture: assets.fall_needle_albedo, lit: 1}
+      }
+
+      seeds : assets.WildFall {
+        Position: {0, (WILD_FALL_LOW + WILD_FALL_HIGH) / 2, 0}
+        Emitter: {
+          max: 8000, rate: 300 * forest_seed_fall(season) * forest_shed(wind), shape: EmitterBox,
+          extents: {WILD_FALL_HALF, (WILD_FALL_HIGH - WILD_FALL_LOW) / 2, WILD_FALL_HALF},
+          direction: {0, 0, 0}, lifetime: {14, 20}, size: {0.05, 0.07},
+          rotation: {0, 360}, spin: {600, 1100}, opacity: {1, 1},
+          color: {178, 150, 102}, color_variance: {18, 16, 12}, seed: 312,
+          follow: player, ground: infinite_forest.land
+        }
+        Forces: {
+          gravity: {0, -2.6, 0}, drag: 3, turbulence: 1, turbulence_scale: 1.6,
+          global_wind: 0.75
+        }
+        Appearance: {shape: Card, blend: Alpha, texture: assets.fall_seed_albedo, lit: 1}
+      }
+    }
+  }
+}

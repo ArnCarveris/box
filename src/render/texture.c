@@ -271,6 +271,11 @@ static void box_render_texture_graph_send(
     desc->height = (uint32_t)graph->height;
     desc->domain = (uint32_t)graph->domain;
     ecs_os_memcpy(desc->region, graph->region, ECS_SIZEOF(desc->region));
+    desc->origin[0] = graph->origin[0];
+    desc->origin[1] = graph->origin[1];
+    desc->spacing[0] = graph->spacing[0];
+    desc->spacing[1] = graph->spacing[1];
+    desc->apron = (uint32_t)graph->apron;
     desc->format = (uint32_t)graph->format;
     desc->node_count = (uint32_t)graph->node_count;
     desc->param_size = (uint32_t)graph->param_size;
@@ -292,6 +297,7 @@ static void box_render_texture_graph_send(
         out[i].params = (uint32_t)node->params;
         out[i].param_size = (uint32_t)node->param_size;
         out[i].texture = node->texture;
+        out[i].window = (uint32_t)node->window;
     }
 
     if (graph->param_size) {
@@ -552,6 +558,8 @@ bool box_render_texture_graph_reads_take(
         r->node = tex && r->index >= 0 && r->index < tex->graph->node_count
             ? tex->graph->nodes[r->index].entity : 0;
     }
+
+    box_render_texture_readbacks_filter(world, out, first);
 
     return result;
 }

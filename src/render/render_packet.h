@@ -68,13 +68,17 @@
 /** Shader handle of the engine shader of the SMAA passes */
 #define BOX_RENDER_SHADER_SMAA (49)
 
+/** Shader handle of the engine shader of the FXAA pass */
+#define BOX_RENDER_SHADER_FXAA (22)
+
 /** Shader handle of the engine shader that blurs the opaque snapshot of transmission */
 #define BOX_RENDER_SHADER_TRANSMISSION (50)
 
 /** Shader handle of the engine shader that builds the mip pyramid of the planar reflections */
 #define BOX_RENDER_SHADER_PLANAR (60)
 
-/** Shader handle of the engine shader that raymarches the fog volumes of a view */
+/** Shader handle of the engine shader that lights the froxel grid of the fog volumes of a view,
+ * integrates it and applies it */
 #define BOX_RENDER_SHADER_FOG_VOLUME (51)
 
 /** Shader handle of the engine shader that raymarches the atmosphere shells of the planets of a
@@ -156,6 +160,23 @@
 #define BOX_RENDER_SHADOW_NEAR_MIN (0.001f)
 
 
+/** Shader handle of the engine shader that copies an impostor frame into its atlas, dilating
+ * the colors of the covered texels into the empty ones */
+#define BOX_RENDER_SHADER_IMPOSTOR (16)
+
+/** Shader handle of the engine compute shader that generates, evolves and inverse FFTs the
+ * spectra of WaterSpectrum */
+#define BOX_RENDER_SHADER_WATER_SPECTRUM (17)
+
+/** Shader handle of the engine compute shader that places the grass blades of a view */
+#define BOX_RENDER_SHADER_GRASS_PLACE (18)
+
+/** Shader handle of the engine shader that draws the grass blades */
+#define BOX_RENDER_SHADER_GRASS (19)
+
+/** Shader handle of the engine compute shader that steps the fields of WaterRipples */
+#define BOX_RENDER_SHADER_WATER_RIPPLES (15)
+
 /** Shader handle of the engine shader of the forward pass that draws the 2D shapes */
 #define BOX_RENDER_SHADER_SHAPE2D (7)
 
@@ -173,15 +194,64 @@
  * DiffuseTransmission or Fresnel. */
 #define BOX_RENDER_SHADER_MESH_EXTENDED (10)
 
-/** Check whether a shader handle is one of the two mesh shaders.
+/** Shader handle of the mesh shader compiled with BOX_TEXTURE_LAYERS: the layers entry points
+ * the batches with TextureLayers draw with (box_render_mesh_layers). A module apart, so the
+ * module of the other batches is unchanged. */
+#define BOX_RENDER_SHADER_MESH_LAYERS (13)
+
+/** Shader handle of the extended mesh shader compiled with BOX_TEXTURE_LAYERS */
+#define BOX_RENDER_SHADER_MESH_EXTENDED_LAYERS (14)
+
+/** Shader handle of the engine shader of the forward pass and the depth prepass that draws the
+ * tiles of a Terrain (etc/shaders/terrain.wgsl), with the Terrain shader features of their
+ * scene; the tiles always draw with it */
+#define BOX_RENDER_SHADER_TERRAIN (20)
+
+/** Shader handle of the terrain shader compiled with BOX_TEXTURE_LAYERS */
+#define BOX_RENDER_SHADER_TERRAIN_LAYERS (21)
+
+/** Check whether a shader handle is one of the mesh shaders: the mesh shader, the extended mesh
+ * shader or the terrain shader.
  *
  * @param pipeline The shader handle of a batch
- * @return Whether it is BOX_RENDER_SHADER_MESH or BOX_RENDER_SHADER_MESH_EXTENDED
+ * @return Whether it is BOX_RENDER_SHADER_MESH, BOX_RENDER_SHADER_MESH_EXTENDED or
+ * BOX_RENDER_SHADER_TERRAIN
  */
 static inline bool box_render_is_mesh(
     uint32_t pipeline)
 {
-    return pipeline == BOX_RENDER_SHADER_MESH || pipeline == BOX_RENDER_SHADER_MESH_EXTENDED;
+    return pipeline == BOX_RENDER_SHADER_MESH || pipeline == BOX_RENDER_SHADER_MESH_EXTENDED ||
+        pipeline == BOX_RENDER_SHADER_TERRAIN;
+}
+
+/** Get the layers module of a mesh shader, which its batches with TextureLayers draw with.
+ *
+ * @param pipeline BOX_RENDER_SHADER_MESH, BOX_RENDER_SHADER_MESH_EXTENDED or
+ * BOX_RENDER_SHADER_TERRAIN
+ * @return BOX_RENDER_SHADER_MESH_LAYERS, BOX_RENDER_SHADER_MESH_EXTENDED_LAYERS or
+ * BOX_RENDER_SHADER_TERRAIN_LAYERS
+ */
+static inline uint32_t box_render_mesh_layers(
+    uint32_t pipeline)
+{
+    return pipeline == BOX_RENDER_SHADER_MESH_EXTENDED
+        ? BOX_RENDER_SHADER_MESH_EXTENDED_LAYERS
+        : pipeline == BOX_RENDER_SHADER_TERRAIN
+        ? BOX_RENDER_SHADER_TERRAIN_LAYERS : BOX_RENDER_SHADER_MESH_LAYERS;
+}
+
+/** Check whether a shader handle is the layers module of a mesh shader.
+ *
+ * @param handle The shader handle
+ * @return Whether it is BOX_RENDER_SHADER_MESH_LAYERS, BOX_RENDER_SHADER_MESH_EXTENDED_LAYERS or
+ * BOX_RENDER_SHADER_TERRAIN_LAYERS
+ */
+static inline bool box_render_is_mesh_layers(
+    uint32_t handle)
+{
+    return handle == BOX_RENDER_SHADER_MESH_LAYERS ||
+        handle == BOX_RENDER_SHADER_MESH_EXTENDED_LAYERS ||
+        handle == BOX_RENDER_SHADER_TERRAIN_LAYERS;
 }
 
 /** Buffer handle of the change buffer the scatter pass reads changed instances from */
@@ -200,6 +270,12 @@ static inline bool box_render_is_mesh(
  * box_render_transform_t by mover index, index 0 the identity. The compose pass places the
  * instances of the mover pages with it. */
 #define BOX_RENDER_BUFFER_MOVERS (4)
+
+/** Buffer handle of the wave table: BOX_RENDER_WATER_WAVE_SETS box_render_water_waves_t, the
+ * travelling waves of the Water materials with WaterWaves by the set their record names
+ * (BOX_RENDER_WATER_WAVES_SHIFT), set 0 unused. Bound as uniforms by the view group of the
+ * forward pass, which the Water fragments read it from. */
+#define BOX_RENDER_BUFFER_WATER_WAVES (5)
 
 /** Records the material table holds at least, doubling from there */
 #define BOX_RENDER_MATERIALS_MIN (64)
@@ -369,6 +445,12 @@ static inline uint32_t box_render_page_kind(
 /** First target handle of captures, the handles below belong to surfaces */
 #define BOX_RENDER_CAPTURE_TARGET_FIRST (0x40000000u)
 
+/** First target handle of the impostor frames, see render/impostor.c */
+#define BOX_RENDER_IMPOSTOR_TARGET_FIRST (0x70000000u)
+
+/** First texture handle of the impostor atlases, see render/impostor.c */
+#define BOX_RENDER_IMPOSTOR_TEXTURE_FIRST (0x70000000u)
+
 /** First shader handle of application shaders, the handles below are engine shaders */
 #define BOX_RENDER_SHADER_FIRST (64)
 
@@ -400,6 +482,33 @@ static inline uint32_t box_render_page_kind(
 
 /** Textures of each layer of a TextureBlend in its record: the maps and the height */
 #define BOX_RENDER_BLEND_SOURCES (BOX_RENDER_BLEND_MAPS + 1)
+
+/** Layers of a TextureLayers */
+#define BOX_RENDER_LAYERS (4)
+
+/** Maps each layer of a TextureLayers samples, consecutive slices of its texture array: the
+ * albedo (display encoded, stored as such), the ORM, the normal and the mask, stored */
+#define BOX_RENDER_LAYER_MAPS (4)
+
+/** Map of a layer of a TextureLayers: albedo, display encoded */
+#define BOX_RENDER_LAYER_ALBEDO (0)
+
+/** Map of a layer of a TextureLayers: occlusion, roughness and metallic, stored */
+#define BOX_RENDER_LAYER_ORM (1)
+
+/** Map of a layer of a TextureLayers: tangent space normal, stored */
+#define BOX_RENDER_LAYER_NORMAL (2)
+
+/** Map of a layer of a TextureLayers: the coverage mask in red, stored */
+#define BOX_RENDER_LAYER_MASK (3)
+
+/** Flags of box_render_texture_layer_t: the layer has an albedo, ORM, normal or mask texture
+ * entity, and it maps with the UVs of the mesh instead of the world position */
+#define BOX_RENDER_LAYER_HAS_ALBEDO (1u)
+#define BOX_RENDER_LAYER_HAS_ORM (2u)
+#define BOX_RENDER_LAYER_HAS_NORMAL (4u)
+#define BOX_RENDER_LAYER_HAS_MASK (8u)
+#define BOX_RENDER_LAYER_UV (16u)
 
 /** Anisotropic samples of the texture samplers when no surface sets them */
 #define BOX_RENDER_ANISOTROPY_DEFAULT (4)
@@ -719,7 +828,8 @@ typedef struct box_render_debug_box_t {
 /** Bit of box_render_debug_box_t.kind of the leaf of an entity */
 #define BOX_RENDER_DEBUG_BOX_LEAF (4u)
 
-/** A FogVolume a view raymarches, resolved; the layout of FogVolume in fog_volume.wgsl.
+/** A FogVolume a view draws through its froxel grid, resolved; the layout of FogVolume in
+ * fog_volume.wgsl.
  *
  * The box is centered on center and spans extent along each of its axes, the world rotation of
  * the entity; the values are clamped to their ranges.
@@ -735,14 +845,15 @@ typedef struct box_render_fog_volume_t {
     float edge_fade;        /**< FogVolume.edge_fade, at least 0 */
     float sun_inscatter;    /**< FogVolume.sun_inscatter, at least 0 */
     float ambient_inscatter; /**< FogVolume.ambient_inscatter, at least 0 */
-    int32_t steps;          /**< FogVolume.steps, 4 to 128 */
+    float light_inscatter;  /**< FogVolume.light_inscatter, at least 0 */
     float offset[3];        /**< World offset the noise moves by: FogVolume.wind times the world
                              *   time, in double precision and wrapped to [0, 10 noise_scale),
                              *   the period of the noise, see box_render_fog_offset */
     float noise_strength;   /**< FogVolume.noise_strength, 0 to 1 */
     float noise_scale;      /**< FogVolume.noise_scale, at least BOX_RENDER_FOG_NOISE_SCALE_MIN */
-    float light_inscatter;  /**< FogVolume.light_inscatter, at least 0 */
-    float pad[2];           /**< Pads the record to the 16 byte stride of its WGSL array */
+    uint32_t shape;         /**< FogVolume.shape, FogVolumeBox for an unknown shape */
+    float height_falloff;   /**< FogVolume.height_falloff, at least 0 */
+    float edge_noise;       /**< FogVolume.edge_noise, 0 to 1 */
 } box_render_fog_volume_t;
 
 /** A PlanarReflection a view renders a mirrored image of, resolved by the extract
@@ -840,6 +951,18 @@ typedef struct box_render_view_gtao_t {
  * of the extended mesh shader offset the snapshot by its noise (material_distortion override) */
 #define BOX_RENDER_FEATURE_DISTORTION (1u << 21)
 
+/** Wind (Scene.wind): the materials pack their WindSway with the Wind of the frame, and the
+ * batches of the shapes with one (box_render_batch_t.wind) draw with the material_wind
+ * override of every vertex stage, which moves their vertices; the other batches keep the
+ * pipelines of a scene without it */
+#define BOX_RENDER_FEATURE_WIND (1u << 22)
+
+/** Texture layers (Scene.texture_layers): the batches of the shapes with TextureLayers
+ * (box_render_batch_t.texture_layers) draw with the layers entry points of the layers modules
+ * of the mesh shaders (box_render_mesh_layers) and their own bind group layouts; the other
+ * batches keep the modules and pipelines of a scene without it */
+#define BOX_RENDER_FEATURE_TEXTURE_LAYERS (1u << 23)
+
 /** The scene features of the mesh shader */
 #define BOX_RENDER_FEATURE_LIGHTING (0x3Fu)
 
@@ -867,6 +990,9 @@ typedef struct box_render_view_gtao_t {
 
 /** Bit of the scene_planet_light override */
 #define BOX_RENDER_OVERRIDE_PLANET_LIGHT (1u << 7)
+
+/** Bit of the material_triplanar override */
+#define BOX_RENDER_OVERRIDE_TRIPLANAR (1u << 12)
 
 /** Bit of the material_fresnel override */
 #define BOX_RENDER_OVERRIDE_FRESNEL (1u << 13)
@@ -910,7 +1036,8 @@ static inline const char* box_render_mesh_override_key(
  * compiles out its code.
  *
  * The mesh shader takes the lighting features, the TextureScroll and the planet light ones,
- * the extended mesh shader all of them, transmissive for the pipelines of transmissive shapes,
+ * the terrain shader those and material_triplanar (box_render_terrain_override_count), the
+ * extended mesh shader all of them, transmissive for the pipelines of transmissive shapes,
  * water for those of transmissive Water shapes and material_distortion for the transmissive
  * ones of a scene with Scene.distortion.
  *
@@ -934,6 +1061,10 @@ static inline uint32_t box_render_mesh_overrides(
     result = (features & BOX_RENDER_FEATURE_LIGHTING) |
         (features & BOX_RENDER_FEATURE_TEXTURE_SCROLL ? BOX_RENDER_OVERRIDE_TEXTURE_SCROLL : 0u) |
         (features & BOX_RENDER_FEATURE_PLANET_LIGHT ? BOX_RENDER_OVERRIDE_PLANET_LIGHT : 0u);
+    if (shader == BOX_RENDER_SHADER_TERRAIN) {
+        result |= features & BOX_RENDER_FEATURE_TRIPLANAR ? BOX_RENDER_OVERRIDE_TRIPLANAR : 0u;
+    }
+
     if (shader != BOX_RENDER_SHADER_MESH_EXTENDED) {
         goto done;
     }
@@ -1016,6 +1147,8 @@ typedef struct box_render_view_t {
     int32_t fog_first;          /**< Index of the first fog volume of the view in the packet */
     int32_t fog_count;          /**< Fog volumes the view draws, back to front, filled by the
                                  *   light extract for a lit view with LightSettings.fog_volumes */
+    float fog_distance;         /**< LightSettings.fog_distance of the view, filled with its
+                                 *   fog volumes, resolved by box_render_fog_distance */
     ViewDebug debug;            /**< View.debug, copied by a capture of the camera of a view;
                                  *   all zero for the other captures (probes, reflections,
                                  *   bakes, no view), which draw no debug pass */
@@ -1058,7 +1191,42 @@ typedef struct box_render_view_t {
                                  *   for a view that does not cull by portals */
     uint32_t stencil_clear;     /**< Stencil value its passes clear to: the region of the area
                                  *   of its eye, BOX_RENDER_STENCIL_DRY when it sees no water */
+    uint32_t impostor;          /**< BOX_RENDER_IMPOSTOR_* channel of an impostor frame the view
+                                 *   renders unlit, 0 for any other view */
+    bool history_reset;         /**< The View has HistoryReset this frame, so its history is
+                                 *   thrown away (box_render_history_update) */
 } box_render_view_t;
+
+/** Channels of an impostor frame (box_render_view_t.impostor), each its own view and atlas.
+ * The shaders see the channel plus one in view.lights.z, above the 0 and 1 of an unlit and a
+ * lit view (impostor_channel in mesh_direct.wgsl). */
+#define BOX_RENDER_IMPOSTOR_ALBEDO (1u)
+#define BOX_RENDER_IMPOSTOR_NORMAL (2u)
+#define BOX_RENDER_IMPOSTOR_DEPTH (3u)
+
+/** Channels of an impostor */
+#define BOX_RENDER_IMPOSTOR_CHANNELS (3)
+
+/** An impostor frame the targets of a packet rendered, copied into a cell of its atlas.
+ *
+ * The backend creates the atlas texture of the handle on its first blit, RGBA8 with mips, and
+ * generates its mips after the last blit of a bake (last). */
+typedef struct box_render_impostor_blit_t {
+    uint32_t target;        /**< Target the frame rendered into, the size of a cell */
+    uint32_t atlas;         /**< Texture handle of the atlas */
+    uint32_t channel;       /**< BOX_RENDER_IMPOSTOR_* channel, the albedo is sRGB encoded */
+    uint32_t atlas_size;    /**< Width and height of the atlas in pixels */
+    uint32_t x;             /**< Left column of the cell in the atlas */
+    uint32_t y;             /**< Top row of the cell in the atlas */
+    uint32_t dilate;        /**< Texels an empty texel looks for a covered one, 0 for none */
+    bool last;              /**< The last blit of the bake into this atlas */
+} box_render_impostor_blit_t;
+
+/** An impostor atlas written to a PNG file, for tests and tools */
+typedef struct box_render_impostor_read_t {
+    uint32_t atlas;         /**< Texture handle of the atlas */
+    uint32_t path;          /**< Offset of the path in the packet data, with its terminator */
+} box_render_impostor_read_t;
 
 /** Kind of an effect pass of a view */
 typedef enum box_render_effect_kind_t {
@@ -1067,6 +1235,7 @@ typedef enum box_render_effect_kind_t {
     BOX_RENDER_EFFECT_BLOOM,    /**< Bloom */
     BOX_RENDER_EFFECT_FOG,      /**< HeightFog */
     BOX_RENDER_EFFECT_SMAA,     /**< Smaa */
+    BOX_RENDER_EFFECT_FXAA,     /**< Fxaa */
     BOX_RENDER_EFFECT_GRADING,  /**< ColorGrading */
     BOX_RENDER_EFFECT_VIGNETTE, /**< Vignette */
     BOX_RENDER_EFFECT_CHROMATIC_ABERRATION, /**< ChromaticAberration */
@@ -1093,6 +1262,7 @@ typedef struct box_render_effect_t {
     HeightFog fog;              /**< Resolved settings of a fog pass */
     DepthOfField depth_of_field; /**< Resolved settings of a depth of field pass */
     Smaa smaa;                  /**< Resolved settings of an anti aliasing pass */
+    Fxaa fxaa;                  /**< Resolved settings of a fast anti aliasing pass */
     box_render_grading_t grading; /**< Resolved settings of a color grading pass */
     Vignette vignette;          /**< Resolved settings of a vignette pass */
     ChromaticAberration chromatic_aberration; /**< Resolved settings of a chromatic aberration
@@ -1113,6 +1283,10 @@ typedef struct box_render_target_desc_t {
     bool texture;           /**< Materials sample the image, so it renders before other targets */
 } box_render_target_desc_t;
 
+/** vec4 of per vertex data per vertex of the data stream of a mesh with data: data0 to data3
+ * (box_mesh_t.data then data_upper, zero without it) */
+#define BOX_RENDER_DATA_VECS (4)
+
 /** Description of a BOX_RENDER_MESH create, followed by its vertices and its indices.
  *
  * The vertices are box_vertex_t, the indices uint32_t with three per counter-clockwise
@@ -1122,6 +1296,10 @@ typedef struct box_render_mesh_desc_t {
     uint32_t surface_asset_count; /**< Surface asset vec4s after the indices */
     uint32_t vertex_count;  /**< Vertices after the description */
     uint32_t index_count;   /**< Indices after the vertices */
+    uint32_t data;          /**< 1 when BOX_RENDER_DATA_VECS vec4 of per vertex data per vertex
+                             *   (box_mesh_t.data and data_upper) follow the surface assets,
+                             *   uploaded as a vertex stream of its own; 0 for a mesh without
+                             *   data, which uploads and binds none */
 } box_render_mesh_desc_t;
 
 /** Description of a BOX_RENDER_TEXTURE create, followed by its RGBA8 pixels row by row, or its
@@ -1558,15 +1736,42 @@ typedef struct box_render_material_t {
     uint32_t anisotropy;    /**< SpecularAnisotropy strength | rotation << 16, two unorm16, the
                              *   strength clamped to 0..1 and the rotation wrapped to 0..2 pi
                              *   over 2 pi, 0 without one or with a strength of 0 */
-    uint32_t sheen;         /**< Sheen r | g << 8 | b << 16 | roughness << 24, the color display
-                             *   encoded and the roughness a unorm8 clamped to 0..1, 0 without
-                             *   one or with a black color */
-    uint32_t diffuse_transmission; /**< DiffuseTransmission r | g << 8 | b << 16 | factor << 24,
-                             *   the color display encoded and the factor a unorm8 clamped to
-                             *   0..1, 0 without one */
-    float thickness;        /**< DiffuseTransmission.thickness, 0 without one */
-    float diffuse_blur;     /**< DiffuseTransmission.blur, 0 without one or with a negative or
-                             *   non finite blur */
+    union {                 /**< The Sheen and DiffuseTransmission of a record without Water,
+                             *   the scatter of one with Water */
+        struct {            /**< The Sheen and DiffuseTransmission of a record without Water */
+            uint32_t sheen; /**< Sheen r | g << 8 | b << 16 | roughness << 24, the color
+                             *   display encoded and the roughness a unorm8 clamped to 0..1, 0
+                             *   without one or with a black color */
+            uint32_t diffuse_transmission; /**< DiffuseTransmission r | g << 8 | b << 16 |
+                             *   factor << 24, the color display encoded and the factor a
+                             *   unorm8 clamped to 0..1, 0 without one */
+        };
+
+        struct {            /**< The scatter of a record with Water, which ignores Sheen and
+                             *   DiffuseTransmission */
+            uint32_t water_scatter_color; /**< Water.scatter_color, display encoded bytes:
+                             *   r | g << 8 | b << 16, 0 without a scatter */
+            float water_scatter; /**< Water.scatter, 0 without one or when negative or not
+                             *   finite, which tells a record without scatter */
+        };
+    };
+    union {                 /**< The DiffuseTransmission of a record without Water, the shore
+                             *   waves of one with Water */
+        struct {            /**< The DiffuseTransmission of a record without Water */
+            float thickness; /**< DiffuseTransmission.thickness, 0 without one */
+            float diffuse_blur; /**< DiffuseTransmission.blur, 0 without one or with a negative
+                             *   or non finite blur */
+        };
+
+        struct {            /**< The shore waves of a record with Water, which ignores
+                             *   DiffuseTransmission */
+            float water_shore_phase; /**< Total render time over Water.shore_period wrapped to
+                             *   0..1 (box_draws_water_shore_phase), 0 without shore waves */
+            float water_shore_reach; /**< Water.shore_reach of a Water with a shore_period
+                             *   above 0, 0 without shore waves or when negative or not finite,
+                             *   which tells a record without them */
+        };
+    };
     uint32_t mapping;       /**< TextureMapping.mode | blend << 16, the blend a unorm16
                              *   clamped to 0..1 (0 when not finite); MappingUv (0) without one
                              *   or for MappingUv, whose blend is dropped */
@@ -1575,14 +1780,38 @@ typedef struct box_render_material_t {
                              *   the record without one */
     float normal_offset[2]; /**< Wrapped TextureScroll.normal_velocity offset the normal map
                              *   adds to uv, 0 without one */
-    uint32_t fresnel_color[2]; /**< Fresnel.color in linear light as unorm16: r | g << 16,
-                             *   b | 0 << 16; 0 without one */
-    float fresnel_strength; /**< Fresnel.strength, 0 without one or when negative or not
-                             *   finite */
-    float fresnel_power;    /**< Fresnel.power, 0 without one or when negative or not finite */
-    float fresnel_bias;     /**< Fresnel.bias, 0 without one or when not finite */
-    float fresnel_opacity;  /**< Fresnel.opacity clamped to 0..1, 0 without one or when not
-                             *   finite */
+    union {                 /**< The Fresnel of a record without Water, the WaterCaustics of
+                             *   one with Water */
+        struct {            /**< The Fresnel of a record without Water */
+            uint32_t fresnel_color[2]; /**< Fresnel.color in linear light as unorm16:
+                                     *   r | g << 16, b | 0 << 16; 0 without one */
+            float fresnel_strength; /**< Fresnel.strength, 0 without one or when negative or
+                                     *   not finite */
+            float fresnel_power;    /**< Fresnel.power, 0 without one or when negative or not
+                                     *   finite */
+            float fresnel_bias;     /**< Fresnel.bias, 0 without one or when not finite */
+            float fresnel_opacity;  /**< Fresnel.opacity clamped to 0..1, 0 without one or when
+                                     *   not finite */
+        };
+
+        struct {            /**< The WaterCaustics of a record with Water, which ignores
+                             *   Fresnel */
+            float caustics_offset[2]; /**< Offset of the water frame of the WaterCaustics in
+                                     *   cells, the integral of the WaterFlow velocity over
+                                     *   1 / scale wrapped to 0..BOX_RENDER_CAUSTICS_PERIOD, 0
+                                     *   without one */
+            float caustics_strength; /**< WaterCaustics.strength, 0 without one or when
+                                     *   negative or not finite, which tells a record without
+                                     *   caustics */
+            float caustics_frequency; /**< 1 over WaterCaustics.scale, which is at least
+                                     *   BOX_RENDER_CAUSTICS_MIN; 0 without one */
+            float caustics_depth;   /**< WaterCaustics.depth, at least BOX_RENDER_CAUSTICS_MIN;
+                                     *   0 without one */
+            float caustics_phase;   /**< WaterCaustics.speed times the total render time over
+                                     *   BOX_RENDER_CAUSTICS_LOOP, wrapped to 0..1
+                                     *   (box_draws_water_caustics_phase); 0 without one */
+        };
+    };
     float water_ripple_offset[2]; /**< Wrapped Water.ripple_velocity offset of the second normal
                              *   sample, 0 without one */
     uint32_t water_shallow; /**< Water.shallow_color, display encoded bytes: r | g << 8 | b << 16,
@@ -1599,15 +1828,114 @@ typedef struct box_render_material_t {
     float water_foam_scale; /**< Water.foam_scale, 0 without one or when not finite */
     float water_ripple_scale; /**< Water.ripple_scale, 0 without one, when negative or not
                              *   finite */
-    uint32_t water_flags;   /**< BOX_RENDER_WATER_* flags, 0 without one */
-    float distortion_strength; /**< Distortion.strength, 0 without one or when negative or not
-                             *   finite (and for a shape with Water, which ignores it) */
-    float distortion_frequency; /**< 1 over Distortion.scale, which is at least
-                             *   BOX_RENDER_DISTORTION_MIN; 0 without one */
-    float distortion_phase; /**< Distortion.speed times the total render time wrapped to 0..1
-                             *   (box_draws_distortion_phase), 0 without one */
-    uint32_t distortion_flags; /**< BOX_RENDER_DISTORTION_* flags, 0 without one */
+    uint32_t water_flags;   /**< BOX_RENDER_WATER_* flags in bit 0, the set of its waves in
+                             *   bits 1..7 (BOX_RENDER_WATER_WAVES_SHIFT, 0 without WaterWaves),
+                             *   Water.absorption display encoded above them
+                             *   (BOX_RENDER_WATER_ABSORPTION_SHIFT): r << 8 | g << 16 | b << 24;
+                             *   0 without one */
+    union {                 /**< The Distortion of a record without Water, the flow mapping of
+                             *   the textures of one with Water */
+        struct {            /**< The Distortion of a record without Water */
+            float distortion_strength; /**< Distortion.strength, 0 without one or when
+                                     *   negative or not finite */
+            float distortion_frequency; /**< 1 over Distortion.scale, which is at least
+                                     *   BOX_RENDER_DISTORTION_MIN; 0 without one */
+            float distortion_phase; /**< Distortion.speed times the total render time wrapped
+                                     *   to 0..1 (box_draws_distortion_phase), 0 without one */
+            uint32_t distortion_flags; /**< BOX_RENDER_DISTORTION_* flags, 0 without one */
+        };
+
+        struct {            /**< The WaterFlow.textures of a record with Water, which ignores
+                             *   Distortion */
+            float water_flow[2]; /**< WaterFlow.velocity, world X and Z, of a Water whose
+                                     *   textures flow (0 when not finite); 0 without */
+            float water_flow_phase; /**< Total render time over BOX_RENDER_WATER_FLOW_PERIOD
+                                     *   wrapped to 0..1 (box_draws_water_flow_phase), 0
+                                     *   without */
+            uint32_t water_flow_flags; /**< BOX_RENDER_WATER_FLOW_TEXTURES when the textures
+                                     *   flow, 0 without */
+        };
+    };
+    float wind_direction[2]; /**< Normalized world X and Z the Wind blows toward, of a record
+                             *   with a WindSway (Scene.wind), 0 without one */
+    float wind_offset[2];   /**< Wrapped world X and Z offset of the gust field, 0 without one */
+    float wind_speed;       /**< Wind.speed, 0 without a WindSway or when calm */
+    float wind_gust;        /**< Wind.gust clamped to 0..1, 0 without a WindSway */
+    float wind_frequency;   /**< 1 over Wind.gust_scale, 0 without a WindSway */
+    float wind_sway;        /**< Phase of the sway of the Wind, 0..1, 0 without a WindSway */
+    float wind_bend;        /**< WindSway.bend, 0 without one or when not finite */
+    float wind_height;      /**< WindSway.height, at least BOX_RENDER_WIND_MIN, 0 without one */
+    float wind_base;        /**< WindSway.base relative to the local origin, or as it is
+                             *   with BOX_RENDER_WIND_LOCAL; 0 without one or when not finite */
+    float wind_flutter;     /**< WindSway.flutter, 0 without one, when negative or not finite */
+    float wind_reach;       /**< WindSway.flutter_reach, at least BOX_RENDER_WIND_MIN, 0
+                             *   without one */
+    float wind_flutter_phase; /**< WindSway.flutter_frequency times the wind clock wrapped
+                             *   to 0..1, 0 without one */
+    uint32_t flags;         /**< BOX_RENDER_WIND_PRESENT with a WindSway, and
+                             *   BOX_RENDER_WIND_PIVOTS with WindSway.pivots (and
+                             *   BOX_RENDER_WIND_FOLIAGE with WindSway.foliage), and
+                             *   BOX_RENDER_WIND_LOCAL with WindSway.local_base; with a VertexReveal
+                             *   whose channel is 0..7 BOX_RENDER_REVEAL_PRESENT, maybe
+                             *   BOX_RENDER_REVEAL_INVERT, the channel at
+                             *   BOX_RENDER_REVEAL_CHANNEL_SHIFT and its softness (0 when
+                             *   negative or not finite) as a half float in the high 16 bits;
+                             *   with a VertexOcclusion BOX_RENDER_OCCLUSION_PRESENT and its
+                             *   channel at BOX_RENDER_OCCLUSION_CHANNEL_SHIFT; 0 without any */
+    float reveal_threshold; /**< VertexReveal.threshold, 0 without one or when not finite */
+    float wind_branch;      /**< WindSway.branch of a record with BOX_RENDER_WIND_PIVOTS, 0
+                             *   without pivots or when not finite */
+    float wind_branch_phase; /**< WindSway.branch_frequency times the wind clock wrapped
+                             *   to 0..1 with BOX_RENDER_WIND_PIVOTS, 0 without */
+    float occlusion_strength; /**< VertexOcclusion.strength clamped to 0..1 of a record with
+                             *   BOX_RENDER_OCCLUSION_PRESENT, 0 without one */
+    float wind_pad;         /**< 0, pads the record to a multiple of 16 bytes */
 } box_render_material_t;
+
+/** Flag of a record with a VertexOcclusion whose channel is 0..7 (box_render_material_t.flags) */
+#define BOX_RENDER_OCCLUSION_PRESENT (1u << 7)
+
+/** Bit of the flags at which the data channel of a VertexOcclusion record starts, 3 bits */
+#define BOX_RENDER_OCCLUSION_CHANNEL_SHIFT (8)
+
+/** Flag of a record with a VertexReveal (box_render_material_t.flags) */
+#define BOX_RENDER_REVEAL_PRESENT (1u << 1)
+
+/** Flag of a VertexReveal record that hides above the threshold (VertexReveal.invert) */
+#define BOX_RENDER_REVEAL_INVERT (1u << 2)
+
+/** Bit of the flags at which the data channel of a VertexReveal record starts, 3 bits */
+#define BOX_RENDER_REVEAL_CHANNEL_SHIFT (3)
+
+/** Bit of the flags at which the softness of a VertexReveal record starts, a half float */
+#define BOX_RENDER_REVEAL_SOFTNESS_SHIFT (16)
+
+/** Smallest WaterCaustics.scale and depth of a record */
+#define BOX_RENDER_CAUSTICS_MIN (1e-3f)
+
+/** Cells after which the pattern of WaterCaustics repeats, which the offset of its water frame
+ * wraps at: its first layer repeats every BOX_RENDER_CAUSTICS_PERIOD cells, its second, 11 / 8
+ * as fine, every 88 */
+#define BOX_RENDER_CAUSTICS_PERIOD (64.0)
+
+/** Cells (speed times seconds) after which the animation of WaterCaustics repeats: the phase is
+ * that over this loop, 0..1 */
+#define BOX_RENDER_CAUSTICS_LOOP (8.0)
+
+/** Flag of a record with a WindSway (Scene.wind) */
+#define BOX_RENDER_WIND_PRESENT (1u)
+
+/** Flag of a WindSway record with pivots (WindSway.pivots): a mesh with per vertex data sways
+ * about the pivots in its data */
+#define BOX_RENDER_WIND_PIVOTS (1u << 6)
+
+/** Flag of a WindSway record with pivots and foliage (WindSway.foliage): the pivots read only
+ * data0, a vertex turns about its pivot with a stiffness of 0 and without its parent */
+#define BOX_RENDER_WIND_FOLIAGE (1u << 11)
+
+/** Flag of a WindSway record with a local base (WindSway.local_base): wind_base is a height
+ * above the origin of the shape rather than a world Y relative to the local origin */
+#define BOX_RENDER_WIND_LOCAL (1u << 12)
 
 /** Smallest Distortion.scale of a record */
 #define BOX_RENDER_DISTORTION_MIN (1e-3f)
@@ -1625,6 +1953,228 @@ typedef struct box_render_material_t {
 
 /** Flag of a Water record: it has a foam_texture, which the foam samples */
 #define BOX_RENDER_WATER_FOAM_TEXTURE (1u << 0)
+
+/** Flag of the water_flow_flags of a Water record: WaterFlow.textures, its normal map and foam
+ * texture move with the flow (two phase flow mapping) */
+#define BOX_RENDER_WATER_FLOW_TEXTURES (1u << 0)
+
+/** Flag of the water_flow_flags of a Water record: the shape has or inherits a WaterSpectrum, so
+ * its fragments take the slopes of the spectrum the view binds. Above the Distortion flags, which
+ * share the word with records without Water. */
+#define BOX_RENDER_WATER_FLOW_SPECTRUM (1u << 2)
+
+/** Seconds of a cycle of the two phase flow mapping of WaterFlow.textures: each of the two
+ * samples moves with the flow for this long, then resets while its weight is 0 */
+#define BOX_RENDER_WATER_FLOW_PERIOD (1.0)
+
+/** Bit of the Water record flags word at which the display encoded Water.absorption starts */
+#define BOX_RENDER_WATER_ABSORPTION_SHIFT (8)
+
+/** Bit of the Water record flags word at which the set of its waves in the wave table starts
+ * (BOX_RENDER_BUFFER_WATER_WAVES), 0 for a Water without WaterWaves */
+#define BOX_RENDER_WATER_WAVES_SHIFT (1)
+
+/** Mask of the set of the waves of a Water record, after the shift */
+#define BOX_RENDER_WATER_WAVES_MASK (0x7Fu)
+
+/** Sets of the wave table, set 0 included, which means no waves: BOX_RENDER_WATER_WAVES_MASK + 1 */
+#define BOX_RENDER_WATER_WAVE_SETS (128)
+
+/** One wave of a set of the wave table, WaterWave of mesh_extended.wgsl */
+typedef struct box_render_water_wave_t {
+    float direction[2];     /**< Normalized direction of travel in world XZ */
+    float k;                /**< Wave number 2 pi / wavelength, 0 for a disabled wave */
+    float phase;            /**< Phase wrapped to 0..2 pi: the height is amplitude *
+                             *   sin(k dot(direction, xz) - phase) */
+    float slope;            /**< Amplitude times k, the largest slope of the wave; 0 for a
+                             *   disabled wave */
+    float steepness;        /**< Gerstner Q, 0..1 */
+    float pad[2];           /**< Unused */
+} box_render_water_wave_t;
+
+/** A set of the wave table, the WaterWaves of one Water material, WaterWaveSet of
+ * mesh_extended.wgsl */
+typedef struct box_render_water_waves_t {
+    box_render_water_wave_t waves[4]; /**< The waves, BOX_MATERIAL_WATER_WAVES */
+    float detail;           /**< WaterWaves.detail, at least 0 */
+    uint32_t count;         /**< Waves that are enabled */
+    float pad[2];           /**< Unused */
+} box_render_water_waves_t;
+
+/** Seconds of a step of the field of WaterRipples */
+#define BOX_RENDER_RIPPLE_STEP (1.0 / 120.0)
+
+/** Steps of a field of WaterRipples a frame at most; a longer frame drops the rest of its time */
+#define BOX_RENDER_RIPPLE_SUBSTEPS (8)
+
+/** RippleSource entities a field of WaterRipples takes a frame at most */
+#define BOX_RENDER_RIPPLE_SOURCES (64)
+
+/** box_material_ripple_at disturbances a field of WaterRipples applies a frame at most, the
+ * others wait for the next frame */
+#define BOX_RENDER_RIPPLE_IMPULSES (64)
+
+/** Largest Courant number c dt / dx of a field of WaterRipples, below the 1 / sqrt(2) bound of
+ * the explicit 2D wave equation; the wave speed is clamped to it */
+#define BOX_RENDER_RIPPLE_COURANT (0.5f)
+
+/** World units the water under a RippleSource sinks per world unit it travels through the water,
+ * times RippleSource.strength */
+#define BOX_RENDER_RIPPLE_PUSH (0.05f)
+
+/** Foam a RippleSource lays down at its center per world unit it travels through the water, times
+ * RippleSource.foam */
+#define BOX_RENDER_RIPPLE_FOAM_PUSH (2.0f)
+
+/** Slope of the heights of a field of WaterRipples (world units per world unit) above which
+ * WaterRipples.crest_foam forms foam, CREST_SLOPE of water_ripples.wgsl */
+#define BOX_RENDER_RIPPLE_CREST_SLOPE (0.1f)
+
+/** Largest share of the difference to its neighbours the foam of a cell takes per step, below the
+ * 1 / 4 bound of the explicit 2D diffusion; WaterRipples.foam_spread is clamped to it */
+#define BOX_RENDER_RIPPLE_FOAM_SPREAD_MAX (0.2f)
+
+/** Relative speeds of a RippleSource below this push nothing, world units per second */
+#define BOX_RENDER_RIPPLE_SPEED_MIN (1e-3f)
+
+/** World units above or below the height of the Water entity within which a Water fragment takes
+ * the normals of the field */
+#define BOX_RENDER_RIPPLE_PLANE_TOLERANCE (0.5f)
+
+/** Water shapes with a WaterFlow a field of WaterRipples takes a frame at most, the nearest to
+ * the center of its window first; the others are ignored */
+#define BOX_RENDER_RIPPLE_FLOWS (64)
+
+/** World units inside the edges of the rectangle of a flowing Water over which its weight in the
+ * velocity of a field of WaterRipples fades from 1 to 0 */
+#define BOX_RENDER_RIPPLE_FLOW_FADE (1.0f)
+
+/** Cells a step of a field of WaterRipples looks back along its velocity relative to the water
+ * frame at most, REACH of water_ripples.wgsl */
+#define BOX_RENDER_RIPPLE_FLOW_REACH (2.0f)
+
+/** The oriented XZ rectangle of a Water shape with a WaterFlow over a field of WaterRipples,
+ * FlowRect of water_ripples.wgsl. Positions and sizes are in cells from the corner of the window of
+ * the frame (or in world units, for box_render_ripples_flow_at, as long as all are in the same
+ * units). */
+typedef struct box_render_ripple_flow_t {
+    float center[2];        /**< Center of the rectangle */
+    float axis[2];          /**< Its first axis in world XZ, normalized; the second is
+                             *   (-axis[1], axis[0]) */
+    float extents[2];       /**< Half size along its two axes */
+    float velocity[2];      /**< WaterFlow velocity, world units per second (X, Z) */
+} box_render_ripple_flow_t;
+
+/** A source of a field of WaterRipples for the steps of a frame, RippleSource of
+ * water_ripples.wgsl: a RippleSource (pushed every step) or a box_material_ripple_at disturbance
+ * (once, on the first step). Positions are in cells from the corner of the window of the frame. */
+typedef struct box_render_ripple_source_t {
+    float from[2];          /**< Center at the start of the frame */
+    float to[2];            /**< Center at the end of the frame; a step at time fraction t of
+                             *   the frame is at mix(from, to, t) */
+    float extents[2];       /**< Half size along its own X and Z, cells */
+    float axis[2];          /**< Its own X axis in world XZ, normalized */
+    float amount;           /**< Height added at the center per step, world units, negative
+                             *   sinks the water */
+    uint32_t once;          /**< 1 for a disturbance applied on the first step only */
+    float foam;             /**< Foam added at the center per step, negative clears it */
+    float pad;              /**< Unused */
+} box_render_ripple_source_t;
+
+/** A field of WaterRipples of a frame, simulated by the backend before the views draw.
+ *
+ * The window covers the cells origin .. origin + resolution - 1 of the water frame; the texel of
+ * cell c is c mod resolution, so a window that moves keeps the heights of the cells it still
+ * covers. */
+typedef struct box_render_water_ripples_t {
+    ecs_entity_t water;     /**< Entity with the Water and WaterRipples, the key of the field */
+    ecs_entity_t scene;     /**< Scene root of the Water, 0 for the default scene */
+    uint32_t resolution;    /**< Cells per side, a power of two */
+    uint32_t steps;         /**< Steps of the frame, 0..BOX_RENDER_RIPPLE_SUBSTEPS */
+    int32_t origin[2];      /**< Window origin modulo the resolution: the texel of its corner */
+    int32_t shift[2];       /**< Cells the window moved since the previous frame, clamped to
+                             *   -resolution..resolution; the cells that entered start flat */
+    bool reset;             /**< The field starts flat: new, or a resolution that changed */
+    float cell;             /**< World units of a cell */
+    float courant2;         /**< (c dt / dx)^2 of the clamped wave speed */
+    float keep;             /**< Factor of the vertical velocity a step keeps, from damping */
+    float corner[2];        /**< World XZ of the corner of the window at the end of the frame */
+    float height;           /**< World Y of the Water entity */
+    float strength;         /**< WaterRipples.strength, 0 when not finite */
+    float foam_spread;      /**< Share of the difference to its neighbours the foam of a cell
+                             *   takes per step, from WaterRipples.foam_spread */
+    float foam_keep;        /**< Factor of the foam a step keeps, from WaterRipples.foam_decay */
+    float crest;            /**< Foam formed per step per unit of slope above
+                             *   BOX_RENDER_RIPPLE_CREST_SLOPE, from WaterRipples.crest_foam */
+    int32_t source_first;   /**< First of its sources in the ripple_sources of the packet */
+    int32_t source_count;   /**< Its sources */
+    float velocity[2];      /**< WaterFlow velocity of its Water that the window frame moves
+                             *   with, world units per second, 0 for still water */
+    int32_t flow_first;     /**< First of its flowing Water rectangles in the ripple_flows of
+                             *   the packet */
+    int32_t flow_count;     /**< Its flowing Water rectangles, the nearest to the center of the
+                             *   window first */
+    bool flowing;           /**< One of its rectangles flows relative to the frame, so the
+                             *   steps advect the heights and the foam */
+} box_render_water_ripples_t;
+
+/** Cascades of a spectrum of WaterSpectrum at most, BOX_MATERIAL_SPECTRUM_CASCADES_MAX */
+#define BOX_RENDER_SPECTRUM_CASCADES (3)
+
+/** Seconds after which the waves of a WaterSpectrum repeat: their angular frequencies are
+ * multiples of 2 pi over it, and the time is wrapped to it in double precision */
+#define BOX_RENDER_SPECTRUM_PERIOD (256.0)
+
+/** Ratio of the tile of a cascade of a WaterSpectrum to the tile of the next */
+#define BOX_RENDER_SPECTRUM_RATIO (5.0f)
+
+/** Cycles per its tile from which a cascade of a WaterSpectrum takes over the waves from the
+ * previous one: the cut between cascade c - 1 and c is at the wave number 2 pi CUT / size of c */
+#define BOX_RENDER_SPECTRUM_CUT (4.0f)
+
+/** Wavelength in world units below which the waves of a WaterSpectrum are damped by
+ * exp(-(k SHORTEST)^2) */
+#define BOX_RENDER_SPECTRUM_SHORTEST (0.01f)
+
+/** Share of the Nyquist wave number (pi resolution / size) of the last cascade of a WaterSpectrum
+ * at which its waves end: shorter waves, down to two texels per wave and to the corners of the
+ * grid, would show as a plaid of texels where the texture is magnified */
+#define BOX_RENDER_SPECTRUM_NYQUIST (2.0f / 3.0f)
+
+/** Wave number above all waves, the upper cut of the spectrum box_render_gpu_spectrum_fft
+ * transforms */
+#define BOX_RENDER_SPECTRUM_K_MAX (1e30f)
+
+/** A spectrum of WaterSpectrum of a frame, evolved and inverse FFT'd by the backend before the
+ * views draw, in a texture array of a layer per cascade. A view binds the one of its scene. */
+typedef struct box_render_water_spectrum_t {
+    ecs_entity_t water;     /**< Entity that owns the WaterSpectrum (the prefab of the shapes
+                             *   that inherit it), the key of the spectrum */
+    ecs_entity_t scene;     /**< Scene root of the shapes, 0 for the default scene */
+    uint32_t resolution;    /**< Texels per side of a cascade, a power of two */
+    uint32_t cascades;      /**< Cascades, 1..BOX_RENDER_SPECTRUM_CASCADES */
+    uint32_t revision;      /**< Changes whenever the parameters of the initial spectrum do, so
+                             *   the backend generates it again */
+    uint32_t seed;          /**< WaterSpectrum.seed */
+    float sizes[BOX_RENDER_SPECTRUM_CASCADES]; /**< World units of the tile of each cascade, 0
+                             *   for the ones it lacks */
+    float cuts[BOX_RENDER_SPECTRUM_CASCADES + 1]; /**< Wave numbers between the cascades:
+                             *   cascade c holds cuts[c] <= |k| < cuts[c + 1], cuts[0] is 0 and
+                             *   cuts[cascades] BOX_RENDER_SPECTRUM_NYQUIST times the Nyquist
+                             *   wave number of the last cascade */
+    float wind[2];          /**< Normalized direction the wind blows toward, world XZ */
+    float wind_speed;       /**< Wind speed, 0 for no waves */
+    float directionality;   /**< WaterSpectrum.directionality clamped to 0..1 */
+    float amplitude;        /**< WaterSpectrum.amplitude, 0 when negative or not finite */
+    float detail;           /**< WaterSpectrum.detail, 0 when negative or not finite */
+    float time;             /**< Render time wrapped to 0..BOX_RENDER_SPECTRUM_PERIOD */
+    float offset[2];        /**< World XZ the fragments add to their local world XZ to sample
+                             *   the tiles: the absolute position of the local origin minus the
+                             *   water frame, wrapped to 0..sizes[0] */
+    float height_scale;     /**< One over twice the standard deviation of the height of the
+                             *   spectrum, which brings its heights to about -1..1; 0 for flat
+                             *   water */
+} box_render_water_spectrum_t;
 
 /** Bits of box_render_mesh_shading_t.material that hold the slot of the material table, the
  * planet light slot is above them */
@@ -1710,6 +2260,185 @@ typedef struct box_render_copy_t {
     uint32_t size;          /**< Bytes copied */
 } box_render_copy_t;
 
+/** Copy of the heights of a tile of a Terrain into its slot of the surface assets of its grid
+ * mesh, which the vertex stages of the tile read (terrain.wgsl), and of its masks into the mask
+ * atlas of the grid mesh, which the fragment stages of a terrain TextureBlend read.
+ *
+ * The backend copies the R32Float image of the texture into the slot when the image changed since
+ * it last copied it there, after the texture graphs evaluated and before the views render. A
+ * slot holds the rows of the image, each aligned to 256 bytes (box_terrain_row_bytes), and
+ * after them the rows of the rough heights as long; the assets grow to hold the highest slot,
+ * which copies every slot again.
+ *
+ * The RGBA8 masks of slot s go to the cell s of the atlas, s % columns across and s / columns
+ * down, a cell twice as wide as the masks image: the masks at its left, the coarse masks in the
+ * top left corner of its right half. The atlas grows by rows as the assets do.
+ */
+typedef struct box_render_terrain_height_t {
+    uint32_t mesh;          /**< Handle of the grid mesh of the tile */
+    uint32_t slot;          /**< Slot of the tile */
+    uint32_t texture;       /**< Handle of the texture with the heights of the tile */
+    uint32_t rough;         /**< Handle of the texture with the heights of the next coarser
+                             *   level at every second texel */
+    uint32_t masks;         /**< Handle of the texture with the masks of the tile, 0 for none */
+    uint32_t coarse;        /**< Handle of the texture with the masks of the next coarser level
+                             *   at every second texel, 0 for none */
+} box_render_terrain_height_t;
+
+/** A tile of a Terrain whose material the backend bakes into the bake atlas of its grid mesh:
+ * the albedo, normal, roughness, metallic and occlusion of its TextureBlend and TextureLayers,
+ * with the light of the sun that the heights of the terrain let through and their ambient
+ * occlusion, in a cell of the tile and a cell of half its texels for the next coarser level.
+ *
+ * The backend bakes a tile when its heights or masks, its material or the sun changed since it
+ * baked it, after the heights are copied and before the views render, by drawing the tile with
+ * the bake entry points of the forward pipeline of its batch.
+ */
+typedef struct box_render_terrain_bake_t {
+    uint32_t mesh;          /**< Handle of the grid mesh of the tile */
+    uint32_t slot;          /**< Slot of the tile: its heights, masks and bake cell */
+    int32_t batch;          /**< Index of the batch record of the tile in the packet */
+    uint32_t instance;      /**< Slot of the tile in the instance page of the batch */
+    int32_t index;          /**< Index of the terrain index of its terrain in terrain_indices */
+    int32_t level;          /**< Level of detail of the tile */
+    int32_t ix;             /**< Column of the tile in the grid of its level */
+    int32_t iz;             /**< Row of the tile in the grid of its level */
+} box_render_terrain_bake_t;
+
+/** The tiles of a Terrain that draw, which a bake reads the heights of beyond its own tile.
+ *
+ * The records are uint32_t in the packet data: the levels, the edge of a tile of level 0 in
+ * meters (f32 bits) and two zero words; then per level the column and row of its first cell
+ * (i32), its columns | rows << 16 and the word offset of its cells from the first record; then
+ * the cells, the slot of the tile plus one, 0 where no tile of the level draws. */
+typedef struct box_render_terrain_index_t {
+    ecs_entity_t terrain;   /**< The terrain entity */
+    uint32_t data;          /**< Offset of the records in the packet data */
+    uint32_t count;         /**< uint32_t of the records */
+} box_render_terrain_index_t;
+/** Levels of detail a sampled terrain indexes at most (BOX_TERRAIN_LEVELS) */
+#define BOX_RENDER_TERRAIN_LEVELS (16)
+
+/** Foci of a sampled terrain at most (BOX_TERRAIN_FOCI) */
+#define BOX_RENDER_TERRAIN_FOCI (8)
+
+/** A Terrain with TerrainSampled, whose tiles that draw the compute and vertex stages read by
+ * world position (terrain_sample.wgsl).
+ *
+ * The grid holds a window of cells by cells per level, the finest first, rows from -z, a cell per
+ * tile of the level from the tile first; each cell the slot of the tile of its node that draws
+ * plus one, 0 where none does. The backend binds the cells, the surface assets and the mask atlas
+ * of the grid mesh of the tiles, filled by the terrain_heights of the same packet. */
+typedef struct box_render_terrain_sample_t {
+    ecs_entity_t terrain;   /**< The terrain entity, the key of its bindings in the backend */
+    uint32_t mesh;          /**< Handle of the grid mesh of the tiles, 0 before one draws */
+    uint32_t grid;          /**< Data offset of the cells, levels * cells * cells uint32_t */
+    int32_t levels;         /**< Levels of detail, 0 when nothing is indexed yet */
+    int32_t cells;          /**< Cells along an edge of the window of a level */
+    int32_t resolution;     /**< Vertices along an edge of a tile */
+    int32_t focus_count;    /**< Foci in foci */
+    bool masks;             /**< The tiles have masks in the mask atlas of the mesh */
+    double origin[3];       /**< Absolute position of the frame of the terrain */
+    double tile_size;       /**< Edge of a tile of level 0 in meters */
+    double extent;          /**< Half size of a bounded terrain, 0 unbounded */
+    double foci[BOX_RENDER_TERRAIN_FOCI][2]; /**< Foci the tiles morph around in the frame of
+                             *   the terrain, x and z */
+    int32_t first[BOX_RENDER_TERRAIN_LEVELS][2]; /**< Column and row of the tile of the first
+                             *   cell of each level */
+    float morph[BOX_RENDER_TERRAIN_LEVELS][2]; /**< Distances of the nearest focus from the
+                             *   center of a tile of each level where its morph starts and ends */
+} box_render_terrain_sample_t;
+
+/** A Grass whose blades the GPU backend places around the camera of each lit view of its scene
+ * and draws (gpu_grass.c), with its defaults resolved (box_grass_resolve) and its colors
+ * linear. Positions and heights are in the local frame of the packet. */
+typedef struct box_render_grass_t {
+    ecs_entity_t grass;     /**< The Grass entity, the key of its buffers in the backend */
+    ecs_entity_t terrain;   /**< Terrain with TerrainSampled it grows on, 0 for the plane */
+    ecs_entity_t scene;     /**< Scene of the Grass entity, 0 for the default scene */
+    float plane;            /**< Local y of the plane of a Grass without a terrain */
+    float ground[2];        /**< Lowest and highest local y of the ground the blades stand on */
+    int32_t mask;           /**< Mask channel that weighs the density, -1 for none */
+    float density;          /**< Blades per square meter */
+    float height[2];        /**< Shortest and tallest blade */
+    float fold;             /**< Height below which blades fold into a V, 0 for none */
+    float width[2];         /**< Narrowest and widest blade */
+    float base[3];          /**< Linear color at the base */
+    float tip[3];           /**< Linear color at the tip */
+    float clump[2];         /**< Distance between the clumps and how strongly blades follow
+                             *   their clump */
+    float variation;        /**< How much color and height vary over the world */
+    float lod[3];           /**< Distances where levels 0 and 1 end and the blades end */
+    uint32_t seed;          /**< Seed of the hash of the cells */
+    float wind_direction[2]; /**< Normalized world X and Z the Wind blows toward, {1, 0}
+                             *   without one */
+    float wind_offset[2];   /**< Wrapped local X and Z offset of the gust field of the Wind
+                             *   (box_render_wind_frame), 0 without one */
+    float wind_speed;       /**< Wind.speed, 0 when calm or without a Wind */
+    float wind_gust;        /**< Wind.gust clamped to 0..1, 0 without a Wind */
+    float wind_frequency;   /**< 1 over Wind.gust_scale */
+    float wind_sway;        /**< Phase of the sway of the Wind, 0..1, made local */
+    float wind_phase;       /**< WindStatus.clock times BOX_RENDER_GRASS_WIND_RATE wrapped to
+                             *   0..1, the phase of the swing and the flutter of the blades, 0
+                             *   without a Wind */
+    float shadow;           /**< Distance from the camera within which the blades cast shadows,
+                             *   0 for none */
+    bool shadow_lights;     /**< The blades cast into the spot and point light tiles too */
+} box_render_grass_t;
+
+/** The far field of a Grass as the fragments of the tiles of its Terrain shade it (the grass_*
+ * of BlendUniforms in blend.wgsl, terrain_grass of terrain.wgsl), all zero for a terrain without
+ * a Grass: beyond its blades the terrain takes the colors, the variation and the waves of the
+ * wind of the grass where its mask channel has density. 112 bytes. */
+typedef struct box_render_grass_far_t {
+    float base[4];          /**< Linear color at the base of the blades, then the variation over
+                             *   the world */
+    float tip[4];           /**< Linear color at the tip of the blades, then the share of the
+                             *   ground the blades cover seen from straight above, 0 to 1 */
+    float range[4];         /**< Distances from the camera where the far field starts to fade
+                             *   in and where it is full, where the blades end, then the tallest
+                             *   blade */
+    float wind_field[4];    /**< Normalized world X and Z the Wind blows toward, wrapped local X
+                             *   and Z offset of its gust field (GrassWind.field) */
+    float wind_strength[4]; /**< Speed, gust, 1 over the gust scale and phase of the sway of the
+                             *   Wind (GrassWind.strength) */
+    float wind_time[4];     /**< Phase of the swing of the blades, then 0 (GrassWind.time) */
+    uint32_t config[4];     /**< Mask channel plus one, 0 for none; 1 when the terrain has a
+                             *   Grass; then 0 */
+} box_render_grass_far_t;
+
+/** Share of the distance where the blades of a Grass end at which its far field is full, where
+ * the blades start to shrink away (GrassParams.lod.w of grass.wgsl) */
+#define BOX_RENDER_GRASS_FAR_FULL (0.85f)
+
+/** Area of the ground a blade covers seen from above, in units of its width times its height,
+ * which with the density gives the share of the ground a field covers from above */
+#define BOX_RENDER_GRASS_FAR_AREA (1.5f)
+
+/** Least and most share of the ground a far field covers from above */
+#define BOX_RENDER_GRASS_FAR_COVER_MIN (0.2f)
+#define BOX_RENDER_GRASS_FAR_COVER_MAX (0.97f)
+
+/** Share of the shadow distance of a Grass at which the blades that cast start to shrink away,
+ * while the darkening of the roots of the blades in the view grows back */
+#define BOX_RENDER_GRASS_SHADOW_FADE (0.4f)
+
+/** Share of the shadow distance of a Grass within which the blades cast with 3 segments, beyond
+ * it as a single triangle */
+#define BOX_RENDER_GRASS_SHADOW_LOD (0.5f)
+
+/** Factor of the length along the light at which the shadow of the tallest blade of a Grass
+ * reaches the ground, for the ground that falls away from the blades */
+#define BOX_RENDER_GRASS_SHADOW_SLACK (2.0f)
+
+/** Least height of the light over the horizon, the sine of its angle, the reach of the shadows
+ * of the blades is measured with */
+#define BOX_RENDER_GRASS_SHADOW_LOW (0.05f)
+
+/** Turns per second of the wind clock (WindStatus.clock) of the phase of the swing of the clumps
+ * of a Grass, whose blades flutter at whole multiples of it (GrassWind.time of grass_wind.wgsl) */
+#define BOX_RENDER_GRASS_WIND_RATE (0.5)
+
 /** Description of a BOX_RENDER_SHADER create or update, followed by its code and its label.
  *
  * The preprocessed WGSL code and the label each end with a terminator that their size counts.
@@ -1756,8 +2485,53 @@ typedef struct box_render_texture_blend_t {
                          *   the arrays */
     uint32_t quality;   /**< Largest dimension of a slice, the texture quality of the surfaces */
     float contrast;     /**< TextureBlend.contrast, 0 for the linear blend without heights */
+    float variation;    /**< TextureBlend.variation, 0 for none */
     uint32_t tiles;     /**< 1 for a TileTerrain, whose mask is its grid of kind indices */
+    uint32_t terrain;   /**< Handle of the grid mesh of the tiles of a Terrain with masks, whose
+                         *   mask is the mask atlas of the mesh, else 0 */
 } box_render_texture_blend_t;
+
+/** The values of one TextureLayer as the mesh shaders read them (TextureLayer of
+ * mesh_layers.wgsl), the uniform buffer of its layer entity. 128 bytes. */
+typedef struct box_render_texture_layer_t {
+    float color[4];         /**< Linear albedo constant (Rgb), then the amount clamped to 0..1;
+                             *   0 does nothing */
+    float direction[4];     /**< Unit world direction, then the facing, 0..1 */
+    float coverage[4];      /**< Cavity -1..1, edge width (one over the contrast), normal 0..1
+                             *   and porosity 0..1 */
+    float material[4];      /**< Roughness and metallic constants (PbrMaterial), then the world
+                             *   units of one repeat (TextureMapping.size) and the triplanar
+                             *   blend, 0..1 */
+    float transform[4];     /**< TextureTransform scale u, v and offset u, v, the offset with
+                             *   the wrapped offset of its TextureScroll */
+    uint32_t modes[4];      /**< TextureLayerBlend of the albedo, roughness, metallic and
+                             *   occlusion */
+    uint32_t flags[4];      /**< BOX_RENDER_LAYER_HAS_* and BOX_RENDER_LAYER_UV, then the
+                             *   bits of the f32 local world height of TextureLayer.altitude
+                             *   and of its altitude_fade (0 for none, negative to cover
+                             *   below the altitude), then 0 */
+    float origin[4];        /**< Wrapped offset of the world projection for the absolute
+                             *   position of the local origin (box_render_origin_mapping); 0 with
+                             *   BOX_RENDER_LAYER_UV */
+} box_render_texture_layer_t;
+
+/** The layers of a TextureLayers as a batch draws them, in the packet data of a batch with
+ * texture_layers.
+ *
+ * The backend keeps a uniform buffer per layer entity, written when its values change, which
+ * every batch with the layer binds, and blits the maps of the layers into one texture array:
+ * slice BOX_RENDER_LAYER_MAPS * layer + map, after the heights of a TextureBlend. */
+typedef struct box_render_texture_layers_t {
+    ecs_entity_t entities[BOX_RENDER_LAYERS]; /**< Layer entity of each slot, which keys its
+                             *   buffer, 0 for a slot that does nothing */
+    box_render_texture_layer_t values[BOX_RENDER_LAYERS]; /**< Values of each slot, zero for a
+                             *   slot without an entity */
+    uint32_t maps[BOX_RENDER_LAYERS][BOX_RENDER_LAYER_MAPS]; /**< Texture handles of the albedo,
+                             *   ORM, normal and mask of each slot, 0 for the default (white, a
+                             *   flat normal) */
+    uint32_t count;         /**< Slots up to the last one with an entity, at least 1 */
+    uint32_t quality;       /**< Largest dimension of a slice, the texture quality */
+} box_render_texture_layers_t;
 
 /** Instanced draw of one mesh with one pipeline, drawn by the views of its scene.
  *
@@ -1805,6 +2579,22 @@ typedef struct box_render_batch_t {
     bool surface;               /**< The instances are parametric surfaces, drawn with the
                                  *   surface variants of the vertex stages of the mesh and shadow
                                  *   shaders */
+    bool wind;                  /**< The instances have a WindSway in a scene with Scene.wind:
+                                 *   every pass draws them with the material_wind override of its
+                                 *   vertex stage, which moves the vertices by the WindSway of
+                                 *   their material */
+    float wind_reach;           /**< Largest world distance the WindSway of an instance moves a
+                                 *   vertex in the wind of the frame, which the cull pass grows
+                                 *   the world box of each instance by; 0 without wind */
+    float range[3];             /**< DrawRange near, far and fade of the instances, all 0 for
+                                 *   none: the cull pass drops the instances out of range and
+                                 *   every pass draws them with the draw_range override, which
+                                 *   dithers the fades */
+    bool impostor;              /**< The instances are the cards of an Impostor (ImpostorDraw):
+                                 *   every pass draws them with the _impostor entry points of
+                                 *   the mesh and shadow shaders, which read the card from the
+                                 *   per vertex data of the mesh and the albedo, depth and
+                                 *   normal atlases from textures 0, 2 and 3 */
     uint32_t mesh;              /**< Mesh handle */
     uint32_t lods[BOX_LOD_LEVELS_MAX]; /**< Mesh handle of each level of detail of an opaque 3D
                                  *   batch, lods[0] being mesh and a level that does not reduce
@@ -1816,6 +2606,11 @@ typedef struct box_render_batch_t {
                                  *   0 for none */
     uint32_t blend_layers;      /**< Data offset of the box_render_texture_blend_t of a batch
                                  *   with texture_blend */
+    bool texture_layers;        /**< The instances have TextureLayers in a scene with
+                                 *   Scene.texture_layers: the layers variants of the mesh
+                                 *   pipelines apply the layers at layers over the surface */
+    uint32_t layers;            /**< Data offset of the box_render_texture_layers_t of a batch
+                                 *   with texture_layers */
     uint32_t wrap;              /**< TextureWrap of the samplers */
     uint32_t instances;         /**< Handle of the transform stream of the instance page
                                  *   holding the instance data; its other streams follow */
@@ -1843,6 +2638,18 @@ typedef struct box_render_batch_t {
                                  *   view space x and y over -z for a perspective camera, of view
                                  *   space x and y for an orthographic one */
 } box_render_batch_t;
+
+/** Check whether the instances of a batch have a DrawRange: a near or a far distance.
+ *
+ * @param b The batch
+ * @return Whether the passes draw it with the draw_range override and the cull pass culls its
+ * instances by their range
+ */
+static inline bool box_render_batch_ranged(
+    const box_render_batch_t *b)
+{
+    return box_render_is_mesh(b->pipeline) && (b->range[0] > 0.0f || b->range[1] > 0.0f);
+}
 
 /** Components whose rendered value can transition, the index of their entry in the layout table
  * of the resolver (box_render_transition_layout) */
@@ -1998,10 +2805,15 @@ typedef struct box_render_transition_record_t {
 typedef struct box_render_packet_t {
     int64_t frame;          /**< Frame the packet was extracted in */
     double time;            /**< World time at the end of the frame, in seconds */
+    double origin[3];       /**< Absolute position of the local origin (WorldOrigin) of the
+                             *   frame, which the world space patterns of the shaders add */
     float delta;            /**< Seconds the frame advanced the world */
     float fps;              /**< Frame rate cap of the frame, box_app_fps, 0 uncapped */
     bool headless;          /**< App.headless: the frame waits for the pipelines it draws
                              *   with, so its output does not depend on how long they take */
+    bool spread;            /**< The frame does not wait for its loads (a window, or
+                             *   App.async_loads): the texture graphs to evaluate are spread
+                             *   over the frames (box_gpu_texture_graphs_evaluate) */
     bool vsync;             /**< A window target of the frame presents with vsync */
     float refresh;          /**< Refresh rate in Hz of the display of that window, 0 unknown */
     uint32_t anisotropy;    /**< Anisotropic samples of the texture samplers, 1 to 16 */
@@ -2033,6 +2845,25 @@ typedef struct box_render_packet_t {
                              *   instances with a planet light slot are lit by */
     ecs_vec_t planar_reflections; /**< box_render_planar_t, the planar reflections of the
                              *   views */
+    ecs_vec_t water_ripples; /**< box_render_water_ripples_t, the fields of WaterRipples,
+                             *   stepped before the targets */
+    ecs_vec_t ripple_sources; /**< box_render_ripple_source_t of those fields */
+    ecs_vec_t ripple_flows; /**< box_render_ripple_flow_t of those fields */
+    ecs_vec_t water_spectra; /**< box_render_water_spectrum_t, the spectra of WaterSpectrum,
+                             *   evolved before the targets */
+    ecs_vec_t impostor_blits; /**< box_render_impostor_blit_t, the impostor frames copied into
+                             *   their atlases after the targets rendered */
+    ecs_vec_t impostor_reads; /**< box_render_impostor_read_t, impostor atlases written to PNG
+                             *   files after the blits */
+    ecs_vec_t terrain_heights; /**< box_render_terrain_height_t, the heights of the terrain
+                             *   tiles that draw, copied after the texture graphs evaluated */
+    ecs_vec_t terrain_bakes; /**< box_render_terrain_bake_t, the terrain tiles that draw with
+                             *   a bake atlas */
+    ecs_vec_t terrain_indices; /**< box_render_terrain_index_t of their terrains */
+    ecs_vec_t terrain_samples; /**< box_render_terrain_sample_t, the terrains with
+                             *   TerrainSampled, bound after their heights were copied */
+    ecs_vec_t grasses;      /**< box_render_grass_t, the Grass entities, whose blades the lit
+                             *   views of their scene place and draw */
     ecs_vec_t debug_boxes;  /**< box_render_debug_box_t, the boxes of the spatial index trees
                              *   of the views */
     ecs_vec_t debug_poses;  /**< mat4, the matrices that place the boxes of the views */

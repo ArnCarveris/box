@@ -7,7 +7,7 @@ using box.material
 using bunnyhopper
 
 $ {
-  box.view.Scene: {diffuse_transmission: true}
+  box.view.Scene: {shader_features: {Extended: {diffuse_transmission: true}}}
 }
 
 // A tuft of grass beside the track

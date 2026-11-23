@@ -42,5 +42,8 @@ assets {
   tex_photo { Path: {path: "etc/scenes/dust_merchant/assets/photo.jpg"} }
   tex_chart { Path: {path: "etc/scenes/dust_merchant/assets/chart.jpg"} }
 
-  space_light { EnvironmentImage: {path: "etc/scenes/dust_merchant/assets/space.hdr"}; Environment: {resolution: 256} }
+  space_light {
+    EnvironmentImage: {path: "etc/scenes/dust_merchant/assets/space.hdr"}
+    Environment: {resolution: 256}
+  }
 }

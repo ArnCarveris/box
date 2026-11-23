@@ -6,7 +6,12 @@ box { audio { Song { Rgb: {170, 110, 255} } } }
 assets {
 
   pd_space {
-    Bus: {output: master, kind: ChannelReturn, volume: 0.8 * state.reverb_level / 100, effects: [pd_space]}
+    Bus: {
+      output: master,
+      kind: ChannelReturn,
+      volume: 0.8 * state.reverb_level / 100,
+      effects: [pd_space]
+    }
     Reverb: {decay: 4.5, damping: 0.5, predelay: 0.04, size: 0.95, shimmer: 0.08}
   }
 
@@ -17,6 +22,7 @@ assets {
       {kind: EqHighShelf, frequency: 7000, gain: 2}
     ]}
   }
+
   pd_glue { Compressor: {threshold: -16, ratio: 2, attack: 0.04, release: 0.35, knee: 10} }
   pd_pads {
     Bus: {output: master, volume: 1, effects: [pd_tone, pd_glue]}
@@ -29,13 +35,22 @@ assets {
   prefab pd_warm_sound {
     Sound: {seed: 101, drift: 6, free_phase: true}
     Envelope: {attack: 0.9, decay: 1.5, sustain: 0.85, release: 2.2, attack_curve: 1}
-    Filter: {kind: LowPass, cutoff: 750, resonance: 0.22, slope: Slope24, model: FilterLadder, keytrack: 0.4, drive: 0.2}
+    Filter: {
+      kind: LowPass,
+      cutoff: 750,
+      resonance: 0.22,
+      slope: Slope24,
+      model: FilterLadder,
+      keytrack: 0.4,
+      drive: 0.2
+    }
     FilterEnvelope: {attack: 1.4, decay: 2.5, sustain: 0.45, release: 2, amount: 1.4}
     Lfo: {rate: 0.18, random_phase: true, cutoff: 0.25}
     saw {
       Oscillator: {wave: Saw, frequency: 440, level: 0.3}
       Unison: {voices: 5, detune: 16, width: 0.85}
     }
+
     low {
       Oscillator: {wave: Saw, frequency: 220, level: 0.12}
       Unison: {voices: 3, detune: 9, width: 0.5}
@@ -51,6 +66,7 @@ assets {
       Oscillator: {wave: Square, frequency: 440, level: 0.22, pulse_width: 0.5}
       Unison: {voices: 3, detune: 7, width: 0.7}
     }
+
     thin {
       Oscillator: {wave: Square, frequency: 880, level: 0.06, pulse_width: 0.3}
       Envelope: {attack: 0.8, decay: 1, sustain: 0.7, release: 1.6}
@@ -70,6 +86,7 @@ assets {
         Envelope: {attack: 0.01, decay: 1.6, sustain: 0.15, release: 2, curve: 3}
       }
     }
+
     shine {
       Oscillator: {wave: Sine, frequency: 880, level: 0.07}
       Envelope: {attack: 1.2, decay: 2, sustain: 0.8, release: 3}
@@ -87,6 +104,7 @@ assets {
       Table: {table: pd_harmonics, position: 2, envelope: 8}
       Unison: {voices: 4, detune: 12, width: 1}
     }
+
     grain {
       Oscillator: {wave: Wavetable, frequency: 880, level: 0.07}
       Table: {table: pd_pulses, position: 3, envelope: 6}
@@ -104,6 +122,7 @@ assets {
       Oscillator: {wave: Saw, frequency: 440, level: 0.38}
       Unison: {voices: 4, detune: 11, width: 0.75}
     }
+
     breath { Oscillator: {wave: Noise, color: NoisePink, level: 0.03} }
   }
 
@@ -118,9 +137,18 @@ assets {
 
   pd_warm { Instrument: {sound: pd_warm_sound, velocity_curve: 1.3} }
   pd_pulse { Instrument: {sound: pd_pulse_sound, velocity_curve: 1.3} }
-  pd_glass { Instrument: {sound: pd_glass_sound, spread: 0.4, spread_mode: InstrumentSpreadAlternate} }
-  pd_morph { Instrument: {sound: pd_morph_sound, spread: 0.3, spread_mode: InstrumentSpreadAlternate} }
-  pd_choir { Instrument: {sound: pd_choir_sound, spread: 0.5, spread_mode: InstrumentSpreadAlternate} }
+  pd_glass {
+    Instrument: {sound: pd_glass_sound, spread: 0.4, spread_mode: InstrumentSpreadAlternate}
+  }
+
+  pd_morph {
+    Instrument: {sound: pd_morph_sound, spread: 0.3, spread_mode: InstrumentSpreadAlternate}
+  }
+
+  pd_choir {
+    Instrument: {sound: pd_choir_sound, spread: 0.5, spread_mode: InstrumentSpreadAlternate}
+  }
+
   pd_air { Instrument: {sound: pd_air_sound, spread: 0.6, spread_mode: InstrumentSpreadAlternate} }
 
   prefab pd_chords {
@@ -296,7 +324,12 @@ assets {
   pd_warm_chorus { Chorus: {voices: 3, rate: 0.15, depth: 4, delay: 16, spread: 1, mix: 0.25} }
   pd_track_warm {
     Track: {instrument: pd_warm, humanize: {timing: 8, velocity: 0.04}}
-    Bus: {output: pd_pads, volume: 0.9, effects: [pd_warm_chorus], sends: [{bus: pd_space, level: 0.35}]}
+    Bus: {
+      output: pd_pads,
+      volume: 0.9,
+      effects: [pd_warm_chorus],
+      sends: [{bus: pd_space, level: 0.35}]
+    }
     Meter: {}
     pd_solo { ClipPlacement: {clip: pd_chords, start: 0} }
     pd_tutti { ClipPlacement: {clip: pd_warm_tutti, start: 96} }
@@ -305,7 +338,12 @@ assets {
   pd_pulse_phaser { Phaser: {stages: 6, rate: 0.12, feedback: 0.45, mix: 0.5} }
   pd_track_pulse {
     Track: {instrument: pd_pulse, humanize: {timing: 8, velocity: 0.04}}
-    Bus: {output: pd_pads, volume: 0.9, effects: [pd_pulse_phaser], sends: [{bus: pd_space, level: 0.3}]}
+    Bus: {
+      output: pd_pads,
+      volume: 0.9,
+      effects: [pd_pulse_phaser],
+      sends: [{bus: pd_space, level: 0.3}]
+    }
     Meter: {}
     pd_solo { ClipPlacement: {clip: pd_chords, start: 16} }
     pd_tutti { ClipPlacement: {clip: pd_pulse_tutti, start: 96} }
@@ -314,7 +352,12 @@ assets {
   pd_glass_echo { Delay: {sync: 0.75, feedback: 0.38, mix: 0.22, damping: 4500, ping_pong: true} }
   pd_track_glass {
     Track: {instrument: pd_glass, humanize: {timing: 12, velocity: 0.06}}
-    Bus: {output: pd_pads, volume: 0.9, effects: [pd_glass_echo], sends: [{bus: pd_space, level: 0.5}]}
+    Bus: {
+      output: pd_pads,
+      volume: 0.9,
+      effects: [pd_glass_echo],
+      sends: [{bus: pd_space, level: 0.5}]
+    }
     Meter: {}
     pd_solo { ClipPlacement: {clip: pd_high_chords, start: 32} }
     pd_tutti { ClipPlacement: {clip: pd_glass_tutti, start: 96} }
@@ -331,7 +374,12 @@ assets {
   pd_choir_chorus { Chorus: {voices: 3, rate: 0.2, depth: 3, delay: 14, spread: 0.9, mix: 0.3} }
   pd_track_choir {
     Track: {instrument: pd_choir, humanize: {timing: 15, velocity: 0.05}}
-    Bus: {output: pd_pads, volume: 0.8, effects: [pd_choir_chorus], sends: [{bus: pd_space, level: 0.45}]}
+    Bus: {
+      output: pd_pads,
+      volume: 0.8,
+      effects: [pd_choir_chorus],
+      sends: [{bus: pd_space, level: 0.45}]
+    }
     Meter: {}
     pd_solo { ClipPlacement: {clip: pd_triads, start: 64} }
     pd_tutti { ClipPlacement: {clip: pd_choir_tutti, start: 96} }

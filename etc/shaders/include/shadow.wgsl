@@ -102,7 +102,8 @@ fn shadow_box_edge(index: u32, world: vec3f) -> f32 {
 }
 
 // Fraction of light that reaches a position with a geometric normal through one cascade. The
-// taps are read in loops with a constant bound that stop at the first weight of 0, and the
+// 2 by 2 taps of a width of 3 and the 3 by 3 taps of a width of 5 are read in a straight line,
+// those of the other widths in loops with a constant bound that stop at the first weight of 0. The
 // offsets and weights rotate instead of being indexed by the loop: D3D compilers turn a local
 // indexed at run time into an indexable copy and are slow on loops with a run time bound.
 fn shadow_cascade(index: u32, world: vec3f, normal: vec3f, l: vec3f) -> f32 {
@@ -122,6 +123,31 @@ fn shadow_cascade(index: u32, world: vec3f, normal: vec3f, l: vec3f) -> f32 {
         let d = textureSampleCompareLevel(shadow_map, shadow_sampler,
             q.base + vec2f(q.x.y, q.y.y), index, depth);
         return q.wy.x * (q.wx.x * a + q.wx.y * b) + q.wy.y * (q.wx.x * c + q.wx.y * d);
+    }
+
+    if (view.shadow_config.y == 5u) {
+        let q = shadow_filter_taps(uv, texel, 5u);
+        let u = q.base.x + q.x.xyz;
+        let v = q.base.y + q.y.xyz;
+        let r0 = q.wx.x * textureSampleCompareLevel(shadow_map, shadow_sampler,
+                vec2f(u.x, v.x), index, depth) +
+            q.wx.y * textureSampleCompareLevel(shadow_map, shadow_sampler,
+                vec2f(u.y, v.x), index, depth) +
+            q.wx.z * textureSampleCompareLevel(shadow_map, shadow_sampler,
+                vec2f(u.z, v.x), index, depth);
+        let r1 = q.wx.x * textureSampleCompareLevel(shadow_map, shadow_sampler,
+                vec2f(u.x, v.y), index, depth) +
+            q.wx.y * textureSampleCompareLevel(shadow_map, shadow_sampler,
+                vec2f(u.y, v.y), index, depth) +
+            q.wx.z * textureSampleCompareLevel(shadow_map, shadow_sampler,
+                vec2f(u.z, v.y), index, depth);
+        let r2 = q.wx.x * textureSampleCompareLevel(shadow_map, shadow_sampler,
+                vec2f(u.x, v.z), index, depth) +
+            q.wx.y * textureSampleCompareLevel(shadow_map, shadow_sampler,
+                vec2f(u.y, v.z), index, depth) +
+            q.wx.z * textureSampleCompareLevel(shadow_map, shadow_sampler,
+                vec2f(u.z, v.z), index, depth);
+        return q.wy.x * r0 + q.wy.y * r1 + q.wy.z * r2;
     }
 
     let t = shadow_filter_taps(uv, texel, view.shadow_config.y);
@@ -199,6 +225,34 @@ fn shadow_factor(world: vec3f, normal: vec3f) -> f32 {
     let span = max(view.shadow_params.y - view.shadow_params.x, 1e-4);
     let fade = clamp((depth - view.shadow_params.x) / span, 0.0, 1.0);
     return mix(shadow, 1.0, fade);
+}
+
+// Fraction of the first directional light that reaches the far side of a thin surface, which the
+// back lobe of a diffuse transmission scatters toward the eye: the light is diffused on its way
+// through, so one bilinear comparison in the first cascade whose box holds the position stands in
+// for the filter and the blend into the next cascade of shadow_factor, with its offset and fade.
+fn shadow_factor_back(world: vec3f, normal: vec3f) -> f32 {
+    let count = view.shadow_config.x;
+    let depth = -(view.view * vec4f(world, 1.0)).z;
+    if (count == 0u || depth >= view.shadow_params.y) {
+        return 1.0;
+    }
+
+    let l = shadow_light();
+    for (var i = 0u; i < count; i++) {
+        if (shadow_box_edge(i, world) >= 0.0) {
+            let offset = world + shadow_normal_offset(normal, l, view.shadow_offset[i]);
+            let p = view.shadow_matrix[i] * vec4f(offset, 1.0);
+            let uv = p.xy * vec2f(0.5, -0.5) + vec2f(0.5);
+            let shadow = textureSampleCompareLevel(shadow_map, shadow_sampler, uv, i,
+                p.z + view.shadow_bias[i]);
+            let span = max(view.shadow_params.y - view.shadow_params.x, 1e-4);
+            let fade = clamp((depth - view.shadow_params.x) / span, 0.0, 1.0);
+            return mix(shadow, 1.0, fade);
+        }
+    }
+
+    return 1.0;
 }
 
 // Fraction of the first directional light that reaches a point in a medium, such as a fog

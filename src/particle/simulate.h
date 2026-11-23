@@ -94,6 +94,25 @@
 /** Blend of the drag curve */
 #define BOX_PARTICLE_MOTION_DRAG (3u)
 
+/** First of the five hash streams of a ParticleCard: three of its initial orientation and two
+ * of the axis it turns around */
+#define BOX_PARTICLE_STREAM_CARD (29u)
+
+/** Card words, one uint32_t per particle of a ParticleCard pool, one pool slot holds */
+#define BOX_PARTICLE_CARD_WORDS (8u)
+
+/** Speed in world units per second, times the world scale, below which a card on the ground
+ * plane comes to rest */
+#define BOX_PARTICLE_CARD_REST_SPEED (0.5f)
+
+/** Height in world units, times the world scale, above the ground plane within which a card is
+ * on it */
+#define BOX_PARTICLE_CARD_REST_HEIGHT (0.01f)
+
+/** Rate per second at which a card at rest eases to lie flat, the rate of exponential decay of
+ * the angle between its normal and the vertical */
+#define BOX_PARTICLE_CARD_REST_RATE (8.0f)
+
 /** Rows of the curve table a vector curve of ParticleMotion takes, four floats per sample: the
  * velocity x, y and z and the speed, or the force x, y and z and the drag */
 #define BOX_PARTICLE_VECTOR_ROWS (4)
@@ -597,6 +616,170 @@ static inline void box_particle_integrate(
         velocity[i] += (forces->acceleration[i] + wander[i] + m->force[i]) * delta;
         velocity[i] = forces->wind[i] + (velocity[i] - forces->wind[i]) * keep;
         position[i] += (velocity[i] * m->speed + m->velocity[i] + forces->drift[i]) * delta;
+    }
+}
+
+/** Spacing in gust patches across the wind of the samples a band of the gust field averages, as
+ * WIND_BAND_SPACING in wind_gust.wgsl */
+#define BOX_PARTICLE_WIND_BAND_SPACING (1.1f)
+
+/** Contrast that restores the spread of the averaged band, as WIND_BAND_CONTRAST */
+#define BOX_PARTICLE_WIND_BAND_CONTRAST (2.2f)
+
+/** Detail patches per gust patch, a whole number so the detail repeats with the field, as
+ * WIND_DETAIL */
+#define BOX_PARTICLE_WIND_DETAIL (4.0f)
+
+/** How far the detail moves the gust field, as WIND_DETAIL_AMOUNT */
+#define BOX_PARTICLE_WIND_DETAIL_AMOUNT (0.15f)
+
+/** Value in 0..1 of a lattice point of the gust field of the Wind, which repeats every
+ * BOX_WIND_GUST_PERIOD points, as wind_hash in wind_gust.wgsl.
+ *
+ * @param x Lattice X
+ * @param z Lattice Z
+ * @return The value
+ */
+static inline float box_particle_wind_hash(
+    int32_t x,
+    int32_t z)
+{
+    int32_t period = (int32_t)BOX_WIND_GUST_PERIOD;
+    uint32_t px = (uint32_t)(((x % period) + period) % period);
+    uint32_t pz = (uint32_t)(((z % period) + period) % period);
+    uint32_t h = px * 374761393u + pz * 668265263u + 1013904223u;
+    h = (h ^ (h >> 13u)) * 1274126177u;
+    h = h ^ (h >> 16u);
+
+    return (float)(h & 0xFFFFu) / 65535.0f;
+}
+
+/** Linear blend of two values as mix of WGSL: a * (1 - t) + b * t.
+ *
+ * @param a The value at 0
+ * @param b The value at 1
+ * @param t The weight of b
+ * @return The blend
+ */
+static inline float box_particle_wind_mix(
+    float a,
+    float b,
+    float t)
+{
+    return a * (1.0f - t) + b * t;
+}
+
+/** Smooth value noise of the gust field in 0..1 at a point in gust patches, as wind_noise in
+ * wind_gust.wgsl.
+ *
+ * @param u The point
+ * @return The noise
+ */
+static inline float box_particle_wind_noise(
+    const float u[2])
+{
+    float ix = floorf(u[0]), iz = floorf(u[1]);
+    float fx = u[0] - ix, fz = u[1] - iz;
+    int32_t cx = (int32_t)ix, cz = (int32_t)iz;
+    float sx = fx * fx * (3.0f - 2.0f * fx), sz = fz * fz * (3.0f - 2.0f * fz);
+    float a = box_particle_wind_hash(cx, cz);
+    float b = box_particle_wind_hash(cx + 1, cz);
+    float d = box_particle_wind_hash(cx, cz + 1);
+    float e = box_particle_wind_hash(cx + 1, cz + 1);
+
+    return box_particle_wind_mix(box_particle_wind_mix(a, b, sx),
+        box_particle_wind_mix(d, e, sx), sz);
+}
+
+/** Gust field in 0..1 at a point in gust patches for a wind that blows along a normalized
+ * direction, as wind_band in wind_gust.wgsl: the noise averaged across the wind into a band of
+ * BOX_PARTICLE_WIND_BAND_SPACING spaced samples, raised back by BOX_PARTICLE_WIND_BAND_CONTRAST
+ * and eased, plus a finer detail of BOX_PARTICLE_WIND_DETAIL patches per gust patch.
+ *
+ * @param u The point
+ * @param direction The normalized world X and Z the wind blows toward
+ * @return The field
+ */
+static inline float box_particle_wind_band(
+    const float u[2],
+    const float direction[2])
+{
+    float ax = -direction[1] * BOX_PARTICLE_WIND_BAND_SPACING;
+    float az = direction[0] * BOX_PARTICLE_WIND_BAND_SPACING;
+    float sum = 0.0f;
+    int32_t i;
+    for (i = 0; i < 4; i ++) {
+        float k = (float)i - 1.5f;
+        float p[2] = {u[0] + k * ax, u[1] + k * az};
+        sum += box_particle_wind_noise(p);
+    }
+
+    float b = 0.5f + BOX_PARTICLE_WIND_BAND_CONTRAST * (0.25f * sum - 0.5f);
+    b = b < 0.0f ? 0.0f : (b > 1.0f ? 1.0f : b);
+    float band = b * b * (3.0f - 2.0f * b);
+    float d[2] = {u[0] * BOX_PARTICLE_WIND_DETAIL + 7.0f, u[1] * BOX_PARTICLE_WIND_DETAIL + 13.0f};
+    float result = band + 2.0f * BOX_PARTICLE_WIND_DETAIL_AMOUNT *
+        (box_particle_wind_noise(d) - 0.5f);
+
+    return result < 0.0f ? 0.0f : (result > 1.0f ? 1.0f : result);
+}
+
+/** Gust factor between 1 - gust and 1 + gust that multiplies the wind speed at the world X and Z
+ * of a point, as wind_gust in wind_gust.wgsl, the field the WindSway of the meshes reads.
+ *
+ * @param x World X
+ * @param z World Z
+ * @param offset Wrapped world X and Z offset of the gust field
+ * @param direction The normalized world X and Z the wind blows toward
+ * @param frequency 1 over the gust scale
+ * @param gust The gust, 0..1
+ * @return The factor
+ */
+static inline float box_particle_wind_gust(
+    float x,
+    float z,
+    const float offset[2],
+    const float direction[2],
+    float frequency,
+    float gust)
+{
+    float u[2] = {(x - offset[0]) * frequency, (z - offset[1]) * frequency};
+
+    return 1.0f + gust * (2.0f * box_particle_wind_band(u, direction) - 1.0f);
+}
+
+/** The world velocity the Wind pulls a particle at a world position toward, added to the wind
+ * of its forces for the step, as particle_global_wind in particle_sim.wgsl: the X and Z
+ * velocity of the global wind of its block times the gust factor there.
+ *
+ * @param wind The global_wind member of the block: X and Z velocity and the gust
+ * @param offset Wrapped world X and Z offset of the gust field, the w of wander and inherit of
+ *               the block
+ * @param frequency 1 over the gust scale, the w of turbulence of the block, 0 when the Wind
+ *                  does not pull the particles
+ * @param world World position of the particle
+ * @param out Receives the velocity, 0 when the Wind does not pull the particles
+ */
+static inline void box_particle_global_wind(
+    const float wind[3],
+    const float offset[2],
+    float frequency,
+    const float world[3],
+    float out[3])
+{
+    out[0] = out[1] = out[2] = 0.0f;
+    if (frequency != 0.0f) {
+        float speed = sqrtf(wind[0] * wind[0] + wind[1] * wind[1]);
+        float direction[2] = {1.0f, 0.0f};
+        if (speed > 0.0f) {
+            direction[0] = wind[0] / speed;
+            direction[1] = wind[1] / speed;
+        }
+
+        float factor = box_particle_wind_gust(
+            world[0], world[2], offset, direction, frequency, wind[2]);
+        out[0] = wind[0] * factor;
+        out[2] = wind[1] * factor;
     }
 }
 
@@ -1534,6 +1717,245 @@ static inline float box_particle_stretch(
     float speed)
 {
     return 1.0f + fmaxf(stretch, 0.0f) * fmaxf(speed, 0.0f);
+}
+
+/** Get the pool slots that hold the card words of a ParticleCard pool, one word per particle,
+ * after its particle slots: a card word is 0 while the card is in the air and 1 plus the age in
+ * microseconds at which it came to rest on the ground plane once it rests.
+ *
+ * @param capacity Particle slots of the pool
+ * @return The slots of the card words
+ */
+static inline uint32_t box_particle_card_slots(
+    uint32_t capacity)
+{
+    return (capacity + BOX_PARTICLE_CARD_WORDS - 1u) / BOX_PARTICLE_CARD_WORDS;
+}
+
+/** Get the card word of the particle in a slot of a ParticleCard pool, word i % 8 of the slot
+ * cards + i / 8 of the pool, which is the uint32_t at (cards + i / 8) * 8 + i % 8 as the eight
+ * words of box_particle_t lie in a slot in order.
+ *
+ * @param pool The slots of the pool as uint32_t, eight per slot
+ * @param cards Slot of the card words from the start of the pool, its particle slots
+ * @param i Slot of the particle
+ * @return The card word
+ */
+static inline uint32_t box_particle_card_word(
+    const uint32_t *pool,
+    uint32_t cards,
+    uint32_t i)
+{
+    return pool[(size_t)(cards + i / BOX_PARTICLE_CARD_WORDS) * BOX_PARTICLE_CARD_WORDS +
+        i % BOX_PARTICLE_CARD_WORDS];
+}
+
+/** Multiply two quaternions, x, y, z and w.
+ *
+ * @param a The left quaternion
+ * @param b The right quaternion, applied first
+ * @param out Receives a b, may alias a or b
+ */
+static inline void box_particle_quat_mul(
+    const float *a,
+    const float *b,
+    float *out)
+{
+    float r[4] = {
+        a[3] * b[0] + a[0] * b[3] + a[1] * b[2] - a[2] * b[1],
+        a[3] * b[1] - a[0] * b[2] + a[1] * b[3] + a[2] * b[0],
+        a[3] * b[2] + a[0] * b[1] - a[1] * b[0] + a[2] * b[3],
+        a[3] * b[3] - a[0] * b[0] - a[1] * b[1] - a[2] * b[2]
+    };
+    int32_t i;
+    for (i = 0; i < 4; i ++) {
+        out[i] = r[i];
+    }
+}
+
+/** Rotate a vector by a unit quaternion: v + 2 w (q x v) + 2 q x (q x v).
+ *
+ * @param q The quaternion, x, y, z and w
+ * @param v The vector
+ * @param out Receives the rotated vector, may alias v
+ */
+static inline void box_particle_quat_rotate(
+    const float *q,
+    const float *v,
+    float *out)
+{
+    float t[3] = {
+        2.0f * (q[1] * v[2] - q[2] * v[1]),
+        2.0f * (q[2] * v[0] - q[0] * v[2]),
+        2.0f * (q[0] * v[1] - q[1] * v[0])
+    };
+    float r[3] = {
+        v[0] + q[3] * t[0] + q[1] * t[2] - q[2] * t[1],
+        v[1] + q[3] * t[1] + q[2] * t[0] - q[0] * t[2],
+        v[2] + q[3] * t[2] + q[0] * t[1] - q[1] * t[0]
+    };
+    int32_t i;
+    for (i = 0; i < 3; i ++) {
+        out[i] = r[i];
+    }
+}
+
+/** Draw the initial orientation of a card, uniform over the rotations, by Shoemake's method
+ * from the first three of its BOX_PARTICLE_STREAM_CARD streams.
+ *
+ * @param seed The seed of the emitter
+ * @param index The spawn index of the particle
+ * @param out Receives the unit quaternion, x, y, z and w
+ */
+static inline void box_particle_card_orientation(
+    uint32_t seed,
+    uint32_t index,
+    float *out)
+{
+    float u0 = box_particle_unit(box_particle_hash(seed, index, BOX_PARTICLE_STREAM_CARD));
+    float u1 = box_particle_unit(box_particle_hash(seed, index, BOX_PARTICLE_STREAM_CARD + 1u));
+    float u2 = box_particle_unit(box_particle_hash(seed, index, BOX_PARTICLE_STREAM_CARD + 2u));
+    float a = sqrtf(1.0f - u0), b = sqrtf(u0);
+    float p = 6.28318530718f * u1, r = 6.28318530718f * u2;
+    out[0] = a * sinf(p);
+    out[1] = a * cosf(p);
+    out[2] = b * sinf(r);
+    out[3] = b * cosf(r);
+}
+
+/** Draw the world axis a card turns around, uniform over the sphere, from the last two of its
+ * BOX_PARTICLE_STREAM_CARD streams.
+ *
+ * @param seed The seed of the emitter
+ * @param index The spawn index of the particle
+ * @param out Receives the unit axis
+ */
+static inline void box_particle_card_axis(
+    uint32_t seed,
+    uint32_t index,
+    float *out)
+{
+    float u0 = box_particle_unit(box_particle_hash(seed, index, BOX_PARTICLE_STREAM_CARD + 3u));
+    float u1 = box_particle_unit(box_particle_hash(seed, index, BOX_PARTICLE_STREAM_CARD + 4u));
+    float y = 1.0f - 2.0f * u0;
+    float ring = sqrtf(fmaxf(0.0f, 1.0f - y * y));
+    float phi = 6.28318530718f * u1;
+    out[0] = ring * cosf(phi);
+    out[1] = y;
+    out[2] = ring * sinf(phi);
+}
+
+/** Turn an orientation around a world axis.
+ *
+ * @param q The orientation, a unit quaternion
+ * @param axis The unit world axis
+ * @param radians The angle
+ * @param out Receives the turned orientation, may alias q
+ */
+static inline void box_particle_card_turn(
+    const float *q,
+    const float *axis,
+    float radians,
+    float *out)
+{
+    float s = sinf(0.5f * radians);
+    float r[4] = { axis[0] * s, axis[1] * s, axis[2] * s, cosf(0.5f * radians) };
+    box_particle_quat_mul(r, q, out);
+}
+
+/** Get how far a card at rest has eased toward lying flat.
+ *
+ * @param seconds Seconds since it came to rest
+ * @return The ease, 0 when it came to rest to 1
+ */
+static inline float box_particle_card_ease(
+    float seconds)
+{
+    return 1.0f - expf(-BOX_PARTICLE_CARD_REST_RATE * fmaxf(seconds, 0.0f));
+}
+
+/** Ease a card toward lying flat: turn its normal, the z axis of the card, by a share of the
+ * angle to the vertical on the side it faces, around the horizontal axis between the two, so
+ * the card keeps its heading.
+ *
+ * @param q The orientation, a unit quaternion
+ * @param ease Share of the angle, 0 to 1 for flat
+ * @param out Receives the orientation, may alias q
+ */
+static inline void box_particle_card_flat(
+    const float *q,
+    float ease,
+    float *out)
+{
+    static const float z[3] = {0, 0, 1};
+    float n[3], axis[3];
+    int32_t i;
+    box_particle_quat_rotate(q, z, n);
+    float up = n[1] >= 0.0f ? 1.0f : -1.0f;
+    float len = sqrtf(n[0] * n[0] + n[2] * n[2]);
+    if (len < 1e-6f) {
+        for (i = 0; i < 4; i ++) {
+            out[i] = q[i];
+        }
+    } else {
+        axis[0] = -n[2] * up / len;
+        axis[1] = 0.0f;
+        axis[2] = n[0] * up / len;
+        float angle = atan2f(len, fabsf(n[1]));
+        box_particle_card_turn(q, axis, angle * ease, out);
+    }
+}
+
+/** Get the orientation of a card: its initial orientation turned around its axis by its angle,
+ * or once it rests, turned by its angle when it came to rest and eased toward lying flat.
+ *
+ * @param seed The seed of the emitter
+ * @param index The spawn index of the particle
+ * @param radians Angle around its axis at its age, from box_particle_rotation, used while it is
+ *        in the air
+ * @param landed Angle around its axis at the age it came to rest, used once it rests
+ * @param rested Seconds since it came to rest, below 0 while it is in the air
+ * @param out Receives the unit quaternion, x, y, z and w
+ */
+static inline void box_particle_card(
+    uint32_t seed,
+    uint32_t index,
+    float radians,
+    float landed,
+    float rested,
+    float *out)
+{
+    float q[4], axis[3];
+    box_particle_card_orientation(seed, index, q);
+    box_particle_card_axis(seed, index, axis);
+    if (rested < 0.0f) {
+        box_particle_card_turn(q, axis, radians, out);
+    } else {
+        box_particle_card_turn(q, axis, landed, q);
+        box_particle_card_flat(q, box_particle_card_ease(rested), out);
+    }
+}
+
+/** Check whether a card in the air comes to rest after its step: on the ground plane, within
+ * BOX_PARTICLE_CARD_REST_HEIGHT of it, and slower than BOX_PARTICLE_CARD_REST_SPEED.
+ *
+ * @param mode Ground collision mode, only BOX_PARTICLE_GROUND_BOUNCE has cards rest
+ * @param y World height of the card
+ * @param speed World speed of its stored velocity
+ * @param height World height of the ground plane
+ * @param scale Uniform world scale of the emitter
+ * @return Whether it rests
+ */
+static inline bool box_particle_card_rests(
+    uint32_t mode,
+    float y,
+    float speed,
+    float height,
+    float scale)
+{
+    return mode == BOX_PARTICLE_GROUND_BOUNCE &&
+        y - height <= BOX_PARTICLE_CARD_REST_HEIGHT * scale &&
+        speed < BOX_PARTICLE_CARD_REST_SPEED * scale;
 }
 
 /** Sample points over the surface of a mesh, area weighted, as the table of an EmitterMesh.

@@ -121,10 +121,12 @@ uint8_t box_draws_blend(
 
 bool box_draws_scene_cutout(
     const AlphaCutoff *cutoff,
+    const VertexReveal *reveal,
     const Shape2D *shape2d,
     uint32_t features)
 {
-    return box_draws_cutout(cutoff, shape2d) && (features & BOX_RENDER_FEATURE_ALPHA_CUTOUT);
+    return (box_draws_cutout(cutoff, shape2d) || (reveal && !shape2d)) &&
+        (features & BOX_RENDER_FEATURE_ALPHA_CUTOUT);
 }
 
 uint8_t box_draws_scene_blend(
@@ -151,6 +153,21 @@ static uint32_t box_draws_unorm16(
     float value)
 {
     return (uint32_t)(glm_clamp(value, 0.0f, 1.0f) * 65535.0f + 0.5f);
+}
+
+/** A value as a half float holds it (pack2x16float of the shaders): rounded to 11 significant
+ * bits, for a normal half float.
+ *
+ * @param value The value
+ * @return The rounded value
+ */
+static double box_draws_half_round(
+    float value)
+{
+    int exponent;
+    double m = frexp((double)value, &exponent);
+
+    return ldexp(round(m * 2048.0) / 2048.0, exponent);
 }
 
 void box_draws_color_pack(
@@ -373,6 +390,21 @@ float box_draws_water_transmittance(
     return glm_clamp(result, 0.0f, 1.0f);
 }
 
+float box_draws_water_absorption(
+    float absorption,
+    float ray_length,
+    float visibility)
+{
+    float result = 1.0f;
+    if (isfinite(ray_length)) {
+        float a = glm_clamp(absorption, 1e-6f, 1.0f);
+        float e = glm_max(ray_length, 0.0f) / glm_max(visibility, BOX_RENDER_WATER_MIN);
+        result = exp2f(e * log2f(a));
+    }
+
+    return glm_clamp(result, 0.0f, 1.0f);
+}
+
 float box_draws_water_foam(
     float d,
     float foam_width,
@@ -397,13 +429,17 @@ float box_draws_water_foam(
  * depth and visibility at least BOX_RENDER_WATER_MIN, the other floats when finite (foam width
  * and ripple scale when positive), the ripple offset wrapped at the time; 0 without one.
  *
+ * The set of its WaterWaves in the wave table goes into the flags.
+ *
  * @param out The record
  * @param water The component, NULL for none
+ * @param waves Set of its WaterWaves in the wave table, 0 for none
  * @param time Total render time the ripple offset is computed at
  */
 static void box_draws_water_pack(
     box_render_material_t *out,
     const Water *water,
+    uint32_t waves,
     double time)
 {
     out->water_ripple_offset[0] = 0.0f;
@@ -439,6 +475,9 @@ static void box_draws_water_pack(
     out->water_ripple_scale = isfinite(water->ripple_scale) && water->ripple_scale > 0.0f
         ? water->ripple_scale : 0.0f;
     out->water_flags = water->foam_texture ? BOX_RENDER_WATER_FOAM_TEXTURE : 0u;
+    out->water_flags |= ((uint32_t)water->absorption.r | ((uint32_t)water->absorption.g << 8) |
+        ((uint32_t)water->absorption.b << 16)) << BOX_RENDER_WATER_ABSORPTION_SHIFT;
+    out->water_flags |= (waves & BOX_RENDER_WATER_WAVES_MASK) << BOX_RENDER_WATER_WAVES_SHIFT;
     if (out->water_ripple_scale > 0.0f) {
         TextureScroll ripple = {
             .velocity = { water->ripple_velocity[0], water->ripple_velocity[1] }
@@ -449,6 +488,171 @@ static void box_draws_water_pack(
         out->water_ripple_offset[1] = offsets[1];
     }
 
+done:
+    return;
+}
+
+/** Pack the scatter of a Water into the scatter words of its record, which hold the Sheen and
+ * DiffuseTransmission of a record without Water: its strength when positive and finite and its
+ * color display encoded; both 0 without a strength, which draws as without scatter.
+ *
+ * @param out The record
+ * @param water The component
+ */
+static void box_draws_water_scatter_pack(
+    box_render_material_t *out,
+    const Water *water)
+{
+    out->water_scatter_color = 0u;
+    out->water_scatter = 0.0f;
+    if (isfinite(water->scatter) && water->scatter > 0.0f) {
+        out->water_scatter = water->scatter;
+        out->water_scatter_color = (uint32_t)water->scatter_color.r |
+            ((uint32_t)water->scatter_color.g << 8) | ((uint32_t)water->scatter_color.b << 16);
+    }
+}
+
+float box_draws_water_shore_phase(
+    float period,
+    double time)
+{
+    float result = 0.0f;
+    if (isfinite(period) && period > 0.0f && isfinite(time)) {
+        double v = fmod(time / (double)period, 1.0);
+        if (v < 0.0) {
+            v += 1.0;
+        }
+
+        result = (float)v;
+        if (result >= 1.0f) {
+            result = 0.0f;
+        }
+    }
+
+    return result;
+}
+
+/** Pack the shore waves of a Water into the shore words of its record, which hold the
+ * DiffuseTransmission thickness and blur of a record without Water.
+ *
+ * With a finite shore_period above 0 and a positive, finite shore_reach they are its phase at
+ * the time and the reach; both 0 otherwise, which draws as without shore waves.
+ *
+ * @param out The record
+ * @param water The component
+ * @param time Total render time the phase is computed at
+ */
+static void box_draws_water_shore_pack(
+    box_render_material_t *out,
+    const Water *water,
+    double time)
+{
+    out->water_shore_phase = 0.0f;
+    out->water_shore_reach = 0.0f;
+    if (isfinite(water->shore_period) && water->shore_period > 0.0f &&
+        isfinite(water->shore_reach) && water->shore_reach > 0.0f)
+    {
+        out->water_shore_reach = water->shore_reach;
+        out->water_shore_phase = box_draws_water_shore_phase(water->shore_period, time);
+    }
+}
+
+float box_draws_water_flow_phase(
+    double time)
+{
+    float result = 0.0f;
+    if (isfinite(time)) {
+        double v = fmod(time / BOX_RENDER_WATER_FLOW_PERIOD, 1.0);
+        if (v < 0.0) {
+            v += 1.0;
+        }
+
+        result = (float)v;
+        if (result >= 1.0f) {
+            result = 0.0f;
+        }
+    }
+
+    return result;
+}
+
+/** Pack the WaterFlow of a Water into the flow words of its record, which hold the Distortion of
+ * a record without Water.
+ *
+ * With WaterFlow.textures they are its velocity (0 when not finite), the phase of the flow
+ * mapping at the time and BOX_RENDER_WATER_FLOW_TEXTURES; 0 without one or without textures.
+ *
+ * @param out The record
+ * @param flow The WaterFlow of the Water, NULL for none
+ * @param time Total render time the phase is computed at
+ */
+static void box_draws_water_flow_pack(
+    box_render_material_t *out,
+    const WaterFlow *flow,
+    double time)
+{
+    out->water_flow[0] = 0.0f;
+    out->water_flow[1] = 0.0f;
+    out->water_flow_phase = 0.0f;
+    out->water_flow_flags = 0u;
+    if (!flow || !flow->textures) {
+        goto done;
+    }
+
+    out->water_flow[0] = isfinite(flow->velocity[0]) ? flow->velocity[0] : 0.0f;
+    out->water_flow[1] = isfinite(flow->velocity[1]) ? flow->velocity[1] : 0.0f;
+    out->water_flow_phase = box_draws_water_flow_phase(time);
+    out->water_flow_flags = BOX_RENDER_WATER_FLOW_TEXTURES;
+done:
+    return;
+}
+
+/** Pack a WaterCaustics into the caustics words of a Water record, which hold the Fresnel of a
+ * record without Water: its strength when positive and finite, the inverse of its scale and its
+ * depth (at least BOX_RENDER_CAUSTICS_MIN), its water frame and its phase at the time.
+ *
+ * Without one or without a strength the words are 0, which draws as without one.
+ *
+ * @param out The record
+ * @param caustics The component, NULL for none
+ * @param frame Offset of its water frame in cells, wrapped
+ * @param origin Absolute position of the local origin, which the frame moves back by
+ * @param time Total render time the phase is computed at
+ */
+static void box_draws_water_caustics_pack(
+    box_render_material_t *out,
+    const WaterCaustics *caustics,
+    const float *frame,
+    const double *origin,
+    double time)
+{
+    out->caustics_offset[0] = 0.0f;
+    out->caustics_offset[1] = 0.0f;
+    out->caustics_strength = 0.0f;
+    out->caustics_frequency = 0.0f;
+    out->caustics_depth = 0.0f;
+    out->caustics_phase = 0.0f;
+    if (!caustics || !isfinite(caustics->strength) || caustics->strength <= 0.0f) {
+        goto done;
+    }
+
+    out->caustics_strength = caustics->strength;
+    out->caustics_frequency = box_draws_water_caustics_frequency(caustics);
+    out->caustics_depth = isfinite(caustics->depth) && caustics->depth > BOX_RENDER_CAUSTICS_MIN
+        ? caustics->depth : BOX_RENDER_CAUSTICS_MIN;
+    out->caustics_offset[0] = isfinite(frame[0]) ? frame[0] : 0.0f;
+    out->caustics_offset[1] = isfinite(frame[1]) ? frame[1] : 0.0f;
+    if (origin[0] != 0.0 || origin[2] != 0.0) {
+        double frequency = (double)out->caustics_frequency;
+        out->caustics_offset[0] = box_render_origin_wrap_float(
+            (double)out->caustics_offset[0] - origin[0] * frequency,
+            BOX_RENDER_CAUSTICS_PERIOD);
+        out->caustics_offset[1] = box_render_origin_wrap_float(
+            (double)out->caustics_offset[1] - origin[2] * frequency,
+            BOX_RENDER_CAUSTICS_PERIOD);
+    }
+
+    out->caustics_phase = box_draws_water_caustics_phase(caustics->speed, time);
 done:
     return;
 }
@@ -562,6 +766,79 @@ void box_draws_texture_scroll(
     out[3] = scroll ? box_draws_scroll_axis(scroll->normal_velocity[1], time) : 0.0f;
 }
 
+/** Convert a positive float to a half float, rounded toward zero, the largest half for one
+ * above its range and 0 for one below it.
+ *
+ * @param value The value, positive and finite
+ * @return The bits of the half float
+ */
+static uint32_t box_draws_half(
+    float value)
+{
+    uint32_t bits, result = 0u;
+    ecs_os_memcpy(&bits, &value, ECS_SIZEOF(bits));
+    int32_t exponent = (int32_t)((bits >> 23) & 0xFFu) - 127 + 15;
+    uint32_t mantissa = (bits & 0x7FFFFFu) | 0x800000u;
+    if (exponent >= 31) {
+        result = 0x7BFFu;
+    } else if (exponent > 0) {
+        result = ((uint32_t)exponent << 10) | ((bits >> 13) & 0x3FFu);
+    } else if (exponent > -10) {
+        result = mantissa >> (14 - exponent);
+    }
+
+    return result;
+}
+
+/** Pack a VertexReveal into the reveal bits of the flags and the threshold of a material record,
+ * after the wind fields, which set the flags.
+ *
+ * @param out The record
+ * @param reveal The VertexReveal, NULL for none
+ */
+static void box_draws_reveal_pack(
+    box_render_material_t *out,
+    const VertexReveal *reveal)
+{
+    out->reveal_threshold = 0.0f;
+    if (!reveal || reveal->channel < 0 || reveal->channel > 7) {
+        goto done;
+    }
+
+    float softness = isfinite(reveal->softness) && reveal->softness > 0.0f
+        ? reveal->softness : 0.0f;
+    out->reveal_threshold = isfinite(reveal->threshold) ? reveal->threshold : 0.0f;
+    out->flags |= BOX_RENDER_REVEAL_PRESENT |
+        ((uint32_t)reveal->channel << BOX_RENDER_REVEAL_CHANNEL_SHIFT) |
+        (reveal->invert ? BOX_RENDER_REVEAL_INVERT : 0u) |
+        (box_draws_half(softness) << BOX_RENDER_REVEAL_SOFTNESS_SHIFT);
+done:
+    return;
+}
+
+/** Pack a VertexOcclusion into the occlusion bits of the flags and the strength of a material
+ * record, after the wind fields, which set the flags.
+ *
+ * @param out The record
+ * @param occlusion The VertexOcclusion, NULL for none
+ */
+static void box_draws_occlusion_pack(
+    box_render_material_t *out,
+    const VertexOcclusion *occlusion)
+{
+    out->occlusion_strength = 0.0f;
+    if (!occlusion || occlusion->channel < 0 || occlusion->channel > 7) {
+        goto done;
+    }
+
+    out->occlusion_strength = isfinite(occlusion->strength)
+        ? glm_clamp(occlusion->strength, 0.0f, 1.0f) : 0.0f;
+    out->flags |= BOX_RENDER_OCCLUSION_PRESENT |
+        ((uint32_t)occlusion->channel << BOX_RENDER_OCCLUSION_CHANNEL_SHIFT);
+done:
+    return;
+}
+
 void box_draws_material_pack(
     box_render_material_t *out,
     const box_draw_material_t *material)
@@ -602,8 +879,17 @@ void box_draws_material_pack(
         out->normal_offset[1] = 0.0f;
     }
 
-    box_draws_fresnel_pack(out, material->fresnel);
-    box_draws_water_pack(out, material->water, material->time);
+    box_draws_water_pack(out, material->water, material->water_waves, material->time);
+    if (material->water) {
+        box_draws_water_caustics_pack(out, material->caustics, material->caustics_frame,
+            material->origin, material->time);
+    } else {
+        box_draws_fresnel_pack(out, material->fresnel);
+    }
+
+    box_render_wind_pack(out, material->sway, &material->wind);
+    box_draws_reveal_pack(out, material->shape2d ? NULL : material->reveal);
+    box_draws_occlusion_pack(out, material->shape2d ? NULL : material->occlusion);
     out->transmission_factor = transmission ? transmission->transmission_factor : 0.0f;
     out->ior = transmission ? transmission->ior : BOX_MATERIAL_IOR;
     out->thickness_factor = transmission ? glm_max(transmission->thickness_factor, 0.0f) : 0.0f;
@@ -612,19 +898,36 @@ void box_draws_material_pack(
     out->clear_coat = coat && box_draws_unorm16(coat->strength)
         ? box_draws_unorm16(coat->strength) | (box_draws_unorm16(coat->roughness) << 16) : 0u;
     out->anisotropy = box_draws_anisotropy_pack(material->anisotropy);
-    out->sheen = box_draws_sheen_pack(material->sheen);
-    out->diffuse_transmission = box_draws_diffuse_transmission_pack(
-        material->diffuse_transmission);
-    box_draws_distortion_pack(out, material->water ? NULL : material->distortion,
-        transmission, material->time);
-    out->thickness = material->diffuse_transmission &&
-        isfinite(material->diffuse_transmission->thickness) &&
-        material->diffuse_transmission->thickness > 0.0f
-        ? material->diffuse_transmission->thickness : 0.0f;
-    out->diffuse_blur = material->diffuse_transmission &&
-        isfinite(material->diffuse_transmission->blur) &&
-        material->diffuse_transmission->blur > 0.0f
-        ? material->diffuse_transmission->blur : 0.0f;
+    if (material->water) {
+        box_draws_water_scatter_pack(out, material->water);
+    } else {
+        out->sheen = box_draws_sheen_pack(material->sheen);
+        out->diffuse_transmission = box_draws_diffuse_transmission_pack(
+            material->diffuse_transmission);
+    }
+
+    if (material->water) {
+        box_draws_water_flow_pack(out, material->flow, material->time);
+        if (material->spectrum) {
+            out->water_flow_flags |= BOX_RENDER_WATER_FLOW_SPECTRUM;
+        }
+    } else {
+        box_draws_distortion_pack(out, material->distortion, transmission, material->time);
+    }
+
+    if (material->water) {
+        box_draws_water_shore_pack(out, material->water, material->time);
+    } else {
+        out->thickness = material->diffuse_transmission &&
+            isfinite(material->diffuse_transmission->thickness) &&
+            material->diffuse_transmission->thickness > 0.0f
+            ? material->diffuse_transmission->thickness : 0.0f;
+        out->diffuse_blur = material->diffuse_transmission &&
+            isfinite(material->diffuse_transmission->blur) &&
+            material->diffuse_transmission->blur > 0.0f
+            ? material->diffuse_transmission->blur : 0.0f;
+    }
+
     out->mapping = (uint32_t)MappingUv;
     out->mapping_size = 0.0f;
     if (material->mapping && (material->mapping->mode == MappingObject ||
@@ -635,6 +938,21 @@ void box_draws_material_pack(
         out->mapping = (uint32_t)material->mapping->mode |
             (box_draws_unorm16(isfinite(blend) ? blend : 0.0f) << 16);
         out->mapping_size = isfinite(size) && size > 0.0f ? size : 1.0f;
+    }
+
+    if (material->water && material->mapping && out->water_ripple_scale > 0.0f &&
+        (material->mapping->mode == MappingWorld || material->mapping->mode == MappingFrame) &&
+        (material->origin[0] != 0.0 || material->origin[2] != 0.0))
+    {
+        double s = (double)out->mapping_size, rs = box_draws_half_round(out->water_ripple_scale);
+        double u = material->origin[2] / s * (double)out->uv[0];
+        double v = material->origin[0] / s * (double)out->uv[1];
+        u -= box_render_origin_wrap(u, BOX_RENDER_WATER_ORIGIN_PERIOD);
+        v -= box_render_origin_wrap(v, BOX_RENDER_WATER_ORIGIN_PERIOD);
+        out->water_ripple_offset[0] = box_render_origin_wrap_float(
+            (double)out->water_ripple_offset[0] + rs * u, 1.0);
+        out->water_ripple_offset[1] = box_render_origin_wrap_float(
+            (double)out->water_ripple_offset[1] - rs * v, 1.0);
     }
 }
 
@@ -1010,4 +1328,295 @@ bool box_draws_extended(
     }
 done:
     return result;
+}
+
+bool box_draws_terrain(
+    const ecs_world_t *world,
+    ecs_entity_t e)
+{
+    return ecs_id(TerrainTile) && ecs_has(world, e, TerrainTile);
+}
+
+uint32_t box_draws_features(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    ecs_entity_t scene)
+{
+    return box_draws_terrain(world, e) ? box_render_terrain_features(world, scene)
+        : box_render_scene_features(world, scene);
+}
+
+uint32_t box_draws_shader(
+    const ecs_world_t *world,
+    const box_render_draws_t *d,
+    ecs_entity_t e,
+    const box_draw_key_t *key)
+{
+    uint32_t result = BOX_RENDER_SHADER_MESH;
+    if (box_draws_terrain(world, e)) {
+        result = BOX_RENDER_SHADER_TERRAIN;
+    } else if (box_draws_extended(world, d, e, key)) {
+        result = BOX_RENDER_SHADER_MESH_EXTENDED;
+    }
+
+    return result;
+}
+
+/** Clamp a float to a range, a value that is not finite to a fallback.
+ *
+ * @param v The value
+ * @param lo Lower bound
+ * @param hi Upper bound
+ * @param fallback Value of a v that is not finite
+ * @return The clamped value
+ */
+static float box_draws_layer_clamp(
+    float v,
+    float lo,
+    float hi,
+    float fallback)
+{
+    return isfinite(v) ? glm_clamp(v, lo, hi) : fallback;
+}
+
+void box_draws_layer_pack(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    double time,
+    box_render_texture_layer_t *out)
+{
+    const TextureLayer *l = ecs_get(world, e, TextureLayer);
+    const Rgb *rgb = ecs_get(world, e, Rgb);
+    const PbrMaterial *pbr = ecs_get(world, e, PbrMaterial);
+    const PbrTextures *textures = ecs_get(world, e, PbrTextures);
+    const TextureMapping *mapping = ecs_get(world, e, TextureMapping);
+    const TextureTransform *uv = ecs_get(world, e, TextureTransform);
+    const TextureScroll *scroll = ecs_get(world, e, TextureScroll);
+    float scrolled[4];
+    ecs_os_memset_t(out, 0, box_render_texture_layer_t);
+    if (!l) {
+        goto done;
+    }
+
+    out->color[0] = rgb ? box_draws_linear(rgb->r) : 1.0f;
+    out->color[1] = rgb ? box_draws_linear(rgb->g) : 1.0f;
+    out->color[2] = rgb ? box_draws_linear(rgb->b) : 1.0f;
+    out->color[3] = box_draws_layer_clamp(l->amount, 0.0f, 1.0f, 0.0f);
+
+    vec3 dir = { l->direction[0], l->direction[1], l->direction[2] };
+    float len = glm_vec3_norm(dir);
+    if (!isfinite(len) || len < 1e-6f) {
+        glm_vec3_copy((vec3){ 0.0f, 1.0f, 0.0f }, dir);
+    } else {
+        glm_vec3_scale(dir, 1.0f / len, dir);
+    }
+
+    out->direction[0] = dir[0];
+    out->direction[1] = dir[1];
+    out->direction[2] = dir[2];
+    out->direction[3] = box_draws_layer_clamp(l->facing, 0.0f, 1.0f, 0.0f);
+
+    float contrast = isfinite(l->contrast) && l->contrast > 0.0f
+        ? l->contrast : BOX_MATERIAL_LAYER_CONTRAST;
+    out->coverage[0] = box_draws_layer_clamp(l->cavity, -1.0f, 1.0f, 0.0f);
+    out->coverage[1] = 1.0f / contrast;
+    out->coverage[2] = box_draws_layer_clamp(l->normal, 0.0f, 1.0f, 0.0f);
+    out->coverage[3] = box_draws_layer_clamp(l->porosity, 0.0f, 1.0f, 0.0f);
+
+    out->material[0] = pbr
+        ? box_draws_layer_clamp(pbr->roughness, 0.0f, 1.0f, BOX_MATERIAL_ROUGHNESS)
+        : BOX_MATERIAL_ROUGHNESS;
+    out->material[1] = pbr
+        ? box_draws_layer_clamp(pbr->metallic, 0.0f, 1.0f, BOX_MATERIAL_METALLIC)
+        : BOX_MATERIAL_METALLIC;
+    out->material[2] = mapping && isfinite(mapping->size) && mapping->size > 0.0f
+        ? mapping->size : 1.0f;
+    out->material[3] = mapping ? box_draws_layer_clamp(mapping->blend, 0.0f, 1.0f, 0.0f) : 0.0f;
+
+    box_draws_texture_scroll(scroll, time, scrolled);
+    out->transform[0] = uv ? uv->scale_x : 1.0f;
+    out->transform[1] = uv ? uv->scale_y : 1.0f;
+    out->transform[2] = (uv ? uv->offset_x : 0.0f) + scrolled[0];
+    out->transform[3] = (uv ? uv->offset_y : 0.0f) + scrolled[1];
+
+    out->modes[0] = (uint32_t)l->albedo <= LayerMultiply ? (uint32_t)l->albedo : LayerKeep;
+    out->modes[1] = (uint32_t)l->roughness <= LayerMultiply ? (uint32_t)l->roughness : LayerKeep;
+    out->modes[2] = (uint32_t)l->metallic <= LayerMultiply ? (uint32_t)l->metallic : LayerKeep;
+    out->modes[3] = (uint32_t)l->occlusion <= LayerMultiply ? (uint32_t)l->occlusion : LayerKeep;
+
+    out->flags[0] = (textures && textures->albedo ? BOX_RENDER_LAYER_HAS_ALBEDO : 0u) |
+        (textures && textures->orm ? BOX_RENDER_LAYER_HAS_ORM : 0u) |
+        (textures && textures->normal ? BOX_RENDER_LAYER_HAS_NORMAL : 0u) |
+        (l->mask ? BOX_RENDER_LAYER_HAS_MASK : 0u) |
+        (mapping && mapping->mode == MappingUv ? BOX_RENDER_LAYER_UV : 0u);
+    double origin[3];
+    box_render_origin(world, origin);
+    if (!(out->flags[0] & BOX_RENDER_LAYER_UV)) {
+        box_render_origin_mapping(origin, out->material[2], out->transform[0],
+            out->transform[1], out->origin);
+    }
+
+    if (isfinite(l->altitude) && isfinite(l->altitude_fade) && l->altitude_fade != 0.0f) {
+        float altitude = (float)((double)l->altitude - origin[1]);
+        ecs_os_memcpy(&out->flags[1], &altitude, ECS_SIZEOF(float));
+        ecs_os_memcpy(&out->flags[2], &l->altitude_fade, ECS_SIZEOF(float));
+    }
+done:
+    return;
+}
+
+uint64_t box_draws_layers_hash(
+    const box_draw_key_t *key)
+{
+    uint64_t h = 0;
+    int32_t k;
+    for (k = 0; k < BOX_RENDER_LAYERS; k ++) {
+        h = (h ^ (h >> 31)) * 0x9E3779B97F4A7C15ull + key->layers[k];
+    }
+
+    return h;
+}
+
+bool box_draws_key_layered(
+    const box_draw_key_t *key)
+{
+    bool result = false;
+    int32_t k;
+    for (k = 0; k < BOX_RENDER_LAYERS; k ++) {
+        result |= key->layers[k] != 0;
+    }
+
+    return result;
+}
+
+void box_draws_batch_layers(
+    box_render_packet_t *p,
+    const box_render_draws_t *d,
+    const box_draw_batch_t *b,
+    box_render_batch_t *out)
+{
+    uint32_t offset = 0;
+    int32_t k;
+    if (!box_draws_key_layered(&b->key) || !d->world) {
+        goto done;
+    }
+
+    box_render_texture_layers_t *r = box_render_packet_reserve(p,
+        (uint32_t)sizeof(box_render_texture_layers_t), &offset);
+    ecs_os_memset_t(r, 0, box_render_texture_layers_t);
+    r->count = 1;
+    r->quality = d->textures && d->textures->quality
+        ? (uint32_t)d->textures->quality : BOX_TEXTURE_QUALITY_DEFAULT;
+    for (k = 0; k < BOX_RENDER_LAYERS; k ++) {
+        ecs_entity_t layer = b->key.layers[k];
+        if (!layer || !ecs_is_alive(d->world, layer) || !ecs_has(d->world, layer, TextureLayer)) {
+            continue;
+        }
+
+        const PbrTextures *textures = ecs_get(d->world, layer, PbrTextures);
+        const TextureLayer *l = ecs_get(d->world, layer, TextureLayer);
+        r->entities[k] = layer;
+        r->count = (uint32_t)k + 1;
+        box_draws_layer_pack(d->world, layer, d->materials.time, &r->values[k]);
+        if (textures) {
+            r->maps[k][BOX_RENDER_LAYER_ALBEDO] = box_draws_texture_handle(d, textures->albedo);
+            r->maps[k][BOX_RENDER_LAYER_ORM] = box_draws_texture_handle(d, textures->orm);
+            r->maps[k][BOX_RENDER_LAYER_NORMAL] = box_draws_texture_handle(d, textures->normal);
+        }
+
+        r->maps[k][BOX_RENDER_LAYER_MASK] = box_draws_texture_handle(d, l->mask);
+    }
+
+    out->texture_layers = true;
+    out->layers = offset;
+done:
+    return;
+}
+
+void box_draws_batch_textures(
+    const box_render_draws_t *d,
+    const box_draw_batch_t *b,
+    box_render_batch_t *out)
+{
+    int32_t i;
+    for (i = 0; i < BOX_RENDER_TEXTURE_SLOTS; i ++) {
+        ecs_entity_t e = b->key.textures[i];
+        out->textures[i] = e ? box_textures_handle(d->textures, e) : 0;
+        if (e && !out->textures[i] && d->world) {
+            out->textures[i] = box_render_texture_target_handle(d->world, e);
+        }
+    }
+
+    if (b->key.atlas) {
+        out->textures[2] = b->key.atlas;
+    }
+
+    if (b->key.impostor && d->world) {
+        out->textures[0] = box_render_impostor_atlas(d->world, b->key.impostor, ImpostorAlbedo);
+        out->textures[1] = 0;
+        out->textures[2] = box_render_impostor_atlas(d->world, b->key.impostor, ImpostorDepth);
+        out->textures[3] = box_render_impostor_atlas(d->world, b->key.impostor, ImpostorNormal);
+    }
+
+    out->foam = b->key.foam ? box_textures_handle(d->textures, b->key.foam) : 0;
+    if (b->key.foam && !out->foam && d->world) {
+        out->foam = box_render_texture_target_handle(d->world, b->key.foam);
+    }
+
+    out->wrap = b->key.wrap;
+}
+
+void box_draws_impostor_key(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    box_draw_key_t *key)
+{
+    const ImpostorCard *card = ecs_id(ImpostorCard) ? ecs_get(world, e, ImpostorCard) : NULL;
+    if (!card || !card->impostor || key->pipeline == BOX_RENDER_SHADER_SHAPE2D) {
+        goto done;
+    }
+
+    key->impostor = card->impostor;
+    key->pipeline = BOX_RENDER_SHADER_MESH;
+    key->blend = Opaque;
+    key->cutout = true;
+    key->transmissive = false;
+    key->water = false;
+    key->foam = 0;
+    key->texture_blend = false;
+    key->wind = false;
+    key->frame = false;
+    key->bake = false;
+    key->atmosphere = 0;
+    key->wrap = WrapClamp;
+    key->back_face = BackFacePlain;
+    ecs_os_memset_n(key->textures, 0, ecs_entity_t, BOX_RENDER_TEXTURE_SLOTS);
+    ecs_os_memset_n(key->layers, 0, ecs_entity_t, BOX_RENDER_LAYERS);
+done:
+    return;
+}
+
+bool box_draws_range(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    float *out)
+{
+    const DrawRange *range = NULL;
+    ecs_entity_t cur = e;
+    out[0] = out[1] = out[2] = 0.0f;
+    while (cur && !range) {
+        range = ecs_get(world, cur, DrawRange);
+        cur = ecs_get_parent(world, cur);
+    }
+
+    if (range) {
+        out[0] = isfinite(range->near_) && range->near_ > 0.0f ? range->near_ : 0.0f;
+        out[1] = isfinite(range->far_) && range->far_ > 0.0f ? range->far_ : 0.0f;
+        out[2] = isfinite(range->fade) && range->fade > 0.0f ? range->fade : 0.0f;
+        if (out[0] == 0.0f && out[1] == 0.0f) {
+            out[2] = 0.0f;
+        }
+    }
+
+    return out[0] > 0.0f || out[1] > 0.0f;
 }

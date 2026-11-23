@@ -60,6 +60,8 @@ ECS_STRUCT(PathFollow, {
     float distance;      /**< Distance along the path, written by the system, set it to seek */
     PathFollowMode mode; /**< Once stops at the ends, Loop wraps, PingPong reverses */
     bool orient;         /**< Set Rotation so the entity faces along the path tangent */
+    vec3 offset;         /**< Added to the path points, default zero; a WorldOrigin shift
+                          *   moves it with a follower whose Position it moves */
 });
 
 /** Pans the local Rotation about Y back and forth on a sine, as a security camera sweeps.

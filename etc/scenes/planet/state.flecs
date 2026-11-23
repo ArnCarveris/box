@@ -31,13 +31,11 @@ state {
     }
   }
 
-  // What the scene shows: the planet or the star, each with its own values
   export const MODE_PLANET: i32 = 0
   export const MODE_STAR: i32 = 1
   export mut mode: i32 = MODE_PLANET
 
-  // What the panel shows: the page of the planet, of the star or of the background. Showing the
-  // planet or the star sets mode too, the background page keeps the body the stage shows
+  // Showing the planet or star page sets mode too, the background page keeps the shown body
   export const PAGE_PLANET: i32 = 0
   export const PAGE_STAR: i32 = 1
   export const PAGE_BACKGROUND: i32 = 2
@@ -48,11 +46,9 @@ state {
 
   export const SUN_DAY: f32 = 123
 
-  // The planet the scene starts with and resets to
   export const START_KIND: i32 = KIND_GARDEN
   export const START_SEED: i32 = 23
 
-  // The planet the panel edits: its kind, seed, detail and parameters
   export mut kind: i32 = START_KIND
   export mut seed: i32 = START_SEED
   export mut detail: i32 = 2
@@ -69,14 +65,12 @@ state {
   export mut orbit_yaw: f32 = 0
   export mut orbit_pitch: f32 = 0
 
-  // The wheel zoom: the camera distance is the framing distance of the mode times zoom. cam_dist
-  // is the distance the camera shows, eased toward it every frame by logic.flecs
+  // cam_dist eases toward the framing distance of the mode times zoom in logic.flecs
   export mut zoom: f32 = 1
   export mut cam_dist: f32 = 27
 
-  // The values that change the maps of the planet as the planet shows them: logic.flecs copies
-  // them once the evaluations of its graphs are done, so dragging a slider does not queue an
-  // evaluation per step. edits counts the changes, shown_edits the last one shown
+  // logic.flecs copies the edited values here once its graph evaluations are done, so dragging a
+  // slider does not queue an evaluation per step
   export mut edits: i32 = 0
   export mut shown_edits: i32 = 0
   export mut shown_kind: i32 = START_KIND
@@ -89,9 +83,7 @@ state {
   export mut shown_lava: PlanetLava = lava_preset(START_KIND)
   export mut shown_gas: PlanetGas = gas_preset(START_SEED)
 
-  // The star the scene starts with and resets to, and the star the panel edits: its type, seed,
-  // detail and parameters. A star has no evaluation to wait for, so the star shows them as they
-  // change
+  // A star has no evaluation to wait for, so it shows its parameters as they change
   export const STAR_YELLOW: i32 = 1
   export const START_STAR: i32 = STAR_YELLOW
   export const START_STAR_SEED: i32 = 7
@@ -101,17 +93,8 @@ state {
   export mut star_detail: i32 = 2
   export mut star: StarParams = star_preset(START_STAR)
 
-  // The background: the stars of the StarField of the sky (count, brightness of the brightest,
-  // falloff of the brightness, size in pixels, temperature range in kelvin, saturation of their
-  // colors, share along the band and its width in degrees, seed), the nebula and the orientation
-  // of the sky (yaw about the vertical and tilt of the band, in degrees). The milky band of the
-  // faint gas of the whole sky follows the band of the stars.
-  //
-  // The nebula is a patch of the sky: its kind (NEBULA_*), its intensity, its width in degrees
-  // (span, about 5 / 8 of it high), its position in the sky (yaw and pitch in degrees, turned
-  // with the sky), how far its gas is smeared into filaments, how much its dense gas absorbs the
-  // light of its star (pillars), the share of dark dust, the brightness of its star and the
-  // colors of its emission lines: H-alpha, OIII and SII, seed
+  // Angles are in degrees. The nebula span is its width, about 5 / 8 of it high, and pillars is
+  // how much its dense gas absorbs the light of its star
   struct BackgroundParams(
     count: f32, brightness: f32, falloff: f32, size: f32, temperature_min: f32,
     temperature_max: f32, saturation: f32, band: f32, band_width: f32, star_seed: i32,
@@ -119,21 +102,14 @@ state {
     filaments: f32, pillars: f32, dust: f32, glow: f32, halpha: Col, oiii: Col, sii: Col,
     nebula_seed: i32, yaw: f32, tilt: f32)
 
-  // The kinds of nebula: an emission nebula around the star that ionizes it, with pillars and
-  // bright rims, the thin filamentary shell of a supernova remnant without a star, and a
-  // reflection nebula, blue dust lit by a bright star
   export const NEBULA_EMISSION: i32 = 0
   export const NEBULA_REMNANT: i32 = 1
   export const NEBULA_REFLECTION: i32 = 2
 
-  // Value of a parameter of the nebula for a kind: e for an emission nebula, r for a remnant, f
-  // for a reflection nebula
   fn nebula_pick(k: i32, e: f32, r: f32, f: f32) -> f32 {
     k == NEBULA_REMNANT ? r : (k == NEBULA_REFLECTION ? f : e)
   }
 
-  // The parameters of b with the nebula of a kind, its stars, seed, position and orientation
-  // kept
   fn nebula_preset(b: BackgroundParams, k: i32) -> BackgroundParams {
     {
       count: b.count, brightness: b.brightness, falloff: b.falloff, size: b.size,
@@ -156,9 +132,6 @@ state {
     }
   }
 
-  // A dark sky of many faint stars and a few bright ones, a band across the view behind the
-  // body, and an emission nebula (the values of nebula_preset) beside the body in the view the
-  // scene starts with
   fn background_preset() -> BackgroundParams {
     {
       count: 180000, brightness: 8, falloff: 7, size: 1.2, temperature_min: 3200,

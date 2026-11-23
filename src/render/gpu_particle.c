@@ -19,7 +19,7 @@
 #define BOX_GPU_PARTICLE_GROUP (256u)
 
 /** Bytes between the blocks of two pools */
-#define BOX_GPU_PARTICLE_STRIDE (512u)
+#define BOX_GPU_PARTICLE_STRIDE (544u)
 
 _Static_assert(sizeof(box_render_particle_block_t) <= BOX_GPU_PARTICLE_STRIDE,
     "a particle block must fit in its stride");
@@ -32,8 +32,8 @@ _Static_assert(sizeof(box_render_particle_block_t) <= BOX_GPU_PARTICLE_STRIDE,
 #define BOX_GPU_PARTICLE_VERTEX_STORAGE (5u)
 
 /** Storage buffers of the integrate and spawn passes: blocks, particles, spawn slots, mesh
- * tables, the curve table and the work items */
-#define BOX_GPU_PARTICLE_SIM_STORAGE (6u)
+ * tables, the curve table, the work items and the grid and heights of the sampled terrain */
+#define BOX_GPU_PARTICLE_SIM_STORAGE (8u)
 
 /** Bytes between the batch uniforms of two dispatches, the dynamic offset alignment */
 #define BOX_GPU_PARTICLE_BATCH_STRIDE (256u)
@@ -53,6 +53,7 @@ typedef struct box_gpu_particle_draw_t {
     WGPUTextureView texture;        /**< Sprite it reads, white for none */
     bool soft;                      /**< It fades in front of the depth of the view */
     float origin[3];                /**< World position of the emitter */
+    ecs_entity_t terrain;           /**< Sampled terrain its passes bind, 0 for none */
 } box_gpu_particle_draw_t;
 
 /** A dispatch of the simulation: a batch of work items of one entry point */
@@ -60,6 +61,7 @@ typedef struct box_gpu_particle_dispatch_t {
     uint32_t batch;                 /**< Batch uniform of its first work item */
     uint32_t groups;                /**< Workgroups */
     bool spawn;                     /**< The spawn entry point, else integrate */
+    ecs_entity_t terrain;           /**< Sampled terrain of its pools, 0 for none */
 } box_gpu_particle_dispatch_t;
 
 /** The draw group of a sprite, kept until a buffer it binds is replaced */
@@ -86,7 +88,12 @@ typedef struct box_gpu_particle_order_t {
 struct box_gpu_particles_t {
     WGPUBindGroupLayout sim_layout; /**< Blocks, particles, spawn slots, mesh tables, curves,
                                      *   work items and the batch */
-    WGPUPipelineLayout sim_pipeline_layout; /**< Pipeline layout of the compute passes */
+    WGPUPipelineLayout sim_pipeline_layout; /**< Pipeline layout of the compute passes: the
+                                     *   simulation and the sampled terrain, created with the
+                                     *   first compute pipelines */
+    WGPUBuffer no_terrain_params;   /**< Params of no sampled terrain, zero */
+    WGPUBuffer no_terrain_grid;     /**< Grid of no sampled terrain */
+    WGPUBindGroup no_terrain;       /**< The sampled terrain of pools without one */
     WGPUComputePipeline integrate;  /**< Ages and moves the used slots of the pools */
     WGPUComputePipeline spawn;      /**< Writes the spawned particles into their slots */
     int32_t sim_revision;           /**< Revision of the shader the compute pipelines use */
@@ -345,11 +352,6 @@ void box_gpu_particles_init(
 
     s->sim_layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
         &(WGPUBindGroupLayoutDescriptor){ .entryCount = 7, .entries = sim });
-    s->sim_pipeline_layout = wgpuDeviceCreatePipelineLayout(gpu->device,
-        &(WGPUPipelineLayoutDescriptor){
-            .bindGroupLayoutCount = 1,
-            .bindGroupLayouts = &s->sim_layout
-        });
     box_gpu_particle_draw_init(gpu, s);
     s->no_table = box_gpu_particle_buffer(gpu, 32, WGPUBufferUsage_Storage);
     ecs_vec_init_t(NULL, &s->groups, box_gpu_particle_group_t, 0);
@@ -414,6 +416,9 @@ void box_gpu_particles_fini(
     box_gpu_particle_sim_reset(s);
     BOX_GPU_PARTICLE_RELEASE(s->sim_pipeline_layout, wgpuPipelineLayoutRelease);
     BOX_GPU_PARTICLE_RELEASE(s->sim_layout, wgpuBindGroupLayoutRelease);
+    BOX_GPU_PARTICLE_RELEASE(s->no_terrain, wgpuBindGroupRelease);
+    BOX_GPU_PARTICLE_RELEASE(s->no_terrain_params, wgpuBufferRelease);
+    BOX_GPU_PARTICLE_RELEASE(s->no_terrain_grid, wgpuBufferRelease);
     BOX_GPU_PARTICLE_RELEASE(s->draw_pipeline_layout, wgpuPipelineLayoutRelease);
     BOX_GPU_PARTICLE_RELEASE(s->draw_layout, wgpuBindGroupLayoutRelease);
     BOX_GPU_PARTICLE_RELEASE(s->no_depth_group, wgpuBindGroupRelease);
@@ -465,6 +470,47 @@ static WGPUComputePipeline box_gpu_particle_compute(
     return box_gpu_compute_pipeline(gpu, &desc);
 }
 
+/** Create the pipeline layout of the compute passes and the group of no sampled terrain, after
+ * the layout of the sampled terrains exists.
+ *
+ * @param gpu The backend
+ */
+static void box_gpu_particle_sim_layout(
+    box_gpu_t *gpu)
+{
+    box_gpu_particles_t *s = gpu->particles;
+    if (s->sim_pipeline_layout) {
+        goto done;
+    }
+
+    WGPUBindGroupLayout layouts[2] = { s->sim_layout, gpu->terrain_sample_layout };
+    s->sim_pipeline_layout = wgpuDeviceCreatePipelineLayout(gpu->device,
+        &(WGPUPipelineLayoutDescriptor){
+            .bindGroupLayoutCount = 2,
+            .bindGroupLayouts = layouts
+        });
+    s->no_terrain_params = box_gpu_particle_buffer(gpu, sizeof(box_gpu_terrain_sample_params_t),
+        WGPUBufferUsage_Uniform);
+    s->no_terrain_grid = box_gpu_particle_buffer(gpu, 16, WGPUBufferUsage_Storage);
+    WGPUBindGroupEntry entries[4] = {
+        {
+            .binding = 0,
+            .buffer = s->no_terrain_params,
+            .size = sizeof(box_gpu_terrain_sample_params_t)
+        },
+        { .binding = 1, .buffer = s->no_terrain_grid, .size = 16 },
+        { .binding = 2, .buffer = gpu->no_assets, .size = WGPU_WHOLE_SIZE },
+        { .binding = 3, .textureView = gpu->white->linear }
+    };
+    s->no_terrain = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
+        .layout = gpu->terrain_sample_layout,
+        .entryCount = 4,
+        .entries = entries
+    });
+done:
+    return;
+}
+
 /** Make the compute pipelines match the simulation shader; the previous ones stay until every
  * new one exists.
  *
@@ -481,6 +527,7 @@ static bool box_gpu_particle_sim_pipelines(
         goto done;
     }
 
+    box_gpu_particle_sim_layout(gpu);
     WGPUComputePipeline *current[2] = { &s->integrate, &s->spawn };
     WGPUComputePipeline next[2] = {
         box_gpu_particle_compute(gpu, s->sim_pipeline_layout, shader->module, "integrate"),
@@ -693,11 +740,13 @@ static uint32_t box_gpu_particle_work(
  * @param s The particle state
  * @param first The first work item
  * @param spawn Whether they run the spawn entry point
+ * @param terrain Sampled terrain of their pools, 0 for none
  */
 static void box_gpu_particle_dispatches(
     box_gpu_particles_t *s,
     uint32_t first,
-    bool spawn)
+    bool spawn,
+    ecs_entity_t terrain)
 {
     uint32_t end = (uint32_t)ecs_vec_count(&s->work_data) / 2u;
     while (first < end) {
@@ -708,11 +757,55 @@ static void box_gpu_particle_dispatches(
         d->batch = (uint32_t)ecs_vec_count(&s->batch_data) / BOX_GPU_PARTICLE_BATCH_STRIDE;
         d->groups = groups;
         d->spawn = spawn;
+        d->terrain = terrain;
         uint8_t *b = ecs_vec_grow_t(NULL, &s->batch_data, uint8_t,
             (int32_t)BOX_GPU_PARTICLE_BATCH_STRIDE);
         ecs_os_memset(b, 0, (ecs_size_t)BOX_GPU_PARTICLE_BATCH_STRIDE);
         *(uint32_t*)b = first;
         first += groups;
+    }
+}
+
+/** Add the work items and dispatches of an entry point over the draws of the packet, one run of
+ * dispatches per sampled terrain of the draws.
+ *
+ * @param s The particle state
+ * @param spawn Whether they run the spawn entry point over the spawns of the pools, else
+ *              integrate over their used slots
+ */
+static void box_gpu_particle_works(
+    box_gpu_particles_t *s,
+    bool spawn)
+{
+    int32_t i, j, count = ecs_vec_count(&s->draws_of_packet);
+    for (i = 0; i < count; i ++) {
+        const box_gpu_particle_draw_t *d = ecs_vec_get_t(
+            &s->draws_of_packet, box_gpu_particle_draw_t, i);
+        bool seen = false;
+        for (j = 0; j < i && !seen; j ++) {
+            seen = ecs_vec_get_t(&s->draws_of_packet, box_gpu_particle_draw_t, j)->terrain ==
+                d->terrain;
+        }
+
+        if (seen) {
+            continue;
+        }
+
+        uint32_t first = (uint32_t)ecs_vec_count(&s->work_data) / 2u;
+        for (j = i; j < count; j ++) {
+            const box_gpu_particle_draw_t *e = ecs_vec_get_t(
+                &s->draws_of_packet, box_gpu_particle_draw_t, j);
+            if (e->terrain != d->terrain) {
+                continue;
+            }
+
+            const box_render_particle_block_t *b = (const box_render_particle_block_t*)
+                ecs_vec_get_t(&s->block_data, uint8_t,
+                    (int32_t)(e->block * BOX_GPU_PARTICLE_STRIDE));
+            box_gpu_particle_work(s, e->block, spawn ? b->count : e->used);
+        }
+
+        box_gpu_particle_dispatches(s, first, spawn, d->terrain);
     }
 }
 
@@ -768,6 +861,7 @@ static void box_gpu_particle_upload(
             &s->block_data, uint8_t, i * (int32_t)BOX_GPU_PARTICLE_STRIDE);
         *b = pool->block;
         b->base = pool->offset / BOX_RENDER_PARTICLE_SIZE;
+        box_gpu_origin_split(packet->origin, b->origin);
         b->slot_first = (uint32_t)ecs_vec_count(&s->slot_data);
         if (!pool->table || s->tables == s->no_table) {
             b->points = 0;
@@ -789,29 +883,17 @@ static void box_gpu_particle_upload(
         d->block = (uint32_t)i;
         d->used = b->used;
         d->blend = b->blend;
-        d->texture = box_gpu_texture_color(gpu, b->look == ParticleSprite ? pool->texture : 0);
+        d->texture = box_gpu_texture_color(gpu,
+            b->look == ParticleSprite || b->look == ParticleCard ? pool->texture : 0);
         d->soft = b->softness > 0;
         d->origin[0] = b->model[3][0];
         d->origin[1] = b->model[3][1];
         d->origin[2] = b->model[3][2];
+        d->terrain = b->sampled ? pool->terrain : 0;
     }
 
-    for (i = 0; i < ecs_vec_count(&s->draws_of_packet); i ++) {
-        const box_gpu_particle_draw_t *d = ecs_vec_get_t(
-            &s->draws_of_packet, box_gpu_particle_draw_t, i);
-        box_gpu_particle_work(s, d->block, d->used);
-    }
-
-    box_gpu_particle_dispatches(s, 0, false);
-    uint32_t spawns = (uint32_t)ecs_vec_count(&s->work_data) / 2u;
-    for (i = 0; i < ecs_vec_count(&s->draws_of_packet); i ++) {
-        const box_gpu_particle_draw_t *d = ecs_vec_get_t(
-            &s->draws_of_packet, box_gpu_particle_draw_t, i);
-        box_gpu_particle_work(s, d->block, ((const box_render_particle_block_t*)ecs_vec_get_t(
-            &s->block_data, uint8_t, (int32_t)(d->block * BOX_GPU_PARTICLE_STRIDE)))->count);
-    }
-
-    box_gpu_particle_dispatches(s, spawns, true);
+    box_gpu_particle_works(s, false);
+    box_gpu_particle_works(s, true);
     if (!ecs_vec_count(&s->slot_data)) {
         *ecs_vec_append_t(NULL, &s->slot_data, uint32_t) = BOX_RENDER_PARTICLE_NO_SLOT;
     }
@@ -923,7 +1005,11 @@ void box_gpu_particles_simulate(
         const box_gpu_particle_dispatch_t *d = ecs_vec_get_t(
             &s->dispatches, box_gpu_particle_dispatch_t, i);
         uint32_t offset = d->batch * BOX_GPU_PARTICLE_BATCH_STRIDE;
+        WGPUBindGroup terrain = d->terrain
+            ? box_gpu_terrain_sample_group(gpu, d->terrain)
+            : NULL;
         wgpuComputePassEncoderSetBindGroup(pass, 0, group, 1, &offset);
+        wgpuComputePassEncoderSetBindGroup(pass, 1, terrain ? terrain : s->no_terrain, 0, NULL);
         wgpuComputePassEncoderSetPipeline(pass, d->spawn ? s->spawn : s->integrate);
         wgpuComputePassEncoderDispatchWorkgroups(pass, d->groups, 1, 1);
     }

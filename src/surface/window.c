@@ -24,6 +24,8 @@
 #include <objc/message.h>
 #include <objc/runtime.h>
 #endif
+#include <stdlib.h>
+#include <string.h>
 
 /** Seconds after which the refresh rate of a window is read again without a move or a change
  * of the monitors, so a changed display mode is noticed */
@@ -134,6 +136,13 @@ box_window_t* box_window_new(
 {
     box_window_t *result = NULL;
     GLFWwindow *window;
+    const char *headless_only = getenv("BOX_HEADLESS_ONLY");
+    if (headless_only && headless_only[0] && strcmp(headless_only, "0")) {
+        ecs_fatal("cannot open window '%s' (%dx%d): BOX_HEADLESS_ONLY is set",
+            title ? title : "", width, height);
+        ecs_os_abort();
+    }
+
     glfwSetErrorCallback(box_window_error);
     if (!box_window_count && !glfwInit()) {
         ecs_err("cannot initialize glfw");

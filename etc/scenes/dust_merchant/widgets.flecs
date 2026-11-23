@@ -37,11 +37,13 @@ assets {
     prop z: f32 = 0.6
 
     Text: {value: text, size: size, font: font, align: align, width: width}
+
     if bus {
       Rgb: ink
     } else {
       Rgb: {ink.r * 0.16, ink.g * 0.16, ink.b * 0.16}
     }
+
     Transition: [Rgb: {duration: 0.9, delay: 0.15, timing_function: EaseOut}]
     Ignore
   }
@@ -73,7 +75,14 @@ assets {
     prop ink: Rgb = {26, 26, 40}
 
     Rotation: {0, 0, tilt}
-    Text: {value: text, size: size, font: font_hand, align: Center, width: width, line_height: size * 0.84}
+    Text: {
+      value: text,
+      size: size,
+      font: font_hand,
+      align: Center,
+      width: width,
+      line_height: size * 0.84
+    }
     Rgb: ink
     Ignore
   }
@@ -112,7 +121,12 @@ assets {
     prop turn: f32 = 0.4
 
     Position: {x, y, 0.5}
-    head : BareSteel { Rotation: {PI / 2, 0, 0}; Cylinder: {radius: 5, length: 2.4, segments: 10, smooth: true}; Rgb: {140, 136, 128} }
+    head : BareSteel {
+      Rotation: {PI / 2, 0, 0}
+      Cylinder: {radius: 5, length: 2.4, segments: 10, smooth: true}
+      Rgb: {140, 136, 128}
+    }
+
     slot : BlackAnod { Position: {0, 0, 1.25}; Rotation: {0, 0, turn}; Box: {9, 1.3, 0.3} }
     Ignore
   }
@@ -142,12 +156,15 @@ assets {
       Screw s_c(x: 0 - w / 2 + 12, y: 12 - h / 2, turn: 2.1)
       Screw s_d(x: w / 2 - 12, y: 12 - h / 2, turn: 0.7)
       const across: i32 = floor(w / 170)
+
       for i in 1..across {
         const sx = 0 - w / 2 + 12 + i * (w - 24) / across
         Screw "s_t_{i}"(x: sx, y: h / 2 - 12, turn: i * 1.7)
         Screw "s_b_{i}"(x: sx, y: 12 - h / 2, turn: i * 0.9 + 0.4)
       }
+
       const down: i32 = floor(h / 170)
+
       for i in 1..down {
         const sy = 0 - h / 2 + 12 + i * (h - 24) / down
         Screw "s_l_{i}"(x: 0 - w / 2 + 12, y: sy, turn: i * 2.3)
@@ -193,11 +210,41 @@ assets {
 
     Position: {x, y, 0.45}
     Ignore
-    top { Position: {0, h / 2, 0}; Rect: {w, 1.4}; Rgb: tone; Transition: [Rgb: {duration: 0.9, delay: 0.2}] }
-    left { Position: {0 - w / 2, 0, 0}; Rect: {1.4, h}; Rgb: tone; Transition: [Rgb: {duration: 0.9, delay: 0.2}] }
-    right { Position: {w / 2, 0, 0}; Rect: {1.4, h}; Rgb: tone; Transition: [Rgb: {duration: 0.9, delay: 0.2}] }
-    low_a { Position: {0 - w / 2 + run / 2, 0 - h / 2, 0}; Rect: {run, 1.4}; Rgb: tone; Transition: [Rgb: {duration: 0.9, delay: 0.2}] }
-    low_b { Position: {w / 2 - run / 2, 0 - h / 2, 0}; Rect: {run, 1.4}; Rgb: tone; Transition: [Rgb: {duration: 0.9, delay: 0.2}] }
+    top {
+      Position: {0, h / 2, 0}
+      Rect: {w, 1.4}
+      Rgb: tone
+      Transition: [Rgb: {duration: 0.9, delay: 0.2}]
+    }
+
+    left {
+      Position: {0 - w / 2, 0, 0}
+      Rect: {1.4, h}
+      Rgb: tone
+      Transition: [Rgb: {duration: 0.9, delay: 0.2}]
+    }
+
+    right {
+      Position: {w / 2, 0, 0}
+      Rect: {1.4, h}
+      Rgb: tone
+      Transition: [Rgb: {duration: 0.9, delay: 0.2}]
+    }
+
+    low_a {
+      Position: {0 - w / 2 + run / 2, 0 - h / 2, 0}
+      Rect: {run, 1.4}
+      Rgb: tone
+      Transition: [Rgb: {duration: 0.9, delay: 0.2}]
+    }
+
+    low_b {
+      Position: {w / 2 - run / 2, 0 - h / 2, 0}
+      Rect: {run, 1.4}
+      Rgb: tone
+      Transition: [Rgb: {duration: 0.9, delay: 0.2}]
+    }
+
     if text != "" {
       Label words(text: text, size: 13, ink: {150, 144, 124}) { Position: {0, 0 - h / 2, 0.1} }
     }
@@ -216,15 +263,23 @@ assets {
     Position: {x, y, 1.3}
     Rotation: {0, 0, tilt}
     Ignore
-    strip { Position: {0, 0, 0}; Box: {len, size * 1.5, 0.6}; Rgb: tone; PbrMaterial: {metallic: 0, roughness: 0.3} }
+    strip {
+      Position: {0, 0, 0}
+      Box: {len, size * 1.5, 0.6}
+      Rgb: tone
+      PbrMaterial: {metallic: 0, roughness: 0.3}
+    }
+
     words {
       Position: {0, 0, 0.4}
       Text: {value: text, size: size, font: font_mono, align: Center}
+
       if bus {
         Rgb: ink
       } else {
         Rgb: {ink.r * 0.12, ink.g * 0.12, ink.b * 0.12}
       }
+
       Transition: [Rgb: {duration: 0.9, delay: 0.15}]
     }
   }
@@ -240,8 +295,19 @@ assets {
     Position: {x, y, 0.16}
     Rotation: {0, 0, tilt}
     Ignore
-    gap { Position: {0, 0, -0.08}; Box: {w + 4, h + 4, 0.14}; Rgb: {6, 6, 6}; PbrMaterial: {metallic: 0, roughness: 0.9} }
-    sheet : PaintedSteel { Position: {0, 0, 0.02}; Box: {w, h, 0.26}; Rgb: tone; texture.Mapping: {mode: MappingObject, size: 0.52} }
+    gap {
+      Position: {0, 0, -0.08}
+      Box: {w + 4, h + 4, 0.14}
+      Rgb: {6, 6, 6}
+      PbrMaterial: {metallic: 0, roughness: 0.9}
+    }
+
+    sheet : PaintedSteel {
+      Position: {0, 0, 0.02}
+      Box: {w, h, 0.26}
+      Rgb: tone
+      texture.Mapping: {mode: MappingObject, size: 0.52}
+    }
   }
 
   template Dzus {
@@ -251,8 +317,18 @@ assets {
 
     Position: {x, y, 0.5}
     Ignore
-    cup : BareSteel { Rotation: {PI / 2, 0, 0}; Cylinder: {radius: 7, length: 1, segments: 14, smooth: true}; Rgb: {104, 102, 96} }
-    head : BareSteel { Position: {0, 0, 0.9}; Rotation: {PI / 2, 0, 0}; Cylinder: {radius: 4.6, length: 1.2, segments: 12, smooth: true} }
+    cup : BareSteel {
+      Rotation: {PI / 2, 0, 0}
+      Cylinder: {radius: 7, length: 1, segments: 14, smooth: true}
+      Rgb: {104, 102, 96}
+    }
+
+    head : BareSteel {
+      Position: {0, 0, 0.9}
+      Rotation: {PI / 2, 0, 0}
+      Cylinder: {radius: 4.6, length: 1.2, segments: 12, smooth: true}
+    }
+
     slot : BlackAnod { Position: {0, 0, 1.55}; Rotation: {0, 0, turn}; Box: {8, 1.4, 0.2} }
   }
 
@@ -265,11 +341,18 @@ assets {
     const pitch = h / slats
 
     Ignore
-    back { Position: {0, 0, 0.2}; Box: {w, h, 0.4}; Rgb: {6, 6, 6}; PbrMaterial: {metallic: 0, roughness: 0.9} }
+    back {
+      Position: {0, 0, 0.2}
+      Box: {w, h, 0.4}
+      Rgb: {6, 6, 6}
+      PbrMaterial: {metallic: 0, roughness: 0.9}
+    }
+
     rim_t : Soot { Position: {0, h / 2 + 2, 1.8}; Box: {w + 8, 4, 3.6} }
     rim_b : Soot { Position: {0, 0 - h / 2 - 2, 1.8}; Box: {w + 8, 4, 3.6} }
     rim_l : Soot { Position: {0 - w / 2 - 2, 0, 1.8}; Box: {4, h, 3.6} }
     rim_r : Soot { Position: {w / 2 + 2, 0, 1.8}; Box: {4, h, 3.6} }
+
     for i in 0..slats {
       "slat_{i}" : PaintedSteel {
         Position: {0, (i + 0.5) * pitch - h / 2, 1.6}
@@ -299,21 +382,56 @@ assets {
     mount {
       Position: {0, -6, 0}
       Ignore
+
       if hover {
-        halo { Position: {0, 0, 0.9}; Circle: {14}; Rgb: {0, 0, 0}; Border: {width: 1.2, color: {255, 200, 120, 255}}; Opacity: {0.9} }
+        halo {
+          Position: {0, 0, 0.9}
+          Circle: {14}
+          Rgb: {0, 0, 0}
+          Border: {width: 1.2, color: {255, 200, 120, 255}}
+          Opacity: {0.9}
+        }
       }
-      collar : BareSteel { Position: {0, 0, 0.8}; Rotation: {PI / 2, 0, 0}; Cylinder: {radius: 10, length: 1.6, segments: 6}; Rgb: {112, 110, 104} }
+
+      collar : BareSteel {
+        Position: {0, 0, 0.8}
+        Rotation: {PI / 2, 0, 0}
+        Cylinder: {radius: 10, length: 1.6, segments: 6}
+        Rgb: {112, 110, 104}
+      }
+
       stem {
         Position: {0, 0, out ? 7 : 1.4}
         Transition: [Position: {duration: 0.07, timing_function: EaseOut}]
+
         if out {
-          band { Position: {0, 0, 2.6}; Rotation: {PI / 2, 0, 0}; Cylinder: {radius: 9.4, length: 2.4, segments: 16, smooth: true}; Rgb: {226, 222, 206}; PbrMaterial: {metallic: 0, roughness: 0.5} }
+          band {
+            Position: {0, 0, 2.6}
+            Rotation: {PI / 2, 0, 0}
+            Cylinder: {radius: 9.4, length: 2.4, segments: 16, smooth: true}
+            Rgb: {226, 222, 206}
+            PbrMaterial: {metallic: 0, roughness: 0.5}
+          }
         }
-        cap : Bakelite { Position: {0, 0, 7}; Rotation: {PI / 2, 0, 0}; Cylinder: {radius: 7.4, length: 5, segments: 14, smooth: true}; Rgb: {16, 14, 12} }
+
+        cap : Bakelite {
+          Position: {0, 0, 7}
+          Rotation: {PI / 2, 0, 0}
+          Cylinder: {radius: 7.4, length: 5, segments: 14, smooth: true}
+          Rgb: {16, 14, 12}
+        }
+
         if flag {
-          tie { Position: {0, 0, 3}; Rotation: {PI / 2, 0, 0}; Torus: {radius: 7, tube: 0.9, segments: 16, rings: 6}; Rgb: {168, 28, 20}; PbrMaterial: {metallic: 0, roughness: 0.5} }
+          tie {
+            Position: {0, 0, 3}
+            Rotation: {PI / 2, 0, 0}
+            Torus: {radius: 7, tube: 0.9, segments: 16, rings: 6}
+            Rgb: {168, 28, 20}
+            PbrMaterial: {metallic: 0, roughness: 0.5}
+          }
         }
       }
+
       if flag {
         Tape tag(w: 36, h: 18, x: 11, y: -15, tilt: -0.4, tone: {216, 60, 40})
       }
@@ -349,6 +467,7 @@ assets {
     Rect: {120, 96}
     Rgb: {0, 0, 0}
     BlendMode: Additive
+
     if hover {
       Border: {width: 1.6, color: {255, 200, 120, 255}}
     } else {
@@ -406,18 +525,24 @@ assets {
     prop r: f32 = 4
     prop power: f32 = 5
 
-    rim : BareSteel { Rotation: {PI / 2, 0, 0}; Cylinder: {radius: r + 2, length: 2, segments: 16, smooth: true} }
+    rim : BareSteel {
+      Rotation: {PI / 2, 0, 0}
+      Cylinder: {radius: r + 2, length: 2, segments: 16, smooth: true}
+    }
+
     dome {
       Position: {0, 0, 0.8}
       Scale: {r, r, r * 0.7}
       Sphere: {radius: 1, segments: 12, smooth: true}
       Rgb: {hue.r * 0.25, hue.g * 0.25, hue.b * 0.25}
       PbrMaterial: {metallic: 0, roughness: 0.2}
+
       if lit {
         Emissive: {strength: power, color: hue}
       } else {
         Emissive: {strength: 0, color: hue}
       }
+
       Transition: [Emissive: {duration: 0.12, timing_function: EaseOut}]
     }
   }
@@ -443,18 +568,51 @@ assets {
       Ignore
 
       if hover {
-        halo { Position: {0, 0, 0.9}; Circle: {24}; Rgb: {0, 0, 0}; Border: {width: 1.6, color: {255, 200, 120, 255}}; Opacity: {0.9} }
+        halo {
+          Position: {0, 0, 0.9}
+          Circle: {24}
+          Rgb: {0, 0, 0}
+          Border: {width: 1.6, color: {255, 200, 120, 255}}
+          Opacity: {0.9}
+        }
       }
 
-      washer : BareSteel { Position: {0, 0, 1}; Rotation: {PI / 2, 0, 0}; Cylinder: {radius: 15, length: 2, segments: 24, smooth: true}; Rgb: {120, 118, 112} }
-      nut : Chrome { Position: {0, 0, 4}; Rotation: {PI / 2, 0, 0}; Cylinder: {radius: 11.5, length: 4, segments: 6}; Rgb: {150, 150, 152} }
-      collar : Chrome { Position: {0, 0, 8}; Rotation: {PI / 2, 0, 0}; Cylinder: {radius: 7, length: 6, segments: 16, smooth: true} }
+      washer : BareSteel {
+        Position: {0, 0, 1}
+        Rotation: {PI / 2, 0, 0}
+        Cylinder: {radius: 15, length: 2, segments: 24, smooth: true}
+        Rgb: {120, 118, 112}
+      }
+
+      nut : Chrome {
+        Position: {0, 0, 4}
+        Rotation: {PI / 2, 0, 0}
+        Cylinder: {radius: 11.5, length: 4, segments: 6}
+        Rgb: {150, 150, 152}
+      }
+
+      collar : Chrome {
+        Position: {0, 0, 8}
+        Rotation: {PI / 2, 0, 0}
+        Cylinder: {radius: 7, length: 6, segments: 16, smooth: true}
+      }
+
       arm {
         Position: {0, 0, 10}
         Rotation: {on ? -0.58 : 0.58, 0, 0}
         Transition: [Rotation: {duration: 0.075, timing_function: EaseIn}]
-        bat : Chrome { Position: {0, 0, 15}; Rotation: {PI / 2, 0, 0}; Frustum: {radius_bottom: 3.2, radius_top: 5.8, length: 30, segments: 14, smooth: true}; Rgb: cap }
-        tip : Chrome { Position: {0, 0, 30}; Sphere: {radius: 5.8, segments: 14, smooth: true}; Rgb: cap }
+        bat : Chrome {
+          Position: {0, 0, 15}
+          Rotation: {PI / 2, 0, 0}
+          Frustum: {radius_bottom: 3.2, radius_top: 5.8, length: 30, segments: 14, smooth: true}
+          Rgb: cap
+        }
+
+        tip : Chrome {
+          Position: {0, 0, 30}
+          Sphere: {radius: 5.8, segments: 14, smooth: true}
+          Rgb: cap
+        }
       }
     }
 
@@ -498,19 +656,39 @@ assets {
 
     Label words(text: label, size: 15, ink: {255, 214, 160}) { Position: {0, 52, 0.6} }
 
-    hazard { Position: {0, -6, 0.5}; Quad: {74, 92}; Rgb: {255, 255, 255}; PbrMaterial: {metallic: 0, roughness: 0.8}; PbrTextures: {albedo: tex_hazard}; texture.Transform: {scale_x: 0.45, scale_y: 0.55}; Ignore }
+    hazard {
+      Position: {0, -6, 0.5}
+      Quad: {74, 92}
+      Rgb: {255, 255, 255}
+      PbrMaterial: {metallic: 0, roughness: 0.8}
+      PbrTextures: {albedo: tex_hazard}
+      texture.Transform: {scale_x: 0.45, scale_y: 0.55}
+      Ignore
+    }
+
     shadow_gap : BlackAnod { Position: {0, -6, 0.9}; Box: {54, 72, 0.8} }
 
     mount {
       Position: {0, -8, 1.5}
       Ignore
 
-      nut : Chrome { Position: {0, 0, 3}; Rotation: {PI / 2, 0, 0}; Cylinder: {radius: 11, length: 4, segments: 6}; Rgb: {150, 150, 152} }
+      nut : Chrome {
+        Position: {0, 0, 3}
+        Rotation: {PI / 2, 0, 0}
+        Cylinder: {radius: 11, length: 4, segments: 6}
+        Rgb: {150, 150, 152}
+      }
+
       arm {
         Position: {0, 0, 6}
         Rotation: {on ? -0.55 : 0.55, 0, 0}
         Transition: [Rotation: {duration: 0.08, timing_function: EaseIn}]
-        bat : Chrome { Position: {0, 0, 12}; Rotation: {PI / 2, 0, 0}; Frustum: {radius_bottom: 3.4, radius_top: 6, length: 24, segments: 14, smooth: true} }
+        bat : Chrome {
+          Position: {0, 0, 12}
+          Rotation: {PI / 2, 0, 0}
+          Frustum: {radius_bottom: 3.4, radius_top: 6, length: 24, segments: 14, smooth: true}
+        }
+
         tip : Chrome { Position: {0, 0, 24}; Sphere: {radius: 6, segments: 14, smooth: true} }
       }
     }
@@ -521,17 +699,30 @@ assets {
       Transition: [Rotation: {duration: 0.18, timing_function: EaseOut}]
       Ignore
 
-      hinge : BareSteel { Rotation: {0, 0, PI / 2}; Cylinder: {radius: 3.2, length: 48, segments: 12, smooth: true} }
+      hinge : BareSteel {
+        Rotation: {0, 0, PI / 2}
+        Cylinder: {radius: 3.2, length: 48, segments: 12, smooth: true}
+      }
+
       lid : SignalRed { Position: {0, -36, 41}; RoundedBox: {46, 78, 3, 1.2, segments: 2} }
       side_a : SignalRed { Position: {-22, -36, 21}; Box: {2.6, 74, 40} }
       side_b : SignalRed { Position: {22, -36, 21}; Box: {2.6, 74, 40} }
       lip : SignalRed { Position: {0, -74, 21}; Box: {46, 2.6, 40} }
-      pull : Brass { Position: {0, -70, 44}; Rotation: {0, 0, PI / 2}; Cylinder: {radius: 2, length: 22, segments: 8, smooth: true} }
+      pull : Brass {
+        Position: {0, -70, 44}
+        Rotation: {0, 0, PI / 2}
+        Cylinder: {radius: 2, length: 22, segments: 8, smooth: true}
+      }
     }
 
     if beacon {
-      Lamp pilot(lit: slow_blink && stage == STAGE_COLD, hue: AMBER, r: 4, power: 9) { Position: {-38, 52, 1} }
-      Lamp pilot_b(lit: slow_blink && stage == STAGE_COLD, hue: AMBER, r: 4, power: 9) { Position: {38, 52, 1} }
+      Lamp pilot(lit: slow_blink && stage == STAGE_COLD, hue: AMBER, r: 4, power: 9) {
+        Position: {-38, 52, 1}
+      }
+
+      Lamp pilot_b(lit: slow_blink && stage == STAGE_COLD, hue: AMBER, r: 4, power: 9) {
+        Position: {38, 52, 1}
+      }
     }
 
     async {
@@ -546,6 +737,7 @@ assets {
     async {
       while true {
         await on.click(this)
+
         if !armed && !sw[sig] {
           armed = true
           const lift = box.audio.play(SfxGuard, 0.8)
@@ -593,6 +785,7 @@ assets {
         RoundedBox: {w, h, 8, 1.6, segments: 2}
         Rgb: {hue.r * 0.06 + 5, hue.g * 0.06 + 5, hue.b * 0.06 + 5}
         PbrMaterial: {metallic: 0, roughness: 0.24}
+
         if lit {
           Emissive: {strength: 1.1, color: hue}
         } else if hover && bus {
@@ -600,8 +793,10 @@ assets {
         } else {
           Emissive: {strength: 0.02, color: hue}
         }
+
         Transition: [Emissive: {duration: 0.14, timing_function: EaseOut}]
       }
+
       if lit {
         words_lit {
           Position: {0, sub == "" ? 0 : 7, 4.3}
@@ -609,6 +804,7 @@ assets {
           Rgb: {1, 1, 1}
           Ignore
         }
+
         if sub != "" {
           minor_lit {
             Position: {0, -11, 4.3}
@@ -621,23 +817,28 @@ assets {
         words {
           Position: {0, sub == "" ? 0 : 7, 4.3}
           Text: {value: legend, size: size, font: font_stencil, align: Center}
+
           if bus {
             Rgb: {hue.r * 0.8, hue.g * 0.8, hue.b * 0.8}
           } else {
             Rgb: {hue.r * 0.14, hue.g * 0.14, hue.b * 0.14}
           }
+
           Transition: [Rgb: {duration: 0.5}]
           Ignore
         }
+
         if sub != "" {
           minor {
             Position: {0, -11, 4.3}
             Text: {value: sub, size: size * 0.72, font: font_stencil, align: Center}
+
             if bus {
               Rgb: {hue.r * 0.56, hue.g * 0.56, hue.b * 0.56}
             } else {
               Rgb: {hue.r * 0.1, hue.g * 0.1, hue.b * 0.1}
             }
+
             Transition: [Rgb: {duration: 0.5}]
             Ignore
           }
@@ -693,24 +894,34 @@ assets {
     scale_marks {
       Position: {0, -r * 0.18, 0.5}
       Ignore
+
       for i in 0..ticks {
         const a = 2.36 - i * 4.71 / (ticks - 1)
         "tick_{i}" {
           Position: {cos(a) * r * 1.34, sin(a) * r * 1.34, 0}
           Rotation: {0, 0, a}
           Rect: {i % 5 == 0 ? r * 0.32 : r * 0.18, 1.5}
+
           if bus {
             Rgb: {200, 192, 170}
           } else {
             Rgb: {38, 36, 32}
           }
+
           Transition: [Rgb: {duration: 0.9, delay: 0.2}]
         }
       }
     }
 
     if hover {
-      halo { Position: {0, -r * 0.18, 0.8}; Circle: {r * 1.12}; Rgb: {0, 0, 0}; Border: {width: 1.4, color: {255, 200, 120, 255}}; Opacity: {0.9}; Ignore }
+      halo {
+        Position: {0, -r * 0.18, 0.8}
+        Circle: {r * 1.12}
+        Rgb: {0, 0, 0}
+        Border: {width: 1.4, color: {255, 200, 120, 255}}
+        Opacity: {0.9}
+        Ignore
+      }
     }
 
     rotor {
@@ -718,10 +929,32 @@ assets {
       Rotation: {0, 0, turn - PI / 2}
       Transition: [Rotation: {duration: 0.06}]
       Ignore
-      skirt : BlackAnod { Position: {0, 0, 2}; Rotation: {PI / 2, 0, 0}; Cylinder: {radius: r, length: 4, segments: 32, smooth: true} }
-      grip : Bakelite { Position: {0, 0, 12}; Rotation: {PI / 2, 0, 0}; Frustum: {radius_bottom: r * 0.8, radius_top: r * 0.68, length: 18, segments: 16} }
-      crown : BareSteel { Position: {0, 0, 21.3}; Rotation: {PI / 2, 0, 0}; Cylinder: {radius: r * 0.62, length: 0.6, segments: 24, smooth: true}; Rgb: {150, 144, 130} }
-      mark { Position: {0, r * 0.82, 4.2}; Box: {r * 0.1, r * 0.34, 0.5}; Rgb: {240, 236, 224}; Emissive: {strength: bus ? 0.6 : 0.02, color: {255, 236, 200}} }
+      skirt : BlackAnod {
+        Position: {0, 0, 2}
+        Rotation: {PI / 2, 0, 0}
+        Cylinder: {radius: r, length: 4, segments: 32, smooth: true}
+      }
+
+      grip : Bakelite {
+        Position: {0, 0, 12}
+        Rotation: {PI / 2, 0, 0}
+        Frustum: {radius_bottom: r * 0.8, radius_top: r * 0.68, length: 18, segments: 16}
+      }
+
+      crown : BareSteel {
+        Position: {0, 0, 21.3}
+        Rotation: {PI / 2, 0, 0}
+        Cylinder: {radius: r * 0.62, length: 0.6, segments: 24, smooth: true}
+        Rgb: {150, 144, 130}
+      }
+
+      mark {
+        Position: {0, r * 0.82, 4.2}
+        Box: {r * 0.1, r * 0.34, 0.5}
+        Rgb: {240, 236, 224}
+        Emissive: {strength: bus ? 0.6 : 0.02, color: {255, 236, 200}}
+      }
+
       line { Position: {0, r * 0.32, 21.8}; Box: {1.8, r * 0.6, 0.5}; Rgb: {30, 28, 24} }
     }
 
@@ -739,6 +972,7 @@ assets {
         const e = await on.drag(this)
         const was = kn[sig]
         kn[sig] = clamp(kn[sig] + (e.delta_x - e.delta_y) * speed, 0, 1)
+
         if floor(kn[sig] * DETENTS) != floor(was * DETENTS) {
           const tick = box.audio.play(SfxDetent, 0.7)
         }
@@ -750,6 +984,7 @@ assets {
         const e = await on.scroll(this)
         const was = kn[sig]
         kn[sig] = clamp(kn[sig] + e.delta_y * 0.02, 0, 1)
+
         if floor(kn[sig] * DETENTS) != floor(was * DETENTS) {
           const tick = box.audio.play(SfxDetent, 0.7)
         }
@@ -783,18 +1018,31 @@ assets {
     Label name(text: label, size: 15) { Position: {0, travel / 2 + 15, 0.8} }
 
     slot : BlackAnod { Position: {0, 0, 0.4}; Box: {18, travel - 12, 1}; Ignore }
-    slot_lip_a : BareSteel { Position: {-13, 0, 1.2}; Box: {4, travel, 2.2}; Rgb: {108, 104, 96}; Ignore }
-    slot_lip_b : BareSteel { Position: {13, 0, 1.2}; Box: {4, travel, 2.2}; Rgb: {108, 104, 96}; Ignore }
+    slot_lip_a : BareSteel {
+      Position: {-13, 0, 1.2}
+      Box: {4, travel, 2.2}
+      Rgb: {108, 104, 96}
+      Ignore
+    }
+
+    slot_lip_b : BareSteel {
+      Position: {13, 0, 1.2}
+      Box: {4, travel, 2.2}
+      Rgb: {108, 104, 96}
+      Ignore
+    }
 
     for i in 0..11 {
       "mark_{i}" {
         Position: {-28, (i - 5) * travel / 11.5, 0.5}
         Rect: {i % 5 == 0 ? 18 : 10, 1.8}
+
         if bus {
           Rgb: {204, 196, 172}
         } else {
           Rgb: {38, 36, 32}
         }
+
         Transition: [Rgb: {duration: 0.9, delay: 0.2}]
         Ignore
       }
@@ -809,10 +1057,34 @@ assets {
       Transition: [Rotation: {duration: 0.05}]
       Ignore
 
-      shaft : Chrome { Position: {0, 0, reach * 0.5}; Rotation: {PI / 2, 0, 0}; Cylinder: {radius: 7, length: reach, segments: 14, smooth: true}; Rgb: {150, 150, 154} }
-      grip_band : Brass { Position: {0, 0, reach * 0.96}; Rotation: {PI / 2, 0, 0}; Cylinder: {radius: 13, length: 7, segments: 18, smooth: true} }
-      grip_core { Position: {0, 0, reach + 24}; Rotation: {PI / 2, 0, 0}; Capsule: {radius: 16, length: 38, segments: 18, smooth: true}; Rgb: handle; PbrMaterial: {metallic: 0, roughness: 0.42} }
-      bar { Position: {0, 0, reach + 60}; Rotation: {0, 0, PI / 2}; Capsule: {radius: 9, length: 64, segments: 12, smooth: true}; Rgb: handle; PbrMaterial: {metallic: 0, roughness: 0.42} }
+      shaft : Chrome {
+        Position: {0, 0, reach * 0.5}
+        Rotation: {PI / 2, 0, 0}
+        Cylinder: {radius: 7, length: reach, segments: 14, smooth: true}
+        Rgb: {150, 150, 154}
+      }
+
+      grip_band : Brass {
+        Position: {0, 0, reach * 0.96}
+        Rotation: {PI / 2, 0, 0}
+        Cylinder: {radius: 13, length: 7, segments: 18, smooth: true}
+      }
+
+      grip_core {
+        Position: {0, 0, reach + 24}
+        Rotation: {PI / 2, 0, 0}
+        Capsule: {radius: 16, length: 38, segments: 18, smooth: true}
+        Rgb: handle
+        PbrMaterial: {metallic: 0, roughness: 0.42}
+      }
+
+      bar {
+        Position: {0, 0, reach + 60}
+        Rotation: {0, 0, PI / 2}
+        Capsule: {radius: 9, length: 64, segments: 12, smooth: true}
+        Rgb: handle
+        PbrMaterial: {metallic: 0, roughness: 0.42}
+      }
     }
 
     async {
@@ -830,6 +1102,7 @@ assets {
         dragging = true
         await on.release(this)
         dragging = false
+
         if spring && kn[sig] > 0 {
           kn[sig] = 0
           const back = box.audio.play(SfxBreaker, 0.6)
@@ -840,9 +1113,11 @@ assets {
     async {
       while true {
         const e = await on.drag(this)
+
         if !locked {
           const was = kn[sig]
           kn[sig] = clamp(kn[sig] + (pull ? e.delta_y : 0 - e.delta_y) * speed, 0, 1)
+
           if floor(kn[sig] * DETENTS) != floor(was * DETENTS) {
             const tick = box.audio.play(SfxDetent, 0.5)
           }
@@ -871,15 +1146,34 @@ assets {
     Layout: {}
     Item: {width: {mode: Fixed, value: r * 2.3}, height: {mode: Fixed, value: r * 2.3}}
 
-    bezel : Chrome { Position: {0, 0, 4}; Rotation: {PI / 2, 0, 0}; Tube: {radius: r + 7, thickness: 7.5, length: 9, segments: 48, smooth: true}; Rgb: {126, 124, 118}; PbrMaterial: {metallic: 1, roughness: 0.3} }
-    well : BlackAnod { Position: {0, 0, 0.4}; Rotation: {PI / 2, 0, 0}; Cylinder: {radius: r + 2, length: 0.8, segments: 48, smooth: true}; Rgb: {10, 10, 11} }
+    bezel : Chrome {
+      Position: {0, 0, 4}
+      Rotation: {PI / 2, 0, 0}
+      Tube: {radius: r + 7, thickness: 7.5, length: 9, segments: 48, smooth: true}
+      Rgb: {126, 124, 118}
+      PbrMaterial: {metallic: 1, roughness: 0.3}
+    }
+
+    well : BlackAnod {
+      Position: {0, 0, 0.4}
+      Rotation: {PI / 2, 0, 0}
+      Cylinder: {radius: r + 2, length: 0.8, segments: 48, smooth: true}
+      Rgb: {10, 10, 11}
+    }
 
     face {
       Position: {0, 0, 1}
       Ignore
 
       disc { Position: {0, 0, 0}; Circle: {r}; Rgb: {10, 11, 12} }
-      pool { Position: {0, 0, 0.1}; Rect: {r * 2.5, r * 2.5}; Image: {texture: tex_halo}; Rgb: {face_hue.r * 0.16, face_hue.g * 0.16, face_hue.b * 0.16}; BlendMode: Additive; Transition: [Rgb: {duration: 1.1}] }
+      pool {
+        Position: {0, 0, 0.1}
+        Rect: {r * 2.5, r * 2.5}
+        Image: {texture: tex_halo}
+        Rgb: {face_hue.r * 0.16, face_hue.g * 0.16, face_hue.b * 0.16}
+        BlendMode: Additive
+        Transition: [Rgb: {duration: 1.1}]
+      }
 
       for i in 0..(majors * 5 + 1) {
         const a = a0 - i * sweep / (majors * 5)
@@ -889,11 +1183,13 @@ assets {
           Position: {cos(a) * r * 0.84, sin(a) * r * 0.84, 0.3}
           Rotation: {0, 0, a}
           Rect: {major ? r * 0.2 : r * 0.1, major ? r * 0.04 : r * 0.024}
+
           if frac >= red_from && ink_lit {
             Rgb: {255, 70, 40}
           } else {
             Rgb: face_hue
           }
+
           Transition: [Rgb: {duration: 0.8, delay: 0.2}]
         }
       }
@@ -908,8 +1204,19 @@ assets {
         }
       }
 
-      name { Position: {0, r * 0.32, 0.3}; Text: {value: label, size: r * 0.2, font: font_stencil, align: Center}; Rgb: face_hue; Transition: [Rgb: {duration: 0.8, delay: 0.2}] }
-      units { Position: {0, 0 - r * 0.42, 0.3}; Text: {value: unit, size: r * 0.17, font: font_mono, align: Center}; Rgb: face_hue; Transition: [Rgb: {duration: 0.8, delay: 0.2}] }
+      name {
+        Position: {0, r * 0.32, 0.3}
+        Text: {value: label, size: r * 0.2, font: font_stencil, align: Center}
+        Rgb: face_hue
+        Transition: [Rgb: {duration: 0.8, delay: 0.2}]
+      }
+
+      units {
+        Position: {0, 0 - r * 0.42, 0.3}
+        Text: {value: unit, size: r * 0.17, font: font_mono, align: Center}
+        Rgb: face_hue
+        Transition: [Rgb: {duration: 0.8, delay: 0.2}]
+      }
     }
 
     needle {
@@ -917,9 +1224,20 @@ assets {
       Rotation: {0, 0, dial}
       Transition: [Rotation: {duration: 0.35, timing_function: EaseOut}]
       Ignore
-      blade { Position: {r * 0.37, 0, 0}; Box: {r * 1.05, r * 0.035, 0.6}; Rgb: {255, 96, 40}; Emissive: {strength: ink_lit ? 2.2 : 0.02, color: {255, 100, 40}}; Transition: [Emissive: {duration: 0.8}] }
+      blade {
+        Position: {r * 0.37, 0, 0}
+        Box: {r * 1.05, r * 0.035, 0.6}
+        Rgb: {255, 96, 40}
+        Emissive: {strength: ink_lit ? 2.2 : 0.02, color: {255, 100, 40}}
+        Transition: [Emissive: {duration: 0.8}]
+      }
+
       tail { Position: {0 - r * 0.16, 0, 0}; Box: {r * 0.32, r * 0.07, 0.6}; Rgb: {20, 20, 22} }
-      hub : BlackAnod { Position: {0, 0, 0.8}; Rotation: {PI / 2, 0, 0}; Cylinder: {radius: r * 0.09, length: 1.6, segments: 16, smooth: true} }
+      hub : BlackAnod {
+        Position: {0, 0, 0.8}
+        Rotation: {PI / 2, 0, 0}
+        Cylinder: {radius: r * 0.09, length: 1.6, segments: 16, smooth: true}
+      }
     }
 
     glass {
@@ -953,10 +1271,17 @@ assets {
       height: {mode: Fixed, value: vertical ? len + 28 : thick + 28}
     }
 
-    back : BlackAnod { Position: {0, -6, 0.6}; Box: {vertical ? thick + 8 : len + 8, vertical ? len + 8 : thick + 8, 1.2}; Rgb: {12, 12, 13}; Ignore }
+    back : BlackAnod {
+      Position: {0, -6, 0.6}
+      Box: {vertical ? thick + 8 : len + 8, vertical ? len + 8 : thick + 8, 1.2}
+      Rgb: {12, 12, 13}
+      Ignore
+    }
 
     if label != "" {
-      Label words(text: label, size: 13) { Position: {0, vertical ? len / 2 + 7 : thick / 2 + 9, 0.8} }
+      Label words(text: label, size: 13) {
+        Position: {0, vertical ? len / 2 + 7 : thick / 2 + 9, 0.8}
+      }
     }
 
     for i in 0..count {
@@ -970,11 +1295,13 @@ assets {
         Box: {vertical ? thick : seg, vertical ? seg : thick, 0.6}
         Rgb: {tint.r * 0.13, tint.g * 0.13, tint.b * 0.13}
         PbrMaterial: {metallic: 0, roughness: 0.4}
+
         if lit {
           Emissive: {strength: 3.2, color: tint}
         } else {
           Emissive: {strength: 0, color: tint}
         }
+
         Transition: [Emissive: {duration: 0.06}]
         Ignore
       }
@@ -1001,14 +1328,17 @@ assets {
       Box: {w, h, 0.8}
       Rgb: {hue.r * 0.05 + 3, hue.g * 0.05 + 3, hue.b * 0.05 + 3}
       PbrMaterial: {metallic: 0, roughness: 0.25}
+
       if shown {
         Emissive: {strength: 0.46, color: hue}
       } else {
         Emissive: {strength: 0, color: hue}
       }
+
       Transition: [Emissive: {duration: 0.09, timing_function: EaseOut}]
       Ignore
     }
+
     if shown {
       words_lit {
         Position: {-0.2, sub == "" ? 0 : size * 0.5, 2.9}
@@ -1016,12 +1346,14 @@ assets {
         Rgb: {1, 1, 1}
         Ignore
       }
+
       words_lit_b {
         Position: {0.2, sub == "" ? 0 : size * 0.5, 2.92}
         Text: {value: legend, size: size, font: font_stencil, align: Center}
         Rgb: {1, 1, 1}
         Ignore
       }
+
       if sub != "" {
         minor_lit {
           Position: {-0.18, 0 - size * 0.56, 2.9}
@@ -1029,6 +1361,7 @@ assets {
           Rgb: {1, 1, 1}
           Ignore
         }
+
         minor_lit_b {
           Position: {0.18, 0 - size * 0.56, 2.92}
           Text: {value: sub, size: size * 0.86, font: font_stencil, align: Center}
@@ -1040,23 +1373,28 @@ assets {
       words {
         Position: {0, sub == "" ? 0 : size * 0.5, 2.9}
         Text: {value: legend, size: size, font: font_stencil, align: Center}
+
         if bus {
           Rgb: {hue.r * 0.62, hue.g * 0.62, hue.b * 0.62}
         } else {
           Rgb: {hue.r * 0.1, hue.g * 0.1, hue.b * 0.1}
         }
+
         Transition: [Rgb: {duration: 0.5}]
         Ignore
       }
+
       if sub != "" {
         minor {
           Position: {0, 0 - size * 0.56, 2.9}
           Text: {value: sub, size: size * 0.86, font: font_stencil, align: Center}
+
           if bus {
             Rgb: {hue.r * 0.46, hue.g * 0.46, hue.b * 0.46}
           } else {
             Rgb: {hue.r * 0.08, hue.g * 0.08, hue.b * 0.08}
           }
+
           Transition: [Rgb: {duration: 0.5}]
           Ignore
         }
@@ -1099,16 +1437,26 @@ assets {
       const on = has_bit(mask, i)
       const horizontal = i == 0 || i == 3 || i == 6
       const px = match i { 1, 2: s * 0.32; 4, 5: 0 - s * 0.32; _: 0 }
-      const py = match i { 0: s * 0.62; 1: s * 0.31; 2: 0 - s * 0.31; 3: 0 - s * 0.62; 4: 0 - s * 0.31; 5: s * 0.31; _: 0 }
+      const py = match i {
+        0: s * 0.62
+        1: s * 0.31
+        2: 0 - s * 0.31
+        3: 0 - s * 0.62
+        4: 0 - s * 0.31
+        5: s * 0.31
+        _: 0
+      }
       "bar_{i}" {
         Position: {px, py, 0.6}
         Box: {horizontal ? s * 0.5 : k, horizontal ? k : s * 0.5, 0.4}
         Rgb: {hue.r * 0.07, hue.g * 0.07, hue.b * 0.07}
+
         if on {
           Emissive: {strength: 3.6, color: hue}
         } else {
           Emissive: {strength: 0, color: hue}
         }
+
         Ignore
       }
     }
@@ -1130,9 +1478,21 @@ assets {
 
     window {
       Layout: {direction: Row, spacing: s * 0.14, padding: {6, 6, 8, 8}, h: Center, v: Middle}
-      pane : BlackAnod { Rgb: {6, 5, 5}; Position: {0, 0, 0}; Box: {(s * 0.94) * digits + 14, s * 1.5 + 12, 0.8}; Float: {h: Center, v: Middle, anchor_h: Center, anchor_v: Middle}; Ignore }
+      pane : BlackAnod {
+        Rgb: {6, 5, 5}
+        Position: {0, 0, 0}
+        Box: {(s * 0.94) * digits + 14, s * 1.5 + 12, 0.8}
+        Float: {h: Center, v: Middle, anchor_h: Center, anchor_v: Middle}
+        Ignore
+      }
+
       for i in 0..digits {
-        SegDigit "d_{i}"(digit: floor(value / floor(pow(10, digits - 1 - i))) % 10, hue: hue, s: s, blank: dark)
+        SegDigit "d_{i}"(
+          digit: floor(value / floor(pow(10, digits - 1 - i))) % 10,
+          hue: hue,
+          s: s,
+          blank: dark
+        )
       }
     }
   }
@@ -1152,7 +1512,13 @@ assets {
       Rotation: {spin, 0, 0}
       Transition: [Rotation: {duration: 0.45, timing_function: EaseInOut}]
       Ignore
-      body { Rotation: {0, 0, PI / 2}; Cylinder: {radius: r, length: w - 2, segments: 24, smooth: true}; Rgb: {18, 17, 16}; PbrMaterial: {metallic: 0.2, roughness: 0.5} }
+      body {
+        Rotation: {0, 0, PI / 2}
+        Cylinder: {radius: r, length: w - 2, segments: 24, smooth: true}
+        Rgb: {18, 17, 16}
+        PbrMaterial: {metallic: 0.2, roughness: 0.5}
+      }
+
       for i in 0..10 {
         "face_{i}" {
           Rotation: {0 - i * (2 * PI / 10), 0, 0}
@@ -1179,8 +1545,20 @@ assets {
 
     frame {
       Layout: {direction: Row, spacing: 1.5, padding: {3, 3, 4, 4}, h: Center, v: Middle}
-      bezel_t : BlackAnod { Position: {0, 16, 1.4}; Box: {digits * 20.5 + 14, 4, 2.8}; Float: {h: Center, v: Middle, anchor_h: Center, anchor_v: Middle, y: 16}; Ignore }
-      bezel_b : BlackAnod { Position: {0, -16, 1.4}; Box: {digits * 20.5 + 14, 4, 2.8}; Float: {h: Center, v: Middle, anchor_h: Center, anchor_v: Middle, y: -16}; Ignore }
+      bezel_t : BlackAnod {
+        Position: {0, 16, 1.4}
+        Box: {digits * 20.5 + 14, 4, 2.8}
+        Float: {h: Center, v: Middle, anchor_h: Center, anchor_v: Middle, y: 16}
+        Ignore
+      }
+
+      bezel_b : BlackAnod {
+        Position: {0, -16, 1.4}
+        Box: {digits * 20.5 + 14, 4, 2.8}
+        Float: {h: Center, v: Middle, anchor_h: Center, anchor_v: Middle, y: -16}
+        Ignore
+      }
+
       for i in 0..digits {
         DrumDigit "d_{i}"(digit: floor(value / floor(pow(10, digits - 1 - i))) % 10)
       }

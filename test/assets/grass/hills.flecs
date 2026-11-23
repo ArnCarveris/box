@@ -1,0 +1,42 @@
+// Grass on a terrain of steep hills for the Grass tests of test/gpu/render/src/Grass.c. A camera
+// that is the focus looks down on it until the test stands it at eye height among the hills.
+
+using box.transform
+using box.material
+using box.texture
+using box.terrain
+using box.camera
+using box.view
+using box.light
+using box.world
+using box.grass
+
+grass_hills {
+  bumps  { nodes.Noise: {frequency: 0.012, octaves: 2, seed: 9} }
+  height { nodes.Multiply: {a: bumps, b_value: {40, 40, 40, 40}} }
+  Terrain: {height: height, tile_size: 32, resolution: 65, levels: 5,
+            lod_distance: 128, min_height: -10, max_height: 60, budget: 64,
+            query_spacing: 0.5, query_radius: 128}
+  Rgb: {120, 140, 90}
+  PbrMaterial: {roughness: 1}
+}
+
+grass_walker {
+  Position: {0, 60, 0}
+  Rotation: {-0.05, 0, 0}
+  Camera: {fov: 60, near_: 0.1, far_: 2000}
+  WorldFocus
+}
+
+grass_view {
+  View: {camera: grass_walker, clear: {enabled: true, color: {20, 30, 60, 255}}}
+}
+
+grass_sun {
+  Rotation: {0.8, 0.6, 0}
+  DirectionalLight: {intensity: 3.14}
+}
+
+grass_meadow {
+  Grass: {terrain: grass_hills, density: 16, lod: [20, 50, 100]}
+}

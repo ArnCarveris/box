@@ -17,10 +17,23 @@ assets {
     { (IsA, StationTruss); Position: {0, -0.45, 0.45}; Box: {length, 0.12, 0.12} }
     { (IsA, StationTruss); Position: {0, -0.45, -0.45}; Box: {length, 0.12, 0.12} }
     const bays = floor(length / 1.6)
+
     for i in 0..bays {
       const x = -length / 2 + (i + 0.5) * length / bays
-      { (IsA, StationTruss); Position: {x, 0, 0.225}; Rotation: {0.46, 0, 0}; Box: {0.09, 1.02, 0.09} }
-      { (IsA, StationTruss); Position: {x, 0, -0.225}; Rotation: {-0.46, 0, 0}; Box: {0.09, 1.02, 0.09} }
+      {
+        (IsA, StationTruss)
+        Position: {x, 0, 0.225}
+        Rotation: {0.46, 0, 0}
+        Box: {0.09, 1.02, 0.09}
+      }
+
+      {
+        (IsA, StationTruss)
+        Position: {x, 0, -0.225}
+        Rotation: {-0.46, 0, 0}
+        Box: {0.09, 1.02, 0.09}
+      }
+
       { (IsA, StationTruss); Position: {x, -0.45, 0}; Box: {0.09, 0.09, 0.9} }
     }
   }
@@ -28,15 +41,44 @@ assets {
   template StationTank {
     prop tint: entity = 0
 
-    body : StationHull { Position: {0, 0, 0}; Rotation: {0, 0, 1.5708}; Capsule: {radius: 1.1, length: 3.2, segments: 20, smooth: true} }
-    { (IsA, StationDark); Position: {-1, 0, 0}; Rotation: {0, 0, 1.5708}; Cylinder: {radius: 1.13, length: 0.14, segments: 20, smooth: true} }
-    { (IsA, StationDark); Position: {1, 0, 0}; Rotation: {0, 0, 1.5708}; Cylinder: {radius: 1.13, length: 0.14, segments: 20, smooth: true} }
-    { (IsA, StationOrange); Position: {0, 0, 0}; Rotation: {0, 0, 1.5708}; Cylinder: {radius: 1.125, length: 0.5, segments: 20, smooth: true} }
+    body : StationHull {
+      Position: {0, 0, 0}
+      Rotation: {0, 0, 1.5708}
+      Capsule: {radius: 1.1, length: 3.2, segments: 20, smooth: true}
+    }
+
+    {
+      (IsA, StationDark)
+      Position: {-1, 0, 0}
+      Rotation: {0, 0, 1.5708}
+      Cylinder: {radius: 1.13, length: 0.14, segments: 20, smooth: true}
+    }
+
+    {
+      (IsA, StationDark)
+      Position: {1, 0, 0}
+      Rotation: {0, 0, 1.5708}
+      Cylinder: {radius: 1.13, length: 0.14, segments: 20, smooth: true}
+    }
+
+    {
+      (IsA, StationOrange)
+      Position: {0, 0, 0}
+      Rotation: {0, 0, 1.5708}
+      Cylinder: {radius: 1.125, length: 0.5, segments: 20, smooth: true}
+    }
   }
 
   template StationThruster {
-    bell : StationDark { Position: {0, 0, 0}; Frustum: {radius_bottom: 0.7, radius_top: 0.35, length: 0.9, segments: 16, smooth: true} }
-    glow : StationPlasma { Position: {0, -0.42, 0}; Cylinder: {radius: 0.5, length: 0.04, segments: 16} }
+    bell : StationDark {
+      Position: {0, 0, 0}
+      Frustum: {radius_bottom: 0.7, radius_top: 0.35, length: 0.9, segments: 16, smooth: true}
+    }
+
+    glow : StationPlasma {
+      Position: {0, -0.42, 0}
+      Cylinder: {radius: 0.5, length: 0.04, segments: 16}
+    }
   }
 
   template StationDeckPlate {
@@ -50,6 +92,7 @@ assets {
       const x = (i - st_grid_w / 2.0) * st_pitch
       { (IsA, StationDark); Position: {x, 0.015, 0}; Box: {0.34, 0.03, st_grid_h * st_pitch} }
     }
+
     for i in 0..st_grid_h + 1 {
       const z = (i - st_grid_h / 2.0) * st_pitch
       { (IsA, StationDark); Position: {0, 0.015, z}; Box: {st_grid_w * st_pitch, 0.03, 0.34} }
@@ -57,7 +100,9 @@ assets {
 
     for i in 0..st_grid_w + 1 {
       for j in 0..st_grid_h + 1 {
-        StationJunction "node_{i}_{j}"() { Position: {(i - st_grid_w / 2.0) * st_pitch, 0, (j - st_grid_h / 2.0) * st_pitch} }
+        StationJunction "node_{i}_{j}"() {
+          Position: {(i - st_grid_w / 2.0) * st_pitch, 0, (j - st_grid_h / 2.0) * st_pitch}
+        }
       }
     }
 
@@ -79,38 +124,70 @@ assets {
       { (IsA, StationDark); Position: {x, -0.3, d / 2 + 0.22}; Box: {0.12, 0.5, 0.05} }
       { (IsA, StationDark); Position: {x, -0.3, -d / 2 - 0.22}; Box: {0.12, 0.5, 0.05} }
     }
+
     for i in 0..14 {
       const z = -d / 2 + 1 + i * (d - 2) / 13
       { (IsA, StationDark); Position: {w / 2 + 0.22, -0.3, z}; Box: {0.05, 0.5, 0.12} }
       { (IsA, StationDark); Position: {-w / 2 - 0.22, -0.3, z}; Box: {0.05, 0.5, 0.12} }
     }
-    StationPipeX edge_pipe_s(length: w, radius: 0.09, clamps: 14) { Position: {0, -0.6, d / 2 + 0.3} }
-    StationPipeX edge_pipe_n(length: w, radius: 0.09, clamps: 14) { Position: {0, -0.6, -d / 2 - 0.3} }
-    StationPipeZ edge_pipe_e(length: d, radius: 0.09, clamps: 10) { Position: {w / 2 + 0.3, -0.6, 0} }
-    StationPipeZ edge_pipe_w(length: d, radius: 0.09, clamps: 10) { Position: {-w / 2 - 0.3, -0.6, 0} }
+
+    StationPipeX edge_pipe_s(length: w, radius: 0.09, clamps: 14) {
+      Position: {0, -0.6, d / 2 + 0.3}
+    }
+
+    StationPipeX edge_pipe_n(length: w, radius: 0.09, clamps: 14) {
+      Position: {0, -0.6, -d / 2 - 0.3}
+    }
+
+    StationPipeZ edge_pipe_e(length: d, radius: 0.09, clamps: 10) {
+      Position: {w / 2 + 0.3, -0.6, 0}
+    }
+
+    StationPipeZ edge_pipe_w(length: d, radius: 0.09, clamps: 10) {
+      Position: {-w / 2 - 0.3, -0.6, 0}
+    }
 
     for i in 0..9 {
       const x = -w / 2 + 2.5 + i * (w - 5) / 8
       const kind = i % 3
+
       if kind == 0 {
         StationVent "n_vent_{i}"(w: 1.4, d: 0.34) { Position: {x, 0.35, -d / 2 + 0.02} }
       } else if kind == 1 {
-        StationGreebleBlock "n_box_{i}"(w: 1, h: 0.34, d: 0.3, led: StationCyanLight) { Position: {x, 0.35, -d / 2 + 0.02} }
+        StationGreebleBlock "n_box_{i}"(w: 1, h: 0.34, d: 0.3, led: StationCyanLight) {
+          Position: {x, 0.35, -d / 2 + 0.02}
+        }
       } else {
         StationAntenna "n_ant_{i}"(tall: 1.4 + (i % 2) * 0.8) { Position: {x, 0.35, -d / 2 + 0.02} }
       }
     }
 
-    corner_a : StationRedLight { Position: {-w / 2, 0.5, d / 2}; Sphere: {radius: 0.2, segments: 10, smooth: true} }
-    corner_b : StationGreenLight { Position: {w / 2, 0.5, d / 2}; Sphere: {radius: 0.2, segments: 10, smooth: true} }
-    corner_c : StationRedLight { Position: {-w / 2, 0.5, -d / 2}; Sphere: {radius: 0.2, segments: 10, smooth: true} }
-    corner_d : StationGreenLight { Position: {w / 2, 0.5, -d / 2}; Sphere: {radius: 0.2, segments: 10, smooth: true} }
+    corner_a : StationRedLight {
+      Position: {-w / 2, 0.5, d / 2}
+      Sphere: {radius: 0.2, segments: 10, smooth: true}
+    }
+
+    corner_b : StationGreenLight {
+      Position: {w / 2, 0.5, d / 2}
+      Sphere: {radius: 0.2, segments: 10, smooth: true}
+    }
+
+    corner_c : StationRedLight {
+      Position: {-w / 2, 0.5, -d / 2}
+      Sphere: {radius: 0.2, segments: 10, smooth: true}
+    }
+
+    corner_d : StationGreenLight {
+      Position: {w / 2, 0.5, -d / 2}
+      Sphere: {radius: 0.2, segments: 10, smooth: true}
+    }
   }
 
   template StationRadiator {
     prop length: f32 = 12
 
     spine : StationTruss { Position: {0, 0, 0}; Box: {0.25, 0.25, length} }
+
     for i in 0..6 {
       const z = -length / 2 + (i + 0.5) * length / 6
       { (IsA, StationDark); Position: {2.1, 0, z}; Box: {3.8, 0.05, length / 6 - 0.2} }
@@ -120,7 +197,11 @@ assets {
       { (IsA, StationAmberLight); Position: {4.04, 0, z}; Box: {0.05, 0.06, length / 6 - 0.3} }
       { (IsA, StationAmberLight); Position: {-4.04, 0, z}; Box: {0.05, 0.06, length / 6 - 0.3} }
     }
-    tip : StationRedLight { Position: {0, 0, length / 2 + 0.2}; Sphere: {radius: 0.16, segments: 8} }
+
+    tip : StationRedLight {
+      Position: {0, 0, length / 2 + 0.2}
+      Sphere: {radius: 0.16, segments: 8}
+    }
   }
 
   template StationKeel {
@@ -130,30 +211,66 @@ assets {
     StationKeelStrut spine(length: w) { Position: {0, -2, 0} }
     StationKeelStrut spine_n(length: w - 6) { Position: {0, -2, -d / 3} }
     StationKeelStrut spine_s(length: w - 6) { Position: {0, -2, d / 3} }
+
     for i in 0..3 {
-      StationKeelStrut "cross_{i}"(length: d - 2) { Position: {(i - 1) * w / 3, -2, 0}; Rotation: {0, 1.5708, 0} }
+      StationKeelStrut "cross_{i}"(length: d - 2) {
+        Position: {(i - 1) * w / 3, -2, 0}
+        Rotation: {0, 1.5708, 0}
+      }
     }
 
-    core : StationHull { Position: {0, -5, 0}; Cylinder: {radius: 4, length: 5, segments: 32, smooth: true} }
-    core_band : StationDark { Position: {0, -5, 0}; Cylinder: {radius: 4.05, length: 0.8, segments: 32, smooth: true} }
-    core_nose : StationPanel { Position: {0, -8.7, 0}; Frustum: {radius_bottom: 1.5, radius_top: 4, length: 2.4, segments: 32, smooth: true} }
+    core : StationHull {
+      Position: {0, -5, 0}
+      Cylinder: {radius: 4, length: 5, segments: 32, smooth: true}
+    }
+
+    core_band : StationDark {
+      Position: {0, -5, 0}
+      Cylinder: {radius: 4.05, length: 0.8, segments: 32, smooth: true}
+    }
+
+    core_nose : StationPanel {
+      Position: {0, -8.7, 0}
+      Frustum: {radius_bottom: 1.5, radius_top: 4, length: 2.4, segments: 32, smooth: true}
+    }
+
     for i in 0..8 {
       const a = i * PI / 4
-      { (IsA, StationWindow); Position: {cos(a) * 4.02, -5, sin(a) * 4.02}; Rotation: {0, -a, 0}; Box: {0.08, 0.28, 0.9} }
+      {
+        (IsA, StationWindow)
+        Position: {cos(a) * 4.02, -5, sin(a) * 4.02}
+        Rotation: {0, -a, 0}
+        Box: {0.08, 0.28, 0.9}
+      }
     }
 
     ring {
       Position: {0, -6.5, 0}
       Rotation: {0, 0, 0}
       AngularVelocity: {0, 0.09, 0}
-      tube : StationHull { Position: {0, 0, 0}; Torus: {radius: 11, tube: 0.75, segments: 64, rings: 14, smooth: true} }
+      tube : StationHull {
+        Position: {0, 0, 0}
+        Torus: {radius: 11, tube: 0.75, segments: 64, rings: 14, smooth: true}
+      }
+
       for i in 0..4 {
         const a = i * PI / 2
-        { (IsA, StationTruss); Position: {cos(a) * 7, 0, sin(a) * 7}; Rotation: {0, -a, 0}; Box: {7.2, 0.3, 0.3} }
+        {
+          (IsA, StationTruss)
+          Position: {cos(a) * 7, 0, sin(a) * 7}
+          Rotation: {0, -a, 0}
+          Box: {7.2, 0.3, 0.3}
+        }
       }
+
       for i in 0..24 {
         const a = i * PI / 12
-        { (IsA, StationWindow); Position: {cos(a) * 11.76, 0, sin(a) * 11.76}; Rotation: {0, -a, 0}; Box: {0.04, 0.26, 0.6} }
+        {
+          (IsA, StationWindow)
+          Position: {cos(a) * 11.76, 0, sin(a) * 11.76}
+          Rotation: {0, -a, 0}
+          Box: {0.04, 0.26, 0.6}
+        }
       }
     }
 
@@ -163,11 +280,21 @@ assets {
     StationTank tank_d() { Position: {13, -4.2, -5} }
 
     for i in 0..10 {
-      { (IsA, StationDark); Position: {0, -5 + 2.2 - i * 0.5, 0}; Cylinder: {radius: 4.06, length: 0.04, segments: 32, smooth: true} }
+      {
+        (IsA, StationDark)
+        Position: {0, -5 + 2.2 - i * 0.5, 0}
+        Cylinder: {radius: 4.06, length: 0.04, segments: 32, smooth: true}
+      }
     }
+
     for i in 0..16 {
       const a = i * PI / 8
-      { (IsA, StationCopper); Position: {cos(a) * 3.1, -9.4, sin(a) * 3.1}; Rotation: {0, -a, 0.65}; Box: {0.05, 2.6, 0.05} }
+      {
+        (IsA, StationCopper)
+        Position: {cos(a) * 3.1, -9.4, sin(a) * 3.1}
+        Rotation: {0, -a, 0.65}
+        Box: {0.05, 2.6, 0.05}
+      }
     }
 
     StationRadiator rad_a(length: 14) { Position: {-12, -1.6, -25} }
@@ -182,16 +309,27 @@ assets {
 
   template StationBeacon {
     mast : StationTruss { Position: {0, 4, 0}; Cylinder: {radius: 0.09, length: 8, segments: 8} }
+
     for i in 0..3 {
       { (IsA, StationTruss); Position: {0, 2 + i * 2, 0}; Box: {1.4 - i * 0.3, 0.06, 0.06} }
       { (IsA, StationTruss); Position: {0, 2 + i * 2, 0}; Box: {0.06, 0.06, 1.4 - i * 0.3} }
     }
-    tip : StationRedLight { Position: {0, 8.15, 0}; Sphere: {radius: 0.2, segments: 10, smooth: true} }
+
+    tip : StationRedLight {
+      Position: {0, 8.15, 0}
+      Sphere: {radius: 0.2, segments: 10, smooth: true}
+    }
+
     dish {
       Position: {0, 6.2, 0}
       Rotation: {0, 0, 0}
       AngularVelocity: {0, 0.4, 0}
-      bowl : StationWhite { Position: {0.7, 0, 0}; Rotation: {0, 0, 1.1}; HemiSphere: {radius: 0.9, segments: 16, smooth: true} }
+      bowl : StationWhite {
+        Position: {0.7, 0, 0}
+        Rotation: {0, 0, 1.1}
+        HemiSphere: {radius: 0.9, segments: 16, smooth: true}
+      }
+
       feed : StationGold { Position: {1.3, 0.2, 0}; Sphere: {radius: 0.08, segments: 8} }
     }
   }
@@ -213,6 +351,7 @@ assets {
       PbrTextures: {albedo: planet_tex, emissive: planet_night_tex}
       NoShadow
     }
+
     clouds {
       Position: {0, 0, 0}
       Rotation: {0, 0, 0.3}
@@ -224,6 +363,7 @@ assets {
       PbrTextures: {albedo: planet_cloud_tex}
       NoShadow
     }
+
     halo {
       Position: {0, 0, 0}
       Rotation: {0.32, -0.77, 0}
@@ -247,13 +387,28 @@ assets {
 
     body {
       Position: {radius, 0, 0}
-      hull : StationWhite { Position: {0, 0, 0}; Sphere: {radius: 0.26, segments: 14, smooth: true} }
-      band : StationDark { Position: {0, 0, 0}; Cylinder: {radius: 0.28, length: 0.07, segments: 14, smooth: true} }
+      hull : StationWhite {
+        Position: {0, 0, 0}
+        Sphere: {radius: 0.26, segments: 14, smooth: true}
+      }
+
+      band : StationDark {
+        Position: {0, 0, 0}
+        Cylinder: {radius: 0.28, length: 0.07, segments: 14, smooth: true}
+      }
+
       eye : StationCyanLight { Position: {0, 0.02, 0.26}; Sphere: {radius: 0.06, segments: 8} }
       arm_a : StationTruss { Position: {0.42, 0, 0}; Box: {0.4, 0.03, 0.03} }
       arm_b : StationTruss { Position: {-0.42, 0, 0}; Box: {0.4, 0.03, 0.03} }
-      pod_a : StationPlasma { Position: {0.64, 0, 0}; Cylinder: {radius: 0.07, length: 0.05, segments: 8} }
-      pod_b : StationPlasma { Position: {-0.64, 0, 0}; Cylinder: {radius: 0.07, length: 0.05, segments: 8} }
+      pod_a : StationPlasma {
+        Position: {0.64, 0, 0}
+        Cylinder: {radius: 0.07, length: 0.05, segments: 8}
+      }
+
+      pod_b : StationPlasma {
+        Position: {-0.64, 0, 0}
+        Cylinder: {radius: 0.07, length: 0.05, segments: 8}
+      }
     }
   }
 

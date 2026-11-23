@@ -6,7 +6,12 @@ box { audio { Song { Rgb: {130, 160, 255} } } }
 
 assets {
   orbit_space {
-    Bus: {output: master, kind: ChannelReturn, volume: state.reverb_level / 100, effects: [orbit_space]}
+    Bus: {
+      output: master,
+      kind: ChannelReturn,
+      volume: state.reverb_level / 100,
+      effects: [orbit_space]
+    }
     Reverb: {decay: 7, damping: 0.5, predelay: 0.06, size: 1}
   }
 
@@ -24,6 +29,7 @@ assets {
       Oscillator: {wave: Triangle, frequency: 440, level: 0.22}
       Unison: {voices: 3, detune: 9, width: 0.85}
     }
+
     air { Oscillator: {wave: Sine, frequency: 880, level: 0.035} }
   }
 
@@ -45,12 +51,14 @@ assets {
         Envelope: {attack: 2.2, decay: 3.5, curve: 2}
       }
     }
+
     halo {
       Oscillator: {wave: Sine, frequency: 880, level: 0.065}
       Envelope: {attack: 2.6, decay: 11, curve: 0.8}
       Unison: {voices: 2, detune: 7, width: 1}
       Lfo: {rate: 0.16, random_phase: true, amplitude: 0.15}
     }
+
     glass {
       Oscillator: {wave: Sine, frequency: 1848, level: 0.035}
       Envelope: {attack: 2, decay: 2.8, curve: 2}
@@ -67,10 +75,12 @@ assets {
       Oscillator: {wave: Triangle, frequency: 440, level: 0.24}
       Unison: {voices: 3, detune: 6, width: 0.45}
     }
+
     breath {
       Oscillator: {wave: Saw, frequency: 440, level: 0.045}
       Lfo: {rate: 0.13, random_phase: true, amplitude: 0.18}
     }
+
     warmth { Oscillator: {wave: Sine, frequency: 220, level: 0.05} }
   }
 

@@ -30,7 +30,7 @@ const AREA_SUN_FAR: f32 = 1000.0;
 // Distance outside the planes of an entry a fragment still counts as seen through it.
 const AREA_ENTRY_SLACK: f32 = 0.02;
 
-@group(0) @binding(24) var<uniform> area_block: array<vec4f, 4096>;
+@group(0) @binding(30) var<uniform> area_block: array<vec4f, 4096>;
 
 // Index of the area of the fragment, 0 for the outdoors, -1 without areas (area_fragment).
 var<private> fragment_area: i32 = -1;

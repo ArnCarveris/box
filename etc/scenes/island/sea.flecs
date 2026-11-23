@@ -1,0 +1,127 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+using box.render
+using state
+using assets
+
+assets {
+  island_wave_h {
+    Gen: {
+      width: 512,
+      height: 512,
+      seed: 401,
+      layers: [
+        {kind: GenNoise, frequency: 5, octaves: 4, amount: 1},
+        {kind: GenNoise, frequency: 22, octaves: 3, amount: 0.3, seed: 1}
+      ]
+    }
+  }
+
+  island_wave_n { Gen: {source: island_wave_h, output: GenNormal, strength: 1.2} }
+
+  island_foam_h {
+    Gen: {
+      width: 512,
+      height: 512,
+      seed: 402,
+      layers: [
+        {kind: GenCells, count: 26, amount: 0.5},
+        {kind: GenCells, count: 380, distance: GenEdge, edge: 0.45, amount: -0.45, seed: 1},
+        {kind: GenCells, count: 1500, distance: GenEdge, edge: 0.5, amount: -0.15, seed: 2},
+        {kind: GenNoise, frequency: 6, octaves: 3, amount: 0.4, seed: 3}
+      ]
+    }
+  }
+
+  prefab IslandOceanWater {
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 0.1}
+    Water: {
+      shallow_color: {
+        forest_seasonal(season, 60, 64, 62, 70),
+        forest_seasonal(season, 204, 214, 196, 170),
+        forest_seasonal(season, 190, 198, 184, 170)
+      },
+      deep_color: {
+        forest_seasonal(season, 8, 10, 10, 16),
+        forest_seasonal(season, 84, 96, 78, 62),
+        forest_seasonal(season, 124, 136, 116, 96)
+      },
+      depth: 7,
+      visibility: 16,
+      absorption: {84, 198, 190},
+      refraction: 0.012,
+      foam_color: {240, 250, 248},
+      foam_width: 0.22,
+      foam_texture: island_foam_h,
+      foam_scale: 2,
+      scatter_color: {46, 214, 178},
+      scatter: 0.8,
+      ripple_scale: 0.37,
+      ripple_velocity: {-0.006, 0.004},
+      shore_period: 6,
+      shore_reach: 0.6
+    }
+    WaterCaustics: {strength: 1.5, scale: 1.2, speed: 0.35, depth: 5}
+    PbrTextures: {normal: island_wave_n}
+    texture.Mapping: {mode: MappingWorld, size: 23}
+    texture.Scroll: {velocity: {0.004, 0.01}}
+    texture.Layers: {layers: [layer_rain_rings]}
+    WaterWaves: {
+      waves: [
+        {direction: {WIND_DIR_X, WIND_DIR_Z}, wavelength: 46, amplitude: 0.3 + 0.05 * wind,
+          steepness: 0.3},
+        {direction: {0.6, 0.8}, wavelength: 17, amplitude: 0.1 + 0.02 * wind, steepness: 0.35},
+        {direction: {-0.5, 0.86}, wavelength: 7, amplitude: 0.04, steepness: 0.3}
+      ]
+    }
+    WaterSpectrum: {
+      wind_speed: 2 + wind,
+      wind_direction: {WIND_DIR_X, WIND_DIR_Z},
+      size: 97,
+      cascades: 3,
+      resolution: 128,
+      directionality: 0.75,
+      amplitude: 1,
+      seed: 7,
+      detail: 0.2
+    }
+    NoShadow
+  }
+
+  prefab IslandLakeWater {
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 0.06}
+    Water: {
+      shallow_color: {70, 190, 170},
+      deep_color: {12, 86, 96},
+      depth: 4,
+      visibility: 8,
+      absorption: {90, 200, 180},
+      refraction: 0.01,
+      foam_color: {236, 244, 240},
+      foam_width: 0.08,
+      foam_texture: island_foam_h,
+      foam_scale: 2,
+      ripple_scale: 2.2,
+      ripple_velocity: {0.01, 0.015}
+    }
+    PbrTextures: {normal: island_wave_n}
+    texture.Mapping: {mode: MappingWorld, size: 6}
+    texture.Layers: {layers: [layer_rain_rings]}
+    NoShadow
+  }
+
+  prefab IslandLakeIce {
+    Rgb: {214, 228, 236}
+    PbrMaterial: {roughness: 0.35}
+    PbrTextures: {normal: forest_snow_n}
+    texture.Mapping: {mode: MappingWorld, size: 14}
+    texture.Layers: {layers: [island_peak_snow]}
+    NoShadow
+  }
+}

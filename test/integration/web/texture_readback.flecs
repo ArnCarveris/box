@@ -1,0 +1,63 @@
+// The scene of the browser check of TextureReadback (texture_readback.mjs). Three graphs of
+// one ridged noise keep a CPU copy of their image: a GraphColor (RGBA8) one that the quad shows,
+// a GraphFloat (r32float) window of heights in meters and a GraphHdr (rgba16float) one. The page
+// opens a window only for a scene with a Surface; its 640x480 points fill the viewport of the
+// check.
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+using box.camera
+using box.view
+using box.light
+using box.surface
+
+window {
+  Surface: {width: 640, height: 480}
+}
+
+camera {
+  Position: {0, 0, 6}
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {20, 22, 30, 255}}}
+}
+
+$ {
+  AmbientLight: {sky: {60, 60, 60}, ground: {60, 60, 60}}
+}
+
+ridged {
+  nodes.Noise: {frequency: 0.01, octaves: 4, lacunarity: 2, gain: 0.5, fractal: NoiseRidged,
+    offset: 1}
+}
+
+height {
+  nodes.Multiply: {a: ridged, b_value: {2000, 2000, 2000, 1}}
+}
+
+colors {
+  Graph: {output: ridged, width: 64, domain: DomainWorld,
+    window: {x: 1000000, z: -2000, width: 256}}
+  Readback: {}
+}
+
+heights {
+  Graph: {output: height, width: 64, domain: DomainWorld, format: GraphFloat,
+    window: {x: 1000000, z: -2000, width: 256}}
+  Readback: {}
+}
+
+hdr {
+  Graph: {output: ridged, width: 64, format: GraphHdr}
+  Readback: {level: 1}
+}
+
+colors_quad {
+  Quad: {2, 2}
+  Rgb: {255, 255, 255}
+  PbrMaterial: {roughness: 1}
+  PbrTextures: {albedo: colors}
+}

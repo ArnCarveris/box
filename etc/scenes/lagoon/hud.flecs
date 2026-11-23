@@ -18,12 +18,14 @@ state {
   // Seconds of a run the steering hint stays up, and how long the coconut count pops
   export const HINT_TIME: f32 = 6
   export const POP_TIME: f32 = 0.18
-  // Opacity of a lost hull life
   export const LOST_ALPHA: f32 = 0.22
+  // Seconds the "Faster!" cue stays up once the pace steps up
+  export const FASTER_TIME: f32 = 1.4
 
   // Written by the HUD loop only when they change, so the HUD does not rebuild every frame
   export mut hud_hint: bool = true
   export mut hud_pop: bool = false
+  export mut hud_faster: bool = false
   // True from the frame after the game is over, so the capsized panel is created clear and fades in
   export mut hud_panel: bool = false
 }
@@ -56,10 +58,26 @@ assets {
     Rgb: {110, 68, 36}
     Border: {width: 2, color: {54, 30, 14, 255}}
     patch { Position: {size * 0.1, size * 0.1, 0.05}; Circle: {size * 0.3}; Rgb: {146, 96, 54} }
-    eye_0 { Position: {0 - size * 0.12, 0 - size * 0.02, 0.1}; Circle: {size * 0.075}; Rgb: {44, 24, 10} }
-    eye_1 { Position: {size * 0.12, 0 - size * 0.02, 0.1}; Circle: {size * 0.075}; Rgb: {44, 24, 10} }
+    eye_0 {
+      Position: {0 - size * 0.12, 0 - size * 0.02, 0.1}
+      Circle: {size * 0.075}
+      Rgb: {44, 24, 10}
+    }
+
+    eye_1 {
+      Position: {size * 0.12, 0 - size * 0.02, 0.1}
+      Circle: {size * 0.075}
+      Rgb: {44, 24, 10}
+    }
+
     eye_2 { Position: {0, 0 - size * 0.2, 0.1}; Circle: {size * 0.075}; Rgb: {44, 24, 10} }
-    shine { Position: {0 - size * 0.2, size * 0.22, 0.12}; Circle: {size * 0.07}; Rgb: {255, 240, 214}; Opacity: {0.6} }
+    shine {
+      Position: {0 - size * 0.2, size * 0.22, 0.12}
+      Circle: {size * 0.07}
+      Rgb: {255, 240, 214}
+      Opacity: {0.6}
+    }
+
     leaf {
       Position: {size * 0.26, size * 0.44, 0.15}
       Rotation: {0, 0, 0.6}
@@ -77,6 +95,7 @@ assets {
     Item: {width: {mode: Fixed, value: size}, height: {mode: Fixed, value: size}}
     Transition: [Opacity: {duration: 0.4, timing_function: EaseOut}]
     Opacity: {idx < lives ? 1 : LOST_ALPHA}
+
     for k in 0..5 {
       const a = HALF_PI + k * 1.2566
       "petal_{k}" {
@@ -86,6 +105,7 @@ assets {
         Border: {width: 1.4, color: {150, 24, 54, 255}}
       }
     }
+
     heart { Position: {0, 0, 0.1}; Circle: {size * 0.13}; Rgb: {255, 206, 84} }
     stamen { Position: {size * 0.06, size * 0.07, 0.15}; Circle: {size * 0.05}; Rgb: {200, 30, 40} }
   }
@@ -101,7 +121,7 @@ assets {
 }
 
 lg_hud {
-  Scene: {blend_modes: true}
+  Scene: {shader_features: {Extended: {blend_modes: true}}}
 
   camera {
     Position: {0, 0, 100}
@@ -112,7 +132,6 @@ lg_hud {
     Fill: {surface: window}
     Layout: {}
 
-    // Top left: the coconut count, it pops when it rises
     LgBadge nuts() {
       Item: {h: Left, v: Top, x: 20, y: -20}
       LgNutIcon icon(size: 40)
@@ -127,9 +146,9 @@ lg_hud {
       }
     }
 
-    // Top right: the hull lives
     LgBadge lives() {
       Item: {h: Right, v: Top, x: -20, y: -20}
+
       for i in 0..MAX_LIVES {
         "life_{i}" {
           LgLifeIcon: {size: 40, idx: i}
@@ -137,7 +156,18 @@ lg_hud {
       }
     }
 
-    // Bottom center, the first seconds of a run
+    // A small cue under the top edge when the pace steps up
+    faster {
+      Item: {h: Center, v: Top, y: -24}
+      Layout: {direction: Row, padding: {6, 6, 16, 16}}
+      Rect: {1, 1}
+      Rgb: C_HUD_BG
+      Border: {width: 2, radius: 16, color: {255, 210, 136, 255}}
+      Transition: [Opacity: {duration: 0.35, timing_function: EaseOut}]
+      Opacity: {hud_faster ? 0.9 : 0}
+      LgShadowText label(text: "Faster!", size: 24, color: {255, 222, 150})
+    }
+
     hint {
       Item: {h: Center, v: Bottom, y: 24}
       Layout: {direction: Row, padding: {8, 8, 18, 18}}
@@ -173,6 +203,7 @@ lg_hud {
 
         waves {
           Layout: {direction: Row, spacing: 8}
+
           for k in 0..11 {
             "wave_{k}" {
               Item: {width: {mode: Fixed, value: 12}, height: {mode: Fixed, value: 12}}
@@ -185,6 +216,7 @@ lg_hud {
         result {
           Layout: {direction: Row, spacing: 12, v: Middle}
           LgNutIcon icon(size: 34)
+
           if coconuts == 1 {
             LgShadowText label(text: "1 coconut gathered", size: 30)
           } else {
@@ -202,33 +234,63 @@ lg_hud {
   }
 }
 
-// Shows the hint at the start of a run, pops the count when a coconut is gathered and shows the
-// capsized panel the frame after the game is over
 async {
   mut last_nuts: i32 = coconuts
   mut pop_t: f32 = 0
+  mut last_pace: f32 = pace
+  mut faster_t: f32 = 0
   mut was_over: bool = false
+
   while true {
     await next_frame()
     const show = game_state == GS_PLAYING && clock < HINT_TIME
+
     if show != hud_hint {
       hud_hint = show
     }
+
     const over = game_state == GS_OVER
     const panel = over && was_over
+
     if panel != hud_panel {
       hud_panel = panel
     }
+
     was_over = over
+
     if coconuts > last_nuts {
       pop_t = POP_TIME
+
       if !hud_pop {
         hud_pop = true
       }
     }
+
     last_nuts = coconuts
+
+    if pace > last_pace && game_state == GS_PLAYING {
+      faster_t = FASTER_TIME
+    }
+
+    last_pace = pace
+
+    if game_state != GS_PLAYING {
+      faster_t = 0
+    }
+
+    if faster_t > 0 {
+      faster_t -= dt
+    }
+
+    const fast = faster_t > 0
+
+    if fast != hud_faster {
+      hud_faster = fast
+    }
+
     if pop_t > 0 {
       pop_t -= dt
+
       if pop_t <= 0 && hud_pop {
         hud_pop = false
       }

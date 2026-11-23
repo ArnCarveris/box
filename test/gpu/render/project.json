@@ -12,7 +12,8 @@
             "../../../src/render",
             "../../../src/texture",
             "../../../src/geometry",
-            "../../../src/spatial"
+            "../../../src/spatial",
+            "../../../src/terrain"
         ]
     },
     "test": {
@@ -27,6 +28,53 @@
                 ]
             },
             {
+                "id": "Impostor",
+                "testcases": [
+                    "direction_round_trip",
+                    "hemisphere_layout",
+                    "sphere_layout",
+                    "status_after_bake",
+                    "instances_share_prefab",
+                    "hemisphere_colors_match_directions",
+                    "sphere_colors_match_directions",
+                    "background_uncovered",
+                    "dilation_fills_border",
+                    "normal_and_depth",
+                    "cutout_coverage",
+                    "material_change_rebakes",
+                    "unchanged_does_not_rebake",
+                    "budget_spreads_bake",
+                    "remove_frees_atlases",
+                    "not_ready_cannot_write",
+                    "card_matches_full_render",
+                    "crossfade_covers_once",
+                    "card_casts_shadow"
+                ]
+            },
+            {
+                "id": "DrawRange",
+                "testcases": [
+                    "beyond_far_not_drawn",
+                    "inside_range_drawn",
+                    "nearer_than_near_not_drawn",
+                    "fade_out_band_draws_share",
+                    "fade_in_band_draws_share",
+                    "fade_is_stable",
+                    "complementary_cover_once",
+                    "complementary_opaque_no_holes",
+                    "inherited_from_prefab",
+                    "inherited_from_parent",
+                    "own_range_overrides_parent",
+                    "set_and_removed_after_drawn",
+                    "stats_count_range_culled",
+                    "out_of_frustum_counts_as_range_culled",
+                    "with_levels_of_detail",
+                    "beyond_far_casts_no_shadow",
+                    "inside_range_casts_shadow",
+                    "fade_band_dims_shadow"
+                ]
+            },
+            {
                 "id": "MeshLod",
                 "testcases": [
                     "far_sphere_level_2",
@@ -38,7 +86,10 @@
                     "far_lathe_and_sweep_level_2",
                     "culling_off",
                     "occlusion",
-                    "one_level_unchanged"
+                    "one_level_unchanged",
+                    "fade_ranged_both_levels",
+                    "fade_unranged_one_level",
+                    "fade_outside_band_one_level"
                 ]
             },
             {
@@ -318,6 +369,8 @@
                 "testcases": [
                     "shallow_closer_to_shallow_color",
                     "object_fades_with_depth",
+                    "absorption_tints_with_depth",
+                    "absorption_white_keeps_colors",
                     "foam_at_shore",
                     "foam_texture_breaks_up",
                     "sky_counts_as_deep",
@@ -325,6 +378,91 @@
                     "off_draws_without_water",
                     "off_equals_without_water",
                     "still_uploads_nothing"
+                ]
+            },
+            {
+                "id": "WaterWaves",
+                "testcases": [
+                    "periodic_along_direction",
+                    "moves_over_time",
+                    "flow_moves_pattern",
+                    "far_waves_fade",
+                    "without_waves_unchanged",
+                    "ignored_without_water"
+                ]
+            },
+            {
+                "id": "WaterScatter",
+                "testcases": [
+                    "crests_glow_toward_sun",
+                    "sun_behind_small",
+                    "zero_unchanged",
+                    "without_waves_faint"
+                ]
+            },
+            {
+                "id": "WaterShore",
+                "testcases": [
+                    "waves_move",
+                    "beyond_reach_clear",
+                    "zero_period_unchanged"
+                ]
+            },
+            {
+                "id": "WaterGlint",
+                "testcases": [
+                    "far_glitter_wider",
+                    "near_unchanged"
+                ]
+            },
+            {
+                "id": "WaterCaustics",
+                "testcases": [
+                    "lit_floor_varies",
+                    "none_in_shadow",
+                    "strength_zero_unchanged",
+                    "deep_floor_unchanged",
+                    "move_over_time"
+                ]
+            },
+            {
+                "id": "WaterFlowTextures",
+                "testcases": [
+                    "foam_moves_with_flow",
+                    "foam_still_without_textures",
+                    "no_seam_in_field"
+                ]
+            },
+            {
+                "id": "WaterRipples",
+                "testcases": [
+                    "ring_spreads",
+                    "ring_decays",
+                    "wake_behind_source",
+                    "ring_drifts_with_flow",
+                    "follow_keeps_ripples",
+                    "deterministic",
+                    "no_field_without_component",
+                    "foam_trail_behind_source",
+                    "foam_fades",
+                    "foam_drifts_with_flow",
+                    "foam_spreads",
+                    "crest_foam",
+                    "no_foam_without_foam",
+                    "foam_follows_local_flow",
+                    "foam_bends_with_flow",
+                    "uniform_flow_unchanged"
+                ]
+            },
+            {
+                "id": "WaterSpectrum",
+                "testcases": [
+                    "fft_single_frequency",
+                    "slopes_mean_zero",
+                    "variance_grows_with_wind",
+                    "changes_over_time",
+                    "flat_without_wind",
+                    "ignored_without_water"
                 ]
             },
             {
@@ -349,6 +487,42 @@
                     "opacity_ignored_when_opaque",
                     "scene_off_unchanged",
                     "ignored_by_2d"
+                ]
+            },
+            {
+                "id": "WindSway",
+                "testcases": [
+                    "calm_matches_without",
+                    "bends_downwind",
+                    "shadow_follows",
+                    "plain_mesh_unchanged",
+                    "scene_off_draws_without",
+                    "gusts_roll",
+                    "local_base_any_height"
+                ]
+            },
+            {
+                "id": "WindHierarchy",
+                "testcases": [
+                    "branches_turn_about_pivots",
+                    "stiff_branches_still",
+                    "without_data_unchanged",
+                    "shadow_follows_branch",
+                    "deep_levels_attached",
+                    "deep_levels_shadow",
+                    "deep_levels_wireframe",
+                    "card_stems_pinned_tips_flutter",
+                    "card_stems_turn_with_twig"
+                ]
+            },
+            {
+                "id": "VertexData",
+                "testcases": [
+                    "draws_same_without",
+                    "no_data_binds_nothing",
+                    "reveal_thresholds",
+                    "reveal_channel_invert",
+                    "reveal_soft_edge"
                 ]
             },
             {
@@ -413,6 +587,7 @@
                     "gpu_mip_shared_color_and_data",
                     "gpu_mip_reload_keeps_color",
                     "gpu_emissive_mip_linear_average",
+                    "gpu_mips_many_textures_one_frame",
                     "gpu_orm_roughness_green",
                     "gpu_orm_metallic_blue",
                     "gpu_orm_occlusion_indirect_only",
@@ -461,6 +636,40 @@
                     "height_contrast",
                     "flat_heights_contrast",
                     "flat_heights_switch"
+                ]
+            },
+            {
+                "id": "TextureLayers",
+                "testcases": [
+                    "mix_constants",
+                    "amount_zero",
+                    "albedo_map",
+                    "porosity",
+                    "texture_blend",
+                    "amount_animates",
+                    "flag_off",
+                    "altitude_below",
+                    "altitude_below_above",
+                    "altitude_below_band",
+                    "water",
+                    "water_ripples"
+                ]
+            },
+            {
+                "id": "MeshGraphLod",
+                "testcases": [
+                    "levels_by_distance",
+                    "far_tree_small_fraction",
+                    "adjacent_silhouettes"
+                ]
+            },
+            {
+                "id": "MeshGraph",
+                "testcases": [
+                    "tube_with_spheres",
+                    "branching_tree",
+                    "broadleaf_crown",
+                    "conifer_crown"
                 ]
             },
             {
@@ -679,6 +888,13 @@
                     "light_leaves_fixture",
                     "tile_counts",
                     "tag_change_renders_tile"
+                ]
+            },
+            {
+                "id": "ShadowStartup",
+                "testcases": [
+                    "cull_ready_shadows_floor",
+                    "cull_late_renders_tile"
                 ]
             },
             {
@@ -1022,6 +1238,24 @@
                 ]
             },
             {
+                "id": "ViewHistory",
+                "testcases": [
+                    "first_frame_invalid",
+                    "second_frame_has_previous_projection",
+                    "frame_index_counts_frames",
+                    "moving_camera_keeps_history",
+                    "resize_resets",
+                    "camera_entity_resets",
+                    "projection_change_resets",
+                    "history_reset_resets",
+                    "two_views_independent",
+                    "pair_swaps_every_frame",
+                    "pair_invalid_after_resize",
+                    "pair_freed_when_unused",
+                    "bloom_reset_clears_temporal"
+                ]
+            },
+            {
                 "id": "ShaderCompile",
                 "testcases": [
                     "failed_recompile_keeps_module",
@@ -1045,6 +1279,15 @@
                     "background_pipelines",
                     "failed_pipeline_ends_task",
                     "bake_reports_probes"
+                ]
+            },
+            {
+                "id": "GpuStats",
+                "testcases": [
+                    "counts_commands",
+                    "counts_triangles",
+                    "counts_culled_triangles",
+                    "detail_off_when_closed"
                 ]
             },
             {
@@ -1123,6 +1366,16 @@
                     "wall_shows_in_facing_face",
                     "perf_run_waits_for_captures",
                     "non_finite_radiance_counts_as_sky"
+                ]
+            },
+            {
+                "id": "ReflectionFollow",
+                "testcases": [
+                    "captures_at_focus",
+                    "recaptures_after_distance",
+                    "blends_previous_capture",
+                    "far_shapes_do_not_queue",
+                    "origin_shift_does_not_recapture"
                 ]
             },
             {
@@ -1407,7 +1660,36 @@
                     "spot_shadow_in_fog",
                     "point_shadow_in_fog",
                     "light_outside_clusters",
-                    "no_new_splits"
+                    "no_new_splits",
+                    "overlap_no_new_pass",
+                    "fog_distance_sky",
+                    "grid_size_4k",
+                    "history_converges",
+                    "history_reset",
+                    "history_camera_turns",
+                    "history_removed_volume",
+                    "history_two_views",
+                    "history_resize",
+                    "history_grazing_slab",
+                    "blended_inside_fogged",
+                    "blended_behind_fogged",
+                    "blended_fog_color",
+                    "blended_in_front_unchanged",
+                    "additive_particles_dimmed",
+                    "no_fog_blended_unchanged",
+                    "blended_no_new_pass",
+                    "falloff_defaults_unchanged",
+                    "ellipsoid_corner",
+                    "ellipsoid_camera_inside",
+                    "height_falloff",
+                    "edge_noise",
+                    "unbounded_sky",
+                    "unbounded_geometry",
+                    "unbounded_height_falloff",
+                    "unbounded_shadow_shaft",
+                    "unbounded_with_bounded",
+                    "unbounded_orthographic",
+                    "unbounded_transmissive_pass_count"
                 ]
             },
             {
@@ -1619,6 +1901,8 @@
                     "time_zero_scale_still",
                     "rate_limits_updates",
                     "undrawn_skips_update",
+                    "layer_amount_zero_skips_update",
+                    "layer_normal_zero_skips_update",
                     "downstream_edit_keeps_upstream",
                     "shared_subgraph",
                     "toggle_back_reuses",
@@ -1657,6 +1941,15 @@
                 ]
             },
             {
+                "id": "TextureRipples",
+                "testcases": [
+                    "plane_tiles",
+                    "density_zero",
+                    "density_follows",
+                    "time_moves"
+                ]
+            },
+            {
                 "id": "TextureGraphRegion",
                 "testcases": [
                     "noise_matches_whole",
@@ -1665,6 +1958,44 @@
                     "full_range_equals_default",
                     "range_edit",
                     "shell_lines_up"
+                ]
+            },
+            {
+                "id": "TextureErosion",
+                "testcases": [
+                    "defaults",
+                    "flat_is_zero",
+                    "gullies_run_down_slope",
+                    "adjacent_windows_match",
+                    "center_from_point"
+                ]
+            },
+            {
+                "id": "TextureGraphWorld",
+                "testcases": [
+                    "adjacent_windows_match",
+                    "coords_meters",
+                    "far_window_smooth",
+                    "far_windows_match",
+                    "float_heights",
+                    "float4_values",
+                    "blur_meters",
+                    "cache_keeps_windows_apart",
+                    "many_windows",
+                    "float_material_defaults"
+                ]
+            },
+            {
+                "id": "TextureReadback",
+                "testcases": [
+                    "r32float",
+                    "rgba16float",
+                    "rgba8",
+                    "r32float_raw",
+                    "before_first_copy",
+                    "graph_change",
+                    "keep_off",
+                    "level"
                 ]
             },
             {
@@ -1782,6 +2113,91 @@
                     "sphere_seam",
                     "zero_strength",
                     "strength_edit_no_recompile"
+                ]
+            },
+            {
+                "id": "Terrain",
+                "testcases": [
+                    "bounded_renders",
+                    "levels_no_cracks",
+                    "focus_refines",
+                    "origin_shift_same_image"
+                ]
+            },
+            {
+                "id": "TerrainQuery",
+                "testcases": [
+                    "heights_match_graph",
+                    "ray_hits",
+                    "walk_slope_stop_at_cliff",
+                    "chunk_waits_for_terrain"
+                ]
+            },
+            {
+                "id": "Grass",
+                "testcases": [
+                    "plane_places_blades",
+                    "thins_with_distance",
+                    "stays_put_as_camera_moves",
+                    "stays_put_across_origin_shift",
+                    "follows_terrain_height",
+                    "mask_weighs_density",
+                    "stats_show_counts_and_time",
+                    "renders_lit_blades",
+                    "clumps_share_facing",
+                    "never_thinner_than_a_pixel",
+                    "varies_over_world",
+                    "wind_stiffness_and_phase",
+                    "bends_in_wind",
+                    "gusts_roll_as_waves",
+                    "casts_into_cascades",
+                    "shadow_counts_apart",
+                    "lights_only_when_enabled",
+                    "shadows_darken_meadow",
+                    "culls_behind_occluder",
+                    "occlusion_follows_camera",
+                    "culls_behind_hills"
+                ]
+            },
+            {
+                "id": "TerrainSample",
+                "testcases": [
+                    "matches_queries",
+                    "tile_edges",
+                    "after_origin_shift",
+                    "coarse_levels_further_out",
+                    "beyond_windows_not_found",
+                    "untagged_has_no_bindings"
+                ]
+            },
+            {
+                "id": "TerrainMaterial",
+                "testcases": [
+                    "mask_matches_graph",
+                    "layers_show_channels",
+                    "levels_seamless",
+                    "triplanar_slope_density",
+                    "sample_renders"
+                ]
+            },
+            {
+                "id": "WorldOrigin",
+                "testcases": [
+                    "shift_same_image",
+                    "rebase_same_image",
+                    "particles_same_image"
+                ]
+            },
+            {
+                "id": "WorldOriginShading",
+                "testcases": [
+                    "mapping_world_shift",
+                    "triplanar_shift",
+                    "mapping_frame_shift",
+                    "texture_layer_shift",
+                    "wind_sway_shift",
+                    "fog_volume_shift",
+                    "far_origin_not_blocky"
                 ]
             }
         ]

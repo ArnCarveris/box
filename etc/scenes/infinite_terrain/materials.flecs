@@ -1,0 +1,224 @@
+using flecs.script
+using flecs.script.math
+using box.material
+using box.texture
+using state
+
+state {
+  export const MAP_ALBEDO: i32 = 0
+  export const MAP_NORMAL: i32 = 1
+  export const MAP_HEIGHT: i32 = 2
+  export const MAP_ORM: i32 = 3
+  export const GROUND_RES: i32 = 1024
+  export const GROUND_MAP_SIZE: f32 = 160
+}
+
+assets {
+  template TerrainGrassMap {
+    prop map: i32 = 0
+    prop seed: i32 = 70
+    prop dry: f32 = 0
+
+    warp_n { nodes.Noise: {channels: 3, frequency: 5, octaves: 2, seed: seed} }
+    warp { nodes.Warp: {offset: warp_n, amount_value: 0.05} }
+    tufts { nodes.Noise: {coords: warp, frequency: 48, octaves: 3, fractal: NoiseBillow, seed: seed + 1} }
+    blades { nodes.Noise: {coords: warp, frequency: 320, octaves: 2, seed: seed + 2} }
+    patch { nodes.Noise: {frequency: 6, octaves: 3, seed: seed + 3} }
+    height { nodes.Mix: {a: tufts, b: blades, factor_value: {0.45, 0, 0, 0}} }
+    soil { nodes.Smoothstep: {input: height, edge0_value: {0.32, 0, 0, 0}, edge1_value: {0.22, 0, 0, 0}} }
+
+    if map == MAP_ALBEDO {
+      tone {
+        nodes.Ramp: {
+          input: height,
+          keys: [
+            {0.2, {38 + 20 * dry, 52 + 4 * dry, 18 + 4 * dry}},
+            {0.4, {62 + 30 * dry, 88 - 4 * dry, 26 + 6 * dry}},
+            {0.55, {86 + 34 * dry, 110 - 6 * dry, 34 + 10 * dry}},
+            {0.7, {112 + 34 * dry, 128 - 2 * dry, 44 + 14 * dry}},
+            {0.85, {146 + 30 * dry, 148 + 4 * dry, 70 + 16 * dry}}
+          ]
+        }
+      }
+
+      straw {
+        nodes.Ramp: {input: patch, keys: [{0.35, {230, 245, 225}}, {0.55, {255, 255, 255}}, {0.75, {255, 232, 178}}]}
+      }
+
+      dried { nodes.Multiply: {a: tone, b: straw} }
+      color { nodes.Mix: {a: dried, b_value: {0.045, 0.034, 0.02, 1}, factor: soil} }
+      Graph: {output: color, width: GROUND_RES}
+    } else if map == MAP_NORMAL {
+      bumps { nodes.Normal: {height: height, strength: 2.5} }
+      Graph: {output: bumps, width: GROUND_RES, format: GraphLinear}
+    } else if map == MAP_HEIGHT {
+      Graph: {output: height, width: GROUND_RES, format: GraphSingle}
+    } else {
+      occlusion { nodes.Remap: {input: height, from_min: 0.15, from_max: 0.6, to_min: 0.55, to_max: 1, clamp: true} }
+      orm { nodes.Combine: {r: occlusion, g_value: 0.9, b_value: 0, a_value: 1} }
+      Graph: {output: orm, width: GROUND_RES}
+    }
+  }
+
+  template TerrainDirtMap {
+    prop map: i32 = 0
+
+    warp_n { nodes.Noise: {channels: 3, frequency: 12, octaves: 2, seed: 30} }
+    warp { nodes.Warp: {offset: warp_n, amount_value: 0.01} }
+    soil { nodes.Noise: {coords: warp, frequency: 12, octaves: 6, gain: 0.55, seed: 31} }
+    grit { nodes.Noise: {frequency: 320, octaves: 2, seed: 32} }
+    stones_c { nodes.Cells: {coords: warp, distance: CellsNearest, count: 900, seed: 33} }
+    stone_d { nodes.Split: {input: stones_c, channel: ChannelR} }
+    stone_r { nodes.Split: {input: stones_c, channel: ChannelB} }
+    stone_t { nodes.Split: {input: stones_c, channel: ChannelA} }
+    stone_on { nodes.Step: {input: stone_r, edge_value: {0.8, 0, 0, 0}} }
+    stone_size { nodes.Remap: {input: stone_t, from_min: 0, from_max: 1, to_min: 0.12, to_max: 0.32} }
+    stone_edge { nodes.Add: {a: stone_size, b_value: {0.06, 0, 0, 0}} }
+    stone_out { nodes.Smoothstep: {input: stone_d, edge0: stone_size, edge1: stone_edge} }
+    stone_in { nodes.Subtract: {a_value: {1, 0, 0, 0}, b: stone_out} }
+    stones { nodes.Multiply: {a: stone_in, b: stone_on} }
+    ground { nodes.Mix: {a: soil, b: grit, factor_value: {0.3, 0, 0, 0}} }
+    ground_low { nodes.Multiply: {a: ground, b_value: {0.5, 0, 0, 0}} }
+    height { nodes.Mix: {a: ground_low, b_value: {0.85, 0, 0, 0}, factor: stones} }
+
+    if map == MAP_ALBEDO {
+      dirt {
+        nodes.Ramp: {
+          input: ground,
+          keys: [{0.25, {52, 40, 30}}, {0.45, {74, 58, 42}}, {0.6, {92, 74, 54}}, {0.8, {108, 90, 68}}]
+        }
+      }
+
+      stone_color {
+        nodes.Ramp: {
+          input: stone_t,
+          keys: [{0, {84, 80, 74}}, {0.4, {112, 106, 96}}, {0.7, {96, 88, 76}}, {1, {126, 118, 104}}]
+        }
+      }
+
+      color { nodes.Mix: {a: dirt, b: stone_color, factor: stones} }
+      Graph: {output: color, width: GROUND_RES}
+    } else if map == MAP_NORMAL {
+      bumps { nodes.Normal: {height: height, strength: 2} }
+      Graph: {output: bumps, width: GROUND_RES, format: GraphLinear}
+    } else if map == MAP_HEIGHT {
+      Graph: {output: height, width: GROUND_RES, format: GraphSingle}
+    } else {
+      rough { nodes.Remap: {input: stones, from_min: 0, from_max: 1, to_min: 0.9, to_max: 0.62, clamp: true} }
+      occlusion { nodes.Remap: {input: height, from_min: 0, from_max: 0.5, to_min: 0.7, to_max: 1, clamp: true} }
+      orm { nodes.Combine: {r: occlusion, g: rough, b_value: 0, a_value: 1} }
+      Graph: {output: orm, width: GROUND_RES, format: GraphLinear}
+    }
+  }
+
+  template TerrainRockMap {
+    prop map: i32 = 0
+
+    ridges { nodes.Noise: {frequency: 5, octaves: 6, fractal: NoiseRidged, seed: 71} }
+    grain { nodes.Noise: {frequency: 128, octaves: 2, seed: 72} }
+    cracks_c { nodes.Cells: {distance: CellsEdge, count: 24, edge: 0.05, seed: 73} }
+    cracks { nodes.Split: {input: cracks_c, channel: ChannelR} }
+    crack_shade { nodes.Remap: {input: cracks, from_min: 0, from_max: 1, to_min: 0.55, to_max: 1, clamp: true} }
+    relief { nodes.Mix: {a: ridges, b: grain, factor_value: {0.2, 0, 0, 0}} }
+    height { nodes.Multiply: {a: relief, b: crack_shade} }
+
+    if map == MAP_ALBEDO {
+      stone {
+        nodes.Ramp: {
+          input: relief,
+          keys: [{0.2, {70, 68, 64}}, {0.45, {112, 108, 100}}, {0.7, {148, 142, 130}}, {0.9, {170, 164, 152}}]
+        }
+      }
+
+      spots { nodes.Noise: {frequency: 36, octaves: 3, seed: 74} }
+      lichen { nodes.Smoothstep: {input: spots, edge0_value: {0.6, 0, 0, 0}, edge1_value: {0.66, 0, 0, 0}} }
+      shaded { nodes.Multiply: {a: stone, b: crack_shade} }
+      color { nodes.Mix: {a: shaded, b_value: {0.36, 0.38, 0.2, 1}, factor: lichen} }
+      Graph: {output: color, width: GROUND_RES}
+    } else if map == MAP_NORMAL {
+      bumps { nodes.Normal: {height: height, strength: 3} }
+      Graph: {output: bumps, width: GROUND_RES, format: GraphLinear}
+    } else if map == MAP_HEIGHT {
+      Graph: {output: height, width: GROUND_RES, format: GraphSingle}
+    } else {
+      occlusion { nodes.Remap: {input: crack_shade, from_min: 0.55, from_max: 1, to_min: 0.5, to_max: 1, clamp: true} }
+      orm { nodes.Combine: {r: occlusion, g_value: 0.82, b_value: 0, a_value: 1} }
+      Graph: {output: orm, width: GROUND_RES, format: GraphLinear}
+    }
+  }
+
+  TerrainGrassMap terrain_rough_albedo(map: MAP_ALBEDO, seed: 90, dry: 0.45)
+  TerrainGrassMap terrain_rough_normal(map: MAP_NORMAL, seed: 90, dry: 0.45)
+  TerrainGrassMap terrain_rough_height(map: MAP_HEIGHT, seed: 90, dry: 0.45)
+  TerrainGrassMap terrain_rough_orm(map: MAP_ORM, seed: 90, dry: 0.45)
+  TerrainGrassMap terrain_grass_albedo(map: MAP_ALBEDO)
+  TerrainGrassMap terrain_grass_normal(map: MAP_NORMAL)
+  TerrainGrassMap terrain_grass_height(map: MAP_HEIGHT)
+  TerrainGrassMap terrain_grass_orm(map: MAP_ORM)
+  TerrainDirtMap terrain_dirt_albedo(map: MAP_ALBEDO)
+  TerrainDirtMap terrain_dirt_normal(map: MAP_NORMAL)
+  TerrainDirtMap terrain_dirt_height(map: MAP_HEIGHT)
+  TerrainDirtMap terrain_dirt_orm(map: MAP_ORM)
+  TerrainRockMap terrain_rock_albedo(map: MAP_ALBEDO)
+  TerrainRockMap terrain_rock_normal(map: MAP_NORMAL)
+  TerrainRockMap terrain_rock_height(map: MAP_HEIGHT)
+  TerrainRockMap terrain_rock_orm(map: MAP_ORM)
+
+  terrain_rough {
+    PbrTextures: {albedo: terrain_rough_albedo, normal: terrain_rough_normal, orm: terrain_rough_orm}
+    texture.Transform: {scale_x: 32, scale_y: 32}
+  }
+
+  terrain_grass {
+    PbrTextures: {albedo: terrain_grass_albedo, normal: terrain_grass_normal, orm: terrain_grass_orm}
+    texture.Transform: {scale_x: 40, scale_y: 40}
+  }
+
+  terrain_dirt {
+    PbrTextures: {albedo: terrain_dirt_albedo, normal: terrain_dirt_normal, orm: terrain_dirt_orm}
+    texture.Transform: {scale_x: 56, scale_y: 56}
+  }
+
+  terrain_rock {
+    PbrTextures: {albedo: terrain_rock_albedo, normal: terrain_rock_normal, orm: terrain_rock_orm}
+    texture.Transform: {scale_x: 16, scale_y: 16}
+  }
+
+  terrain_snow_drifts {
+    n { nodes.Noise: {frequency: 3, octaves: 4, seed: 315} }
+    soft { nodes.Remap: {input: n, from_min: 0.25, from_max: 0.75, to_min: 0.05, to_max: 1, clamp: true} }
+    Graph: {output: soft, width: 256, format: GraphSingle}
+  }
+
+  terrain_snow_n {
+    lumps { nodes.Noise: {frequency: 24, octaves: 4, fractal: NoiseBillow, seed: 316} }
+    normal { nodes.Normal: {height: lumps, strength: 0.8} }
+    Graph: {output: normal, width: 512, format: GraphLinear}
+  }
+
+  terrain_peak_snow {
+    texture.Layer: {
+      amount: 0.4,
+      direction: {0, 1, 0},
+      facing: 0.45,
+      mask: terrain_snow_drifts,
+      cavity: 0.3,
+      contrast: 5,
+      albedo: LayerMix,
+      roughness: LayerMix,
+      metallic: LayerMix,
+      occlusion: LayerKeep,
+      normal: 0.6,
+      altitude: SNOW_LINE,
+      altitude_fade: SNOW_FADE
+    }
+    Rgb: {238, 242, 250}
+    PbrMaterial: {roughness: 0.7, metallic: 0}
+    PbrTextures: {normal: terrain_snow_n}
+    texture.Mapping: {mode: MappingWorld, size: 60}
+  }
+
+  terrain_clouds {
+    Gen: {width: 512, seed: 17, layers: [{kind: GenNoise, frequency: 4, octaves: 5, gain: 0.55}]}
+  }
+}

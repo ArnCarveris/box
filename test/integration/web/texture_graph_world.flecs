@@ -1,0 +1,95 @@
+// The scene of the browser check of TextureGraph on DomainWorld (texture_graph_world.mjs), which
+// renders on the main thread. The page opens a window only for a scene with a Surface; its
+// 640x480 points fill the viewport of the check. Three quads facing the camera share one graph
+// of ridged noise a million meters from the origin, blurred by 8 m and with its slope. The left
+// quad shows the blurred noise of a 512 m window (GraphColor, in red as a Scalar shows): a
+// pattern of dark and light red. The middle quad names a GraphFloat window of the heights in
+// meters and the right one a GraphFloat4 window of the slope; a material can not filter float32
+// images on the web, so both show white.
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+using box.camera
+using box.view
+using box.light
+using box.surface
+
+window {
+  Surface: {width: 640, height: 480}
+}
+
+camera {
+  Position: {0, 0, 6}
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {20, 22, 30, 255}}}
+}
+
+$ {
+  AmbientLight: {sky: {60, 60, 60}, ground: {60, 60, 60}}
+}
+
+sun {
+  Rotation: {0, 3.14159265, 0}
+  DirectionalLight: {intensity: 3.14159265}
+  Rgb: {255, 255, 255}
+}
+
+ridged {
+  nodes.Noise: {frequency: 0.01, octaves: 5, lacunarity: 2, gain: 0.5, fractal: NoiseRidged,
+    offset: 1}
+}
+
+blurred {
+  nodes.Blur: {input: ridged, radius: 8}
+}
+
+height {
+  nodes.Multiply: {a: blurred, b_value: {2000, 2000, 2000, 1}}
+}
+
+slope {
+  nodes.Slope: {height: height, strength: 1}
+}
+
+pattern {
+  Graph: {output: blurred, width: 129, domain: DomainWorld,
+    window: {x: 1000000, z: -2000, width: 512}}
+}
+
+heights {
+  Graph: {output: height, width: 129, domain: DomainWorld, format: GraphFloat,
+    window: {x: 1000000, z: -2000, width: 512}}
+}
+
+slopes {
+  Graph: {output: slope, width: 129, domain: DomainWorld, format: GraphFloat4,
+    window: {x: 1000512, z: -2000, width: 512}}
+}
+
+pattern_quad {
+  Position: {-2.4, 0, 0}
+  Quad: {2, 2}
+  Rgb: {255, 255, 255}
+  PbrMaterial: {roughness: 1}
+  PbrTextures: {albedo: pattern}
+}
+
+heights_quad {
+  Position: {0, 0, 0}
+  Quad: {2, 2}
+  Rgb: {255, 255, 255}
+  PbrMaterial: {roughness: 1}
+  PbrTextures: {albedo: heights}
+}
+
+slopes_quad {
+  Position: {2.4, 0, 0}
+  Quad: {2, 2}
+  Rgb: {255, 255, 255}
+  PbrMaterial: {roughness: 1}
+  PbrTextures: {albedo: slopes}
+}

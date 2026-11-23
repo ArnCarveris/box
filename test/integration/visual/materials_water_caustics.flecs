@@ -1,0 +1,121 @@
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+using box.camera
+using box.view
+using box.light
+
+$ {
+  Scene: {shader_features: {Extended: {water: true, texture_scroll: true}}}
+}
+
+// A shallow pool (Water) over a sandy floor that slopes from a dry shore in front of the camera
+// to 2.3 deep at the back, seen from above at an angle in a high sun from behind. Its
+// WaterCaustics draw a moving web of bright lines on the sand that is sharp in the shallows and
+// blurs and fades out toward the deep back of the pool, and also light the submerged stone. A
+// wooden footbridge across the pool casts its shadow on the floor, where the caustics stop. A
+// slow WaterFlow along +x carries the pattern; a generated normal map scrolled by texture.Scroll
+// ripples the surface.
+// frames: 60
+water_caustics {
+  Scene: {shader_features: {Extended: {water: true, texture_scroll: true}}}
+  AmbientLight: {sky: {150, 175, 210}, ground: {80, 72, 58}, intensity: 0.5}
+
+  sun {
+    Rotation: {1.0, 0.6, 0}
+    DirectionalLight: {intensity: 3.2}
+    Rgb: {255, 246, 230}
+  }
+
+  camera {
+    Position: {0, 7, 9}
+    Rotation: {-0.65, 0, 0}
+    Camera: {fov: 50}
+  }
+
+  main_view {
+    View: {camera: camera, clear: {enabled: true, color: {150, 175, 205, 255}},
+      shadows: {enabled: true}}
+  }
+
+  detail_height {
+    Gen: {
+      width: 256, height: 256, seed: 7
+      layers: [
+        {kind: GenNoise, frequency: 6, octaves: 3, amount: 1}
+      ]
+    }
+  }
+
+  detail {
+    Gen: {source: detail_height, output: GenNormal, strength: 0.6}
+  }
+
+  // Tilted so its top runs from 0.08 above the water in front to 2.3 below it at the back
+  floor {
+    Position: {0, -1.3, 0}
+    Rotation: {-0.17, 0, 0}
+    Box: {30, 0.4, 30}
+    Rgb: {214, 192, 150}
+    PbrMaterial: {roughness: 0.95}
+  }
+
+  stone {
+    Position: {-1.8, -0.75, 2.5}
+    Rotation: {0.3, 0.9, 0.1}
+    Scale: {1.3, 0.7, 1.1}
+    IcoSphere: {segments: 1, radius: 0.6}
+    Rgb: {120, 114, 104}
+    PbrMaterial: {roughness: 0.9}
+  }
+
+  bridge {
+    Position: {0.5, 0.6, -3}
+
+    deck {
+      Position: {0, 0, 0}
+      Box: {12, 0.12, 1.3}
+      Rgb: {124, 88, 58}
+      PbrMaterial: {roughness: 0.8}
+    }
+
+    post_left {
+      Position: {-3, -1.2, 0}
+      Box: {0.2, 2.4, 0.2}
+      Rgb: {98, 70, 46}
+      PbrMaterial: {roughness: 0.8}
+    }
+
+    post_right {
+      Position: {3.5, -1.2, 0}
+      Box: {0.2, 2.4, 0.2}
+      Rgb: {98, 70, 46}
+      PbrMaterial: {roughness: 0.8}
+    }
+  }
+
+  pool {
+    Position: {0, 0, 0}
+    Rotation: {-1.5708, 0, 0}
+    Quad: {30, 30}
+    Rgb: {255, 255, 255}
+    PbrMaterial: {metallic: 0, roughness: 0.05}
+    PbrTextures: {normal: detail}
+    texture.Transform: {scale_x: 6, scale_y: 6, offset_x: 0, offset_y: 0}
+    texture.Scroll: {velocity: {0, 0}, normal_velocity: {0.012, 0.006}}
+    Water: {
+      shallow_color: {120, 190, 175}
+      deep_color: {20, 80, 95}
+      depth: 4
+      visibility: 4
+      absorption: {170, 225, 215}
+      refraction: 0.02
+      foam_color: {240, 245, 245}
+      foam_width: 0.08
+      foam_scale: 2
+    }
+    WaterCaustics: {strength: 1.2, scale: 1.1, speed: 0.6, depth: 2.2}
+    WaterFlow: {velocity: {0.15, 0}}
+  }
+}

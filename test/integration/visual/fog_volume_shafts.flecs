@@ -11,6 +11,7 @@ using box.light
 // shafts. The camera stands inside the fog by the right wall and looks back at the windows, so
 // the forward phase of the fog makes the shafts brighter toward them; the ambient keeps the fog
 // in the shadows faintly visible, and a crate stands in the fog in front of the right shaft.
+// frames: 30
 
 camera {
   Position: {7.6, 1.6, 0}
@@ -106,5 +107,5 @@ crate {
 
 fog {
   Position: {0, 3, 0}
-  FogVolume: {extent: {8.2, 3, 6.2}, density: 0.12, color: {235, 238, 245}, asymmetry: 0.5, edge_fade: 0.3, steps: 48}
+  FogVolume: {extent: {8.2, 3, 6.2}, density: 0.12, color: {235, 238, 245}, asymmetry: 0.5, edge_fade: 0.3}
 }

@@ -7,7 +7,7 @@ using box.view
 using box.light
 
 $ {
-  Scene: {triplanar: true, alpha_cutout: true}
+  Scene: {shader_features: {Extended: {triplanar: true, alpha_cutout: true}}}
 }
 
 // Texture mapping relative to a frame (texture.Mapping MappingFrame, texture.Frame).

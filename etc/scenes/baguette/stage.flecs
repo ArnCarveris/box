@@ -1,0 +1,283 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+using box.light
+using state
+using assets
+
+assets {
+  template WoodTexture {
+    prop seed: i32 = 1
+    prop rings: f32 = 14
+    prop light: Rgb = {150, 98, 58}
+    prop mid: Rgb = {112, 68, 38}
+    prop dark: Rgb = {72, 42, 24}
+    prop bumps: bool = false
+
+    grain_uv { nodes.Coords: {} }
+    grain_v { nodes.Split: {input: grain_uv, channel: ChannelG} }
+    warp_grid { nodes.Transform: {scale: {1, 4, 1}} }
+    pore_grid { nodes.Transform: {scale: {1, 128, 1}} }
+    warp_noise { nodes.Noise: {coords: warp_grid, frequency: 2, octaves: 3, seed: seed} }
+    pore_noise { nodes.Noise: {coords: pore_grid, frequency: 3, octaves: 3, seed: seed + 1} }
+    grain_lines { nodes.Multiply: {a: grain_v, b_value: {rings, 0, 0, 0}} }
+    grain_warp { nodes.Multiply: {a: warp_noise, b_value: {rings * 0.14, 0, 0, 0}} }
+    grain_sum { nodes.Add: {a: grain_lines, b: grain_warp} }
+    ring_fract { nodes.Fract: {input: grain_sum} }
+    ring {
+      nodes.Smoothstep: {input: ring_fract, edge0_value: {0, 0, 0, 0}, edge1_value: {0.9, 0, 0, 0}}
+    }
+
+    tone_noise { nodes.Noise: {frequency: 2, octaves: 2, seed: seed + 2} }
+    streaks { nodes.Mix: {a: ring, b: pore_noise, factor_value: {0.65, 0, 0, 0}} }
+    figure { nodes.Mix: {a: streaks, b: tone_noise, factor_value: {0.3, 0, 0, 0}} }
+
+    if bumps {
+      wood_normal { nodes.Normal: {height: figure, strength: 0.12} }
+      Graph: {output: wood_normal, width: 1024, height: 1024, format: GraphLinear}
+    } else {
+      wood {
+        nodes.Ramp: {
+          input: figure,
+          keys: [
+            {0.15, {dark.r, dark.g, dark.b}},
+            {0.5, {mid.r, mid.g, mid.b}},
+            {0.9, {light.r, light.g, light.b}}
+          ]
+        }
+      }
+
+      Graph: {output: wood, width: 1024, height: 1024}
+    }
+  }
+
+  WoodTexture walnut(
+    seed: 21,
+    rings: 40,
+    light: {120, 78, 50},
+    mid: {84, 52, 32},
+    dark: {48, 30, 20}
+  )
+  WoodTexture walnut_bumps(seed: 21, rings: 40, bumps: true)
+  WoodTexture oak(
+    seed: 7,
+    rings: 56,
+    light: {200, 156, 104},
+    mid: {172, 126, 80},
+    dark: {128, 88, 52}
+  )
+  WoodTexture oak_bumps(seed: 7, rings: 56, bumps: true)
+
+  linen {
+    linen_color {}
+    linen_bumps {}
+
+    weave_uv { nodes.Coords: {} }
+    weave_v { nodes.Split: {input: weave_uv, channel: ChannelG} }
+    weave_noise { nodes.Noise: {frequency: 160, octaves: 1, seed: 31} }
+    slub_noise { nodes.Noise: {frequency: 12, octaves: 3, seed: 32} }
+    band_pos { nodes.Multiply: {a: weave_v, b_value: {4, 0, 0, 0}} }
+    band_fract { nodes.Fract: {input: band_pos} }
+    band_in {
+      nodes.Smoothstep: {
+        input: band_fract,
+        edge0_value: {0.38, 0, 0, 0},
+        edge1_value: {0.4, 0, 0, 0}
+      }
+    }
+
+    band_out {
+      nodes.Smoothstep: {
+        input: band_fract,
+        edge0_value: {0.5, 0, 0, 0},
+        edge1_value: {0.52, 0, 0, 0}
+      }
+    }
+
+    band { nodes.Subtract: {a: band_in, b: band_out} }
+    pin_in {
+      nodes.Smoothstep: {
+        input: band_fract,
+        edge0_value: {0.56, 0, 0, 0},
+        edge1_value: {0.57, 0, 0, 0}
+      }
+    }
+
+    pin_out {
+      nodes.Smoothstep: {
+        input: band_fract,
+        edge0_value: {0.585, 0, 0, 0},
+        edge1_value: {0.595, 0, 0, 0}
+      }
+    }
+
+    pin { nodes.Subtract: {a: pin_in, b: pin_out} }
+    stripes { nodes.Add: {a: band, b: pin} }
+    cloth { nodes.Mix: {a: weave_noise, b: slub_noise, factor_value: {0.4, 0, 0, 0}} }
+
+    linen_color {
+      base { nodes.Ramp: {input: cloth, keys: [{0.3, {222, 212, 192}}, {0.7, {240, 234, 220}}]} }
+      stripe { nodes.Ramp: {input: cloth, keys: [{0.3, {150, 44, 40}}, {0.7, {176, 58, 50}}]} }
+      striped { nodes.Mix: {a: base, b: stripe, factor: stripes} }
+      Graph: {output: striped, width: 1024, height: 1024}
+    }
+
+    linen_bumps {
+      weave_normal { nodes.Normal: {height: weave_noise, strength: 1.2} }
+      Graph: {output: weave_normal, width: 1024, height: 1024, format: GraphLinear}
+    }
+  }
+}
+
+$ {
+  AmbientLight: {sky: {130, 122, 114}, ground: {70, 52, 38}, intensity: 0.3}
+}
+
+stage {
+  key_light {
+    Position: {-0.55, 1.9, 0.6}
+    Rotation: {1.15, 2.4, 0}
+    SpotLight: {
+      intensity: 11 * PI,
+      range: 6,
+      inner_angle: 20,
+      outer_angle: 42,
+      shadows: true,
+      shadow_resolution: 2048
+    }
+    Rgb: {255, 220, 176}
+  }
+
+  fill_light {
+    Position: {1.8, 1.3, 1.6}
+    Rotation: {0.49, -2.3, 0}
+    SpotLight: {intensity: 2.5 * PI, range: 6, inner_angle: 30, outer_angle: 55}
+    Rgb: {176, 200, 235}
+  }
+
+  rim_light {
+    Position: {-0.53, 0.45, -0.83}
+    PointLight: {intensity: 2 * PI, range: 2.5}
+    Rgb: {255, 196, 140}
+  }
+
+  table {
+    Position: {0, -0.04, 0}
+    Box: {6, 0.08, 4}
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 0.55}
+    PbrTextures: {albedo: assets.walnut, normal: assets.walnut_bumps}
+    texture.Mapping: {mode: MappingWorld, size: 1.6}
+  }
+
+  wall {
+    Position: {0, 1.5, -2.2}
+    Box: {6, 3, 0.1}
+    Rgb: {62, 50, 42}
+    PbrMaterial: {roughness: 0.95}
+  }
+
+  towel {
+    Position: {-0.12, 0.004, -0.78}
+    Rotation: {0, 0.5, 0}
+    RoundedBox: {0.7, 0.008, 0.5, 0.004}
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 0.95}
+    PbrTextures: {albedo: assets.linen.linen_color, normal: assets.linen.linen_bumps}
+    texture.Mapping: {mode: MappingObject, size: 0.7}
+  }
+
+  towel_fold {
+    Position: {-0.19, 0.014, -0.85}
+    Rotation: {0, 0.5, 0.012}
+    RoundedBox: {0.5, 0.01, 0.5, 0.005}
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 0.95}
+    PbrTextures: {albedo: assets.linen.linen_color, normal: assets.linen.linen_bumps}
+    texture.Mapping: {mode: MappingObject, size: 0.7}
+  }
+
+  board {
+    Position: {0, 0, 0}
+    Rotation: {0, -0.32, 0}
+
+    slab {
+      Position: {0, 0.02, 0}
+      RoundedBox: {0.5, 0.04, 1.75, 0.012}
+      Rgb: {255, 255, 255}
+      PbrMaterial: {roughness: 0.6}
+      PbrTextures: {albedo: assets.oak, normal: assets.oak_bumps}
+      texture.Mapping: {mode: MappingObject, size: 1.2}
+    }
+
+    knife {
+      Position: {0.17, 0.04, 0.1}
+      Rotation: {0, 0.12, 0}
+
+      blade {
+        Position: {0, 0.003, -0.12}
+        RoundedBox: {0.045, 0.004, 0.42, 0.002}
+        Rgb: {206, 210, 216}
+        PbrMaterial: {metallic: 1, roughness: 0.28}
+      }
+
+      for i in 0..40 {
+        "tooth_{i}" {
+          Position: {-0.023, 0.003, -0.32 + i * 0.0095}
+          Rotation: {0, 0.785, 0}
+          Box: {0.005, 0.0038, 0.005}
+          Rgb: {196, 200, 206}
+          PbrMaterial: {metallic: 1, roughness: 0.32}
+        }
+      }
+
+      handle {
+        Position: {0, 0.009, 0.17}
+        RoundedBox: {0.034, 0.018, 0.16, 0.008}
+        Rgb: {255, 255, 255}
+        PbrMaterial: {roughness: 0.45}
+        PbrTextures: {albedo: assets.walnut, normal: assets.walnut_bumps}
+        texture.Mapping: {mode: MappingObject, size: 0.3}
+      }
+
+      for r in 0..3 {
+        "rivet_{r}" {
+          Position: {0, 0.0185, 0.115 + r * 0.05}
+          Cylinder: {radius: 0.0045, length: 0.002, segments: 12, smooth: true}
+          Rgb: {214, 178, 110}
+          PbrMaterial: {metallic: 1, roughness: 0.3}
+        }
+      }
+    }
+
+    for i in 0..18 {
+      const a: f32 = i * 2.39996 + seed * 0.7
+      const d: f32 = 0.06 + ((i * 37 + seed * 11) % 17) * 0.009
+      const s: f32 = 0.004 + ((i * 13 + seed * 5) % 7) * 0.0016
+      "crumb_{i}" {
+        Position: {cos(a) * d * 0.9 - 0.08, 0.04 + s * 0.5, sin(a) * d * 3.2 + 0.05}
+        Rotation: {i * 0.7, i * 1.3, 0}
+        Scale: {1, 0.7, 1.2}
+        IcoSphere: {radius: s, segments: 1}
+        PbrMaterial: {roughness: 0.9}
+
+        if i % 3 == 0 {
+          Rgb: {226, 190, 130}
+        } else {
+          Rgb: {190 - bake * 60, 130 - bake * 50, 66 - bake * 30}
+        }
+      }
+    }
+
+    BaguetteLoaf loaf(
+      length: length, thickness: thickness, height: height, taper: taper, cuts: cuts,
+      angle: angle, opening: opening, bake: bake, flour: flour, crust: crust, seed: seed
+    ) {
+      Position: {-0.06, 0.04, 0}
+      Rotation: {0, 0.03, 0}
+    }
+  }
+}

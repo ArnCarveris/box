@@ -62,6 +62,27 @@ void box_render_cookie_resolve(
         glm_vec3_normalize(out->axis_y);
     }
 
+    double origin[3], size = (double)c->size, along[2];
+    int32_t i;
+    box_render_origin(world, origin);
+    if (c->projection == LightCookieProjectionPlane) {
+        along[0] = origin[0];
+        along[1] = origin[2];
+        out->height = (float)((double)c->height - origin[1]);
+    } else {
+        along[0] = (double)out->axis_x[0] * origin[0] +
+            (double)out->axis_x[1] * origin[1] + (double)out->axis_x[2] * origin[2];
+        along[1] = (double)out->axis_y[0] * origin[0] + (double)out->axis_y[1] * origin[1] +
+            (double)out->axis_y[2] * origin[2];
+    }
+
+    for (i = 0; i < 2; i ++) {
+        if (along[i] != 0.0) {
+            out->offset[i] = box_render_origin_wrap_float(
+                (double)out->offset[i] + along[i], size);
+        }
+    }
+
 done:
     return;
 }

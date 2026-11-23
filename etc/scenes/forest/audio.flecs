@@ -1,0 +1,618 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.audio
+using box.audio.synth
+using state
+
+// The sound of the forest, synthesized: the wind in the crowns and the rustling leaves that
+// follow the Wind slider, the brook babbling along its bed and roaring at the cascade, rain on
+// the leaves and drips from the trees, birdsong by season and time of day, crickets on warm
+// summer nights and an owl in the dark. Snow muffles all of it.
+//
+// The sounds are synth patches (assets) played by looping sources and by emitters; their
+// levels follow the state through the expressions below, so the patches never change while
+// they play. Everything mixes into the ambience bus, whose lowpass closes under snow and whose
+// compressor keeps a gale in the rain under the limiter. The master volume and the mute (M) are
+// the Settings of hud.flecs.
+state {
+  // How much the snow hushes the forest, 0..1: the snow on the ground and the snow that falls
+  fn forest_hush(snow: f64, p: f64, t: f64) -> f64 {
+    max(clamp(snow, 0, 1), forest_snowfall(p, t))
+  }
+
+  // Leaves on the trees to rustle, 0..1, and the share of them that are dry, by season
+  fn forest_leafage(season: f64) -> f64 {
+    forest_foliage(season, 0.75, 1, 0.8, 0.15)
+  }
+
+  fn forest_dry_leaves(season: f64) -> f64 {
+    forest_seasonal(season, 0, 0, 1, 0.4)
+  }
+
+  // Wind in m/s as 0..1 of the slider, eased so a breeze is soft and a gale is loud
+  fn forest_wind_level(w: f64) -> f64 {
+    const f = clamp(w / WIND_MAX, 0, 1)
+    f * sqrt(f)
+  }
+
+  // How much the birds sing, 0..1: in the day, most in the dawn chorus and again at dusk, less
+  // in the rain and a strong wind
+  fn forest_birdsong(season: f64, hour: f64, rain: f64, w: f64) -> f64 {
+    const sr = forest_sunrise(season)
+    const ss = forest_sunset(season)
+    const day = forest_daylight(season, hour)
+    const dawn = forest_smooth(sr - 0.6, sr + 0.4, hour) * (1 - forest_smooth(sr + 1.2, sr + 3.5, hour))
+    const dusk = forest_smooth(ss - 2.5, ss - 1, hour) * (1 - forest_smooth(ss - 0.3, ss + 0.6, hour))
+    const time = max(day * 0.55, max(dawn, dusk * 0.7))
+    time * (1 - 0.9 * clamp(rain * 1.6, 0, 1)) * (1 - 0.8 * forest_smooth(7, 15, w))
+  }
+
+  // Night, 0..1
+  fn forest_night(season: f64, hour: f64) -> f64 {
+    1 - forest_daylight(season, hour)
+  }
+
+  // How loud the crickets chirp, 0..1: on warm nights of summer and early autumn, not in the
+  // rain or a strong wind
+  fn forest_crickets(season: f64, hour: f64, t: f64, rain: f64, w: f64) -> f64 {
+    const warm = forest_smooth(11, 17, t)
+    const summer = forest_seasonal(season, 0.1, 1, 0.45, 0)
+    forest_night(season, hour) * warm * summer * (1 - clamp(rain * 3, 0, 1)) *
+      (1 - forest_smooth(5, 12, w))
+  }
+
+  // Seconds between plays of an emitter at an activity a, 0..1: base at full activity, up to
+  // 60 seconds when it is rare
+  fn forest_every(base: f64, a: f64) -> f64 {
+    min(60, base / max(a, 0.01))
+  }
+
+  // How full the brook runs: more in and after the rain, less when it is frozen at the edges
+  fn forest_brook_level(rain: f64, wet: f64, t: f64) -> f64 {
+    (0.8 + 0.25 * wet + 0.35 * rain) * (t < -2 ? 0.55 : 1)
+  }
+}
+
+// The patches. A looping bed holds for about a minute and starts over after a short lull, at
+// a different length each, so the lulls of the beds do not line up
+assets {
+  // Wind: a low rush of the air through the trunks, and the surge of the crowns in the gusts
+  prefab forest_wind_rush {
+    Sound: {seed: 101}
+    Envelope: {attack: 0.4, sustain: 1, hold: 57.1, release: 0.4}
+    Filter: {kind: LowPass, cutoff: 320, resonance: 0.1}
+    Lfo: {wave: LfoRandom, rate: 0.35, amplitude: 0.45, cutoff: 0.5, random_phase: true}
+    air { Oscillator: {wave: Noise, color: NoiseBrown, level: 0.7} }
+  }
+
+  prefab forest_wind_crowns {
+    Sound: {seed: 102}
+    Envelope: {attack: 0.4, sustain: 1, hold: 58.3, release: 0.4}
+    Filter: {kind: BandPass, cutoff: 650, resonance: 0.2}
+    Lfo: {wave: LfoSine, rate: 0.083, amplitude: 0.6, cutoff: 0.8}
+    surge { Oscillator: {wave: Noise, color: NoisePink, level: 0.6} }
+    flutter {
+      Oscillator: {wave: Noise, color: NoisePink, level: 0.25}
+      Lfo: {wave: LfoRandom, rate: 0.6, amplitude: 0.7, random_phase: true}
+    }
+  }
+
+  // The howl of a gale in the limbs: noise through a ringing bandpass that wanders
+  prefab forest_wind_howl {
+    Sound: {seed: 103}
+    Envelope: {attack: 0.4, sustain: 1, hold: 55.7, release: 0.4}
+    Filter: {kind: BandPass, cutoff: 820, resonance: 0.82}
+    Lfo: {wave: LfoRandom, rate: 0.45, cutoff: 0.6, amplitude: 0.6, random_phase: true}
+    moan { Oscillator: {wave: Noise, color: NoisePink, level: 0.5} }
+  }
+
+  // Leaves: a fine flutter of soft green leaves, and the dry crackle of autumn leaves
+  prefab forest_leaves_green {
+    Sound: {seed: 111}
+    Envelope: {attack: 0.4, sustain: 1, hold: 56.9, release: 0.4}
+    Filter: {kind: BandPass, cutoff: 3200, resonance: 0.1}
+    Lfo: {wave: LfoRandom, rate: 9, amplitude: 0.55, random_phase: true}
+    hiss { Oscillator: {wave: Noise, color: NoisePink, level: 0.5} }
+    sway {
+      Oscillator: {wave: Noise, level: 0.12}
+      Lfo: {wave: LfoSine, rate: 0.13, amplitude: 0.8, random_phase: true}
+    }
+  }
+
+  prefab forest_leaves_dry {
+    Sound: {seed: 112}
+    Envelope: {attack: 0.4, sustain: 1, hold: 54.4, release: 0.4}
+    Filter: {kind: HighPass, cutoff: 2600, resonance: 0.15}
+    Lfo: {wave: LfoRandom, rate: 26, amplitude: 0.85, random_phase: true}
+    crackle { Oscillator: {wave: Noise, level: 0.4} }
+    gust {
+      Oscillator: {wave: Noise, color: NoisePink, level: 0.2}
+      Lfo: {wave: LfoSine, rate: 0.17, amplitude: 0.85, random_phase: true}
+    }
+  }
+
+  // The brook: a low rush of the water and a babble of bubbling, gurgling runs
+  prefab forest_brook_rush {
+    Sound: {seed: 121}
+    Envelope: {attack: 0.4, sustain: 1, hold: 58.9, release: 0.4}
+    Filter: {kind: LowPass, cutoff: 700, resonance: 0.1}
+    water { Oscillator: {wave: Noise, color: NoisePink, level: 0.45} }
+  }
+
+  prefab forest_brook_babble {
+    Sound: {seed: 122}
+    Envelope: {attack: 0.4, sustain: 1, hold: 55.2, release: 0.4}
+    Filter: {kind: BandPass, cutoff: 1100, resonance: 0.55}
+    Lfo: {wave: LfoRandom, rate: 13, cutoff: 1.1, random_phase: true}
+    gurgle {
+      Oscillator: {wave: Noise, color: NoisePink, level: 0.6}
+      Lfo: {wave: LfoRandom, rate: 7, amplitude: 0.6, random_phase: true}
+    }
+  }
+
+  // The cascade: a fuller roar with a splash on top
+  prefab forest_cascade {
+    Sound: {seed: 123}
+    Envelope: {attack: 0.4, sustain: 1, hold: 57.7, release: 0.4}
+    Filter: {kind: LowPass, cutoff: 2400, resonance: 0.05}
+    Lfo: {wave: LfoRandom, rate: 5, amplitude: 0.2, random_phase: true}
+    roar { Oscillator: {wave: Noise, color: NoisePink, level: 0.5} }
+    splash { Oscillator: {wave: Noise, level: 0.08} }
+  }
+
+  // A bubble that pops at the surface: a blip that slides up
+  prefab forest_bubble {
+    Sound: {seed: 124, pitch_variance: 0.4, level_variance: 0.5}
+    Envelope: {attack: 0.002, decay: 0.05, curve: 3}
+    Oscillator: {frequency: 620, frequency_end: 1350, sweep: 0.04, level: 0.3}
+  }
+
+  // Rain on the leaves: a steady hiss with a patter in it, and a tick of a drop on a leaf
+  prefab forest_rain_bed {
+    Sound: {seed: 131}
+    Envelope: {attack: 0.4, sustain: 1, hold: 56.3, release: 0.4}
+    Filter: {kind: HighPass, cutoff: 700, resonance: 0.05}
+    Lfo: {wave: LfoRandom, rate: 32, amplitude: 0.35, random_phase: true}
+    patter { Oscillator: {wave: Noise, color: NoisePink, level: 0.5} }
+    hiss { Oscillator: {wave: Noise, level: 0.12} }
+  }
+
+  prefab forest_rain_tick {
+    Sound: {seed: 132, level_variance: 0.6}
+    Envelope: {attack: 0.0005, decay: 0.018, curve: 4}
+    Filter: {kind: BandPass, cutoff: 3800, resonance: 0.3}
+    Oscillator: {wave: Noise, level: 0.5}
+  }
+
+  // A drop that falls from a crown into the litter or a puddle: a short plop
+  prefab forest_drip {
+    Sound: {seed: 133, pitch_variance: 0.3, level_variance: 0.4}
+    Envelope: {attack: 0.001, decay: 0.07, curve: 3}
+    plop { Oscillator: {frequency: 900, frequency_end: 1900, sweep: 0.025, level: 0.3} }
+    tap {
+      Oscillator: {wave: Noise, level: 0.08}
+      Envelope: {attack: 0.0005, decay: 0.008}
+    }
+  }
+
+  // Birds. A warbling song of a blackbird or a thrush, in spring and summer
+  prefab forest_warbler {
+    Sound: {seed: 141, pitch_variance: 0.12, drift: 20}
+    Envelope: {attack: 0.03, decay: 0.2, sustain: 0.85, hold: 1.4, release: 0.25}
+    Lfo: {wave: LfoRandom, rate: 9, pitch: 450, random_phase: true}
+    voice {
+      Oscillator: {frequency: 2500, level: 0.24}
+      Lfo: {wave: LfoSquare, rate: 6.5, amplitude: 0.9, random_phase: true}
+      overtone { Oscillator: {frequency: 5000, level: 0.04} }
+    }
+  }
+
+  // The two notes of a tit, "fee-bee", the whole year round
+  prefab forest_tit {
+    Sound: {seed: 142, pitch_variance: 0.06}
+    Envelope: {attack: 0.01, sustain: 1, hold: 0.56, release: 0.04}
+    Lfo: {wave: LfoSquare, rate: 1.6, pitch: 140}
+    note {
+      Oscillator: {frequency: 3900, level: 0.2}
+      Lfo: {wave: LfoSquare, rate: 3.2, amplitude: 0.95}
+    }
+  }
+
+  // The fast falling trill of a wren
+  prefab forest_wren {
+    Sound: {seed: 143, pitch_variance: 0.08}
+    Envelope: {attack: 0.005, sustain: 1, hold: 1.5, release: 0.1}
+    Lfo: {wave: LfoSquare, rate: 15, amplitude: 0.95}
+    trill {
+      Oscillator: {frequency: 5600, frequency_end: 3900, sweep: 1.6, level: 0.16}
+      Lfo: {wave: LfoRandom, rate: 15, pitch: 260}
+    }
+  }
+
+  // The cuckoo, in spring: two falling notes
+  prefab forest_cuckoo {
+    Sound: {seed: 144, pitch_variance: 0.03}
+    Envelope: {attack: 0.03, sustain: 1, hold: 0.52, release: 0.08}
+    Filter: {kind: LowPass, cutoff: 1400}
+    Lfo: {wave: LfoSquare, rate: 1.7, pitch: 170}
+    call {
+      Oscillator: {frequency: 600, level: 0.35}
+      Lfo: {wave: LfoSquare, rate: 3.4, amplitude: 1}
+      hoot { Oscillator: {frequency: 1200, level: 0.05} }
+    }
+  }
+
+  // The soft coo of a wood pigeon, in summer
+  prefab forest_pigeon {
+    Sound: {seed: 145, pitch_variance: 0.04}
+    Envelope: {attack: 0.05, sustain: 1, hold: 1.5, release: 0.15}
+    Filter: {kind: LowPass, cutoff: 900}
+    Lfo: {wave: LfoSine, rate: 2.6, pitch: 70}
+    coo {
+      Oscillator: {wave: Triangle, frequency: 470, level: 0.3}
+      Lfo: {wave: LfoSquare, rate: 2.6, amplitude: 1}
+    }
+  }
+
+  // The caws of a crow, in autumn and winter
+  prefab forest_crow {
+    Sound: {seed: 146, pitch_variance: 0.08}
+    Envelope: {attack: 0.02, decay: 0.1, sustain: 0.8, hold: 0.75, release: 0.08}
+    Filter: {kind: Formant, vowel: 0.3}
+    Lfo: {wave: LfoSquare, rate: 3.6, amplitude: 1}
+    caw {
+      Oscillator: {wave: Saw, frequency: 520, frequency_end: 430, sweep: 0.8, level: 0.14}
+      Unison: {voices: 3, detune: 35}
+    }
+  }
+
+  // The drumming of a woodpecker on a dead limb, in spring
+  prefab forest_woodpecker {
+    Sound: {seed: 147, pitch_variance: 0.1}
+    Envelope: {attack: 0.002, decay: 1, curve: 2}
+    Filter: {kind: BandPass, cutoff: 900, resonance: 0.4}
+    Lfo: {wave: LfoSquare, rate: 17, amplitude: 1}
+    knock { Oscillator: {wave: Noise, color: NoiseBrown, level: 0.7} }
+    wood { Oscillator: {frequency: 520, level: 0.2} }
+  }
+
+  // Two hoots of a tawny owl at night
+  prefab forest_owl {
+    Sound: {seed: 148, pitch_variance: 0.04}
+    Envelope: {attack: 0.06, sustain: 1, hold: 1.5, release: 0.3}
+    Filter: {kind: LowPass, cutoff: 700}
+    Lfo: {wave: LfoSine, rate: 6, pitch: 30}
+    hoot {
+      Oscillator: {frequency: 400, frequency_end: 370, sweep: 1.4, level: 0.35}
+      Lfo: {wave: LfoSquare, rate: 1.1, amplitude: 1}
+    }
+  }
+
+  // Crickets: a chirp of a few pulses, and the chorus of a meadow of them as a bed
+  prefab forest_cricket {
+    Sound: {seed: 151, pitch_variance: 0.05, level_variance: 0.4}
+    Envelope: {attack: 0.003, sustain: 1, hold: 0.1, release: 0.01}
+    Lfo: {wave: LfoSquare, rate: 30, amplitude: 1}
+    Oscillator: {frequency: 4600, level: 0.16}
+  }
+
+  prefab forest_cricket_chorus {
+    Sound: {seed: 152, drift: 15}
+    Envelope: {attack: 0.4, sustain: 1, hold: 53.8, release: 0.4}
+    Lfo: {wave: LfoSquare, rate: 2.3, amplitude: 1, random_phase: true}
+    chirps {
+      Oscillator: {frequency: 4400, level: 0.08}
+      Unison: {voices: 3, detune: 30, width: 0.8}
+      Lfo: {wave: LfoSquare, rate: 29, amplitude: 0.85}
+    }
+  }
+}
+
+forest {
+  ambience {
+    // Snow on the ground and in the air muffles the forest; the compressor holds the loudest
+    // weather well under the limiter of the master
+    muffle {
+      box.audio.Filter: {
+        kind: LowPass,
+        cutoff: 16000 - 14000 * sqrt(forest_hush(snow, precipitation, temperature)),
+        slope: Slope12
+      }
+    }
+
+    glue { Compressor: {threshold: -16, ratio: 3, attack: 0.02, release: 0.4, knee: 8} }
+
+    canopy { Reverb: {decay: 1.6, damping: 0.6, predelay: 0.02, size: 0.6} }
+
+    // The crowns brighten as the wind rises
+    air_tone {
+      box.audio.Filter: {kind: LowPass, cutoff: 600 + 260 * min(wind, WIND_MAX), slope: Slope12}
+    }
+
+    mix {
+      Bus: {
+        output: master,
+        volume: 1.4 * (1 - 0.7 * forest_hush(snow, precipitation, temperature)),
+        effects: [ambience.muffle, ambience.glue]
+      }
+    }
+
+    reverb { Bus: {output: ambience.mix, kind: ChannelReturn, effects: [ambience.canopy]} }
+    air { Bus: {output: ambience.mix, volume: 0.9, effects: [ambience.air_tone]} }
+    leaves { Bus: {output: ambience.mix, volume: 0.7} }
+    water { Bus: {output: ambience.mix, volume: 0.8, sends: [{bus: ambience.reverb, level: 0.12}]} }
+    rainfall { Bus: {output: ambience.mix, volume: 0.75} }
+    birds { Bus: {output: ambience.mix, volume: 0.8, sends: [{bus: ambience.reverb, level: 0.35}]} }
+    insects { Bus: {output: ambience.mix, volume: 1.1, sends: [{bus: ambience.reverb, level: 0.15}]} }
+
+    // The wind all around, from a whisper in the calm to a roaring, howling gale
+    wind_rush {
+      Source: {sound: assets.forest_wind_rush, loop: true, volume: 0.06 + 0.9 * forest_wind_level(wind)}
+      Output: {bus: ambience.air}
+    }
+
+    wind_crowns {
+      Source: {
+        sound: assets.forest_wind_crowns,
+        loop: true,
+        volume: 0.02 + 0.85 * forest_smooth(0.5, 16, wind) * (1 - 0.5 * forest_hush(snow, precipitation, temperature))
+      }
+      Output: {bus: ambience.air}
+    }
+
+    wind_howl {
+      Source: {
+        sound: assets.forest_wind_howl,
+        loop: true,
+        volume: 0.55 * forest_smooth(9, 19, wind) * (1 - 0.4 * forest_leafage(season))
+      }
+      Output: {bus: ambience.air}
+    }
+
+    // The leaves rustle with the wind, softly even in the calm; dry in autumn, few in winter
+    leaves_green {
+      Source: {
+        sound: assets.forest_leaves_green,
+        loop: true,
+        volume: forest_leafage(season) * (1 - forest_dry_leaves(season)) * (0.05 + 0.8 * forest_smooth(0.3, 14, wind))
+      }
+      Output: {bus: ambience.leaves}
+    }
+
+    leaves_dry {
+      Source: {
+        sound: assets.forest_leaves_dry,
+        loop: true,
+        volume: forest_leafage(season) * forest_dry_leaves(season) * (0.04 + 0.7 * forest_smooth(0.3, 14, wind)) * (1 - 0.8 * wet)
+      }
+      Output: {bus: ambience.leaves}
+    }
+
+    // Rain on the leaves, louder with more leaves to fall on, and the drops on the leaves
+    // around the camera
+    rain_bed {
+      Source: {
+        sound: assets.forest_rain_bed,
+        loop: true,
+        volume: 0.9 * sqrt(clamp(rain, 0, 1)) * (0.65 + 0.35 * forest_leafage(season)),
+        playing: rain > 0.005
+      }
+      Output: {bus: ambience.rainfall}
+    }
+  }
+
+  // The brook murmurs along its bed, heard from a few meters of its banks, and roars at the
+  // cascade; bubbles pop where it runs over the stones
+  brook {
+    murmur {
+      const level = forest_brook_level(rain, wet, temperature)
+
+      for i in 0..13 {
+        const x = -42 + i * 7
+        "rush_{i}" {
+          Position: {x, BROOK_WATER_Y + 0.1, forest_brook_z(x)}
+          Source: {sound: assets.forest_brook_rush, loop: true, volume: 0.32 * level}
+          Spatial: {min_distance: 3, max_distance: 30, rolloff: 1, cutoff: 1800}
+          Output: {bus: forest.ambience.water}
+        }
+
+        "babble_{i}" {
+          Position: {x + 3.5, BROOK_WATER_Y + 0.1, forest_brook_z(x + 3.5)}
+          Source: {sound: assets.forest_brook_babble, loop: true, volume: 0.42 * level}
+          Spatial: {min_distance: 2.5, max_distance: 24, rolloff: 1.2, cutoff: 1500}
+          Output: {bus: forest.ambience.water}
+        }
+      }
+
+      cascade {
+        Position: {CASCADE_X, BROOK_WATER_Y, forest_brook_z(CASCADE_X)}
+        Source: {sound: assets.forest_cascade, loop: true, volume: 0.45 * level}
+        Spatial: {min_distance: 3, max_distance: 45, rolloff: 1, cutoff: 1200}
+        Output: {bus: forest.ambience.water}
+      }
+
+      for i in 0..7 {
+        const x = -36 + i * 12
+        "bubbles_{i}" {
+          Position: {x, BROOK_WATER_Y + 0.05, forest_brook_z(x)}
+          Rotation: {0, forest_brook_yaw(x), 0}
+          Spatial: {min_distance: 2, max_distance: 22, rolloff: 1.3, cutoff: 2500}
+          Output: {bus: forest.ambience.water}
+          Emitter: {
+            sound: assets.forest_bubble,
+            interval_min: 0.06 / level, interval_max: 0.35 / level,
+            shape: EmitterBox, extents: {6, 0, BROOK_HALF_WIDTH * 0.6},
+            volume_min: 0.15, volume_max: 0.55 * level, pitch_min: 0.7, pitch_max: 1.5,
+            max_active: 3, seed: 160 + i, playing: temperature > -2
+          }
+        }
+      }
+    }
+  }
+}
+
+// What is heard around the camera goes with it: drops on the leaves, drips from the crowns,
+// the birds in the canopy and the crickets in the grass
+camera {
+  rain_drops {
+    Spatial: {min_distance: 2, max_distance: 14, rolloff: 0.8}
+    Output: {bus: forest.ambience.rainfall}
+    Emitter: {
+      sound: assets.forest_rain_tick,
+      interval_min: 0.015 + 0.15 * (1 - clamp(rain, 0, 1)),
+      interval_max: 0.04 + 0.4 * (1 - clamp(rain, 0, 1)),
+      shape: EmitterSphere, radius: 7,
+      volume_min: 0.1, volume_max: 0.35 + 0.35 * clamp(rain, 0, 1),
+      max_active: 8, seed: 171, playing: rain > 0.02
+    }
+  }
+
+  drips {
+    Spatial: {min_distance: 2, max_distance: 14, rolloff: 0.8}
+    Output: {bus: forest.ambience.rainfall}
+    Emitter: {
+      sound: assets.forest_drip,
+      interval_min: forest_every(0.12, drip), interval_max: forest_every(0.6, drip),
+      shape: EmitterSphere, radius: 6,
+      volume_min: 0.15, volume_max: 0.5, max_active: 4, seed: 172, playing: drip > 0.04
+    }
+  }
+
+  birds {
+    const a = forest_birdsong(season, hour, rain, wind)
+    const night = forest_night(season, hour)
+
+    warbler {
+      Spatial: {min_distance: 8, max_distance: 70, rolloff: 0.9, cutoff: 3000}
+      Output: {bus: forest.ambience.birds}
+      Emitter: {
+        sound: assets.forest_warbler,
+        interval_min: forest_every(2.2, a * forest_seasonal(season, 1, 0.9, 0.12, 0)),
+        interval_max: forest_every(6, a * forest_seasonal(season, 1, 0.9, 0.12, 0)),
+        shape: EmitterHemisphere, radius: 30, volume_min: 0.4, volume_max: 0.9,
+        pitch_min: 0.9, pitch_max: 1.12, max_active: 2, seed: 181,
+        playing: a * forest_seasonal(season, 1, 0.9, 0.12, 0) > 0.03
+      }
+    }
+
+    tit {
+      Spatial: {min_distance: 6, max_distance: 60, rolloff: 1, cutoff: 3000}
+      Output: {bus: forest.ambience.birds}
+      Emitter: {
+        sound: assets.forest_tit,
+        interval_min: forest_every(3, a * forest_seasonal(season, 1, 0.6, 0.5, 0.75)),
+        interval_max: forest_every(9, a * forest_seasonal(season, 1, 0.6, 0.5, 0.75)),
+        shape: EmitterHemisphere, radius: 25, volume_min: 0.4, volume_max: 0.85,
+        max_active: 2, seed: 182, playing: a * forest_seasonal(season, 1, 0.6, 0.5, 0.75) > 0.03
+      }
+    }
+
+    wren {
+      Spatial: {min_distance: 5, max_distance: 50, rolloff: 1, cutoff: 3500}
+      Output: {bus: forest.ambience.birds}
+      Emitter: {
+        sound: assets.forest_wren,
+        interval_min: forest_every(6, a * forest_seasonal(season, 1, 0.8, 0.35, 0.25)),
+        interval_max: forest_every(16, a * forest_seasonal(season, 1, 0.8, 0.35, 0.25)),
+        shape: EmitterSphere, radius: 18, volume_min: 0.4, volume_max: 0.8,
+        max_active: 1, seed: 183, playing: a * forest_seasonal(season, 1, 0.8, 0.35, 0.25) > 0.03
+      }
+    }
+
+    cuckoo {
+      Spatial: {min_distance: 15, max_distance: 120, rolloff: 0.6, cutoff: 1200}
+      Output: {bus: forest.ambience.birds}
+      Emitter: {
+        sound: assets.forest_cuckoo,
+        interval_min: forest_every(7, a * forest_seasonal(season, 1, 0.25, 0, 0)),
+        interval_max: forest_every(20, a * forest_seasonal(season, 1, 0.25, 0, 0)),
+        shape: EmitterHemisphere, radius: 60, volume_min: 0.5, volume_max: 0.8,
+        max_active: 1, seed: 184, playing: a * forest_seasonal(season, 1, 0.25, 0, 0) > 0.05
+      }
+    }
+
+    pigeon {
+      Spatial: {min_distance: 10, max_distance: 80, rolloff: 0.8, cutoff: 1500}
+      Output: {bus: forest.ambience.birds}
+      Emitter: {
+        sound: assets.forest_pigeon,
+        interval_min: forest_every(8, a * forest_seasonal(season, 0.5, 1, 0.3, 0)),
+        interval_max: forest_every(22, a * forest_seasonal(season, 0.5, 1, 0.3, 0)),
+        shape: EmitterHemisphere, radius: 40, volume_min: 0.5, volume_max: 0.9,
+        max_active: 1, seed: 185, playing: a * forest_seasonal(season, 0.5, 1, 0.3, 0) > 0.05
+      }
+    }
+
+    // The crows care little for the weather
+    crow {
+      Spatial: {min_distance: 15, max_distance: 120, rolloff: 0.6, cutoff: 2000}
+      Output: {bus: forest.ambience.birds}
+      Emitter: {
+        sound: assets.forest_crow,
+        interval_min: forest_every(9, forest_daylight(season, hour) * forest_seasonal(season, 0.15, 0.15, 0.9, 1)),
+        interval_max: forest_every(26, forest_daylight(season, hour) * forest_seasonal(season, 0.15, 0.15, 0.9, 1)),
+        shape: EmitterHemisphere, radius: 60, volume_min: 0.4, volume_max: 0.8,
+        max_active: 1, seed: 186,
+        playing: forest_daylight(season, hour) * forest_seasonal(season, 0.15, 0.15, 0.9, 1) > 0.1 && precipitation < 0.8
+      }
+    }
+
+    woodpecker {
+      Spatial: {min_distance: 15, max_distance: 120, rolloff: 0.6, cutoff: 2000}
+      Output: {bus: forest.ambience.birds}
+      Emitter: {
+        sound: assets.forest_woodpecker,
+        interval_min: forest_every(10, a * forest_seasonal(season, 1, 0.3, 0.1, 0.35)),
+        interval_max: forest_every(30, a * forest_seasonal(season, 1, 0.3, 0.1, 0.35)),
+        shape: EmitterSphere, radius: 50, volume_min: 0.4, volume_max: 0.7,
+        max_active: 1, seed: 187, playing: a * forest_seasonal(season, 1, 0.3, 0.1, 0.35) > 0.05
+      }
+    }
+
+    owl {
+      Spatial: {min_distance: 15, max_distance: 120, rolloff: 0.6, cutoff: 1200}
+      Output: {bus: forest.ambience.birds}
+      Emitter: {
+        sound: assets.forest_owl,
+        interval_min: forest_every(9, night * forest_seasonal(season, 0.6, 0.45, 1, 0.8) * (1 - clamp(rain * 2, 0, 1))),
+        interval_max: forest_every(25, night * forest_seasonal(season, 0.6, 0.45, 1, 0.8) * (1 - clamp(rain * 2, 0, 1))),
+        shape: EmitterHemisphere, radius: 60, volume_min: 0.5, volume_max: 0.8,
+        max_active: 1, seed: 188, playing: night * (1 - rain) > 0.5 && wind < 12
+      }
+    }
+  }
+
+  crickets {
+    const c = forest_crickets(season, hour, temperature, rain, wind)
+
+    chirps {
+      Position: {0, -1.5, 0}
+      Spatial: {min_distance: 2, max_distance: 25, rolloff: 1, cutoff: 3000}
+      Output: {bus: forest.ambience.insects}
+      Emitter: {
+        sound: assets.forest_cricket,
+        interval_min: forest_every(0.05, c), interval_max: forest_every(0.25, c),
+        shape: EmitterDisc, radius: 14, volume_min: 0.3, volume_max: 0.9,
+        pitch_min: 0.94, pitch_max: 1.06, max_active: 6, seed: 191, playing: c > 0.05
+      }
+    }
+  }
+}
+
+// The chorus of the crickets in the grass of the clearing and along the banks
+forest {
+  meadow {
+    const c = forest_crickets(season, hour, temperature, rain, wind)
+
+    for i in 0..4 {
+      const x = -10 + i * 7
+      "crickets_{i}" {
+        Position: {x, 0.1, 4 - 5 * forest_hash(i, 197)}
+        Source: {sound: assets.forest_cricket_chorus, loop: true, volume: 0.8 * c, playing: c > 0.02}
+        Spatial: {min_distance: 3, max_distance: 40, rolloff: 1, cutoff: 3500}
+        Output: {bus: forest.ambience.insects}
+      }
+    }
+  }
+}

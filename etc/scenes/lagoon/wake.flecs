@@ -1,0 +1,85 @@
+using flecs.script
+using flecs.script.math
+using box.app
+using box.transform
+using box.material
+using state
+
+state {
+  // The wake: a field of WaterRipples of WAKE_SIZE units on the water, its center WAKE_AHEAD up the
+  // lagoon from the canoe so it reaches the fish ahead and fades out past the bottom of the view
+  // behind. Ripples spread at WAKE_WAVE_SPEED, well below the speed of the water, so the hull and
+  // the float leave a narrow V that drifts back with the water
+  export const WAKE_SIZE: f32 = 64
+  export const WAKE_RESOLUTION: i32 = 512
+  export const WAKE_AHEAD: f32 = 20
+  export const WAKE_WAVE_SPEED: f32 = 2.5
+
+  // Rings of box.material.ripple_at: radius and depth for a paddle stroke, a fish leaving or
+  // entering the water, a hazard hit, a coconut pickup and the capsize
+  export const RING_PADDLE_R: f32 = 0.35
+  export const RING_PADDLE: f32 = 0.06
+  export const RING_FISH_R: f32 = 0.4
+  export const RING_FISH: f32 = 0.08
+  export const RING_HIT_R: f32 = 0.9
+  export const RING_HIT: f32 = 0.16
+  export const RING_NUT_R: f32 = 0.5
+  export const RING_NUT: f32 = 0.08
+  export const RING_CAPSIZE_R: f32 = 1.5
+  export const RING_CAPSIZE: f32 = 0.1
+  // Foam the capsize splashes around the hull
+  export const CAPSIZE_FOAM: f32 = 0.5
+
+  // The paddle blade (canoe.flecs) is furthest forward at this paddle_phase and pulls back from
+  // there; the catch leaves a ring just right of the hull
+  export const PADDLE_CATCH: f32 = HALF_PI
+  export const PADDLE_X: f32 = 0.6
+  export const PADDLE_Z: f32 = 0.3
+}
+
+lagoon {
+  // The point the field of the WaterRipples stays centered on
+  wake_center { Position: {canoe_x, 0, CANOE_Z - WAKE_AHEAD} }
+
+  // The wake and the rings run in the frame of the water, which WaterFlow (play.flecs) carries
+  // toward the camera. Foam fades fast so the trail behind the canoe thins out before it leaves
+  // the view; the steepest crests of the V foam a little. After a restart the field is off for
+  // wake_calm frames, so the next run starts on calm water
+  water {
+    WaterRipples: {
+      size: wake_calm > 0 ? 0 : WAKE_SIZE,
+      resolution: WAKE_RESOLUTION,
+      follow: lagoon.wake_center,
+      wave_speed: WAKE_WAVE_SPEED,
+      damping: 0.6,
+      strength: 1.5,
+      foam_decay: 0.85,
+      foam_spread: 0.03,
+      crest_foam: 0.5
+    }
+  }
+}
+
+async {
+  // Paddle strokes the canoe made, a ring each time paddle_phase passes the catch
+  mut strokes: f64 = floor((paddle_phase - PADDLE_CATCH) / (2 * PI))
+
+  while true {
+    await next_frame()
+
+    if wake_calm > 0 {
+      wake_calm -= 1
+    }
+
+    const n = floor((paddle_phase - PADDLE_CATCH) / (2 * PI))
+
+    if n != strokes {
+      if n > strokes && game_state == GS_PLAYING {
+        const r = box.material.ripple_at(lagoon.water,
+          {canoe_x + PADDLE_X, 0, CANOE_Z + PADDLE_Z}, RING_PADDLE_R, RING_PADDLE)
+      }
+
+      strokes = n
+    }
+  }
+}

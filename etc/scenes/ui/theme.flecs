@@ -2,8 +2,6 @@
 // one of these to it restyles every widget in the next frame:
 //
 //   box { ui { theme { Theme: LightTheme } } }
-//
-// The theme entity belongs to box.ui, so a script that assigns it never owns or deletes it.
 
 module box.widgets
 

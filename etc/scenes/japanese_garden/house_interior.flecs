@@ -17,6 +17,396 @@ using box.controllers
 using box.movement
 
 assets {
+  template HouseInteriorTeaRoom {
+    prop accent: Rgb = {151, 109, 139}
+    prop timber: Rgb = {109, 65, 53}
+
+    tea_table {
+      Position: {0, 0.31, -0.15}
+      RoundedBox: {1.45, 0.1, 0.8, 0.035}
+      Rgb: timber
+    }
+
+    for x in 0..2 {
+      for z in 0..2 {
+        {
+          Position: {(x - 0.5) * 1.15, 0.17, -0.15 + (z - 0.5) * 0.52}
+          Box: {0.09, 0.18, 0.09}
+          Rgb: timber
+        }
+      }
+
+      SeatCushion(tint: accent) {
+        Position: {(x - 0.5) * 2.1, 0.16, -0.15}
+      }
+    }
+
+    TeaService() { Position: {-0.1, 0.36, -0.15} }
+    sweets_plate {
+      Position: {0.53, 0.38, -0.12}
+      Cylinder: {radius: 0.14, length: 0.035, segments: 20}
+      Rgb: {220, 207, 180}
+    }
+
+    for i in 0..3 {
+      {
+        Position: {0.53 + math.cos(i * 2.1) * 0.065, 0.424, -0.12 + math.sin(i * 2.1) * 0.065}
+        Scale: {1, 0.7, 1}
+        Sphere: {radius: 0.05, segments: 12, smooth: true}
+        Rgb: {223 - i * 25, 177 + i * 12, 161 - i * 15}
+      }
+    }
+  }
+
+  template HouseInteriorWorkshop {
+    prop style: i32 = 0
+    prop accent: Rgb = {151, 109, 139}
+    prop timber: Rgb = {109, 65, 53}
+
+    worktop {
+      Position: {0, 0.73, -0.65}
+      Box: {2.8, 0.12, 0.7}
+      Rgb: timber
+    }
+
+    for side in 0..2 {
+      {
+        Position: {(side - 0.5) * 2.35, 0.335, -0.65}
+        Box: {0.12, 0.67, 0.55}
+        Rgb: timber
+      }
+    }
+
+    for i in 0..5 {
+      CeramicVase(glaze: accent) {
+        Position: {-1.05 + i * 0.52, 0.79, -0.65}
+        Scale: {0.75 + i % 3 * 0.15, 0.8 + i % 2 * 0.4, 0.75 + i % 3 * 0.15}
+      }
+
+      if style == 3 {
+        FlowerArrangement(tint: {251, 188 + i % 2 * 28, 204}, phase: i * 1.7) {
+          Position: {-1.05 + i * 0.52, 0.79 + (0.8 + i % 2 * 0.4) * 0.4, -0.65}
+          Scale: {0.85, 0.85, 0.85}
+        }
+      }
+    }
+
+    lower_shelf {
+      Position: {0, 0.24, -0.65}
+      Box: {2.3, 0.06, 0.55}
+      Rgb: timber
+    }
+
+    for i in 0..3 {
+      CeramicVase(glaze: {181 + i * 12, 143 + i * 9, 112 + i * 15}) {
+        Position: {-0.8 + i * 0.8, 0.27, -0.65}
+        Scale: {0.8, 0.75, 0.8}
+      }
+    }
+
+    if style == 1 {
+      for side in 0..2 {
+        {
+          Position: {(side - 0.5) * 2.7, 1.55, -1.09}
+          Box: {0.84, 0.065, 0.32}
+          Rgb: timber
+        }
+
+        for i in 0..3 {
+          CeramicVase(glaze: {168 + i * 22, 178 + side * 24, 174 - i * 18}) {
+            Position: {(side - 0.5) * 2.7 + (i - 1) * 0.26, 1.585, -1.09}
+            Scale: {0.58, 0.6 + i % 2 * 0.2, 0.58}
+          }
+        }
+      }
+
+      wheel_base {
+        Position: {-0.65, 0.18, 0.35}
+        Cylinder: {radius: 0.21, length: 0.36, segments: 12}
+        Rgb: timber
+      }
+
+      wheel {
+        Position: {-0.65, 0.4, 0.35}
+        Cylinder: {radius: 0.38, length: 0.08, segments: 24}
+        Rgb: GardenStone
+      }
+
+      CeramicVase(glaze: {187, 133, 100}) { Position: {-0.65, 0.44, 0.35} }
+      stool_seat {
+        Position: {0.35, 0.41, 0.35}
+        Cylinder: {radius: 0.24, length: 0.07, segments: 20}
+        Rgb: timber
+      }
+
+      for i in 0..3 {
+        TreeLimb(
+          ax: 0.35 + math.cos(i * 2.094) * 0.18,
+          ay: 0.02,
+          az: 0.35 + math.sin(i * 2.094) * 0.18,
+          bx: 0.35 + math.cos(i * 2.094) * 0.13,
+          by: 0.38,
+          bz: 0.35 + math.sin(i * 2.094) * 0.13,
+          base: 0.03,
+          tip: 0.025,
+          tint: timber
+        )
+      }
+
+      wheel_rim {
+        Position: {-0.65, 0.445, 0.35}
+        Torus: {radius: 0.34, tube: 0.012, segments: 24, rings: 6}
+        Rgb: {137, 145, 136}
+      }
+
+      clay_tray {
+        Position: {0.83, 0.81, -0.41}
+        Box: {0.65, 0.04, 0.19}
+        Rgb: {182, 138, 98}
+      }
+
+      for i in 0..3 {
+        {
+          Position: {0.64 + i * 0.18, 0.85, -0.41}
+          Rotation: {0, 0, math.PI / 2}
+          Cylinder: {radius: 0.014, length: 0.14, segments: 8}
+          Rgb: {92, 67, 47}
+        }
+      }
+    }
+
+    if style == 3 {
+      display_stand {
+        Position: {0, 0.25, 0.35}
+        Box: {0.8, 0.5, 0.65}
+        Rgb: timber
+      }
+
+      flower_bowl {
+        Position: {0, 0.58, 0.35}
+        Scale: {1, 0.45, 1}
+        Sphere: {radius: 0.28, segments: 12, smooth: true}
+        Rgb: accent
+      }
+
+      FlowerArrangement(tint: {248, 208, 174}, phase: 0.7) {
+        Position: {0, 0.64, 0.35}
+        Scale: {1.55, 1.3, 1.55}
+      }
+
+      for side in 0..2 {
+        {
+          Position: {(side - 0.5) * 0.82, 0.27, 0.55}
+          Box: {0.035, 0.38, 0.05}
+          Rgb: {181, 138, 91}
+        }
+      }
+
+      arrangement_label {
+        Position: {0, 0.43, 0.69}
+        Box: {0.23, 0.09, 0.015}
+        Rgb: GardenPaper
+      }
+    }
+  }
+
+  template HouseInteriorStudy {
+    prop accent: Rgb = {151, 109, 139}
+    prop timber: Rgb = {109, 65, 53}
+
+    desk {
+      Position: {-0.6, 0.5, -0.1}
+      Box: {1.5, 0.1, 0.8}
+      Rgb: timber
+    }
+
+    for side in 0..2 {
+      {
+        Position: {-0.6 + (side - 0.5) * 1.2, 0.265, -0.1}
+        Box: {0.12, 0.37, 0.55}
+        Rgb: timber
+      }
+    }
+
+    paper_sheet {
+      Position: {-0.6, 0.555, -0.06}
+      Box: {0.54, 0.01, 0.4}
+      Rgb: GardenPaper
+    }
+
+    inkstone {
+      Position: {-0.04, 0.575, -0.22}
+      Box: {0.16, 0.05, 0.22}
+      Rgb: GardenSlate
+    }
+
+    brush {
+      Position: {-0.6, 0.575, 0.12}
+      Rotation: {0, 0, math.PI / 2}
+      Cylinder: {radius: 0.012, length: 0.4, segments: 6}
+      Rgb: timber
+    }
+
+    SeatCushion(tint: accent) { Position: {-0.6, 0.16, 0.38} }
+    ink_pool {
+      Position: {-0.04, 0.602, -0.22}
+      RoundedBox: {0.11, 0.008, 0.15, 0.025}
+      Rgb: {27, 33, 39}
+      PbrMaterial: {roughness: 0.14}
+    }
+
+    brush_tip {
+      Position: {-0.36, 0.575, 0.12}
+      Rotation: {0, 0, -math.PI / 2}
+      Cone: {radius: 0.018, length: 0.08, segments: 8}
+      Rgb: {48, 44, 41}
+    }
+
+    for i in 0..4 {
+      {
+        Position: {-0.72 + i * 0.075, 0.562, -0.08 + math.sin(i * 1.8) * 0.04}
+        Rotation: {0, -0.2 + i * 0.12, 0}
+        Box: {0.016, 0.004, 0.13 - i % 2 * 0.035}
+        Rgb: {48, 54, 57}
+      }
+    }
+
+    for i in 0..2 {
+      {
+        Position: {-1.15, 0.59 + i * 0.065, -0.25}
+        Box: {0.29, 0.045, 0.32}
+        Rgb: {214, 202, 173}
+      }
+
+      for cover in 0..2 {
+        {
+          Position: {-1.15, 0.563 + i * 0.065 + cover * 0.054, -0.25}
+          Box: {0.31, 0.009, 0.34}
+          Rgb: accent
+        }
+      }
+    }
+
+    for side in 0..2 {
+      {
+        Position: {1.4 + (side - 0.5) * 0.8, 0.75, -0.65}
+        Box: {0.07, 1.5, 0.38}
+        Rgb: timber
+      }
+    }
+
+    for shelf in 0..3 {
+      {
+        Position: {1.4, 0.12 + shelf * 0.5, -0.65}
+        Box: {0.8, 0.07, 0.38}
+        Rgb: timber
+      }
+
+      for book in 0..5 {
+        {
+          Position: {1.12 + book * 0.14, 0.3 + shelf * 0.5, -0.65}
+          Box: {0.1, 0.29 - book % 2 * 0.05, 0.27}
+          Rgb: {135 + book * 17, 130 + shelf * 20, 131 + book % 3 * 24}
+        }
+
+        {
+          Position: {1.12 + book * 0.14, 0.34 + shelf * 0.5, -0.509}
+          Box: {0.055, 0.085, 0.008}
+          Rgb: {231, 218, 183}
+        }
+
+        for band in 0..2 {
+          {
+            Position: {1.12 + book * 0.14, 0.21 + shelf * 0.5 + band * 0.16, -0.509}
+            Box: {0.1, 0.012, 0.008}
+            Rgb: {92, 87, 86}
+          }
+        }
+      }
+    }
+  }
+
+  template HouseInteriorShrine {
+    prop accent: Rgb = {151, 109, 139}
+    prop timber: Rgb = {109, 65, 53}
+
+    for i in 0..3 {
+      {
+        Position: {(i - 1) * 1.08, 0.17, 0.05}
+        Scale: {1, 0.29, 1}
+        Sphere: {radius: 0.31, segments: 24, smooth: true}
+        Rgb: accent
+      }
+
+      {
+        Position: {(i - 1) * 1.08, 0.17, 0.05}
+        Torus: {radius: 0.305, tube: 0.012, segments: 24, rings: 6}
+        Rgb: {218, 196, 162}
+      }
+
+      for stitch in 0..12 {
+        const x = math.cos(stitch * math.PI / 6)
+        const z = math.sin(stitch * math.PI / 6)
+        TreeLimb(ax: (i - 1) * 1.08 + x * 0.31, ay: 0.17, az: 0.05 + z * 0.31,
+          bx: (i - 1) * 1.08 + x * 0.286, by: 0.205, bz: 0.05 + z * 0.286,
+          base: 0.007, tip: 0.007, tint: {218, 196, 162})
+      }
+    }
+
+    altar {
+      Position: {0, 0.24, -0.9}
+      Box: {1.15, 0.32, 0.42}
+      Rgb: timber
+    }
+
+    singing_bowl {
+      Position: {0, 0.5, -0.9}
+      Tube: {radius: 0.18, thickness: 0.035, length: 0.2, segments: 20}
+      Rgb: {193, 153, 83}
+      PbrMaterial: {roughness: 0.3, metallic: 0.6}
+    }
+
+    bowl_rim {
+      Position: {0, 0.603, -0.9}
+      Torus: {radius: 0.163, tube: 0.018, segments: 24, rings: 8}
+      Rgb: {222, 184, 111}
+      PbrMaterial: {roughness: 0.25, metallic: 0.6}
+    }
+
+    bowl_bottom {
+      Position: {0, 0.416, -0.9}
+      Cylinder: {radius: 0.148, length: 0.018, segments: 24}
+      Rgb: {139, 105, 53}
+    }
+
+    striker {
+      Position: {0.34, 0.425, -0.85}
+      Rotation: {math.PI / 2, 0.3, 0}
+      Cylinder: {radius: 0.025, length: 0.28, segments: 12}
+      Rgb: {155, 108, 66}
+    }
+
+    incense_dish {
+      Position: {-0.36, 0.42, -0.9}
+      Cylinder: {radius: 0.11, length: 0.035, segments: 20}
+      Rgb: accent
+    }
+
+    for i in 0..3 {
+      {
+        Position: {-0.4 + i * 0.035, 0.54, -0.9}
+        Cylinder: {radius: 0.007, length: 0.22, segments: 6}
+        Rgb: {172, 125, 72}
+      }
+    }
+
+    CeramicVase(glaze: accent) { Position: {1.55, 0.08, -0.8} }
+    FlowerArrangement(tint: {242, 222, 184}, phase: 2) {
+      Position: {1.55, 0.48, -0.8}
+      Scale: {1, 1.35, 1}
+    }
+  }
+
   template HouseInterior {
     prop style: i32 = 0
     prop accent: Rgb = {151, 109, 139}
@@ -25,12 +415,14 @@ assets {
     if style == 0 || style == 2 || style == 4 {
       const depths = [1.45, 1.45, 1.7, 1.45, 1.45]
       const centers = [-0.25, -0.25, -0.16, -0.25, -0.25]
+
       for i in 0..3 {
         {
           Position: {(i - 1) * 1.08, 0.035, centers[style]}
           Box: {1.04, 0.07, depths[style]}
           Rgb: {178, 185, 135}
         }
+
         for weave in 0..24 {
           {
             Position: {(i - 1) * 1.08, 0.073, centers[style] + (weave - 11.5) * depths[style] / 25}
@@ -38,6 +430,7 @@ assets {
             Rgb: {199, 199, 150}
           }
         }
+
         for side in 0..2 {
           {
             Position: {(i - 1) * 1.08 + (side - 0.5) * 0.98, 0.075, centers[style]}
@@ -53,6 +446,7 @@ assets {
       Box: {0.81, 1.13, 0.018}
       Rgb: accent
     }
+
     for side in 0..2 {
       {
         Position: {(side - 0.5) * 1.02, 1.2, -1.23}
@@ -60,31 +454,37 @@ assets {
         Rgb: timber
       }
     }
+
     alcove_header {
       Position: {0, 1.9, -1.23}
       Box: {1.18, 0.08, 0.12}
       Rgb: timber
     }
+
     if style == 0 || style == 2 {
       alcove_shelf {
         Position: {0, 0.17, -1.12}
         RoundedBox: {1.06, 0.18, 0.28, 0.025}
         Rgb: timber
       }
+
       CeramicVase(glaze: accent) {
         Position: {0.28, 0.26, -1.12}
         Scale: {0.65, 0.65, 0.65}
       }
+
       FlowerArrangement(phase: 1.3) {
         Position: {0.28, 0.5, -1.12}
         Scale: {0.5, 0.5, 0.5}
       }
     }
+
     scroll {
       Position: {0, 1.25, -1.265}
       Box: {0.68, 0.96, 0.025}
       Rgb: {232, 218, 187}
     }
+
     for side in 0..2 {
       {
         Position: {0, 0.76 + side * 0.98, -1.23}
@@ -93,12 +493,14 @@ assets {
         Rgb: timber
       }
     }
+
     painted_sun {
       Position: {0.12, 1.45, -1.243}
       Rotation: {math.PI / 2, 0, 0}
       Cylinder: {radius: 0.12, length: 0.012, segments: 24}
       Rgb: accent
     }
+
     painted_mountain {
       Position: {-0.08, 1.13, -1.238}
       Triangle: {0.43, 0.32}
@@ -110,6 +512,7 @@ assets {
       Triangle: {0.24, 0.2}
       Rgb: {144, 159, 139}
     }
+
     for i in 0..3 {
       {
         Position: {-0.03 + i * 0.06, 0.98 - i * 0.05, -1.244}
@@ -119,325 +522,19 @@ assets {
     }
 
     if style == 0 {
-      tea_table {
-        Position: {0, 0.31, -0.15}
-        RoundedBox: {1.45, 0.1, 0.8, 0.035}
-        Rgb: timber
-      }
-      for x in 0..2 {
-        for z in 0..2 {
-          {
-            Position: {(x - 0.5) * 1.15, 0.17, -0.15 + (z - 0.5) * 0.52}
-            Box: {0.09, 0.18, 0.09}
-            Rgb: timber
-          }
-        }
-        SeatCushion(tint: accent) {
-          Position: {(x - 0.5) * 2.1, 0.16, -0.15}
-        }
-      }
-      TeaService() { Position: {-0.1, 0.36, -0.15} }
-      sweets_plate {
-        Position: {0.53, 0.38, -0.12}
-        Cylinder: {radius: 0.14, length: 0.035, segments: 20}
-        Rgb: {220, 207, 180}
-      }
-      for i in 0..3 {
-        {
-          Position: {0.53 + math.cos(i * 2.1) * 0.065, 0.424, -0.12 + math.sin(i * 2.1) * 0.065}
-          Scale: {1, 0.7, 1}
-          Sphere: {radius: 0.05, segments: 12, smooth: true}
-          Rgb: {223 - i * 25, 177 + i * 12, 161 - i * 15}
-        }
-      }
+      HouseInteriorTeaRoom(accent: accent, timber: timber) {}
     }
 
     if style == 1 || style == 3 {
-      worktop {
-        Position: {0, 0.73, -0.65}
-        Box: {2.8, 0.12, 0.7}
-        Rgb: timber
-      }
-      for side in 0..2 {
-        {
-          Position: {(side - 0.5) * 2.35, 0.335, -0.65}
-          Box: {0.12, 0.67, 0.55}
-          Rgb: timber
-        }
-      }
-      for i in 0..5 {
-        CeramicVase(glaze: accent) {
-          Position: {-1.05 + i * 0.52, 0.79, -0.65}
-          Scale: {0.75 + i % 3 * 0.15, 0.8 + i % 2 * 0.4, 0.75 + i % 3 * 0.15}
-        }
-        if style == 3 {
-          FlowerArrangement(tint: {251, 188 + i % 2 * 28, 204}, phase: i * 1.7) {
-            Position: {-1.05 + i * 0.52, 0.79 + (0.8 + i % 2 * 0.4) * 0.4, -0.65}
-            Scale: {0.85, 0.85, 0.85}
-          }
-        }
-      }
-      lower_shelf {
-        Position: {0, 0.24, -0.65}
-        Box: {2.3, 0.06, 0.55}
-        Rgb: timber
-      }
-      for i in 0..3 {
-        CeramicVase(glaze: {181 + i * 12, 143 + i * 9, 112 + i * 15}) {
-          Position: {-0.8 + i * 0.8, 0.27, -0.65}
-          Scale: {0.8, 0.75, 0.8}
-        }
-      }
-      if style == 1 {
-        for side in 0..2 {
-          {
-            Position: {(side - 0.5) * 2.7, 1.55, -1.09}
-            Box: {0.84, 0.065, 0.32}
-            Rgb: timber
-          }
-          for i in 0..3 {
-            CeramicVase(glaze: {168 + i * 22, 178 + side * 24, 174 - i * 18}) {
-              Position: {(side - 0.5) * 2.7 + (i - 1) * 0.26, 1.585, -1.09}
-              Scale: {0.58, 0.6 + i % 2 * 0.2, 0.58}
-            }
-          }
-        }
-        wheel_base {
-          Position: {-0.65, 0.18, 0.35}
-          Cylinder: {radius: 0.21, length: 0.36, segments: 12}
-          Rgb: timber
-        }
-        wheel {
-          Position: {-0.65, 0.4, 0.35}
-          Cylinder: {radius: 0.38, length: 0.08, segments: 24}
-          Rgb: GardenStone
-        }
-        CeramicVase(glaze: {187, 133, 100}) { Position: {-0.65, 0.44, 0.35} }
-        stool_seat {
-          Position: {0.35, 0.41, 0.35}
-          Cylinder: {radius: 0.24, length: 0.07, segments: 20}
-          Rgb: timber
-        }
-        for i in 0..3 {
-          TreeLimb(ax: 0.35 + math.cos(i * 2.094) * 0.18, ay: 0.02, az: 0.35 + math.sin(i * 2.094) * 0.18,
-            bx: 0.35 + math.cos(i * 2.094) * 0.13, by: 0.38, bz: 0.35 + math.sin(i * 2.094) * 0.13,
-            base: 0.03, tip: 0.025, tint: timber)
-        }
-        wheel_rim {
-          Position: {-0.65, 0.445, 0.35}
-          Torus: {radius: 0.34, tube: 0.012, segments: 24, rings: 6}
-          Rgb: {137, 145, 136}
-        }
-        clay_tray {
-          Position: {0.83, 0.81, -0.41}
-          Box: {0.65, 0.04, 0.19}
-          Rgb: {182, 138, 98}
-        }
-        for i in 0..3 {
-          {
-            Position: {0.64 + i * 0.18, 0.85, -0.41}
-            Rotation: {0, 0, math.PI / 2}
-            Cylinder: {radius: 0.014, length: 0.14, segments: 8}
-            Rgb: {92, 67, 47}
-          }
-        }
-      }
-      if style == 3 {
-        display_stand {
-          Position: {0, 0.25, 0.35}
-          Box: {0.8, 0.5, 0.65}
-          Rgb: timber
-        }
-        flower_bowl {
-          Position: {0, 0.58, 0.35}
-          Scale: {1, 0.45, 1}
-          Sphere: {radius: 0.28, segments: 12, smooth: true}
-          Rgb: accent
-        }
-        FlowerArrangement(tint: {248, 208, 174}, phase: 0.7) {
-          Position: {0, 0.64, 0.35}
-          Scale: {1.55, 1.3, 1.55}
-        }
-        for side in 0..2 {
-          {
-            Position: {(side - 0.5) * 0.82, 0.27, 0.55}
-            Box: {0.035, 0.38, 0.05}
-            Rgb: {181, 138, 91}
-          }
-        }
-        arrangement_label {
-          Position: {0, 0.43, 0.69}
-          Box: {0.23, 0.09, 0.015}
-          Rgb: GardenPaper
-        }
-      }
+      HouseInteriorWorkshop(style: style, accent: accent, timber: timber) {}
     }
 
     if style == 2 {
-      desk {
-        Position: {-0.6, 0.5, -0.1}
-        Box: {1.5, 0.1, 0.8}
-        Rgb: timber
-      }
-      for side in 0..2 {
-        {
-          Position: {-0.6 + (side - 0.5) * 1.2, 0.265, -0.1}
-          Box: {0.12, 0.37, 0.55}
-          Rgb: timber
-        }
-      }
-      paper_sheet {
-        Position: {-0.6, 0.555, -0.06}
-        Box: {0.54, 0.01, 0.4}
-        Rgb: GardenPaper
-      }
-      inkstone {
-        Position: {-0.04, 0.575, -0.22}
-        Box: {0.16, 0.05, 0.22}
-        Rgb: GardenSlate
-      }
-      brush {
-        Position: {-0.6, 0.575, 0.12}
-        Rotation: {0, 0, math.PI / 2}
-        Cylinder: {radius: 0.012, length: 0.4, segments: 6}
-        Rgb: timber
-      }
-      SeatCushion(tint: accent) { Position: {-0.6, 0.16, 0.38} }
-      ink_pool {
-        Position: {-0.04, 0.602, -0.22}
-        RoundedBox: {0.11, 0.008, 0.15, 0.025}
-        Rgb: {27, 33, 39}
-        PbrMaterial: {roughness: 0.14}
-      }
-      brush_tip {
-        Position: {-0.36, 0.575, 0.12}
-        Rotation: {0, 0, -math.PI / 2}
-        Cone: {radius: 0.018, length: 0.08, segments: 8}
-        Rgb: {48, 44, 41}
-      }
-      for i in 0..4 {
-        {
-          Position: {-0.72 + i * 0.075, 0.562, -0.08 + math.sin(i * 1.8) * 0.04}
-          Rotation: {0, -0.2 + i * 0.12, 0}
-          Box: {0.016, 0.004, 0.13 - i % 2 * 0.035}
-          Rgb: {48, 54, 57}
-        }
-      }
-      for i in 0..2 {
-        {
-          Position: {-1.15, 0.59 + i * 0.065, -0.25}
-          Box: {0.29, 0.045, 0.32}
-          Rgb: {214, 202, 173}
-        }
-        for cover in 0..2 {
-          {
-            Position: {-1.15, 0.563 + i * 0.065 + cover * 0.054, -0.25}
-            Box: {0.31, 0.009, 0.34}
-            Rgb: accent
-          }
-        }
-      }
-      for side in 0..2 {
-        {
-          Position: {1.4 + (side - 0.5) * 0.8, 0.75, -0.65}
-          Box: {0.07, 1.5, 0.38}
-          Rgb: timber
-        }
-      }
-      for shelf in 0..3 {
-        {
-          Position: {1.4, 0.12 + shelf * 0.5, -0.65}
-          Box: {0.8, 0.07, 0.38}
-          Rgb: timber
-        }
-        for book in 0..5 {
-          {
-            Position: {1.12 + book * 0.14, 0.3 + shelf * 0.5, -0.65}
-            Box: {0.1, 0.29 - book % 2 * 0.05, 0.27}
-            Rgb: {135 + book * 17, 130 + shelf * 20, 131 + book % 3 * 24}
-          }
-          {
-            Position: {1.12 + book * 0.14, 0.34 + shelf * 0.5, -0.509}
-            Box: {0.055, 0.085, 0.008}
-            Rgb: {231, 218, 183}
-          }
-          for band in 0..2 {
-            {
-              Position: {1.12 + book * 0.14, 0.21 + shelf * 0.5 + band * 0.16, -0.509}
-              Box: {0.1, 0.012, 0.008}
-              Rgb: {92, 87, 86}
-            }
-          }
-        }
-      }
+      HouseInteriorStudy(accent: accent, timber: timber) {}
     }
 
     if style == 4 {
-      for i in 0..3 {
-        {
-          Position: {(i - 1) * 1.08, 0.17, 0.05}
-          Scale: {1, 0.29, 1}
-          Sphere: {radius: 0.31, segments: 24, smooth: true}
-          Rgb: accent
-        }
-        {
-          Position: {(i - 1) * 1.08, 0.17, 0.05}
-          Torus: {radius: 0.305, tube: 0.012, segments: 24, rings: 6}
-          Rgb: {218, 196, 162}
-        }
-        for stitch in 0..12 {
-          const x = math.cos(stitch * math.PI / 6)
-          const z = math.sin(stitch * math.PI / 6)
-          TreeLimb(ax: (i - 1) * 1.08 + x * 0.31, ay: 0.17, az: 0.05 + z * 0.31,
-            bx: (i - 1) * 1.08 + x * 0.286, by: 0.205, bz: 0.05 + z * 0.286,
-            base: 0.007, tip: 0.007, tint: {218, 196, 162})
-        }
-      }
-      altar {
-        Position: {0, 0.24, -0.9}
-        Box: {1.15, 0.32, 0.42}
-        Rgb: timber
-      }
-      singing_bowl {
-        Position: {0, 0.5, -0.9}
-        Tube: {radius: 0.18, thickness: 0.035, length: 0.2, segments: 20}
-        Rgb: {193, 153, 83}
-        PbrMaterial: {roughness: 0.3, metallic: 0.6}
-      }
-      bowl_rim {
-        Position: {0, 0.603, -0.9}
-        Torus: {radius: 0.163, tube: 0.018, segments: 24, rings: 8}
-        Rgb: {222, 184, 111}
-        PbrMaterial: {roughness: 0.25, metallic: 0.6}
-      }
-      bowl_bottom {
-        Position: {0, 0.416, -0.9}
-        Cylinder: {radius: 0.148, length: 0.018, segments: 24}
-        Rgb: {139, 105, 53}
-      }
-      striker {
-        Position: {0.34, 0.425, -0.85}
-        Rotation: {math.PI / 2, 0.3, 0}
-        Cylinder: {radius: 0.025, length: 0.28, segments: 12}
-        Rgb: {155, 108, 66}
-      }
-      incense_dish {
-        Position: {-0.36, 0.42, -0.9}
-        Cylinder: {radius: 0.11, length: 0.035, segments: 20}
-        Rgb: accent
-      }
-      for i in 0..3 {
-        {
-          Position: {-0.4 + i * 0.035, 0.54, -0.9}
-          Cylinder: {radius: 0.007, length: 0.22, segments: 6}
-          Rgb: {172, 125, 72}
-        }
-      }
-      CeramicVase(glaze: accent) { Position: {1.55, 0.08, -0.8} }
-      FlowerArrangement(tint: {242, 222, 184}, phase: 2) {
-        Position: {1.55, 0.48, -0.8}
-        Scale: {1, 1.35, 1}
-      }
+      HouseInteriorShrine(accent: accent, timber: timber) {}
     }
   }
 }

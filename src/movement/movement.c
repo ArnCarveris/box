@@ -406,9 +406,9 @@ static void BoxPathFollowSystem(
 
         f[i].distance = distance;
         f[i].speed = speed;
-        p[i].x = point[0];
-        p[i].y = point[1];
-        p[i].z = point[2];
+        p[i].x = point[0] + f[i].offset[0];
+        p[i].y = point[1] + f[i].offset[1];
+        p[i].z = point[2] + f[i].offset[2];
 
         if (f[i].orient && glm_vec3_norm2(tangent) > 1e-12f) {
             if (speed < 0) {

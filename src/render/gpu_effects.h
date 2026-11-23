@@ -117,10 +117,6 @@ typedef struct box_gpu_fx_state_t {
     WGPUTexture up;                 /**< Upsampled levels of a bloom, one fewer than the chain */
     WGPUTextureView up_mips[BOX_GPU_BLOOM_MIPS]; /**< View of every upsampled level */
     WGPUBuffer steps;               /**< Blend of each upsample, BOX_GPU_BLOOM_STEP bytes apart */
-    WGPUTexture history[2];         /**< First mip of the previous and the current frame */
-    WGPUTextureView history_views[2]; /**< Views of the history images */
-    int32_t history_index;          /**< History image that holds the last frame */
-    bool history_valid;             /**< The history holds a frame */
     box_gpu_fx_bloom_group_t groups[BOX_GPU_BLOOM_GROUPS]; /**< Bind groups of the dispatches
                                      *   of a bloom */
     int32_t group_count;            /**< Bind groups kept */
@@ -207,12 +203,6 @@ typedef struct box_gpu_fx_ctx_t {
     box_gpu_fx_blend_t blend;       /**< How the effect writes its output */
 } box_gpu_fx_ctx_t;
 
-/** Uniforms of the tone map pass, matching Tonemap in etc/shaders/tonemap.wgsl */
-typedef struct box_gpu_tonemap_uniforms_t {
-    uint32_t flags[4];              /**< Scale by the exposure, operator (0 none, 1 PBR Neutral,
-                                     *   2 Tony McMapface), two unused */
-} box_gpu_tonemap_uniforms_t;
-
 /** Uniforms of the exposure passes, matching Settings in etc/shaders/exposure.wgsl */
 typedef struct box_gpu_measure_uniforms_t {
     float range[4];                 /**< Min log luminance, its range, low and high percentile */
@@ -250,6 +240,26 @@ typedef struct box_gpu_vignette_uniforms_t {
     float shape[4];                 /**< Center x and y, width over height of the image, unused */
     float color[4];                 /**< Linear color of the vignette, unused */
 } box_gpu_vignette_uniforms_t;
+
+/** Uniforms of the FXAA pass, matching Fxaa in etc/shaders/fxaa.wgsl */
+typedef struct box_gpu_fxaa_uniforms_t {
+    float params[4];                /**< Edge threshold, least threshold, subpixel blend, unused */
+    float texel[4];                 /**< 1 / width, 1 / height of the image, two unused */
+} box_gpu_fxaa_uniforms_t;
+
+/** Flag of the tone map uniforms: the pass applies the color grading that follows it */
+#define BOX_GPU_TONEMAP_GRADING (1u)
+
+/** Flag of the tone map uniforms: the pass applies the vignette that follows it */
+#define BOX_GPU_TONEMAP_VIGNETTE (2u)
+
+/** Uniforms of the tone map pass, matching Tonemap in etc/shaders/tonemap.wgsl */
+typedef struct box_gpu_tonemap_uniforms_t {
+    uint32_t flags[4];              /**< Scale by the exposure, operator (0 none, 1 PBR Neutral,
+                                     *   2 Tony McMapface), BOX_GPU_TONEMAP_* flags, unused */
+    box_gpu_grading_uniforms_t grading; /**< The grading, with BOX_GPU_TONEMAP_GRADING */
+    box_gpu_vignette_uniforms_t vignette; /**< The vignette, with BOX_GPU_TONEMAP_VIGNETTE */
+} box_gpu_tonemap_uniforms_t;
 
 /** Uniforms of the chromatic aberration pass, matching ChromaticAberration in
  * etc/shaders/chromatic_aberration.wgsl */
@@ -355,6 +365,30 @@ void box_gpu_fx_uniforms(
  */
 void box_gpu_fx_dof_release(
     box_gpu_fx_target_t *ft);
+
+/** Record an FXAA pass.
+ *
+ * @param gpu The backend
+ * @param ctx The chain
+ * @param e The pass
+ * @return Whether the pass was recorded
+ */
+bool box_gpu_fx_fxaa(
+    box_gpu_t *gpu,
+    const box_gpu_fx_ctx_t *ctx,
+    const box_render_effect_t *e);
+
+/** Record a chromatic aberration pass.
+ *
+ * @param gpu The backend
+ * @param ctx The chain
+ * @param e The pass
+ * @return Whether the pass was recorded
+ */
+bool box_gpu_fx_chromatic_aberration(
+    box_gpu_t *gpu,
+    const box_gpu_fx_ctx_t *ctx,
+    const box_render_effect_t *e);
 
 /** Record the depth of field passes: the half resolution image with its circle of confusion,
  * the dilated near CoC, the far and near gathers, their median filter and the composite at full

@@ -25,8 +25,8 @@
 extern "C" {
 #endif
 
-/** Cluster lookups of the point and spot lights a FogVolume ray makes at most, and the lights
- * of each lookup it marches at most; FOG_LIGHT_SEGMENTS in etc/shaders/fog_volume.wgsl */
+/** Point and spot lights of its cluster a cell of the froxel grid of the FogVolumes is lit by
+ * at most; FOG_LIGHTS in etc/shaders/fog_volume.wgsl */
 #define BOX_FOG_VOLUME_LIGHT_STEPS (8)
 
 /** How a light takes part in the LightBake of its scene, as Unity's light modes.
@@ -232,6 +232,10 @@ extern ECS_TAG_DECLARE(NoBake);
  *
  * Values apply as specified: budget_ms 0 captures nothing, a resolution outside 8 to 512
  * captures nothing and sets ReflectionBakeStatus.error.
+ *
+ * With follow_focus the scene probe follows the first WorldFocus of the scene (box_world_focus)
+ * for streamed worlds; without one it stays over the static bounds. A shift of the world origin
+ * moves it without a capture.
  */
 ECS_STRUCT(ReflectionBake, {
     int32_t resolution;   /**< Face edge of a probe cubemap in texels, 8 to 512, default 128 */
@@ -239,7 +243,17 @@ ECS_STRUCT(ReflectionBake, {
                            *   milliseconds, default 1 */
     bool scene_probe;     /**< The engine adds a probe covering the whole scene, default true */
     float scene_probe_height; /**< Height of the scene probe above the bottom of the static
-                               *   bounds of the scene, default 2 */
+                               *   bounds of the scene, or above the focus with follow_focus,
+                               *   default 2 */
+    bool follow_focus;    /**< The scene probe captures above the focus of the scene, again once
+                           *   the focus moved more than follow_distance, blending to the new
+                           *   capture over follow_blend, default false */
+    float follow_distance; /**< Distance the focus moves before the scene probe captures again,
+                            *   default 16 */
+    float follow_radius;  /**< Changes of static shapes or lights farther than this from a scene
+                           *   probe that follows the focus do not recapture it, default 64 */
+    float follow_blend;   /**< Seconds over which the scene probe blends from its old capture to
+                           *   the one at its new place, default 0.5, 0 switches at once */
     ecs_entity_t environment; /**< Environment source the captures see where no shape covers
                                *   them, default 0 for the hemisphere of the AmbientLight */
     float light_threshold; /**< Degrees a directional light turns from the direction it was
@@ -335,22 +349,56 @@ ECS_STRUCT(PlanarReflection, {
                            *   perfect mirror */
 });
 
-/** A box of fog the lit views of its scene with LightSettings.fog_volumes raymarch, placed by the
+/** Shape of the fog of a FogVolume in its box */
+ECS_ENUM(FogVolumeShape, {
+    FogVolumeBox = 0,       /**< The box: edge_fade fades the density by the distance to its
+                             *   nearest face */
+    FogVolumeEllipsoid = 1, /**< The ellipsoid inscribed in the box, with semi-axes extent:
+                             *   edge_fade fades the density by an approximate distance inside
+                             *   its surface, so the outline is round */
+    FogVolumeUnbounded = 2  /**< All space of its scene, out to the fog_distance of each view,
+                             *   wherever the camera is: extent, edge_fade and edge_noise are
+                             *   ignored and the volume is never culled */
+});
+
+/** A box of fog the lit views of its scene with LightSettings.fog_volumes render, placed by the
  * position and rotation of the entity. Probe and reflection captures and bakes do not see it.
  *
- * It draws after the opaque meshes and the sky, back to front, at most 32 per view. Other blended
- * shapes and particles in or behind it are not fogged. It is lit by the ambient of the view, the
- * first directional light and the point and spot lights of the clusters of the view.
+ * The fog fills the box or the ellipsoid inscribed in it (shape) and fades to 0 over edge_fade
+ * inside its surface; height_falloff thins it out toward the top of the box, and edge_noise lets
+ * the noise erode the faded border into billows instead of an outline of the shape.
+ *
+ * A FogVolumeUnbounded volume has no box: it fills all space of its scene, out to the
+ * fog_distance of each lit view, wherever the camera is, and is in every lit view of its scene.
+ * Its height_falloff is measured from the position of the entity along its local +Y, as the
+ * base_height of a HeightFog, so the same density and falloff give fog like a HeightFog, with
+ * shadows, shafts, noise and local lights. In the fog the sun's shadow fades out over the last
+ * part of the shadow distance, so the shafts end without a ring.
+ *
+ * The unbounded volumes and the nearest bounded ones a view sees, 32 in all, render through a
+ * froxel grid of the view: a grid aligned with its frustum, one cell per tile of about 8x8
+ * pixels (larger tiles above 1920 pixels, so a grid has at most 240 cells along its larger
+ * edge) by 64 depth slices from the near plane to LightSettings.fog_distance, thickening
+ * exponentially with the distance (evenly for an orthographic camera). Each cell sums the density of every volume at its center and is lit
+ * once, so the cost follows the grid, not the image size, the screen coverage or the number of
+ * overlapping volumes. The grid is applied after the opaque meshes and the sky, one lookup per
+ * pixel at its depth; fog beyond fog_distance is not drawn, and the sky takes the fog up to it.
+ * Detail smaller than a cell, such as a hard face of a box or a thin shaft, is softened over a
+ * cell. Particles and blended shapes in or behind it are fogged at their own depth by one
+ * lookup in the grid, alpha blended ones taking on the fog in front of them and additive ones
+ * dimmed by it; 2D shapes and text are not fogged. It is lit by the ambient of the view, the
+ * first directional light through its shadow cascades and cookie, and the point and spot lights
+ * of the clusters of the view.
  *
  * A shape with Transmission in or behind it is fogged as an opaque surface at its depth: the fog
- * behind the nearest glass of a pixel is marched before the snapshot the glass shows, the fog in
+ * behind the nearest glass of a pixel is applied before the snapshot the glass shows, the fog in
  * front of it after the last transmissive draw, from a depth only pass of the transmissive shapes.
- * Blended shapes drawn in front of glass before the last glass are fogged as the glass; the fog
- * between two layers of glass is lost.
+ * Blended shapes and particles drawn before the last glass are not fogged at their own depth:
+ * over glass they are fogged as the glass, elsewhere not at all; the fog between two layers of
+ * glass is lost.
  *
- * A ray looks up its clusters at most BOX_FOG_VOLUME_LIGHT_STEPS times, each segment lit by the
- * first BOX_FOG_VOLUME_LIGHT_STEPS lights of the cluster at its middle, so dense clusters may
- * lose lights. Shadows are one depth comparison per step.
+ * A cell is lit by the first BOX_FOG_VOLUME_LIGHT_STEPS lights of its cluster, so dense clusters
+ * may lose lights. Shadows are one depth comparison per cell.
  */
 ECS_STRUCT(FogVolume, {
     vec3 extent;             /**< Half size of the box, default {5, 5, 5} */
@@ -367,9 +415,6 @@ ECS_STRUCT(FogVolume, {
     float ambient_inscatter; /**< Scale of the ambient light, default 1 */
     float light_inscatter;   /**< Scale of the point and spot lights, default 1, 0 skips their
                               *   lookup */
-    int32_t steps;           /**< March steps across a volume, default 24, clamped to 4..128;
-                              *   a ray that crosses part of the box takes its share of them,
-                              *   at least 4, or 8 with noise */
     float noise_strength;    /**< 0 constant density, 1 the density goes from 0 to twice its
                               *   value with a tileable 3D noise, clamped to 0..1, default 0 */
     float noise_scale;       /**< World size of the largest billows, default 4. The noise is in
@@ -378,6 +423,19 @@ ECS_STRUCT(FogVolume, {
     vec3 wind;               /**< World units per second the noise moves, times the world time,
                               *   so a fixed --delta-time renders the same frames every run,
                               *   default {0, 0, 0} */
+    FogVolumeShape shape;    /**< Shape of the fog in the box, default FogVolumeBox. The box
+                              *   bounds every shape and is what views cull it by, except
+                              *   FogVolumeUnbounded, which has no box and is never culled */
+    float height_falloff;    /**< The density times exp(-height_falloff * h), h the height
+                              *   above the bottom of the box along its local +Y, as
+                              *   HeightFog.falloff, so ground mist thins out toward its top;
+                              *   for FogVolumeUnbounded h is the height above the entity,
+                              *   denser below it; at least 0, default 0 for uniform density */
+    float edge_noise;        /**< How much the noise erodes the faded border, 0 to 1, default 0:
+                              *   at 0 the fade of edge_fade scales the density, at 1 it is a
+                              *   threshold on the noise, so the fog reaches further out where
+                              *   the noise is high and the outline follows its billows. Applies
+                              *   with noise_strength and edge_fade above 0 */
 });
 
 /** Stars a StarField draws at most; a larger count draws this many */

@@ -1,0 +1,153 @@
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+using box.camera
+using box.view
+using box.light
+using box.movement
+
+$ {
+  Scene: {shader_features: {Extended: {water: true}}}
+}
+
+// A brook that bends a quarter turn, seen from above at an angle: five Water lengths over a
+// sandy bed, a straight one along +x, three across the bend turned 15, 45 and 75 degrees and a
+// straight one flowing away from the camera along -z, each with a WaterFlow along its own length
+// and WaterFlow.textures. Their normal map and foam texture are projected from the world
+// (texture.Mapping MappingWorld) and travel with the flow: the ripples and the foam lace move
+// downstream and bend with the water, without a seam where the lengths meet. A field of
+// WaterRipples over the bend blends the velocity of the lengths, and two rocks held still in the
+// water (RippleSources with foam) leave foaming trails that drift around the bend.
+// frames: 240
+water_flow_textures {
+  Scene: {shader_features: {Extended: {water: true}}}
+  AmbientLight: {sky: {140, 165, 205}, ground: {70, 64, 52}, intensity: 0.6}
+
+  sun {
+    Rotation: {0.7, 0.4, 0}
+    DirectionalLight: {intensity: 3}
+    Rgb: {255, 240, 215}
+  }
+
+  camera {
+    Position: {-1.5, 11, 8}
+    Rotation: {-0.95, 0, 0}
+    Camera: {fov: 50}
+  }
+
+  main_view {
+    View: {camera: camera, clear: {enabled: true, color: {150, 170, 195, 255}}}
+  }
+
+  ripple_height {
+    Gen: {
+      width: 256, height: 256, seed: 11
+      layers: [
+        {kind: GenNoise, frequency: 6, octaves: 3, amount: 1}
+      ]
+    }
+  }
+
+  ripple_normal {
+    Gen: {source: ripple_height, output: GenNormal, strength: 1.5}
+  }
+
+  foam_noise {
+    Gen: {
+      width: 256, height: 256, seed: 5
+      layers: [
+        {kind: GenNoise, frequency: 8, octaves: 3, amount: 1}
+      ]
+    }
+  }
+
+  bed {
+    Position: {0, -0.35, 0}
+    Box: {30, 0.2, 30}
+    Rgb: {150, 132, 100}
+    PbrMaterial: {roughness: 0.95}
+  }
+
+  prefab BrookWater {
+    Rgb: {255, 255, 255}
+    PbrMaterial: {metallic: 0, roughness: 0.05}
+    PbrTextures: {normal: ripple_normal}
+    texture.Mapping: {mode: MappingWorld, size: 3}
+    Water: {
+      shallow_color: {70, 150, 140}
+      deep_color: {20, 60, 70}
+      depth: 1
+      visibility: 1
+      refraction: 0.02
+      foam_color: {240, 245, 245}
+      foam_width: 0.3
+      foam_texture: foam_noise
+      foam_scale: 2
+    }
+  }
+
+  // Along +x, from x = -9 to -1
+  run_a : BrookWater {
+    Position: {-5, 0, 2}
+    Box: {8.4, 0.01, 3}
+    WaterFlow: {velocity: {1.2, 0}, textures: true}
+  }
+
+  // The bend, a quarter turn of radius 3 about (-1, -1) in three lengths turned 15, 45 and 75
+  // degrees, each flowing along its own length
+  bend_a : BrookWater {
+    Position: {-0.25, 0.002, 1.8}
+    Rotation: {0, 0.2618, 0}
+    Box: {2.4, 0.01, 3}
+    WaterFlow: {velocity: {1.159, -0.311}, textures: true}
+  }
+
+  bend_b : BrookWater {
+    Position: {1.05, 0.004, 1.05}
+    Rotation: {0, 0.7854, 0}
+    Box: {2.4, 0.01, 3}
+    WaterFlow: {velocity: {0.849, -0.849}, textures: true}
+  }
+
+  bend_c : BrookWater {
+    Position: {1.8, 0.006, -0.25}
+    Rotation: {0, 1.309, 0}
+    Box: {2.4, 0.01, 3}
+    WaterFlow: {velocity: {0.311, -1.159}, textures: true}
+  }
+
+  // Along -z, away from the camera, from z = -1 to -9
+  run_b : BrookWater {
+    Position: {2, 0.008, -5}
+    Box: {3, 0.01, 8.4}
+    WaterFlow: {velocity: {0, -1.2}, textures: true}
+  }
+
+  // The field over the bend, on a Water of its own without a shape
+  field {
+    Position: {0, 0, 0}
+    Water: {}
+    WaterRipples: {
+      size: 20, resolution: 256, wave_speed: 1.2, damping: 0.4, strength: 1.5
+      foam_decay: 0.15, foam_spread: 0.01
+    }
+  }
+
+  // Held still in the first length, so the water flows past them
+  rock_a {
+    Position: {-3.6, 0.05, 1.4}
+    IcoSphere: {segments: 1, radius: 0.35}
+    Rgb: {110, 104, 96}
+    PbrMaterial: {roughness: 0.9}
+    RippleSource: {extents: {0.35, 0.35}, strength: 0.6, foam: 1.5}
+  }
+
+  rock_b {
+    Position: {-2.4, 0.05, 2.8}
+    IcoSphere: {segments: 1, radius: 0.3}
+    Rgb: {110, 104, 96}
+    PbrMaterial: {roughness: 0.9}
+    RippleSource: {extents: {0.3, 0.3}, strength: 0.6, foam: 1.5}
+  }
+}

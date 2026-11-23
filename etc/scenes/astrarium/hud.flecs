@@ -16,18 +16,6 @@ using assets
 const nav_tab_width: f32 = 142
 
 state {
-  fn spell_r(i: i32) -> i32 {
-    match i { 0: 255; 1: 86; 2: 120; 3: 186; 4: 255; _: 255 }
-  }
-
-  fn spell_g(i: i32) -> i32 {
-    match i { 0: 130; 1: 196; 2: 240; 3: 146; 4: 226; _: 70 }
-  }
-
-  fn spell_b(i: i32) -> i32 {
-    match i { 0: 70; 1: 255; 2: 160; 3: 255; 4: 150; _: 90 }
-  }
-
   fn digits(v: f32) -> i32 {
     v >= 100 ? 3 : v >= 10 ? 2 : 1
   }
@@ -80,7 +68,12 @@ assets {
     glass {
       Position: {0, 0, 0}
       Layout: {}
-      Item: {h: Center, v: Middle, width: {mode: Fixed, value: inner}, height: {mode: Fixed, value: inner}}
+      Item: {
+        h: Center,
+        v: Middle,
+        width: {mode: Fixed, value: inner},
+        height: {mode: Fixed, value: inner}
+      }
       Rect: {1, 1}
       Rgb: dark
       Border: {radius: inner / 2}
@@ -146,6 +139,7 @@ assets {
         Rgb: {255, 255, 255}
         box.spatial.Ignore
       }
+
       name {
         Text: {value: label, size: 10, font: font_display}
         Rgb: {255, 244, 226}
@@ -199,7 +193,7 @@ assets {
     prop down: bool = false
 
     const size = 62
-    const hue: Rgb = {spell_r(index), spell_g(index), spell_b(index)}
+    const hue: Rgb = spells[index].hue
     const cooling = spell_cooling[index]
     const afford = spell_afford[index]
     const live = afford && !cooling
@@ -226,11 +220,17 @@ assets {
       Rect: {1, 1}
       Image: {texture: tex_panel}
       Rgb: live ? {hue.r * 0.17, hue.g * 0.17, hue.b * 0.2} : {18, 20, 30}
+
       if hover {
         Border: {width: 2, radius: 7, color: {ui_pale.r, ui_pale.g, ui_pale.b, 255}}
       } else {
-        Border: {width: 1, radius: 7, color: {ui_gold.r * 0.7, ui_gold.g * 0.7, ui_gold.b * 0.7, 255}}
+        Border: {
+          width: 1,
+          radius: 7,
+          color: {ui_gold.r * 0.7, ui_gold.g * 0.7, ui_gold.b * 0.7, 255}
+        }
       }
+
       Transition: [Rgb: {duration: 0.25}]
       ClipChildren
 
@@ -247,6 +247,7 @@ assets {
         Position: {0, 0, 2}
         Rect: {38, 38}
         Image: {texture: spell_tex(index)}
+
         if live {
           Rgb: {min(255, hue.r + 70), min(255, hue.g + 70), min(255, hue.b + 70)}
           Emissive: {strength: 0.22, color: hue}
@@ -254,12 +255,13 @@ assets {
           Rgb: {88, 90, 104}
           Emissive: {strength: 0, color: hue}
         }
+
         Transition: [Rgb: {duration: 0.25}]
         box.spatial.Ignore
       }
 
       if cooling {
-        CooldownWipe wipe(seconds: spell_cooldown(index) * haste_scale(stat_haste), size: size)
+        CooldownWipe wipe(seconds: spells[index].cooldown * haste_scale(stat_haste), size: size)
       } else {
         ReadyFlash flash(size: size)
       }
@@ -279,10 +281,10 @@ assets {
       }
     }
 
-    if spell_cost(index) > 0 {
+    if spells[index].cost > 0 {
       cost {
         Position: {size / 2 - 13, -size / 2 + 8, 4}
-        Text: {value: "{spell_cost(index):.0}", size: 11, font: font_body}
+        Text: {value: "{spells[index].cost:.0}", size: 11, font: font_body}
         Rgb: afford ? {150, 214, 255} : {255, 96, 86}
         box.spatial.Ignore
       }
@@ -392,8 +394,13 @@ assets {
         Rect: {1, 1}
         Image: {texture: tex_panel}
         Rgb: ui_ink
-        Border: {width: 1, radius: 8, color: {ui_gold.r * 0.5, ui_gold.g * 0.5, ui_gold.b * 0.5, 255}}
-        for i in 0..6 {
+        Border: {
+          width: 1,
+          radius: 8,
+          color: {ui_gold.r * 0.5, ui_gold.g * 0.5, ui_gold.b * 0.5, 255}
+        }
+
+        for i in 0..spells.count() {
           SpellSlot "slot_{i}"(index: i)
         }
       }
@@ -425,6 +432,7 @@ assets {
 
     name {
       Text: {value: label, size: 17, font: font_display}
+
       if active {
         Rgb: {255, 246, 220}
         Emissive: {strength: 0.5, color: {255, 200, 120}}
@@ -435,6 +443,7 @@ assets {
         Rgb: {ui_gold.r * 0.72, ui_gold.g * 0.72, ui_gold.b * 0.72}
         Emissive: {strength: 0, color: {255, 200, 120}}
       }
+
       Transition: [Rgb: {duration: 0.2}, Emissive: {duration: 0.2}]
       box.spatial.Ignore
     }
@@ -501,11 +510,16 @@ assets {
     Rect: {1, 1}
     Image: {texture: tex_panel}
     Rgb: ui_ink
-    Border: {width: 1, radius: 14, color: {ui_gold.r * 0.45, ui_gold.g * 0.45, ui_gold.b * 0.45, 255}}
+    Border: {
+      width: 1,
+      radius: 14,
+      color: {ui_gold.r * 0.45, ui_gold.g * 0.45, ui_gold.b * 0.45, 255}
+    }
 
     Icon glyph(tex: icon, size: 17, color: tint) {
       Emissive: {strength: 0.4, color: tint}
     }
+
     Caption amount(text: text, size: 14, font: font_display, color: ui_pale)
   }
 
@@ -542,6 +556,7 @@ assets {
           const lit = (i + 0.5) / 40 < f
           Position: {0, 0, 2}
           Line: {cos(a) * 26, sin(a) * 26, cos(a) * 29, sin(a) * 29, width: 1.6}
+
           if lit {
             Rgb: ui_pale
             Emissive: {strength: 0.8, color: {255, 190, 100}}
@@ -549,6 +564,7 @@ assets {
             Rgb: {ui_dim.r * 0.6, ui_dim.g * 0.6, ui_dim.b * 0.6}
             Emissive: {strength: 0, color: {255, 190, 100}}
           }
+
           Transition: [Rgb: {duration: 0.3}, Emissive: {duration: 0.3}]
         }
       }
@@ -557,7 +573,12 @@ assets {
     who {
       Layout: {direction: Column, spacing: 1}
       Caption name(text: "Ilyra Vane", size: 19, font: font_display, color: ui_pale)
-      Caption role(text: "Star-Warden, level {hero_level}", size: 13, color: ui_muted, font: font_italic)
+      Caption role(
+        text: "Star-Warden, level {hero_level}",
+        size: 13,
+        color: ui_muted,
+        font: font_italic
+      )
     }
   }
 
@@ -599,8 +620,8 @@ assets {
     const shown = spell_hover >= 0 && screen != SCREEN_TITLE
     const i = max(spell_hover, 0)
     const a = shown ? 1 : 0
-    const x = (i - 2.5) * 80
-    const hue: Rgb = {spell_r(i), spell_g(i), spell_b(i)}
+    const x = (i - (spells.count() - 1) / 2.0) * 80
+    const hue: Rgb = spells[i].hue
 
     Item: {h: Center, v: Bottom, width: {mode: Fixed, value: 300}, x: x, y: 164}
     Layout: {direction: Column, padding: {12, 12, 14, 14}, spacing: 4}
@@ -616,13 +637,17 @@ assets {
     ]
     box.spatial.Ignore
 
-    Caption name(text: spell_name(i), size: 17, font: font_display, color: hue)
-    Caption blurb(text: spell_desc(i), size: 14, width: 272, color: ui_text)
+    Caption name(text: spells[i].name, size: 17, font: font_display, color: hue)
+    Caption blurb(text: spells[i].desc, size: 14, width: 272, color: ui_text)
     meta {
-      const cool = round(spell_cooldown(i) * haste_scale(stat_haste) * 10) / 10
-      const cool_at = digits(spell_cost(i)) + 10
+      const cool = round(spells[i].cooldown * haste_scale(stat_haste) * 10) / 10
+      const cool_at = digits(spells[i].cost) + 10
       const xp_at = cool_at + digits(cool) + 15
-      Text: {value: "{spell_cost(i):.0} aether   {cool:.1}s recharge   +{spell_xp(i):.0} xp", size: 12, font: font_body}
+      Text: {
+        value: "{spells[i].cost:.0} aether   {cool:.1}s recharge   +{spells[i].xp:.0} xp",
+        size: 12,
+        font: font_body
+      }
       Rgb: {150, 214, 255}
       Spans: {spans: [
         {start: cool_at, end: xp_at, color: {ui_muted.r, ui_muted.g, ui_muted.b, 255}},
@@ -636,7 +661,13 @@ assets {
     const a = banner_on ? 1 : 0
     const y = banner_on ? -84 : -54
 
-    Item: {h: Center, v: Top, width: {mode: Fixed, value: 640}, height: {mode: Fixed, value: 96}, y: y}
+    Item: {
+      h: Center,
+      v: Top,
+      width: {mode: Fixed, value: 640},
+      height: {mode: Fixed, value: 96},
+      y: y
+    }
     Layout: {}
     Opacity: {a}
     Transition: [
@@ -646,7 +677,12 @@ assets {
     box.spatial.Ignore
 
     shade {
-      Item: {h: Center, v: Middle, width: {mode: Fixed, value: 900}, height: {mode: Fixed, value: 190}}
+      Item: {
+        h: Center,
+        v: Middle,
+        width: {mode: Fixed, value: 900},
+        height: {mode: Fixed, value: 190}
+      }
       Rect: {1, 1}
       Image: {texture: tex_halo}
       Rgb: {0, 0, 0}
@@ -662,6 +698,7 @@ assets {
       Caption big(text: banner_text, size: 38, font: font_display, color: ui_pale) {
         Emissive: {strength: 0.5, color: {255, 190, 100}}
       }
+
       Caption small(text: banner_sub, size: 17, font: font_italic, color: ui_text)
     }
   }

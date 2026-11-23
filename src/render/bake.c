@@ -41,6 +41,10 @@
 /** Error of a LightBake whose bounces is out of range */
 #define BOX_BAKE_BOUNCES_ERROR "bounces must be 0 to 16"
 
+/** Times the grid of a volume is placed again after its first placement before a warning that
+ * LightBake does not follow streamed scenes */
+#define BOX_BAKE_STREAM_REGRIDS (16)
+
 /** Find the volume of a scene.
  *
  * @param b The state
@@ -946,6 +950,28 @@ static void box_bake_resize(
     ecs_vec_fini_t(NULL, &requeue, uint32_t);
 }
 
+/** Count a new grid of a volume, and warn once when its static bounds keep changing, as in a
+ * streamed scene: the grid covers all of the static bounds and rebakes as they grow and move,
+ * it does not follow the focus.
+ *
+ * @param world The world
+ * @param v The volume
+ */
+static void box_bake_stream_warn(
+    const ecs_world_t *world,
+    box_bake_volume_t *v)
+{
+    v->regrids += v->probes != 0;
+    if (v->regrids > BOX_BAKE_STREAM_REGRIDS && !v->stream_warned) {
+        char *path = v->entity ? ecs_get_path(world, v->entity) : NULL;
+        ecs_warn("LightBake '%s' does not support streamed scenes: its probe grid covers the "
+            "static bounds of the scene, which changed %d times, and rebakes with them",
+            path ? path : "", v->regrids);
+        ecs_os_free(path);
+        v->stream_warned = true;
+    }
+}
+
 /** Place the grid of a volume again and keep it when it did not change.
  *
  * @param it The iterator of the system
@@ -976,6 +1002,8 @@ static void box_bake_update(
     if (probes == v->probes && !ecs_os_memcmp_t(&grid, &v->grid, box_bake_grid_t)) {
         goto done;
     }
+
+    box_bake_stream_warn(it->world, v);
 
     if (v->sent && v->probes && probes && grid.spacing == v->grid.spacing) {
         box_bake_resize(it->world, b, p, v, &grid, probes);
@@ -1657,6 +1685,7 @@ static void BoxRenderExtractBake(
     }
 
     box_bake_changes(world, b);
+    b->shifting = false;
     for (i = 0; i < ecs_vec_count(&b->volumes); i ++) {
         box_bake_lights(b, ecs_vec_get_t(&b->volumes, box_bake_volume_t, i));
     }
@@ -1736,6 +1765,50 @@ box_render_bake_t* box_bake_state(
     const ecs_system_t *s = system ? ecs_system_get(world, system) : NULL;
 
     return s ? s->ctx : NULL;
+}
+
+/** Add an offset to every point of a vector of vec3.
+ *
+ * @param points The vector
+ * @param offset The offset
+ */
+static void box_bake_shift_points(
+    ecs_vec_t *points,
+    const vec3 offset)
+{
+    int32_t i;
+    for (i = 0; i < ecs_vec_count(points); i ++) {
+        float *point = *ecs_vec_get_t(points, vec3, i);
+        glm_vec3_add(point, ECS_CONST_CAST(float*, offset), point);
+    }
+}
+
+void box_render_bake_shift(
+    ecs_world_t *world,
+    ecs_entity_t scene,
+    const vec3 offset)
+{
+    box_render_bake_t *b = box_bake_state(world);
+    box_bake_volume_t *v = b ? box_bake_find(b, scene) : NULL;
+    int32_t i;
+    if (b) {
+        b->shifting = true;
+    }
+
+    if (!v) {
+        goto done;
+    }
+
+    for (i = 0; i < 3; i ++) {
+        v->grid.origin[i] += offset[i];
+    }
+
+    glm_vec3_add(v->min, ECS_CONST_CAST(float*, offset), v->min);
+    glm_vec3_add(v->max, ECS_CONST_CAST(float*, offset), v->max);
+    box_bake_shift_points(&v->cameras, offset);
+    box_bake_shift_points(&v->sorted, offset);
+done:
+    return;
 }
 
 bool box_render_bake_probe(

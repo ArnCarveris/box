@@ -355,7 +355,7 @@ void box_gpu_light_uniforms(
     u->cluster[3] = far_;
     u->lights[1] = glm_min(l->count, capacity);
     u->lights[0] = glm_min(l->directional, u->lights[1]);
-    u->lights[2] = l->enabled ? 1u : 0u;
+    u->lights[2] = l->enabled ? 1u : v->impostor ? v->impostor + 1u : 0u;
     u->lights[3] = c->ortho ? 1u : 0u;
     u->grid[0] = BOX_GPU_CLUSTER_X;
     u->grid[1] = BOX_GPU_CLUSTER_Y;
@@ -748,7 +748,7 @@ void box_gpu_light_cluster_with(
     };
     WGPUBindGroup group = wgpuDeviceCreateBindGroup(gpu->device, &desc);
     wgpuCommandEncoderClearBuffer(encoder, clusters, 0, sizeof(uint32_t));
-    WGPUComputePassEncoder pass = wgpuCommandEncoderBeginComputePass(encoder, NULL);
+    WGPUComputePassEncoder pass = box_gpu_profile_compute_pass(gpu, encoder, "light clusters");
     wgpuComputePassEncoderSetPipeline(pass, pipeline);
     wgpuComputePassEncoderSetBindGroup(pass, 0, group, 1, &offset);
     wgpuComputePassEncoderDispatchWorkgroups(pass,
@@ -861,6 +861,212 @@ static int32_t box_gpu_light_area_slot(
     return result;
 }
 
+WGPUBindGroupLayout box_gpu_light_layout(
+    box_gpu_t *gpu)
+{
+    WGPUBindGroupLayoutEntry entries[BOX_GPU_VIEW_BINDINGS] = {
+        {
+            .binding = 0,
+            .visibility = WGPUShaderStage_Vertex | WGPUShaderStage_Fragment,
+            .buffer = {
+                .type = WGPUBufferBindingType_Uniform,
+                .hasDynamicOffset = true,
+                .minBindingSize = sizeof(box_gpu_view_uniforms_t)
+            }
+        },
+        {
+            .binding = 1,
+            .visibility = WGPUShaderStage_Fragment,
+            .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
+        },
+        {
+            .binding = 2,
+            .visibility = WGPUShaderStage_Fragment,
+            .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
+        },
+        {
+            .binding = 3,
+            .visibility = WGPUShaderStage_Fragment,
+            .texture = {
+                .sampleType = WGPUTextureSampleType_Depth,
+                .viewDimension = WGPUTextureViewDimension_2DArray
+            }
+        },
+        {
+            .binding = 4,
+            .visibility = WGPUShaderStage_Fragment,
+            .sampler = { .type = WGPUSamplerBindingType_Comparison }
+        },
+        {
+            .binding = 5,
+            .visibility = WGPUShaderStage_Vertex | WGPUShaderStage_Fragment,
+            .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
+        },
+        {
+            .binding = 6,
+            .visibility = WGPUShaderStage_Fragment,
+            .texture = {
+                .sampleType = WGPUTextureSampleType_Float,
+                .viewDimension = WGPUTextureViewDimension_CubeArray
+            }
+        },
+        {
+            .binding = 7,
+            .visibility = WGPUShaderStage_Fragment,
+            .sampler = { .type = WGPUSamplerBindingType_Filtering }
+        },
+        {
+            .binding = 8,
+            .visibility = WGPUShaderStage_Fragment,
+            .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
+        },
+        {
+            .binding = 9,
+            .visibility = WGPUShaderStage_Fragment,
+            .texture = {
+                .sampleType = WGPUTextureSampleType_Float,
+                .viewDimension = WGPUTextureViewDimension_3D
+            }
+        },
+        {
+            .binding = 10,
+            .visibility = WGPUShaderStage_Fragment,
+            .sampler = { .type = WGPUSamplerBindingType_Filtering }
+        },
+        {
+            .binding = 11,
+            .visibility = WGPUShaderStage_Vertex | WGPUShaderStage_Fragment,
+            .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
+        },
+        {
+            .binding = 12,
+            .visibility = WGPUShaderStage_Fragment,
+            .texture = {
+                .sampleType = WGPUTextureSampleType_Float,
+                .viewDimension = WGPUTextureViewDimension_Cube
+            }
+        },
+        {
+            .binding = 13,
+            .visibility = WGPUShaderStage_Fragment,
+            .buffer = {
+                .type = WGPUBufferBindingType_Uniform,
+                .minBindingSize = BOX_GPU_PROBE_SIZE
+            }
+        },
+        {
+            .binding = 14,
+            .visibility = WGPUShaderStage_Fragment,
+            .texture = {
+                .sampleType = WGPUTextureSampleType_UnfilterableFloat,
+                .viewDimension = WGPUTextureViewDimension_2D
+            }
+        },
+        {
+            .binding = 15,
+            .visibility = WGPUShaderStage_Fragment,
+            .texture = {
+                .sampleType = WGPUTextureSampleType_Depth,
+                .viewDimension = WGPUTextureViewDimension_2D
+            }
+        },
+        {
+            .binding = 16,
+            .visibility = WGPUShaderStage_Fragment,
+            .buffer = {
+                .type = WGPUBufferBindingType_Uniform,
+                .minBindingSize = BOX_GPU_ATLAS_TILES_SIZE
+            }
+        },
+        {
+            .binding = 17,
+            .visibility = WGPUShaderStage_Fragment,
+            .texture = {
+                .sampleType = WGPUTextureSampleType_Float,
+                .viewDimension = WGPUTextureViewDimension_2D
+            }
+        },
+        {
+            .binding = 18,
+            .visibility = WGPUShaderStage_Fragment,
+            .sampler = { .type = WGPUSamplerBindingType_Filtering }
+        },
+        {
+            .binding = 19,
+            .visibility = WGPUShaderStage_Fragment,
+            .texture = {
+                .sampleType = WGPUTextureSampleType_Float,
+                .viewDimension = WGPUTextureViewDimension_2D
+            }
+        },
+        {
+            .binding = 20,
+            .visibility = WGPUShaderStage_Fragment,
+            .texture = {
+                .sampleType = WGPUTextureSampleType_Depth,
+                .viewDimension = WGPUTextureViewDimension_2D
+            }
+        },
+        {
+            .binding = 21,
+            .visibility = WGPUShaderStage_Fragment,
+            .texture = {
+                .sampleType = WGPUTextureSampleType_Float,
+                .viewDimension = WGPUTextureViewDimension_2DArray
+            }
+        },
+        {
+            .binding = BOX_GPU_PLANET_LIGHTS_BINDING,
+            .visibility = WGPUShaderStage_Fragment,
+            .buffer = {
+                .type = WGPUBufferBindingType_Uniform,
+                .minBindingSize = BOX_GPU_PLANET_LIGHTS_SIZE
+            }
+        },
+        {
+            .binding = BOX_GPU_PLANET_LUTS_BINDING,
+            .visibility = WGPUShaderStage_Fragment,
+            .storageTexture = {
+                .access = WGPUStorageTextureAccess_ReadOnly,
+                .format = WGPUTextureFormat_RGBA16Float,
+                .viewDimension = WGPUTextureViewDimension_2DArray
+            }
+        },
+        {
+            .binding = BOX_GPU_WATER_WAVES_BINDING,
+            .visibility = WGPUShaderStage_Fragment,
+            .buffer = {
+                .type = WGPUBufferBindingType_Uniform,
+                .minBindingSize = BOX_RENDER_WATER_WAVE_SETS * sizeof(box_render_water_waves_t)
+            }
+        },
+        [BOX_GPU_FOG_GRID_BINDING] = {
+            .binding = BOX_GPU_FOG_GRID_BINDING,
+            .visibility = WGPUShaderStage_Fragment,
+            .texture = {
+                .sampleType = WGPUTextureSampleType_Float,
+                .viewDimension = WGPUTextureViewDimension_3D
+            }
+        },
+        [BOX_GPU_AREAS_BINDING] = {
+            .binding = BOX_GPU_AREAS_BINDING,
+            .visibility = WGPUShaderStage_Fragment,
+            .buffer = {
+                .type = WGPUBufferBindingType_Uniform,
+                .minBindingSize = BOX_GPU_AREAS_SIZE
+            }
+        }
+    };
+    WGPUBindGroupLayoutDescriptor layout = {
+        .entryCount = BOX_GPU_VIEW_BINDINGS, .entries = entries };
+    box_gpu_water_fields_layout(entries);
+    for (int32_t i = 0; i < BOX_GPU_VIEW_BINDINGS; i ++) {
+        entries[i].visibility |= entries[i].storageTexture.access ? 0 : WGPUShaderStage_Compute;
+    }
+
+    return wgpuDeviceCreateBindGroupLayout(gpu->device, &layout);
+}
+
 WGPUBindGroup box_gpu_light_group_with(
     box_gpu_t *gpu,
     const box_gpu_target_t *t,
@@ -882,7 +1088,9 @@ WGPUBindGroup box_gpu_light_group_with(
     WGPUBuffer tiles = NULL;
     const box_gpu_atlas_t *atlas = t ? box_gpu_atlas_of(gpu, v, &tiles) : NULL;
     int32_t area = box_gpu_light_area_slot(gpu, v);
-    WGPUBindGroupEntry entries[25] = {
+    const box_gpu_buffer_t *waves = ecs_map_get_deref(
+        &gpu->buffers, box_gpu_buffer_t, BOX_RENDER_BUFFER_WATER_WAVES);
+    WGPUBindGroupEntry entries[BOX_GPU_VIEW_BINDINGS] = {
         { .binding = 0, .buffer = uniforms, .size = sizeof(box_gpu_view_uniforms_t) },
         { .binding = 1, .buffer = lights, .size = size },
         { .binding = 2, .buffer = clusters, .size = wgpuBufferGetSize(clusters) },
@@ -926,6 +1134,11 @@ WGPUBindGroup box_gpu_light_group_with(
                 ? snapshot_depth : box_gpu_transmission_depth_view(gpu, NULL)
         },
         [21] = { .binding = 21, .textureView = box_gpu_planar_view(gpu, t, v) },
+        [24] = {
+            .binding = BOX_GPU_WATER_WAVES_BINDING,
+            .buffer = waves ? waves->buffer : gpu->no_water_waves,
+            .size = BOX_RENDER_WATER_WAVE_SETS * sizeof(box_render_water_waves_t)
+        },
         [BOX_GPU_AREAS_BINDING] = {
             .binding = BOX_GPU_AREAS_BINDING,
             .buffer = area >= 0 ? gpu->area_buffer : gpu->no_areas,
@@ -936,9 +1149,15 @@ WGPUBindGroup box_gpu_light_group_with(
     box_gpu_atmosphere_bindings(gpu, t, v, &entries[9]);
     box_gpu_environment_bindings(gpu, t ? v : NULL, &entries[12]);
     box_gpu_planet_lights_bindings(gpu, &entries[BOX_GPU_PLANET_LIGHTS_BINDING]);
+    box_gpu_ripples_bindings(gpu, v, entries);
+    box_gpu_spectra_bindings(gpu, v, entries);
+    entries[BOX_GPU_FOG_GRID_BINDING] = (WGPUBindGroupEntry){
+        .binding = BOX_GPU_FOG_GRID_BINDING,
+        .textureView = box_gpu_fog_volumes_grid_view(gpu, t, v)
+    };
     WGPUBindGroupDescriptor desc = {
         .layout = gpu->view_layout,
-        .entryCount = 25,
+        .entryCount = BOX_GPU_VIEW_BINDINGS,
         .entries = entries
     };
 

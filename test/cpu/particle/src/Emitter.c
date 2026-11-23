@@ -327,7 +327,7 @@ void Emitter_extracted_block(void) {
     test_uint(b->delta_us, 16667);
     test_uint(b->life_min, 500000);
     test_uint(b->life_span, 1000000);
-    test_int(sizeof(box_render_particle_block_t), 512);
+    test_int(sizeof(box_render_particle_block_t), 544);
 
     frame(world);
     pool = pool_of(null, e);
@@ -1047,6 +1047,153 @@ void Emitter_world_scale_forces_linger(void) {
     const box_render_particle_pool_t *pool = pool_of(null, e);
     test_assert(pool != NULL);
     check_forces_scaled(&pool->block, 10);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void Emitter_follow_offsets_model(void) {
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t target = ecs_new(world);
+    ecs_set(world, target, Position, {10, 20, 30});
+    ecs_set(world, target, Rotation, {0, 1, 0});
+    ecs_entity_t e = emitter_new(world);
+    ecs_set(world, e, Position, {1, 2, 3});
+    ecs_get_mut(world, e, ParticleEmitter)->follow = target;
+    ecs_modified(world, e, ParticleEmitter);
+    frame(world);
+
+    const box_render_particle_pool_t *pool = pool_of(null, e);
+    test_assert(pool != NULL);
+    test_flt(pool->block.model[0][0], 1);
+    test_flt(pool->block.model[3][0], 11);
+    test_flt(pool->block.model[3][1], 22);
+    test_flt(pool->block.model[3][2], 33);
+    test_uint(pool->terrain, 0);
+    test_uint(pool->block.sampled, 0);
+
+    ecs_set(world, target, Position, {-5, 0, 5});
+    frame(world);
+    pool = pool_of(null, e);
+    test_assert(pool != NULL);
+    test_flt(pool->block.model[3][0], -4);
+    test_flt(pool->block.model[3][1], 2);
+    test_flt(pool->block.model[3][2], 8);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void Emitter_follow_ground_keeps_height(void) {
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t terrain = ecs_new(world);
+    ecs_add(world, terrain, TerrainSampled);
+    ecs_entity_t target = ecs_new(world);
+    ecs_set(world, target, Position, {10, 20, 30});
+    ecs_entity_t e = emitter_new(world);
+    ecs_set(world, e, Position, {1, 2, 3});
+    ParticleEmitter *p = ecs_get_mut(world, e, ParticleEmitter);
+    p->follow = target;
+    p->ground = terrain;
+    ecs_modified(world, e, ParticleEmitter);
+    frame(world);
+
+    const box_render_particle_pool_t *pool = pool_of(null, e);
+    test_assert(pool != NULL);
+    test_flt(pool->block.model[3][0], 11);
+    test_flt(pool->block.model[3][1], 2);
+    test_flt(pool->block.model[3][2], 33);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void Emitter_ground_sampled_terrain(void) {
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t terrain = ecs_new(world);
+    ecs_entity_t e = emitter_new(world);
+    ecs_get_mut(world, e, ParticleEmitter)->ground = terrain;
+    ecs_modified(world, e, ParticleEmitter);
+    frame(world);
+
+    const box_render_particle_pool_t *pool = pool_of(null, e);
+    test_assert(pool != NULL);
+    test_uint(pool->terrain, 0);
+    test_uint(pool->block.sampled, 0);
+
+    ecs_add(world, terrain, TerrainSampled);
+    frame(world);
+    pool = pool_of(null, e);
+    test_assert(pool != NULL);
+    test_uint(pool->terrain, terrain);
+    test_uint(pool->block.sampled, BOX_RENDER_PARTICLE_SPAWN_GROUND);
+
+    ecs_get_mut(world, e, ParticleEmitter)->local = true;
+    ecs_modified(world, e, ParticleEmitter);
+    frame(world);
+    pool = pool_of(null, e);
+    test_assert(pool != NULL);
+    test_uint(pool->terrain, 0);
+    test_uint(pool->block.sampled, 0);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void Emitter_collision_sampled_terrain(void) {
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t terrain = ecs_new(world);
+    ecs_add(world, terrain, TerrainSampled);
+    ecs_entity_t e = emitter_new(world);
+    ecs_set(world, e, ParticleCollision, {.ground = true, .height = 4, .terrain = terrain});
+    frame(world);
+
+    const box_render_particle_pool_t *pool = pool_of(null, e);
+    test_assert(pool != NULL);
+    test_uint(pool->terrain, terrain);
+    test_uint(pool->block.sampled, BOX_RENDER_PARTICLE_COLLIDE_TERRAIN);
+    test_flt(pool->block.ground[0], 4);
+
+    ecs_get_mut(world, e, ParticleEmitter)->ground = terrain;
+    ecs_modified(world, e, ParticleEmitter);
+    frame(world);
+    pool = pool_of(null, e);
+    test_assert(pool != NULL);
+    test_uint(pool->terrain, terrain);
+    test_uint(pool->block.sampled,
+        BOX_RENDER_PARTICLE_SPAWN_GROUND | BOX_RENDER_PARTICLE_COLLIDE_TERRAIN);
+
+    ecs_set(world, e, ParticleCollision, {.ground = false, .terrain = terrain});
+    frame(world);
+    pool = pool_of(null, e);
+    test_assert(pool != NULL);
+    test_uint(pool->block.sampled, BOX_RENDER_PARTICLE_SPAWN_GROUND);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void Emitter_collision_other_terrain_than_ground(void) {
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t ground = ecs_new(world);
+    ecs_add(world, ground, TerrainSampled);
+    ecs_entity_t other = ecs_new(world);
+    ecs_add(world, other, TerrainSampled);
+    ecs_entity_t e = emitter_new(world);
+    ecs_get_mut(world, e, ParticleEmitter)->ground = ground;
+    ecs_modified(world, e, ParticleEmitter);
+    ecs_set(world, e, ParticleCollision, {.ground = true, .terrain = other});
+    frame(world);
+
+    const box_render_particle_pool_t *pool = pool_of(null, e);
+    test_assert(pool != NULL);
+    test_uint(pool->terrain, ground);
+    test_uint(pool->block.sampled, BOX_RENDER_PARTICLE_SPAWN_GROUND);
 
     ecs_fini(world);
     box_render_null_free(null);

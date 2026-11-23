@@ -8,5 +8,12 @@ using box.light
 using assets
 component { FrigateCockpit: {} }
 camera { Position: {11, 9, 15}; Rotation: {-0.4, 0.63, 0}; Camera: {fov: 48} }
-main_view { View: {camera: camera, clear: {enabled: true, color: {9, 16, 24, 255}}, shadows: {enabled: true}} }
+main_view {
+  View: {
+    camera: camera,
+    clear: {enabled: true, color: {9, 16, 24, 255}},
+    shadows: {enabled: true, cascades: 3, resolution: 2048, interval: [1, 2, 2]}
+  }
+}
+
 sun { Rotation: {0.7, 2.4, 0}; DirectionalLight: {intensity: 2} }

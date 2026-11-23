@@ -8,11 +8,155 @@ using box.view
 using box.light
 using box.effects
 using box.atmosphere
+using box.particle
 using state
 using assets
 
+state {
+  // The flank of the volcano from its foot (t = 0) to the rim of its crater (t = 1), as radius
+  // and height of a cone one unit across and one unit high: steep near the top, spreading out
+  // in a long concave sweep to its foot
+  fn volcano_r(t: f64) -> f64 {
+    const u = 1 - t
+    u * u * u + 3 * u * u * t * 0.56 + 3 * u * t * t * 0.22 + t * t * t * 0.13
+  }
+
+  fn volcano_y(t: f64) -> f64 {
+    const u = 1 - t
+    3 * u * u * t * 0.07 + 3 * u * t * t * 0.55 + t * t * t * 0.97
+  }
+}
+
+assets {
+  prefab lg_volcano_profile { Path2D: {start: {1, 0}, segments: [
+    {kind: CubicBezier, control1: {0.56, 0.07}, control2: {0.22, 0.55}, end: {0.13, 0.97}},
+    {kind: Line, end: {0.1, 0.955}},
+    {kind: Line, end: {0.065, 0.89}}
+  ]} }
+
+  // The forest on the lower slopes, a little out from the rock, tucked into it at its top
+  prefab lg_volcano_forest { Path2D: {start: {1.04, 0}, segments: [
+    {kind: CatmullRom, end: {0.81, 0.08}},
+    {kind: CatmullRom, end: {0.71, 0.132}},
+    {kind: CatmullRom, end: {0.625, 0.18}},
+    {kind: Line, end: {0.565, 0.205}}
+  ]} }
+
+  prefab lg_volcano_round { Path2D: {start: {1, 0}, closed: true, segments: [
+    {kind: CatmullRom, end: {0, -1}},
+    {kind: CatmullRom, end: {-1, 0}},
+    {kind: CatmullRom, end: {0, 1}}
+  ]} }
+  prefab lg_volcano_tube { Profile2D: {outer: lg_volcano_round} }
+
+  // A ridge down the flank of the volcano at angle, from t0 up to t1 along the flank, half sunk
+  // into it, width across at its foot and narrowing toward its top. Green ridges are the forest
+  // climbing up the slope
+  template LgVolcanoSpur {
+    prop angle: f32 = 0
+    prop t0: f32 = 0.3
+    prop t1: f32 = 0.9
+    prop width: f32 = 0.03
+    prop seed: i32 = 1
+    prop green: bool = false
+    const dt = (t1 - t0) / 4
+
+    path {
+      Path3D: {start: {volcano_r(t0) * cos(angle), volcano_y(t0), volcano_r(t0) * sin(angle)},
+        segments: [
+          {kind: CatmullRom, end: {
+            volcano_r(t0 + dt) * cos(angle + 0.03 * hash(seed)),
+            volcano_y(t0 + dt),
+            volcano_r(t0 + dt) * sin(angle + 0.03 * hash(seed))
+          }},
+          {kind: CatmullRom, end: {
+            volcano_r(t0 + 2 * dt) * cos(angle - 0.03 * hash(seed + 1)),
+            volcano_y(t0 + 2 * dt),
+            volcano_r(t0 + 2 * dt) * sin(angle - 0.03 * hash(seed + 1))
+          }},
+          {kind: CatmullRom, end: {
+            volcano_r(t0 + 3 * dt) * cos(angle + 0.04 * hash(seed + 2)),
+            volcano_y(t0 + 3 * dt),
+            volcano_r(t0 + 3 * dt) * sin(angle + 0.04 * hash(seed + 2))
+          }},
+          {kind: CatmullRom, end: {
+            volcano_r(t1) * cos(angle),
+            volcano_y(t1),
+            volcano_r(t1) * sin(angle)
+          }}
+        ]
+      }
+    }
+
+    if green {
+      ridge : LgVolcanoGreen {
+        Position: {0, 0, 0}
+        Sweep: {path: path, profile: lg_volcano_tube, scale: {width, width}, taper: 0.35,
+          segments: 2, rings: 16}
+        NoShadow
+      }
+    } else {
+      ridge : LgVolcanoRidge {
+        Position: {0, 0, 0}
+        Sweep: {path: path, profile: lg_volcano_tube, scale: {width, width}, taper: 0.3,
+          segments: 2, rings: 16}
+        NoShadow
+      }
+    }
+  }
+
+  // A glowing stream of lava from the breach in the rim at t0 down the flank to t1, lying on it
+  template LgLavaFlow {
+    prop angle: f32 = 0
+    prop t0: f32 = 0.97
+    prop t1: f32 = 0.6
+    prop width: f32 = 0.008
+    prop seed: i32 = 1
+    const dt = (t1 - t0) / 4
+    const up = width * 0.6
+
+    path {
+      Path3D: {
+        start: {
+          (volcano_r(t0) + up) * cos(angle),
+          volcano_y(t0) + up,
+          (volcano_r(t0) + up) * sin(angle)
+        },
+        segments: [
+          {kind: CatmullRom, end: {
+            (volcano_r(t0 + dt) + up) * cos(angle + 0.06 * (hash(seed) - 0.5)),
+            volcano_y(t0 + dt) + up,
+            (volcano_r(t0 + dt) + up) * sin(angle + 0.06 * (hash(seed) - 0.5))
+          }},
+          {kind: CatmullRom, end: {
+            (volcano_r(t0 + 2 * dt) + up) * cos(angle + 0.08 * (hash(seed + 1) - 0.5)),
+            volcano_y(t0 + 2 * dt) + up,
+            (volcano_r(t0 + 2 * dt) + up) * sin(angle + 0.08 * (hash(seed + 1) - 0.5))
+          }},
+          {kind: CatmullRom, end: {
+            (volcano_r(t0 + 3 * dt) + up) * cos(angle + 0.1 * (hash(seed + 2) - 0.5)),
+            volcano_y(t0 + 3 * dt) + up,
+            (volcano_r(t0 + 3 * dt) + up) * sin(angle + 0.1 * (hash(seed + 2) - 0.5))
+          }},
+          {kind: CatmullRom, end: {
+            (volcano_r(t1) + up) * cos(angle + 0.1 * (hash(seed + 3) - 0.5)),
+            volcano_y(t1) + up,
+            (volcano_r(t1) + up) * sin(angle + 0.1 * (hash(seed + 3) - 0.5))
+          }}
+        ]
+      }
+    }
+
+    lava : LgLava {
+      Position: {0, 0, 0}
+      Sweep: {path: path, profile: lg_volcano_tube, scale: {width, width}, taper: 0.25,
+        segments: 2, rings: 20}
+    }
+  }
+}
+
 $ {
-  AmbientLight: {sky: {170, 170, 200}, ground: {150, 120, 80}, intensity: 0.35}
+  AmbientLight: {sky: {160, 186, 222}, ground: {120, 132, 96}, intensity: 0.6}
 }
 
 // Toward the sun: low ahead and to the right of the canoe, a warm late afternoon
@@ -21,19 +165,52 @@ const sunY: f32 = 0.27
 const sunZ: f32 = -1.0
 
 sun {
-  Rotation: {asin(sunY / sqrt(sunX * sunX + sunY * sunY + sunZ * sunZ)), atan2(0 - sunX, 0 - sunZ), 0}
-  DirectionalLight: {intensity: 2.4}
-  Rgb: {255, 230, 200}
+  Rotation: {
+    asin(sunY / sqrt(sunX * sunX + sunY * sunY + sunZ * sunZ)),
+    atan2(0 - sunX, 0 - sunZ),
+    0
+  }
+  DirectionalLight: {intensity: 2.6}
+  Rgb: {255, 248, 236}
+  // Less, whiter haze and a little more air than the default sky, so the sky stays blue
+  // overhead, warm toward the low sun, and the distance does not turn brown
   Atmosphere: {
     sun: sun,
-    mie: {scale_height: 1.2, anisotropy: 0.8, scattering_scale: 1.0, tint: {255, 236, 214}},
-    ground_albedo: {80, 150, 160},
+    rayleigh: {scale_height: 8, scattering_scale: 1.15},
+    mie: {scale_height: 1.2, anisotropy: 0.8, scattering_scale: 0.4, tint: {255, 244, 232}},
+    ground_albedo: {60, 150, 170},
     sun_disk_intensity: 8,
-    sun_radius: 0.8
+    sun_radius: 0.8,
+    aerial_intensity: 2
   }
 }
 
-// Chase camera: behind and above the canoe, its X follows the canoe by CAM_FOLLOW
+// Soft cumulus drifting slowly up the lagoon, lit by the low warm sun, and a thin high veil
+clouds_low {
+  CloudLayer: {
+    texture: lg_cloud_h,
+    size: 2200,
+    altitude: 520,
+    threshold: 0.75,
+    softness: 0.08,
+    density: 0.9,
+    velocity: {2.5, -4}
+  }
+}
+
+clouds_high {
+  CloudLayer: {
+    texture: lg_cloud_h,
+    size: 8000,
+    altitude: 1800,
+    threshold: 0.7,
+    softness: 0.18,
+    density: 0.3,
+    offset: {900, 400},
+    velocity: {5, -2}
+  }
+}
+
 camera {
   Position: {canoe_x * CAM_FOLLOW, CAM_HEIGHT, CANOE_Z + CAM_BACK}
   Rotation: {0 - atan2(CAM_HEIGHT - 0.6, CAM_BACK + CAM_LOOK_AHEAD), 0, 0}
@@ -41,11 +218,13 @@ camera {
 }
 
 exposure {
-  AutoExposure: {min_log_luma: -16, low_percentile: 0, min_brightness: 0.05, max_brightness: 0.5}
+  AutoExposure: {min_log_luma: -16, low_percentile: 0, min_brightness: 0.06, max_brightness: 0.45,
+    exposure_compensation: 0.3}
 }
 
 fog {
-  HeightFog: {density: 0.0012, falloff: 0.025, base_height: 0, max_opacity: 0.4, atmosphere: sun}
+  HeightFog: {density: 0.0005, falloff: 0.025, base_height: 0, max_opacity: 0.25,
+    sun_inscatter: 0.4, atmosphere: sun}
 }
 
 gtao {
@@ -53,45 +232,187 @@ gtao {
 }
 
 bloom {
-  Bloom: {intensity: 0.14, threshold: 1.1, threshold_softness: 0.5}
+  Bloom: {intensity: 0.12, threshold: 1.2, threshold_softness: 0.5}
 }
 
 tonemap {
   Tonemap: {auto_exposure: exposure, operator_: TonyMcMapface}
 }
 
+// After the tonemap: a touch warmer, and back some of the saturation Tony McMapface takes from
+// the water and the greens
+grade {
+  ColorGrading: {temperature: 0.03, contrast: 1.03, saturation: 1.1, vibrance: 0.1}
+}
+
 main_view {
   View: {
     camera: camera,
-    clear: {enabled: true, color: {236, 196, 160, 255}},
+    clear: {enabled: true, color: {176, 200, 224, 255}},
     lighting: {enabled: true, reflections: true, atmosphere: true,
-      environment: {source: sun, intensity: 0.8, yaw: 0, background: false}},
-    shadows: {enabled: true, cascades: 2, resolution: 2048, max_distance: 60},
+      environment: {source: sun, intensity: 1, yaw: 0, background: false}},
+    shadows: {enabled: true, cascades: 3, resolution: 2048, interval: [1, 2, 2], max_distance: 60},
     culling: {enabled: true, min_dimension_px: 2},
-    effects: [{effect: fog}, {effect: gtao}, {effect: sun}, {effect: bloom}, {effect: tonemap}]
+    effects: [{effect: fog}, {effect: gtao}, {effect: sun}, {effect: bloom}, {effect: tonemap},
+      {effect: grade}]
   }
 }
 
 lagoon {
-  // The water and the sand floor under it, wide and long enough to reach the horizon haze
-  water : LgWater { Position: {0, 0, -800}; Box: {1600, 0.02, 2400}; NoShadow }
-  floor : LgSandWet { Position: {0, -1.8, -800}; Box: {1600, 0.2, 2400}; NoShadow }
+  // The water and the sand floor under it, wide and long enough to reach the horizon haze. The
+  // floor scrolls with the world by whole texture repeats and its sand moves with it, so through
+  // the clear water it flows past with the banks
+  //
+  // The water mirrors the palms, huts, the canoe and the volcano, rippled by the wave normals. The
+  // plane is the middle of the thin box; a quarter of the view size keeps the second scene pass
+  // cheap, the waves blur it anyway
+  water : LgWater {
+    Position: {0, 0, -800}
+    Box: {1600, 0.02, 2400}
+    PlanarReflection: {resolution: 0.25, clip_offset: 0.03, distortion: 0.025}
+    NoShadow
+  }
 
-  // A distant volcano island up the lagoon, softened by the haze
+  floor : LgSandWet {
+    Position: {0, -1.8, -800 + 12 * fract(distance / 12)}
+    Box: {1600, 0.2, 2400}
+    texture.Mapping: {mode: MappingObject, size: 6}
+    NoShadow
+  }
+
+  // A distant volcano island up the lagoon, softened by the haze: a tall ridged cone with forest
+  // on its lower slopes and a side cone on its shoulder. Lava pours from a breach in its rim, and
+  // a plume of ash rises from the glowing crater and drifts off on the wind
   volcano {
     Position: {-110, 0, -1250}
-    shore : LgSandDry { Position: {0, 0.6, 0}; Scale: {1, 0.06, 0.7}; Sphere: {radius: 260, segments: 32, smooth: true}; NoShadow }
-    skirt : LgVolcanoGreen { Position: {0, 34, 0}; Frustum: {length: 70, radius_bottom: 230, radius_top: 120, segments: 32, smooth: true}; NoShadow }
-    cone : LgVolcano { Position: {0, 120, 0}; Frustum: {length: 104, radius_bottom: 122, radius_top: 34, segments: 32, smooth: true}; NoShadow }
-    crater : LgVolcano { Position: {0, 171, 0}; Frustum: {length: 4, radius_bottom: 34, radius_top: 28, segments: 24}; Rgb: {72, 64, 66}; NoShadow }
-    smoke {
-      for i in 0..4 {
-        "puff_{i}" { Position: {i * 9, 186 + i * 16, i * 3}; Sphere: {radius: 18 + i * 6, segments: 12, smooth: true}; Rgb: {214, 200, 196}; PbrMaterial: {roughness: 1}; Opacity: {0.35 - i * 0.06}; BlendMode: AlphaBlend; NoShadow }
+    shore : LgSandDry {
+      Position: {0, 0.6, 0}
+      Scale: {1.05, 0.022, 0.95}
+      Sphere: {radius: 340, segments: 40, smooth: true}
+      NoShadow
+    }
+
+    mountain {
+      Position: {0, 0, 0}
+      Scale: {300, 270, 290}
+      cone : LgVolcano {
+        Position: {0, 0, 0}
+        Lathe: {profile: lg_volcano_profile, cap_end: true, segments: 64, rings: 40}
+        NoShadow
+      }
+
+      forest : LgVolcanoGreen {
+        Position: {0, 0, 0}
+        Lathe: {profile: lg_volcano_forest, segments: 64, rings: 12}
+        NoShadow
+      }
+
+      shoulder : LgVolcano {
+        Position: {0.52, 0, 0.14}
+        Scale: {0.36, 0.27, 0.36}
+        Lathe: {profile: lg_volcano_profile, cap_end: true, segments: 40, rings: 24}
+        NoShadow
+      }
+
+      shoulder_forest : LgVolcanoGreen {
+        Position: {0.52, 0, 0.14}
+        Scale: {0.38, 0.6, 0.38}
+        Lathe: {profile: lg_volcano_forest, segments: 40, rings: 8}
+        NoShadow
+      }
+
+      for k in 0..18 {
+        const a = k * 0.349 + 0.15 * hash(k * 7 + 1)
+        "ridge_{k}" {
+          Position: {0, 0, 0}
+          LgVolcanoSpur r(
+            angle: a,
+            t0: 0.22 + 0.12 * hash(k * 5 + 2),
+            t1: 0.78 + 0.18 * hash(k * 3 + 4),
+            width: 0.03 + 0.025 * hash(k * 11 + 3),
+            seed: k * 13
+          )
+        }
+      }
+
+      for k in 0..9 {
+        const a = k * 0.698 + 0.17 + 0.2 * hash(k * 17 + 5)
+        "green_{k}" {
+          Position: {0, 0, 0}
+          LgVolcanoSpur r(
+            angle: a,
+            t0: 0,
+            t1: 0.36 + 0.14 * hash(k * 19 + 1),
+            width: 0.035 + 0.02 * hash(k * 23 + 2),
+            seed: k * 29 + 3,
+            green: true
+          )
+        }
+      }
+
+      // The jagged rim, broken open toward the lagoon where the lava pours out
+      for k in 0..18 {
+        const a = 1.48 + 0.45 + k * 0.31 + 0.1 * hash(k * 17)
+        "crag_{k}" : LgVolcanoRidge {
+          Position: {0.122 * cos(a), 0.958 + 0.008 * hash(k * 3), 0.122 * sin(a)}
+          Rotation: {0.5 * hash(k * 5) - 0.25, a, 0.5 * hash(k * 7) - 0.25}
+          Scale: {1.3, 0.6 + 0.9 * hash(k * 11), 1}
+          IcoSphere: {radius: 0.014 + 0.012 * hash(k * 13), segments: 1}
+          NoShadow
+        }
+      }
+
+      for k in 0..4 {
+        "lava_{k}" {
+          Position: {0, 0, 0}
+          LgLavaFlow flow(
+            angle: 1.3 + k * 0.12 + 0.04 * hash(k * 41),
+            t0: 0.985,
+            t1: 0.48 + 0.25 * hash(k * 31 + 7),
+            width: 0.0035 + 0.0025 * hash(k * 43 + 1),
+            seed: k * 37 + 11
+          )
+        }
       }
     }
+
+    plume {
+      Position: {0, 252, 0}
+      Emitter: {
+        max: 180, rate: 7, shape: EmitterSphere, radius: 22,
+        direction: {0, 1, 0}, spread: 12, speed: {14, 20},
+        lifetime: {20, 26}, size: {60, 95}, opacity: {0.7, 0.9},
+        color: {84, 78, 76}, color_variance: {8, 8, 8}, seed: 11
+      }
+      Forces: {gravity: {0, 0, 0}, wind: {11, 4, 2}, drag: 0.12, turbulence: 0.5}
+      Curves: {
+        size: {keys: [{0, 0.4}, {1, 2.4}]},
+        opacity: {keys: [{0, 0}, {0.06, 1}, {0.6, 0.65}, {1, 0}]},
+        color: {keys: [{0, {255, 170, 120}}, {0.12, {255, 255, 255}}, {1, {255, 255, 255}}]}
+      }
+      Appearance: {lit: 0.6}
+    }
+
+    glow {
+      Position: {0, 258, 0}
+      Emitter: {
+        max: 20, rate: 8, shape: EmitterSphere, radius: 10,
+        direction: {0, 1, 0}, spread: 25, speed: {3, 6},
+        lifetime: {1.5, 2.5}, size: {22, 34}, opacity: {0.12, 0.2},
+        color: {255, 110, 40}, seed: 12
+      }
+      Curves: {opacity: {keys: [{0, 0}, {0.3, 1}, {1, 0}]}}
+      Appearance: {blend: Additive}
+    }
   }
+
   islet {
     Position: {260, 0, -900}
-    hill : LgVolcanoGreen { Position: {0, 0, 0}; Scale: {1, 0.35, 0.8}; Sphere: {radius: 90, segments: 24, smooth: true}; NoShadow }
+    hill : LgVolcanoGreen {
+      Position: {0, 0, 0}
+      Scale: {1, 0.35, 0.8}
+      Sphere: {radius: 90, segments: 24, smooth: true}
+      NoShadow
+    }
   }
 }

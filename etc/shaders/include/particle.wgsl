@@ -37,7 +37,8 @@ struct Emitter {
     extents: vec4f,
     // xyz: world acceleration plus gravity, w: seconds of the frame
     acceleration: vec4f,
-    // rgb: display encoded color
+    // rgb: display encoded color, w: X of the world offset added to the live particles before
+    // they move, the shift of the world origin of the frame for a world space pool
     color: vec4f,
     // xy: speed range, zw: size range
     speed_size: vec4f,
@@ -50,21 +51,24 @@ struct Emitter {
     // x: used slots, y: first spawn slot in the slot buffer, z: mesh table points,
     // w: first point of the mesh table in the table buffer
     pool: vec4u,
-    // x: microseconds of the frame, y: shortest lifetime, z: microseconds the longest is above
+    // x: microseconds of the frame, y: shortest lifetime, z: microseconds the longest is above,
+    // w: slot of the card words of a ParticleCard pool from the start of the pool, 0 for others
     life: vec4u,
     // xyz: world velocity the drag pulls toward, w: drag rate
     wind: vec4f,
     // x: acceleration of the wander field, y: its frequency scale, z: uniform world scale of
-    // the emitter, the multiplier of the velocity and force of its ParticleMotion
+    // the emitter, the multiplier of the velocity and force of its ParticleMotion, w: 1 over the
+    // gust scale of the Wind with ParticleForces.global_wind, 0 when the Wind pulls nothing
     turbulence: vec4f,
     // xyz: phase of the wander field drawn from the seed, offset by the displacement of the
-    // frame of reference
+    // frame of reference, w: wrapped world X offset of the gust field of the global wind
     wander: vec4f,
-    // rgb: display encoded color variance
+    // rgb: display encoded color variance, w: Y of the shift
     variance: vec4f,
-    // xyz: world velocity every spawn of the frame gets
+    // xyz: world velocity every spawn of the frame gets, w: wrapped world Z offset of the gust
+    // field of the global wind
     inherit: vec4f,
-    // x: height of the ground plane, y: bounce, z: friction
+    // x: height of the ground plane, y: bounce, z: friction, w: Z of the shift
     ground: vec4f,
     // World velocity of the frame of reference, added to the position only
     drift: vec3f,
@@ -83,8 +87,11 @@ struct Emitter {
     gradient: vec3f,
     // First of the GRADIENT_ROWS rows of the gradient, CURVE_CONSTANT for a constant one
     gradient_row: u32,
-    // w: 1 when the emitter has a ParticleAppearance
-    draw: vec4u,
+    // xy: world X and Z velocity of the Wind times ParticleForces.global_wind and the world
+    // scale at a gust factor of 1, z: its gust; 0 without global wind
+    global_wind: vec3f,
+    // 1 when the emitter has a ParticleAppearance
+    styled: u32,
     // Rows of the max curves of the size, opacity, rotation and spin, which each particle blends
     // toward by its own draw, CURVE_CONSTANT for a curve without max_keys; the area of the max
     // spin is in the row after it
@@ -95,7 +102,12 @@ struct Emitter {
     gradient_max: vec4u,
     // Rows of the curves of the ParticleMotion, read only while gradient_max.y is 1
     motion: MotionRows,
+    sampled: vec4u,
+    origin: vec4i,
 };
+
+const SAMPLED_SPAWN_GROUND: u32 = 1u;
+const SAMPLED_COLLIDE_TERRAIN: u32 = 2u;
 
 // A pool slot, box_particle_t: remaining is 0 for a free slot. Position and velocity are in the
 // world, or in the space of model for a local emitter.
@@ -121,6 +133,7 @@ const EMITTER_MESH: u32 = 4u;
 // ParticleShape
 const PARTICLE_CIRCLE: u32 = 0u;
 const PARTICLE_SPRITE: u32 = 1u;
+const PARTICLE_CARD: u32 = 2u;
 
 // ParticleBlend
 const PARTICLE_ALPHA: u32 = 0u;
@@ -140,6 +153,7 @@ const STREAM_COLOR: u32 = 15u;
 const STREAM_RADIAL: u32 = 19u;
 const STREAM_CURVE: u32 = 20u;
 const STREAM_MOTION: u32 = 25u;
+const STREAM_CARD: u32 = 29u;
 
 // Curves of ParticleCurves, the offsets of their blend streams from STREAM_CURVE,
 // BOX_PARTICLE_CURVE_*
@@ -160,6 +174,14 @@ const MOTION_DRAG: u32 = 3u;
 const GROUND_NONE: u32 = 0u;
 const GROUND_BOUNCE: u32 = 1u;
 const GROUND_DIE: u32 = 2u;
+
+// Card words a pool slot holds, BOX_PARTICLE_CARD_WORDS
+const CARD_WORDS: u32 = 8u;
+
+// Resting cards, BOX_PARTICLE_CARD_REST_SPEED, _HEIGHT and _RATE
+const CARD_REST_SPEED: f32 = 0.5;
+const CARD_REST_HEIGHT: f32 = 0.01;
+const CARD_REST_RATE: f32 = 8.0;
 
 // Slot of a spawn with a lifetime of 0, which takes no slot
 const NO_SLOT: u32 = 0xFFFFFFFFu;
@@ -641,3 +663,103 @@ fn particle_stretch(stretch: f32, speed: f32) -> f32 {
     return 1.0 + max(stretch, 0.0) * max(speed, 0.0);
 }
 
+
+// The card word of the particle in slot i of a ParticleCard pool whose slots start at base and
+// whose card words start cards slots after them, word i % CARD_WORDS of the slot
+// base + cards + i / CARD_WORDS: 0 while the card is in the air, else 1 plus its age in
+// microseconds when it came to rest.
+fn particle_card_word(base: u32, cards: u32, i: u32) -> u32 {
+    let k = base + cards + i / CARD_WORDS;
+    switch (i % CARD_WORDS) {
+        case 0u: { return bitcast<u32>(particles[k].position.x); }
+        case 1u: { return bitcast<u32>(particles[k].position.y); }
+        case 2u: { return bitcast<u32>(particles[k].position.z); }
+        case 3u: { return particles[k].remaining; }
+        case 4u: { return bitcast<u32>(particles[k].velocity.x); }
+        case 5u: { return bitcast<u32>(particles[k].velocity.y); }
+        case 6u: { return bitcast<u32>(particles[k].velocity.z); }
+        default: { return particles[k].index; }
+    }
+}
+
+// Product a b of two quaternions, b applied first.
+fn particle_quat_mul(a: vec4f, b: vec4f) -> vec4f {
+    return vec4f(
+        a.w * b.x + a.x * b.w + a.y * b.z - a.z * b.y,
+        a.w * b.y - a.x * b.z + a.y * b.w + a.z * b.x,
+        a.w * b.z + a.x * b.y - a.y * b.x + a.z * b.w,
+        a.w * b.w - a.x * b.x - a.y * b.y - a.z * b.z);
+}
+
+// A vector rotated by a unit quaternion.
+fn particle_quat_rotate(q: vec4f, v: vec3f) -> vec3f {
+    let t = 2.0 * cross(q.xyz, v);
+    return v + q.w * t + cross(q.xyz, t);
+}
+
+// Initial orientation of a card, uniform over the rotations by Shoemake's method from the first
+// three of its STREAM_CARD streams.
+fn particle_card_orientation(seed: u32, index: u32) -> vec4f {
+    let u0 = particle_unit(particle_hash(seed, index, STREAM_CARD));
+    let u1 = particle_unit(particle_hash(seed, index, STREAM_CARD + 1u));
+    let u2 = particle_unit(particle_hash(seed, index, STREAM_CARD + 2u));
+    let a = sqrt(1.0 - u0);
+    let b = sqrt(u0);
+    let p = TAU * u1;
+    let r = TAU * u2;
+    return vec4f(a * sin(p), a * cos(p), b * sin(r), b * cos(r));
+}
+
+// World axis a card turns around, uniform over the sphere, from the last two of its STREAM_CARD
+// streams.
+fn particle_card_axis(seed: u32, index: u32) -> vec3f {
+    let u0 = particle_unit(particle_hash(seed, index, STREAM_CARD + 3u));
+    let u1 = particle_unit(particle_hash(seed, index, STREAM_CARD + 4u));
+    let y = 1.0 - 2.0 * u0;
+    let ring = sqrt(max(0.0, 1.0 - y * y));
+    let phi = TAU * u1;
+    return vec3f(ring * cos(phi), y, ring * sin(phi));
+}
+
+// An orientation turned around a unit world axis by an angle in radians.
+fn particle_card_turn(q: vec4f, axis: vec3f, radians: f32) -> vec4f {
+    return particle_quat_mul(vec4f(axis * sin(0.5 * radians), cos(0.5 * radians)), q);
+}
+
+// How far a card at rest has eased toward lying flat, seconds after it came to rest.
+fn particle_card_ease(seconds: f32) -> f32 {
+    return 1.0 - exp(-CARD_REST_RATE * max(seconds, 0.0));
+}
+
+// A card eased toward lying flat: its normal, the z axis of the card, turned by a share of the
+// angle to the vertical on the side it faces, around the horizontal axis between the two.
+fn particle_card_flat(q: vec4f, ease: f32) -> vec4f {
+    let n = particle_quat_rotate(q, vec3f(0.0, 0.0, 1.0));
+    let up = select(-1.0, 1.0, n.y >= 0.0);
+    let len = sqrt(n.x * n.x + n.z * n.z);
+    if (len < 1e-6) {
+        return q;
+    }
+
+    let axis = vec3f(-n.z * up / len, 0.0, n.x * up / len);
+    return particle_card_turn(q, axis, atan2(len, abs(n.y)) * ease);
+}
+
+// Orientation of a card: its initial orientation turned around its axis by radians while it is
+// in the air, a rested below 0, else turned by landed and eased toward flat over rested seconds.
+fn particle_card(seed: u32, index: u32, radians: f32, landed: f32, rested: f32) -> vec4f {
+    let q = particle_card_orientation(seed, index);
+    let axis = particle_card_axis(seed, index);
+    if (rested < 0.0) {
+        return particle_card_turn(q, axis, radians);
+    }
+
+    return particle_card_flat(particle_card_turn(q, axis, landed), particle_card_ease(rested));
+}
+
+// Whether a card in the air comes to rest after its step: on the ground plane within
+// CARD_REST_HEIGHT of it and slower than CARD_REST_SPEED, both times the world scale.
+fn particle_card_rests(mode: u32, y: f32, speed: f32, height: f32, scale: f32) -> bool {
+    return mode == GROUND_BOUNCE && y - height <= CARD_REST_HEIGHT * scale &&
+        speed < CARD_REST_SPEED * scale;
+}

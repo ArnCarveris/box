@@ -13,6 +13,7 @@
 #include "../spatial/spatial.h"
 #include "../geometry/mesh_cache.h"
 #include <float.h>
+#include <math.h>
 #include <string.h>
 
 /** Queue a probe of a volume for the next bake when it is valid and not queued yet.
@@ -254,6 +255,7 @@ static void box_bake_record(
     box_bake_change_t *c = ecs_vec_append_t(NULL, &b->changes, box_bake_change_t);
     c->entity = e;
     c->geometry = geometry;
+    c->shifted = false;
     c->old = box_spatial_bounds(world, e, &c->scene, c->min, c->max);
     if (!c->old && removed && ecs_has(world, e, WorldTransform) &&
         box_bake_shape_bounds(world, e, c->min, c->max))
@@ -269,7 +271,9 @@ static void box_bake_record(
  * @param table The table of the shape
  * @param e The shape
  * @param skip The flag to ignore, 0 for none
- * @return Whether the shape is static and baked as far as the other flags go
+ * @return Whether the shape is static and baked as far as the other flags go. The cheap NoBake
+ * test comes first: a prefab change reaches every instance that inherits it, and the instances
+ * of a NoBake prefab whose material changes all the time must stay cheap
  */
 static bool box_bake_captured_but(
     const ecs_world_t *world,
@@ -277,12 +281,13 @@ static bool box_bake_captured_but(
     ecs_entity_t e,
     ecs_id_t skip)
 {
-    bool dynamic = skip != DynamicTransform && box_transform_dynamic(world, table);
-    bool manual = skip != ManualTransform && ecs_has_id(world, e, ManualTransform) &&
-        !ecs_has(world, e, SurfaceAttachment);
     bool hidden = skip != NoBake && ecs_has_id(world, e, NoBake);
 
-    return !dynamic && !manual && !hidden && !box_projection_anchored(world, e);
+    return !hidden &&
+        (skip == DynamicTransform || !box_transform_dynamic(world, table)) &&
+        (skip == ManualTransform || !ecs_has_id(world, e, ManualTransform) ||
+            ecs_has(world, e, SurfaceAttachment)) &&
+        !box_projection_anchored(world, e);
 }
 
 /** Remember the static shapes whose captured look changed.
@@ -436,11 +441,12 @@ static void box_bake_on_moved(
     int32_t count,
     void *ctx)
 {
-    const box_render_bake_t *b = ctx;
+    box_render_bake_t *b = ctx;
     int32_t i;
     for (i = 0; box_bake_recording(b) && i < count; i ++) {
         if (ecs_has(world, entities[i], ShapeMesh) && !ecs_has_id(world, entities[i], NoBake)) {
             box_bake_record(world, ctx, entities[i], false, true);
+            ecs_vec_last_t(&b->changes, box_bake_change_t)->shifted = b->shifting;
         }
     }
 }
@@ -508,6 +514,32 @@ static void box_bake_add_region(
     glm_vec3_copy(ECS_CONST_CAST(float*, max), r->max);
 }
 
+/** Check whether the bounds of a shape before and after a move in a frame with a shift of the
+ * world origin are the same but for the rounding of the shift.
+ *
+ * @param a_min Minimum corner of the bounds before
+ * @param a_max Maximum corner of the bounds before
+ * @param b_min Minimum corner of the bounds after
+ * @param b_max Maximum corner of the bounds after
+ * @return Whether every corner is within the rounding of its magnitude
+ */
+static bool box_bake_same_bounds(
+    const vec3 a_min,
+    const vec3 a_max,
+    const vec3 b_min,
+    const vec3 b_max)
+{
+    bool result = true;
+    int32_t i;
+    for (i = 0; i < 3; i ++) {
+        float tolerance = 1e-4f * (1.0f + fabsf(a_min[i]) + fabsf(a_max[i]));
+        result = result && fabsf(a_min[i] - b_min[i]) <= tolerance &&
+            fabsf(a_max[i] - b_max[i]) <= tolerance;
+    }
+
+    return result;
+}
+
 void box_bake_changes(
     ecs_world_t *world,
     box_render_bake_t *b)
@@ -518,16 +550,22 @@ void box_bake_changes(
         const box_bake_change_t *c = ecs_vec_get_t(&b->changes, box_bake_change_t, i);
         ecs_entity_t e = c->entity, scene = 0;
         vec3 min, max;
+        bool now = ecs_is_alive(world, e) && !ecs_has_id(world, e, NoBake) &&
+            (!ecs_has_id(world, e, ManualTransform) || ecs_has(world, e, SurfaceAttachment)) &&
+            !box_projection_anchored(world, e) &&
+            !box_transform_dynamic(world, ecs_get_table(world, e)) &&
+            box_spatial_bounds(world, e, &scene, min, max);
+        if (c->shifted && c->old && now && scene == c->scene &&
+            box_bake_same_bounds(c->min, c->max, min, max))
+        {
+            continue;
+        }
+
         if (c->old) {
             box_bake_add_region(b, c->scene, c->min, c->max, c->geometry);
         }
 
-        if (ecs_is_alive(world, e) && !ecs_has_id(world, e, NoBake) &&
-            (!ecs_has_id(world, e, ManualTransform) || ecs_has(world, e, SurfaceAttachment)) &&
-            !box_projection_anchored(world, e) &&
-            !box_transform_dynamic(world, ecs_get_table(world, e)) &&
-            box_spatial_bounds(world, e, &scene, min, max))
-        {
+        if (now) {
             box_bake_add_region(b, scene, min, max, c->geometry);
         }
     }

@@ -1,0 +1,46 @@
+using flecs.script
+using flecs.script.math
+using state
+
+state {
+  // Drift of the fog billows and the motes in m/s along X and Z for a wind, along the Wind
+  // (wind.flecs): still in a calm
+  fn forest_fog_wind_x(w: f64) -> f64 {
+    w * 0.1 * WIND_DIR_X
+  }
+
+  fn forest_fog_wind_z(w: f64) -> f64 {
+    w * 0.1 * WIND_DIR_Z
+  }
+
+  // Pollen in the air through the year, 0..1: spring and early summer
+  fn forest_pollen(season: f64) -> f64 {
+    forest_seasonal(season, 1, 0.55, 0.04, 0)
+  }
+
+  // How much the motes and pollen show: the sun lights them by day; at night the moon barely
+  // does (the auto exposure of the dark would make any more of them a field of stars), and
+  // rain and snow wash them out of the air
+  fn forest_mote_light(season: f64, hour: f64, p: f64) -> f64 {
+    (0.015 + 0.985 * forest_daylight(season, hour)) * (1 - 0.9 * min(1, p * 2))
+  }
+
+  export mut fog_wind_x: f32 = forest_fog_wind_x(START_WIND)
+  export mut fog_wind_z: f32 = forest_fog_wind_z(START_WIND)
+}
+
+async {
+  while true {
+    await next_frame()
+    const fx: f32 = state.forest_fog_wind_x(state.wind)
+    const fz: f32 = state.forest_fog_wind_z(state.wind)
+
+    if abs(fx - state.fog_wind_x) > 0.0001 {
+      state.fog_wind_x = fx
+    }
+
+    if abs(fz - state.fog_wind_z) > 0.0001 {
+      state.fog_wind_z = fz
+    }
+  }
+}

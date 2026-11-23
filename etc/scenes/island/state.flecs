@@ -1,0 +1,64 @@
+using flecs.script
+using flecs.script.math
+using box.input
+using state
+
+state {
+  export const ISLAND_SIZE: f32 = 2000
+  export const ISLAND_PEAK: f32 = 400
+
+  export const ISLAND_K: f32 = ISLAND_SIZE / 4020
+  export const ISLAND_H: f32 = ISLAND_PEAK / 700
+  export const ISLAND_COAST: f32 = 2010 * ISLAND_K
+  export const ISLAND_EXTENT: f32 = 4096 * ISLAND_K
+  export const ISLAND_START_ANGLE: f32 = 2.2
+  export const ISLAND_START_STEP: f32 = 3
+
+  export const EYE: f32 = 1.7
+  export const WALK_SPEED: f32 = 4
+  export const FLY_SPEED: f32 = 40
+
+  export const TERRAIN_TILE: f32 = 32
+  export const TERRAIN_RESOLUTION: i32 = 65
+  export const TERRAIN_LEVELS: i32 = 8
+  export const TERRAIN_DETAIL: f32 = 128
+  export const TERRAIN_BUDGET: i32 = 24
+  export const TERRAIN_QUERY_SPACING: f32 = 0.5
+  export const TERRAIN_QUERY_RADIUS: f32 = 128
+  export const TERRAIN_QUERY_HOLD: i32 = 1200
+  export const PROBE_FOLLOW: f32 = 24
+  export const VIEW_FAR: f32 = 30000
+
+  export const GROUND_MIN: f32 = -20 - 240 * ISLAND_H
+  export const GROUND_MAX: f32 = 20 + 820 * ISLAND_H
+
+  export const TREE_LINE: f32 = 400 * ISLAND_H
+  export const ASH_LINE: f32 = 500 * ISLAND_H
+  export const BEACH_TOP: f32 = 4
+  export const CRATER_LAKE: f32 = 597 * ISLAND_H
+
+  fn island_snow_line(season: f64, snow: f64) -> f64 {
+    (forest_seasonal(season, 520, 900, 560, 410) - 60 * forest_snow_amount(snow)) * ISLAND_H
+  }
+
+  fn island_snow_cover(season: f64, snow: f64) -> f64 {
+    max(forest_seasonal(season, 0.85, 0, 0.8, 1), forest_snow_amount(snow))
+  }
+
+  export mut flying: bool = false
+  export mut scripted: bool = false
+
+  actions {
+    toggle_fly {
+      Action: {description: "Switch between walking and flying"}
+      Binding: {key: F}
+    }
+  }
+}
+
+async {
+  while true {
+    await on.pressed(state.actions.toggle_fly)
+    state.flying = !state.flying
+  }
+}

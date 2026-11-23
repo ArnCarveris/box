@@ -1,0 +1,18 @@
+using flecs.script
+using box.world
+using state
+using assets
+
+island {
+  stream_cells {
+    ChunkGrid: {
+      template: IslandStreamCell,
+      cell_size: {STREAM_CELL, 0, STREAM_CELL},
+      levels: [STREAM_DETAIL_RANGE, STREAM_RANGE],
+      hysteresis: 8,
+      budget: STREAM_BUDGET,
+      budget_ms: STREAM_BUDGET_MS,
+      ground: island.streams
+    }
+  }
+}

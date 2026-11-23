@@ -9,7 +9,6 @@ using state
 using planets
 
 state {
-  // Load the preset of a kind for the seed: every parameter as that kind looks by default
   fn preset(target: i32) {
     state.kind = target
     state.body = body_preset(state.seed)
@@ -34,14 +33,10 @@ state {
     state.zoom = 1
   }
 
-  // Distance of the camera that frames the body the scene shows: the star with its corona,
-  // farther for a larger star
   fn framing() -> f32 { state.mode == MODE_STAR ? star_distance(state.star.radius) : 27 }
 
-  // Radius of the outermost part of the body. A planet: its atmosphere shell, its top
-  // (planet_radius + thickness) km over a planet_radius of 6360 km scaled to the radius in world
-  // units as the atmosphere does, the cloud layer and the rings when they are on. A star: its
-  // corona, camera facing sprites up to 5.6 radii wide, whose corners reach 4 radii
+  // A planet's atmosphere top is scaled from a 6360 km planet radius as the atmosphere does. A
+  // star's corona sprites are up to 5.6 radii wide, so their corners reach 4 radii
   fn outer() -> f32 {
     state.mode == MODE_STAR ? max(state.star.radius, 0.1) * 4 : max(
       state.body.radius * max(
@@ -49,11 +44,9 @@ state {
       state.rings.enabled ? state.body.radius * state.rings.size : 0)
   }
 
-  // The closest zoom: the camera stays 10% outside the outermost part of the body, and past the
-  // near plane of the camera (0.5)
+  // The camera stays 10% outside the outermost part of the body and past its near plane (0.5)
   fn zoom_min() -> f32 { min((outer() * 1.1 + 0.6) / framing(), 1) }
 
-  // Load the preset of a star type
   fn star_load(target: i32) {
     state.star_kind = target
     state.star = star_preset(target)
@@ -68,7 +61,6 @@ state {
     state.zoom = 1
   }
 
-  // Set the parameter of the slider n of the star group to v
   fn edit_star(n: string, v: f32) {
     if n == "temperature" { state.star.temperature = v }
     else if n == "radius" { state.star.radius = v }
@@ -93,7 +85,6 @@ state {
     state.shown_edits = state.edits
   }
 
-  // A color with one channel, r, g or b, set to v
   fn with_channel(c: Col, channel: string, v: f32) -> Col {
     {channel == "r" ? v : c.r, channel == "g" ? v : c.g, channel == "b" ? v : c.b}
   }
@@ -102,10 +93,8 @@ state {
     state.background = background_preset()
   }
 
-  // Whether g is a group of the background page
   fn is_background(g: string) -> bool { g == "stars" || g == "nebula" || g == "orientation" }
 
-  // Set the parameter of the slider n in the group g of the background page to v
   fn edit_background(g: string, n: string, v: f32) {
     if g == "stars" {
       if n == "count" { state.background.count = v }
@@ -132,7 +121,6 @@ state {
     }
   }
 
-  // Set channel c of the line color n of the nebula to v
   fn edit_nebula_color(n: string, c: string, v: f32) {
     if n == "halpha" {
       state.background.halpha = with_channel(state.background.halpha, c, v)
@@ -143,7 +131,6 @@ state {
     }
   }
 
-  // Set the parameter of the slider n in the group of the panel g to v
   fn edit(g: string, n: string, v: f32) {
     if g == "planet_page" {
       if n == "sun" { state.sun_angle = v }
@@ -210,7 +197,6 @@ state {
     }
   }
 
-  // Set channel c of the color n in the group of the panel g to v
   fn edit_color(g: string, n: string, c: string, v: f32) {
     if g == "air" {
       state.air.tint = with_channel(state.air.tint, c, v)
@@ -223,7 +209,6 @@ state {
     }
   }
 
-  // Set the switch n in the group of the panel g to on
   fn edit_switch(g: string, n: string, on: bool) {
     if g == "night" {
       state.night.lights = on
@@ -233,16 +218,16 @@ state {
   }
 }
 
-// A change of a widget of the panel sets the value it stands for: a new type loads its preset,
-// the other widgets set their parameter, found by the names of the widget and of its group. Only
-// the widget that changed is read, so the other parameters keep their exact values. The star and
-// the background show their values as they change, the planet once its graphs are evaluated
+// Only the widget that changed is read, so the other parameters keep their exact values. The star
+// and the background show their values as they change, the planet once its graphs are evaluated
 async {
   while true {
     const e = await on.change(hud.screen.side.panel)
     const w = e.widget
+
     if w.has(Dropdown) {
       const picked: i32 = w[Dropdown.mut].current
+
       if w.name() == "star_kind" {
         if picked != state.star_kind {
           star_load(picked)
@@ -269,6 +254,7 @@ async {
         } else {
           state.detail = w[Stepper.mut].current
         }
+
         state.edits += 1
       }
     } else if w.has(Checkbox) {
@@ -277,10 +263,12 @@ async {
     } else if w.has(Slider) {
       const v: f32 = w[Slider.mut].current
       const p = w.parent()
+
       if p.name() == "star" {
         edit_star(w.name(), v)
       } else if p.name() == "channels" {
         const field = p.parent()
+
         if field.parent().name() == "nebula" {
           edit_nebula_color(field.name(), w.name(), v)
         } else {
@@ -300,6 +288,7 @@ async {
 async {
   while true {
     await on.pressed(state.actions.random_seed)
+
     if state.page == PAGE_BACKGROUND {
       state.background.star_seed = (state.background.star_seed * 621 + 271) % 1000
       state.background.nebula_seed = (state.background.nebula_seed * 621 + 271) % 1000
@@ -315,6 +304,7 @@ async {
 async {
   while true {
     await on.pressed(state.actions.reset)
+
     if state.page == PAGE_BACKGROUND {
       background_reset()
     } else if state.mode == MODE_STAR {
@@ -325,9 +315,7 @@ async {
   }
 }
 
-// The Planet / Star / Background switch: each side keeps its values in the state, so switching
-// back shows the planet or the star as it was. The background page only changes the page, so the
-// stage keeps the body it shows
+// The background page only changes the page, so the stage keeps the body it shows
 async {
   while true {
     await on.pressed(state.actions.show_planet)
@@ -361,11 +349,11 @@ async {
   }
 }
 
-// The wheel zooms anywhere outside the panel, whose InputBlocker zeroes the scroll over it, so the
-// panel keeps scrolling its parameters. Each notch scales the zoom, held between the closest zoom
-// of the body as it is now and 3 times the framing, and the camera eases toward its distance
+// The InputBlocker of the panel zeroes the scroll over it, so the wheel zooms only outside it and
+// the panel keeps scrolling its parameters
 async {
   mut last: f64 = box.app.Status[box.app.Status].elapsed
+
   while true {
     await next_frame()
     const now = box.app.Status[box.app.Status].elapsed
@@ -375,11 +363,14 @@ async {
 
     const scroll: f32 = Input[Input].mouse.scroll.y
     const z: f32 = clamp(state.zoom * clamp(1 - scroll * 0.12, 0.5, 1.5), zoom_min(), 3)
+
     if z != state.zoom {
       state.zoom = z
     }
+
     // The camera eases toward its distance, but never through the body when it grows
     const target: f32 = framing() * state.zoom
+
     if abs(target - state.cam_dist) > 0.002 {
       state.cam_dist = max(state.cam_dist + (target - state.cam_dist) * min(dt * 12, 1),
         framing() * zoom_min())
@@ -392,8 +383,10 @@ async {
 // Show the latest values once the planet's graphs are evaluated, or after 1.5 seconds
 async {
   mut waited: f32 = 0
+
   while true {
     await delay(0.1)
+
     if state.edits != state.shown_edits {
       if InProgressTask[InProgressTask].blocking == 0 || waited >= 1.5 {
         apply()

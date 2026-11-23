@@ -180,7 +180,8 @@ static void box_ui_report(
  * @param ctx Call context, whose ctx is the module state
  * @param argc Number of arguments
  * @param argv The seconds
- * @param future Future the end of the wait resolves with the seconds
+ * @param future Future the end of the wait resolves with the seconds of world time that passed,
+ * at least the seconds asked for
  */
 static void box_ui_delay(
     const ecs_function_ctx_t *ctx,
@@ -234,9 +235,10 @@ static void BoxUiDelayUpdate(
         }
 
         box_ui_timer_t done = *t;
+        float passed = done.seconds - done.left;
         ecs_vec_remove_ordered_t(&st->timers, box_ui_timer_t, i);
         ecs_script_future_resolve(done.future, &(ecs_value_t){
-            .type = ecs_id(ecs_f32_t), .ptr = &done.seconds });
+            .type = ecs_id(ecs_f32_t), .ptr = &passed });
         ecs_script_future_release(done.future);
     }
 }

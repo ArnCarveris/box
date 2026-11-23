@@ -439,8 +439,13 @@
                     "scroll_gutter_with_bar",
                     "scroll_thumb_hover_look",
                     "panel_title_in_column",
+                    "collapsible_content_inset",
                     "list_keeps_width",
                     "scroll_content_added_after_bars",
+                    "scroll_overlay_no_gutter",
+                    "scroll_overlay_shows_on_scroll",
+                    "scroll_overlay_press_through",
+                    "scroll_overlay_hover_shows",
                     "shell_click_taps_button_action",
                     "shell_click_changes_button",
                     "shell_press_release_button",
@@ -593,7 +598,13 @@
                     "view_order_with_console",
                     "script_reload",
                     "script_missing_looked_for_on_open",
-                    "follows_window_resize"
+                    "follows_window_resize",
+                    "inspector_empty_without_selection",
+                    "select_entity_from_tree",
+                    "select_child_shows_parent_path",
+                    "chevron_does_not_select",
+                    "delete_selected_clears_selection",
+                    "select_unnamed_entity"
                 ]
             },
             {
@@ -653,6 +664,19 @@
                     "engine_records_samples",
                     "main_excludes_waits",
                     "jobs_busiest_worker"
+                ]
+            },
+            {
+                "id": "GpuPanel",
+                "testcases": [
+                    "closed_by_default",
+                    "command_toggles",
+                    "below_load_panel",
+                    "stats_without_gpu",
+                    "interval",
+                    "rows_show_stats",
+                    "format_count",
+                    "format_bytes"
                 ]
             },
             {

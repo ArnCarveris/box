@@ -9,8 +9,6 @@ using state
 assets {
   // One module and the hull around it, with the faces and edges that its visible neighbors
   // decide (v). The same template draws a built module and the see-through preview of a tool.
-  // live is its power level 0..1, heat the heat level of a power plant or radiator, trip whether
-  // a power plant tripped and cool whether a radiator cools down.
   template ModuleView {
     prop k: i32 = 0
     prop v: RigCellView = {}
@@ -38,7 +36,13 @@ assets {
     } else if k == K_RADIATOR {
       RadiatorMount mount(side: cool_side(n), heat: heat, cool: cool)
     } else if k == K_DATA {
-      Datacenter racks(pz: n.pz != K_DATA, nz: n.nz != K_DATA, roof: v.roof, seed: seed, power: live)
+      Datacenter racks(
+        pz: n.pz != K_DATA,
+        nz: n.nz != K_DATA,
+        roof: v.roof,
+        seed: seed,
+        power: live
+      )
     } else if k == K_DRILL {
       DrillMount mount(side: drill_side(n), power: live)
     } else if k == K_BUILDER {
@@ -46,14 +50,29 @@ assets {
     } else if shaped(k) && v.shape != 0 {
       HullFairing fairing(shape: v.shape, sx: v.sx, sy: v.sy, sz: v.sz)
     } else if k == K_CARGO {
-      CargoRack rack(px: px, nx: nx, py: py, pz: !racked(n.pz), nz: !racked(n.nz), belly: y == 0, seed: seed)
+      CargoRack rack(
+        px: px,
+        nx: nx,
+        py: py,
+        pz: !racked(n.pz),
+        nz: !racked(n.nz),
+        belly: y == 0,
+        seed: seed
+      )
     } else if k == K_FUEL {
       FuelRack rack(
         px: !racked(n.px), nx: !racked(n.nx), pz: !racked(n.pz), nz: !racked(n.nz),
         tp: n.pz == K_FUEL, tn: n.nz == K_FUEL
       )
     } else if k == K_POWER {
-      PowerPlant plant(pz: n.pz != K_POWER, nz: n.nz != K_POWER, roof: v.roof, power: live, heat: heat, trip: trip)
+      PowerPlant plant(
+        pz: n.pz != K_POWER,
+        nz: n.nz != K_POWER,
+        roof: v.roof,
+        power: live,
+        heat: heat,
+        trip: trip
+      )
     } else if k == K_LIFE {
       LifePlant plant(pz: n.pz != K_LIFE, nz: n.nz != K_LIFE, roof: v.roof, seed: seed, power: live)
     } else if k == K_BIOME {
@@ -94,17 +113,27 @@ assets {
     body {
       Position: {0, lifted ? 2.5 : 0, 0}
       Transition: [Position: {duration: 0.45, timing_function: EaseOut}]
+
       if tinted {
         Tint: tint
       }
-      ModuleView view(k: k, v: v, y: cell_y(idx), seed: idx, live: live, heat: heat, trip: trip, cool: cool)
+
+      ModuleView view(
+        k: k,
+        v: v,
+        y: cell_y(idx),
+        seed: idx,
+        live: live,
+        heat: heat,
+        trip: trip,
+        cool: cool
+      )
     }
   }
 
-  // A rig ship with the modules of its design, 1 unit to the meter. The grid is centered on x and
-  // z, deck 0 starts at y = 0 and the bow points to +z. Decks above cut are not drawn. burning
-  // fires the engines. A rig with power (power.lit) shows the power and heat levels of its
-  // modules, one without runs every module at full power.
+  // A rig ship, 1 unit to the meter. The grid is centered on x and z, deck 0 starts at y = 0 and
+  // the bow points to +z. Decks above cut are not drawn. A rig without power (power.lit) runs
+  // every module at full power.
   //
   // The modules of deck skip are left out, for an editor that draws the deck it works on itself
   // (with RigModule and the views of rig_views).
@@ -122,10 +151,17 @@ assets {
     for i in 0..CELLS {
       const k = design.kinds[i]
       const y = cell_y(i)
+
       if k != 0 && y <= cut && y != skip {
         const live: f32 = power.lit ? power.live[i] : ((k != K_ENGINE || burning) ? 1 : 0)
         RigModule "cell_{i}"(
-          idx: i, k: k, v: views[i], live: live, heat: power.heat[i], trip: power.trip[i], cool: power.cool
+          idx: i,
+          k: k,
+          v: views[i],
+          live: live,
+          heat: power.heat[i],
+          trip: power.trip[i],
+          cool: power.cool
         ) {
           Position: {wx(i), wy(i), wz(i)}
         }

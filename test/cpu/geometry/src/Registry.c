@@ -327,3 +327,87 @@ void Registry_custom_lod(void) {
     test_int(box_mesh_cache_count(cache), 0);
     ecs_fini(world);
 }
+
+/** Generate a Pyramid whose vertices carry per vertex data: data0.x the side of the face and
+ * data1.w the height of the vertex.
+ *
+ * @param value The Pyramid
+ * @param key The key
+ * @param mesh The mesh
+ */
+static void PyramidGenerateData(
+    const void *value, const box_shape_key_t *key, box_mesh_t *mesh)
+{
+    PyramidGenerate(value, key, mesh);
+    for (int32_t v = 0; v < mesh->vertex_count; v ++) {
+        vec4 data0 = { (float)(v / 3), 1.0f, 2.0f, 3.0f };
+        vec4 data1 = { 4.0f, 5.0f, 6.0f, mesh->vertices[v].position[1] };
+        box_mesh_vertex_data(mesh, v, data0, data1);
+    }
+}
+
+void Registry_custom_data(void) {
+    // renderer/meshes
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxGeometry);
+    ECS_COMPONENT(world, Pyramid);
+    box_mesh_cache_t *cache = box_mesh_cache_of(world);
+    test_int(box_shape_register(world, &(box_shape_desc_t){
+        .component = ecs_id(Pyramid),
+        .key = PyramidKey,
+        .generate = PyramidGenerateData,
+        .scale = PyramidScale,
+        .lod = PyramidLod
+    }), 0);
+
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Pyramid, { .sides = 16, .size = 1 });
+    for (int32_t level = 0; level < 4; level ++) {
+        const box_mesh_t *mesh = box_mesh_cache_get(cache, lod_mesh(world, e, level));
+        test_assert(mesh != NULL);
+        test_assert(mesh->data != NULL);
+        for (int32_t v = 0; v < mesh->vertex_count; v ++) {
+            test_flt(mesh->data[v * 2][0], (float)(v / 3));
+            test_flt(mesh->data[v * 2][3], 3.0f);
+            test_flt(mesh->data[v * 2 + 1][0], 4.0f);
+            test_flt(mesh->data[v * 2 + 1][3], mesh->vertices[v].position[1]);
+        }
+    }
+
+    ecs_fini(world);
+}
+
+void Registry_vertex_data_builder(void) {
+    // renderer/meshes
+    ecs_world_t *world = ecs_init();
+    box_mesh_t mesh = {0};
+    vec3 n = { 0.0f, 0.0f, 1.0f };
+    for (int32_t i = 0; i < 3; i ++) {
+        box_mesh_vertex(&mesh, (vec3){ (float)i, 0.0f, 0.0f }, n, 0.0f, 0.0f);
+    }
+
+    test_assert(mesh.data == NULL);
+    box_mesh_vertex_data(&mesh, 1, (vec4){ 1, 2, 3, 4 }, (vec4){ 5, 6, 7, 8 });
+    test_assert(mesh.data != NULL);
+    for (int32_t i = 0; i < 100; i ++) {
+        box_mesh_vertex(&mesh, (vec3){ (float)i, 1.0f, 0.0f }, n, 0.0f, 0.0f);
+    }
+
+    box_mesh_vertex_data(&mesh, 102, (vec4){ 9, 9, 9, 9 }, (vec4){ 10, 10, 10, 10 });
+    test_int(mesh.vertex_count, 103);
+    for (int32_t c = 0; c < 4; c ++) {
+        test_flt(mesh.data[0][c], 0.0f);
+        test_flt(mesh.data[1][c], 0.0f);
+        test_flt(mesh.data[2][c], (float)(c + 1));
+        test_flt(mesh.data[3][c], (float)(c + 5));
+        test_flt(mesh.data[4][c], 0.0f);
+        test_flt(mesh.data[5][c], 0.0f);
+        test_flt(mesh.data[101 * 2][c], 0.0f);
+        test_flt(mesh.data[102 * 2][c], 9.0f);
+        test_flt(mesh.data[102 * 2 + 1][c], 10.0f);
+    }
+
+    box_mesh_fini(&mesh);
+    test_assert(mesh.data == NULL);
+    ecs_fini(world);
+}

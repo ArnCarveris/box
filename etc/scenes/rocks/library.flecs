@@ -1,0 +1,12 @@
+// The rock library: a Rock template (boulders and slabs of granite, sandstone or forest stone,
+// with strata, joints, flatness, displacement and moss as props), the RockScree and RockCluster
+// templates (scree piles and outcrops of several rocks with scree around them) and the presets,
+// all built from mesh graph nodes (box.mesh), with triplanar textures from texture graphs and a
+// moss TextureLayer.
+//
+// A scene includes this, then places the rocks, such as rocks.flecs. The Scene needs
+// texture_layers and triplanar.
+include materials
+include rock
+include scree
+include presets

@@ -1,0 +1,1178 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+using box.render
+using box.world
+using box.terrain
+using trees
+using state
+using assets
+
+// The landmarks of the infinite forest: rare things a walk comes across, placed by a ChunkGrid of
+// LANDMARK_CELL cells within LANDMARK_RANGE of the focus. A cell decides from seeded hashes of
+// absolute positions and from the heights and masks of the terrain (box.terrain), so a landmark
+// is where it was each time its cell loads, and every piece stands on the terrain under it.
+//
+// - boulder fields and crags of stacked slabs on the scree at the foot of the rock walls
+// - a fallen trunk across a forest trail, its root plate torn up on one side
+// - a wooden signpost at a crossing of the trails, a board toward each trail
+// - a giant old oak or beech alone in the middle of a clearing
+// - a mossy ruined wall or a cairn on a knoll, and a pond in a hollow: the terrain makes both
+//   at its landmark sites (terrain.flecs), each in a small glade
+//
+// One landmark per cell comes from two hashed points in the middle of the cell: a boulder field
+// or a crag where the point is on scree, a fallen trunk where it is on a straight stretch of a
+// trail in the forest. The others are where the terrain has a feature: on a lattice of
+// LANDMARK_STEP meters, a signpost at the lattice point where the dirt of a crossing peaks, a
+// giant at the point most in the middle of a clearing, a pond at the lowest point of a hollow,
+// a ruin or cairn at the highest point of a knoll. Each of these is the extreme among the 5 by 5
+// lattice points around it, so a feature gets one landmark even where it spans cells.
+//
+// The landmarks clear the trees and the undergrowth through the masks: the giants stand in the
+// grass of the clearings, the ruins, cairns and ponds in the grass of their glades, the trunks
+// and signposts on the dirt of the trails and the boulders on the scree, where the trees and the
+// shrubs do not grow (stands.flecs, undergrowth.flecs).
+state {
+  // Cells of LANDMARK_CELL meters within LANDMARK_RANGE of the focus, LANDMARK_BUDGET a frame
+  // within LANDMARK_BUDGET_MS. A cell reads the terrain up to LANDMARK_REACH meters beyond its
+  // edges, and waits until it is known there
+  export const LANDMARK_CELL: f32 = 48
+  export const LANDMARK_RANGE: f32 = 300
+  export const LANDMARK_BUDGET: i32 = 4
+  export const LANDMARK_BUDGET_MS: f32 = 4
+  export const LANDMARK_REACH: f32 = 52
+
+  // No landmark stands within LANDMARK_BROOK meters of the middle of a brook
+  export const LANDMARK_BROOK: f32 = 9
+
+  // The lattice of the landmarks of the terrain: LANDMARK_LATTICE points of LANDMARK_STEP meters
+  // across a cell
+  export const LANDMARK_STEP: f32 = 8
+  export const LANDMARK_LATTICE: i32 = 6
+
+  // Shares of the cells on scree that get boulders or a crag, of the cells on a trail that get a
+  // fallen trunk, and of the clearings that get a giant
+  export const LANDMARK_BOULDERS: f32 = 0.5
+  export const LANDMARK_TRUNKS: f32 = 0.35
+  export const LANDMARK_GIANTS: f32 = 0.85
+
+  // The signposts and the small parts of the landmarks fade out by LANDMARK_SMALL_RANGE
+  export const LANDMARK_SMALL_RANGE: f32 = 140
+  export const LANDMARK_SMALL_FADE: f32 = 12
+
+  // Height and masks of the terrain (red forest floor, green grass, blue dirt, alpha rock)
+  fn wild_mark_h(x: f64, z: f64) -> f64 {
+    box.terrain.height(infinite_forest.land, x, z)
+  }
+
+  fn wild_mark_m(x: f64, z: f64, channel: i32) -> f64 {
+    box.terrain.mask(infinite_forest.land, x, z, channel)
+  }
+
+  // Seeded hash of two indices, 0..1
+  fn wild_mark_hash(i: f64, j: f64, seed: f64) -> f64 {
+    forest_hash(i * 1.731 + forest_hash(j, seed + 7) * 917.3, seed)
+  }
+
+  // Rings of samples around x z: the least and greatest height of 12 and of 4 (quick tests),
+  // the sum of a mask channel of 16, the trails that leave toward 24 (the runs of dirt above
+  // 0.5), the axis of the dirt of 16 (along a trail) and the direction the dirt of 12 leans to
+  fn wild_mark_ring_min(x: f64, z: f64, r: f64) -> f64 {
+    const h0 = wild_mark_h(x + r, z)
+    const h1 = wild_mark_h(x + r * 0.866, z + r * 0.5)
+    const h2 = wild_mark_h(x + r * 0.5, z + r * 0.866)
+    const h3 = wild_mark_h(x, z + r)
+    const h4 = wild_mark_h(x - r * 0.5, z + r * 0.866)
+    const h5 = wild_mark_h(x - r * 0.866, z + r * 0.5)
+    const h6 = wild_mark_h(x - r, z)
+    const h7 = wild_mark_h(x - r * 0.866, z - r * 0.5)
+    const h8 = wild_mark_h(x - r * 0.5, z - r * 0.866)
+    const h9 = wild_mark_h(x, z - r)
+    const h10 = wild_mark_h(x + r * 0.5, z - r * 0.866)
+    const h11 = wild_mark_h(x + r * 0.866, z - r * 0.5)
+    const a = min(min(h0, h1), min(h2, h3))
+    const b = min(min(h4, h5), min(h6, h7))
+    const c = min(min(h8, h9), min(h10, h11))
+    min(min(a, b), c)
+  }
+
+  fn wild_mark_ring_max(x: f64, z: f64, r: f64) -> f64 {
+    const h0 = wild_mark_h(x + r, z)
+    const h1 = wild_mark_h(x + r * 0.866, z + r * 0.5)
+    const h2 = wild_mark_h(x + r * 0.5, z + r * 0.866)
+    const h3 = wild_mark_h(x, z + r)
+    const h4 = wild_mark_h(x - r * 0.5, z + r * 0.866)
+    const h5 = wild_mark_h(x - r * 0.866, z + r * 0.5)
+    const h6 = wild_mark_h(x - r, z)
+    const h7 = wild_mark_h(x - r * 0.866, z - r * 0.5)
+    const h8 = wild_mark_h(x - r * 0.5, z - r * 0.866)
+    const h9 = wild_mark_h(x, z - r)
+    const h10 = wild_mark_h(x + r * 0.5, z - r * 0.866)
+    const h11 = wild_mark_h(x + r * 0.866, z - r * 0.5)
+    const a = max(max(h0, h1), max(h2, h3))
+    const b = max(max(h4, h5), max(h6, h7))
+    const c = max(max(h8, h9), max(h10, h11))
+    max(max(a, b), c)
+  }
+
+  fn wild_mark_ring4_min(x: f64, z: f64, r: f64) -> f64 {
+    const h0 = wild_mark_h(x + r * 0.7071, z + r * 0.7071)
+    const h1 = wild_mark_h(x - r * 0.7071, z + r * 0.7071)
+    const h2 = wild_mark_h(x - r * 0.7071, z - r * 0.7071)
+    const h3 = wild_mark_h(x + r * 0.7071, z - r * 0.7071)
+    min(min(h0, h1), min(h2, h3))
+  }
+
+  fn wild_mark_ring4_max(x: f64, z: f64, r: f64) -> f64 {
+    const h0 = wild_mark_h(x + r * 0.7071, z + r * 0.7071)
+    const h1 = wild_mark_h(x - r * 0.7071, z + r * 0.7071)
+    const h2 = wild_mark_h(x - r * 0.7071, z - r * 0.7071)
+    const h3 = wild_mark_h(x + r * 0.7071, z - r * 0.7071)
+    max(max(h0, h1), max(h2, h3))
+  }
+
+  fn wild_mark_ring_sum(x: f64, z: f64, r: f64, channel: i32) -> f64 {
+    wild_mark_m(x + r, z, channel) +
+    wild_mark_m(x + r * 0.9239, z + r * 0.3827, channel) +
+    wild_mark_m(x + r * 0.7071, z + r * 0.7071, channel) +
+    wild_mark_m(x + r * 0.3827, z + r * 0.9239, channel) +
+    wild_mark_m(x, z + r, channel) +
+    wild_mark_m(x - r * 0.3827, z + r * 0.9239, channel) +
+    wild_mark_m(x - r * 0.7071, z + r * 0.7071, channel) +
+    wild_mark_m(x - r * 0.9239, z + r * 0.3827, channel) +
+    wild_mark_m(x - r, z, channel) +
+    wild_mark_m(x - r * 0.9239, z - r * 0.3827, channel) +
+    wild_mark_m(x - r * 0.7071, z - r * 0.7071, channel) +
+    wild_mark_m(x - r * 0.3827, z - r * 0.9239, channel) +
+    wild_mark_m(x, z - r, channel) +
+    wild_mark_m(x + r * 0.3827, z - r * 0.9239, channel) +
+    wild_mark_m(x + r * 0.7071, z - r * 0.7071, channel) +
+    wild_mark_m(x + r * 0.9239, z - r * 0.3827, channel)
+  }
+
+  fn wild_mark_arms(x: f64, z: f64, r: f64) -> f64 {
+    const d0 = wild_mark_m(x + r, z, 2)
+    const d1 = wild_mark_m(x + r * 0.9659, z + r * 0.2588, 2)
+    const d2 = wild_mark_m(x + r * 0.866, z + r * 0.5, 2)
+    const d3 = wild_mark_m(x + r * 0.7071, z + r * 0.7071, 2)
+    const d4 = wild_mark_m(x + r * 0.5, z + r * 0.866, 2)
+    const d5 = wild_mark_m(x + r * 0.2588, z + r * 0.9659, 2)
+    const d6 = wild_mark_m(x, z + r, 2)
+    const d7 = wild_mark_m(x - r * 0.2588, z + r * 0.9659, 2)
+    const d8 = wild_mark_m(x - r * 0.5, z + r * 0.866, 2)
+    const d9 = wild_mark_m(x - r * 0.7071, z + r * 0.7071, 2)
+    const d10 = wild_mark_m(x - r * 0.866, z + r * 0.5, 2)
+    const d11 = wild_mark_m(x - r * 0.9659, z + r * 0.2588, 2)
+    const d12 = wild_mark_m(x - r, z, 2)
+    const d13 = wild_mark_m(x - r * 0.9659, z - r * 0.2588, 2)
+    const d14 = wild_mark_m(x - r * 0.866, z - r * 0.5, 2)
+    const d15 = wild_mark_m(x - r * 0.7071, z - r * 0.7071, 2)
+    const d16 = wild_mark_m(x - r * 0.5, z - r * 0.866, 2)
+    const d17 = wild_mark_m(x - r * 0.2588, z - r * 0.9659, 2)
+    const d18 = wild_mark_m(x, z - r, 2)
+    const d19 = wild_mark_m(x + r * 0.2588, z - r * 0.9659, 2)
+    const d20 = wild_mark_m(x + r * 0.5, z - r * 0.866, 2)
+    const d21 = wild_mark_m(x + r * 0.7071, z - r * 0.7071, 2)
+    const d22 = wild_mark_m(x + r * 0.866, z - r * 0.5, 2)
+    const d23 = wild_mark_m(x + r * 0.9659, z - r * 0.2588, 2)
+    (d0 > 0.5 && d23 <= 0.5 ? 1 : 0) + (d1 > 0.5 && d0 <= 0.5 ? 1 : 0) +
+    (d2 > 0.5 && d1 <= 0.5 ? 1 : 0) + (d3 > 0.5 && d2 <= 0.5 ? 1 : 0) +
+    (d4 > 0.5 && d3 <= 0.5 ? 1 : 0) + (d5 > 0.5 && d4 <= 0.5 ? 1 : 0) +
+    (d6 > 0.5 && d5 <= 0.5 ? 1 : 0) + (d7 > 0.5 && d6 <= 0.5 ? 1 : 0) +
+    (d8 > 0.5 && d7 <= 0.5 ? 1 : 0) + (d9 > 0.5 && d8 <= 0.5 ? 1 : 0) +
+    (d10 > 0.5 && d9 <= 0.5 ? 1 : 0) + (d11 > 0.5 && d10 <= 0.5 ? 1 : 0) +
+    (d12 > 0.5 && d11 <= 0.5 ? 1 : 0) + (d13 > 0.5 && d12 <= 0.5 ? 1 : 0) +
+    (d14 > 0.5 && d13 <= 0.5 ? 1 : 0) + (d15 > 0.5 && d14 <= 0.5 ? 1 : 0) +
+    (d16 > 0.5 && d15 <= 0.5 ? 1 : 0) + (d17 > 0.5 && d16 <= 0.5 ? 1 : 0) +
+    (d18 > 0.5 && d17 <= 0.5 ? 1 : 0) + (d19 > 0.5 && d18 <= 0.5 ? 1 : 0) +
+    (d20 > 0.5 && d19 <= 0.5 ? 1 : 0) + (d21 > 0.5 && d20 <= 0.5 ? 1 : 0) +
+    (d22 > 0.5 && d21 <= 0.5 ? 1 : 0) + (d23 > 0.5 && d22 <= 0.5 ? 1 : 0)
+  }
+
+  fn wild_mark_axis(x: f64, z: f64, r: f64) -> f64 {
+    const d0 = wild_mark_m(x + r, z, 2)
+    const d1 = wild_mark_m(x + r * 0.9239, z + r * 0.3827, 2)
+    const d2 = wild_mark_m(x + r * 0.7071, z + r * 0.7071, 2)
+    const d3 = wild_mark_m(x + r * 0.3827, z + r * 0.9239, 2)
+    const d4 = wild_mark_m(x, z + r, 2)
+    const d5 = wild_mark_m(x - r * 0.3827, z + r * 0.9239, 2)
+    const d6 = wild_mark_m(x - r * 0.7071, z + r * 0.7071, 2)
+    const d7 = wild_mark_m(x - r * 0.9239, z + r * 0.3827, 2)
+    const d8 = wild_mark_m(x - r, z, 2)
+    const d9 = wild_mark_m(x - r * 0.9239, z - r * 0.3827, 2)
+    const d10 = wild_mark_m(x - r * 0.7071, z - r * 0.7071, 2)
+    const d11 = wild_mark_m(x - r * 0.3827, z - r * 0.9239, 2)
+    const d12 = wild_mark_m(x, z - r, 2)
+    const d13 = wild_mark_m(x + r * 0.3827, z - r * 0.9239, 2)
+    const d14 = wild_mark_m(x + r * 0.7071, z - r * 0.7071, 2)
+    const d15 = wild_mark_m(x + r * 0.9239, z - r * 0.3827, 2)
+    const sy = d1 * 0.7071 + d2 + d3 * 0.7071 - d5 * 0.7071 - d6 - d7 * 0.7071 + d9 * 0.7071 + d10 +
+      d11 * 0.7071 - d13 * 0.7071 - d14 - d15 * 0.7071
+    const sx = d0 + d1 * 0.7071 - d3 * 0.7071 - d4 - d5 * 0.7071 + d7 * 0.7071 + d8 + d9 * 0.7071 -
+      d11 * 0.7071 - d12 - d13 * 0.7071 + d15 * 0.7071
+    0.5 * atan2(sy, sx)
+  }
+
+  fn wild_mark_lean(x: f64, z: f64, r: f64) -> f64 {
+    const d0 = wild_mark_m(x + r, z, 2)
+    const d1 = wild_mark_m(x + r * 0.866, z + r * 0.5, 2)
+    const d2 = wild_mark_m(x + r * 0.5, z + r * 0.866, 2)
+    const d3 = wild_mark_m(x, z + r, 2)
+    const d4 = wild_mark_m(x - r * 0.5, z + r * 0.866, 2)
+    const d5 = wild_mark_m(x - r * 0.866, z + r * 0.5, 2)
+    const d6 = wild_mark_m(x - r, z, 2)
+    const d7 = wild_mark_m(x - r * 0.866, z - r * 0.5, 2)
+    const d8 = wild_mark_m(x - r * 0.5, z - r * 0.866, 2)
+    const d9 = wild_mark_m(x, z - r, 2)
+    const d10 = wild_mark_m(x + r * 0.5, z - r * 0.866, 2)
+    const d11 = wild_mark_m(x + r * 0.866, z - r * 0.5, 2)
+    const sz = d1 * 0.5 + d2 * 0.866 + d3 + d4 * 0.866 + d5 * 0.5 - d7 * 0.5 - d8 * 0.866 - d9 -
+      d10 * 0.866 - d11 * 0.5
+    const sx = d0 + d1 * 0.866 + d2 * 0.5 - d4 * 0.5 - d5 * 0.866 - d6 - d7 * 0.866 - d8 * 0.5 +
+      d10 * 0.5 + d11 * 0.866
+    atan2(sz, sx)
+  }
+
+  // Whether the terrain is known LANDMARK_REACH around the cell at x0 z0, and the brooks under
+  // the cell
+  fn wild_mark_ready(x0: f64, z0: f64, size: f64) -> bool {
+    box.terrain.known(infinite_forest.land, x0 - LANDMARK_REACH, z0 - LANDMARK_REACH) &&
+      box.terrain.known(infinite_forest.land, x0 + size + LANDMARK_REACH, z0 - LANDMARK_REACH) &&
+      box.terrain.known(infinite_forest.land, x0 - LANDMARK_REACH, z0 + size + LANDMARK_REACH) &&
+      box.terrain.known(infinite_forest.land, x0 + size + LANDMARK_REACH, z0 + size + LANDMARK_REACH) &&
+      box.terrain.known(infinite_forest.brooks, x0, z0) &&
+      box.terrain.known(infinite_forest.brooks, x0 + size, z0 + size)
+  }
+
+  // Whether x z is clear of the brooks: their stony beds are not scree and their channels not
+  // hollows for a pond (brooks.flecs)
+  fn wild_mark_dry(x: f64, z: f64) -> bool {
+    wild_brook_d(x, z) > LANDMARK_BROOK
+  }
+
+  // Offset of the vertex of the parabola through hm, h0 and hp at -s, 0 and s, within s
+  fn wild_mark_vertex(hm: f64, h0: f64, hp: f64, s: f64) -> f64 {
+    const den = hm - 2 * h0 + hp
+    abs(den) < 0.0001 ? 0 : clamp(s * (hm - hp) / (2 * den), -s, s)
+  }
+
+  // X and Z of the bottom of a hollow or the top of a knoll near x z, from parabolas through
+  // the heights s meters to either side
+  fn wild_mark_refine_x(x: f64, z: f64, s: f64) -> f64 {
+    x + wild_mark_vertex(wild_mark_h(x - s, z), wild_mark_h(x, z), wild_mark_h(x + s, z), s)
+  }
+
+  fn wild_mark_refine_z(x: f64, z: f64, s: f64) -> f64 {
+    z + wild_mark_vertex(wild_mark_h(x, z - s), wild_mark_h(x, z), wild_mark_h(x, z + s), s)
+  }
+
+  // Meters from x z along ux uz to the edge of the dirt of a trail, up to 7.5
+  fn wild_mark_reach(x: f64, z: f64, ux: f64, uz: f64) -> f64 {
+    wild_mark_m(x + ux * 1.5, z + uz * 1.5, 2) < 0.45 ? 1.5 :
+      wild_mark_m(x + ux * 3, z + uz * 3, 2) < 0.45 ? 3 :
+      wild_mark_m(x + ux * 4.5, z + uz * 4.5, 2) < 0.45 ? 4.5 :
+      wild_mark_m(x + ux * 6, z + uz * 6, 2) < 0.45 ? 6 : 7.5
+  }
+
+  // Meters from the middle of a pond x z along ux uz to its shore, where the ground rises above
+  // the water at level
+  fn wild_mark_shore(x: f64, z: f64, ux: f64, uz: f64, level: f64) -> f64 {
+    wild_mark_h(x + ux * 9, z + uz * 9) > level ? 9 :
+      wild_mark_h(x + ux * 10.5, z + uz * 10.5) > level ? 10.5 :
+      wild_mark_h(x + ux * 12, z + uz * 12) > level ? 12 :
+      wild_mark_h(x + ux * 13.5, z + uz * 13.5) > level ? 13.5 :
+      wild_mark_h(x + ux * 15, z + uz * 15) > level ? 15 : 16.5
+  }
+
+  // Meters from x z along ux uz to the farthest of 5 4 3 2 1 that is still on the dirt of a trail
+  fn wild_mark_inside(x: f64, z: f64, ux: f64, uz: f64) -> f64 {
+    wild_mark_m(x + ux * 5, z + uz * 5, 2) > 0.5 ? 5 :
+      wild_mark_m(x + ux * 4, z + uz * 4, 2) > 0.5 ? 4 :
+      wild_mark_m(x + ux * 3, z + uz * 3, 2) > 0.5 ? 3 :
+      wild_mark_m(x + ux * 2, z + uz * 2, 2) > 0.5 ? 2 : 1
+  }
+
+  // Whether a trail leaves x z toward the direction i of 24 around a ring of r meters: the dirt
+  // there is on a trail and the dirt of the direction before is not
+  fn wild_mark_arm_at(x: f64, z: f64, r: f64, i: f64) -> bool {
+    const a = i * PI / 12
+    const b = (i - 1) * PI / 12
+    wild_mark_m(x + r * cos(a), z + r * sin(a), 2) > 0.5 &&
+      wild_mark_m(x + r * cos(b), z + r * sin(b), 2) <= 0.5
+  }
+
+  // What the landmark of a cell at x z is: 1 boulders or a crag on the scree, 2 a fallen trunk
+  // on a straight trail through the forest, 0 none, for the roll of the cell
+  fn wild_mark_kind(x: f64, z: f64, roll: f64) -> f64 {
+    const dirt = wild_mark_m(x, z, 2)
+    const rock = wild_mark_m(x, z, 3)
+    const trail = dirt > 0.7 && wild_mark_m(x, z, 1) < 0.15 && rock < 0.1 &&
+      roll < LANDMARK_TRUNKS
+    const scree = dirt > 0.1 && rock > 0.2 && rock < 0.8 && wild_mark_m(x, z, 0) < 0.3 &&
+      box.terrain.slope(infinite_forest.land, x, z) < 0.6 && roll < LANDMARK_BOULDERS
+    trail ? (wild_mark_arms(x, z, 8) == 2 && wild_mark_ring_sum(x, z, 10, 1) < 3 ? 2 : 0) :
+      scree ? 1 : 0
+  }
+
+  // How much a lattice point is in the middle of a clearing, -1 where it is not in one: the
+  // grass around it, and a little hash that breaks ties
+  fn wild_mark_giant_key(x: f64, z: f64) -> f64 {
+    const ok = wild_mark_m(x, z, 1) > 0.95 &&
+      box.terrain.slope(infinite_forest.land, x, z) < 0.15 && wild_mark_h(x, z) < WILD_BROAD_HEIGHT + 30
+    ok ? wild_mark_ring_sum(x, z, 18, 1) + wild_mark_ring_sum(x, z, 36, 1) +
+      0.001 * wild_mark_hash(floor(x / LANDMARK_STEP), floor(z / LANDMARK_STEP), 3) : -1
+  }
+
+  // How much a lattice point is in the middle of a crossing of the trails, -1 where it is not on
+  // a trail: the dirt on it and around it, and a little hash that breaks ties
+  fn wild_mark_cross_key(x: f64, z: f64) -> f64 {
+    const dirt = wild_mark_m(x, z, 2)
+    dirt > 0.35 ? wild_mark_ring_sum(x, z, 5, 2) + 2 * dirt +
+      0.001 * wild_mark_hash(floor(x / LANDMARK_STEP), floor(z / LANDMARK_STEP), 4) : -1
+  }
+
+  // Over the 5 by 5 lattice points around, whether x z is the lowest, the highest, the most in
+  // the middle of a clearing and of a crossing
+  fn wild_mark_lowest(x: f64, z: f64) -> bool {
+    const k = wild_mark_h(x, z)
+    k < wild_mark_h(x - 2 * LANDMARK_STEP, z - 2 * LANDMARK_STEP) &&
+      k < wild_mark_h(x - 2 * LANDMARK_STEP, z - LANDMARK_STEP) &&
+      k < wild_mark_h(x - 2 * LANDMARK_STEP, z) &&
+      k < wild_mark_h(x - 2 * LANDMARK_STEP, z + LANDMARK_STEP) &&
+      k < wild_mark_h(x - 2 * LANDMARK_STEP, z + 2 * LANDMARK_STEP) &&
+      k < wild_mark_h(x - LANDMARK_STEP, z - 2 * LANDMARK_STEP) &&
+      k < wild_mark_h(x - LANDMARK_STEP, z - LANDMARK_STEP) &&
+      k < wild_mark_h(x - LANDMARK_STEP, z) &&
+      k < wild_mark_h(x - LANDMARK_STEP, z + LANDMARK_STEP) &&
+      k < wild_mark_h(x - LANDMARK_STEP, z + 2 * LANDMARK_STEP) &&
+      k < wild_mark_h(x, z - 2 * LANDMARK_STEP) && k < wild_mark_h(x, z - LANDMARK_STEP) &&
+      k < wild_mark_h(x, z + LANDMARK_STEP) && k < wild_mark_h(x, z + 2 * LANDMARK_STEP) &&
+      k < wild_mark_h(x + LANDMARK_STEP, z - 2 * LANDMARK_STEP) &&
+      k < wild_mark_h(x + LANDMARK_STEP, z - LANDMARK_STEP) &&
+      k < wild_mark_h(x + LANDMARK_STEP, z) &&
+      k < wild_mark_h(x + LANDMARK_STEP, z + LANDMARK_STEP) &&
+      k < wild_mark_h(x + LANDMARK_STEP, z + 2 * LANDMARK_STEP) &&
+      k < wild_mark_h(x + 2 * LANDMARK_STEP, z - 2 * LANDMARK_STEP) &&
+      k < wild_mark_h(x + 2 * LANDMARK_STEP, z - LANDMARK_STEP) &&
+      k < wild_mark_h(x + 2 * LANDMARK_STEP, z) &&
+      k < wild_mark_h(x + 2 * LANDMARK_STEP, z + LANDMARK_STEP) &&
+      k < wild_mark_h(x + 2 * LANDMARK_STEP, z + 2 * LANDMARK_STEP)
+  }
+
+  fn wild_mark_highest(x: f64, z: f64) -> bool {
+    const k = wild_mark_h(x, z)
+    k > wild_mark_h(x - 2 * LANDMARK_STEP, z - 2 * LANDMARK_STEP) &&
+      k > wild_mark_h(x - 2 * LANDMARK_STEP, z - LANDMARK_STEP) &&
+      k > wild_mark_h(x - 2 * LANDMARK_STEP, z) &&
+      k > wild_mark_h(x - 2 * LANDMARK_STEP, z + LANDMARK_STEP) &&
+      k > wild_mark_h(x - 2 * LANDMARK_STEP, z + 2 * LANDMARK_STEP) &&
+      k > wild_mark_h(x - LANDMARK_STEP, z - 2 * LANDMARK_STEP) &&
+      k > wild_mark_h(x - LANDMARK_STEP, z - LANDMARK_STEP) &&
+      k > wild_mark_h(x - LANDMARK_STEP, z) &&
+      k > wild_mark_h(x - LANDMARK_STEP, z + LANDMARK_STEP) &&
+      k > wild_mark_h(x - LANDMARK_STEP, z + 2 * LANDMARK_STEP) &&
+      k > wild_mark_h(x, z - 2 * LANDMARK_STEP) && k > wild_mark_h(x, z - LANDMARK_STEP) &&
+      k > wild_mark_h(x, z + LANDMARK_STEP) && k > wild_mark_h(x, z + 2 * LANDMARK_STEP) &&
+      k > wild_mark_h(x + LANDMARK_STEP, z - 2 * LANDMARK_STEP) &&
+      k > wild_mark_h(x + LANDMARK_STEP, z - LANDMARK_STEP) &&
+      k > wild_mark_h(x + LANDMARK_STEP, z) &&
+      k > wild_mark_h(x + LANDMARK_STEP, z + LANDMARK_STEP) &&
+      k > wild_mark_h(x + LANDMARK_STEP, z + 2 * LANDMARK_STEP) &&
+      k > wild_mark_h(x + 2 * LANDMARK_STEP, z - 2 * LANDMARK_STEP) &&
+      k > wild_mark_h(x + 2 * LANDMARK_STEP, z - LANDMARK_STEP) &&
+      k > wild_mark_h(x + 2 * LANDMARK_STEP, z) &&
+      k > wild_mark_h(x + 2 * LANDMARK_STEP, z + LANDMARK_STEP) &&
+      k > wild_mark_h(x + 2 * LANDMARK_STEP, z + 2 * LANDMARK_STEP)
+  }
+
+  fn wild_mark_giant_best(x: f64, z: f64) -> bool {
+    const k = wild_mark_giant_key(x, z)
+    k > wild_mark_giant_key(x - 2 * LANDMARK_STEP, z - 2 * LANDMARK_STEP) &&
+      k > wild_mark_giant_key(x - 2 * LANDMARK_STEP, z - LANDMARK_STEP) &&
+      k > wild_mark_giant_key(x - 2 * LANDMARK_STEP, z) &&
+      k > wild_mark_giant_key(x - 2 * LANDMARK_STEP, z + LANDMARK_STEP) &&
+      k > wild_mark_giant_key(x - 2 * LANDMARK_STEP, z + 2 * LANDMARK_STEP) &&
+      k > wild_mark_giant_key(x - LANDMARK_STEP, z - 2 * LANDMARK_STEP) &&
+      k > wild_mark_giant_key(x - LANDMARK_STEP, z - LANDMARK_STEP) &&
+      k > wild_mark_giant_key(x - LANDMARK_STEP, z) &&
+      k > wild_mark_giant_key(x - LANDMARK_STEP, z + LANDMARK_STEP) &&
+      k > wild_mark_giant_key(x - LANDMARK_STEP, z + 2 * LANDMARK_STEP) &&
+      k > wild_mark_giant_key(x, z - 2 * LANDMARK_STEP) &&
+      k > wild_mark_giant_key(x, z - LANDMARK_STEP) &&
+      k > wild_mark_giant_key(x, z + LANDMARK_STEP) &&
+      k > wild_mark_giant_key(x, z + 2 * LANDMARK_STEP) &&
+      k > wild_mark_giant_key(x + LANDMARK_STEP, z - 2 * LANDMARK_STEP) &&
+      k > wild_mark_giant_key(x + LANDMARK_STEP, z - LANDMARK_STEP) &&
+      k > wild_mark_giant_key(x + LANDMARK_STEP, z) &&
+      k > wild_mark_giant_key(x + LANDMARK_STEP, z + LANDMARK_STEP) &&
+      k > wild_mark_giant_key(x + LANDMARK_STEP, z + 2 * LANDMARK_STEP) &&
+      k > wild_mark_giant_key(x + 2 * LANDMARK_STEP, z - 2 * LANDMARK_STEP) &&
+      k > wild_mark_giant_key(x + 2 * LANDMARK_STEP, z - LANDMARK_STEP) &&
+      k > wild_mark_giant_key(x + 2 * LANDMARK_STEP, z) &&
+      k > wild_mark_giant_key(x + 2 * LANDMARK_STEP, z + LANDMARK_STEP) &&
+      k > wild_mark_giant_key(x + 2 * LANDMARK_STEP, z + 2 * LANDMARK_STEP)
+  }
+
+  fn wild_mark_cross_best(x: f64, z: f64) -> bool {
+    const k = wild_mark_cross_key(x, z)
+    k > wild_mark_cross_key(x - 2 * LANDMARK_STEP, z - 2 * LANDMARK_STEP) &&
+      k > wild_mark_cross_key(x - 2 * LANDMARK_STEP, z - LANDMARK_STEP) &&
+      k > wild_mark_cross_key(x - 2 * LANDMARK_STEP, z) &&
+      k > wild_mark_cross_key(x - 2 * LANDMARK_STEP, z + LANDMARK_STEP) &&
+      k > wild_mark_cross_key(x - 2 * LANDMARK_STEP, z + 2 * LANDMARK_STEP) &&
+      k > wild_mark_cross_key(x - LANDMARK_STEP, z - 2 * LANDMARK_STEP) &&
+      k > wild_mark_cross_key(x - LANDMARK_STEP, z - LANDMARK_STEP) &&
+      k > wild_mark_cross_key(x - LANDMARK_STEP, z) &&
+      k > wild_mark_cross_key(x - LANDMARK_STEP, z + LANDMARK_STEP) &&
+      k > wild_mark_cross_key(x - LANDMARK_STEP, z + 2 * LANDMARK_STEP) &&
+      k > wild_mark_cross_key(x, z - 2 * LANDMARK_STEP) &&
+      k > wild_mark_cross_key(x, z - LANDMARK_STEP) &&
+      k > wild_mark_cross_key(x, z + LANDMARK_STEP) &&
+      k > wild_mark_cross_key(x, z + 2 * LANDMARK_STEP) &&
+      k > wild_mark_cross_key(x + LANDMARK_STEP, z - 2 * LANDMARK_STEP) &&
+      k > wild_mark_cross_key(x + LANDMARK_STEP, z - LANDMARK_STEP) &&
+      k > wild_mark_cross_key(x + LANDMARK_STEP, z) &&
+      k > wild_mark_cross_key(x + LANDMARK_STEP, z + LANDMARK_STEP) &&
+      k > wild_mark_cross_key(x + LANDMARK_STEP, z + 2 * LANDMARK_STEP) &&
+      k > wild_mark_cross_key(x + 2 * LANDMARK_STEP, z - 2 * LANDMARK_STEP) &&
+      k > wild_mark_cross_key(x + 2 * LANDMARK_STEP, z - LANDMARK_STEP) &&
+      k > wild_mark_cross_key(x + 2 * LANDMARK_STEP, z) &&
+      k > wild_mark_cross_key(x + 2 * LANDMARK_STEP, z + LANDMARK_STEP) &&
+      k > wild_mark_cross_key(x + 2 * LANDMARK_STEP, z + 2 * LANDMARK_STEP)
+  }
+}
+
+// The giants: an oak and a beech much taller and stouter than the trees of the stands
+wild_trees {
+  oak_giant { WildTree: {species: SPECIES_OAK, seed: 61, height: 38, slender: 1.9} }
+  beech_giant { WildTree: {species: SPECIES_BEECH, seed: 67, height: 40, slender: 1.7} }
+}
+
+assets {
+  // The wood of the signposts: grain streaks along the boards and the posts
+  wild_sign_wood_h {
+    Gen: {
+      width: 256,
+      height: 256,
+      seed: 73,
+      layers: [
+        {kind: GenNoise, frequency: 24, octaves: 3, amount: 0.7},
+        {kind: GenNoise, frequency: 4, octaves: 2, amount: 0.3, seed: 1}
+      ]
+    }
+  }
+
+  wild_sign_wood {
+    Gen: {
+      source: wild_sign_wood_h,
+      output: GenAlbedo,
+      colors: [
+        {0, {52, 42, 32}}, {0.45, {94, 78, 60}}, {0.75, {116, 98, 76}}, {1, {136, 120, 96}}
+      ]
+    }
+  }
+
+  wild_sign_wood_n { Gen: {source: wild_sign_wood_h, output: GenNormal, strength: 2.2} }
+
+  // Weathered posts, the grain along Y, and boards, the grain along X
+  prefab WildSignPost {
+    Rgb: {220, 216, 206}
+    PbrMaterial: {roughness: 0.88}
+    PbrTextures: {albedo: wild_sign_wood, normal: wild_sign_wood_n}
+    texture.Mapping: {mode: MappingObject, size: 1}
+    texture.Transform: {scale_x: 0.2, scale_y: 2}
+    texture.Layers: {layers: [layer_wet, layer_snow]}
+  }
+
+  prefab WildSignBoard {
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 0.84}
+    PbrTextures: {albedo: wild_sign_wood, normal: wild_sign_wood_n}
+    texture.Mapping: {mode: MappingObject, size: 1}
+    texture.Transform: {scale_x: 2, scale_y: 0.2}
+    texture.Layers: {layers: [layer_wet, layer_snow]}
+  }
+
+  // The faded paint of the trail mark on a post
+  prefab WildSignPaint {
+    Rgb: {168, 58, 42}
+    PbrMaterial: {roughness: 0.8}
+    texture.Layers: {layers: [layer_wet, layer_snow]}
+  }
+
+  // The ripples of the ponds
+  wild_pond_ripple_h {
+    Gen: {
+      width: 256,
+      height: 256,
+      seed: 75,
+      layers: [
+        {kind: GenNoise, frequency: 6, octaves: 4, amount: 1},
+        {kind: GenNoise, frequency: 24, octaves: 2, amount: 0.25, seed: 1}
+      ]
+    }
+  }
+
+  wild_pond_ripple_n { Gen: {source: wild_pond_ripple_h, output: GenNormal, strength: 0.9} }
+
+  // The still water of a pond: dark and peaty green, the mud of the bed shows through it near
+  // the shore; slow ripples, and the rings of the rain
+  prefab WildPondWater {
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 0.05}
+    Water: {
+      shallow_color: {80, 98, 70},
+      deep_color: {20, 34, 28},
+      depth: 1.2,
+      visibility: 1.6,
+      absorption: {128, 136, 96},
+      refraction: 0.01,
+      foam_color: {192, 196, 182},
+      foam_width: 0.03,
+      ripple_scale: 2.2,
+      ripple_velocity: {0.006, 0.01}
+    }
+    PbrTextures: {normal: wild_pond_ripple_n}
+    texture.Mapping: {mode: MappingWorld, size: 3}
+    texture.Layers: {layers: [layer_rain_rings]}
+    NoShadow
+  }
+
+  // Faceted slabs of the crags, the dressed blocks of the ruins and the stones of the cairns,
+  // all of the mossy boulder rock
+  prefab WildCragSlab : ForestBoulder {
+    IcoSphere: {radius: 1, segments: 1, smooth: false}
+  }
+
+  prefab WildRuinBlock : ForestBoulder {
+    RoundedBox: {x: 1, y: 1, z: 1, radius: 0.16, segments: 2}
+  }
+
+  prefab WildCairnStone : ForestBoulder {
+    DrawRange: {far_: LANDMARK_SMALL_RANGE, fade: LANDMARK_SMALL_FADE}
+    IcoSphere: {radius: 1, segments: 1, smooth: true}
+  }
+
+  prefab WildMarkMoss : ForestMoss {
+    DrawRange: {far_: LANDMARK_SMALL_RANGE, fade: LANDMARK_SMALL_FADE}
+  }
+
+  // A boulder field around x z on the scree: a large boulder and up to a dozen smaller ones
+  // that keep off the forest floor, with moss between them
+  template WildBoulderField {
+    prop x: f64 = 0
+    prop z: f64 = 0
+    prop seed: i32 = 1
+
+    const rng: flecs.script.math.Rng = {seed: seed}
+    const n = 6 + floor(rng.f(7))
+
+    for k in 0..13 {
+      const a = rng.f(6.2832)
+      const r = k == 0 ? 0 : 1.4 + 6 * sqrt(rng.f(1))
+      const v = rng.f(1)
+      const size = k == 0 ? 2.4 + 0.9 * v : 0.6 + 1.9 * v * v
+      const bx = x + r * cos(a)
+      const bz = z + r * sin(a)
+      if k < n && wild_mark_m(bx, bz, 0) < 0.4 {
+        "boulder_{k}" {
+          Position: {bx - x, wild_mark_h(bx, bz) - 0.12 * size, bz - z}
+          Rotation: {0, rng.f(6.2832), 0}
+          ForestBoulderStone: {size: size, seed: k + 1}
+        }
+      }
+    }
+
+    for k in 0..5 {
+      const a = rng.f(6.2832)
+      const r = 1.2 + rng.f(4.5)
+      const mx = x + r * cos(a)
+      const mz = z + r * sin(a)
+      if wild_mark_m(mx, mz, 0) < 0.4 {
+        "moss_{k}" : WildMarkMoss {
+          Position: {mx - x, wild_mark_h(mx, mz) - 0.03, mz - z}
+          Rotation: {0, a, 0}
+          Scale: {0.5 + rng.f(0.4), 0.13, 0.4 + rng.f(0.3)}
+        }
+      }
+    }
+  }
+
+  // A crag at x z on the scree: slabs stacked into a tor some four meters tall, a leaning
+  // pillar and a fallen slab beside it, set on the lowest ground under it, and rubble around
+  template WildCrag {
+    prop x: f64 = 0
+    prop z: f64 = 0
+    prop seed: i32 = 1
+
+    const rng: flecs.script.math.Rng = {seed: seed}
+    const hb = min(min(wild_mark_h(x + 2.5, z), wild_mark_h(x - 2.5, z)),
+      min(wild_mark_h(x, z + 2.5), wild_mark_h(x, z - 2.5)))
+
+    tor {
+      Position: {0, hb, 0}
+      Rotation: {0, rng.f(6.2832), 0}
+
+      base : WildCragSlab {
+        Position: {0, 0.5, 0}
+        Rotation: {0.06, 0, -0.04}
+        Scale: {2.8, 1.7, 2.1}
+      }
+
+      middle : WildCragSlab {
+        Position: {0.4, 2.2, -0.2}
+        Rotation: {-0.08, 0.5, 0.1}
+        Scale: {2.1, 1.2, 1.6}
+      }
+
+      top : WildCragSlab {
+        Position: {0.1, 3.4, 0.15}
+        Rotation: {0.12, 1.1, -0.06}
+        Scale: {1.3, 0.8, 1}
+      }
+
+      pillar : WildCragSlab {
+        Position: {-2.9, 1.5, 1.1}
+        Rotation: {0.16, 0.3, 0.2}
+        Scale: {1, 3, 1.1}
+      }
+
+      slab : WildCragSlab {
+        Position: {2.7, 0.1, 1.9}
+        Rotation: {0.3, 0.8, 0.1}
+        Scale: {1.4, 0.6, 1.1}
+      }
+    }
+
+    for k in 0..7 {
+      const a = rng.f(6.2832)
+      const r = 3.6 + rng.f(2.4)
+      const s = 0.25 + rng.f(0.45)
+      const rx = x + r * cos(a)
+      const rz = z + r * sin(a)
+      "rubble_{k}" : WildCairnStone {
+        Position: {rx - x, wild_mark_h(rx, rz) + 0.1 * s, rz - z}
+        Rotation: {rng.f(0.5), rng.f(6.2832), rng.f(0.5)}
+        Scale: {s, s * 0.6, s * 0.85}
+      }
+    }
+  }
+
+  // A fallen trunk length meters long along local Z, its axis at the origin: the torn up root
+  // plate at -Z, overgrown with moss, the broken crown end at +Z, the stubs of the branches,
+  // bracket fungi and moss along the bark
+  template WildFallenTrunk {
+    prop length: f32 = 8
+    prop radius: f32 = 0.45
+    prop seed: i32 = 1
+
+    const rng: flecs.script.math.Rng = {seed: seed}
+    const half = length / 2
+
+    wood : ForestBarkDead {
+      Rotation: {PI / 2, 0, 0}
+      Scale: {radius, length, radius}
+      Frustum: {segments: 16, smooth: true, length: 1, radius_bottom: 1, radius_top: 0.7}
+    }
+
+    flare : ForestBarkDead {
+      Position: {0, 0, 0.35 - half}
+      Rotation: {PI / 2, 0, 0}
+      Scale: {radius, 0.7, radius}
+      Frustum: {segments: 16, smooth: true, length: 1, radius_bottom: 1.7, radius_top: 1}
+    }
+
+    plate : ForestBarkDead {
+      Position: {0, -0.3 * radius, -half - 0.12}
+      Rotation: {PI / 2, 0, 0}
+      Scale: {radius * 2.9, 0.42, radius * 2.5}
+      Cylinder: {segments: 16, smooth: true, length: 1, radius: 1}
+    }
+
+    earth : ForestMoss {
+      Position: {0, -0.3 * radius, -half - 0.34}
+      Scale: {radius * 2.6, radius * 2.2, 0.2}
+    }
+
+    for k in 0..11 {
+      const a = k * 0.5712 + rng.f(0.4)
+      const len = 0.45 + rng.f(0.35)
+      const rr = radius * (2.1 + rng.f(0.5)) + 0.3 * len
+      "root_{k}" : ForestLimbDead {
+        Position: {cos(a) * rr, -0.3 * radius + sin(a) * rr * 0.86, -half - 0.16 - rng.f(0.12)}
+        Rotation: {0, 0, a - PI / 2}
+        Scale: {0.12 + rng.f(0.06), len, 0.12 + rng.f(0.06)}
+        Frustum: {segments: 6, smooth: true, length: 1, radius_bottom: 1, radius_top: 0.35}
+      }
+    }
+
+    cut : ForestWoodCut {
+      Position: {0, 0, half - 0.02}
+      Rotation: {PI / 2, 0, 0}
+      Scale: {radius * 0.66, 0.03, radius * 0.66}
+    }
+
+    for k in 0..4 {
+      const a = k * 1.571 + rng.f(0.8)
+      "splinter_{k}" : ForestLimbDead {
+        Position: {cos(a) * radius * 0.4, sin(a) * radius * 0.4, half + 0.2}
+        Rotation: {PI / 2 + rng.f(0.3) - 0.15, 0, rng.f(0.3) - 0.15}
+        Scale: {radius * 0.3, 0.22 + rng.f(0.3), radius * 0.25}
+        Cone: {segments: 5, smooth: false, length: 1, radius: 1}
+      }
+    }
+
+    for k in 0..3 {
+      const t = 0.1 + 0.35 * k + rng.f(0.15)
+      const tilt = rng.f(1.6) - 0.8
+      const out = radius * (1 - 0.3 * t) + 0.2
+      "stub_{k}" : ForestLimbDead {
+        Position: {-sin(tilt) * out, cos(tilt) * out, length * (t - 0.5) + 0.3}
+        Rotation: {0.25, 0, tilt}
+        Scale: {0.08 + rng.f(0.04), 0.35 + rng.f(0.35), 0.08 + rng.f(0.04)}
+        Frustum: {segments: 6, smooth: true, length: 1, radius_bottom: 1, radius_top: 0.6}
+      }
+    }
+
+    for k in 0..5 {
+      const t = 0.15 + 0.7 * rng.f(1)
+      const side = k < 3 ? 1 : -1
+      const fs = 0.09 + rng.f(0.08)
+      "fungus_{k}" : ForestFungus {
+        Position: {side * radius * (1 - 0.3 * t) * 0.92, rng.f(radius * 0.4), length * (t - 0.5)}
+        Rotation: {0.05, PI / 2, 0}
+        Scale: {fs * 1.4, fs * 0.32, fs}
+        Sphere: {radius: 1, segments: 12, smooth: true}
+      }
+    }
+
+    for k in 0..4 {
+      const t = 0.12 + 0.2 * k + rng.f(0.12)
+      "moss_{k}" : WildMarkMoss {
+        Position: {0, radius * (1 - 0.3 * t) * 0.86, length * (t - 0.5)}
+        Scale: {radius * 0.75, 0.1, 0.5 + rng.f(0.5)}
+      }
+    }
+  }
+
+  // A fallen trunk across the trail at x z: it lies across the axis of the dirt, from one edge
+  // of the trail to the other, resting on the ground under its ends and its middle
+  template WildTrailTrunk {
+    prop x: f64 = 0
+    prop z: f64 = 0
+    prop seed: i32 = 1
+
+    const rng: flecs.script.math.Rng = {seed: seed}
+    const across = wild_mark_axis(x, z, 6) + PI / 2 + (rng.f(1) < 0.5 ? 0 : PI)
+    const ux = cos(across)
+    const uz = sin(across)
+    const ea = wild_mark_reach(x, z, -ux, -uz)
+    const eb = wild_mark_reach(x, z, ux, uz)
+    const len = clamp(ea + eb + 1.4, 6, 16)
+    const mx = x + (eb - ea) * 0.5 * ux
+    const mz = z + (eb - ea) * 0.5 * uz
+    const radius = 0.4 + rng.f(0.18)
+    const ya = wild_mark_h(mx - ux * len * 0.5, mz - uz * len * 0.5) + radius * 0.8
+    const yb = wild_mark_h(mx + ux * len * 0.5, mz + uz * len * 0.5) + radius * 0.8
+    const ym = (ya + yb) * 0.5
+    const lift = max(0, wild_mark_h(mx, mz) + radius * 0.72 - ym)
+
+    trunk {
+      Position: {mx - x, ym + lift, mz - z}
+      Rotation: {-atan((yb - ya) / len), atan2(ux, uz), 0}
+      WildFallenTrunk: {length: len, radius: radius, seed: seed}
+    }
+  }
+
+  // A signpost at the crossing at x z: a post at the edge of the crossing, away from where the
+  // trails meet, with a board toward each trail that leaves it, a little roof and the paint of
+  // the trail mark
+  template WildSignpost {
+    prop x: f64 = 0
+    prop z: f64 = 0
+    prop seed: i32 = 1
+
+    const rng: flecs.script.math.Rng = {seed: seed}
+    const away = wild_mark_lean(x, z, 6) + PI
+    const d = wild_mark_inside(x, z, cos(away), sin(away))
+    const sx = x + d * cos(away)
+    const sz = z + d * sin(away)
+
+    post {
+      Position: {sx - x, wild_mark_h(sx, sz), sz - z}
+      Rotation: {rng.f(0.04) - 0.02, rng.f(6.2832), rng.f(0.04) - 0.02}
+      DrawRange: {far_: LANDMARK_SMALL_RANGE, fade: LANDMARK_SMALL_FADE}
+
+      pole : WildSignPost {
+        Position: {0, 0.85, 0}
+        Box: {0.14, 2.3, 0.14}
+      }
+
+      roof_a : WildSignBoard {
+        Position: {0.07, 2.04, 0}
+        Rotation: {0, 0, -0.6}
+        Box: {0.2, 0.025, 0.24}
+      }
+
+      roof_b : WildSignBoard {
+        Position: {-0.07, 2.04, 0}
+        Rotation: {0, 0, 0.6}
+        Box: {0.2, 0.025, 0.24}
+      }
+
+      mark_a : WildSignPaint {
+        Position: {0, 1.18, 0}
+        Box: {0.146, 0.06, 0.146}
+      }
+
+      mark_b : WildSignPost {
+        Position: {0, 1.1, 0}
+        Rgb: {236, 232, 222}
+        Box: {0.146, 0.06, 0.146}
+      }
+
+      moss : WildMarkMoss {
+        Position: {0, -0.02, 0}
+        Scale: {0.34, 0.12, 0.3}
+      }
+    }
+
+    // The boards point the way the trails leave, measured from the crossing and set on the post
+    for k in 0..24 {
+      if wild_mark_arm_at(x, z, 9, k) {
+        const a = (k + 0.75) * PI / 12
+        "board_{k}" : WildSignBoard {
+          Position: {
+            sx - x + cos(a) * 0.5,
+            wild_mark_h(sx, sz) + 1.42 + 0.18 * (k - 3 * floor(k / 3)),
+            sz - z + sin(a) * 0.5
+          }
+          Rotation: {0, -a, rng.f(0.08) - 0.04}
+          DrawRange: {far_: LANDMARK_SMALL_RANGE, fade: LANDMARK_SMALL_FADE}
+          Box: {0.86, 0.15, 0.03}
+        }
+      }
+    }
+  }
+
+  // A pond in the hollow around x z: still water from the bottom of the hollow up to a little
+  // below its rim, sedge along the shore and a few mossy stones
+  template WildPond {
+    prop x: f64 = 0
+    prop z: f64 = 0
+    prop seed: i32 = 1
+
+    const rng: flecs.script.math.Rng = {seed: seed}
+    const rx = wild_mark_refine_x(x, z, 6)
+    const rz = wild_mark_refine_z(x, z, 6)
+    const cx = wild_mark_refine_x(rx, rz, 4)
+    const cz = wild_mark_refine_z(rx, rz, 4)
+    const level = wild_mark_ring_min(cx, cz, 21) - 1.2
+
+    // No water where a trail runs through the hollow
+    if wild_mark_ring_sum(cx, cz, 19, 2) < 2 {
+      water : WildPondWater {
+        Position: {cx - x, level, cz - z}
+        Rotation: {-PI / 2, 0, 0}
+        NGon: {sides: 48, radius: 20}
+      }
+
+      for k in 0..20 {
+        const a = k * 0.3142 + rng.f(0.2)
+        const r = wild_mark_shore(cx, cz, cos(a), sin(a), level + 0.06) + rng.f(1.2) - 0.3
+        const ex = cx + r * cos(a)
+        const ez = cz + r * sin(a)
+        "sedge_{k}" : WildSedge {
+          Position: {ex - x, wild_mark_h(ex, ez), ez - z}
+          Rotation: {0, rng.f(6.2832), 0}
+          Scale: {0.8 + rng.f(0.5), 0.9 + rng.f(0.6), 0.8 + rng.f(0.5)}
+        }
+      }
+
+      for k in 0..3 {
+        const a = rng.f(6.2832)
+        const r = wild_mark_shore(cx, cz, cos(a), sin(a), level) + 0.4
+        const ex = cx + r * cos(a)
+        const ez = cz + r * sin(a)
+        const size = 0.7 + rng.f(0.8)
+        "stone_{k}" {
+          Position: {ex - x, wild_mark_h(ex, ez) - 0.15 * size, ez - z}
+          Rotation: {0, rng.f(6.2832), 0}
+          ForestBoulderStone: {size: size, seed: k + 20}
+        }
+      }
+    }
+  }
+
+  // A ruined wall on the knoll around x z: the corner of a dry stone wall, its courses of mossy
+  // blocks broken down toward the ends and through gaps, moss on its top and fallen blocks at
+  // its foot
+  template WildRuin {
+    prop x: f64 = 0
+    prop z: f64 = 0
+    prop seed: i32 = 1
+
+    const rng: flecs.script.math.Rng = {seed: seed}
+    const cx = wild_mark_refine_x(wild_mark_refine_x(x, z, 6), wild_mark_refine_z(x, z, 6), 4)
+    const cz = wild_mark_refine_z(wild_mark_refine_x(x, z, 6), wild_mark_refine_z(x, z, 6), 4)
+    const yaw = rng.f(6.2832)
+    const ax = cos(yaw)
+    const az = sin(yaw)
+    const bx = -sin(yaw)
+    const bz = cos(yaw)
+
+    // The long wall along a, the short one along b, from the corner a little off the top
+    const ox = cx - 1.6 * ax - 1.2 * bx
+    const oz = cz - 1.6 * az - 1.2 * bz
+
+    for k in 0..12 {
+      const t = 0.3 + 0.6 * k
+      const gap = rng.f(1) < 0.12
+      const n = gap ? 0 : floor(clamp(5 - 0.42 * k + rng.f(2.4) - 1.2, 0, 5))
+      const wx = ox + t * ax
+      const wz = oz + t * az
+      const hw = wild_mark_h(wx, wz)
+      for c in 0..5 {
+        if c < n {
+          const b = (c - 2 * floor(c / 2)) * 0.3 - 0.15
+          "a_{k}_{c}" : WildRuinBlock {
+            Position: {wx + b * ax - x, hw + 0.03 + 0.27 * c, wz + b * az - z}
+            Rotation: {rng.f(0.06) - 0.03, yaw + PI / 2 + rng.f(0.12) - 0.06, rng.f(0.06) - 0.03}
+            Scale: {0.6 + rng.f(0.08), 0.26 + rng.f(0.04), 0.5 + rng.f(0.06)}
+          }
+        }
+      }
+
+      if n >= 2 {
+        "moss_a_{k}" : WildMarkMoss {
+          Position: {wx - x, hw + 0.27 * n - 0.06, wz - z}
+          Rotation: {0, yaw + rng.f(0.4), 0}
+          Scale: {0.36, 0.1, 0.3}
+        }
+      }
+    }
+
+    for k in 1..8 {
+      const t = 0.6 * k
+      const gap = rng.f(1) < 0.12
+      const n = gap ? 0 : floor(clamp(4.6 - 0.55 * k + rng.f(2.4) - 1.2, 0, 5))
+      const wx = ox + t * bx
+      const wz = oz + t * bz
+      const hw = wild_mark_h(wx, wz)
+      for c in 0..5 {
+        if c < n {
+          const b = (c - 2 * floor(c / 2)) * 0.3 - 0.15
+          "b_{k}_{c}" : WildRuinBlock {
+            Position: {wx + b * bx - x, hw + 0.03 + 0.27 * c, wz + b * bz - z}
+            Rotation: {rng.f(0.06) - 0.03, yaw + rng.f(0.12) - 0.06, rng.f(0.06) - 0.03}
+            Scale: {0.6 + rng.f(0.08), 0.26 + rng.f(0.04), 0.5 + rng.f(0.06)}
+          }
+        }
+      }
+
+      if n >= 2 {
+        "moss_b_{k}" : WildMarkMoss {
+          Position: {wx - x, hw + 0.27 * n - 0.06, wz - z}
+          Rotation: {0, yaw + rng.f(0.4), 0}
+          Scale: {0.3, 0.1, 0.36}
+        }
+      }
+    }
+
+    // Fallen blocks, most of them outside the corner
+    for k in 0..16 {
+      const along = rng.f(1) < 0.65
+      const t = rng.f(along ? 7 : 4.6)
+      const s = (rng.f(1) < 0.75 ? -1 : 1) * (0.6 + rng.f(1.8))
+      const fx = ox + (along ? t * ax + s * bx : t * bx + s * ax)
+      const fz = oz + (along ? t * az + s * bz : t * bz + s * az)
+      "fallen_{k}" : WildRuinBlock {
+        Position: {fx - x, wild_mark_h(fx, fz) + 0.05, fz - z}
+        Rotation: {rng.f(0.5) - 0.25, rng.f(6.2832), rng.f(0.5) - 0.25}
+        Scale: {0.58 + rng.f(0.1), 0.26 + rng.f(0.04), 0.48 + rng.f(0.08)}
+      }
+    }
+  }
+
+  // A cairn on the top of the knoll around x z: a ring of stones and a stack on it that grows
+  // narrower to a standing stone on its top, moss on the lower stones
+  template WildCairn {
+    prop x: f64 = 0
+    prop z: f64 = 0
+    prop seed: i32 = 1
+
+    const rng: flecs.script.math.Rng = {seed: seed}
+    const cx = wild_mark_refine_x(wild_mark_refine_x(x, z, 6), wild_mark_refine_z(x, z, 6), 4)
+    const cz = wild_mark_refine_z(wild_mark_refine_x(x, z, 6), wild_mark_refine_z(x, z, 6), 4)
+    const hc = wild_mark_h(cx, cz)
+
+    for k in 0..7 {
+      const a = k * 0.8976 + rng.f(0.4)
+      const rx = cx + 0.85 * cos(a)
+      const rz = cz + 0.85 * sin(a)
+      const s = 0.36 + rng.f(0.12)
+      "ring_{k}" : WildCairnStone {
+        Position: {rx - x, wild_mark_h(rx, rz) + 0.08, rz - z}
+        Rotation: {rng.f(0.3), rng.f(6.2832), rng.f(0.3)}
+        Scale: {s, s * 0.62, s * 0.85}
+      }
+
+      if k < 4 {
+        "moss_{k}" : WildMarkMoss {
+          Position: {rx - x, wild_mark_h(rx, rz) + s * 0.5, rz - z}
+          Scale: {s * 0.8, 0.09, s * 0.7}
+        }
+      }
+    }
+
+    for k in 0..8 {
+      const s = 0.62 * (1 - k / 10)
+      "stack_{k}" : WildCairnStone {
+        Position: {cx - x + rng.f(0.1) - 0.05, hc + 0.2 + 0.29 * k, cz - z + rng.f(0.1) - 0.05}
+        Rotation: {rng.f(0.14) - 0.07, rng.f(6.2832), rng.f(0.14) - 0.07}
+        Scale: {s, 0.2, s * 0.85}
+      }
+    }
+
+    top : WildCairnStone {
+      Position: {cx - x, hc + 2.62, cz - z}
+      Rotation: {0.06, rng.f(6.2832), -0.04}
+      Scale: {0.16, 0.36, 0.13}
+    }
+  }
+
+  // A cell of the landmarks, its corner at cell_x cell_z cells
+  template WildLandmarkCell {
+    prop cell_x: i32 = 0
+    prop cell_z: i32 = 0
+    prop level: i32 = 0
+    prop size: f32 = 48
+
+    const x0 = cell_x * size
+    const z0 = cell_z * size
+
+    // The prefabs of the giants, grown once in the library
+    const oak_giant: entity = wild_trees.oak_giant.lookup("tree")
+    const beech_giant: entity = wild_trees.beech_giant.lookup("tree")
+
+    if wild_mark_ready(x0, z0, size) {
+      // The landmark of the cell, at the first of two points in its middle that has one
+      const ax = x0 + size * (0.2 + 0.6 * wild_mark_hash(cell_x, cell_z, 11))
+      const az = z0 + size * (0.2 + 0.6 * wild_mark_hash(cell_x, cell_z, 12))
+      const bx = x0 + size * (0.2 + 0.6 * wild_mark_hash(cell_x, cell_z, 13))
+      const bz = z0 + size * (0.2 + 0.6 * wild_mark_hash(cell_x, cell_z, 14))
+      const roll = wild_mark_hash(cell_x, cell_z, 15)
+      const ka = wild_mark_dry(ax, az) ? wild_mark_kind(ax, az, roll) : 0
+      const kb = ka > 0 || !wild_mark_dry(bx, bz) ? 0 : wild_mark_kind(bx, bz, roll)
+      const px = ka > 0 ? ax : bx
+      const pz = ka > 0 ? az : bz
+      const kind = ka > 0 ? ka : kb
+      const style = wild_mark_hash(cell_x, cell_z, 16)
+      const seed = 1 + floor(9973 * wild_mark_hash(cell_x, cell_z, 17))
+
+      if kind == 1 {
+        landmark {
+          Position: {px - x0, 0, pz - z0}
+          if style < 0.62 {
+            WildBoulderField: {x: px, z: pz, seed: seed}
+          } else {
+            WildCrag: {x: px, z: pz, seed: seed}
+          }
+        }
+      } else if kind == 2 {
+        landmark {
+          Position: {px - x0, 0, pz - z0}
+          WildTrailTrunk: {x: px, z: pz, seed: seed}
+        }
+      }
+
+      // The landmarks of the features of the terrain, on the lattice
+      for i in 0..LANDMARK_LATTICE {
+        for j in 0..LANDMARK_LATTICE {
+          const x = x0 + (i + 0.5) * LANDMARK_STEP
+          const z = z0 + (j + 0.5) * LANDMARK_STEP
+          const ix = floor(x / LANDMARK_STEP)
+          const iz = floor(z / LANDMARK_STEP)
+          const h0 = wild_mark_h(x, z)
+          const dirt = wild_mark_m(x, z, 2)
+          const grass = wild_mark_m(x, z, 1)
+          const lseed = 1 + floor(9973 * wild_mark_hash(ix, iz, 18))
+          const dry = wild_mark_dry(x, z)
+
+          // A signpost where three or more trails meet
+          if dry && dirt > 0.35 && wild_mark_m(x, z, 3) < 0.05 {
+            if wild_mark_arms(x, z, 9) >= 3 && wild_mark_ring_sum(x, z, 9, 3) < 0.5 {
+              if wild_mark_cross_best(x, z) {
+                "sign_{i}_{j}" {
+                  Position: {x - x0, 0, z - z0}
+                  WildSignpost: {x: x, z: z, seed: lseed}
+                }
+              }
+            }
+          }
+
+          // A giant in the middle of some of the clearings
+          if dry && grass > 0.95 && wild_mark_hash(ix, iz, 19) < LANDMARK_GIANTS {
+            if wild_mark_giant_key(x, z) > 22 {
+              if wild_mark_giant_best(x, z) {
+                "giant_{i}_{j}" {
+                  Position: {x - x0, h0, z - z0}
+                  Rotation: {0, 6.2832 * wild_mark_hash(ix, iz, 20), 0}
+                  if wild_mark_hash(ix, iz, 21) < 0.5 {
+                    tree { (IsA, oak_giant) }
+                  } else {
+                    tree { (IsA, beech_giant) }
+                  }
+                }
+              }
+            }
+          }
+
+          // A pond at the bottom of a hollow in a glade, not in the forest
+          if dry && h0 < wild_mark_ring4_min(x, z, 20) - 1.4 && wild_mark_m(x, z, 0) < 0.2 &&
+            wild_mark_ring_sum(x, z, 16, 0) < 2
+          {
+            if h0 < wild_mark_ring_min(x, z, 20) - 1.4 && wild_mark_lowest(x, z) {
+              "pond_{i}_{j}" {
+                Position: {x - x0, 0, z - z0}
+                WildPond: {x: x, z: z, seed: lseed}
+              }
+            }
+          }
+
+          // A ruin or a cairn on the top of a knoll in the open
+          if dry && grass > 0.5 && h0 > wild_mark_ring4_max(x, z, 22) + 1.6 {
+            if h0 > wild_mark_ring_max(x, z, 22) + 1.6 && wild_mark_highest(x, z) {
+              "knoll_{i}_{j}" {
+                Position: {x - x0, 0, z - z0}
+                if wild_mark_hash(ix, iz, 22) < 0.6 {
+                  WildRuin: {x: x, z: z, seed: lseed}
+                } else {
+                  WildCairn: {x: x, z: z, seed: lseed}
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+infinite_forest {
+  // The landmarks around the focus
+  landmarks {
+    ChunkGrid: {
+      template: WildLandmarkCell,
+      cell_size: {LANDMARK_CELL, 0, LANDMARK_CELL},
+      levels: [LANDMARK_RANGE],
+      hysteresis: 16,
+      budget: LANDMARK_BUDGET,
+      budget_ms: LANDMARK_BUDGET_MS,
+      ground: infinite_forest.land
+    }
+  }
+}

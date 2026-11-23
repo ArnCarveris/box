@@ -1,0 +1,50 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.atmosphere
+using box.grass
+
+// A meadow of Grass 1 s into a gusty Wind under a low sun from the side: near the camera the
+// blades cast long shadows across each other and the ground, swaying with the blades, and
+// toward the shadow distance of the Grass (20 m) they fade into the darkened roots of the blades
+// without an edge.
+//
+// frames: 60
+$ {
+  Wind: {direction: {1, 0}, speed: 6, gust: 0.5, gust_scale: 6}
+}
+
+camera {
+  Position: {0, 1.4, 6}
+  Rotation: {-0.2, 0, 0}
+  Camera: {fov: 60, near_: 0.05, far_: 2000}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {120, 160, 210, 255}},
+    shadows: {enabled: true}}
+}
+
+sun {
+  Rotation: {0.2, 1.9, 0}
+  DirectionalLight: {intensity: 3 * flecs.script.math.PI}
+  Rgb: {255, 225, 185}
+}
+
+sky {
+  AmbientLight: {intensity: 0.4}
+}
+
+ground {
+  Position: {0, -0.05, 0}
+  Box: {2000, 0.1, 2000}
+  Rgb: {70, 55, 35}
+}
+
+meadow {
+  Grass: {density: 40, min_height: 0.3, max_height: 0.8, lod: [20, 60, 200],
+    clump_size: 1.2, clump_follow: 0.8, variation: 0.6, shadow_distance: 20}
+}

@@ -21,15 +21,29 @@ assets {
     prop y: f32 = 0
     prop width: f32 = 0.7
     const n = (x1 - x0) / 1.2
+
     for i in 0..n {
       const cx = x0 + (i + 0.5) * 1.2
       const nudge = math.sin(i * 7.3) * 0.006
+
       if i % 3 == 0 {
-        { (IsA, CanalCoping); Position: {cx, y + nudge, z}; RoundedBox: {1.17, 0.14, width, 0.025, segments: 2} }
+        {
+          (IsA, CanalCoping)
+          Position: {cx, y + nudge, z}
+          RoundedBox: {1.17, 0.14, width, 0.025, segments: 2}
+        }
       } else if i % 3 == 1 {
-        { (IsA, CanalCopingOld); Position: {cx, y + nudge, z}; RoundedBox: {1.17, 0.14, width, 0.025, segments: 2} }
+        {
+          (IsA, CanalCopingOld)
+          Position: {cx, y + nudge, z}
+          RoundedBox: {1.17, 0.14, width, 0.025, segments: 2}
+        }
       } else {
-        { (IsA, CanalCopingPale); Position: {cx, y + nudge, z}; RoundedBox: {1.17, 0.14, width, 0.025, segments: 2} }
+        {
+          (IsA, CanalCopingPale)
+          Position: {cx, y + nudge, z}
+          RoundedBox: {1.17, 0.14, width, 0.025, segments: 2}
+        }
       }
     }
   }
@@ -60,14 +74,38 @@ assets {
     Quad: {x1 - x0, top - bottom}
   }
 
-  template CanalLandscape {
-    table : CanalTable { NoBake; Ignore; Position: {0, -5.8, 0}; Rotation: {canal_up, 0, 0}; Quad: {320, 320}; texture.Transform: {scale_x: 16, scale_y: 42} }
-    plinth : CanalTable { Position: {0, -5.35, 0}; RoundedBox: {44.4, 0.9, 22.4, 0.1, segments: 4}; texture.Transform: {scale_x: 5, scale_y: 1} }
-    plinth_lip : CanalTable { Position: {0, -4.94, 0}; RoundedBox: {43, 0.1, 21, 0.03, segments: 2}; texture.Transform: {scale_x: 5, scale_y: 1} }
+  template CanalLandscapeGround {
+    table : CanalTable {
+      NoBake
+      Ignore
+      Position: {0, -5.8, 0}
+      Rotation: {canal_up, 0, 0}
+      Quad: {320, 320}
+      texture.Transform: {scale_x: 16, scale_y: 42}
+    }
+
+    plinth : CanalTable {
+      Position: {0, -5.35, 0}
+      RoundedBox: {44.4, 0.9, 22.4, 0.1, segments: 4}
+      texture.Transform: {scale_x: 5, scale_y: 1}
+    }
+
+    plinth_lip : CanalTable {
+      Position: {0, -4.94, 0}
+      RoundedBox: {43, 0.1, 21, 0.03, segments: 2}
+      texture.Transform: {scale_x: 5, scale_y: 1}
+    }
+
     plate : CanalBrassPlate { Position: {0, -5.35, 11.21}; Quad: {3.6, 0.68} }
+
     for s in 0..2 {
       const sx = s * 2 - 1
-      { (IsA, CanalBrass); Position: {sx * 2.2, -5.35, 11.22}; Rotation: {math.PI / 2, 0, 0}; Cylinder: {radius: 0.05, length: 0.02, segments: 10} }
+      {
+        (IsA, CanalBrass)
+        Position: {sx * 2.2, -5.35, 11.22}
+        Rotation: {math.PI / 2, 0, 0}
+        Cylinder: {radius: 0.05, length: 0.02, segments: 10}
+      }
     }
 
     core_low_s : CanalEarth { Position: {-13.75, -3.05, 6.5}; Box: {14.42, 3.66, 6.92} }
@@ -76,22 +114,97 @@ assets {
     core_high_n : CanalEarth { Position: {7.25, -2.46, -6.5}; Box: {27.42, 4.84, 6.92} }
     core_wall_s : CanalEarth { Position: {0, -2.46, 2.3}; Box: {12.92, 4.84, 1.36} }
     core_wall_n : CanalEarth { Position: {0, -2.46, -2.3}; Box: {12.92, 4.84, 1.36} }
-    bed_low : CanalMud { Position: {-13.75, -4.29, 0}; Box: {14.42, 1.18, 5.96}; texture.Transform: {scale_x: 5, scale_y: 2} }
-    bed_high : CanalMud { Position: {13.75, -3.39, 0}; Box: {14.42, 2.98, 5.96}; texture.Transform: {scale_x: 5, scale_y: 2} }
-    bed_chamber : CanalMud { Position: {0, -4.54, 0}; Box: {12.92, 0.68, 3.16}; texture.Transform: {scale_x: 5, scale_y: 1} }
+    bed_low : CanalMud {
+      Position: {-13.75, -4.29, 0}
+      Box: {14.42, 1.18, 5.96}
+      texture.Transform: {scale_x: 5, scale_y: 2}
+    }
+
+    bed_high : CanalMud {
+      Position: {13.75, -3.39, 0}
+      Box: {14.42, 2.98, 5.96}
+      texture.Transform: {scale_x: 5, scale_y: 2}
+    }
+
+    bed_chamber : CanalMud {
+      Position: {0, -4.54, 0}
+      Box: {12.92, 0.68, 3.16}
+      texture.Transform: {scale_x: 5, scale_y: 1}
+    }
+
     sill_top : CanalDarkStone { Position: {6.17, -2.97, 0}; Box: {0.62, 3.8, 3.12} }
     sill_bottom : CanalDarkStone { Position: {-5.5, -3.92, 0}; Box: {0.3, 0.58, 3.12} }
 
-    ground_low_s : CanalGround { Position: {-13.75, -1.18, 6.5}; Rotation: {canal_up, 0, 0}; Quad: {14.5, 7}; texture.Transform: {scale_x: 14.5 / 42, scale_y: 7 / 20, offset_x: 0, offset_y: 13 / 20} }
-    ground_low_n : CanalGround { Position: {-13.75, -1.18, -6.5}; Rotation: {canal_up, 0, 0}; Quad: {14.5, 7}; texture.Transform: {scale_x: 14.5 / 42, scale_y: 7 / 20, offset_x: 0, offset_y: 0} }
-    ground_high_s : CanalGround { Position: {7.25, 0, 6.5}; Rotation: {canal_up, 0, 0}; Quad: {27.5, 7}; texture.Transform: {scale_x: 27.5 / 42, scale_y: 7 / 20, offset_x: 14.5 / 42, offset_y: 13 / 20} }
-    ground_high_n : CanalGround { Position: {7.25, 0, -6.5}; Rotation: {canal_up, 0, 0}; Quad: {27.5, 7}; texture.Transform: {scale_x: 27.5 / 42, scale_y: 7 / 20, offset_x: 14.5 / 42, offset_y: 0} }
+    ground_low_s : CanalGround {
+      Position: {-13.75, -1.18, 6.5}
+      Rotation: {canal_up, 0, 0}
+      Quad: {14.5, 7}
+      texture.Transform: {scale_x: 14.5 / 42, scale_y: 7 / 20, offset_x: 0, offset_y: 13 / 20}
+    }
 
-    ground_wall_s : CanalGround { Position: {0, 0, 2.75}; Rotation: {canal_up, 0, 0}; Quad: {13, 0.5}; texture.Transform: {scale_x: 13 / 42, scale_y: 0.5 / 20, offset_x: 14.5 / 42, offset_y: 12.5 / 20} }
-    ground_wall_n : CanalGround { Position: {0, 0, -2.75}; Rotation: {canal_up, 0, 0}; Quad: {13, 0.5}; texture.Transform: {scale_x: 13 / 42, scale_y: 0.5 / 20, offset_x: 14.5 / 42, offset_y: 7 / 20} }
+    ground_low_n : CanalGround {
+      Position: {-13.75, -1.18, -6.5}
+      Rotation: {canal_up, 0, 0}
+      Quad: {14.5, 7}
+      texture.Transform: {scale_x: 14.5 / 42, scale_y: 7 / 20, offset_x: 0, offset_y: 0}
+    }
 
-    front { Position: {0, 0, 10}; CanalStrataFace(x0: -21, x1: -6.5, top: -1.18) {}; CanalStrataFace(x0: -6.5, x1: 21, top: 0) {} }
-    back { Position: {0, 0, -10}; Rotation: {0, math.PI, 0}; CanalStrataFace(x0: -21, x1: 6.5, top: 0) {}; CanalStrataFace(x0: 6.5, x1: 21, top: -1.18) {} }
+    ground_high_s : CanalGround {
+      Position: {7.25, 0, 6.5}
+      Rotation: {canal_up, 0, 0}
+      Quad: {27.5, 7}
+      texture.Transform: {
+        scale_x: 27.5 / 42,
+        scale_y: 7 / 20,
+        offset_x: 14.5 / 42,
+        offset_y: 13 / 20
+      }
+    }
+
+    ground_high_n : CanalGround {
+      Position: {7.25, 0, -6.5}
+      Rotation: {canal_up, 0, 0}
+      Quad: {27.5, 7}
+      texture.Transform: {scale_x: 27.5 / 42, scale_y: 7 / 20, offset_x: 14.5 / 42, offset_y: 0}
+    }
+
+    ground_wall_s : CanalGround {
+      Position: {0, 0, 2.75}
+      Rotation: {canal_up, 0, 0}
+      Quad: {13, 0.5}
+      texture.Transform: {
+        scale_x: 13 / 42,
+        scale_y: 0.5 / 20,
+        offset_x: 14.5 / 42,
+        offset_y: 12.5 / 20
+      }
+    }
+
+    ground_wall_n : CanalGround {
+      Position: {0, 0, -2.75}
+      Rotation: {canal_up, 0, 0}
+      Quad: {13, 0.5}
+      texture.Transform: {
+        scale_x: 13 / 42,
+        scale_y: 0.5 / 20,
+        offset_x: 14.5 / 42,
+        offset_y: 7 / 20
+      }
+    }
+
+    front {
+      Position: {0, 0, 10}
+      CanalStrataFace(x0: -21, x1: -6.5, top: -1.18) {}
+      CanalStrataFace(x0: -6.5, x1: 21, top: 0) {}
+    }
+
+    back {
+      Position: {0, 0, -10}
+      Rotation: {0, math.PI, 0}
+      CanalStrataFace(x0: -21, x1: 6.5, top: 0) {}
+      CanalStrataFace(x0: 6.5, x1: 21, top: -1.18) {}
+    }
+
     right {
       Position: {21, 0, 0}
       Rotation: {0, math.PI / 2, 0}
@@ -100,6 +213,7 @@ assets {
       CanalStrataFace(x0: -3, x1: 3, top: -1.9) {}
       resin : CanalResin { Position: {0, -1.175, 0}; Quad: {6, 1.45} }
     }
+
     left {
       Position: {-21, 0, 0}
       Rotation: {0, -math.PI / 2, 0}
@@ -108,6 +222,7 @@ assets {
       CanalStrataFace(x0: -3, x1: 3, top: -3.7) {}
       resin : CanalResin { Position: {0, -2.975, 0}; Quad: {6, 1.45} }
     }
+
     turf_low_f : CanalGrass { Position: {-13.75, -1.235, 10.01}; Box: {14.44, 0.09, 0.04} }
     turf_high_f : CanalGrass { Position: {7.25, -0.055, 10.01}; Box: {27.44, 0.09, 0.04} }
     turf_low_b : CanalGrass { Position: {-13.75, -1.235, -10.01}; Box: {14.44, 0.09, 0.04} }
@@ -116,16 +231,52 @@ assets {
     turf_right_n : CanalGrass { Position: {21.01, -0.055, -6.5}; Box: {0.04, 0.09, 6.94} }
     turf_left_s : CanalGrass { Position: {-21.01, -1.235, 6.5}; Box: {0.04, 0.09, 6.94} }
     turf_left_n : CanalGrass { Position: {-21.01, -1.235, -6.5}; Box: {0.04, 0.09, 6.94} }
+  }
 
+  template CanalLandscape : CanalLandscapeGround {
     for s in 0..2 {
       const sign = s * 2 - 1
       const wall_rot = s == 0 ? 0.0 : math.PI
-      CanalFace(w: 13, h: 4.5) { (IsA, CanalChamberWall); Position: {0, -2.25, sign * 1.6}; Rotation: {0, wall_rot, 0} }
-      { (IsA, CanalAshlar); Quad: {14.5, 2.52}; Position: {-13.75, -2.44, sign * 3}; Rotation: {0, wall_rot, 0} }
-      { (IsA, CanalAshlar); Quad: {14.5, 1.9}; Position: {13.75, -0.95, sign * 3}; Rotation: {0, wall_rot, 0} }
-      { (IsA, CanalAshlar); Quad: {1.4, 3.7}; Position: {-6.5, -1.85, sign * 2.3}; Rotation: {0, -math.PI / 2, 0} }
-      { (IsA, CanalAshlar); Quad: {1.4, 1.9}; Position: {6.5, -0.95, sign * 2.3}; Rotation: {0, math.PI / 2, 0} }
-      { (IsA, CanalBrick); Quad: {7, 1.18}; Position: {-6.5, -0.59, sign * 6.5}; Rotation: {0, -math.PI / 2, 0} }
+      CanalFace(w: 13, h: 4.5) {
+        (IsA, CanalChamberWall)
+        Position: {0, -2.25, sign * 1.6}
+        Rotation: {0, wall_rot, 0}
+      }
+
+      {
+        (IsA, CanalAshlar)
+        Quad: {14.5, 2.52}
+        Position: {-13.75, -2.44, sign * 3}
+        Rotation: {0, wall_rot, 0}
+      }
+
+      {
+        (IsA, CanalAshlar)
+        Quad: {14.5, 1.9}
+        Position: {13.75, -0.95, sign * 3}
+        Rotation: {0, wall_rot, 0}
+      }
+
+      {
+        (IsA, CanalAshlar)
+        Quad: {1.4, 3.7}
+        Position: {-6.5, -1.85, sign * 2.3}
+        Rotation: {0, -math.PI / 2, 0}
+      }
+
+      {
+        (IsA, CanalAshlar)
+        Quad: {1.4, 1.9}
+        Position: {6.5, -0.95, sign * 2.3}
+        Rotation: {0, math.PI / 2, 0}
+      }
+
+      {
+        (IsA, CanalBrick)
+        Quad: {7, 1.18}
+        Position: {-6.5, -0.59, sign * 6.5}
+        Rotation: {0, -math.PI / 2, 0}
+      }
 
       CanalCopingRow(x0: -6.6, x1: 6.6, z: sign * 2.05, y: 0.03, width: 0.92) {}
       CanalCopingRow(x0: -21, x1: -6.6, z: sign * 3.24, y: -1.13, width: 0.5) {}
@@ -137,31 +288,97 @@ assets {
       }
 
       for i in 0..3 {
-        { (IsA, CanalIron); Position: {-4 + i * 4, -0.5, sign * 1.565}; Rotation: {math.PI / 2, 0, 0}; Torus: {radius: 0.09, tube: 0.016, segments: 16, rings: 6} }
+        {
+          (IsA, CanalIron)
+          Position: {-4 + i * 4, -0.5, sign * 1.565}
+          Rotation: {math.PI / 2, 0, 0}
+          Torus: {radius: 0.09, tube: 0.016, segments: 16, rings: 6}
+        }
       }
     }
-    { (IsA, CanalAshlar); Quad: {3.2, 3.15}; Position: {5.84, -2.625, 0}; Rotation: {0, -math.PI / 2, 0} }
+
+    {
+      (IsA, CanalAshlar)
+      Quad: {3.2, 3.15}
+      Position: {5.84, -2.625, 0}
+      Rotation: {0, -math.PI / 2, 0}
+    }
 
     for i in 0..15 {
-      { (IsA, CanalIron); Position: {-1.7, -3.9 + i * 0.28, 1.56}; Rotation: {0, 0, math.PI / 2}; Cylinder: {radius: 0.016, length: 0.42, segments: 6} }
+      {
+        (IsA, CanalIron)
+        Position: {-1.7, -3.9 + i * 0.28, 1.56}
+        Rotation: {0, 0, math.PI / 2}
+        Cylinder: {radius: 0.016, length: 0.42, segments: 6}
+      }
     }
-    { (IsA, CanalIron); Position: {-1.91, -1.95, 1.56}; Cylinder: {radius: 0.018, length: 4.1, segments: 6} }
-    { (IsA, CanalIron); Position: {-1.49, -1.95, 1.56}; Cylinder: {radius: 0.018, length: 4.1, segments: 6} }
+
+    {
+      (IsA, CanalIron)
+      Position: {-1.91, -1.95, 1.56}
+      Cylinder: {radius: 0.018, length: 4.1, segments: 6}
+    }
+
+    {
+      (IsA, CanalIron)
+      Position: {-1.49, -1.95, 1.56}
+      Cylinder: {radius: 0.018, length: 4.1, segments: 6}
+    }
 
     for i in 0..8 {
       const top = -0.15 - i * 0.14
-      { (IsA, CanalStone); Position: {-6.68 - i * 0.36, (top - 1.3) / 2, 8}; RoundedBox: {0.36, top + 1.3, 1.7, 0.02, segments: 1} }
-    }
-    for s in 0..2 {
-      const rz = 7.05 + s * 1.9
-      { (IsA, CanalIron); Position: {-6.75, 0.32, rz}; Cylinder: {radius: 0.03, length: 0.8, segments: 8} }
-      { (IsA, CanalIron); Position: {-9.2, -0.82, rz}; Cylinder: {radius: 0.03, length: 0.8, segments: 8} }
-      { (IsA, CanalIron); Position: {-7.975, 0.14, rz}; Rotation: {0, 0, 1.109}; Cylinder: {radius: 0.024, length: 2.82, segments: 8} }
+      {
+        (IsA, CanalStone)
+        Position: {-6.68 - i * 0.36, (top - 1.3) / 2, 8}
+        RoundedBox: {0.36, top + 1.3, 1.7, 0.02, segments: 1}
+      }
     }
 
-    channel_edge_a : CanalStone { Position: {-8.75, -1.13, -5.48}; RoundedBox: {0.18, 0.14, 3.9, 0.03, segments: 1}; texture.Transform: {scale_x: 0.2, scale_y: 2} }
-    channel_edge_b : CanalStone { Position: {-7.45, -1.13, -5.48}; RoundedBox: {0.18, 0.14, 3.9, 0.03, segments: 1}; texture.Transform: {scale_x: 0.2, scale_y: 2} }
-    channel_water : CanalPondWater { Position: {-8.1, -1.11, -5.5}; Rotation: {canal_up, 0, 0}; Quad: {1.12, 4}; texture.Transform: {scale_x: 0.3, scale_y: 1} }
-    culvert : CanalDarkStone { Position: {-8.1, -1.0, -3.5}; RoundedBox: {1.5, 0.22, 0.26, 0.03, segments: 1}; texture.Transform: {scale_x: 2, scale_y: 0.4} }
+    for s in 0..2 {
+      const rz = 7.05 + s * 1.9
+      {
+        (IsA, CanalIron)
+        Position: {-6.75, 0.32, rz}
+        Cylinder: {radius: 0.03, length: 0.8, segments: 8}
+      }
+
+      {
+        (IsA, CanalIron)
+        Position: {-9.2, -0.82, rz}
+        Cylinder: {radius: 0.03, length: 0.8, segments: 8}
+      }
+
+      {
+        (IsA, CanalIron)
+        Position: {-7.975, 0.14, rz}
+        Rotation: {0, 0, 1.109}
+        Cylinder: {radius: 0.024, length: 2.82, segments: 8}
+      }
+    }
+
+    channel_edge_a : CanalStone {
+      Position: {-8.75, -1.13, -5.48}
+      RoundedBox: {0.18, 0.14, 3.9, 0.03, segments: 1}
+      texture.Transform: {scale_x: 0.2, scale_y: 2}
+    }
+
+    channel_edge_b : CanalStone {
+      Position: {-7.45, -1.13, -5.48}
+      RoundedBox: {0.18, 0.14, 3.9, 0.03, segments: 1}
+      texture.Transform: {scale_x: 0.2, scale_y: 2}
+    }
+
+    channel_water : CanalPondWater {
+      Position: {-8.1, -1.11, -5.5}
+      Rotation: {canal_up, 0, 0}
+      Quad: {1.12, 4}
+      texture.Transform: {scale_x: 0.3, scale_y: 1}
+    }
+
+    culvert : CanalDarkStone {
+      Position: {-8.1, -1.0, -3.5}
+      RoundedBox: {1.5, 0.22, 0.26, 0.03, segments: 1}
+      texture.Transform: {scale_x: 2, scale_y: 0.4}
+    }
   }
 }

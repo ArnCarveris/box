@@ -1,0 +1,102 @@
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+using box.camera
+using box.view
+using box.light
+
+$ {
+  Scene: {shader_features: {Extended: {water: true}}}
+}
+
+// Open water under a breeze of 6 m/s whose waves come from a WaterSpectrum: hundreds of waves of
+// different lengths in two cascades, each travelling at its own speed, instead of a scrolled
+// normal map. Seen from a low camera 2 units above the water, the left half of the image looks
+// toward a late afternoon sun low ahead, whose broad glitter path breaks up on the facets of the
+// waves and keeps sparkling into the distance without aliasing; the right half looks away from
+// the sun at the same sea, darker, its waves shaded by the sky. Each half is its own scene with
+// its own sea, which covers only its half of the image (the line below the camera runs down the
+// middle), so the two views share the image.
+// frames: 60
+toward {
+  Scene: {shader_features: {Extended: {water: true}}}
+  AmbientLight: {sky: {120, 140, 180}, ground: {40, 46, 52}, intensity: 0.4}
+
+  sun {
+    Rotation: {0.1, 0.43, 0}
+    DirectionalLight: {intensity: 3}
+    Rgb: {255, 220, 180}
+  }
+
+  camera {
+    Position: {0, 2, 0}
+    Rotation: {-0.08, 0, 0}
+    Camera: {fov: 55, far_: 3000}
+  }
+
+  sea {
+    Position: {-500, 0, -1000}
+    Rotation: {-1.5708, 0, 0}
+    Quad: {1000, 2000}
+    Rgb: {255, 255, 255}
+    PbrMaterial: {metallic: 0, roughness: 0.06}
+    Water: {
+      shallow_color: {10, 50, 70}
+      deep_color: {6, 30, 52}
+      depth: 3
+      visibility: 2
+      refraction: 0.02
+      foam_width: 0
+      scatter_color: {40, 200, 170}
+      scatter: 1
+    }
+    WaterSpectrum: {wind_speed: 6, wind_direction: {0.3, 1}, size: 40, cascades: 2,
+      resolution: 128, directionality: 0.8, amplitude: 1, seed: 7, detail: 0}
+  }
+}
+
+away {
+  Scene: {shader_features: {Extended: {water: true}}}
+  AmbientLight: {sky: {120, 140, 180}, ground: {40, 46, 52}, intensity: 0.4}
+
+  sun {
+    Rotation: {0.1, 0.43, 0}
+    DirectionalLight: {intensity: 3}
+    Rgb: {255, 220, 180}
+  }
+
+  camera {
+    Position: {0, 2, 0}
+    Rotation: {-0.08, 3.14159, 0}
+    Camera: {fov: 55, far_: 3000}
+  }
+
+  sea {
+    Position: {-500, 0, 1000}
+    Rotation: {-1.5708, 0, 0}
+    Quad: {1000, 2000}
+    Rgb: {255, 255, 255}
+    PbrMaterial: {metallic: 0, roughness: 0.06}
+    Water: {
+      shallow_color: {10, 50, 70}
+      deep_color: {6, 30, 52}
+      depth: 3
+      visibility: 2
+      refraction: 0.02
+      foam_width: 0
+      scatter_color: {40, 200, 170}
+      scatter: 1
+    }
+    WaterSpectrum: {wind_speed: 6, wind_direction: {0.3, 1}, size: 40, cascades: 2,
+      resolution: 128, directionality: 0.8, amplitude: 1, seed: 7, detail: 0}
+  }
+}
+
+toward_view {
+  View: {camera: toward.camera, clear: {enabled: true, color: {200, 180, 160, 255}}}
+}
+
+away_view {
+  View: {camera: away.camera, clear: {enabled: false}, order: 1}
+}

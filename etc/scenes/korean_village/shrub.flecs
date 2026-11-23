@@ -7,23 +7,56 @@ using box.material
 assets {
   template KoreanShrub {
     prop bloom: Rgb = {214, 96, 132}
+
     for leaf in 0..11 {
       const a = leaf * 2.4
       const r = 0.1 + leaf * 0.055
-      { Position: {math.sin(a) * r, 0.33 - r * 0.32, math.cos(a) * r}; Rotation: {a, a * 0.4, 0}; Scale: {1, 0.78, 1}; IcoSphere: {radius: 0.27 - leaf * 0.008, segments: 1}; Rgb: {48 + leaf % 3 * 13, 92 + leaf % 3 * 14, 56 + leaf % 3 * 7} }
+      {
+        Position: {math.sin(a) * r, 0.33 - r * 0.32, math.cos(a) * r}
+        Rotation: {a, a * 0.4, 0}
+        Scale: {1, 0.78, 1}
+        IcoSphere: {radius: 0.27 - leaf * 0.008, segments: 1}
+        Rgb: {48 + leaf % 3 * 13, 92 + leaf % 3 * 14, 56 + leaf % 3 * 7}
+      }
     }
+
     for flower in 0..20 {
       const a = flower * 2.4
       const r = 0.05 + flower * 0.033
-      { Position: {math.sin(a) * r, 0.58 - r * 0.42, math.cos(a) * r}; Sphere: {radius: 0.045, segments: 5}; Rgb: bloom; PbrMaterial: {roughness: 0.7} }
+      {
+        Position: {math.sin(a) * r, 0.58 - r * 0.42, math.cos(a) * r}
+        Sphere: {radius: 0.045, segments: 5}
+        Rgb: bloom
+        PbrMaterial: {roughness: 0.7}
+      }
     }
   }
 
   template KoreanRock {
     prop size: f32 = 1
     Scale: {size, size, size}
-    { Position: {0, 0.17, 0}; Scale: {1.25, 0.72, 0.95}; IcoSphere: {radius: 0.36, segments: 1}; Rgb: {124, 126, 115}; PbrMaterial: {roughness: 1} }
-    { Position: {0.28, 0.1, 0.16}; Scale: {1, 0.6, 0.85}; IcoSphere: {radius: 0.2, segments: 1}; Rgb: {108, 110, 102}; PbrMaterial: {roughness: 1} }
-    { Position: {-0.06, 0.34, -0.03}; Scale: {1.1, 0.26, 0.82}; IcoSphere: {radius: 0.28, segments: 1}; Rgb: {88, 112, 66}; PbrMaterial: {roughness: 1} }
+    {
+      Position: {0, 0.17, 0}
+      Scale: {1.25, 0.72, 0.95}
+      IcoSphere: {radius: 0.36, segments: 1}
+      Rgb: {124, 126, 115}
+      PbrMaterial: {roughness: 1}
+    }
+
+    {
+      Position: {0.28, 0.1, 0.16}
+      Scale: {1, 0.6, 0.85}
+      IcoSphere: {radius: 0.2, segments: 1}
+      Rgb: {108, 110, 102}
+      PbrMaterial: {roughness: 1}
+    }
+
+    {
+      Position: {-0.06, 0.34, -0.03}
+      Scale: {1.1, 0.26, 0.82}
+      IcoSphere: {radius: 0.28, segments: 1}
+      Rgb: {88, 112, 66}
+      PbrMaterial: {roughness: 1}
+    }
   }
 }

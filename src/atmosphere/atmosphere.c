@@ -146,6 +146,30 @@ static void box_cloud_layer_ctor(
     }
 }
 
+/** Construct Wind values: calm, toward +X, with a gust of 0.5 over patches of 20 world units.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_wind_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    Wind *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (Wind){
+            .direction = { 1.0f, 0.0f },
+            .speed = BOX_WIND_SPEED,
+            .gust = BOX_WIND_GUST,
+            .gust_scale = BOX_WIND_GUST_SCALE
+        };
+    }
+}
+
 /** Add AtmosphereStatus to an entity that got Atmosphere, and Environment with the defaults of
  * an atmosphere unless it has one.
  *
@@ -442,6 +466,9 @@ void BoxAtmosphereImport(
     ecs_set_hooks(world, CloudLayer, { .ctor = box_cloud_layer_ctor });
     ECS_META_COMPONENT(world, TimeOfDay);
     ECS_META_COMPONENT(world, TimeOfDayStatus);
+    ECS_META_COMPONENT(world, Wind);
+    ecs_set_hooks(world, Wind, { .ctor = box_wind_ctor });
+    ECS_META_COMPONENT(world, WindStatus);
 
     ecs_observer(world, {
         .query.terms = {{ .id = ecs_id(Atmosphere) }},
@@ -469,4 +496,5 @@ void BoxAtmosphereImport(
     box_render_atmosphere_import(world);
     box_render_lights_time_of_day(world);
     box_tod_init(world);
+    box_render_wind_import(world);
 }

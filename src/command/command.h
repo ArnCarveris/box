@@ -434,6 +434,21 @@ void box_cmd_fit_init(
 void box_cmd_frames_init(
     ecs_world_t *world);
 
+/** Register the counts command: the entities, meshes, batches, instance slots and texture
+ * graphs alive and the GPU memory the renderer counts.
+ *
+ * @param world The world
+ */
+void box_cmd_counts_init(
+    ecs_world_t *world);
+
+/** Register the ablate command and the system that settles and times the steps of its runs.
+ *
+ * @param world The world
+ */
+void box_cmd_ablate_init(
+    ecs_world_t *world);
+
 /** Register the edit command that opens and closes the editor.
  *
  * @param world The world

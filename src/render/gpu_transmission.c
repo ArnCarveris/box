@@ -396,7 +396,9 @@ box_gpu_snapshot_t* box_gpu_transmission_begin(
     box_gpu_snapshot_t *result = NULL, **slot_of_format;
     uint32_t width = (uint32_t)(t->desc.render_width > 0 ? t->desc.render_width : 1);
     uint32_t height = (uint32_t)(t->desc.render_height > 0 ? t->desc.render_height : 1);
-    if (!tr || !box_gpu_transmission_draws(gpu, packet, slot)) {
+    if (!tr || !box_gpu_transmission_draws(gpu, packet, slot) ||
+        box_gpu_cull_glass_hidden(gpu, packet, slot))
+    {
         goto done;
     }
 
@@ -502,11 +504,11 @@ void box_gpu_transmission_record(
             .loadOp = WGPULoadOp_Clear,
             .storeOp = WGPUStoreOp_Store
         };
-        WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder,
+        WGPURenderPassEncoder pass = box_gpu_profile_render_pass(gpu, encoder,
             &(WGPURenderPassDescriptor){
                 .colorAttachmentCount = 1,
                 .colorAttachments = &attachment
-            });
+            }, "transmission");
         wgpuRenderPassEncoderSetPipeline(pass, pipeline);
         wgpuRenderPassEncoderSetBindGroup(pass, 0, s->groups[i], 0, NULL);
         wgpuRenderPassEncoderDraw(pass, 3, 1, 0, 0);
@@ -585,9 +587,10 @@ int32_t box_gpu_transmission_plan(
 {
     float rects[BOX_GPU_TRANSMISSION_PLAN_RECTS][4], visible[4];
     float areas[BOX_GPU_TRANSMISSION_SNAPSHOTS];
+    bool waters[BOX_GPU_TRANSMISSION_PLAN_RECTS];
     int32_t keep = BOX_GPU_TRANSMISSION_SNAPSHOTS - 1;
     int32_t i, j, rect_count = 0, first = -1, kept = 0, result = 0;
-    bool everywhere = false, particles = false;
+    bool everywhere = false, everywhere_water = false, particles = false;
     box_gpu_transmission_visible(t, v, visible);
     for (i = 0; cv && i < cv->draw_count; i ++) {
         const box_gpu_cull_draw_t *d = ecs_vec_get_t(
@@ -601,8 +604,12 @@ int32_t box_gpu_transmission_plan(
         }
 
         if (b->transmissive) {
-            bool stale = first < 0 || everywhere;
+            bool stale = first < 0 || everywhere || (everywhere_water && !b->water);
             for (j = 0; !stale && j < rect_count; j ++) {
+                if (b->water && waters[j]) {
+                    continue;
+                }
+
                 stale = !b->screened || box_gpu_transmission_overlaps(b->screen, rects[j]);
             }
 
@@ -637,16 +644,21 @@ int32_t box_gpu_transmission_plan(
             if (stale) {
                 rect_count = 0;
                 everywhere = false;
+                everywhere_water = false;
             }
         }
 
         if (!b->screened) {
-            everywhere = true;
+            everywhere = everywhere || !b->water;
+            everywhere_water = everywhere_water || b->water;
         } else if (rect_count < BOX_GPU_TRANSMISSION_PLAN_RECTS) {
             ecs_os_memcpy_n(rects[rect_count], b->screen, float, 4);
+            waters[rect_count] = b->water;
             rect_count ++;
         } else {
             float *r = rects[BOX_GPU_TRANSMISSION_PLAN_RECTS - 1];
+            waters[BOX_GPU_TRANSMISSION_PLAN_RECTS - 1] =
+                waters[BOX_GPU_TRANSMISSION_PLAN_RECTS - 1] && b->water;
             r[0] = glm_min(r[0], b->screen[0]);
             r[1] = glm_min(r[1], b->screen[1]);
             r[2] = glm_max(r[2], b->screen[2]);

@@ -74,198 +74,6 @@ static WGPUPipelineLayout box_gpu_mesh_layout(
     });
 }
 
-/** Create the layout of the view group of the forward pass: the view uniforms, the lights and
- * clusters, the shadows, the reflections, the aerial perspective, the environment, the AO,
- * the cookie, the opaque snapshot, the planar images, the planet lights and the areas.
- *
- * @param gpu The backend
- * @return The layout
- */
-static WGPUBindGroupLayout box_gpu_view_layout(
-    box_gpu_t *gpu)
-{
-    WGPUBindGroupLayoutEntry entries[25] = {
-        {
-            .binding = 0,
-            .visibility = WGPUShaderStage_Vertex | WGPUShaderStage_Fragment,
-            .buffer = {
-                .type = WGPUBufferBindingType_Uniform,
-                .hasDynamicOffset = true,
-                .minBindingSize = sizeof(box_gpu_view_uniforms_t)
-            }
-        },
-        {
-            .binding = 1,
-            .visibility = WGPUShaderStage_Fragment,
-            .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
-        },
-        {
-            .binding = 2,
-            .visibility = WGPUShaderStage_Fragment,
-            .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
-        },
-        {
-            .binding = 3,
-            .visibility = WGPUShaderStage_Fragment,
-            .texture = {
-                .sampleType = WGPUTextureSampleType_Depth,
-                .viewDimension = WGPUTextureViewDimension_2DArray
-            }
-        },
-        {
-            .binding = 4,
-            .visibility = WGPUShaderStage_Fragment,
-            .sampler = { .type = WGPUSamplerBindingType_Comparison }
-        },
-        {
-            .binding = 5,
-            .visibility = WGPUShaderStage_Vertex | WGPUShaderStage_Fragment,
-            .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
-        },
-        {
-            .binding = 6,
-            .visibility = WGPUShaderStage_Fragment,
-            .texture = {
-                .sampleType = WGPUTextureSampleType_Float,
-                .viewDimension = WGPUTextureViewDimension_CubeArray
-            }
-        },
-        {
-            .binding = 7,
-            .visibility = WGPUShaderStage_Fragment,
-            .sampler = { .type = WGPUSamplerBindingType_Filtering }
-        },
-        {
-            .binding = 8,
-            .visibility = WGPUShaderStage_Fragment,
-            .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
-        },
-        {
-            .binding = 9,
-            .visibility = WGPUShaderStage_Fragment,
-            .texture = {
-                .sampleType = WGPUTextureSampleType_Float,
-                .viewDimension = WGPUTextureViewDimension_3D
-            }
-        },
-        {
-            .binding = 10,
-            .visibility = WGPUShaderStage_Fragment,
-            .sampler = { .type = WGPUSamplerBindingType_Filtering }
-        },
-        {
-            .binding = 11,
-            .visibility = WGPUShaderStage_Vertex | WGPUShaderStage_Fragment,
-            .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
-        },
-        {
-            .binding = 12,
-            .visibility = WGPUShaderStage_Fragment,
-            .texture = {
-                .sampleType = WGPUTextureSampleType_Float,
-                .viewDimension = WGPUTextureViewDimension_Cube
-            }
-        },
-        {
-            .binding = 13,
-            .visibility = WGPUShaderStage_Fragment,
-            .buffer = {
-                .type = WGPUBufferBindingType_Uniform,
-                .minBindingSize = BOX_GPU_PROBE_SIZE
-            }
-        },
-        {
-            .binding = 14,
-            .visibility = WGPUShaderStage_Fragment,
-            .texture = {
-                .sampleType = WGPUTextureSampleType_UnfilterableFloat,
-                .viewDimension = WGPUTextureViewDimension_2D
-            }
-        },
-        {
-            .binding = 15,
-            .visibility = WGPUShaderStage_Fragment,
-            .texture = {
-                .sampleType = WGPUTextureSampleType_Depth,
-                .viewDimension = WGPUTextureViewDimension_2D
-            }
-        },
-        {
-            .binding = 16,
-            .visibility = WGPUShaderStage_Fragment,
-            .buffer = {
-                .type = WGPUBufferBindingType_Uniform,
-                .minBindingSize = BOX_GPU_ATLAS_TILES_SIZE
-            }
-        },
-        {
-            .binding = 17,
-            .visibility = WGPUShaderStage_Fragment,
-            .texture = {
-                .sampleType = WGPUTextureSampleType_Float,
-                .viewDimension = WGPUTextureViewDimension_2D
-            }
-        },
-        {
-            .binding = 18,
-            .visibility = WGPUShaderStage_Fragment,
-            .sampler = { .type = WGPUSamplerBindingType_Filtering }
-        },
-        {
-            .binding = 19,
-            .visibility = WGPUShaderStage_Fragment,
-            .texture = {
-                .sampleType = WGPUTextureSampleType_Float,
-                .viewDimension = WGPUTextureViewDimension_2D
-            }
-        },
-        {
-            .binding = 20,
-            .visibility = WGPUShaderStage_Fragment,
-            .texture = {
-                .sampleType = WGPUTextureSampleType_Depth,
-                .viewDimension = WGPUTextureViewDimension_2D
-            }
-        },
-        {
-            .binding = 21,
-            .visibility = WGPUShaderStage_Fragment,
-            .texture = {
-                .sampleType = WGPUTextureSampleType_Float,
-                .viewDimension = WGPUTextureViewDimension_2DArray
-            }
-        },
-        {
-            .binding = BOX_GPU_PLANET_LIGHTS_BINDING,
-            .visibility = WGPUShaderStage_Fragment,
-            .buffer = {
-                .type = WGPUBufferBindingType_Uniform,
-                .minBindingSize = BOX_GPU_PLANET_LIGHTS_SIZE
-            }
-        },
-        {
-            .binding = BOX_GPU_PLANET_LUTS_BINDING,
-            .visibility = WGPUShaderStage_Fragment,
-            .storageTexture = {
-                .access = WGPUStorageTextureAccess_ReadOnly,
-                .format = WGPUTextureFormat_RGBA16Float,
-                .viewDimension = WGPUTextureViewDimension_2DArray
-            }
-        },
-        {
-            .binding = BOX_GPU_AREAS_BINDING,
-            .visibility = WGPUShaderStage_Fragment,
-            .buffer = {
-                .type = WGPUBufferBindingType_Uniform,
-                .minBindingSize = BOX_GPU_AREAS_SIZE
-            }
-        }
-    };
-    WGPUBindGroupLayoutDescriptor layout = { .entryCount = 25, .entries = entries };
-
-    return wgpuDeviceCreateBindGroupLayout(gpu->device, &layout);
-}
-
 void box_gpu_draw_init(
     box_gpu_t *gpu)
 {
@@ -273,7 +81,7 @@ void box_gpu_draw_init(
     box_gpu_volume_init(gpu);
     box_gpu_reflect_init(gpu);
     box_gpu_environment_init(gpu);
-    gpu->view_layout = box_gpu_view_layout(gpu);
+    gpu->view_layout = box_gpu_light_layout(gpu);
     gpu->mesh_layout = box_gpu_mesh_layout(gpu, gpu->material_layout);
     gpu->blend_mesh_layout = box_gpu_mesh_layout(gpu, gpu->blend_layout);
     gpu->prepass_empty_layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
@@ -288,15 +96,18 @@ void box_gpu_draw_init(
     ecs_map_init(&gpu->forward, NULL);
     ecs_map_init(&gpu->forward_previous, NULL);
     ecs_vec_init_t(NULL, &gpu->view_data, uint8_t, 0);
+    ecs_vec_init_t(NULL, &gpu->view_unfogged, int32_t, 0);
     box_gpu_copy_init(gpu);
     box_gpu_light_init(gpu);
     box_gpu_shadow_init(gpu);
     box_gpu_effects_init(gpu);
     box_gpu_gtao_init(gpu);
+    box_gpu_history_init(gpu);
     box_gpu_transmission_init(gpu);
     box_gpu_portal_stencil_init(gpu);
     box_gpu_atmosphere_init(gpu);
     box_gpu_particles_init(gpu);
+    box_gpu_water_fields_init(gpu);
     box_gpu_fog_volumes_init(gpu);
     box_gpu_star_fields_init(gpu);
     box_gpu_planets_init(gpu);
@@ -315,6 +126,17 @@ static void box_gpu_mesh_free(
 {
     box_gpu_debug_mesh_free(m);
     wgpuBufferRelease(m->surface_assets);
+    ecs_os_free(m->terrain_serials);
+    ecs_os_free(m->terrain_mask_serials);
+    if (m->terrain_mask_view) {
+        wgpuTextureViewRelease(m->terrain_mask_view);
+    }
+
+    if (m->terrain_masks) {
+        wgpuTextureRelease(m->terrain_masks);
+    }
+
+    box_gpu_terrain_bake_free(m);
     if (m->buffer) {
         box_gpu_mesh_pool_free(gpu, m->page, m->offset, m->alloc_size);
     }
@@ -366,9 +188,13 @@ void box_gpu_instance_layouts_init(
         &(WGPUBindGroupLayoutDescriptor){ .entryCount = 6, .entries = entries });
     gpu->transform_layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
         &(WGPUBindGroupLayoutDescriptor){ .entryCount = 3, .entries = entries });
+    gpu->material_instance_layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
+        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 5, .entries = entries });
     gpu->no_materials = box_gpu_buffer_new(gpu, sizeof(box_render_material_t),
         WGPUBufferUsage_Storage);
     wgpuQueueWriteBuffer(gpu->queue, gpu->no_materials, 0, &fallback, sizeof(fallback));
+    gpu->no_water_waves = box_gpu_buffer_new(gpu,
+        BOX_RENDER_WATER_WAVE_SETS * sizeof(box_render_water_waves_t), WGPUBufferUsage_Uniform);
 }
 
 void box_gpu_instance_layouts_fini(
@@ -384,9 +210,19 @@ void box_gpu_instance_layouts_fini(
         gpu->transform_layout = NULL;
     }
 
+    if (gpu->material_instance_layout) {
+        wgpuBindGroupLayoutRelease(gpu->material_instance_layout);
+        gpu->material_instance_layout = NULL;
+    }
+
     if (gpu->no_materials) {
         wgpuBufferRelease(gpu->no_materials);
         gpu->no_materials = NULL;
+    }
+
+    if (gpu->no_water_waves) {
+        wgpuBufferRelease(gpu->no_water_waves);
+        gpu->no_water_waves = NULL;
     }
 }
 
@@ -405,7 +241,7 @@ void box_gpu_instance_layouts_fini(
  * frame stream of a page without one
  * @param assets The surface assets
  * @param size Bytes of the surface assets
- * @param shading Bind the shading stream too, instance_layout, else transform_layout
+ * @param binds The streams to bind, box_gpu_instance_binds_t
  * @return The bind group
  */
 static WGPUBindGroup box_gpu_instance_group_new(
@@ -413,7 +249,7 @@ static WGPUBindGroup box_gpu_instance_group_new(
     box_gpu_buffer_t *const *streams,
     WGPUBuffer assets,
     uint64_t size,
-    bool shading)
+    int32_t binds)
 {
     const box_gpu_buffer_t *transforms = streams[BOX_RENDER_STREAM_TRANSFORM];
     const box_gpu_buffer_t *shadings = streams[BOX_RENDER_STREAM_SHADING];
@@ -443,19 +279,33 @@ static WGPUBindGroup box_gpu_instance_group_new(
         }
     };
 
+    WGPUBindGroupLayout layouts[3] = {
+        gpu->transform_layout, gpu->instance_layout, gpu->material_instance_layout
+    };
+    size_t counts[3] = { 3, 6, 5 };
+
     return wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
-        .layout = shading ? gpu->instance_layout : gpu->transform_layout,
-        .entryCount = shading ? 6 : 3,
+        .layout = layouts[binds],
+        .entryCount = counts[binds],
         .entries = entry
     });
 }
 
-WGPUBindGroup box_gpu_instance_group(
+/** Get the bind group of an instance page with the surface assets of a mesh, made on use.
+ *
+ * @param gpu The backend
+ * @param page Handle of the transform stream of the page
+ * @param handle Handle of the mesh
+ * @param m The mesh, NULL for a pass that reads no surface assets
+ * @param binds The streams to bind, box_gpu_instance_binds_t
+ * @return The bind group, NULL when a stream of the page is missing or not a storage buffer
+ */
+static WGPUBindGroup box_gpu_instance_group_binds(
     box_gpu_t *gpu,
     uint32_t page,
     uint32_t handle,
     const box_gpu_mesh_t *m,
-    bool shading)
+    int32_t binds)
 {
     WGPUBindGroup result = NULL;
     box_gpu_buffer_t *streams[BOX_RENDER_INSTANCE_STREAMS] = {0};
@@ -480,10 +330,11 @@ WGPUBindGroup box_gpu_instance_group(
 
     box_gpu_buffer_t *b = streams[BOX_RENDER_STREAM_TRANSFORM];
     if (!m || !m->assets) {
-        WGPUBindGroup *group = shading ? &b->instances : &b->transforms;
+        WGPUBindGroup *groups[3] = { &b->transforms, &b->instances, &b->materials };
+        WGPUBindGroup *group = groups[binds];
         if (!*group) {
             *group = box_gpu_instance_group_new(gpu, streams, gpu->no_assets, sizeof(vec4),
-                shading);
+                binds);
         }
 
         result = *group;
@@ -493,7 +344,7 @@ WGPUBindGroup box_gpu_instance_group(
     box_gpu_instance_group_t *g = NULL;
     for (i = 0; i < ecs_vec_count(&b->mesh_groups); i ++) {
         g = ecs_vec_get_t(&b->mesh_groups, box_gpu_instance_group_t, i);
-        if (g->mesh == handle && g->shading == shading) {
+        if (g->mesh == handle && g->binds == binds) {
             break;
         }
 
@@ -509,16 +360,36 @@ WGPUBindGroup box_gpu_instance_group(
     } else {
         g = ecs_vec_append_t(NULL, &b->mesh_groups, box_gpu_instance_group_t);
         g->mesh = handle;
-        g->shading = shading;
+        g->binds = binds;
     }
 
     g->assets = m->surface_assets;
     wgpuBufferAddRef(g->assets);
     g->group = box_gpu_instance_group_new(gpu, streams, m->surface_assets,
-        m->surface_asset_size, shading);
+        m->surface_asset_size, binds);
     result = g->group;
 done:
     return result;
+}
+
+WGPUBindGroup box_gpu_instance_group(
+    box_gpu_t *gpu,
+    uint32_t page,
+    uint32_t handle,
+    const box_gpu_mesh_t *m,
+    bool shading)
+{
+    return box_gpu_instance_group_binds(gpu, page, handle, m,
+        shading ? BOX_GPU_INSTANCE_ALL : BOX_GPU_INSTANCE_TRANSFORMS);
+}
+
+WGPUBindGroup box_gpu_instance_group_material(
+    box_gpu_t *gpu,
+    uint32_t page,
+    uint32_t handle,
+    const box_gpu_mesh_t *m)
+{
+    return box_gpu_instance_group_binds(gpu, page, handle, m, BOX_GPU_INSTANCE_MATERIALS);
 }
 
 void box_gpu_instance_groups_release(
@@ -533,6 +404,11 @@ void box_gpu_instance_groups_release(
     if (b->transforms) {
         wgpuBindGroupRelease(b->transforms);
         b->transforms = NULL;
+    }
+
+    if (b->materials) {
+        wgpuBindGroupRelease(b->materials);
+        b->materials = NULL;
     }
 
     for (i = 0; i < ecs_vec_count(&b->mesh_groups); i ++) {
@@ -695,6 +571,7 @@ void box_gpu_draw_fini(
     ecs_map_fini(&gpu->buffers);
     box_gpu_copy_fini(gpu);
     ecs_vec_fini_t(NULL, &gpu->view_data, uint8_t);
+    ecs_vec_fini_t(NULL, &gpu->view_unfogged, int32_t);
     box_gpu_forward_reset(gpu, false);
     ecs_map_fini(&gpu->forward);
     ecs_map_fini(&gpu->forward_previous);
@@ -707,10 +584,12 @@ void box_gpu_draw_fini(
     box_gpu_environment_fini(gpu);
     box_gpu_effects_fini(gpu);
     box_gpu_gtao_fini(gpu);
+    box_gpu_history_fini(gpu);
     box_gpu_transmission_fini(gpu);
     box_gpu_portal_stencil_fini(gpu);
     box_gpu_atmosphere_fini(gpu);
     box_gpu_particles_fini(gpu);
+    box_gpu_water_fields_fini(gpu);
     box_gpu_fog_volumes_fini(gpu);
     box_gpu_star_fields_fini(gpu);
     box_gpu_planets_fini(gpu);
@@ -745,30 +624,6 @@ void box_gpu_draw_fini(
         wgpuBindGroupLayoutRelease(gpu->view_layout);
         gpu->view_layout = NULL;
     }
-}
-
-/** Compute the box around the vertex positions of a mesh.
- *
- * @param m The mesh
- * @param vertices The vertices
- * @param count Number of vertices
- */
-static void box_gpu_mesh_bounds(
-    box_gpu_mesh_t *m,
-    const box_vertex_t *vertices,
-    uint32_t count)
-{
-    vec3 lo, hi;
-    uint32_t i;
-    glm_vec3_copy(ECS_CONST_CAST(float*, vertices[0].position), lo);
-    glm_vec3_copy(lo, hi);
-    for (i = 1; i < count; i ++) {
-        glm_vec3_minv(lo, ECS_CONST_CAST(float*, vertices[i].position), lo);
-        glm_vec3_maxv(hi, ECS_CONST_CAST(float*, vertices[i].position), hi);
-    }
-
-    glm_vec3_center(lo, hi, m->center);
-    glm_vec3_sub(hi, m->center, m->extent);
 }
 
 void box_gpu_mesh_apply(
@@ -808,7 +663,11 @@ void box_gpu_mesh_apply(
     const uint8_t *vertices = (const uint8_t*)(desc + 1);
     uint64_t vertex_span = (vertex_size + BOX_GPU_MESH_ALIGN - 1) &
         ~(uint64_t)(BOX_GPU_MESH_ALIGN - 1);
-    uint64_t alloc_size = vertex_span + index_size;
+    uint64_t data_size = desc->data
+        ? (uint64_t)desc->vertex_count * BOX_RENDER_DATA_VECS * sizeof(vec4) : 0;
+    uint64_t data_span = (data_size + BOX_GPU_MESH_ALIGN - 1) &
+        ~(uint64_t)(BOX_GPU_MESH_ALIGN - 1);
+    uint64_t alloc_size = vertex_span + data_span + index_size;
     if (alloc_size > limits.maxBufferSize) {
         ecs_err("surface mesh exceeds device buffer capacity");
         goto done;
@@ -824,11 +683,14 @@ void box_gpu_mesh_apply(
     m->buffer = box_gpu_mesh_pool_buffer(gpu, m->page);
     m->alloc_size = alloc_size;
     m->vertex_size = vertex_size;
-    m->index_offset = m->offset + vertex_span;
+    m->data_offset = m->offset + vertex_span;
+    m->data_size = data_size;
+    m->index_offset = m->offset + vertex_span + data_span;
     m->index_size = index_size;
     m->id = ++ gpu->mesh_ids;
     m->wireable = vertex_size <= limits.maxStorageBufferBindingSize &&
-        index_size <= limits.maxStorageBufferBindingSize;
+        index_size * 2 <= limits.maxStorageBufferBindingSize &&
+        data_size <= limits.maxStorageBufferBindingSize;
     m->surface_asset_size = desc->surface_asset_count ?
         (uint64_t)desc->surface_asset_count * sizeof(vec4) : sizeof(vec4);
     m->assets = desc->surface_asset_count != 0;
@@ -843,6 +705,11 @@ void box_gpu_mesh_apply(
     wgpuQueueWriteBuffer(gpu->queue, m->buffer, m->offset, vertices, (size_t)vertex_size);
     wgpuQueueWriteBuffer(gpu->queue, m->buffer, m->index_offset, vertices + vertex_size,
         (size_t)index_size);
+    if (data_size) {
+        wgpuQueueWriteBuffer(gpu->queue, m->buffer, m->data_offset, vertices + vertex_size +
+            index_size + (uint64_t)desc->surface_asset_count * sizeof(vec4), (size_t)data_size);
+    }
+
     box_gpu_debug_mesh_adjacency(gpu, m, (const box_vertex_t*)vertices, desc->vertex_count,
         (const uint32_t*)(vertices + vertex_size));
     ecs_map_insert_ptr(&gpu->meshes, handle, m);
@@ -1017,7 +884,8 @@ static bool box_gpu_target_has_view(
 }
 
 /** Write the uniforms of the views a target renders into the view buffer, then those of their
- * planar reflections after them (box_gpu_planar_add).
+ * planar reflections after them (box_gpu_planar_add), then the copies of the views with fog
+ * volumes whose blended draws are not fogged (box_gpu_fog_volumes_unfogged_write).
  *
  * @param gpu The backend
  * @param t The target
@@ -1031,9 +899,13 @@ static int32_t box_gpu_view_write(
     const box_render_packet_t *packet,
     const box_render_target_t *frame)
 {
-    int32_t i, result = 0, extra = 0, slot = 0, count = ecs_vec_count(&packet->views);
+    int32_t i, result = 0, extra = 0, unfogged = 0, slot = 0;
+    int32_t count = ecs_vec_count(&packet->views);
     ecs_vec_set_count_t(NULL, &gpu->view_data, uint8_t, count * BOX_GPU_VIEW_STRIDE);
     ecs_vec_clear(&gpu->area_views);
+    gpu->origin[0] = packet->origin[0];
+    gpu->origin[1] = packet->origin[1];
+    gpu->origin[2] = packet->origin[2];
     box_gpu_cull_begin(gpu, packet);
     box_gpu_planar_begin(gpu);
     box_gpu_shadow_begin(gpu, packet->frame);
@@ -1057,12 +929,17 @@ static int32_t box_gpu_view_write(
         u->viewport[1] = (float)t->desc.render_height;
         u->viewport[2] = 1.0f / (float)(t->desc.render_width > 0 ? t->desc.render_width : 1);
         u->viewport[3] = 1.0f / (float)(t->desc.render_height > 0 ? t->desc.render_height : 1);
+        box_gpu_history_uniforms(gpu, t, packet, v, proj, u);
         box_gpu_light_uniforms(gpu, v, proj, u);
-        box_gpu_shadow_uniforms(gpu, v, proj, result, packet->frame, u);
+        box_gpu_shadow_uniforms(gpu, v, proj, result, packet->frame,
+            box_gpu_grass_cascades(gpu, packet, v), u);
         box_gpu_atlas_uniforms(gpu, v, u);
         box_gpu_atmosphere_uniforms(gpu, v, u);
         box_gpu_environment_uniforms(gpu, v, u);
         box_gpu_cookie_uniforms(gpu, v, u);
+        box_gpu_water_fields_uniforms(gpu, v, u);
+        box_gpu_fog_volumes_uniforms(gpu, t, v, u);
+        box_gpu_origin_split(packet->origin, u->origin);
         box_gpu_cull_add(gpu, t, packet, i, result, proj, u);
         *ecs_vec_append_t(NULL, &gpu->area_views, const box_render_view_t*) = v;
         result ++;
@@ -1087,12 +964,14 @@ static int32_t box_gpu_view_write(
         box_gpu_planar_uniforms(gpu, ecs_vec_first(&gpu->view_data));
     }
 
+    unfogged = box_gpu_fog_volumes_unfogged_write(gpu, result, result + extra);
     if (result) {
         box_gpu_cull_upload(gpu);
         box_gpu_shadow_upload(gpu, result);
-        box_gpu_view_reserve(gpu, result + extra);
+        box_gpu_view_reserve(gpu, result + extra + unfogged);
         wgpuQueueWriteBuffer(gpu->queue, gpu->view_buffer, 0,
-            ecs_vec_first(&gpu->view_data), (size_t)(result + extra) * BOX_GPU_VIEW_STRIDE);
+            ecs_vec_first(&gpu->view_data),
+            (size_t)(result + extra + unfogged) * BOX_GPU_VIEW_STRIDE);
         box_gpu_light_areas(gpu, packet);
     }
 
@@ -1144,6 +1023,9 @@ typedef struct box_gpu_view_pass_t {
                                      *   the depth instead of writing it */
     bool planets;                   /**< The planet atmosphere shells draw in a pass of their own
                                      *   that reads the depth instead of writing it */
+    bool hidden;                    /**< None of the transmissive instances of the view is
+                                     *   visible: they do not draw, without a snapshot
+                                     *   (box_gpu_cull_glass_hidden) */
     box_gpu_snapshot_t *snapshot;   /**< Snapshot the image is copied into before transmissive
                                      *   draws (box_gpu_draw_snapshot), NULL without them */
     int32_t snapshots;              /**< Snapshots the pass took, at most
@@ -1157,7 +1039,7 @@ typedef struct box_gpu_view_pass_t {
     WGPUTexture depth_texture;      /**< Texture of the depth attachment, which the snapshot
                                      *   copies next to its color */
     int32_t front;                  /**< Index of the draw after the last transmissive draw of
-                                     *   a view with fog volumes, before which the volumes march
+                                     *   a view with fog volumes, before which the volumes apply
                                      *   the rays in front of the glass, -1 for none */
     WGPUTextureView glass;          /**< Depth of the nearest transmissive surfaces over the
                                      *   opaque depth, NULL until box_gpu_draw_glass */
@@ -1208,7 +1090,7 @@ static WGPURenderPassEncoder box_gpu_view_pass_continue(
 
     box_gpu_count(gpu, BOX_GPU_STAT_FORWARD_PASS);
 
-    return wgpuCommandEncoderBeginRenderPass(vp->encoder, &desc);
+    return box_gpu_profile_render_pass(gpu, vp->encoder, &desc, "forward");
 }
 
 /** Record the transmissive draws of a view depth only into the glass depth of its snapshot, a
@@ -1248,8 +1130,8 @@ static void box_gpu_draw_glass(
         .stencilLoadOp = WGPULoadOp_Load,
         .stencilStoreOp = WGPUStoreOp_Discard
     };
-    WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(vp->encoder,
-        &(WGPURenderPassDescriptor){ .depthStencilAttachment = &depth });
+    WGPURenderPassEncoder pass = box_gpu_profile_render_pass(gpu, vp->encoder,
+        &(WGPURenderPassDescriptor){ .depthStencilAttachment = &depth }, "forward glass");
     wgpuRenderPassEncoderSetBindGroup(pass, 0, group, 1, &offset);
     wgpuRenderPassEncoderSetBindGroup(pass, 3, box_gpu_volume_group(gpu, v), 0, NULL);
     for (i = 0; cv && i < cv->draw_count; i ++) {
@@ -1272,7 +1154,7 @@ static void box_gpu_draw_glass(
             bound = pipeline;
         }
 
-        WGPUBindGroup layers = box_gpu_material_group(gpu, packet, b);
+        WGPUBindGroup layers = box_gpu_forward_group(gpu, packet, b);
         if (layers != material) {
             wgpuRenderPassEncoderSetBindGroup(pass, 1, layers, 1, &(uint32_t){0});
             material = layers;
@@ -1294,7 +1176,7 @@ static void box_gpu_draw_glass(
  * samples its depth. The shells haze the blended layers around the ground of a planet, such as
  * clouds, which come before them, but not the others, such as those in front of a planet.
  *
- * The fog volumes of a view with transmissive draws march only the rays behind the glass
+ * The fog volumes of a view with transmissive draws apply only the rays behind the glass
  * (box_gpu_draw_glass), which its snapshot then holds.
  *
  * @param gpu The backend
@@ -1305,6 +1187,8 @@ static void box_gpu_draw_glass(
  * @param v The view
  * @param group The bind group of the view
  * @param slot Slot of the view in the view buffer
+ * @param offset Offset of the uniforms the forward pass binds in the view buffer, those of the
+ * view or the copy whose blended draws are not fogged
  * @param last Whether nothing draws after the particles
  * @return Whether the pipeline and material bound before are lost
  */
@@ -1317,9 +1201,9 @@ static bool box_gpu_draw_particles(
     const box_render_view_t *v,
     WGPUBindGroup group,
     int32_t slot,
+    uint32_t offset,
     bool last)
 {
-    uint32_t offset = (uint32_t)(slot * BOX_GPU_VIEW_STRIDE);
     bool result = true, rebind = true;
     if (!vp->soft && !vp->fog && !vp->planets) {
         result = box_gpu_particles_draw(gpu, vp->pass, format, v, NULL);
@@ -1359,13 +1243,16 @@ static bool box_gpu_draw_particles(
     return result;
 }
 
-/** End the pass of a view after its last transmissive draw, march its fog volumes from the
+/** End the pass of a view after its last transmissive draw, apply its fog volumes from the
  * camera to the nearest transmissive surface of each pixel that has one in a pass that reads the
  * depth, then continue in a new pass with the groups of the forward pass bound again.
  *
- * Together with the part behind the glass, which the snapshot holds, every ray is marched once,
- * so the glass is fogged as an opaque surface at its depth. Blended shapes drawn in front of the
- * glass before its last transmissive draw are fogged as the glass behind them.
+ * Together with the part behind the glass, which the snapshot holds, every ray is fogged once,
+ * so the glass is fogged as an opaque surface at its depth.
+ *
+ * Blended shapes and particles drawn before it bind the uniforms of the view without its fog
+ * grid (box_gpu_fog_volumes_unfogged), so over glass they are fogged once, as the glass behind
+ * them; those drawn after it fog themselves at their depth.
  *
  * @param gpu The backend
  * @param t The target
@@ -1446,7 +1333,7 @@ static void box_gpu_draw_snapshot(
  * snapshot, taken right before the first transmissive draw and again before a later one that
  * overlaps the draws since the last one, BOX_GPU_TRANSMISSION_SNAPSHOTS at most
  * (box_gpu_transmission_plan, box_gpu_draw_snapshot). A view
- * with fog volumes and transmissive draws marches the rays behind the glass before the snapshot
+ * with fog volumes and transmissive draws applies the rays behind the glass before the snapshot
  * and those in front of it after the last transmissive draw (box_gpu_draw_fog_front)
  * @param format The format of the color target
  * @param packet The packet
@@ -1473,6 +1360,7 @@ static void box_gpu_draw_batches(
     WGPUBindGroup material = NULL, instances = NULL;
     uint32_t material_kind = 0;
     uint32_t offset = (uint32_t)(slot * BOX_GPU_VIEW_STRIDE);
+    uint32_t fogged = offset;
     bool sky = phase == 1 || !box_gpu_atmosphere_sky(gpu, v);
     bool stars = phase == 1 || !box_gpu_star_fields_ready(gpu, v);
     bool particles = phase == 1;
@@ -1492,12 +1380,18 @@ static void box_gpu_draw_batches(
         }
     }
 
+    if (vp->front >= 0) {
+        offset = box_gpu_fog_volumes_unfogged(gpu, slot);
+        wgpuRenderPassEncoderSetBindGroup(vp->pass, 0, group, 1, &offset);
+    }
+
     for (i = 0; cv && i < cv->draw_count; i ++) {
         const box_gpu_cull_draw_t *d = ecs_vec_get_t(
             &gpu->cull.draws, box_gpu_cull_draw_t, cv->first_draw + i);
         const box_render_batch_t *b = ecs_vec_get_t(
             &packet->batches, box_render_batch_t, d->batch);
         if (i == vp->front && vp->glass) {
+            offset = fogged;
             box_gpu_draw_fog_front(gpu, t, vp, format, packet, v, group, offset);
             bound = NULL;
             material = NULL;
@@ -1526,7 +1420,8 @@ static void box_gpu_draw_batches(
 
         if (!particles && !mesh && !b->atmosphere) {
             particles = true;
-            if (box_gpu_draw_particles(gpu, t, vp, format, packet, v, group, slot, false)) {
+            if (box_gpu_draw_particles(gpu, t, vp, format, packet, v, group, slot, offset,
+                false)) {
                 bound = NULL;
                 material = NULL;
                 instances = NULL;
@@ -1553,7 +1448,7 @@ static void box_gpu_draw_batches(
             continue;
         }
 
-        if (d->skip) {
+        if (d->skip || (vp->hidden && b->transmissive)) {
             continue;
         }
 
@@ -1562,7 +1457,7 @@ static void box_gpu_draw_batches(
             bound = pipeline;
         }
 
-        WGPUBindGroup group = box_gpu_material_group(gpu, packet, b);
+        WGPUBindGroup group = box_gpu_forward_group(gpu, packet, b);
         uint32_t kind = box_gpu_draw_kind(b, phase == 3);
         if (group != material || kind != material_kind) {
             wgpuRenderPassEncoderSetBindGroup(vp->pass, 1, group, 1, &kind);
@@ -1578,6 +1473,7 @@ static void box_gpu_draw_batches(
     }
 
     if (cv && vp->front == cv->draw_count && vp->glass) {
+        offset = fogged;
         box_gpu_draw_fog_front(gpu, t, vp, format, packet, v, group, offset);
     }
 
@@ -1590,7 +1486,7 @@ static void box_gpu_draw_batches(
     }
 
     if (!particles) {
-        box_gpu_draw_particles(gpu, t, vp, format, packet, v, group, slot, true);
+        box_gpu_draw_particles(gpu, t, vp, format, packet, v, group, slot, offset, true);
     }
 }
 
@@ -1661,7 +1557,8 @@ static void box_gpu_draw_pass(
         .planets = planets,
         .snapshot = phase != 1 ? snapshot : NULL,
         .source = source,
-        .depth_texture = t->depth
+        .depth_texture = t->depth,
+        .hidden = box_gpu_cull_glass_hidden(gpu, packet, slot)
     };
     WGPURenderPassDepthStencilAttachment depth = {
         .view = t->depth_attachment,
@@ -1681,7 +1578,7 @@ static void box_gpu_draw_pass(
     };
     uint32_t offset = (uint32_t)(slot * BOX_GPU_VIEW_STRIDE);
     WGPUTextureFormat format = hdr ? BOX_GPU_HDR_FORMAT : t->format;
-    vp.pass = wgpuCommandEncoderBeginRenderPass(encoder, &desc);
+    vp.pass = box_gpu_profile_render_pass(gpu, encoder, &desc, "forward");
     box_gpu_count(gpu, BOX_GPU_STAT_FORWARD_PASS);
     if (phase != 2) {
         box_gpu_environment_draw_background(gpu, vp.pass, format, v, offset);
@@ -1689,6 +1586,9 @@ static void box_gpu_draw_pass(
 
     wgpuRenderPassEncoderSetBindGroup(vp.pass, 0, group, 1, &offset);
     wgpuRenderPassEncoderSetBindGroup(vp.pass, 3, box_gpu_volume_group(gpu, v), 0, NULL);
+    box_gpu_grass_draw(gpu, vp.pass, packet, v, format, phase == 3,
+        phase == 1 ? BOX_GPU_GRASS_EARLY : phase == 2 ? BOX_GPU_GRASS_LATE : BOX_GPU_GRASS_ALL);
+
     box_gpu_draw_batches(gpu, t, &vp, format, packet, v, group, slot, phase);
     wgpuRenderPassEncoderEnd(vp.pass);
     wgpuRenderPassEncoderRelease(vp.pass);
@@ -1764,41 +1664,44 @@ static void box_gpu_draw_prepass_draws(
     WGPURenderPipeline bound = NULL;
     WGPUBindGroup material = NULL, instances = NULL;
     uint32_t offset = (uint32_t)(slot * BOX_GPU_VIEW_STRIDE);
-    int32_t i;
+    int32_t i, sweep;
     wgpuRenderPassEncoderSetBindGroup(pass, 0, group, 1, &offset);
     wgpuRenderPassEncoderSetBindGroup(pass, 3, box_gpu_volume_group(gpu, v), 0, NULL);
-    for (i = 0; cv && i < cv->draw_count; i ++) {
-        const box_gpu_cull_draw_t *d = ecs_vec_get_t(
-            &gpu->cull.draws, box_gpu_cull_draw_t, cv->first_draw + i);
-        const box_render_batch_t *b = ecs_vec_get_t(
-            &packet->batches, box_render_batch_t, d->batch);
-        if (!box_gpu_prepass_draws(b)) {
-            continue;
-        }
+    for (sweep = 0; cv && sweep < BOX_GPU_DEPTH_SWEEPS; sweep ++) {
+        for (i = 0; i < cv->draw_count; i ++) {
+            const box_gpu_cull_draw_t *d = ecs_vec_get_t(
+                &gpu->cull.draws, box_gpu_cull_draw_t, cv->first_draw + i);
+            const box_render_batch_t *b = ecs_vec_get_t(
+                &packet->batches, box_render_batch_t, d->batch);
+            if (!box_gpu_prepass_draws(b) || box_gpu_depth_sweep(b) != sweep) {
+                continue;
+            }
 
-        WGPURenderPipeline pipeline = box_gpu_prepass_pipeline(gpu, b, count);
-        if (!pipeline || d->skip) {
-            continue;
-        }
+            WGPURenderPipeline pipeline = box_gpu_prepass_pipeline(gpu, b, count);
+            if (!pipeline || d->skip) {
+                continue;
+            }
 
-        if (pipeline != bound) {
-            wgpuRenderPassEncoderSetPipeline(pass, pipeline);
-            bound = pipeline;
-        }
+            if (pipeline != bound) {
+                wgpuRenderPassEncoderSetPipeline(pass, pipeline);
+                bound = pipeline;
+            }
 
-        WGPUBindGroup layers = box_gpu_material_group(gpu, packet, b);
-        if (layers != material) {
-            wgpuRenderPassEncoderSetBindGroup(pass, 1, layers, 1, &(uint32_t){0});
-            material = layers;
-        }
+            WGPUBindGroup layers = box_gpu_forward_group(gpu, packet, b);
+            if (layers != material) {
+                wgpuRenderPassEncoderSetBindGroup(pass, 1, layers, 1, &(uint32_t){0});
+                material = layers;
+            }
 
-        if (box_gpu_cull_draw(gpu, pass, packet, d, 2, late, true, &instances)) {
-            box_gpu_count(gpu, stat);
+            if (box_gpu_cull_draw(gpu, pass, packet, d, 2, late, true, &instances)) {
+                box_gpu_count(gpu, stat);
+            }
         }
     }
 }
 
-/** Record a depth prepass of a view: its opaque and alpha tested mesh draws, depth only.
+/** Record a depth prepass of a view: its opaque and alpha tested mesh draws, depth only, and
+ * the grass blades it placed before (early) or after (late) its depth pyramid.
  *
  * @param gpu The backend
  * @param t The target
@@ -1831,9 +1734,12 @@ static void box_gpu_draw_prepass(
         .stencilClearValue = v->stencil_clear
     };
     WGPURenderPassDescriptor desc = { .depthStencilAttachment = &depth };
-    WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &desc);
+    WGPURenderPassEncoder pass = box_gpu_profile_render_pass(gpu, encoder, &desc, "prepass");
     box_gpu_draw_prepass_draws(gpu, pass, packet, v, group, slot, late,
         WGPUTextureFormat_Undefined, BOX_GPU_STAT_PREPASS_DRAW);
+    box_gpu_grass_draw(gpu, pass, packet, v, WGPUTextureFormat_Undefined, false,
+        late ? BOX_GPU_GRASS_LATE : BOX_GPU_GRASS_EARLY);
+
     wgpuRenderPassEncoderEnd(pass);
     wgpuRenderPassEncoderRelease(pass);
     box_gpu_count(gpu, BOX_GPU_STAT_PREPASS);
@@ -1873,12 +1779,12 @@ bool box_gpu_draw_overdraw(
         .stencilLoadOp = WGPULoadOp_Clear,
         .stencilStoreOp = WGPUStoreOp_Discard
     };
-    WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder,
+    WGPURenderPassEncoder pass = box_gpu_profile_render_pass(gpu, encoder,
         &(WGPURenderPassDescriptor){
             .colorAttachmentCount = 1,
             .colorAttachments = &attachment,
             .depthStencilAttachment = &depth_attachment
-        });
+        }, "overdraw");
     wgpuRenderPassEncoderSetViewport(pass, 0, 0, (float)width, (float)height, 0, 1);
     box_gpu_draw_prepass_draws(gpu, pass, packet, v, group, slot, false, format,
         BOX_GPU_STAT_DRAW);
@@ -1916,6 +1822,7 @@ void box_gpu_draw_views(
         box_gpu_atmosphere_view(gpu, t, encoder, packet, v);
         box_gpu_light_cluster(gpu, t, encoder, v, slot);
         box_gpu_cull_record(gpu, encoder, slot);
+        box_gpu_grass_record(gpu, encoder, packet, v, slot);
         box_gpu_shadow_render(gpu, encoder, packet, i, slot);
         box_gpu_planar_render(gpu, t, encoder, packet, v, slot);
         bool prepasses = box_gpu_draw_prepasses(gpu, packet, v, slot);
@@ -1927,10 +1834,13 @@ void box_gpu_draw_views(
             box_gpu_transmission_begin(gpu, t, packet, slot, source,
                 hdr ? BOX_GPU_HDR_FORMAT : t->format);
         WGPUBindGroup group = box_gpu_light_group(gpu, t, v, slot, ao, snapshot);
+        box_gpu_terrain_bake(gpu, encoder, packet, v, group, slot);
+        box_gpu_fog_volumes_inject(gpu, t, encoder, packet, v, group, slot);
         if (prepasses) {
             box_gpu_draw_prepass(gpu, t, encoder, packet, v, group, slot, false);
             if (occludes) {
                 box_gpu_cull_record_late(gpu, encoder, t->depth_view, slot);
+                box_gpu_grass_record_late(gpu, encoder, packet, v, slot);
                 box_gpu_draw_prepass(gpu, t, encoder, packet, v, group, slot, true);
             }
 
@@ -1945,6 +1855,7 @@ void box_gpu_draw_views(
                 occludes ? 1 : 0, snapshot, source);
             if (occludes) {
                 box_gpu_cull_record_late(gpu, encoder, t->depth_view, slot);
+                box_gpu_grass_record_late(gpu, encoder, packet, v, slot);
                 box_gpu_draw_pass(gpu, t, encoder, color, hdr, packet, v, group, slot, 2,
                     snapshot, source);
             }
@@ -1964,7 +1875,7 @@ void box_gpu_draw_views(
         slot ++;
     }
 
-    box_gpu_cull_finish(gpu, encoder);
+    box_gpu_cull_finish(gpu, encoder, packet);
 done:
     return;
 }

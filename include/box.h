@@ -18,6 +18,7 @@
 #include "box/texture.h"
 #include "box/material.h"
 #include "box/terrain.h"
+#include "box/mesh_graph.h"
 #include "box/surface.h"
 #include "box/view.h"
 #include "box/effects.h"
@@ -43,8 +44,10 @@
 #include "box/startup.h"
 #include "box/atmosphere.h"
 #include "box/particle.h"
+#include "box/grass.h"
 #include "box/transition.h"
 #include "box/portal.h"
+#include "box/world.h"
 
 #ifdef __cplusplus
 extern "C" {

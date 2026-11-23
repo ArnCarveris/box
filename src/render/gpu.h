@@ -83,6 +83,14 @@ WGPUComputePipeline box_gpu_compute_pipeline(
 int32_t box_gpu_pipelines_building(
     const box_gpu_t *gpu);
 
+/** Get the pipelines in the cache: built, building or failed, until a sweep drops them.
+ *
+ * @param gpu The backend
+ * @return The pipelines
+ */
+int32_t box_gpu_pipelines_cached(
+    const box_gpu_t *gpu);
+
 /** Replace a group of render pipelines once every pipeline that replaces them was created, so
  * the group keeps its previous pipelines until then and when one of them failed.
  *
@@ -338,8 +346,9 @@ void box_gpu_texture_mips(
     const box_render_packet_t *packet);
 
 /** Get the texture of a handle that a texture graph writes, creating it with storage binding
- * (unless R8Unorm) and a full mip chain when the handle has none of the size and format; a
- * replaced image of the handle is released.
+ * (unless R8Unorm) and a full mip chain (one level for R32Float and RGBA32Float, which are not
+ * filterable) when the handle has none of the size and format; a replaced image of the handle
+ * is released.
  *
  * An RGBA8Unorm texture has an sRGB view, which the color layers sample. Its levels below the
  * first are generated once box_gpu_texture_output_written queued them.
@@ -348,7 +357,7 @@ void box_gpu_texture_mips(
  * @param handle Handle of the texture
  * @param width Width of the first level
  * @param height Height of the first level
- * @param format RGBA8Unorm, RGBA16Float or R8Unorm
+ * @param format RGBA8Unorm, RGBA16Float, R8Unorm, R32Float or RGBA32Float
  * @param color The texture holds display encoded color, whose levels average linear light
  * @return The texture
  */
@@ -469,6 +478,11 @@ void box_gpu_texture_graph_compiled(
  * due an update at the time of the packet, deliver their outcomes and readbacks and evict cached
  * values over the budget.
  *
+ * A packet that does not wait for its loads (box_render_packet_t.spread) evaluates the graphs
+ * out of date up to BOX_GPU_TG_SPREAD_TEXELS texels of nodes per sixtieth of a second, or one
+ * BOX_GPU_TG_SPREAD_SHARE of those waiting if that is more, and leaves the rest to the next
+ * packets, so a burst of streamed graphs does not land in one frame.
+ *
  * It runs after the resources of a packet applied and before the mip levels are generated, so
  * the passes of the packet sample the new images.
  *
@@ -508,7 +522,7 @@ void box_gpu_materials_clear(
  *
  * @param gpu The backend
  * @param handle Texture handle
- * @return The view, NULL when the backend has no image of the handle
+ * @return The view, NULL when the backend has no image of the handle or it is float32
  */
 WGPUTextureView box_gpu_texture_cookie(
     box_gpu_t *gpu,
@@ -582,6 +596,103 @@ WGPUBindGroup box_gpu_material_group(
 uint32_t box_gpu_draw_kind(
     const box_render_batch_t *b,
     bool equal);
+
+/** Compute the box around the vertex positions of a mesh.
+ *
+ * @param m The mesh
+ * @param vertices The vertices
+ * @param count Number of vertices
+ */
+void box_gpu_mesh_bounds(
+    box_gpu_mesh_t *m,
+    const box_vertex_t *vertices,
+    uint32_t count);
+
+/** Check whether a batch draws with the per vertex data variants of the mesh pipelines: a
+ * batch of a mesh shader whose mesh has per vertex data (box_gpu_mesh_t.data_size).
+ *
+ * Its forward pipelines read the data stream in every vertex stage (the _data entry points),
+ * its alpha tested depth prepass and shadow pipelines too; the plain depth prepass and shadow
+ * pipelines do not read it. Its draws bind the data stream in vertex buffer slot 2.
+ *
+ * @param gpu The backend
+ * @param b The batch
+ * @return Whether its mesh has per vertex data
+ */
+bool box_gpu_vertex_data(
+    const box_gpu_t *gpu,
+    const box_render_batch_t *b);
+
+/** Vertex buffer layout of the per vertex data stream of the _data entry points of the mesh
+ * and shadow shaders: data0 to data3 at locations 4 to 7 (VertexData).
+ *
+ * @param attrs Receives the BOX_RENDER_DATA_VECS attributes the layout points to
+ * @return The layout
+ */
+WGPUVertexBufferLayout box_gpu_vertex_data_layout(
+    WGPUVertexAttribute *attrs);
+
+/** Check whether a batch draws with the layers variants of the mesh pipelines: an opaque,
+ * alpha tested or blended batch of a mesh shader with TextureLayers, not transmissive, or a
+ * water batch with TextureLayers (fs_water_layers).
+ *
+ * Its forward and depth prepass pipelines have the layers layouts and bind the group of
+ * box_gpu_forward_group; its shadows bind the group without layers.
+ *
+ * @param b The batch
+ * @return Whether it applies texture layers
+ */
+bool box_gpu_layered(
+    const box_render_batch_t *b);
+
+/** Get the bind group the forward and depth prepass pipelines of a batch bind in group 1: the
+ * layers group of a batch with box_gpu_layered, else box_gpu_material_group.
+ *
+ * The layers group binds the entries of the material or blend group of the batch, the texture
+ * array of the layer maps and the uniform buffer of each layer entity, which it writes when the
+ * values of the layer changed, shared by every batch with the layer.
+ *
+ * @param gpu The backend
+ * @param packet The packet of the batch
+ * @param b The batch
+ * @return The bind group
+ */
+WGPUBindGroup box_gpu_forward_group(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet,
+    const box_render_batch_t *b);
+
+/** Get a hash of what the material group of a TextureBlend batch shades with: its blend, the
+ * versions of its arrays, its emissive layer and sampler, and with TextureLayers its layers, the
+ * version of their array and their values. Unlike the group it does not change when an atlas
+ * of a terrain blend is made again.
+ *
+ * @param gpu The backend
+ * @param packet The packet of the batch
+ * @param b The batch
+ * @return The hash
+ */
+uint64_t box_gpu_forward_content(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet,
+    const box_render_batch_t *b);
+
+/** Get the pipeline layout of the layers variants of the mesh pipelines, made on first use.
+ *
+ * @param gpu The backend
+ * @param blend Whether the variant blends the layers of a TextureBlend
+ * @return The layout
+ */
+WGPUPipelineLayout box_gpu_layer_pipeline_layout(
+    box_gpu_t *gpu,
+    bool blend);
+
+/** Release the layers groups, buffers and layouts.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_layer_layouts_fini(
+    box_gpu_t *gpu);
 
 /** Check whether a batch draws with the texture_blend variant of the mesh pipeline: a batch of
  * the mesh shader with a TextureBlend, of any blend mode, alpha tested or transmissive.
@@ -864,11 +975,27 @@ WGPURenderPipeline box_gpu_forward_pipeline(
     const box_render_batch_t *b,
     bool equal);
 
+/** Get the pipeline that bakes the tiles of a terrain batch into the bake atlas of their grid
+ * mesh, created on first use in the forward cache: vs_terrain_bake and fs_terrain_bake of the
+ * module of the forward pipeline of the batch, into the BOX_GPU_TERRAIN_BAKE_LAYERS layers.
+ *
+ * @param gpu The backend
+ * @param b The batch, a TextureBlend batch of the extended mesh shader with surfaces
+ * @param layout The pipeline layout: the layout of the forward pipeline of the batch with the
+ * bake group in place of the volume group
+ * @return The pipeline, NULL for another batch or while it is created
+ */
+WGPURenderPipeline box_gpu_terrain_bake_pipeline(
+    box_gpu_t *gpu,
+    const box_render_batch_t *b,
+    WGPUPipelineLayout layout);
+
 /** Create the layouts the forward pass shares.
  *
- * Group 0 binds 10 sampled textures to the fragment stage, the planar reflection array (binding
- * 21) the last: with the 5 of the material group the mesh pipelines sample 15 of the 16 a device
- * has at least, the TextureBlend ones all 16, the particle and fog volume pipelines fewer.
+ * Group 0 binds 12 sampled textures to the fragment stage, with the spectrum of the water
+ * (binding 28) and the fog grid (binding 29): with the 5 of the material group the mesh pipelines
+ * sample 17, one more than the 16 a device has at least, so the device takes the limit of the
+ * adapter (box_gpu_fog_volumes_init warns below it); the particle and fog volume pipelines fewer.
  *
  * @param gpu The backend
  */
@@ -1006,6 +1133,328 @@ void box_gpu_copy(
     box_gpu_t *gpu,
     const box_render_packet_t *packet);
 
+/** Copy the heights of the terrain tiles of a packet into the surface assets of their grid
+ * meshes (box_render_terrain_height_t): the assets of a mesh grow to hold its highest slot, and
+ * a slot is copied when the image of its texture changed since it was copied there.
+ *
+ * @param gpu The backend
+ * @param packet The packet
+ */
+void box_gpu_terrain_heights(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet);
+
+/** Bake the material of the terrain tiles of a packet that changed into the bake atlases of
+ * their grid meshes (box_render_terrain_bake_t), once per packet, with the view group of the
+ * first view that draws their scene.
+ *
+ * @param gpu The backend
+ * @param encoder The encoder of the frame
+ * @param packet The packet
+ * @param v The view
+ * @param group The bind group of the view
+ * @param slot Slot of the view in the view buffer
+ */
+void box_gpu_terrain_bake(
+    box_gpu_t *gpu,
+    WGPUCommandEncoder encoder,
+    const box_render_packet_t *packet,
+    const box_render_view_t *v,
+    WGPUBindGroup group,
+    int32_t slot);
+
+/** Get the timestamp writes of a pass to measure with the GPU profile (gpu_profile.c), on
+ * when the BOX_GPU_PROFILE environment variable is set.
+ *
+ * @param gpu The backend
+ * @param label Label of the pass, a string that outlives the backend
+ * @param out Receives the writes
+ * @return out, NULL when the profile is off or its queries are taken
+ */
+const WGPUPassTimestampWrites* box_gpu_profile_writes(
+    box_gpu_t *gpu,
+    const char *label,
+    WGPUPassTimestampWrites *out);
+
+/** Begin a render pass that the GPU profile measures under a label when it is on.
+ *
+ * @param gpu The backend
+ * @param encoder The encoder
+ * @param desc The pass, measured only without timestamp writes of its own
+ * @param label Label of the pass, a string that outlives the backend
+ * @return The pass
+ */
+WGPURenderPassEncoder box_gpu_profile_render_pass(
+    box_gpu_t *gpu,
+    WGPUCommandEncoder encoder,
+    const WGPURenderPassDescriptor *desc,
+    const char *label);
+
+/** Begin a compute pass that the GPU profile measures under a label when it is on.
+ *
+ * @param gpu The backend
+ * @param encoder The encoder
+ * @param label Label of the pass, a string that outlives the backend
+ * @return The pass
+ */
+WGPUComputePassEncoder box_gpu_profile_compute_pass(
+    box_gpu_t *gpu,
+    WGPUCommandEncoder encoder,
+    const char *label);
+
+/** End the frame of the GPU profile: read the frames the queue finished and log their means.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_profile_frame(
+    box_gpu_t *gpu);
+
+/** Release the bake atlas of a terrain grid mesh.
+ *
+ * @param m The mesh
+ */
+void box_gpu_terrain_bake_free(
+    box_gpu_mesh_t *m);
+
+/** Create the bind group layout of the sampled terrains (terrain_sample.wgsl).
+ *
+ * @param gpu The backend
+ */
+void box_gpu_terrain_init(
+    box_gpu_t *gpu);
+
+/** Release the bindings of the sampled terrains and their layout, and the layouts, buffers and
+ * placeholder of the terrain bakes.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_terrain_fini(
+    box_gpu_t *gpu);
+
+/** Get the bake atlas a terrain blend binds and its layout in the BlendUniforms: the view of
+ * the bake atlas of the grid mesh of the blend, else an empty one.
+ *
+ * @param gpu The backend
+ * @param blend The blend record
+ * @param layout Receives texels of a bake | cells across << 16, 0 without an atlas
+ * @param version Receives the version of the atlas, 0 without one
+ * @return The view
+ */
+WGPUTextureView box_gpu_terrain_bake_view(
+    box_gpu_t *gpu,
+    const box_render_texture_blend_t *blend,
+    uint32_t *layout,
+    uint32_t *version);
+/** Write the bindings of the terrains with TerrainSampled of a packet
+ * (box_render_terrain_sample_t), after box_gpu_terrain_heights copied their heights: the params
+ * and the cells when they changed, a cell whose slot holds no heights yet as no tile, and the bind
+ * group again when the surface assets or the mask atlas of the grid mesh were made again. The
+ * bindings of the terrains the packet does not sample are released.
+ *
+ * @param gpu The backend
+ * @param packet The packet
+ */
+void box_gpu_terrain_samples(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet);
+
+/** Get the bind group of a sampled terrain, for the passes whose compute or vertex stages read it
+ * with terrain_sample.wgsl at the group of terrain_sample_layout.
+ *
+ * @param gpu The backend
+ * @param terrain The terrain entity
+ * @return The group, valid until the next packet, NULL when the last packet did not sample it
+ */
+WGPUBindGroup box_gpu_terrain_sample_group(
+    box_gpu_t *gpu,
+    ecs_entity_t terrain);
+
+/** Create the layouts of the grass passes: the place pass reads a sampled terrain and writes
+ * the blades of a Grass, the draw reads the blades in the vertex stage.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_grass_init(
+    box_gpu_t *gpu);
+
+/** Release the grass passes, their pipelines and the buffers of every Grass.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_grass_fini(
+    box_gpu_t *gpu);
+
+/** Start the grass work of a packet: publish the blade counts and times read back, make the
+ * buffers of its Grass entities and release those of the Grass entities it no longer has, and
+ * zero the counts of the packet.
+ *
+ * @param gpu The backend
+ * @param packet The packet
+ */
+void box_gpu_grass_begin(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet);
+
+/** End the grass work of a packet: copy its blade counts and the timestamps of its passes into
+ * a readback, mapped a packet later.
+ *
+ * @param gpu The backend
+ * @param packet The packet
+ */
+void box_gpu_grass_end(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet);
+
+/** Check whether a view draws grass: it is lit, has a depth, is not an impostor frame nor
+ * WireframeOnly and a Grass of its scene has its buffers and pipelines.
+ *
+ * @param gpu The backend
+ * @param packet The packet
+ * @param v The view
+ * @return Whether box_gpu_grass_record places blades for it
+ */
+bool box_gpu_grass_drawn(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet,
+    const box_render_view_t *v);
+
+/** Record the compute pass that places the blades of the Grass entities of the scene of a view
+ * around its camera: per Grass a reset, a place dispatch over the patches of its grid and a
+ * finish that clamps the indirect arguments of its levels and adds the counts of the packet.
+ * Of a view that culls by occlusion it places only the blades that cast shadows, its blades
+ * are placed after its depth pyramid (box_gpu_grass_record_late).
+ *
+ * @param gpu The backend
+ * @param encoder The encoder of the frame
+ * @param packet The packet
+ * @param v The view
+ * @param slot Slot of the view in the view buffer, whose uniforms are in view_data
+ */
+void box_gpu_grass_record(
+    box_gpu_t *gpu,
+    WGPUCommandEncoder encoder,
+    const box_render_packet_t *packet,
+    const box_render_view_t *v,
+    int32_t slot);
+
+/** Get the cascades of the directional light of a view the blades of the Grass entities of its
+ * scene cast into, which render in every packet instead of keeping their depth.
+ *
+ * @param gpu The backend
+ * @param packet The packet
+ * @param v The view
+ * @return Mask of the cascades, bit i for cascade i, 0 when the view draws no grass
+ */
+uint32_t box_gpu_grass_cascades(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet,
+    const box_render_view_t *v);
+
+/** Record the render pass that draws the blades the last box_gpu_grass_record placed for a view
+ * to cast shadows into a cascade of the view, after its casters: one indirect draw per Grass
+ * casting into the cascade and level, timed with the grass passes. No pass when no Grass casts
+ * into it.
+ *
+ * @param gpu The backend
+ * @param encoder The encoder of the frame
+ * @param v The view
+ * @param cascade Index of the cascade
+ * @param layer View of the layer of the cascade, which the pass loads
+ * @param matrix Local world to clip space of the cascade
+ */
+void box_gpu_grass_shadow(
+    box_gpu_t *gpu,
+    WGPUCommandEncoder encoder,
+    const box_render_view_t *v,
+    int32_t cascade,
+    WGPUTextureView layer,
+    const float *matrix);
+
+/** Check whether a Grass of a scene casts into the spot and point light tiles of its atlas
+ * (Grass.shadow_lights), so its tiles render in every packet.
+ *
+ * @param gpu The backend
+ * @param packet The packet
+ * @param scene The scene of the atlas
+ * @return Whether a Grass casts into them and the scene has a lit view to place its blades
+ * around
+ */
+bool box_gpu_grass_lights(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet,
+    ecs_entity_t scene);
+
+/** Place the blades of the Grass entities of the scene of an atlas that cast into its light
+ * tiles around the camera of the first lit view of the scene, and record the render pass that
+ * draws them into each tile that renders, after its casters; into each octant of a point light
+ * tile. Both passes are timed with the grass passes.
+ *
+ * @param gpu The backend
+ * @param encoder The encoder of the atlas
+ * @param packet The packet
+ * @param a The atlas of the packet
+ * @param renders Whether each of its tiles renders
+ * @param target View of the atlas, which the pass loads
+ * @param resolution Edge of the atlas in texels
+ */
+void box_gpu_grass_atlas(
+    box_gpu_t *gpu,
+    WGPUCommandEncoder encoder,
+    const box_render_packet_t *packet,
+    const box_render_shadow_atlas_t *a,
+    const bool *renders,
+    WGPUTextureView target,
+    int32_t resolution);
+
+/** Record the compute pass that places the blades of the Grass entities of the scene of a view
+ * that culls by occlusion, after the depth pyramid of what it drew first was built
+ * (box_gpu_cull_record_late): box_gpu_grass_record placed only the blades that cast shadows,
+ * these cull the patches and the blades hidden behind the pyramid. Nothing for another view.
+ *
+ * @param gpu The backend
+ * @param encoder The encoder of the frame
+ * @param packet The packet
+ * @param v The view, the last box_gpu_grass_record recorded
+ * @param slot Slot of the view in the view buffer, whose uniforms are in view_data
+ */
+void box_gpu_grass_record_late(
+    box_gpu_t *gpu,
+    WGPUCommandEncoder encoder,
+    const box_render_packet_t *packet,
+    const box_render_view_t *v,
+    int32_t slot);
+
+/** Which blades of a view a pass draws (box_gpu_grass_draw) */
+typedef enum box_gpu_grass_phase_t {
+    BOX_GPU_GRASS_EARLY,            /**< Those placed before the depth pyramid of the view, all
+                                     *   of a view that does not cull by occlusion */
+    BOX_GPU_GRASS_LATE,             /**< Those placed after it (box_gpu_grass_record_late) */
+    BOX_GPU_GRASS_ALL               /**< Both */
+} box_gpu_grass_phase_t;
+
+/** Record the draws of the blades a view placed (box_gpu_grass_record,
+ * box_gpu_grass_record_late) into one of its passes, one indirect draw per Grass and level of
+ * detail. Replaces the pipeline and the bind group at 1.
+ *
+ * @param gpu The backend
+ * @param pass The pass, with the bind group of the view at 0
+ * @param packet The packet
+ * @param v The view
+ * @param format Format of the color target, Undefined for the depth prepass
+ * @param equal Whether the pass loads the depth of a prepass that drew the blades, so it tests
+ * against it without writing it
+ * @param phase Which of the blades it draws, box_gpu_grass_phase_t
+ * @return Whether a blade draw was recorded
+ */
+bool box_gpu_grass_draw(
+    box_gpu_t *gpu,
+    WGPURenderPassEncoder pass,
+    const box_render_packet_t *packet,
+    const box_render_view_t *v,
+    WGPUTextureFormat format,
+    bool equal,
+    int32_t phase);
+
 /** Write the uploads of a packet into their buffers.
  *
  * @param gpu The backend
@@ -1069,6 +1518,17 @@ void box_gpu_draw_views(
     WGPUCommandEncoder encoder,
     WGPUTextureView color,
     WGPUTexture texture);
+
+/** Create the layout of the view group of the forward pass and the fog grid compute (all but the
+ * storage textures): view uniforms, lights, clusters, shadows, reflections, aerial perspective,
+ * environment, ambient occlusion, cookie, opaque snapshot, planar images, planet lights, water,
+ * fog grid.
+ *
+ * @param gpu The backend
+ * @return The layout
+ */
+WGPUBindGroupLayout box_gpu_light_layout(
+    box_gpu_t *gpu);
 
 /** Create the layouts of the cluster pass and the empty light buffer.
  *
@@ -1259,6 +1719,8 @@ void box_gpu_shadow_begin(
  * @param proj Projection of the view for its target
  * @param slot Slot of the view in the view buffer
  * @param frame Frame of the packet
+ * @param live Mask of the cascades that render even when the view keeps them, those the grass
+ * casts into (box_gpu_grass_cascades)
  * @param u The uniforms
  */
 void box_gpu_shadow_uniforms(
@@ -1267,6 +1729,7 @@ void box_gpu_shadow_uniforms(
     mat4 proj,
     int32_t slot,
     int64_t frame,
+    uint32_t live,
     box_gpu_view_uniforms_t *u);
 
 /** Get the cascades of a view that render in the packet, after box_gpu_shadow_uniforms.
@@ -1423,6 +1886,10 @@ void box_gpu_atlas_apply(
  *
  * A point light tile draws every caster draw once per octant, 8 draws, the octant in the dynamic
  * offset of the shadow uniforms, clipped to it with clip distances or by a discard.
+ *
+ * While the cull pipelines don't exist yet (still compiling) the casters aren't culled and draw
+ * nothing: the tiles that render are then left empty and the atlas doesn't keep them, so they
+ * render again once the cull pipelines exist.
  *
  * @param gpu The backend
  * @param packet The packet
@@ -1646,6 +2113,193 @@ void box_gpu_particles_simulate(
     box_gpu_t *gpu,
     const box_render_packet_t *packet);
 
+/** Create the layouts and placeholder of the spectra of WaterSpectrum.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_spectra_init(
+    box_gpu_t *gpu);
+
+/** Release the spectra of WaterSpectrum, their pipelines and placeholder.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_spectra_fini(
+    box_gpu_t *gpu);
+
+/** Evolve the spectra of WaterSpectrum of a packet to its time and inverse FFT them into their
+ * texture arrays with mips, after its scatters and before its targets; a spectrum whose
+ * parameters changed generates its initial spectrum first.
+ *
+ * @param gpu The backend
+ * @param packet The packet
+ */
+void box_gpu_spectra_evolve(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet);
+
+/** Fill the view layout entry of the slopes of the spectrum of WaterSpectrum.
+ *
+ * @param entries The entries of the view layout, of which BOX_GPU_SPECTRUM_BINDING is filled
+ */
+void box_gpu_spectra_layout(
+    WGPUBindGroupLayoutEntry *entries);
+
+/** Fill the view group entry of the slopes of the spectrum of WaterSpectrum of the scene of a
+ * view, the placeholder without one.
+ *
+ * @param gpu The backend
+ * @param v The view, NULL for none
+ * @param entries The entries of the view group, of which BOX_GPU_SPECTRUM_BINDING is filled
+ */
+void box_gpu_spectra_bindings(
+    box_gpu_t *gpu,
+    const box_render_view_t *v,
+    WGPUBindGroupEntry *entries);
+
+/** Write the record of the spectrum of WaterSpectrum of the scene of a view into its uniforms,
+ * a zero record without one.
+ *
+ * @param gpu The backend
+ * @param v The view
+ * @param u The uniforms
+ */
+void box_gpu_spectra_uniforms(
+    const box_gpu_t *gpu,
+    const box_render_view_t *v,
+    box_gpu_view_uniforms_t *u);
+
+/** Create the layouts and placeholders of the fields of WaterRipples and the spectra of
+ * WaterSpectrum.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_water_fields_init(
+    box_gpu_t *gpu);
+
+/** Release the fields of WaterRipples and the spectra of WaterSpectrum.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_water_fields_fini(
+    box_gpu_t *gpu);
+
+/** Fill the view layout entries of the field of WaterRipples and the spectrum of WaterSpectrum.
+ *
+ * @param entries The entries of the view layout
+ */
+void box_gpu_water_fields_layout(
+    WGPUBindGroupLayoutEntry *entries);
+
+/** Write the records of the field of WaterRipples and the spectrum of WaterSpectrum of the
+ * scene of a view into its uniforms.
+ *
+ * @param gpu The backend
+ * @param v The view
+ * @param u The uniforms
+ */
+void box_gpu_water_fields_uniforms(
+    const box_gpu_t *gpu,
+    const box_render_view_t *v,
+    box_gpu_view_uniforms_t *u);
+
+/** Create the layouts and placeholders of the fields of WaterRipples.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_ripples_init(
+    box_gpu_t *gpu);
+
+/** Release the fields of WaterRipples, their pipelines and placeholders.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_ripples_fini(
+    box_gpu_t *gpu);
+
+/** Step the fields of WaterRipples of a packet, after its scatters and before its targets:
+ * create the fields that are new, free the ones the packet no longer has, clear the cells that
+ * entered their windows and run their steps.
+ *
+ * @param gpu The backend
+ * @param packet The packet
+ */
+void box_gpu_ripples_simulate(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet);
+
+/** Fill the view layout entries of the heights and the foam of the field of WaterRipples.
+ *
+ * @param entries The entries of the view layout, of which BOX_GPU_RIPPLES_HEIGHTS_BINDING,
+ * BOX_GPU_RIPPLES_FOAM_BINDING and BOX_GPU_RIPPLES_FLOW_BINDING are filled
+ */
+void box_gpu_ripples_layout(
+    WGPUBindGroupLayoutEntry *entries);
+
+/** Fill the view group entries of the heights and the foam of the field of WaterRipples of the
+ * scene of a view, the 1x1 zero texture without one.
+ *
+ * @param gpu The backend
+ * @param v The view, NULL for none
+ * @param entries The entries of the view group, of which BOX_GPU_RIPPLES_HEIGHTS_BINDING,
+ * BOX_GPU_RIPPLES_FOAM_BINDING and BOX_GPU_RIPPLES_FLOW_BINDING are filled
+ */
+void box_gpu_ripples_bindings(
+    box_gpu_t *gpu,
+    const box_render_view_t *v,
+    WGPUBindGroupEntry *entries);
+
+/** Get the velocity texture of the field of WaterRipples of the scene of a view, for the mesh
+ * shaders: rgba32float in the addressing of the heights, the world velocity of the water of a
+ * cell (xy) and its velocity relative to the frame of the field (zw); the 1x1 zero texture
+ * without a field.
+ *
+ * @param gpu The backend
+ * @param v The view, NULL for none
+ * @return The view of the texture
+ */
+WGPUTextureView box_gpu_ripples_flow_view(
+    const box_gpu_t *gpu,
+    const box_render_view_t *v);
+
+/** Write the record of the field of WaterRipples of the scene of a view into its uniforms, a
+ * zero record without one.
+ *
+ * @param gpu The backend
+ * @param v The view
+ * @param u The uniforms of the view
+ */
+void box_gpu_ripples_uniforms(
+    const box_gpu_t *gpu,
+    const box_render_view_t *v,
+    box_gpu_view_uniforms_t *u);
+
+/** Split the absolute position of the local origin (WorldOrigin) as the shaders take it (View
+ * and Cascade, world_origin of world_origin.wgsl): the whole world units of X, Y and Z, clamped
+ * to 32 bits, and in w the rest of a unit of each in BOX_GPU_ORIGIN_REST_BITS bits, X lowest;
+ * split in double precision, so a shader computes a world space pattern of the absolute position
+ * without losing precision (origin_phase). 0 for an origin of 0.
+ *
+ * @param origin Absolute position of the local origin
+ * @param out Receives the split
+ */
+void box_gpu_origin_split(
+    const double origin[3],
+    int32_t out[4]);
+
+/** Bits of the rest of a world unit of each axis of the split origin (box_gpu_origin_split) */
+#define BOX_GPU_ORIGIN_REST_BITS (10)
+
+/** Write the absolute position of the local origin into the uniforms of a cascade, tile or
+ * octant of the shadow pass at BOX_GPU_SHADOW_ORIGIN (box_gpu_origin_split).
+ *
+ * @param origin Absolute position of the local origin
+ * @param block The uniforms of the cascade
+ */
+void box_gpu_shadow_origin(
+    const double origin[3],
+    void *block);
+
 /** Check whether a pool of the scene of a view fades in front of the depth of the view, so the
  * view draws its particles in a pass that reads the depth instead of writing it.
  *
@@ -1803,15 +2457,16 @@ void box_gpu_fog_volumes_init(
 void box_gpu_fog_volumes_fini(
     box_gpu_t *gpu);
 
-/** Start the fog volume draws of a packet, which fill the buffer of the draws from its start.
+/** Start the fog volume passes of a packet, which fill the buffer of the passes from its start,
+ * and release the grids of views that drew no fog volumes for a while.
  *
  * @param gpu The backend
  */
 void box_gpu_fog_volumes_begin(
     box_gpu_t *gpu);
 
-/** Check whether a view draws fog volumes: it has records and the shader is compiled, so its
- * forward pass splits around them.
+/** Check whether a view draws fog volumes: it has records and the shader and its compute
+ * pipelines exist, so it injects its grid and its forward pass splits around the apply draw.
  *
  * @param gpu The backend
  * @param v The view
@@ -1821,8 +2476,85 @@ bool box_gpu_fog_volumes_ready(
     box_gpu_t *gpu,
     const box_render_view_t *v);
 
-/** Segment of the rays of a view a fog volume draw marches (FogDraw.segment of
- * fog_volume.wgsl) */
+/** Light the froxel grid of a view with fog volumes in a target and integrate it, in one
+ * compute pass before its forward pass (inject and integrate of fog_volume.wgsl): after its
+ * clusters and shadows, with the bind group of the view. Records nothing for a view without
+ * volumes or before the pipelines exist, and the apply draws of the view then draw nothing.
+ *
+ * @param gpu The backend
+ * @param t The target, whose render size the grid follows
+ * @param encoder The encoder of the frame
+ * @param packet The packet, which holds the records
+ * @param v The view
+ * @param group The bind group of the view
+ * @param slot Slot of the view in the view buffer
+ */
+void box_gpu_fog_volumes_inject(
+    box_gpu_t *gpu,
+    const box_gpu_target_t *t,
+    WGPUCommandEncoder encoder,
+    const box_render_packet_t *packet,
+    const box_render_view_t *v,
+    WGPUBindGroup group,
+    int32_t slot);
+
+/** Fill the members of the uniforms of a view in a target about its froxel grid (fog_grid and
+ * fog_range of the View uniform), with which its blended draws fog themselves
+ * (fog_blend.wgsl): the slicing of the grid of a lit view that draws fog volumes, zero for any
+ * other view.
+ *
+ * @param gpu The backend
+ * @param t The target, whose render size the grid follows
+ * @param v The view
+ * @param u The uniforms of the view
+ */
+void box_gpu_fog_volumes_uniforms(
+    box_gpu_t *gpu,
+    const box_gpu_target_t *t,
+    const box_render_view_t *v,
+    box_gpu_view_uniforms_t *u);
+
+/** Get the integrated froxel grid of a view in a target that its view group binds
+ * (BOX_GPU_FOG_GRID_BINDING), created at the size of the grid of this frame so the inject pass
+ * of the view writes it: a texel of no light and full transmittance for a view that draws no fog
+ * volumes or without a target.
+ *
+ * @param gpu The backend
+ * @param t The target, NULL for the captures
+ * @param v The view
+ * @return The view of the texture
+ */
+WGPUTextureView box_gpu_fog_volumes_grid_view(
+    box_gpu_t *gpu,
+    const box_gpu_target_t *t,
+    const box_render_view_t *v);
+
+/** Append a copy of the uniforms of each view whose blended draws fog themselves, without its
+ * fog grid, after the slots of the view buffer written so far (box_gpu_t.view_unfogged). A view
+ * with glass binds it for the draws before the fog in front of its glass, which fogs them.
+ *
+ * @param gpu The backend
+ * @param views Views of the target, the first slots of view_data
+ * @param count Slots of view_data written so far
+ * @return The copies appended
+ */
+int32_t box_gpu_fog_volumes_unfogged_write(
+    box_gpu_t *gpu,
+    int32_t views,
+    int32_t count);
+
+/** Offset in the view buffer of the uniforms of a view whose blended draws are not fogged.
+ *
+ * @param gpu The backend
+ * @param slot Slot of the view
+ * @return The offset of its copy (box_gpu_fog_volumes_unfogged_write), its own without one
+ */
+uint32_t box_gpu_fog_volumes_unfogged(
+    const box_gpu_t *gpu,
+    int32_t slot);
+
+/** Segment of the rays of a view a fog volume apply draw takes (Froxel.segment of
+ * froxel.wgsl) */
 typedef enum box_gpu_fog_segment_t {
     BOX_GPU_FOG_SEGMENT_FULL,       /**< From the camera to the opaque depth */
     BOX_GPU_FOG_SEGMENT_BEHIND,     /**< From the nearest transmissive surface of a pixel to the
@@ -1833,8 +2565,9 @@ typedef enum box_gpu_fog_segment_t {
                                      *   transmissive draw */
 } box_gpu_fog_segment_t;
 
-/** Record the fog volumes of a view, one instanced draw back to front. Replaces the pipeline
- * and the bind group at 1. A draw of the front segment does not count its volumes again.
+/** Apply the froxel grid the view injected in this packet (box_gpu_fog_volumes_inject), one
+ * fullscreen draw that looks the grid up at the depth of each pixel. Replaces the pipeline and
+ * the bind group at 1.
  *
  * @param gpu The backend
  * @param pass The render pass of the view, which reads its depth, with the bind group of the
@@ -1845,8 +2578,8 @@ typedef enum box_gpu_fog_segment_t {
  * @param v The view
  * @param depth The depth of the view, read only in the pass
  * @param glass The depth of the nearest transmissive surfaces over the opaque depth
- * (box_gpu_transmission_glass), NULL to march the full segment
- * @param segment The segment of the rays to march, FULL without glass
+ * (box_gpu_transmission_glass), NULL to apply the full segment
+ * @param segment The segment of the rays to apply, FULL without glass
  * @return Whether the volumes were drawn
  */
 bool box_gpu_fog_volumes_draw(
@@ -1949,13 +2682,14 @@ bool box_gpu_debug_enabled(
 
 /** Upload the edge adjacency of a mesh that can be wired (box_gpu_mesh_t.wireable) for its
  * wire draws (debug_wire.wgsl): for each index, the vertex of the neighbor triangle across the
- * edge opposite that corner which is not on the edge, or BOX_GPU_WIRE_NONE on a border.
+ * edge opposite that corner which is not on the edge, or BOX_GPU_WIRE_NONE on a border. It
+ * follows a copy of the indices in one buffer, so the wire draws read both from one binding.
  *
  * Edges are matched by the positions of their vertices, welded within a tiny distance, so the
  * vertices a face or a uv seam duplicates still join, in linear time.
  *
- * The backend keeps no CPU copy of a mesh, so it is built at the upload; it has one uint32_t
- * per index, the size of the indices.
+ * The backend keeps no CPU copy of a mesh, so it is built at the upload; the buffer has two
+ * uint32_t per index, twice the size of the indices.
  *
  * @param gpu The backend
  * @param m The mesh, with its index count
@@ -2130,6 +2864,122 @@ void box_gpu_gtao_sweep(
     box_gpu_t *gpu,
     const box_render_packet_t *packet);
 
+/** Consumer kind of the history of the first mip of a Bloom, keyed by its effect entity */
+#define BOX_GPU_HISTORY_BLOOM (1)
+
+/** Consumer kind of the injected froxel grid of the fog volumes of a view, one per view */
+#define BOX_GPU_HISTORY_FOG_VOLUMES (2)
+
+/** Packets a history pair is kept without being used before it is released */
+#define BOX_GPU_HISTORY_IDLE (4)
+
+/** What a temporal pass asks the history textures for: the key of a pair and its shape */
+typedef struct box_gpu_history_desc_t {
+    uint32_t target;                /**< Handle of the target */
+    ecs_entity_t view;              /**< View entity */
+    uint32_t consumer;              /**< Kind of consumer, BOX_GPU_HISTORY_* */
+    ecs_entity_t entity;            /**< Entity of the consumer, 0 for one per view */
+    WGPUTextureDimension dimension; /**< 2D or 3D */
+    uint32_t width;                 /**< Width in texels */
+    uint32_t height;                /**< Height in texels */
+    uint32_t depth;                 /**< Depth of a 3D texture, 1 for 2D */
+    WGPUTextureFormat format;       /**< Format */
+    WGPUTextureUsage usage;         /**< Usage, 0 for TextureBinding with RenderAttachment in 2D
+                                     *   and with StorageBinding in 3D */
+} box_gpu_history_desc_t;
+
+/** The textures of a history pair in a frame */
+typedef struct box_gpu_history_t {
+    WGPUTexture read_texture;       /**< Texture the last frame wrote */
+    WGPUTextureView read;           /**< Its view, which the pass reads */
+    WGPUTexture write_texture;      /**< Texture this frame writes */
+    WGPUTextureView write;          /**< Its view, which the pass writes */
+    bool valid;                     /**< read holds the previous frame of the view, of the same
+                                     *   size and format, and the history of the view is valid */
+} box_gpu_history_t;
+
+/** Create the lists of the view histories and the history textures.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_history_init(
+    box_gpu_t *gpu);
+
+/** Release the history textures and forget the view histories, on fini and device loss.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_history_fini(
+    box_gpu_t *gpu);
+
+/** Advance the history of a view in a target and write its temporal members of the View
+ * uniforms: prev_view_proj and temporal.
+ *
+ * @param gpu The backend
+ * @param t The target
+ * @param packet The packet
+ * @param v The view
+ * @param proj Projection the view renders the target with
+ * @param u The uniforms of the view, with view_proj
+ */
+void box_gpu_history_uniforms(
+    box_gpu_t *gpu,
+    const box_gpu_target_t *t,
+    const box_render_packet_t *packet,
+    const box_render_view_t *v,
+    const mat4 proj,
+    box_gpu_view_uniforms_t *u);
+
+/** Get the temporal state a view renders a target with in the current packet.
+ *
+ * @param gpu The backend
+ * @param target Handle of the target
+ * @param view View entity
+ * @return The state, NULL when the view has no history in the target
+ */
+const box_render_temporal_t* box_gpu_history_view(
+    box_gpu_t *gpu,
+    uint32_t target,
+    ecs_entity_t view);
+
+/** Get the ping-pong pair of a temporal pass for a frame, created on first use and created again
+ * when its shape changes. The first use in a packet swaps the read and write textures; later
+ * uses in the same packet get the same ones.
+ *
+ * The pass writes the whole write texture, or calls box_gpu_history_discard when it does not.
+ *
+ * @param gpu The backend
+ * @param packet The packet
+ * @param desc The key and shape of the pair
+ * @param out Receives the textures
+ * @return Whether the pair exists, false for an empty size
+ */
+bool box_gpu_history_acquire(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet,
+    const box_gpu_history_desc_t *desc,
+    box_gpu_history_t *out);
+
+/** Mark the write texture of a pair as not holding the frame, when its pass did not run, so
+ * the next frame does not read it as valid.
+ *
+ * @param gpu The backend
+ * @param desc The key of the pair
+ */
+void box_gpu_history_discard(
+    box_gpu_t *gpu,
+    const box_gpu_history_desc_t *desc);
+
+/** Release the history pairs no pass used for BOX_GPU_HISTORY_IDLE packets and forget the
+ * histories of the views that did not render in a packet.
+ *
+ * @param gpu The backend
+ * @param packet The packet that rendered
+ */
+void box_gpu_history_sweep(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet);
+
 /** Create the bind group layout, sampler and white fallback of the opaque snapshot of
  * transmission.
  *
@@ -2209,6 +3059,9 @@ WGPUTextureView box_gpu_transmission_depth_view(
  * overlaps it by their bounds in the image plane (box_render_batch_t.screen) or has none, so
  * runs that do not overlap share one. The particles, drawn at the first blended draw that is
  * not a layer around a planet, cover the view.
+ *
+ * A draw of water takes none for the draws of water before it: the water surfaces of a scene
+ * share the snapshot of the first, and water seen through water refracts what is under both.
  *
  * Past BOX_GPU_TRANSMISSION_SNAPSHOTS the first one is taken and the others go to the draws
  * that cover most of the image, the later of equal ones, so a large shape that encloses the
@@ -2389,6 +3242,50 @@ void box_gpu_capture_write(
     box_gpu_t *gpu,
     box_gpu_target_t *t,
     const char *path);
+
+/** Record a copy of mip 0 of an RGBA8 texture into a readback buffer of its own, such as an
+ * impostor atlas.
+ *
+ * @param gpu The backend
+ * @param encoder The encoder the copy is recorded in
+ * @param texture The texture
+ * @return The capture, which box_gpu_capture_texture_write maps once the encoder is submitted
+ */
+box_gpu_capture_t* box_gpu_capture_texture(
+    box_gpu_t *gpu,
+    WGPUCommandEncoder encoder,
+    WGPUTexture texture);
+
+/** Map the copy of a texture capture after its encoder was submitted, which writes the PNG
+ * file like box_gpu_capture_write.
+ *
+ * @param gpu The backend
+ * @param capture The capture of box_gpu_capture_texture, owned by the map from here on
+ * @param path The file
+ */
+void box_gpu_capture_texture_write(
+    box_gpu_t *gpu,
+    box_gpu_capture_t *capture,
+    const char *path);
+
+/** Copy the frames of the impostors of a packet that its targets rendered into their atlases,
+ * dilating the colors of the covered texels, generate the mips of the atlases a bake finished,
+ * and write the atlases the packet reads. A frame whose shader or pipeline does not exist yet
+ * keeps its image until a later packet copies it.
+ *
+ * @param gpu The backend
+ * @param packet The packet, after its targets rendered
+ */
+void box_gpu_impostor_render(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet);
+
+/** Release the frames of the impostors that wait for their copy and the impostor pipelines.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_impostor_fini(
+    box_gpu_t *gpu);
 
 /** Release the idle readback buffer of a target. Captures of the target that are still
  * mapping complete on their own.

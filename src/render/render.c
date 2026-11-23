@@ -113,9 +113,11 @@ box_render_packet_t* box_render_packet(
         result = box_render_ring_acquire(ring);
         result->frame = info->frame_count_total;
         result->time = info->world_time_total;
+        box_render_origin(real, result->origin);
         result->delta = info->delta_time;
         result->fps = ecs_id(App) ? box_app_fps(real) : 0;
         result->headless = app && app->headless;
+        result->spread = !app || !app->headless || app->async_loads;
     }
 
     return result;
@@ -236,42 +238,79 @@ static int box_render_view_compare(
     return box_view_compare(x->order, x->view, y->order, y->view);
 }
 
-uint32_t box_render_scene_features(
-    const ecs_world_t *world,
-    ecs_entity_t scene)
+/** Get the BOX_RENDER_FEATURE_* bits of the lighting features of a Scene and of the material
+ * features of one of its shaders.
+ *
+ * @param f The Scene
+ * @param m The material features of the shader
+ * @return The features
+ */
+static uint32_t box_render_features_of(
+    const Scene *f,
+    const ShaderFeatures *m)
 {
-    const Scene *f = scene && ecs_is_alive(world, scene)
-        ? ecs_get(world, scene, Scene)
-        : ecs_singleton_get(world, Scene);
-
     uint32_t result = 0;
-    if (!f) {
-        goto done;
-    }
-
     result |= f->baked ? BOX_RENDER_FEATURE_BAKED : 0u;
     result |= f->reflections ? BOX_RENDER_FEATURE_REFLECTIONS : 0u;
     result |= f->punctual_shadows ? BOX_RENDER_FEATURE_PUNCTUAL_SHADOWS : 0u;
     result |= f->cookies ? BOX_RENDER_FEATURE_COOKIES : 0u;
     result |= f->environment ? BOX_RENDER_FEATURE_ENVIRONMENT : 0u;
     result |= f->aerial_perspective ? BOX_RENDER_FEATURE_AERIAL : 0u;
-    result |= f->sheen ? BOX_RENDER_FEATURE_SHEEN : 0u;
-    result |= f->clear_coat ? BOX_RENDER_FEATURE_CLEAR_COAT : 0u;
-    result |= f->anisotropy ? BOX_RENDER_FEATURE_ANISOTROPY : 0u;
-    result |= f->diffuse_transmission ? BOX_RENDER_FEATURE_DIFFUSE_TRANSMISSION : 0u;
-    result |= f->triplanar ? BOX_RENDER_FEATURE_TRIPLANAR : 0u;
-    result |= f->fresnel ? BOX_RENDER_FEATURE_FRESNEL : 0u;
-    result |= f->transmission ? BOX_RENDER_FEATURE_TRANSMISSION : 0u;
-    result |= f->texture_blend ? BOX_RENDER_FEATURE_TEXTURE_BLEND : 0u;
-    result |= f->alpha_cutout ? BOX_RENDER_FEATURE_ALPHA_CUTOUT : 0u;
-    result |= f->blend_modes ? BOX_RENDER_FEATURE_BLEND_MODES : 0u;
-    result |= f->water ? BOX_RENDER_FEATURE_WATER : 0u;
     result |= f->planar_reflections ? BOX_RENDER_FEATURE_PLANAR : 0u;
-    result |= f->texture_scroll ? BOX_RENDER_FEATURE_TEXTURE_SCROLL : 0u;
     result |= f->planet_light ? BOX_RENDER_FEATURE_PLANET_LIGHT : 0u;
-    result |= f->distortion ? BOX_RENDER_FEATURE_DISTORTION : 0u;
-done:
+    result |= m->sheen ? BOX_RENDER_FEATURE_SHEEN : 0u;
+    result |= m->clear_coat ? BOX_RENDER_FEATURE_CLEAR_COAT : 0u;
+    result |= m->anisotropy ? BOX_RENDER_FEATURE_ANISOTROPY : 0u;
+    result |= m->diffuse_transmission ? BOX_RENDER_FEATURE_DIFFUSE_TRANSMISSION : 0u;
+    result |= m->triplanar ? BOX_RENDER_FEATURE_TRIPLANAR : 0u;
+    result |= m->fresnel ? BOX_RENDER_FEATURE_FRESNEL : 0u;
+    result |= m->transmission ? BOX_RENDER_FEATURE_TRANSMISSION : 0u;
+    result |= m->texture_blend ? BOX_RENDER_FEATURE_TEXTURE_BLEND : 0u;
+    result |= m->alpha_cutout ? BOX_RENDER_FEATURE_ALPHA_CUTOUT : 0u;
+    result |= m->blend_modes ? BOX_RENDER_FEATURE_BLEND_MODES : 0u;
+    result |= m->water ? BOX_RENDER_FEATURE_WATER : 0u;
+    result |= m->texture_scroll ? BOX_RENDER_FEATURE_TEXTURE_SCROLL : 0u;
+    result |= m->distortion ? BOX_RENDER_FEATURE_DISTORTION : 0u;
+    result |= m->wind ? BOX_RENDER_FEATURE_WIND : 0u;
+    result |= m->texture_layers ? BOX_RENDER_FEATURE_TEXTURE_LAYERS : 0u;
+
     return result;
+}
+
+/** Get the Scene of a scene root, the singleton for the default scene.
+ *
+ * @param world The world
+ * @param scene The scene root, 0 for the default scene
+ * @return The Scene, NULL without one
+ */
+static const Scene* box_render_scene_get(
+    const ecs_world_t *world,
+    ecs_entity_t scene)
+{
+    return scene && ecs_is_alive(world, scene)
+        ? ecs_get(world, scene, Scene)
+        : ecs_singleton_get(world, Scene);
+}
+
+uint32_t box_render_scene_features(
+    const ecs_world_t *world,
+    ecs_entity_t scene)
+{
+    const Scene *f = box_render_scene_get(world, scene);
+
+    return f ? box_render_features_of(f, &f->shader_features.Extended) : 0u;
+}
+
+uint32_t box_render_terrain_features(
+    const ecs_world_t *world,
+    ecs_entity_t scene)
+{
+    const uint32_t terrain = BOX_RENDER_FEATURE_TEXTURE_BLEND | BOX_RENDER_FEATURE_TRIPLANAR |
+        BOX_RENDER_FEATURE_TEXTURE_LAYERS;
+    const Scene *f = box_render_scene_get(world, scene);
+    uint32_t result = f ? box_render_features_of(f, &f->shader_features.Terrain) : 0u;
+
+    return result & (BOX_RENDER_FEATURE_LIGHTING | BOX_RENDER_FEATURE_PLANET_LIGHT | terrain);
 }
 
 uint32_t box_render_view_features(
@@ -322,6 +361,7 @@ static void box_render_extract_view(
     v->camera_data = *data;
     v->clear = view->clear;
     v->debug = view->debug;
+    v->history_reset = ecs_has_id(world, e, HistoryReset);
     box_render_lod_settings(&view->lod, &v->lod);
     v->cull.enabled = view->culling.enabled;
     v->cull.occlusion = view->culling.enabled && view->culling.occlusion &&
@@ -359,10 +399,14 @@ void box_render_lod_settings(
         distance = isfinite(distance) && distance > 0.0f ? distance : 0.0f;
         out->distances[i] = previous = glm_max(distance, previous);
     }
+
+    out->fade = isfinite(settings->fade) && out->levels ? glm_clamp(settings->fade, 0.0f, 0.5f)
+        : 0.0f;
 }
 
 /** Add a view to the packet for every View whose camera is alive and has a Camera, in
- * render order: by View.order, then by creation.
+ * render order: by View.order, then by creation. Remove HistoryReset from every View, which the
+ * view in the packet carries as history_reset.
  *
  * @param it The iterator of the system
  */
@@ -375,6 +419,9 @@ static void BoxRenderExtractViews(
         const View *views = ecs_field(it, View, 0);
         for (i = 0; i < it->count; i ++) {
             box_render_extract_view(it->world, p, it->entities[i], &views[i]);
+            if (ecs_has_id(it->world, it->entities[i], HistoryReset)) {
+                ecs_remove_id(it->stage, it->entities[i], HistoryReset);
+            }
         }
     }
 
@@ -426,6 +473,12 @@ void BoxRenderImport(
     ECS_COMPONENT_DEFINE(world, RenderRing);
     ecs_set_name_prefix(world, NULL);
     ECS_META_COMPONENT(world, CullStatus);
+    ECS_META_COMPONENT(world, DrawRange);
+    ecs_add_pair(world, ecs_id(DrawRange), EcsOnInstantiate, EcsInherit);
+    ECS_META_COMPONENT(world, Impostor);
+    ECS_META_COMPONENT(world, ImpostorStatus);
+    ECS_META_COMPONENT(world, ImpostorBudget);
+    ECS_META_COMPONENT(world, ImpostorChannel);
 
     ecs_set_hooks(world, RenderRing, {
         .ctor = flecs_default_ctor,
@@ -470,14 +523,19 @@ void BoxRenderImport(
     box_render_transitions_init(world);
     box_render_scenes_init(world);
     box_render_captures_init(world);
+    box_render_impostors_init(world);
     box_render_textures_init(world);
     box_render_texture_previews_init(world);
+    box_render_texture_readbacks_init(world);
     box_render_draws_init(world);
     box_render_transitions_slots_init(world);
     box_render_atmosphere_init(world);
     box_render_particles_init(world);
     box_render_lights_init(world);
     box_render_planar_init(world);
+    box_render_water_ripples_init(world);
+    box_render_water_spectrum_init(world);
+    box_render_terrain_init(world);
     box_render_bake_init(world);
     box_render_reflect_init(world);
     box_render_shadows_init(world);

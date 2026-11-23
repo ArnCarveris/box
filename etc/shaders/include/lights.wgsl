@@ -21,7 +21,8 @@ struct View {
     ambient_ground: vec4f,
     // x, y: inverse projection scale of x and y, z, w: near and far of the depth slices
     cluster: vec4f,
-    // x: directional lights, y: lights, z: 1 when lit, w: 1 for an orthographic camera
+    // x: directional lights, y: lights, z: 1 when lit, 0 unlit, above 1 the channel of an
+    // impostor frame (impostor_channel), w: 1 for an orthographic camera
     lights: vec4u,
     // x, y, z: clusters per axis, w: reflection probes the clusters list, the first ones of the
     // reflection probe buffer
@@ -76,6 +77,40 @@ struct View {
     planar_owner: array<vec4f, 6>,
     // Page slot plus one of the instance of the shape of each slot, 0 for none
     planar_slots: vec4u,
+    // The field of WaterRipples of the scene of the view (gpu_ripples.c), see mesh_extended.wgsl:
+    // the world XZ of the corner of its window (a.xy), 1 / the world units of a cell (a.z), the
+    // strength of its normals (a.w), the world Y of its Water (b.x), the height above or below it
+    // within which a fragment takes the field (b.y), the cells over which the normals fade out
+    // at the border (b.z), the resolution (c.x), the texel of the window corner (c.yz) and 1 for
+    // a field (c.w), 0 for a view without one, whose fragments never read the heights
+    ripple_a: vec4f,
+    ripple_b: vec4f,
+    ripple_c: vec4u,
+    // The spectrum of WaterSpectrum of the scene of the view (gpu_spectrum.c), see
+    // mesh_extended.wgsl: the world XZ offset fragments add to their world XZ to sample its tiles
+    // (spectrum_a.xy), the weight of the normal map over it (spectrum_a.z), the scale that brings
+    // its heights to about -1..1 (spectrum_a.w), one over the world units of the tile of each
+    // cascade (spectrum_b.xyz) and the cascades (spectrum_c.x), 0 for a view without one, whose
+    // fragments never sample it
+    spectrum_a: vec4f,
+    spectrum_b: vec4f,
+    spectrum_c: vec4u,
+    // The absolute position of the local origin (WorldOrigin) as box_gpu_origin_split packs it:
+    // its whole world units (xyz) and the rest of a unit of each (w), see world_origin.wgsl
+    origin: vec4i,
+    // view_proj of the previous frame the view rendered, see temporal.wgsl; view_proj itself
+    // when the history is not valid
+    prev_view_proj: mat4x4f,
+    // x: frames rendered since the last reset of the history, y: 1 when the history is valid,
+    // z, w: unused
+    temporal: vec4u,
+    // Integrated froxel grid of the fog volumes of the view, which blended draws look up
+    // (fog_blend.wgsl): x, y the share of the grid the render size covers across and down, z its
+    // slices, w 1 when the view has fog volumes and 0 when not
+    fog_grid: vec4f,
+    // x: view depth of the near plane of the grid, y: of its far end, z: 1 for an orthographic
+    // camera, w: unused
+    fog_range: vec4f,
 };
 
 // shadow is the index of the tile record of a spot or point light in the shadow atlas of the
@@ -107,9 +142,11 @@ struct ReflectionProbe {
     capture: vec3f,
     scene: u32,
     ready: u32,
+    // Slot of the previous capture of the scene probe and its weight, fading out after the
+    // probe followed the focus; fade 0 for none
+    previous: u32,
+    fade: f32,
     pad0: u32,
-    pad1: u32,
-    pad2: u32,
 };
 
 // Reflection probes a cluster lists at most.

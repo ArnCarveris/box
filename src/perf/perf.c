@@ -75,6 +75,9 @@ static box_perf_t* box_perf_new(void)
 {
     box_perf_t *result = ecs_os_calloc_t(box_perf_t);
     ecs_vec_init_t(NULL, &result->intervals, double, 0);
+    ecs_vec_init_t(NULL, &result->grass_samples, double, 0);
+    ecs_vec_init_t(NULL, &result->grass_ms, double, 0);
+    ecs_vec_init_t(NULL, &result->grass_drawn, double, 0);
 
     return result;
 }
@@ -88,6 +91,9 @@ static void box_perf_free(
 {
     box_perf_t *perf = ctx;
     ecs_vec_fini_t(NULL, &perf->intervals, double);
+    ecs_vec_fini_t(NULL, &perf->grass_samples, double);
+    ecs_vec_fini_t(NULL, &perf->grass_ms, double);
+    ecs_vec_fini_t(NULL, &perf->grass_drawn, double);
     ecs_os_free(perf);
 }
 
@@ -187,7 +193,11 @@ static void BoxPerfOnSet(
     ecs_os_memset(perf->cull_sum, 0, ECS_SIZEOF(perf->cull_sum));
     perf->graph_sampled = false;
     ecs_os_memset(perf->graph_sum, 0, ECS_SIZEOF(perf->graph_sum));
+    perf->grass_sampled = false;
     ecs_vec_clear(&perf->intervals);
+    ecs_vec_clear(&perf->grass_samples);
+    ecs_vec_clear(&perf->grass_ms);
+    ecs_vec_clear(&perf->grass_drawn);
     if (!valid) {
         ecs_err("PerfRun.fps is %g, expected 30, 60, 90 or 120", (double)run->fps);
         if (run->quit) {
@@ -459,22 +469,22 @@ static void box_perf_range(
  *
  * @param perf The state of the module
  * @param status The status whose ranges are updated
- * @param counts The visible, frustum culled and occlusion culled instances, the batches skipped
- *   by the views and by their cascades
+ * @param counts The visible, frustum culled, occlusion culled and range culled instances, the
+ *   batches skipped by the views and by their cascades
  */
 static void box_perf_cull_count(
     box_perf_t *perf,
     PerfStatus *status,
-    const int32_t counts[5])
+    const int32_t counts[6])
 {
-    PerfRange *ranges[5] = {
+    PerfRange *ranges[6] = {
         &status->visible, &status->frustum_culled, &status->occlusion_culled,
-        &status->batches_skipped, &status->casters_skipped
+        &status->range_culled, &status->batches_skipped, &status->casters_skipped
     };
     bool changed = false;
     int32_t i;
     status->cull_samples ++;
-    for (i = 0; i < 5; i ++) {
+    for (i = 0; i < 6; i ++) {
         changed |= status->cull_samples > 1 && counts[i] != perf->cull_last[i];
         perf->cull_last[i] = counts[i];
         perf->cull_sum[i] += counts[i];
@@ -498,7 +508,7 @@ static void box_perf_sample_cull(
     PerfStatus *status,
     ecs_entity_t camera)
 {
-    int32_t counts[5] = {0, 0, 0, 0, 0};
+    int32_t counts[6] = {0, 0, 0, 0, 0, 0};
     int64_t frame = -1;
     int32_t views = 0;
     ecs_iter_t it = ecs_each(world, View);
@@ -517,8 +527,9 @@ static void box_perf_sample_cull(
                 counts[0] += cull->visible;
                 counts[1] += cull->frustum_culled;
                 counts[2] += cull->occlusion_culled;
-                counts[3] += cull->batches_skipped;
-                counts[4] += cull->casters_skipped;
+                counts[3] += cull->range_culled;
+                counts[4] += cull->batches_skipped;
+                counts[5] += cull->casters_skipped;
                 frame = cull->frame > frame ? cull->frame : frame;
             }
         }
@@ -578,6 +589,118 @@ done:
     return;
 }
 
+/** Sample the grass work of a measured frame: the GPU time of a grass pass when new
+ * timestamps were read back since the previous measured frame, and the blades drawn per packet
+ * when new counts were. Both series carry the latest value through the frames without one.
+ *
+ * @param world The world
+ * @param perf The state of the module
+ */
+static void box_perf_sample_grass(
+    ecs_world_t *world,
+    box_perf_t *perf)
+{
+    int64_t *last = perf->grass_last;
+    box_render_gpu_stats_t stats;
+    int64_t now[BOX_PERF_GRASS_COUNTS], timed, reads, drawn = 0;
+    double ms = 0, blades = 0;
+    int32_t count = ecs_vec_count(&perf->grass_ms), i;
+    if (count) {
+        ms = ecs_vec_get_t(&perf->grass_ms, double, count - 1)[0];
+        blades = ecs_vec_get_t(&perf->grass_drawn, double, count - 1)[0];
+    }
+
+    if (!box_render_gpu_stats(world, &stats)) {
+        goto done;
+    }
+
+    now[0] = stats.grass_passes;
+    now[1] = stats.grass_ns;
+    now[2] = stats.grass_timed;
+    now[3] = stats.grass_reads;
+    for (i = 0; i < BOX_GRASS_LODS; i ++) {
+        now[4 + i] = stats.grass_generated[i];
+        now[4 + BOX_GRASS_LODS + i] = stats.grass_drawn[i];
+    }
+
+    now[4 + 2 * BOX_GRASS_LODS] = stats.grass_culled_patches;
+    now[5 + 2 * BOX_GRASS_LODS] = stats.grass_culled_blades;
+
+    if (!perf->grass_sampled) {
+        ecs_os_memcpy(perf->grass_base, now, ECS_SIZEOF(now));
+        ecs_os_memcpy(last, now, ECS_SIZEOF(now));
+        perf->grass_sampled = true;
+    }
+
+    timed = now[2] - last[2];
+    if (timed > 0) {
+        ms = (double)(now[1] - last[1]) * 1e-6 / (double)timed;
+        ecs_vec_append_t(NULL, &perf->grass_samples, double)[0] = ms;
+    }
+
+    reads = now[3] - last[3];
+    if (reads > 0) {
+        for (i = 0; i < BOX_GRASS_LODS; i ++) {
+            drawn += now[4 + BOX_GRASS_LODS + i] - last[4 + BOX_GRASS_LODS + i];
+        }
+
+        blades = (double)drawn / (double)reads;
+    }
+
+    ecs_os_memcpy(last, now, ECS_SIZEOF(now));
+done:
+    ecs_vec_append_t(NULL, &perf->grass_ms, double)[0] = ms;
+    ecs_vec_append_t(NULL, &perf->grass_drawn, double)[0] = blades;
+}
+
+/** Complete the grass work of a run from the counters since its first measured frame.
+ *
+ * @param perf The state of the module
+ * @param status The status to complete
+ */
+static void box_perf_end_grass(
+    const box_perf_t *perf,
+    PerfStatus *status)
+{
+    PerfGrass *g = &status->grass;
+    PerfGrassLevel *levels[BOX_GRASS_LODS] = { &g->lod0, &g->lod1, &g->lod2 };
+    const int64_t *base = perf->grass_base, *last = perf->grass_last;
+    box_perf_stats_t times;
+    double reads;
+    int32_t i;
+    ecs_os_memset_t(g, 0, PerfGrass);
+    if (!perf->grass_sampled) {
+        goto done;
+    }
+
+    g->passes = (int32_t)(last[0] - base[0]);
+    g->timed = (int32_t)(last[2] - base[2]);
+    g->reads = (int32_t)(last[3] - base[3]);
+    g->samples = ecs_vec_count(&perf->grass_samples);
+    g->mean_ms = g->timed > 0 ? (double)(last[1] - base[1]) * 1e-6 / (double)g->timed : 0;
+    box_perf_stats(&perf->grass_samples, &times);
+    g->p50_ms = times.p50;
+    g->p95_ms = times.p95;
+    g->p99_ms = times.p99;
+    g->max_ms = times.max;
+    reads = g->reads > 0 ? (double)g->reads : 1.0;
+    for (i = 0; i < BOX_GRASS_LODS; i ++) {
+        levels[i]->generated = (double)(last[4 + i] - base[4 + i]) / reads;
+        levels[i]->drawn = (double)(last[4 + BOX_GRASS_LODS + i] -
+            base[4 + BOX_GRASS_LODS + i]) / reads;
+        g->generated += levels[i]->generated;
+        g->drawn += levels[i]->drawn;
+    }
+
+    g->culled_patches = (double)(last[4 + 2 * BOX_GRASS_LODS] -
+        base[4 + 2 * BOX_GRASS_LODS]) / reads;
+    g->culled_blades = (double)(last[5 + 2 * BOX_GRASS_LODS] -
+        base[5 + 2 * BOX_GRASS_LODS]) / reads;
+
+done:
+    return;
+}
+
 /** Complete the CPU usage and the presents of a run.
  *
  * @param world The world
@@ -619,6 +742,7 @@ static void box_perf_end(
     status->min_ms = frames.min;
     status->mean_ms = frames.mean;
     status->p50_ms = frames.p50;
+    status->p95_ms = frames.p95;
     status->p99_ms = frames.p99;
     status->max_ms = frames.max;
     status->slept_ms = app ? (app->slept - perf->slept) * 1000.0 : 0;
@@ -627,6 +751,7 @@ static void box_perf_end(
         ? (float)((perf->mark - perf->measure) / run->period)
         : 0.0f;
     box_perf_end_usage(world, perf, status);
+    box_perf_end_grass(perf, status);
     status->passed = status->errors == 0 && status->frame == perf->frames;
     status->state = PerfDone;
     perf->state = PerfDone;
@@ -635,7 +760,7 @@ static void box_perf_end(
     }
 
     if (run->report && run->report[0]) {
-        box_perf_report(world, run, status, &perf->intervals);
+        box_perf_report(world, run, status, perf);
     }
 
     if (run->quit) {
@@ -697,6 +822,7 @@ static void box_perf_measure(
     box_perf_count(perf, status, now - perf->mark);
     box_perf_sample_cull(world, perf, status, camera);
     box_perf_sample_graphs(world, perf, status);
+    box_perf_sample_grass(world, perf);
     if (audio && audio->load > status->audio_load) {
         status->audio_load = audio->load;
     }
@@ -811,6 +937,8 @@ void BoxPerfImport(
     ECS_META_COMPONENT(world, PerfRange);
     ECS_META_COMPONENT(world, PerfChecks);
     ECS_META_COMPONENT(world, PerfTextureGraphs);
+    ECS_META_COMPONENT(world, PerfGrassLevel);
+    ECS_META_COMPONENT(world, PerfGrass);
     ECS_META_COMPONENT(world, PerfRun);
     ECS_META_COMPONENT(world, PerfStatus);
     ecs_set_name_prefix(world, NULL);

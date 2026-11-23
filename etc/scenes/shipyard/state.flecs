@@ -29,11 +29,11 @@ state {
   event Request(op: i32)
 
   export mut grid: RigGrid = {}
-  export mut status: i32[1080] = {}
-  export mut counts: i32[18] = {}
+  export mut status: i32[CELLS] = {}
+  export mut counts: i32[KINDS] = {}
   export mut modules: i32 = 0
   export mut problems: i32 = 0
-  export mut air: bool[1080] = {}
+  export mut air: RigFlags = {}
   export mut placed: RigGrid = {}
   export mut stamp: i32 = 0
   export mut yard_design: RigDesign = {}
@@ -70,16 +70,17 @@ state {
   }
 
   fn validate() {
-    mut st: i32[1080] = {}
-    mut aired: bool[1080] = {}
-    mut queue: i32[1080] = {}
-    mut tally: i32[18] = {}
+    mut st: i32[CELLS] = {}
+    mut aired: RigFlags = {}
+    mut queue: i32[CELLS] = {}
+    mut tally: i32[KINDS] = {}
     mut front: i32 = GZ
     mut back: i32 = -1
     mut total: i32 = 0
 
     for i in 0..CELLS {
       const k = grid[i]
+
       if k != 0 {
         total += 1
         tally[k] += 1
@@ -90,6 +91,7 @@ state {
 
     mut head: i32 = 0
     mut tail: i32 = 0
+
     for i in 0..CELLS {
       if grid[i] == K_LIFE || grid[i] == K_OBS {
         aired[i] = true
@@ -97,37 +99,44 @@ state {
         tail += 1
       }
     }
+
     while head < tail {
       const c = queue[head]
       head += 1
       const x = cell_x(c)
       const y = cell_y(c)
       const z = cell_z(c)
+
       if x > 0 && crewed(grid[c - 1]) && !aired[c - 1] {
         aired[c - 1] = true
         queue[tail] = c - 1
         tail += 1
       }
+
       if x < GX - 1 && crewed(grid[c + 1]) && !aired[c + 1] {
         aired[c + 1] = true
         queue[tail] = c + 1
         tail += 1
       }
+
       if z > 0 && crewed(grid[c - GX]) && !aired[c - GX] {
         aired[c - GX] = true
         queue[tail] = c - GX
         tail += 1
       }
+
       if z < GZ - 1 && crewed(grid[c + GX]) && !aired[c + GX] {
         aired[c + GX] = true
         queue[tail] = c + GX
         tail += 1
       }
+
       if y > 0 && crewed(grid[c - LAYER]) && !aired[c - LAYER] {
         aired[c - LAYER] = true
         queue[tail] = c - LAYER
         tail += 1
       }
+
       if y < GY - 1 && crewed(grid[c + LAYER]) && !aired[c + LAYER] {
         aired[c + LAYER] = true
         queue[tail] = c + LAYER
@@ -138,15 +147,20 @@ state {
     const d = rig_design(grid, placed)
 
     mut bad: i32 = 0
+
     for i in 0..CELLS {
       const k = grid[i]
+
       if k != 0 {
         const own = rule_code(grid, d.shape, cell_x(i), cell_y(i), cell_z(i), k)
+
         if own != 0 {
           st[i] = own
-        } else if k == K_HAB && !aired[i] && touches_any(near_in(grid, cell_x(i), cell_y(i), cell_z(i))) {
+        } else if k == K_HAB && !aired[i] &&
+          touches_any(near_in(grid, cell_x(i), cell_y(i), cell_z(i))) {
           st[i] = 17
         }
+
         if st[i] != 0 {
           bad += 1
         }

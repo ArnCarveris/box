@@ -46,7 +46,7 @@ not load. Layout comes from `box.layout`, text from `box.text`, pointer events f
 | `ProgressBar` | `value` (0..1), `label`, `width` | f32 |
 | `TextInput` | `label`, `placeholder`, `value`, `password`, `read_only`, `disabled`, `width` | string |
 | `Dropdown` | `options` (list), `value` (index), `row` 28, `inset` 4, `disabled`, `width` | i32 |
-| `ScrollView` | `width`, `height`, `horizontal` false, `vertical` true, `bar` 10, `step` 40, `keys` true, `focusable` true | |
+| `ScrollView` | `width`, `height`, `horizontal` false, `vertical` true, `bar` 10, `step` 40, `keys` true, `focusable` true, `overlay` false, `hide_delay` 1, `transparent` false (app copy) | |
 | `ListView` | `items`, `value` (-1), `row`, `height`, ... (a ScrollView) | i32 |
 | `TabView` > `Tab` | view: `value`, `width`, `height`; tab: `label` | i32 |
 | `Collapsible` | `title`, `value` (open), `disabled`, `width`, `header` 32 | bool |

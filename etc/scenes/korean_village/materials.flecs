@@ -11,19 +11,45 @@ assets {
   prefab KoreanBlue { Rgb: {39, 88, 122}; PbrMaterial: {roughness: 0.76} }
   prefab KoreanGold { Rgb: {232, 181, 79}; PbrMaterial: {roughness: 0.72} }
   prefab KoreanPaper { Rgb: {233, 222, 187}; PbrMaterial: {roughness: 0.97} }
-  prefab KoreanSilk { Rgb: {226, 76, 58}; Emissive: {strength: 1.1, color: {255, 92, 60}}; Sheen: {color: {110, 36, 26}, roughness: 0.6} }
+  prefab KoreanSilk {
+    Rgb: {226, 76, 58}
+    Emissive: {strength: 1.1, color: {255, 92, 60}}
+    Sheen: {color: {110, 36, 26}, roughness: 0.6}
+  }
+
   prefab KoreanPlaster { Rgb: {220, 209, 178}; PbrMaterial: {roughness: 0.97} }
   prefab KoreanStone { Rgb: {154, 155, 143}; PbrMaterial: {roughness: 0.96} }
   prefab KoreanTile { Rgb: {54, 65, 74}; PbrMaterial: {roughness: 0.67} }
   prefab KoreanTileEdge { Rgb: {89, 105, 114}; PbrMaterial: {roughness: 0.64} }
-  prefab KoreanGlaze { Rgb: {91, 53, 32}; PbrMaterial: {roughness: 0.29}; ClearCoat: {strength: 0.65, roughness: 0.23} }
-  prefab KoreanLitPaper { Rgb: {236, 222, 182}; PbrMaterial: {roughness: 0.97}; Emissive: {strength: 0.12, color: {255, 186, 110}}; DiffuseTransmission: {factor: 0.45, color: {255, 220, 170}} }
+  prefab KoreanGlaze {
+    Rgb: {91, 53, 32}
+    PbrMaterial: {roughness: 0.29}
+    ClearCoat: {strength: 0.65, roughness: 0.23}
+  }
+
+  prefab KoreanLitPaper {
+    Rgb: {236, 222, 182}
+    PbrMaterial: {roughness: 0.97}
+    Emissive: {strength: 0.12, color: {255, 186, 110}}
+    DiffuseTransmission: {factor: 0.45, color: {255, 220, 170}}
+  }
+
   prefab KoreanBark { Rgb: {78, 56, 42}; PbrMaterial: {roughness: 1} }
   prefab KoreanBronze { Rgb: {92, 124, 104}; PbrMaterial: {metallic: 0.75, roughness: 0.48} }
   prefab KoreanIron { Rgb: {58, 56, 50}; PbrMaterial: {metallic: 0.65, roughness: 0.55} }
   prefab KoreanStraw { Rgb: {176, 148, 92}; PbrMaterial: {roughness: 1} }
   prefab KoreanSignGround { Rgb: {28, 39, 45}; PbrMaterial: {roughness: 0.55} }
-  prefab KoreanWater { Rgb: {170, 214, 210}; PbrMaterial: {roughness: 0.06}; Transmission: {transmission_factor: 0.9, ior: 1.33, thickness_factor: 0.3, attenuation_distance: 0.6, attenuation_color: {42, 98, 100}} }
+  prefab KoreanWater {
+    Rgb: {170, 214, 210}
+    PbrMaterial: {roughness: 0.06}
+    Transmission: {
+      transmission_factor: 0.9,
+      ior: 1.33,
+      thickness_factor: 0.3,
+      attenuation_distance: 0.6,
+      attenuation_color: {42, 98, 100}
+    }
+  }
 
   prefab KoreanRoundShape {
     Path2D: {
@@ -40,6 +66,7 @@ assets {
       closed: true
     }
   }
+
   prefab KoreanRoundProfile { Profile2D: {outer: KoreanRoundShape} }
 
   prefab KoreanTileShape {
@@ -57,5 +84,6 @@ assets {
       closed: true
     }
   }
+
   prefab KoreanTileProfile { Profile2D: {outer: KoreanTileShape} }
 }

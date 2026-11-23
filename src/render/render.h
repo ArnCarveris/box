@@ -13,12 +13,16 @@
 
 #include "render_packet.h"
 #include "render_backend.h"
+#include "../../etc/shaders/include/froxel.h"
 
 /** Counters of the instanced batches of a world, written by the draw extract */
 typedef struct box_render_draws_stats_t {
     int32_t batches;            /**< Batches alive */
     int32_t instances;          /**< Static instances in batches */
     int32_t dynamic;            /**< Dynamic instances in batches */
+    int32_t impostors;          /**< Instances drawn as the card of an Impostor beyond its
+                                 *   distance, one card per instance of its prefab */
+    int32_t impostor_batches;   /**< Batches of impostor cards, one per prefab */
     int32_t processed;          /**< Changed entities processed by the last extract */
     int32_t scattered;          /**< Instances the last extract sent through the scatter pass */
     int32_t scatters;           /**< Scatters the last extract sent, one per instance page with
@@ -270,6 +274,43 @@ void box_render_texture_previews_filter(
     ecs_vec_t *out,
     int32_t first);
 
+/** Bit set in the tickets of the readbacks of the TextureReadback copies */
+#define BOX_RENDER_READBACK_TICKET (0x40000000u)
+
+/** Bits of a ticket that tell its owner: the readback bit and the bit of the previews */
+#define BOX_RENDER_READBACK_TICKET_MASK (0xC0000000u)
+
+/** Move the readbacks of the previews in a vector to the previews, which encode them in their
+ * next frame, and the others to the readbacks kept for box_render_texture_graph_reads.
+ *
+ * @param world The world
+ * @param reads The readbacks, cleared
+ */
+void box_render_texture_previews_return(
+    ecs_world_t *world,
+    ecs_vec_t *reads);
+
+/** Store the readbacks of the TextureReadback copies among the ones a caller took into their
+ * copies, removing them from the vector.
+ *
+ * @param world The world
+ * @param out The readbacks, compacted
+ * @param first Index of the first readback the caller took
+ */
+void box_render_texture_readbacks_filter(
+    ecs_world_t *world,
+    ecs_vec_t *out,
+    int32_t first);
+
+/** Register the system that keeps the CPU copies of the textures with a TextureReadback after
+ * every new revision of their image and writes TextureReadbackStatus. It runs after the texture
+ * extract.
+ *
+ * @param world The world
+ */
+void box_render_texture_readbacks_init(
+    ecs_world_t *world);
+
 /** Register the system that reads back the nodes with a TextureNodePreview and writes their
  * TextureNodePreviewStatus, and TextureGraphStats. It runs after the texture extract.
  *
@@ -326,9 +367,12 @@ void box_render_fog_noise(
     uint8_t *out);
 
 /** Give every lit view with LightSettings.fog_volumes the FogVolumes of the scene of its camera
- * that may be in its frustum, back to front by the distance of their centers from the camera.
+ * that may be in its frustum and the FogVolumeUnbounded ones, which are never culled, back to
+ * front by the distance of their centers from the camera, the unbounded ones last, and its
+ * LightSettings.fog_distance.
  *
- * A view that sees more than BOX_RENDER_FOG_VOLUMES_MAX keeps the nearest and warns once.
+ * A view that sees more than BOX_RENDER_FOG_VOLUMES_MAX keeps the unbounded ones, then the
+ * nearest, and warns once.
  * Views without a view entity, unlit views and cameras without a depth range get none. The
  * records go after those of the views before, with the noise offsets at the time of the packet.
  *
@@ -342,6 +386,59 @@ void box_render_fog_views(
     box_render_fog_t *fog,
     box_render_packet_t *p,
     box_render_lights_stats_t *stats);
+
+/** Resolve LightSettings.fog_distance: 0 is BOX_FROXEL_DISTANCE_DEFAULT, else at least
+ * BOX_FROXEL_DISTANCE_MIN.
+ *
+ * @param distance LightSettings.fog_distance
+ * @return World units the froxel grid of the view reaches beyond its near plane
+ */
+float box_render_fog_distance(
+    float distance);
+
+/** Get the size of the froxel grid of the fog volumes of a view of a render size: one cell per
+ * tile of max(BOX_FROXEL_TILE_MIN, ceil(edge / BOX_FROXEL_CELLS_MAX)) pixels, edge the larger
+ * of width and height, so the grid has at most BOX_FROXEL_CELLS_MAX cells along it.
+ *
+ * @param width Render width in pixels
+ * @param height Render height in pixels
+ * @param out Receives the cells across, the cells down and the tile edge in pixels
+ */
+void box_render_froxel_grid(
+    int32_t width,
+    int32_t height,
+    int32_t *out);
+
+/** Get the view depth at a share of the depth of a froxel grid, froxel_depth of froxel.wgsl:
+ * exponential from the near plane for a perspective camera (BOX_FROXEL_EXPONENT), linear for an
+ * orthographic one.
+ *
+ * @param share Share of the depth of the grid, 0 at the near plane and 1 at its far end
+ * @param near_ View depth of the near plane
+ * @param far_ View depth of the far end of the grid, near_ plus the fog distance
+ * @param ortho Whether the camera is orthographic
+ * @return The view depth
+ */
+float box_render_froxel_depth(
+    float share,
+    float near_,
+    float far_,
+    bool ortho);
+
+/** Get the share of the depth of a froxel grid of a view depth, the inverse of
+ * box_render_froxel_depth, clamped to 0..1; froxel_share of froxel.wgsl.
+ *
+ * @param depth The view depth
+ * @param near_ View depth of the near plane
+ * @param far_ View depth of the far end of the grid
+ * @param ortho Whether the camera is orthographic
+ * @return The share
+ */
+float box_render_froxel_share(
+    float depth,
+    float near_,
+    float far_,
+    bool ortho);
 
 /** Give every view with a tree on in BvhDebug the boxes of those trees of the spatial index of
  * the scene of its camera, after the boxes of the views before it.
@@ -382,6 +479,156 @@ void box_render_portals_capture(
     box_render_view_t *v,
     float aspect);
 
+/** The Wind of a frame as the WindSway records pack it (box_render_wind_frame) */
+typedef struct box_render_wind_t {
+    float direction[2];     /**< Normalized world X and Z the wind blows toward */
+    float offset[2];        /**< Wrapped world X and Z offset of the gust field */
+    float speed;            /**< World units per second, 0 when calm or without a Wind */
+    float gust;             /**< Gust, clamped to 0..1 */
+    float frequency;        /**< 1 over the gust scale, gust patches per world unit */
+    float sway;             /**< Phase of the sway, 0..1 */
+    double time;            /**< Seconds the wind was advanced */
+    double clock;           /**< WindStatus.clock, the clock of the flutter and branches */
+    double origin_y;        /**< Absolute Y of the local origin, which the WindSway.base of a
+                             *   record is made local by */
+} box_render_wind_t;
+
+/** Axis the phase of the flutter of a vertex runs along, WIND_FLUTTER_AXIS of wind.wgsl */
+#define BOX_RENDER_WIND_FLUTTER_AXIS {3.1f, 1.7f, 2.3f}
+
+/** Period the flutter offset wraps to: 20 pi, over which the three sines of the flutter, at 1,
+ * 1.3 and 0.7 times its phase, repeat */
+#define BOX_RENDER_WIND_FLUTTER_PERIOD (62.83185307179586)
+
+/** Smallest Wind.gust_scale the engine uses */
+#define BOX_RENDER_WIND_GUST_SCALE_MIN (0.01f)
+
+/** Smallest WindSway.height and flutter_reach a record keeps */
+#define BOX_RENDER_WIND_MIN (1e-3f)
+
+/** Relative amplitude of the sway of a plant around its lean, along the wind */
+#define BOX_RENDER_WIND_SWAY (0.1f)
+
+/** Relative amplitude of the sway of a plant across the wind */
+#define BOX_RENDER_WIND_CROSS (0.06f)
+
+/** Relative amplitude of the turn of a branch of a WindSway with pivots about the wind axis */
+#define BOX_RENDER_WIND_BRANCH_CROSS (0.3f)
+
+/** Frequency of the sway in Hz in a calm, and the Hz it gains per world unit per second of wind
+ * speed, up to BOX_RENDER_WIND_SWAY_MAX */
+#define BOX_RENDER_WIND_SWAY_BASE (0.25)
+#define BOX_RENDER_WIND_SWAY_RATE (0.05)
+#define BOX_RENDER_WIND_SWAY_MAX (1.5)
+
+/** Rate of the wind clock in a calm, relative to its rate at BOX_WIND_FULL_SPEED: the rate grows
+ * linearly from it to 1 at full speed, so a breeze of 2 m/s runs at a third */
+#define BOX_RENDER_WIND_CLOCK_CALM (1.0 / 6.0)
+
+/** Resolve the values of a Wind: the direction normalized ({1, 0} when zero or not finite), the
+ * speed 0 when negative or not finite, the gust clamped to 0..1, the gust scale at least
+ * BOX_RENDER_WIND_GUST_SCALE_MIN.
+ *
+ * @param wind The Wind
+ * @param out Receives the resolved values
+ */
+void box_render_wind_resolve(
+    const Wind *wind,
+    Wind *out);
+
+/** Frequency of the sway of a resolved Wind in Hz, which grows with its speed.
+ *
+ * @param wind The resolved Wind
+ * @return The frequency
+ */
+double box_render_wind_sway_frequency(
+    const Wind *wind);
+
+/** Rate of the wind clock of a resolved Wind, seconds of the clock per second: from
+ * BOX_RENDER_WIND_CLOCK_CALM in a calm linearly to 1 at BOX_WIND_FULL_SPEED and above.
+ *
+ * @param wind The resolved Wind
+ * @return The rate
+ */
+double box_render_wind_clock_rate(
+    const Wind *wind);
+
+/** Advance the status of a Wind by a delta: the gust offset moves along the direction by the
+ * speed times the delta and wraps to BOX_WIND_GUST_PERIOD times the gust scale, the sway phase
+ * advances by its frequency times the delta and wraps to 0..1, time by the delta, all in
+ * double precision. A negative or not finite delta advances nothing.
+ *
+ * @param wind The Wind
+ * @param delta Seconds to advance by
+ * @param status The status, advanced in place
+ */
+void box_render_wind_advance(
+    const Wind *wind,
+    double delta,
+    WindStatus *status);
+
+/** Get the Wind of a world as the WindSway records pack it: the singleton Wind, resolved, with
+ * the state of its WindStatus; a calm wind without one.
+ *
+ * The gust offset moves back by the absolute position of the local origin (WorldOrigin), the
+ * sway phase by the wave across it along the wind, and the flutter offset is the origin along
+ * the flutter axis, all wrapped in double precision, so the patterns hold across a shift.
+ *
+ * @param world The world
+ * @param out Receives the wind
+ */
+void box_render_wind_frame(
+    const ecs_world_t *world,
+    box_render_wind_t *out);
+
+/** Pack the WindSway fields of a material record: the wind of the frame and the sway, the flutter
+ * and branch phases computed from the time of the wind in double precision; all 0 without a
+ * sway.
+ *
+ * @param out The record
+ * @param sway The WindSway, NULL for none
+ * @param wind The wind of the frame
+ */
+void box_render_wind_pack(
+    box_render_material_t *out,
+    const WindSway *sway,
+    const box_render_wind_t *wind);
+
+/** Largest world distance a WindSway moves a vertex in a wind, which the bounds of its shapes
+ * grow by: the bend along and across the wind at the strongest gust and sway (the drop that keeps
+ * the length is below it) plus 1.15 times the flutter, the longest flutter vector; with pivots
+ * plus twice the chord of the largest turn of a branch over size, which a branch and its parent
+ * turn by; 0 when calm.
+ *
+ * @param sway The WindSway
+ * @param wind The wind of the frame
+ * @param size Largest world distance of a vertex of a shape from a pivot of its branch, the
+ *   diameter of its bounds; ignored without pivots
+ * @return The distance
+ */
+float box_render_wind_reach(
+    const WindSway *sway,
+    const box_render_wind_t *wind,
+    float size);
+
+/** Largest angle in radians a branch of a WindSway with pivots turns about its pivot: its
+ * branch along and BOX_RENDER_WIND_BRANCH_CROSS of it across the wind, at most pi; 0 without
+ * pivots or branch.
+ *
+ * @param sway The WindSway
+ * @return The angle
+ */
+float box_render_wind_turn(
+    const WindSway *sway);
+
+/** Register the system that advances the WindStatus of the Wind and the observer that adds it,
+ * called by the import of box.atmosphere.
+ *
+ * @param world The world
+ */
+void box_render_wind_import(
+    ecs_world_t *world);
+
 /** Get the offset the wind of a FogVolume moves its noise by at a time: its wind times the time
  * on each axis, computed in double precision and wrapped to [0, BOX_RENDER_FOG_NOISE_PERIOD
  * times its noise_scale), the distance over which both noise samples of the shader repeat.
@@ -394,6 +641,65 @@ void box_render_fog_offset(
     const FogVolume *fog,
     double time,
     float *out);
+
+/** Get the absolute world position of the local origin, the WorldOrigin singleton; 0 without
+ * one or when it is not finite.
+ *
+ * The world space patterns of the shaders sample the local position plus this origin, which
+ * the CPU splits per use in double precision and wraps to the period of each pattern.
+ *
+ * @param world The world
+ * @param out Receives X, Y and Z
+ */
+void box_render_origin(
+    const ecs_world_t *world,
+    double out[3]);
+
+/** Wrap a value to [0, period) in double precision, 0 when it or the period is not finite or
+ * the period not above 0.
+ *
+ * @param v The value
+ * @param period The period
+ * @return The wrapped value
+ */
+double box_render_origin_wrap(
+    double v,
+    double period);
+
+/** Wrap a value to [0, period) in double precision and round it to a float below the period.
+ *
+ * @param v The value
+ * @param period The period
+ * @return The wrapped value
+ */
+float box_render_origin_wrap_float(
+    double v,
+    double period);
+
+/** Get the offset a MappingWorld projection (and a MappingFrame one without a frame) adds to the
+ * projected local position of a fragment for the absolute position.
+ *
+ * The origin over the size times the TextureTransform scale, as mapping_object of material.wgsl
+ * makes it, (x * su, y * sv, z * su, x * sv), each wrapped to [0, 1). 0 at an origin of 0.
+ *
+ * @param origin The absolute position of the local origin
+ * @param size TextureMapping.size, 1 when it is not above 0 and finite
+ * @param scale_u TextureTransform.scale_x
+ * @param scale_v TextureTransform.scale_y
+ * @param out Receives the four components
+ */
+void box_render_origin_mapping(
+    const double origin[3],
+    float size,
+    float scale_u,
+    float scale_v,
+    float out[4]);
+
+/** Repeats the projection of the absolute position of the local origin of a Water record wraps
+ * to in the shaders (WATER_ORIGIN_PERIOD of material.wgsl): its foam samples scale the UVs by
+ * Water.foam_scale and by a second, rotated scale of 1.63 (0.8, 0.6), which stay whole repeats
+ * over this many for foam scales of a few binary decimals */
+#define BOX_RENDER_WATER_ORIGIN_PERIOD (5000.0)
 
 /** Star fields the light extract gives the views, see box_render_star_views */
 typedef struct box_render_stars_t box_render_stars_t;
@@ -568,6 +874,324 @@ int32_t box_render_planar_select(
  */
 void box_render_planar_init(
     ecs_world_t *world);
+
+/** Check whether a packet places or draws grass blades with an engine shader.
+ *
+ * @param p The packet
+ * @param handle Handle of the shader
+ * @return Whether it is a grass shader and the packet has a Grass
+ */
+bool box_render_grass_use(
+    const box_render_packet_t *p,
+    uint32_t handle);
+
+/** Fill the far field of a Grass, which the tiles of its terrain shade beyond its blades: it
+ * fades in from where level 0 ends and the blades start to thin out to BOX_RENDER_GRASS_FAR_FULL
+ * of the distance where they end, and covers the share of the ground its blades cover from
+ * above.
+ *
+ * @param g The Grass of the packet
+ * @param out Receives the far field
+ */
+void box_render_grass_far(
+    const box_render_grass_t *g,
+    box_render_grass_far_t *out);
+
+/** Get the cascades of the directional light of a view a Grass casts into: those that start
+ * within its shadow distance, none when the view renders no shadows or the Grass casts none.
+ *
+ * @param g The Grass of the packet
+ * @param s The shadows of the view
+ * @return Mask of the cascades, bit i for cascade i
+ */
+uint32_t box_render_grass_cascades(
+    const box_render_grass_t *g,
+    const box_render_view_shadows_t *s);
+
+/** Get the distance from the camera at which the blades of a Grass that cast shadows start to
+ * shrink away, so their shadows end without an edge: BOX_RENDER_GRASS_SHADOW_FADE of its shadow
+ * distance.
+ *
+ * @param g The Grass of the packet
+ * @return The distance, 0 for a Grass that casts no shadows
+ */
+float box_render_grass_shadow_fade(
+    const box_render_grass_t *g);
+
+/** Get how far along the light the shadow of a blade of a Grass reaches: BOX_RENDER_GRASS_SHADOW_SLACK
+ * times the length along the light at which the shadow of its tallest blade reaches the ground,
+ * longer the lower the light, at most its shadow distance. The pass that places the blades that
+ * cast keeps those whose shadow within that reach falls into the view.
+ *
+ * @param g The Grass of the packet
+ * @param direction Normalized direction toward the light
+ * @return The reach, 0 for a Grass that casts no shadows
+ */
+float box_render_grass_shadow_reach(
+    const box_render_grass_t *g,
+    const float direction[3]);
+
+/** Find the far field the tiles of a terrain draw with: of the first Grass of the packet on the
+ * sampled Terrain whose tiles draw with a grid mesh.
+ *
+ * @param p The packet
+ * @param mesh Handle of the grid mesh of the tiles, 0 for none
+ * @param out Receives the far field, all zero when no Grass grows on the terrain
+ * @return Whether a Grass grows on the terrain
+ */
+bool box_render_grass_far_of(
+    const box_render_packet_t *p,
+    uint32_t mesh,
+    box_render_grass_far_t *out);
+
+/** Register the system that appends the heights of the terrain tiles that draw to the packet,
+ * which the backend copies into the surface assets of their grid mesh (gpu_draw.c).
+ *
+ * @param world The world
+ */
+void box_render_terrain_init(
+    ecs_world_t *world);
+
+/** Register the system that steps the fields of WaterRipples on the main thread: the water
+ * frame of each field, its window, its steps and its sources, appended to the packet for the
+ * backend (gpu_ripples.c), after the views.
+ *
+ * @param world The world
+ */
+void box_render_water_ripples_init(
+    ecs_world_t *world);
+
+/** Get the cells per side of a field of WaterRipples: the nearest power of two (a tie rounds up)
+ * in BOX_MATERIAL_RIPPLES_RESOLUTION_MIN..BOX_MATERIAL_RIPPLES_RESOLUTION_MAX.
+ *
+ * @param resolution WaterRipples.resolution
+ * @return The cells per side
+ */
+int32_t box_render_ripples_resolution(
+    int32_t resolution);
+
+/** Get the origin of the window of a field centered on a point of the water frame, by whole
+ * cells: the cell of the point minus half the resolution.
+ *
+ * @param x X of the point in the water frame
+ * @param z Z of the point in the water frame
+ * @param cell World units of a cell
+ * @param resolution Cells per side
+ * @param out Receives the cell of the corner of the window, X and Z
+ */
+void box_render_ripples_window(
+    double x,
+    double z,
+    double cell,
+    int32_t resolution,
+    int64_t *out);
+
+/** Get the velocity of a RippleSource relative to the water it moves through.
+ *
+ * @param velocity World velocity of the source, X and Z
+ * @param flow WaterFlow of the Water, NULL for still water
+ * @param out Receives the velocity relative to the water, X and Z
+ * @return The speed relative to the water, 0 below BOX_RENDER_RIPPLE_SPEED_MIN
+ */
+float box_render_ripples_relative(
+    const float *velocity,
+    const WaterFlow *flow,
+    float *out);
+
+/** Get the weight of the rectangle of a flowing Water at a point, the C twin of flow_weight of
+ * water_ripples.wgsl: 0 outside it, rising smoothly (smoothstep) over fade inside each of its
+ * edges to 1, the product of the two axes.
+ *
+ * @param flow The rectangle
+ * @param fade Distance inside an edge over which the weight rises, in the units of the rectangle;
+ * 0 or less for a weight of 1 inside
+ * @param point The point, X and Z
+ * @return The weight, 0..1
+ */
+float box_render_ripples_flow_weight(
+    const box_render_ripple_flow_t *flow,
+    float fade,
+    const float *point);
+
+/** Get the velocity of the water at a point of a field of WaterRipples, the C twin of the flow
+ * pass of water_ripples.wgsl: the frame velocity plus the weighted average of the velocities of the
+ * rectangles relative to it (box_render_ripples_flow_weight), the frame velocity where no
+ * rectangle covers the point. Where every covering rectangle flows with the frame the result is
+ * the frame velocity exactly.
+ *
+ * @param flows The rectangles
+ * @param count Rectangles
+ * @param fade Distance inside an edge over which a weight rises, in the units of the rectangles
+ * @param frame Velocity of the water frame (the WaterFlow of the Water of the field), X and Z
+ * @param point The point, X and Z
+ * @param out Receives the velocity, world units per second, X and Z
+ * @return The sum of the weights of the rectangles at the point, 0 where none covers it
+ */
+float box_render_ripples_flow_at(
+    const box_render_ripple_flow_t *flows,
+    int32_t count,
+    float fade,
+    const float *frame,
+    const float *point,
+    float *out);
+
+/** Get the wave terms of a step of a field of WaterRipples: the wave speed clamped to
+ * BOX_RENDER_RIPPLE_COURANT and the damping as a factor of the velocity per step. The amplitude
+ * of h + keep (h - h_prev) shrinks by sqrt(keep) a step, so its energy by keep: keep is
+ * (1 - damping) to the power of the step.
+ *
+ * @param ripples The component
+ * @param cell World units of a cell
+ * @param courant2 Receives (c dt / dx)^2
+ * @param keep Receives the factor of the vertical velocity a step keeps
+ * @return The wave speed the field moves with, world units per second
+ */
+float box_render_ripples_wave(
+    const WaterRipples *ripples,
+    float cell,
+    float *courant2,
+    float *keep);
+
+/** Get the foam terms of a step of a field of WaterRipples: foam_spread as the share of the
+ * difference to its neighbours a cell takes per step (clamped to
+ * BOX_RENDER_RIPPLE_FOAM_SPREAD_MAX), foam_decay as the factor of the foam a step keeps and
+ * crest_foam as the foam formed per step per unit of slope. Values that are negative or not
+ * finite are 0.
+ *
+ * @param ripples The component
+ * @param cell World units of a cell
+ * @param spread Receives the share taken from the neighbours per step
+ * @param keep Receives the factor of the foam kept per step
+ * @param crest Receives the foam formed per step per unit of slope
+ */
+void box_render_ripples_foam(
+    const WaterRipples *ripples,
+    float cell,
+    float *spread,
+    float *keep,
+    float *crest);
+
+/** Get the world velocity of a RippleSource the last ripple extract computed from the change of
+ * its world position, for tests.
+ *
+ * @param world The world
+ * @param source The entity with RippleSource
+ * @param out Receives the velocity, X, Y and Z
+ * @return Whether the extract knows the entity
+ */
+bool box_render_ripples_velocity(
+    const ecs_world_t *world,
+    ecs_entity_t source,
+    float *out);
+
+/** Register the system that appends the spectra of WaterSpectrum on the main thread: the
+ * parameters of the spectrum of each scene, the time wrapped to its period and its water frame,
+ * appended to the packet for the backend (gpu_spectrum.c), after the views.
+ *
+ * @param world The world
+ */
+void box_render_water_spectrum_init(
+    ecs_world_t *world);
+
+/** Get the texels per side of a cascade of a WaterSpectrum: the nearest power of two (a tie
+ * rounds up) in BOX_MATERIAL_SPECTRUM_RESOLUTION_MIN..BOX_MATERIAL_SPECTRUM_RESOLUTION_MAX.
+ *
+ * @param resolution WaterSpectrum.resolution
+ * @return The texels per side
+ */
+int32_t box_render_spectrum_resolution(
+    int32_t resolution);
+
+/** Get the cascades of a WaterSpectrum, clamped to 1..BOX_RENDER_SPECTRUM_CASCADES.
+ *
+ * @param cascades WaterSpectrum.cascades
+ * @return The cascades
+ */
+int32_t box_render_spectrum_cascades(
+    int32_t cascades);
+
+/** Wrap a render time to 0..BOX_RENDER_SPECTRUM_PERIOD in double precision, the time the
+ * spectrum of a WaterSpectrum evolves to: as its angular frequencies are multiples of 2 pi over
+ * the period, the waves are the same at a time and at the time plus the period.
+ *
+ * @param time Total render time in seconds
+ * @return The wrapped time, 0 when not finite
+ */
+double box_render_spectrum_time(
+    double time);
+
+/** Fill the parameters of the initial spectrum of a record from a WaterSpectrum: the validated
+ * resolution, cascades, tiles, cuts, wind, directionality, amplitude, seed and detail. The
+ * entities, revision, time, offset and height scale are left alone.
+ *
+ * @param spectrum The component
+ * @param out The record
+ */
+void box_render_spectrum_params(
+    const WaterSpectrum *spectrum,
+    box_render_water_spectrum_t *out);
+
+/** Check whether two records have the same initial spectrum, so the backend keeps it.
+ *
+ * @param a The first record
+ * @param b The second record
+ * @return Whether their resolution, cascades, tiles, cuts, wind, directionality, amplitude and
+ * seed are the same
+ */
+bool box_render_spectrum_same(
+    const box_render_water_spectrum_t *a,
+    const box_render_water_spectrum_t *b);
+
+/** Get the angular frequency of a wave of a WaterSpectrum: the deep water dispersion
+ * sqrt(g k) rounded down to a multiple of 2 pi / BOX_RENDER_SPECTRUM_PERIOD, as evolved
+ * computes it in water_spectrum.wgsl.
+ *
+ * @param k Wave number, radians per world unit
+ * @return Radians per second
+ */
+double box_render_spectrum_omega(
+    double k);
+
+/** Get the directional wave spectrum of a record at a wave vector, the variance of the height
+ * per unit area of wave vectors (JONSWAP of a fully developed sea for the wind speed, spread by
+ * the directionality, damped below BOX_RENDER_SPECTRUM_SHORTEST, times the square of the
+ * amplitude), the C twin of spectrum_density of water_spectrum.wgsl.
+ *
+ * @param s The record
+ * @param kx Wave vector X, radians per world unit
+ * @param kz Wave vector Z, radians per world unit
+ * @return The density, 0 for the zero wave vector or no wind
+ */
+double box_render_spectrum_density(
+    const box_render_water_spectrum_t *s,
+    double kx,
+    double kz);
+
+/** Get the expected variance of the height, or of the slope along X plus that along Z, of a
+ * cascade of a record: the sum of the density over the wave vectors of its grid between its
+ * cuts, times the area of a cell of the grid (times k^2 for the slopes).
+ *
+ * @param s The record
+ * @param cascade The cascade
+ * @param slope Whether to get the slope variance instead of the height variance
+ * @return The variance, 0 for a cascade the record lacks
+ */
+double box_render_spectrum_variance(
+    const box_render_water_spectrum_t *s,
+    int32_t cascade,
+    bool slope);
+
+/** Get the revision of the spectrum of a WaterSpectrum the last extract appended, for tests.
+ *
+ * @param world The world
+ * @param water The entity that owns the WaterSpectrum
+ * @param out Receives the revision
+ * @return Whether the extract knows the spectrum
+ */
+bool box_render_spectrum_revision(
+    const ecs_world_t *world,
+    ecs_entity_t water,
+    uint32_t *out);
 
 /** Get the instance of the shape of an entity in the instance pages.
  *
@@ -958,6 +1582,14 @@ uint32_t box_render_shadow_rendered(
     const ecs_world_t *world,
     ecs_entity_t view);
 
+/** Render every shadow cascade of every view in the next extract, as when the views are new:
+ * after a shift of the world origin the cascades kept from earlier frames show the old place.
+ *
+ * @param world The world
+ */
+void box_render_shadows_reset(
+    ecs_world_t *world);
+
 /** Resolve shadow settings: every field is clamped to its valid range and an even
  * filter_size rounds up to the next odd one, other values apply as set.
  *
@@ -1264,6 +1896,17 @@ void box_render_draws_shadow_record(
     const ecs_world_t *world,
     bool record);
 
+/** Check whether the draw extract of this frame found shadow casters with a WindSway in a
+ * scene while the wind blows, whose shadow cascades then render every frame.
+ *
+ * @param world The world
+ * @param scene The scene, 0 for the default scene
+ * @return Whether the scene has swaying casters
+ */
+bool box_render_draws_swaying(
+    const ecs_world_t *world,
+    ecs_entity_t scene);
+
 /** Make the light extract of a world render every shadow atlas tile every frame instead of only
  * the tiles that changed, for tests that compare both. Applies from the next extract.
  *
@@ -1359,7 +2002,10 @@ typedef struct box_render_reflection_probe_t {
     uint32_t scene;         /**< 1 for the scene probe, 0 for a ReflectionProbe */
     uint32_t ready;         /**< 1 when views can sample the slot: its capture was reported or
                              *   runs before the targets of this packet */
-    uint32_t pad[3];        /**< Unused */
+    uint32_t previous;      /**< Slot of the previous capture of the scene probe that fades out
+                             *   after it followed the focus, valid while fade is above 0 */
+    float fade;             /**< Weight of the previous capture, 1 to 0, 0 for none */
+    uint32_t pad;           /**< Unused */
 } box_render_reflection_probe_t;
 
 /** Register the system that keeps the reflection probes of every scene with ReflectionBake.
@@ -1372,6 +2018,19 @@ typedef struct box_render_reflection_probe_t {
  */
 void box_render_reflect_init(
     ecs_world_t *world);
+
+/** Move the reflection probes of a scene, its scene probe and its static bounds by the offset
+ * of a shift of the world origin, and take the moves of the probes in this frame by the offset
+ * alone as no change, so a shift captures nothing again.
+ *
+ * @param world The world
+ * @param scene The scene, 0 for the default scene
+ * @param offset Added to the world positions
+ */
+void box_render_reflect_shift(
+    ecs_world_t *world,
+    ecs_entity_t scene,
+    const vec3 offset);
 
 /** Get the resident reflection probes of a scene.
  *
@@ -1567,6 +2226,15 @@ void box_render_exposure_settings(
 void box_render_smaa_settings(
     const Smaa *in,
     Smaa *out);
+
+/** Resolve the settings of a fast anti aliasing pass.
+ *
+ * @param in The settings of an effect entity
+ * @param out Receives the resolved settings
+ */
+void box_render_fxaa_settings(
+    const Fxaa *in,
+    Fxaa *out);
 
 /** Resolve the settings of a color grading pass.
  *
@@ -1787,6 +2455,37 @@ typedef struct box_render_capture_desc_t {
 void box_render_captures_init(
     ecs_world_t *world);
 
+/** Register the impostor bakes: the hooks of Impostor and the system that adds the views of
+ * the bakes to the packet, after the captures.
+ *
+ * @param world The world
+ */
+void box_render_impostors_init(
+    ecs_world_t *world);
+
+/** Get the texture handle of an atlas of the last complete bake of an impostor, which every
+ * instance of its prefab samples.
+ *
+ * @param world The world
+ * @param impostor Entity with Impostor
+ * @param channel The atlas
+ * @return The handle, 0 while the impostor has no complete bake
+ */
+uint32_t box_render_impostor_atlas(
+    const ecs_world_t *world,
+    ecs_entity_t impostor,
+    ImpostorChannel channel);
+
+/** Card of an Impostor (ImpostorDraw), set on the card prefab of the impostor that the card of
+ * each of its instances inherits. The shapes with it draw as one alpha tested card that shows
+ * the atlases of the impostor, in a batch of their own. */
+typedef struct ImpostorCard {
+    ecs_entity_t impostor;      /**< Entity with the Impostor */
+} ImpostorCard;
+
+/** Component id of ImpostorCard */
+extern ECS_COMPONENT_DECLARE(ImpostorCard);
+
 /** Ask for a capture in the next extracted frame.
  *
  * The image is written on the thread that renders the packet of that frame, through a
@@ -1863,13 +2562,26 @@ box_render_transition_record_t* box_render_packet_transition(
 box_render_packet_t* box_render_packet(
     ecs_world_t *world);
 
-/** Get the BOX_RENDER_FEATURE_* features of a scene from its Scene.
+/** Get the BOX_RENDER_FEATURE_* features of a scene from its Scene: its lighting features and
+ * the material features of its Extended mesh shaders (SceneShaderFeatures).
  *
  * @param world The world
  * @param scene The scene root, 0 for the default scene, whose features are the Scene singleton
  * @return The features, 0 without a Scene
  */
 uint32_t box_render_scene_features(
+    const ecs_world_t *world,
+    ecs_entity_t scene);
+
+/** Get the BOX_RENDER_FEATURE_* features of the terrain shader of a scene: its lighting and
+ * planet light features and the texture_blend, triplanar and texture_layers of its Terrain
+ * shader features (SceneShaderFeatures).
+ *
+ * @param world The world
+ * @param scene The scene root, 0 for the default scene, whose features are the Scene singleton
+ * @return The features, 0 without a Scene
+ */
+uint32_t box_render_terrain_features(
     const ecs_world_t *world,
     ecs_entity_t scene);
 

@@ -1,0 +1,348 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using box.mesh
+using trees
+using state
+using assets
+
+// The trees of the forest: beech, oak, birch, spruce and fir templates and dead snags, each with
+// a seed prop that varies its shape. stands.flecs places them.
+//
+// A tree is a preset of the tree generator (trees/presets.flecs), two MeshGraph shapes, its
+// bark and its foliage, in the barks of bark.flecs and the leaf prefabs of leaves.flecs, which
+// recolor the canopies by the season and thin them by a VertexReveal. Trees of a species share
+// a few seeds and grow at a few ages, scaled to their height and slenderness, so they share
+// their meshes and draw instanced. The Tree sets the WindSway of both shapes, a hierarchy from
+// the pivots of the graph, as stiff as the sway of the species in wind.flecs. Nothing picks,
+// collides with or queries the trees, so they stay out of the spatial index (spatial.Ignore on
+// the root).
+state {
+  // A tree, on its root entity
+  struct ForestTree(species: i32, height: f32, seed: i32, detail: i32)
+
+  export const SPECIES_BEECH: i32 = 0
+  export const SPECIES_OAK: i32 = 1
+  export const SPECIES_BIRCH: i32 = 2
+  export const SPECIES_SPRUCE: i32 = 3
+  export const SPECIES_FIR: i32 = 4
+  export const SPECIES_SNAG: i32 = 5
+
+  // Full trees in the forest, cheap ones in the backdrop that cast no shadow
+  export const DETAIL_FULL: i32 = 0
+  export const DETAIL_CHEAP: i32 = 1
+
+  // Trunk paths of the logs (undergrowth.flecs) run TRUNK_LEN path units up with a profile of
+  // radius TRUNK_RADIUS; trunks start TRUNK_SINK below the ground
+  export const TRUNK_LEN: f32 = 20
+  export const TRUNK_RADIUS: f32 = 0.5
+  export const TRUNK_SINK: f32 = 0.3
+
+  // The seeds a species grows from, and the ages: a tree grows at the age of a mature tree
+  // times FOREST_AGE_STEP to a power, the closest to its height
+  export const FOREST_SEEDS: i32 = 4
+  export const FOREST_AGE_STEP: f32 = 0.75
+
+  // Mature height of the preset of a species (trees/presets.flecs)
+  fn forest_preset_height(species: f64) -> f64 {
+    species < 0.5 ? 24 : (species < 1.5 ? 21 : (species < 2.5 ? 19 : (species < 3.5 ? 28 : 30)))
+  }
+
+  // The age a tree of a species and height grows at
+  fn forest_tree_age(species: f64, height: f64) -> f64 {
+    const n = clamp(round(log(max(height, 0.5) / forest_preset_height(species)) / log(FOREST_AGE_STEP)), 0, 10)
+    pow(FOREST_AGE_STEP, n)
+  }
+
+  // The stiffness of a Tree of a height whose top bends as much as the sway of its kind, bend
+  // at sway_height (wind.flecs), bends a vertex at that height (Tree: the top of a Tree bends
+  // height * 0.0028 * (1.4 - stiffness))
+  fn forest_tree_stiffness(height: f64, bend: f64, sway_height: f64) -> f64 {
+    clamp(1.4 - bend * height / (sway_height * sway_height * 0.0028), 0, 1.4)
+  }
+
+  // A snag (ForestSnag): the radius of its trunk at its foot, the age of the TreeSnag with that
+  // radius, and its radius at height y over its foot. It stands straight, so its axis is its Y
+  export const SNAG_TAPER: f32 = 0.55
+
+  fn forest_snag_r0(seed: f64) -> f64 {
+    0.26 + 0.18 * forest_hash(1, seed)
+  }
+
+  fn forest_snag_age(seed: f64) -> f64 {
+    pow(forest_snag_r0(seed) / 0.36, 1 / 1.3)
+  }
+
+  fn forest_snag_radius(seed: f64, height: f64, y: f64) -> f64 {
+    forest_snag_r0(seed) * (1 - SNAG_TAPER * clamp(y / height, 0, 1))
+  }
+
+  // The fallen top of a snag: a log along local +Z on the ground beside it, its radius, the
+  // start of its axis and its length
+  fn forest_fallen_radius(seed: f64) -> f64 {
+    forest_snag_r0(seed) * 0.8
+  }
+
+  fn forest_fallen_start(seed: f64) -> f64 {
+    forest_snag_r0(seed) + 0.5
+  }
+
+  fn forest_fallen_length(seed: f64) -> f64 {
+    4 + 4 * forest_hash(60, seed)
+  }
+
+  // Offset of trunk path variant v at f (0 foot, 1 top) across X and Z, in path units
+  fn forest_trunk_x(v: f64, f: f64) -> f64 {
+    v < 0.5 ? 0.15 * sin(f * PI) : (
+      v < 1.5 ? 0.25 * sin(f * 2 * PI) * f : (
+      v < 2.5 ? 0.5 * f * f : 0.22 * sin(f * 3 * PI) * f))
+  }
+
+  fn forest_trunk_z(v: f64, f: f64) -> f64 {
+    v < 0.5 ? 0 : (
+      v < 1.5 ? 0.1 * sin(f * PI) : (
+      v < 2.5 ? 0 - 0.1 * sin(f * PI) : 0.25 * sin(f * 1.5 * PI) * f))
+  }
+
+  // (x, y, z) turned as Rotation {p, w, 0} turns it (Ry * Rx): pitch p about X, then yaw w
+  // about Y
+  fn forest_rot_x(x: f64, y: f64, z: f64, p: f64, w: f64) -> f64 {
+    x * cos(w) + (y * sin(p) + z * cos(p)) * sin(w)
+  }
+
+  fn forest_rot_y(x: f64, y: f64, z: f64, p: f64, w: f64) -> f64 {
+    y * cos(p) - z * sin(p)
+  }
+
+  fn forest_rot_z(x: f64, y: f64, z: f64, p: f64, w: f64) -> f64 {
+    (y * sin(p) + z * cos(p)) * cos(w) - x * sin(w)
+  }
+
+  // The Rotation (Ry * Rx * Rz) of a card that points along the unit vector (tx, ty, tz) (its
+  // +Y), its face (+Z) turned up as far as that allows and then banked by b about its length
+  fn forest_card_s(ty: f64) -> f64 {
+    sqrt(max(1 - ty * ty, 0.0004))
+  }
+
+  fn forest_card_pitch(ty: f64, b: f64) -> f64 {
+    0 - asin(min(forest_card_s(ty) * cos(b), 0.99995))
+  }
+
+  fn forest_card_yaw(tx: f64, ty: f64, tz: f64, b: f64) -> f64 {
+    atan2(0 - ty * tx * cos(b) - tz * sin(b), 0 - ty * tz * cos(b) + tx * sin(b))
+  }
+
+  fn forest_card_roll(ty: f64, b: f64) -> f64 {
+    atan2(0 - forest_card_s(ty) * sin(b), ty)
+  }
+}
+
+assets {
+  // A round profile of radius 1 for trunks and limbs
+  prefab ForestRoundShape {
+    Path2D: {
+      start: {1, 0},
+      segments: [
+        {kind: CatmullRom, end: {0.5, 0.866}},
+        {kind: CatmullRom, end: {-0.5, 0.866}},
+        {kind: CatmullRom, end: {-1, 0}},
+        {kind: CatmullRom, end: {-0.5, -0.866}},
+        {kind: CatmullRom, end: {0.5, -0.866}}
+      ],
+      closed: true
+    }
+  }
+
+  prefab ForestRoundProfile { Profile2D: {outer: ForestRoundShape} }
+
+  // The trunk paths, through forest_trunk_x/z at quarters
+  template ForestTrunkPath {
+    prop variant: i32 = 0
+
+    Path3D: {
+      start: {0, 0, 0},
+      segments: [
+        {kind: CatmullRom, end: {forest_trunk_x(variant, 0.25), TRUNK_LEN * 0.25, forest_trunk_z(variant, 0.25)}},
+        {kind: CatmullRom, end: {forest_trunk_x(variant, 0.5), TRUNK_LEN * 0.5, forest_trunk_z(variant, 0.5)}},
+        {kind: CatmullRom, end: {forest_trunk_x(variant, 0.75), TRUNK_LEN * 0.75, forest_trunk_z(variant, 0.75)}},
+        {kind: CatmullRom, end: {forest_trunk_x(variant, 1), TRUNK_LEN, forest_trunk_z(variant, 1)}}
+      ]
+    }
+  }
+
+  ForestTrunkPath forest_trunk_path_0(variant: 0)
+  ForestTrunkPath forest_trunk_path_1(variant: 1)
+  ForestTrunkPath forest_trunk_path_2(variant: 2)
+  ForestTrunkPath forest_trunk_path_3(variant: 3)
+
+  // A trunk: a Sweep along trunk path variant, TRUNK_RADIUS path units at its foot, tapering to
+  // taper of that at its top, in the bark of the species. Scale it by the length of the trunk
+  // over TRUNK_LEN along and its radius over TRUNK_RADIUS across
+  template ForestTrunk {
+    prop species: i32 = 0
+    prop variant: i32 = 0
+    prop detail: i32 = 0
+    prop taper: f32 = 0.3
+
+    const seg: i32 = detail == DETAIL_FULL ? 3 : 1
+    const rings: i32 = detail == DETAIL_FULL ? 16 : 6
+
+    if variant == 0 {
+      Sweep: {path: forest_trunk_path_0, profile: ForestRoundProfile, scale: {TRUNK_RADIUS, TRUNK_RADIUS}, taper: taper, segments: seg, rings: rings}
+    } else if variant == 1 {
+      Sweep: {path: forest_trunk_path_1, profile: ForestRoundProfile, scale: {TRUNK_RADIUS, TRUNK_RADIUS}, taper: taper, segments: seg, rings: rings}
+    } else if variant == 2 {
+      Sweep: {path: forest_trunk_path_2, profile: ForestRoundProfile, scale: {TRUNK_RADIUS, TRUNK_RADIUS}, taper: taper, segments: seg, rings: rings}
+    } else {
+      Sweep: {path: forest_trunk_path_3, profile: ForestRoundProfile, scale: {TRUNK_RADIUS, TRUNK_RADIUS}, taper: taper, segments: seg, rings: rings}
+    }
+
+    if species == SPECIES_BEECH {
+      (IsA, ForestBarkBeech)
+    } else if species == SPECIES_OAK {
+      (IsA, ForestBarkOak)
+    } else if species == SPECIES_BIRCH {
+      (IsA, ForestBarkBirch)
+    } else if species == SPECIES_SPRUCE {
+      (IsA, ForestBarkSpruce)
+    } else if species == SPECIES_FIR {
+      (IsA, ForestBarkFir)
+    } else {
+      (IsA, ForestBarkDead)
+    }
+  }
+
+  // A living tree of a species, height meters tall, its trunk slender times as thick as usual:
+  // the preset of the species from seed % FOREST_SEEDS at the closest age, scaled to height
+  // (and across by slender), in the forest bark and the leaves of the species, every other seed
+  // of a broadleaf in the leaves that turn later. The species templates derive from it
+  template ForestGrown {
+    prop species: i32 = 0
+    prop seed: i32 = 1
+    prop height: f32 = 22
+    prop detail: i32 = 0
+    prop slender: f32 = 1
+
+    ForestTree: {species: species, height: height, seed: seed, detail: detail}
+    box.spatial.Ignore
+    if detail != DETAIL_FULL {
+      NoShadow
+    }
+
+    const v: i32 = seed % FOREST_SEEDS
+    const ts: i32 = v * 7 + 1
+    const late = v % 2 == 1
+    const age = forest_tree_age(species, height)
+    const hr = forest_preset_height(species) * age
+    const k = (height + TRUNK_SINK) / hr
+    const kx = k * (0.75 + 0.25 * slender)
+    const broad_stiff = forest_tree_stiffness(hr, SWAY_BROADLEAF_BEND, SWAY_BROADLEAF_HEIGHT)
+    const conifer_stiff = forest_tree_stiffness(hr, SWAY_CONIFER_BEND, SWAY_CONIFER_HEIGHT)
+
+    if species == SPECIES_BEECH {
+      TreeBeech tree(seed: ts, age: age, bark_material: ForestTreeBarkBeech, leaf_material: late ? ForestLeafBeechB : ForestLeafBeech, stiffness: broad_stiff, flutter: SWAY_LEAF_FLUTTER, flutter_frequency: SWAY_LEAF_FREQUENCY, sway_branch: SWAY_BROADLEAF_BRANCH, branch_frequency: SWAY_BROADLEAF_BRANCH_FREQUENCY) {
+        Position: {0, 0 - TRUNK_SINK, 0}
+        Scale: {kx, k, kx}
+      }
+    } else if species == SPECIES_OAK {
+      TreeOak tree(seed: ts, age: age, bark_material: ForestTreeBarkOak, leaf_material: late ? ForestLeafOakB : ForestLeafOak, stiffness: broad_stiff, flutter: SWAY_LEAF_FLUTTER, flutter_frequency: SWAY_LEAF_FREQUENCY, sway_branch: SWAY_BROADLEAF_BRANCH, branch_frequency: SWAY_BROADLEAF_BRANCH_FREQUENCY) {
+        Position: {0, 0 - TRUNK_SINK, 0}
+        Scale: {kx, k, kx}
+      }
+    } else if species == SPECIES_BIRCH {
+      TreeBirch tree(seed: ts, age: age, bark_material: ForestTreeBarkBirch, leaf_material: late ? ForestLeafBirchB : ForestLeafBirch, stiffness: forest_tree_stiffness(hr, SWAY_BIRCH_BEND, SWAY_BIRCH_HEIGHT), flutter: SWAY_LEAF_FLUTTER, flutter_frequency: SWAY_LEAF_FREQUENCY, sway_branch: SWAY_BIRCH_BRANCH, branch_frequency: SWAY_BIRCH_BRANCH_FREQUENCY) {
+        Position: {0, 0 - TRUNK_SINK, 0}
+        Scale: {kx, k, kx}
+      }
+    } else if species == SPECIES_SPRUCE {
+      TreeSpruce tree(seed: ts, age: age, bark_material: ForestTreeBarkSpruce, leaf_material: ForestNeedleSpruce, stiffness: conifer_stiff, flutter: SWAY_NEEDLE_FLUTTER, flutter_frequency: SWAY_NEEDLE_FREQUENCY, sway_branch: SWAY_CONIFER_BRANCH, branch_frequency: SWAY_CONIFER_BRANCH_FREQUENCY) {
+        Position: {0, 0 - TRUNK_SINK, 0}
+        Scale: {kx, k, kx}
+      }
+    } else {
+      TreeFir tree(seed: ts, age: age, bark_material: ForestTreeBarkFir, leaf_material: ForestNeedleFir, stiffness: conifer_stiff, flutter: SWAY_NEEDLE_FLUTTER, flutter_frequency: SWAY_NEEDLE_FREQUENCY, sway_branch: SWAY_CONIFER_BRANCH, branch_frequency: SWAY_CONIFER_BRANCH_FREQUENCY) {
+        Position: {0, 0 - TRUNK_SINK, 0}
+        Scale: {kx, k, kx}
+      }
+    }
+  }
+
+  // Beech: a tall, straight, smooth grey bole, ascending limbs and a dome of flat layered sprays
+  template ForestBeech : ForestGrown {
+    prop species: i32 = SPECIES_BEECH
+    prop height: f32 = 24
+  }
+
+  // Oak: a stout, furrowed trunk that splits low into wide, crooked limbs under a broad crown
+  template ForestOak : ForestGrown {
+    prop species: i32 = SPECIES_OAK
+    prop height: f32 = 21
+  }
+
+  // Birch: a slender white trunk, steep thin limbs and hanging twigs of small leaves
+  template ForestBirch : ForestGrown {
+    prop species: i32 = SPECIES_BIRCH
+    prop height: f32 = 16
+  }
+
+  // Spruce: a narrow cone from low down, drooping branches with upturned tips and hanging
+  // curtains of twigs
+  template ForestSpruce : ForestGrown {
+    prop species: i32 = SPECIES_SPRUCE
+    prop height: f32 = 25
+  }
+
+  // Fir: a higher, more columnar crown of flat, level branch tiers with darker, glossy needles
+  template ForestFir : ForestGrown {
+    prop species: i32 = SPECIES_FIR
+    prop height: f32 = 23
+  }
+
+  // A dead snag height meters tall: a TreeSnag standing straight, its trunk forest_snag_r0
+  // thick at the foot, broken off with a closed top, without sway. Fallen, its upper part lies
+  // beside it on the ground along local +Z, merged into its bark
+  template ForestSnag {
+    prop seed: i32 = 1
+    prop height: f32 = 6
+    prop fallen: bool = false
+    prop detail: i32 = 0
+
+    ForestTree: {species: SPECIES_SNAG, height: height, seed: seed, detail: detail}
+    box.spatial.Ignore
+    if detail != DETAIL_FULL {
+      NoShadow
+    }
+
+    const rt = forest_snag_radius(seed, height, height)
+    const lr = forest_fallen_radius(seed)
+
+    // The broken top, closed
+    top_curve { nodes.Stem: {position: {0, height - 0.04, 0}, length: 0.05, segments: 1, radius: rt, taper: 0.15} }
+    top_mesh { nodes.Tube: {curves: top_curve, sides: 10, caps: true} }
+
+    log_curve {
+      if fallen {
+        nodes.Stem: {
+          position: {0, lr, forest_fallen_start(seed)}, direction: {0, 0, 1},
+          length: forest_fallen_length(seed), segments: 8, radius: lr, taper: 0.25
+        }
+      }
+    }
+    log_mesh {
+      if fallen {
+        nodes.Tube: {curves: log_curve, sides: 10, caps: true}
+      }
+    }
+    extra {
+      if fallen {
+        nodes.Merge: {inputs: [top_mesh, log_mesh]}
+      }
+    }
+
+    TreeSnag tree(seed: seed, age: forest_snag_age(seed), height: height, bend: 0, lean: 0, bark_extra: fallen ? extra : top_mesh, bark_material: ForestTreeBarkDead, leaf_material: ForestTwigDead, stiffness: 1.4, sway_branch: 0) {
+      Position: {0, 0, 0}
+    }
+  }
+}

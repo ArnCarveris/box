@@ -14,6 +14,7 @@ assets {
       TrianglePrism: {span, 1.16, run}
       Rgb: color
     }
+
     for side in 0..2 {
       for course in 0..5 {
         const distance = (course + 0.5) * span / 10
@@ -25,9 +26,11 @@ assets {
         }
       }
     }
+
     for i in 0..16 {
       {
         Position: {0, 0, -run / 2 + (i + 0.5) * run / 16}
+
         for side in 0..2 {
           {
             Position: {(side * 2 - 1) * span / 4, 0.66, 0}
@@ -38,6 +41,7 @@ assets {
         }
       }
     }
+
     {
       Position: {0, 1.24, 0}
       Rotation: {math.PI / 2, 0, 0}

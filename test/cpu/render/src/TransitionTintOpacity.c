@@ -442,11 +442,14 @@ void TransitionTintOpacity_opacity_mesh(void) {
     // engine_core/transition
     box_render_null_t *null;
     ecs_world_t *world = tr_scene(&null);
-    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
-        .punctual_shadows = true, .cookies = true, .environment = true,
-        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
-        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
-        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true, .punctual_shadows = true,
+        .cookies = true, .environment = true, .aerial_perspective = true,
+        .shader_features.Extended.alpha_cutout = true, .shader_features.Extended.blend_modes = true,
+        .shader_features.Extended.transmission = true,
+        .shader_features.Extended.texture_blend = true, .shader_features.Extended.triplanar = true,
+        .shader_features.Extended.sheen = true, .shader_features.Extended.clear_coat = true,
+        .shader_features.Extended.anisotropy = true,
+        .shader_features.Extended.diffuse_transmission = true});
     ecs_entity_t e = tr_shape(world, 0, 0);
     int32_t i;
     ecs_set(world, e, Opacity, {0.2f});
@@ -640,11 +643,14 @@ void TransitionTintOpacity_opacity_target_zero(void) {
     // engine_core/transition
     box_render_null_t *null;
     ecs_world_t *world = tr_scene(&null);
-    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
-        .punctual_shadows = true, .cookies = true, .environment = true,
-        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
-        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
-        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true, .punctual_shadows = true,
+        .cookies = true, .environment = true, .aerial_perspective = true,
+        .shader_features.Extended.alpha_cutout = true, .shader_features.Extended.blend_modes = true,
+        .shader_features.Extended.transmission = true,
+        .shader_features.Extended.texture_blend = true, .shader_features.Extended.triplanar = true,
+        .shader_features.Extended.sheen = true, .shader_features.Extended.clear_coat = true,
+        .shader_features.Extended.anisotropy = true,
+        .shader_features.Extended.diffuse_transmission = true});
     ecs_entity_t parent = tr_group(world);
     ecs_entity_t child = tr_shape(world, parent, 0);
     int32_t i;
@@ -710,11 +716,14 @@ void TransitionTintOpacity_fade_in_batch(void) {
     // engine_core/transition
     box_render_null_t *null;
     ecs_world_t *world = tr_scene(&null);
-    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
-        .punctual_shadows = true, .cookies = true, .environment = true,
-        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
-        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
-        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true, .punctual_shadows = true,
+        .cookies = true, .environment = true, .aerial_perspective = true,
+        .shader_features.Extended.alpha_cutout = true, .shader_features.Extended.blend_modes = true,
+        .shader_features.Extended.transmission = true,
+        .shader_features.Extended.texture_blend = true, .shader_features.Extended.triplanar = true,
+        .shader_features.Extended.sheen = true, .shader_features.Extended.clear_coat = true,
+        .shader_features.Extended.anisotropy = true,
+        .shader_features.Extended.diffuse_transmission = true});
     ecs_entity_t e = tr_shape(world, 0, 0);
     ecs_entity_t reference = tr_shape(world, 0, 0);
     int32_t i;
@@ -756,11 +765,14 @@ void TransitionTintOpacity_fade_out_batch(void) {
     // engine_core/transition
     box_render_null_t *null;
     ecs_world_t *world = tr_scene(&null);
-    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
-        .punctual_shadows = true, .cookies = true, .environment = true,
-        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
-        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
-        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true, .punctual_shadows = true,
+        .cookies = true, .environment = true, .aerial_perspective = true,
+        .shader_features.Extended.alpha_cutout = true, .shader_features.Extended.blend_modes = true,
+        .shader_features.Extended.transmission = true,
+        .shader_features.Extended.texture_blend = true, .shader_features.Extended.triplanar = true,
+        .shader_features.Extended.sheen = true, .shader_features.Extended.clear_coat = true,
+        .shader_features.Extended.anisotropy = true,
+        .shader_features.Extended.diffuse_transmission = true});
     ecs_entity_t e = tr_shape(world, 0, 0);
     ecs_entity_t reference = tr_shape(world, 0, 0);
     int32_t i;
@@ -793,11 +805,14 @@ void TransitionTintOpacity_blend_mode_kept(void) {
     // engine_core/transition
     box_render_null_t *null;
     ecs_world_t *world = tr_scene(&null);
-    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
-        .punctual_shadows = true, .cookies = true, .environment = true,
-        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
-        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
-        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true, .punctual_shadows = true,
+        .cookies = true, .environment = true, .aerial_perspective = true,
+        .shader_features.Extended.alpha_cutout = true, .shader_features.Extended.blend_modes = true,
+        .shader_features.Extended.transmission = true,
+        .shader_features.Extended.texture_blend = true, .shader_features.Extended.triplanar = true,
+        .shader_features.Extended.sheen = true, .shader_features.Extended.clear_coat = true,
+        .shader_features.Extended.anisotropy = true,
+        .shader_features.Extended.diffuse_transmission = true});
     ecs_entity_t e = tr_shape(world, 0, 0);
     int32_t i;
     ecs_set(world, e, BlendMode, {Additive});
@@ -927,11 +942,14 @@ void TransitionTintOpacity_dynamic_material_fade_in(void) {
     // engine_core/transition
     box_render_null_t *null;
     ecs_world_t *world = tr_scene(&null);
-    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
-        .punctual_shadows = true, .cookies = true, .environment = true,
-        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
-        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
-        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true, .punctual_shadows = true,
+        .cookies = true, .environment = true, .aerial_perspective = true,
+        .shader_features.Extended.alpha_cutout = true, .shader_features.Extended.blend_modes = true,
+        .shader_features.Extended.transmission = true,
+        .shader_features.Extended.texture_blend = true, .shader_features.Extended.triplanar = true,
+        .shader_features.Extended.sheen = true, .shader_features.Extended.clear_coat = true,
+        .shader_features.Extended.anisotropy = true,
+        .shader_features.Extended.diffuse_transmission = true});
     ecs_entity_t e = tr_shape(world, 0, 0);
     ecs_entity_t reference = tr_shape(world, 0, 0);
     box_render_mesh_shading_t rendered, expected;
@@ -1294,7 +1312,7 @@ void TransitionTintOpacity_opacity_stays_out_of_bake(void) {
     box_render_null_t *null;
     ecs_world_t *world = tr_scene(&null);
     ecs_entity_t scene = ecs_new(world);
-    ecs_set(world, scene, Scene, {.blend_modes = true});
+    ecs_set(world, scene, Scene, {.shader_features.Extended.blend_modes = true});
     ecs_set(world, scene, LightBake, {.probe_spacing = 2, .capture_size = 8, .budget_ms = 2,
         .compute = true});
     ecs_entity_t e = tr_shape(world, scene, 0);

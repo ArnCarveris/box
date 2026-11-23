@@ -149,6 +149,8 @@ typedef struct box_gpu_bake_draw_t {
     uint64_t mesh;                  /**< Id of the mesh (box_gpu_mesh_t.id) */
     uint64_t vertex_offset;         /**< Offset of the vertices in buffer */
     uint64_t vertex_size;           /**< Bytes of the vertices */
+    uint64_t data_offset;           /**< Offset of the per vertex data in buffer */
+    uint64_t data_size;             /**< Bytes of the per vertex data, 0 for none */
     uint64_t index_offset;          /**< Offset of the indices in buffer */
     uint64_t index_size;            /**< Bytes of the indices */
 } box_gpu_bake_draw_t;

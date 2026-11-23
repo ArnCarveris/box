@@ -1,0 +1,291 @@
+using flecs.script
+using flecs.script.math
+using box.material
+using box.texture
+using state
+using assets
+
+assets {
+  template IslandSandMap {
+    prop map: i32 = 0
+
+    dunes { nodes.Noise: {frequency: 6, octaves: 3, seed: 311} }
+    warp_n { nodes.Noise: {channels: 3, frequency: 5, octaves: 2, seed: 310} }
+    warp { nodes.Warp: {offset: warp_n, amount_value: 0.06} }
+    stretched { nodes.Transform: {coords: warp, scale: {3, 22, 1}} }
+    ripples { nodes.Noise: {coords: stretched, frequency: 4, octaves: 2, seed: 312} }
+    grain { nodes.Noise: {frequency: 220, octaves: 2, seed: 313} }
+    relief { nodes.Mix: {a: ripples, b: dunes, factor_value: {0.7, 0, 0, 0}} }
+    height { nodes.Mix: {a: relief, b: grain, factor_value: {0.3, 0, 0, 0}} }
+
+    if map == MAP_ALBEDO {
+      tone {
+        nodes.Ramp: {
+          input: height,
+          keys: [{0.25, {226, 210, 172}}, {0.5, {242, 232, 204}}, {0.75, {252, 248, 230}}]
+        }
+      }
+
+      specks { nodes.Noise: {frequency: 300, octaves: 1, seed: 314} }
+      dark {
+        nodes.Smoothstep: {input: specks, edge0_value: {0.7, 0, 0, 0}, edge1_value: {0.8, 0, 0, 0}}
+      }
+
+      spotted { nodes.Multiply: {a: dark, b_value: {0.35, 0.35, 0.35, 0.35}} }
+      color { nodes.Mix: {a: tone, b_value: {0.2, 0.17, 0.14, 1}, factor: spotted} }
+      Graph: {output: color, width: GROUND_RES}
+    } else if map == MAP_NORMAL {
+      bumps { nodes.Normal: {height: height, strength: 0.6} }
+      Graph: {output: bumps, width: GROUND_RES, format: GraphLinear}
+    } else if map == MAP_HEIGHT {
+      Graph: {output: height, width: GROUND_RES, format: GraphSingle}
+    } else {
+      occlusion {
+        nodes.Remap: {input: height, from_min: 0.2, from_max: 0.6, to_min: 0.75, to_max: 1,
+          clamp: true}
+      }
+
+      orm { nodes.Combine: {r: occlusion, g_value: 0.9, b_value: 0, a_value: 1} }
+      Graph: {output: orm, width: GROUND_RES, format: GraphLinear}
+    }
+  }
+
+  template IslandBasaltMap {
+    prop map: i32 = 0
+
+    ridges { nodes.Noise: {frequency: 5, octaves: 6, fractal: NoiseRidged, seed: 321} }
+    grain { nodes.Noise: {frequency: 140, octaves: 2, seed: 322} }
+    crack_n { nodes.Noise: {channels: 3, frequency: 9, octaves: 3, seed: 326} }
+    crack_w { nodes.Warp: {offset: crack_n, amount_value: 0.2} }
+    cracks_c {
+      nodes.Cells: {distance: CellsEdge, count: 90, edge: 0.07, seed: 323, coords: crack_w}
+    }
+
+    cracks { nodes.Split: {input: cracks_c, channel: ChannelR} }
+    crack_shade {
+      nodes.Remap: {input: cracks, from_min: 0, from_max: 1, to_min: 0.95, to_max: 1, clamp: true}
+    }
+
+    relief_a { nodes.Mix: {a: ridges, b: grain, factor_value: {0.2, 0, 0, 0}} }
+    height { nodes.Mix: {a: relief_a, b: crack_shade, factor_value: {0.04, 0, 0, 0}} }
+
+    if map == MAP_ALBEDO {
+      stone {
+        nodes.Ramp: {
+          input: relief_a,
+          keys: [
+            {0.2, {50, 46, 45}},
+            {0.45, {66, 61, 59}},
+            {0.7, {82, 76, 72}},
+            {0.9, {98, 90, 84}}
+          ]
+        }
+      }
+
+      rust_n { nodes.Noise: {frequency: 9, octaves: 3, seed: 325} }
+      rust {
+        nodes.Smoothstep: {
+          input: rust_n,
+          edge0_value: {0.6, 0, 0, 0},
+          edge1_value: {0.85, 0, 0, 0}
+        }
+      }
+
+      rusted { nodes.Mix: {a: stone, b_value: {0.2, 0.09, 0.06, 1}, factor: rust} }
+      color { nodes.Multiply: {a: rusted, b: crack_shade} }
+      Graph: {output: color, width: GROUND_RES}
+    } else if map == MAP_NORMAL {
+      bumps { nodes.Normal: {height: height, strength: 3.2} }
+      Graph: {output: bumps, width: GROUND_RES, format: GraphLinear}
+    } else if map == MAP_HEIGHT {
+      Graph: {output: height, width: GROUND_RES, format: GraphSingle}
+    } else {
+      occlusion {
+        nodes.Remap: {input: crack_shade, from_min: 0.95, from_max: 1, to_min: 0.8, to_max: 1,
+          clamp: true}
+      }
+
+      orm { nodes.Combine: {r: occlusion, g_value: 0.86, b_value: 0, a_value: 1} }
+      Graph: {output: orm, width: GROUND_RES, format: GraphLinear}
+    }
+  }
+
+  template IslandGrassMap {
+    prop map: i32 = 0
+    prop res: i32 = GROUND_RES
+
+    warp_n { nodes.Noise: {channels: 3, frequency: 5, octaves: 2, seed: 70} }
+    warp { nodes.Warp: {offset: warp_n, amount_value: 0.05} }
+    tufts { nodes.Noise: {coords: warp, frequency: 48, octaves: 3, fractal: NoiseBillow, seed: 71} }
+    blades { nodes.Noise: {coords: warp, frequency: 320, octaves: 2, seed: 72} }
+    patch { nodes.Noise: {frequency: 6, octaves: 3, seed: 73} }
+    height { nodes.Mix: {a: tufts, b: blades, factor_value: {0.45, 0, 0, 0}} }
+    soil {
+      nodes.Smoothstep: {input: height, edge0_value: {0.32, 0, 0, 0}, edge1_value: {0.22, 0, 0, 0}}
+    }
+
+    if map == MAP_ALBEDO {
+      tone {
+        nodes.Ramp: {
+          input: height,
+          keys: [
+            {0.2, {38, 52, 18}}, {0.4, {62, 88, 26}}, {0.55, {86, 110, 34}},
+            {0.7, {112, 128, 44}}, {0.85, {146, 148, 70}}
+          ]
+        }
+      }
+
+      straw {
+        nodes.Ramp: {
+          input: patch,
+          keys: [{0.35, {230, 245, 225}}, {0.55, {255, 255, 255}}, {0.75, {255, 232, 178}}]
+        }
+      }
+
+      dried { nodes.Multiply: {a: tone, b: straw} }
+      color { nodes.Mix: {a: dried, b_value: {0.045, 0.034, 0.02, 1}, factor: soil} }
+      Graph: {output: color, width: res}
+    } else if map == MAP_NORMAL {
+      bumps { nodes.Normal: {height: height, strength: 2.5} }
+      Graph: {output: bumps, width: res, format: GraphLinear}
+    } else if map == MAP_HEIGHT {
+      Graph: {output: height, width: res, format: GraphSingle}
+    } else {
+      occlusion {
+        nodes.Remap: {
+          input: height,
+          from_min: 0.15,
+          from_max: 0.6,
+          to_min: 0.55,
+          to_max: 1,
+          clamp: true
+        }
+      }
+
+      orm { nodes.Combine: {r: occlusion, g_value: 0.9, b_value: 0, a_value: 1} }
+      Graph: {output: orm, width: res}
+    }
+  }
+
+  IslandSandMap island_sand_albedo(map: MAP_ALBEDO)
+  IslandSandMap island_sand_normal(map: MAP_NORMAL)
+  IslandSandMap island_sand_height(map: MAP_HEIGHT)
+  IslandSandMap island_sand_orm(map: MAP_ORM)
+  IslandBasaltMap island_basalt_albedo(map: MAP_ALBEDO)
+  IslandBasaltMap island_basalt_normal(map: MAP_NORMAL)
+  IslandBasaltMap island_basalt_height(map: MAP_HEIGHT)
+  IslandBasaltMap island_basalt_orm(map: MAP_ORM)
+  IslandGrassMap island_grass_albedo(map: MAP_ALBEDO)
+  IslandGrassMap island_grass_normal(map: MAP_NORMAL)
+  IslandGrassMap island_grass_height(map: MAP_HEIGHT)
+  IslandGrassMap island_grass_orm(map: MAP_ORM)
+
+  island_floor {
+    PbrTextures: {albedo: moss_albedo, normal: moss_normal, orm: moss_orm}
+    texture.Transform: {scale_x: 24, scale_y: 24}
+  }
+
+  island_grass {
+    PbrTextures: {albedo: island_grass_albedo, normal: island_grass_normal, orm: island_grass_orm}
+    texture.Transform: {scale_x: 40, scale_y: 40}
+  }
+
+  island_sand {
+    PbrTextures: {albedo: island_sand_albedo, normal: island_sand_normal, orm: island_sand_orm}
+    texture.Transform: {scale_x: 32, scale_y: 32}
+  }
+
+  island_rock {
+    PbrTextures: {
+      albedo: island_basalt_albedo,
+      normal: island_basalt_normal,
+      orm: island_basalt_orm
+    }
+    texture.Transform: {scale_x: 18, scale_y: 18}
+  }
+
+  island_peak_snow {
+    texture.Layer: {
+      amount: island_snow_cover(season, snow),
+      direction: {0, 1, 0},
+      facing: 0.4,
+      mask: forest_snow_drifts,
+      cavity: 0.3,
+      contrast: 5,
+      albedo: LayerMix,
+      roughness: LayerMix,
+      metallic: LayerMix,
+      occlusion: LayerKeep,
+      normal: 0.6,
+      altitude: island_snow_line(season, snow),
+      altitude_fade: 110 * ISLAND_H
+    }
+    Rgb: {238, 242, 250}
+    PbrMaterial: {roughness: 0.7, metallic: 0}
+    PbrTextures: {normal: forest_snow_n}
+    texture.Mapping: {mode: MappingWorld, size: 60}
+  }
+
+  island_scoria_mask {
+    Gen: {
+      width: 256,
+      height: 256,
+      seed: 331,
+      layers: [
+        {kind: GenNoise, frequency: 3, octaves: 5, amount: 1},
+        {kind: GenNoise, frequency: 12, octaves: 2, amount: 0.25, seed: 1}
+      ]
+    }
+  }
+
+  island_scoria {
+    texture.Layer: {
+      amount: 0.45,
+      mask: island_scoria_mask,
+      contrast: 1.6,
+      albedo: LayerMultiply,
+      roughness: LayerKeep,
+      metallic: LayerKeep,
+      occlusion: LayerKeep,
+      altitude: ASH_LINE - 70 * ISLAND_H,
+      altitude_fade: 90 * ISLAND_H
+    }
+    Rgb: {232, 184, 160}
+    texture.Mapping: {mode: MappingWorld, size: 110}
+  }
+
+  island_wet_sand {
+    texture.Layer: {
+      amount: 1,
+      contrast: 4,
+      albedo: LayerMultiply,
+      roughness: LayerMix,
+      metallic: LayerKeep,
+      occlusion: LayerKeep,
+      normal: 0.4,
+      porosity: 1,
+      altitude: 1.6,
+      altitude_fade: -1.1
+    }
+    Rgb: {168, 156, 140}
+    PbrMaterial: {roughness: 0.32}
+  }
+
+  island_wet {
+    texture.Layer: {
+      amount: forest_wet_amount(wet),
+      mask: forest_wet_patches,
+      cavity: 0.4,
+      contrast: 5,
+      albedo: LayerMultiply,
+      roughness: LayerMix,
+      metallic: LayerKeep,
+      occlusion: LayerKeep,
+      normal: 0.12 + 0.4 * puddles,
+      porosity: 1
+    }
+    Rgb: {138, 128, 112}
+    PbrMaterial: {roughness: 0.5 - 0.3 * puddles}
+    texture.Mapping: {mode: MappingWorld, size: 7}
+  }
+}

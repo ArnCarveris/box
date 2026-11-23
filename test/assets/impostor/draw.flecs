@@ -1,0 +1,19 @@
+// Prefabs whose shape is on the root, for the tests of the impostor cards: the root and its card
+// measure the same distance to the camera, so their DrawRange crossfades are complementary at
+// every pixel. Panel is a flat board that faces +Z, Tower a white column 6 high around its
+// origin, which casts a long shadow under a low sun.
+
+using box.geometry
+using box.material
+using box.transform
+
+prefab Panel {
+  Box: {4, 4, 0.2}
+  Rgb: {230, 120, 40}
+}
+
+prefab Tower {
+  Box: {2, 6, 2}
+  Rgb: {255, 255, 255}
+  PbrMaterial: {metallic: 0, roughness: 1}
+}

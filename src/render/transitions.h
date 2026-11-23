@@ -40,6 +40,8 @@ typedef struct box_transition_node_t {
     int64_t seen;                   /**< Stamp of the last extract that matched the entity */
     uint32_t live;                  /**< 1 << component per slot that is present, leaving or
                                      *   absent, so the slots of the others are not read */
+    uint32_t listed;                /**< 1 << component per valid entry of its Transition when
+                                     *   it was last visited, the values whose set it reads */
     double until;                   /**< Latest end of the transitions its slots started, past
                                      *   which none of them runs */
     box_transition_slot_t slots[BOX_RENDER_TRANSITION_COMPONENTS]; /**< By
@@ -86,13 +88,21 @@ typedef struct box_transition_box_shadow_t {
 
 /** Main thread state of the transition extract */
 struct box_render_transitions_t {
-    ecs_query_t *query;             /**< Transition(self|up IsA), prefabs included, and the
-                                     *   optional TransitionNode of the entity */
+    ecs_query_t *query;             /**< Transition(self|up IsA), prefabs included, whose
+                                     *   entities the first extract visits */
     const ecs_world_t *world;       /**< The world, read for the TransitionNode of an entity */
+    int32_t refs;                   /**< The system and the observers that use the state */
+    bool rescan;                    /**< The next extract visits every entity of the query */
     int32_t node_count;             /**< Nodes that belong to an entity */
-    ecs_vec_t node_add;             /**< uint32_t ids of the nodes made in this frame for
-                                     *   entities without TransitionNode, which get it after
-                                     *   the query */
+    ecs_vec_t dirty;                /**< ecs_entity_t whose Transition, transitioned components
+                                     *   or Disabled changed since the last extract, owned or
+                                     *   inherited */
+    ecs_vec_t gone;                 /**< uint32_t ids of the nodes whose entity lost
+                                     *   TransitionNode, as a deleted entity does */
+    ecs_vec_t revisit;              /**< uint32_t ids of the nodes the next extract visits
+                                     *   without a change: a transition runs or a slot leaves */
+    ecs_vec_t revisit_last;         /**< uint32_t, the revisit list of the last extract while
+                                     *   this one visits it */
     ecs_vec_t nodes;               /**< box_transition_node_t by node id, 0 unused */
     ecs_vec_t free;                 /**< uint32_t node ids to reuse */
     ecs_vec_t running;              /**< int32_t ids of the nodes a transition can run or leave
@@ -266,32 +276,6 @@ bool box_transitions_runs(
     const box_transition_node_t *node,
     double time);
 
-/** Send the destruction of the nodes the extract did not see in this frame.
- *
- * @param world The world
- * @param s The state of the extract
- * @param p The packet, NULL when the query matched no entity
- * @return The packet, created when a node is destroyed
- */
-box_render_packet_t* box_transitions_sweep(
-    ecs_world_t *world,
-    box_render_transitions_t *s,
-    box_render_packet_t *p);
-
-/** Give an entity a node, reusing a freed id first, and send its creation.
- *
- * @param s The state of the extract
- * @param p The packet
- * @param entity The entity
- * @param out Its TransitionNode, NULL when it has none yet
- * @return The node id
- */
-uint32_t box_transitions_node_new(
-    box_render_transitions_t *s,
-    box_render_packet_t *p,
-    ecs_entity_t entity,
-    TransitionNode *out);
-
 /** Register TransitionNode in the current scope: not inherited, and a copy has no node.
  *
  * @param world The world
@@ -299,15 +283,34 @@ uint32_t box_transitions_node_new(
 void box_transitions_node_define(
     ecs_world_t *world);
 
-/** Give TransitionNode to the entities whose node was made in this frame without one. Called
- * after the query, as the component moves the entities to other tables.
+/** Register the observers that collect the entities whose Transition, transitioned components
+ * or Disabled changed, owned or inherited over IsA, and the nodes of deleted entities.
  *
  * @param world The world
  * @param s The state of the extract
  */
-void box_transitions_node_attach(
+void box_transitions_observers(
     ecs_world_t *world,
     box_render_transitions_t *s);
+
+/** Visit the entities that changed since the last extract and the nodes whose transitions run
+ * or leave: compare their components to the last targets, make and free nodes and fill the
+ * running list.
+ *
+ * @param world The world
+ * @param s The state of the extract
+ * @return The packet, NULL when no entity has a node or changed
+ */
+box_render_packet_t* box_transitions_changes(
+    ecs_world_t *world,
+    box_render_transitions_t *s);
+
+/** Release a reference to the state of the extract, freeing it with the last one.
+ *
+ * @param ctx The state
+ */
+void box_transitions_release(
+    void *ctx);
 
 /** Get a node of the running list.
  *

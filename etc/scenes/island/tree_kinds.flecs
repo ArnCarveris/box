@@ -1,0 +1,388 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.render
+using box.material
+using box.texture
+using box.mesh
+using box.light
+using trees
+using state
+using assets
+
+state {
+  export const ISLAND_JUNGLE_A: i32 = 0
+  export const ISLAND_JUNGLE_B: i32 = 1
+  export const ISLAND_BIRCH: i32 = 2
+  export const ISLAND_SPRUCE: i32 = 3
+  export const ISLAND_FIR: i32 = 4
+  export const ISLAND_PALM: i32 = 6
+  export const ISLAND_KAPOK: i32 = 7
+  export const ISLAND_TREE_FERN: i32 = 8
+
+  export const ISLAND_IMPOSTOR_DISTANCE: f32 = 110
+  export const ISLAND_IMPOSTOR_FADE: f32 = 10
+  export const ISLAND_IMPOSTOR_FRAMES: i32 = 8
+  export const ISLAND_IMPOSTOR_RESOLUTION: i32 = 128
+  export const ISLAND_TREE_LODS: i32 = 3
+  export const ISLAND_FAR_NEAR: f32 = 880
+  export const ISLAND_FAR_FADE: f32 = 80
+  export const ISLAND_YOUNG_RANGE: f32 = 100
+  export const ISLAND_YOUNG_FADE: f32 = 12
+  export const ISLAND_BRANCH_SWING: f32 = 0.06
+  export const ISLAND_LEAF_LAG: f32 = 0.25
+
+  fn island_leaf_r(season: f64) -> f64 {
+    forest_seasonal(season, 92, 66, 100, 84)
+  }
+
+  fn island_leaf_g(season: f64) -> f64 {
+    forest_seasonal(season, 150, 122, 124, 110)
+  }
+
+  fn island_leaf_b(season: f64) -> f64 {
+    forest_seasonal(season, 46, 38, 40, 44)
+  }
+
+  fn island_leaf_thin(season: f64) -> f64 {
+    forest_seasonal(season, 0.04, 0, 0.1, 0.24)
+  }
+}
+
+assets {
+  prefab IslandLeafPalm : TreeFoliage {
+    Rgb: {
+      forest_seasonal(season, 104, 84, 122, 110),
+      forest_seasonal(season, 150, 130, 136, 124),
+      forest_seasonal(season, 52, 44, 50, 54)
+    }
+    PbrMaterial: {roughness: 0.6}
+    AlphaCutoff: {0.4}
+    DiffuseTransmission: {factor: 0.5, color: {214, 255, 140}}
+    PbrTextures: {albedo: island_frond_albedo, normal: island_frond_normal}
+    texture.Layers: {layers: [layer_wet_foliage]}
+    NoBake
+  }
+
+  prefab IslandLeafFern : IslandLeafPalm {
+    Rgb: {
+      forest_seasonal(season, 116, 92, 128, 112),
+      forest_seasonal(season, 168, 146, 146, 132),
+      forest_seasonal(season, 58, 48, 52, 56)
+    }
+    DiffuseTransmission: {factor: 0.65, color: {214, 255, 140}}
+  }
+
+  prefab IslandLeafJungle : TreeLeafBeech {
+    Rgb: {island_leaf_r(season), island_leaf_g(season), island_leaf_b(season)}
+    VertexReveal: {channel: TREE_CHANNEL_SEED, threshold: island_leaf_thin(season), softness: 0}
+    DiffuseTransmission: {factor: 0.55, color: {214, 255, 140}}
+    texture.Layers: {layers: [layer_wet_foliage]}
+    NoBake
+  }
+
+  prefab IslandLeafJungleB : TreeLeafOak {
+    Rgb: {
+      island_leaf_r(season - ISLAND_LEAF_LAG) * 0.86,
+      island_leaf_g(season - ISLAND_LEAF_LAG) * 0.9,
+      island_leaf_b(season - ISLAND_LEAF_LAG)
+    }
+    VertexReveal: {
+      channel: TREE_CHANNEL_SEED, threshold: island_leaf_thin(season - ISLAND_LEAF_LAG),
+      softness: 0
+    }
+    DiffuseTransmission: {factor: 0.45, color: {214, 255, 140}}
+    texture.Layers: {layers: [layer_wet_foliage]}
+    NoBake
+  }
+
+  prefab IslandBark {
+    PbrMaterial: {roughness: 1}
+    texture.Mapping: {mode: MappingObject, size: BARK_MASK_SIZE / BARK_TILES}
+    texture.Transform: {scale_x: 1, scale_y: -1}
+    texture.Layers: {layers: [layer_wet]}
+  }
+
+  prefab IslandBarkJungle : IslandBark {
+    Rgb: {124, 112, 92}
+    WindSway: {bend: SWAY_BROADLEAF_BEND, height: SWAY_BROADLEAF_HEIGHT, base: 0}
+    PbrTextures: {albedo: bark_beech_albedo, normal: bark_beech_normal, orm: bark_beech_orm}
+  }
+
+  prefab IslandBarkJungleB : IslandBark {
+    Rgb: {176, 160, 138}
+    WindSway: {bend: SWAY_BROADLEAF_BEND, height: SWAY_BROADLEAF_HEIGHT, base: 0}
+    PbrTextures: {albedo: bark_oak_albedo, normal: bark_oak_normal, orm: bark_oak_orm}
+  }
+
+  prefab IslandBarkPalm : IslandBark {
+    Rgb: {222, 206, 186}
+    WindSway: {bend: SWAY_BIRCH_BEND, height: SWAY_BIRCH_HEIGHT, base: 0}
+    PbrTextures: {albedo: bark_spruce_albedo, normal: bark_spruce_normal, orm: bark_spruce_orm}
+    texture.Mapping: {mode: MappingObject, size: BARK_MASK_SIZE / (BARK_TILES * 2)}
+  }
+
+  prefab IslandBarkFern : IslandBark {
+    Rgb: {96, 80, 66}
+    WindSway: {bend: SWAY_BIRCH_BEND, height: SWAY_BIRCH_HEIGHT, base: 0}
+    PbrTextures: {albedo: bark_oak_albedo, normal: bark_oak_normal, orm: bark_oak_orm}
+    texture.Mapping: {mode: MappingObject, size: BARK_MASK_SIZE / (BARK_TILES * 3)}
+  }
+
+  prefab IslandBarkBirch : IslandBark {
+    Rgb: {255, 255, 255}
+    WindSway: {bend: SWAY_BIRCH_BEND, height: SWAY_BIRCH_HEIGHT, base: 0}
+    PbrTextures: {albedo: bark_birch_albedo, normal: bark_birch_normal, orm: bark_birch_orm}
+    texture.Layers: {layers: [layer_wet, layer_snow]}
+  }
+
+  prefab IslandBarkSpruce : IslandBark {
+    Rgb: {255, 255, 255}
+    WindSway: {bend: SWAY_CONIFER_BEND, height: SWAY_CONIFER_HEIGHT, base: 0}
+    PbrTextures: {albedo: bark_spruce_albedo, normal: bark_spruce_normal, orm: bark_spruce_orm}
+    texture.Mapping: {mode: MappingObject, size: BARK_MASK_SIZE / (BARK_TILES * 1.5)}
+    texture.Layers: {layers: [layer_wet, layer_snow]}
+  }
+
+  prefab IslandBarkFir : IslandBarkJungle {
+    Rgb: {170, 172, 178}
+    WindSway: {bend: SWAY_CONIFER_BEND, height: SWAY_CONIFER_HEIGHT, base: 0}
+    texture.Layers: {layers: [layer_wet, layer_snow]}
+  }
+
+  prefab IslandCanopyFar {
+    Rgb: {island_leaf_r(season) * 1.5, island_leaf_g(season) * 1.15, island_leaf_b(season)}
+    PbrMaterial: {roughness: 0.92}
+    PbrTextures: {albedo: canopy_leaf_albedo, normal: canopy_normal}
+    texture.Mapping: {mode: MappingWorld, size: 22, blend: 0.5}
+    texture.Layers: {layers: [layer_wet_foliage]}
+    IcoSphere: {radius: 1, segments: 2, smooth: true}
+    DrawRange: {near_: ISLAND_FAR_NEAR, fade: ISLAND_FAR_FADE}
+    NoShadow
+    NoBake
+  }
+
+  prefab IslandCanopyFarPalm : IslandCanopyFar {
+    Rgb: {
+      forest_seasonal(season, 124, 100, 144, 130),
+      forest_seasonal(season, 168, 146, 150, 138),
+      forest_seasonal(season, 60, 50, 56, 60)
+    }
+    texture.Mapping: {mode: MappingWorld, size: 9, blend: 0.5}
+  }
+
+  prefab IslandCanopyFarHigh : IslandCanopyFar {
+    Rgb: {
+      forest_seasonal(season, 84, 70, 96, 78),
+      forest_seasonal(season, 128, 112, 108, 104),
+      forest_seasonal(season, 58, 54, 48, 62)
+    }
+    texture.Mapping: {mode: MappingWorld, size: 12, blend: 0.5}
+    texture.Layers: {layers: [layer_wet_foliage, layer_snow_foliage]}
+  }
+
+  template IslandPalm {
+    prop seed: i32 = 1
+    prop height: f32 = 11
+    prop bark_material: entity = IslandBarkPalm
+    prop leaf_material: entity = IslandLeafPalm
+    prop lods: i32 = 3
+
+    const rng: flecs.script.math.Rng = {seed: seed + 77}
+    const lean = 0.08 + rng.f(0.2)
+
+    Tree tree(
+      seed: seed, height: height, radius: 0.19 + height * 0.004, taper: 0.4, bend: 0.07,
+      lean: lean, bark_material: bark_material,
+      b1: {count: 20, start: 0.975, end: 1, distribution: Spiral, down: 2.0, down_end: 0.25,
+        length: 4.4 / height, length_end: 3.6 / height, gravity: 0.1, light: 0, noise: 0.06,
+        exponent: 2.6},
+      b2: {count: 0}, b3: {count: 0}, b4: {count: 0},
+      crown: None, prune: false, bark_drop: 0.6,
+      needles: true, leaf_material: leaf_material, leaf_start: 0.03, needle_style: Fir,
+      needle_cards: 1, needle_width: 0.3, needle_droop: 0.12, card: Bent, card_bend: 0.3,
+      crown_shape: Density, crown_normals: 0.3, occlusion: 0.35, stiffness: 0.3,
+      flutter: 0.12, flutter_frequency: 2.2, sway_branch: 0.2, branch_frequency: 0.5,
+      lods: lods
+    ) { Position: {0, 0, 0} }
+  }
+
+  template IslandTreeFern {
+    prop seed: i32 = 1
+    prop height: f32 = 5
+    prop lods: i32 = 3
+
+    const rng: flecs.script.math.Rng = {seed: seed + 91}
+    const lean = 0.03 + rng.f(0.1)
+
+    Tree tree(
+      seed: seed, height: height, radius: 0.11 + height * 0.006, taper: 0.25, bend: 0.04,
+      lean: lean, bark_material: IslandBarkFern,
+      b1: {count: 18, start: 0.97, end: 1, distribution: Spiral, down: 1.1, down_end: 0.55,
+        length: 2.7 / height, length_end: 2 / height, gravity: 0.22, light: 0, noise: 0.08,
+        exponent: 2.2},
+      b2: {count: 0}, b3: {count: 0}, b4: {count: 0},
+      crown: None, prune: false, bark_drop: 0.3,
+      needles: true, leaf_material: IslandLeafFern, leaf_start: 0.05, needle_style: Fir,
+      needle_cards: 1, needle_width: 0.42, needle_droop: 0.2, card: Bent, card_bend: 0.4,
+      crown_shape: Density, crown_normals: 0.3, occlusion: 0.4, stiffness: 0.4,
+      flutter: 0.1, flutter_frequency: 2, sway_branch: 0.15, branch_frequency: 0.6,
+      lods: lods
+    ) { Position: {0, 0, 0} }
+  }
+
+  template IslandKapok {
+    prop seed: i32 = 1
+    prop height: f32 = 34
+    prop bark_material: entity = IslandBarkJungle
+    prop leaf_material: entity = IslandLeafJungle
+    prop lods: i32 = 3
+    prop leaf_lod_skip: i32 = 1
+    prop leaf_lod_flat: i32 = 2
+
+    Tree tree(
+      seed: seed, height: height, radius: height * 0.022, taper: 0.8, bend: 0.015,
+      flutes: 7, flare: 0.75, flare_height: height * 0.16, bark_material: bark_material,
+      b1: {count: 18, start: 0.58, end: 0.97, distribution: Spiral, down: 1.35, down_end: 0.8,
+        length: 0.5, length_end: 0.26, gravity: 0.004, light: 0.03, noise: 0.25, exponent: 2.3},
+      b2: {count: 8, start: 0.25, distribution: Alternate, down: 0.9, down_end: 0.6,
+        length: 0.5, length_end: 0.3, gravity: 0.02, light: 0.08, noise: 0.4, exponent: 2},
+      b3: {count: 6, start: 0.15, distribution: Alternate, down: 0.8, down_end: 0.6,
+        length: 0.45, length_end: 0.3, gravity: 0.04, light: 0.12, noise: 0.5, exponent: 1.8},
+      crown: Ellipsoid, crown_base: 0.58, crown_top: 1.06, crown_width: 0.5,
+      leaf_material: leaf_material, leaf_size: 1.1, leaf_count: 4, leaf_start: 0.2,
+      leaf_angle: 0.6, leaf_orientation: FaceUp, leaf_tilt: 0.35, crown_shape: Ellipsoid,
+      crown_normals: 0.7, occlusion: 0.75, stiffness: 0.8, flutter: 0.07,
+      flutter_frequency: 2.4, sway_branch: 0.1, branch_frequency: 0.35, lods: lods,
+      leaf_lod_skip: leaf_lod_skip, leaf_lod_flat: leaf_lod_flat
+    ) { Position: {0, 0, 0} }
+  }
+
+  template IslandTree {
+    prop species: i32 = 0
+    prop seed: i32 = 1
+    prop height: f32 = 22
+    prop slender: f32 = 1
+    prop impostor: bool = true
+
+    const custom = species > 5
+    const age = custom ? 1 : forest_tree_age(species, height)
+    const hr = custom ? height : forest_preset_height(species) * age
+    const k = custom ? 1 : (height + TRUNK_SINK) / hr
+    const kx = k * (0.75 + 0.25 * slender)
+    const broad_stiff = forest_tree_stiffness(hr, SWAY_BROADLEAF_BEND, SWAY_BROADLEAF_HEIGHT)
+    const conifer_stiff = forest_tree_stiffness(hr, SWAY_CONIFER_BEND, SWAY_CONIFER_HEIGHT)
+    const birch_stiff = forest_tree_stiffness(hr, SWAY_BIRCH_BEND, SWAY_BIRCH_HEIGHT)
+    const conifer = species == ISLAND_SPRUCE || species == ISLAND_FIR
+    const supple = species == ISLAND_BIRCH || species == ISLAND_PALM
+    const flutter = conifer ? SWAY_NEEDLE_FLUTTER : SWAY_LEAF_FLUTTER
+    const flutter_frequency = conifer ? SWAY_NEEDLE_FREQUENCY : SWAY_LEAF_FREQUENCY
+    const stiff = conifer ? conifer_stiff : (supple ? birch_stiff : broad_stiff)
+    const bend = hr * 0.0028 * (1.4 - stiff)
+    const foot = custom ? 0 : TRUNK_SINK
+
+    source {
+      if species == ISLAND_JUNGLE_A {
+        TreeBeech tree(seed: seed, age: age, bark_material: IslandBarkJungle,
+          leaf_material: IslandLeafJungle, stiffness: broad_stiff, flutter: SWAY_LEAF_FLUTTER,
+          lods: ISLAND_TREE_LODS, leaf_lod_skip: 1, leaf_lod_flat: 2) {
+          Position: {0, 0, 0}
+        }
+      } else if species == ISLAND_JUNGLE_B {
+        TreeOak tree(seed: seed, age: age, bark_material: IslandBarkJungleB,
+          leaf_material: IslandLeafJungleB, stiffness: broad_stiff, flutter: SWAY_LEAF_FLUTTER,
+          lods: ISLAND_TREE_LODS, leaf_lod_skip: 1, leaf_lod_flat: 2) {
+          Position: {0, 0, 0}
+        }
+      } else if species == ISLAND_BIRCH {
+        TreeBirch tree(seed: seed, age: age, bark_material: IslandBarkBirch,
+          leaf_material: ForestLeafBirch, stiffness: birch_stiff, flutter: SWAY_LEAF_FLUTTER,
+          lods: ISLAND_TREE_LODS, leaf_lod_skip: 1, leaf_lod_flat: 2) {
+          Position: {0, 0, 0}
+        }
+      } else if species == ISLAND_SPRUCE {
+        TreeSpruce tree(seed: seed, age: age, bark_material: IslandBarkSpruce,
+          leaf_material: ForestNeedleSpruce, stiffness: conifer_stiff,
+          flutter: SWAY_NEEDLE_FLUTTER, lods: ISLAND_TREE_LODS, leaf_lod_skip: 1,
+          leaf_lod_flat: 2) {
+          Position: {0, 0, 0}
+        }
+      } else if species == ISLAND_FIR {
+        TreeFir tree(seed: seed, age: age, bark_material: IslandBarkFir,
+          leaf_material: ForestNeedleFir, stiffness: conifer_stiff,
+          flutter: SWAY_NEEDLE_FLUTTER, lods: ISLAND_TREE_LODS, leaf_lod_skip: 1,
+          leaf_lod_flat: 2) {
+          Position: {0, 0, 0}
+        }
+      } else if species == ISLAND_TREE_FERN {
+        IslandTreeFern tree(seed: seed, height: height, lods: ISLAND_TREE_LODS) {
+          Position: {0, 0, 0}
+        }
+      } else if species == ISLAND_PALM {
+        IslandPalm tree(seed: seed, height: height, lods: ISLAND_TREE_LODS) {
+          Position: {0, 0, 0}
+        }
+      } else {
+        IslandKapok tree(seed: seed, height: height, lods: ISLAND_TREE_LODS) {
+          Position: {0, 0, 0}
+        }
+      }
+    }
+
+    source {
+      Prefab
+      tree {
+        Prefab
+        tree {
+          Prefab
+          bark { Prefab }
+          foliage { Prefab }
+        }
+      }
+    }
+
+    const grown: entity = this.lookup("source").lookup("tree").lookup("tree")
+    const bark_base: entity = grown.lookup("bark")
+    const foliage_base: entity = grown.lookup("foliage")
+
+    prefab tree {
+      if impostor {
+        Impostor: {
+          frames: ISLAND_IMPOSTOR_FRAMES,
+          resolution: ISLAND_IMPOSTOR_RESOLUTION,
+          hemisphere: true,
+          distance: ISLAND_IMPOSTOR_DISTANCE,
+          fade: ISLAND_IMPOSTOR_FADE
+        }
+      } else {
+        DrawRange: {far_: ISLAND_YOUNG_RANGE, fade: ISLAND_YOUNG_FADE}
+      }
+
+      const y = 0 - foot
+
+      bark {
+        (IsA, bark_base)
+        NoBake
+        Position: {0, y, 0}
+        Scale: {kx, k, kx}
+        WindSway: {
+          bend: bend, height: hr, base: foot, pivots: true, branch: ISLAND_BRANCH_SWING,
+          local_base: true
+        }
+      }
+
+      foliage {
+        (IsA, foliage_base)
+        NoBake
+        Position: {0, y, 0}
+        Scale: {kx, k, kx}
+        WindSway: {
+          bend: bend, height: hr, base: foot, flutter: flutter,
+          flutter_frequency: flutter_frequency, pivots: true, branch: ISLAND_BRANCH_SWING,
+          foliage: true, local_base: true
+        }
+      }
+    }
+  }
+}

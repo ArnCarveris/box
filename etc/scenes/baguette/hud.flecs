@@ -1,0 +1,375 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.camera
+using box.view
+using box.geometry
+using box.material
+using box.layout
+using box.text
+using box.input
+using box.picking
+using box.ui
+using box.widgets
+using box.texture
+using state
+
+const PANEL_W: f32 = 300
+const FRAME: f32 = 12
+const SLIDER_W: f32 = PANEL_W - 2 * FRAME - 32
+const CHALK: Rgb = {238, 232, 218}
+const GOLD: Rgb = {222, 176, 104}
+
+assets {
+  font_display { Font: {path: "etc/scenes/baguette/fonts/Cinzel.ttf"} }
+
+  chalkboard {
+    smudge { nodes.Noise: {frequency: 5, octaves: 5, seed: 41} }
+    dust { nodes.Noise: {frequency: 64, octaves: 2, seed: 42} }
+    wipe { nodes.Mix: {a: smudge, b: dust, factor_value: {0.3, 0, 0, 0}} }
+    slate {
+      nodes.Ramp: {
+        input: wipe,
+        keys: [{0.3, {28, 34, 32}}, {0.55, {37, 44, 41}}, {0.75, {52, 58, 54}}]
+      }
+    }
+
+    Graph: {output: slate, width: 512, height: 1024}
+  }
+
+  template Rule {
+    prop alpha: f32 = 140
+
+    Item: {width: {mode: Grow}, height: {mode: Fixed, value: 1}}
+    Rect: {1, 1}
+    Rgb: GOLD
+    Opacity: {alpha / 255}
+  }
+
+  template Screw {
+    prop h: Align = Left
+    prop v: VAlign = Top
+
+    Layout: {}
+    Item: {
+      h: h,
+      v: v,
+      x: h == Left ? 4 : -4,
+      y: v == Top ? 4 : -4,
+      width: {mode: Fixed, value: 7},
+      height: {mode: Fixed, value: 7}
+    }
+    Rect: {1, 1}
+    Rgb: {196, 158, 92}
+    Border: {width: 1, radius: 3.5, color: {92, 66, 34, 255}}
+
+    slot {
+      Item: {h: Center, v: Middle, width: {mode: Fixed, value: 5}, height: {mode: Fixed, value: 1}}
+      Rect: {1, 1}
+      Rgb: {110, 80, 42}
+    }
+  }
+
+  template LoafRow {
+    prop text: string = ""
+
+    Layout: {direction: Row, spacing: 6, v: Middle}
+    Item: {width: {mode: Grow}}
+
+    Label name(text: text)
+
+    gap {
+      Item: {width: {mode: Grow}}
+    }
+  }
+
+  template LoafGroup {
+    prop text: string = ""
+
+    Layout: {direction: Column, spacing: 6, padding: {8, 0, 0, 0}}
+    Item: {width: {mode: Grow}}
+
+    heading {
+      Layout: {direction: Row, spacing: 8, v: Middle}
+      Item: {width: {mode: Grow}}
+
+      label {
+        Text: {value: text, size: 14, font: font_display}
+        Rgb: GOLD
+      }
+
+      Rule rule(alpha: 110)
+    }
+  }
+}
+
+box {
+  text {
+    DefaultFont {
+      Font: {path: "etc/scenes/baguette/fonts/Spectral-Regular.ttf"}
+    }
+  }
+
+  ui {
+    theme {
+      Theme = {
+        accent: GOLD, accent_text: {30, 22, 14}, surface: {54, 61, 58},
+        surface_alt: {44, 50, 47}, border: {112, 106, 92}, hover: {68, 76, 72},
+        pressed: {38, 44, 42}, selection: {120, 96, 60}, text: CHALK,
+        text_muted: {176, 170, 156}, font_size: 14, radius: 3
+      }
+    }
+  }
+}
+
+hud {
+  Scene: {}
+
+  camera {
+    Position: {0, 0, 100}
+    Camera: {ortho: true, ortho_scale: 1}
+  }
+
+  screen {
+    Fill: {surface: window}
+    Layout: {}
+    FocusScope
+
+    panel {
+      InputBlocker
+      Layout: {padding: {FRAME, FRAME, FRAME, FRAME}}
+      Item: {h: Left, v: Middle, x: 16, width: {mode: Fixed, value: PANEL_W}}
+      Rect: {1, 1}
+      Image: {texture: assets.walnut}
+      Rgb: {255, 236, 216}
+      Border: {width: 1, radius: 6, color: {34, 22, 14, 255}}
+      BoxShadow: {offset_y: -6, blur: 22, spread: 2, color: {0, 0, 0, 150}}
+
+      board {
+        Layout: {direction: Column, spacing: 8, padding: {14, 16, 16, 16}}
+        Item: {width: {mode: Grow}}
+        Rect: {1, 1}
+        Image: {texture: assets.chalkboard}
+        Rgb: {255, 255, 255}
+        Border: {width: 2, radius: 2, color: {26, 18, 12, 255}}
+
+        masthead {
+          Layout: {direction: Column, spacing: 4, h: Center}
+          Item: {width: {mode: Grow}}
+
+          title {
+            Text: {value: "Baguette", size: 30, font: assets.font_display}
+            Rgb: CHALK
+          }
+
+          flourish {
+            Layout: {direction: Row, spacing: 6, v: Middle}
+            Item: {width: {mode: Fixed, value: 150}}
+
+            assets.Rule left()
+            dot_l {
+              Item: {width: {mode: Fixed, value: 3}, height: {mode: Fixed, value: 3}}
+              Rect: {1, 1}
+              Rgb: GOLD
+              Border: {radius: 1.5}
+            }
+
+            diamond {
+              Item: {width: {mode: Fixed, value: 7}, height: {mode: Fixed, value: 7}}
+              Rect: {1, 1}
+              Rgb: GOLD
+              Border: {radius: 3.5}
+            }
+
+            dot_r {
+              Item: {width: {mode: Fixed, value: 3}, height: {mode: Fixed, value: 3}}
+              Rect: {1, 1}
+              Rgb: GOLD
+              Border: {radius: 1.5}
+            }
+
+            assets.Rule right()
+          }
+        }
+
+        assets.LoafGroup shape(text: "Shape") {
+          Slider length(
+            label: "Length",
+            width: SLIDER_W,
+            min: 0.6,
+            max: 1.6,
+            step: 0.01,
+            decimals: 2,
+            value: state.length
+          )
+          Slider thickness(
+            label: "Thickness",
+            width: SLIDER_W,
+            min: 0.05,
+            max: 0.13,
+            step: 0.001,
+            decimals: 3,
+            value: state.thickness
+          )
+          Slider height(
+            label: "Height",
+            width: SLIDER_W,
+            min: 0.55,
+            max: 1,
+            step: 0.01,
+            decimals: 2,
+            value: state.height
+          )
+          Slider taper(
+            label: "Taper",
+            width: SLIDER_W,
+            min: 0.15,
+            max: 0.9,
+            step: 0.01,
+            decimals: 2,
+            value: state.taper
+          )
+        }
+
+        assets.LoafGroup scoring(text: "Scoring") {
+          assets.LoafRow cuts_row(text: "Cuts") {
+            Stepper cuts(min: 1, max: 9, value: state.cuts, width: 104)
+          }
+
+          Slider angle(
+            label: "Angle",
+            width: SLIDER_W,
+            min: 8,
+            max: 45,
+            step: 1,
+            unit: "°",
+            value: state.angle
+          )
+          Slider opening(
+            label: "Opening",
+            width: SLIDER_W,
+            min: 0.12,
+            max: 0.48,
+            step: 0.01,
+            decimals: 2,
+            value: state.opening
+          )
+        }
+
+        assets.LoafGroup oven(text: "Bake") {
+          Slider bake(
+            label: "Bake",
+            width: SLIDER_W,
+            min: 0,
+            max: 100,
+            step: 1,
+            unit: "%",
+            value: state.bake * 100
+          )
+          Slider flour(
+            label: "Flour",
+            width: SLIDER_W,
+            min: 0,
+            max: 100,
+            step: 1,
+            unit: "%",
+            value: state.flour * 100
+          )
+          Slider crust(
+            label: "Crust relief",
+            width: SLIDER_W,
+            min: 0,
+            max: 5,
+            step: 0.1,
+            decimals: 1,
+            value: state.crust
+          )
+        }
+
+        assets.LoafGroup variant(text: "Variation") {
+          assets.LoafRow seed_row(text: "Seed") {
+            Stepper seed(min: 0, max: 999, value: state.seed, width: 104)
+          }
+
+          actions_row {
+            Layout: {direction: Row, spacing: 8}
+            Item: {width: {mode: Grow}}
+            Button random(label: "Random", variant: "secondary", action: state.actions.randomize)
+            Button reset(label: "Reset", variant: "secondary", action: state.actions.reset)
+          }
+        }
+      }
+
+      assets.Screw screw_tl(h: Left, v: Top)
+      assets.Screw screw_tr(h: Right, v: Top)
+      assets.Screw screw_bl(h: Left, v: Bottom)
+      assets.Screw screw_br(h: Right, v: Bottom)
+    }
+  }
+
+  view {
+    View: {camera: hud.camera, lighting: {enabled: false}, culling: {enabled: false}}
+  }
+}
+
+async {
+  while true {
+    const e = await on.change(hud.screen.panel)
+    const w = e.widget
+    const n = w.name()
+
+    if w.has(Slider) {
+      const v: f32 = w[Slider.mut].current
+
+      if n == "length" {
+        state.length = v
+      } else if n == "thickness" {
+        state.thickness = v
+      } else if n == "height" {
+        state.height = v
+      } else if n == "taper" {
+        state.taper = v
+      } else if n == "angle" {
+        state.angle = v
+      } else if n == "opening" {
+        state.opening = v
+      } else if n == "bake" {
+        state.bake = v / 100
+      } else if n == "flour" {
+        state.flour = v / 100
+      } else if n == "crust" {
+        state.crust = v
+      }
+    } else if w.has(Stepper) {
+      if n == "cuts" {
+        state.cuts = w[Stepper.mut].current
+      } else if n == "seed" {
+        state.seed = w[Stepper.mut].current
+      }
+    }
+  }
+}
+
+async {
+  while true {
+    await on.pressed(state.actions.randomize)
+    state.seed = (state.seed * 621 + 271) % 1000
+  }
+}
+
+async {
+  while true {
+    await on.pressed(state.actions.reset)
+    state.length = START_LENGTH
+    state.thickness = START_THICKNESS
+    state.height = START_HEIGHT
+    state.taper = START_TAPER
+    state.cuts = START_CUTS
+    state.angle = START_ANGLE
+    state.opening = START_OPENING
+    state.bake = START_BAKE
+    state.flour = START_FLOUR
+    state.crust = START_CRUST
+    state.seed = START_SEED
+  }
+}

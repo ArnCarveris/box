@@ -32,12 +32,20 @@ assets {
         ]
       }
     }
+
     stalk {
       Position: {0, 0, 0}
-      Sweep: {path: stalk_path, profile: GardenRoundProfile, scale: {0.082, 0.082}, taper: 0.61, rings: 42}
+      Sweep: {
+        path: stalk_path,
+        profile: GardenRoundProfile,
+        scale: {0.082, 0.082},
+        taper: 0.61,
+        rings: 42
+      }
       Rgb: {122, 167, 85}
       PbrMaterial: {roughness: 0.55}
     }
+
     for i in 1..8 {
       const t = i / 7.0
       const lean = math.atan2(t * 0.32, height)
@@ -47,6 +55,7 @@ assets {
         Torus: {radius: 0.082 - t * 0.032, tube: 0.011, segments: 14, rings: 6}
         Rgb: {58, 93, 51}
       }
+
       {
         Position: {t * t * 0.16, height * t - 0.035, 0}
         Rotation: {0, 0, 0 - lean}
@@ -54,6 +63,7 @@ assets {
         Rgb: {199, 211, 144}
       }
     }
+
     for i in 0..4 {
       const t = (i + 3) / 7.0
       const angle = i * 2.4 + phase
@@ -62,6 +72,7 @@ assets {
       TreeLimb(ax: x, ay: y, az: 0,
         bx: x + math.cos(angle) * 0.48, by: y + 0.18, bz: math.sin(angle) * 0.48,
         base: 0.017, tip: 0.004, tint: {127, 155, 93})
+
       for j in 0..4 {
         const along = 0.13 + j * 0.1
         GardenLeaf(tint: {95 + j % 3 * 12, 139 + j % 3 * 10, 92 + j % 2 * 14}) {
@@ -71,8 +82,10 @@ assets {
         }
       }
     }
+
     TreeLimb(ax: 0.16, ay: height, az: 0, bx: 0.2, by: height + 0.18, bz: 0.03,
       base: 0.05, tip: 0.006, tint: {126, 159, 103})
+
     for i in 0..2 {
       GardenLeaf(tint: {137, 168, 110}) {
         Position: {0.18, height + 0.09, 0.015}

@@ -68,6 +68,22 @@ WGPUBindGroup box_gpu_instance_group(
     const box_gpu_mesh_t *m,
     bool shading);
 
+/** Get the bind group of an instance page without its frame stream
+ * (material_instance_layout), for the wire draws of the batches with a WindSway, as
+ * box_gpu_instance_group does.
+ *
+ * @param gpu The backend
+ * @param page Handle of the transform stream of the page, box_render_batch_t.instances
+ * @param handle Handle of the mesh
+ * @param m The mesh
+ * @return The bind group, NULL when a stream of the page is missing or not a storage buffer
+ */
+WGPUBindGroup box_gpu_instance_group_material(
+    box_gpu_t *gpu,
+    uint32_t page,
+    uint32_t handle,
+    const box_gpu_mesh_t *m);
+
 /** Forget the cull views of the previous target, before the views of a target are written.
  *
  * Also maps the counter copies of earlier targets, which have been submitted by now, publishes
@@ -280,10 +296,56 @@ void box_gpu_cull_record_late(
  *
  * @param gpu The backend
  * @param encoder The encoder of the target, after its views
+ * @param packet The packet
  */
 void box_gpu_cull_finish(
     box_gpu_t *gpu,
-    WGPUCommandEncoder encoder);
+    WGPUCommandEncoder encoder,
+    const box_render_packet_t *packet);
+
+/** List the draw arguments of the transmissive draws of the views that report their counts,
+ * which a copy of the counters then also reads back.
+ *
+ * @param c The cull state
+ * @param packet The packet
+ * @param r The copy whose lists it fills, NULL to only count
+ * @return The transmissive draws listed
+ */
+int32_t box_gpu_cull_glass_list(
+    const box_gpu_cull_t *c,
+    const box_render_packet_t *packet,
+    box_gpu_cull_readback_t *r);
+
+/** Count the transmissive instances the cull pass of each view of a mapped copy kept and keep
+ * them as the last counts of the view, unless it has counts of a newer frame.
+ *
+ * @param c The cull state
+ * @param r The copy, mapped
+ * @param args The draw arguments read back
+ */
+void box_gpu_cull_glass_publish(
+    box_gpu_cull_t *c,
+    const box_gpu_cull_readback_t *r,
+    const uint32_t *args);
+
+/** Check whether the cull pass of a view kept none of its transmissive instances: the last
+ * counts read back are of a frame at most BOX_GPU_CULL_GLASS_FRAMES ago, of as many transmissive
+ * instances as the view tests now, and none of them was visible.
+ *
+ * A view whose counts are not known draws its transmissive instances: the first frames of a
+ * view, a view that just got or lost some of them and a view the GPU is far behind on. So a
+ * transmissive surface that comes into view shows as many frames late as the counts take to
+ * arrive, and a view that never shows one takes no snapshot.
+ *
+ * @param gpu The backend
+ * @param packet The packet
+ * @param slot Slot of the view in the view buffer
+ * @return Whether the view has transmissive draws and none of their instances is visible
+ */
+bool box_gpu_cull_glass_hidden(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet,
+    int32_t slot);
 
 /** Create the layouts, pipelines layouts and empty bindings of the depth pyramid.
  *
@@ -460,6 +522,8 @@ bool box_gpu_cull_draw(
  * @param group Bind group index the instance page is bound at
  * @param late Draw what the late phase kept instead of the early or only phase
  * @param sequence Index buffer of the sequence, at least index_count of the mesh long
+ * @param shading Bind the shading stream and material table of the page too, for the wire
+ * pipeline of the batches with a WindSway (material_instance_layout)
  * @param bound Instance bind group bound last in the pass, NULL for none, updated
  * @return Whether the draw was recorded
  */
@@ -471,6 +535,7 @@ bool box_gpu_cull_draw_wire(
     uint32_t group,
     bool late,
     WGPUBuffer sequence,
+    bool shading,
     WGPUBindGroup *bound);
 
 #endif

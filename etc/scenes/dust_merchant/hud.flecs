@@ -66,10 +66,12 @@ assets {
 
     Position: {x, 0, 0}
     GlowLine rail(x1: 0, y1: -60, x2: 0, y2: 60, w: 1)
+
     for i in 0..9 {
       const py = (i - 4) * 15.0 - (value * 4 - floor(value * 4)) * 15
       "t_{i}" { GlowLine: {x1: 0, y1: py, x2: i % 2 == 0 ? 9 : 5, y2: py, w: 1} }
     }
+
     Glow head(text: label, size: 10, power: 1) { Position: {0, 70, 0} }
     Glow read(text: "{value * span:.0}", size: 13, power: 1.6) { Position: {0, -72, 0} }
   }
@@ -89,6 +91,7 @@ assets {
       BlendMode: Additive
       Border: {width: 1.2, color: {140, 255, 170, 255}}
       Ignore
+
       for i in 0..4 {
         "tick_{i}" {
           Rotation: {0, 0, i * PI / 2}
@@ -109,6 +112,7 @@ assets {
         Rotation: {0, 0, attitude_roll}
         scroll_y {
           Position: {0, 0 - attitude_pitch * 183, 0}
+
           for i in -4..5 {
             Ladder "l_{i + 4}"(deg: i * 10)
           }
@@ -131,7 +135,9 @@ assets {
       power: match stage { 3: 2.6; 4: 3; _: 1.2 }
     ) { Position: {0, -84, 0} }
 
-    Glow dest_line(text: course >= 0 ? dest_code(course) : dest_code(here), size: 11, power: 1) { Position: {0, 86, 0} }
+    Glow dest_line(text: course >= 0 ? dests[course].code : dests[here].code, size: 11, power: 1) {
+      Position: {0, 86, 0}
+    }
   }
 
   template Combiner {

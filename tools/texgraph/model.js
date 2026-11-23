@@ -205,6 +205,9 @@
     [TEX + "nodes.Slope"]: { strength: 1 },
     [TEX + "nodes.Gradient"]: { strength: 1 },
     [TEX + "nodes.Flow"]: { length_value: 1 },
+    [TEX + "nodes.Erosion"]: {
+      frequency: 4, octaves: 5, lacunarity: 2, gain: 0.5, scale: 1, branch: 1,
+    },
     [TEX + "nodes.Transmittance"]: { steps: 64 },
     [TEX + "nodes.Noise"]: { frequency: 4, octaves: 1, lacunarity: 2, gain: 0.5, offset: 1, channels: 1 },
     [TEX + "nodes.Blocks"]: { courses: 8, per_course: 4, softness: -1 },

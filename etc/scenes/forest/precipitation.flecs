@@ -1,0 +1,129 @@
+using flecs.script
+using flecs.script.math
+using box.app
+using box.transform
+using box.particle
+using state
+
+// What falls from the sky around the camera, from the Precipitation slider at the temperature
+// (weather.flecs): rain in streaks, sleet as rain with hard white pellets, snow in drifting
+// flakes, all carried by the gusts of the Wind (wind.flecs) through ParticleForces.global_wind.
+// The rain splashes off the floor around the camera, and the trees drip for a while after it
+// stops, as long as they are wet.
+//
+// The emitters follow the Position of the camera (view.flecs) without its rotation, so they
+// fall straight down whichever way the camera looks; their particles stay in the world.
+state {
+  // The volume the precipitation falls in: PRECIP_HALF meters to either side of the camera, from
+  // a little under it to PRECIP_TOP meters over it
+  export const PRECIP_HALF: f32 = 11
+  export const PRECIP_TOP: f32 = 9
+
+  // Particles a second at full rain, snow and drips
+  export const RAIN_RATE: f32 = 18000
+  export const SNOW_RATE: f32 = 3200
+  export const SPLASH_RATE: f32 = 7000
+  export const DRIP_RATE: f32 = 260
+
+  // How hard the trees drip, 0..1: in the rain, and while they dry after it. Kept up to date
+  // by the async block at the end in steps of a twentieth, so the drips change rarely
+  fn forest_drip(rain: f64, wet: f64) -> f64 {
+    max(rain, wet * wet * 0.6)
+  }
+
+  export mut drip: f32 = 0
+}
+
+forest {
+  falling {
+    const cam = camera[Position]
+    const floor_y = forest_ground_y(cam.x, cam.z)
+    const r = forest_rainfall(precipitation, temperature)
+    const sleet = precip_kind == PRECIP_SLEET ? precipitation : 0
+    const snowing = precip_kind == PRECIP_SNOW ? precipitation : 0
+
+    // Rain: thin streaks at their terminal speed, gravity against the drag of the air, which
+    // also carries them along the wind
+    raindrops {
+      Position: {cam.x, cam.y + PRECIP_TOP / 2 - 0.5, cam.z}
+      Emitter: {
+        max: 26000, rate: RAIN_RATE * r, shape: EmitterBox,
+        extents: {PRECIP_HALF, PRECIP_TOP / 2, PRECIP_HALF},
+        direction: {0, -1, 0}, speed: {7.5, 8.5}, lifetime: {1.1, 1.4}, size: {0.005, 0.007},
+        opacity: {0.12, 0.26}, color: {178, 186, 196}, color_variance: {10, 10, 10}, seed: 81
+      }
+      Forces: {gravity: {0, -9.81, 0}, drag: 1.2, global_wind: 1}
+      Appearance: {shape: Circle, blend: Alpha, stretch: 7, lit: 0.85}
+      Collision: {height: floor_y - 0.05, die: true}
+    }
+
+    // Sleet: hard, white pellets among the rain, falling a little slower
+    sleet_pellets {
+      Position: {cam.x, cam.y + PRECIP_TOP / 2 - 0.5, cam.z}
+      Emitter: {
+        max: 8000, rate: 5000 * sleet, shape: EmitterBox,
+        extents: {PRECIP_HALF, PRECIP_TOP / 2, PRECIP_HALF},
+        direction: {0, -1, 0}, speed: {4, 5}, lifetime: {1.8, 2.2}, size: {0.012, 0.02},
+        opacity: {0.6, 0.9}, color: {236, 240, 246}, seed: 82
+      }
+      Forces: {gravity: {0, -9.81, 0}, drag: 2.2, global_wind: 1, turbulence: 0.6}
+      Appearance: {shape: Circle, blend: Alpha, stretch: 0.8, lit: 0.85}
+      Collision: {height: floor_y - 0.05, die: true}
+    }
+
+    // Snow: flakes that drift down at a meter a second, wandering and swept by the gusts
+    snowflakes {
+      Position: {cam.x, cam.y + PRECIP_TOP / 2 - 0.5, cam.z}
+      Emitter: {
+        max: 30000, rate: SNOW_RATE * snowing, shape: EmitterBox,
+        extents: {PRECIP_HALF, PRECIP_TOP / 2, PRECIP_HALF},
+        direction: {0, -1, 0}, speed: {0.8, 1.2}, lifetime: {7, 9}, size: {0.024, 0.045},
+        rotation: {0, 360}, opacity: {0.8, 1}, color: {246, 249, 255}, seed: 83
+      }
+      Forces: {
+        gravity: {0, -3, 0}, drag: 3, global_wind: 1, turbulence: 2.2, turbulence_scale: 1.6
+      }
+      Appearance: {shape: Circle, blend: Alpha, softness: 0.05, lit: 0.45}
+      Collision: {height: floor_y - 0.05, die: true}
+    }
+
+    // Splashes of the rain off the floor: droplets that jump and fall back
+    splashes {
+      Position: {cam.x, floor_y + 0.02, cam.z}
+      Emitter: {
+        max: 4000, rate: SPLASH_RATE * r, shape: EmitterDisc, radius: PRECIP_HALF * 0.8,
+        direction: {0, 1, 0}, spread: 45, speed: {0.6, 1.5}, lifetime: {0.18, 0.32},
+        size: {0.007, 0.014}, opacity: {0.35, 0.65}, color: {214, 222, 230}, seed: 84
+      }
+      Appearance: {shape: Circle, blend: Alpha, stretch: 3, lit: 0.75}
+    }
+
+    // Drips from the leaves and the limbs: larger drops from the crowns, in the rain and while
+    // the trees dry
+    drips {
+      Position: {cam.x, floor_y + 6, cam.z}
+      Emitter: {
+        max: 1200, rate: DRIP_RATE * drip, shape: EmitterBox,
+        extents: {PRECIP_HALF * 0.8, 3.5, PRECIP_HALF * 0.8},
+        direction: {0, -1, 0}, speed: {0, 0.4}, lifetime: {1.6, 2}, size: {0.012, 0.018},
+        opacity: {0.45, 0.75}, color: {210, 220, 228}, seed: 85
+      }
+      Forces: {gravity: {0, -9.81, 0}, drag: 0.5, global_wind: 0.3}
+      Appearance: {shape: Circle, blend: Alpha, stretch: 2.5, lit: 0.8}
+      Collision: {height: floor_y - 0.05, die: true}
+    }
+  }
+}
+
+// The drips follow the rain and the wetness of the trees
+async {
+  while true {
+    await next_frame()
+    const v = state.forest_drip(state.rain, state.wet)
+    const q: f32 = floor(v * 20 + 0.5) / 20
+
+    if q != state.drip {
+      state.drip = q
+    }
+  }
+}

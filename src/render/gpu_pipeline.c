@@ -24,14 +24,6 @@
 /** Packets between two sweeps of the cache for pipelines whose time is up */
 #define BOX_GPU_PIPELINE_SWEEP (30)
 
-#if defined(_MSC_VER)
-/** Storage of a variable of which every thread has its own */
-#define BOX_GPU_THREAD_LOCAL __declspec(thread)
-#else
-/** Storage of a variable of which every thread has its own */
-#define BOX_GPU_THREAD_LOCAL _Thread_local
-#endif
-
 typedef struct box_gpu_pipeline_t box_gpu_pipeline_t;
 
 /** Where the creation of a pipeline of the cache is */
@@ -88,6 +80,7 @@ struct box_gpu_pipelines_t {
                                      *   this packet */
     int64_t packets;                /**< Packets delivered, the clock of the cache */
     int32_t building;               /**< Pipelines whose outcome was not delivered */
+    int32_t count;                  /**< Pipelines in the cache, built or building */
 };
 
 /** Capture of the creation that runs on this thread, which device errors are reported to */
@@ -1017,6 +1010,7 @@ static box_gpu_pipeline_t* box_gpu_pipeline_request(
     box_gpu_key_bytes(&p->key, ecs_vec_first(&c->scratch), ecs_vec_count(&c->scratch));
     p->next = ecs_map_get_deref(&c->entries, box_gpu_pipeline_t, hash);
     *ecs_map_ensure(&c->entries, hash) = (ecs_map_val_t)(uintptr_t)p;
+    c->count ++;
     box_gpu_pipeline_count(gpu, true, false);
     c->building ++;
     if (gpu->pipeline_wait && !c->hold) {
@@ -1064,6 +1058,12 @@ int32_t box_gpu_pipelines_building(
     const box_gpu_t *gpu)
 {
     return gpu->pipelines ? gpu->pipelines->building : 0;
+}
+
+int32_t box_gpu_pipelines_cached(
+    const box_gpu_t *gpu)
+{
+    return gpu->pipelines ? gpu->pipelines->count : 0;
 }
 
 bool box_gpu_render_pipelines_swap(
@@ -1174,6 +1174,7 @@ static void box_gpu_pipelines_sweep(
                 c->packets - p->used > BOX_GPU_PIPELINE_KEEP)
             {
                 box_gpu_pipeline_free(p);
+                c->count --;
             } else {
                 *tail = p;
                 tail = &p->next;

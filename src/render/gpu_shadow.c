@@ -12,6 +12,7 @@
  */
 
 #include "gpu.h"
+#include "gpu_forward.h"
 #include <math.h>
 
 #ifdef BOX_RENDER_WGPU
@@ -21,7 +22,7 @@ void box_gpu_shadow_init(
 {
     WGPUBindGroupLayoutEntry entry = {
         .binding = 0,
-        .visibility = WGPUShaderStage_Vertex,
+        .visibility = WGPUShaderStage_Vertex | WGPUShaderStage_Fragment,
         .buffer = {
             .type = WGPUBufferBindingType_Uniform,
             .hasDynamicOffset = true,
@@ -364,6 +365,39 @@ void box_gpu_shadow_cascade_uniforms(
     u->shadow_offset[index] = normal_offset * cascade->texel;
 }
 
+void box_gpu_origin_split(
+    const double origin[3],
+    int32_t out[4])
+{
+    const double units = (double)(1 << BOX_GPU_ORIGIN_REST_BITS);
+    uint32_t rests = 0;
+    int32_t k;
+    for (k = 0; k < 3; k ++) {
+        double v = isfinite(origin[k]) ? origin[k] : 0.0;
+        v = v < -2147483648.0 ? -2147483648.0 : v > 2147483647.0 ? 2147483647.0 : v;
+        double whole = floor(v);
+        double rest = round((v - whole) * units);
+        if (rest >= units) {
+            rest = 0.0;
+            whole += whole < 2147483647.0 ? 1.0 : 0.0;
+        }
+
+        out[k] = (int32_t)whole;
+        rests |= (uint32_t)rest << (k * BOX_GPU_ORIGIN_REST_BITS);
+    }
+
+    out[3] = (int32_t)rests;
+}
+
+void box_gpu_shadow_origin(
+    const double origin[3],
+    void *block)
+{
+    int32_t split[4];
+    box_gpu_origin_split(origin, split);
+    ecs_os_memcpy((uint8_t*)block + BOX_GPU_SHADOW_ORIGIN, split, ECS_SIZEOF(split));
+}
+
 void box_gpu_shadow_filter_uniforms(
     box_gpu_view_uniforms_t *u,
     int32_t cascades,
@@ -520,6 +554,7 @@ void box_gpu_shadow_uniforms(
     mat4 proj,
     int32_t slot,
     int64_t frame,
+    uint32_t live,
     box_gpu_view_uniforms_t *u)
 {
     const box_render_view_shadows_t *s = &v->shadows;
@@ -555,7 +590,7 @@ void box_gpu_shadow_uniforms(
         }
 
         glm_mat4_copy(proj, store->proj);
-        cs->renders &= s->render | ~store->valid;
+        cs->renders &= s->render | live | ~store->valid;
     }
 
     float distance = s->splits[n - 1];
@@ -574,9 +609,10 @@ void box_gpu_shadow_uniforms(
             cascade = store->fits[i];
         }
 
-        ecs_os_memcpy(ecs_vec_get_t(&gpu->shadow_data, uint8_t,
-            (slot * BOX_RENDER_SHADOW_CASCADES + i) * BOX_GPU_CASCADE_STRIDE),
-            cascade.matrix, sizeof(mat4));
+        uint8_t *block = ecs_vec_get_t(&gpu->shadow_data, uint8_t,
+            (slot * BOX_RENDER_SHADOW_CASCADES + i) * BOX_GPU_CASCADE_STRIDE);
+        ecs_os_memcpy(block, cascade.matrix, sizeof(mat4));
+        box_gpu_shadow_origin(gpu->origin, block);
         box_gpu_shadow_cascade_uniforms(u, i, &cascade, s->depth_bias, s->normal_offset,
             s->resolution);
     }
@@ -640,6 +676,15 @@ done:
  * @param texture_blend Whether the alpha tested pipeline blends the layers of a TextureBlend;
  * ignored without cutout
  * @param surface Whether the casters are parametric surfaces
+ * @param wind Whether the vertex stage moves the vertices by the WindSway of their material
+ * (the material_wind constant), as the mesh shaders do
+ * @param data Whether the vertex stage reads the per vertex data of the mesh for its
+ * VertexReveal or the pivots of its WindSway (the _data entry points, a third vertex buffer);
+ * ignored without cutout or wind
+ * @param range Whether the casters have a DrawRange: both stages have the draw_range constant
+ * and a plain caster discards with fs_range; ignored by the point light pipelines
+ * @param impostor Whether the casters are impostor cards, drawn with vs_impostor and
+ * fs_impostor from the frame of their atlases nearest the light; not for the point lights
  * @return The pipeline
  */
 static WGPURenderPipeline box_gpu_shadow_create(
@@ -649,16 +694,46 @@ static WGPURenderPipeline box_gpu_shadow_create(
     bool point,
     bool discard,
     bool texture_blend,
-    bool surface)
+    bool surface,
+    bool wind,
+    bool data,
+    bool range,
+    bool impostor)
 {
+    WGPUConstantEntry vertex_constants[2];
+    WGPUConstantEntry range_constant = {
+        .key = { .data = "draw_range", .length = WGPU_STRLEN },
+        .value = 1.0
+    };
+    size_t vertex_count = 0;
+    range = range && !point;
+    impostor = impostor && !point;
+    if (wind) {
+        vertex_constants[vertex_count ++] = (WGPUConstantEntry){
+            .key = { .data = "material_wind", .length = WGPU_STRLEN },
+            .value = 1.0
+        };
+    }
+
+    if (range) {
+        vertex_constants[vertex_count ++] = range_constant;
+    }
+
     static const char *vertex[2][2][2] = {
         { { "vs", "vs_surface" }, { "vs_cutout", "vs_cutout_surface" } },
         { { "vs_point", "vs_point_surface" }, { "vs_point_cutout", "vs_point_cutout_surface" } }
     };
-    const char *vs = vertex[point][cutout][surface];
+    static const char *vertex_data[2][2][2] = {
+        { { "vs_data", "vs_surface_data" }, { "vs_cutout_data", "vs_cutout_surface_data" } },
+        { { "vs_point_data", "vs_point_surface_data" },
+          { "vs_point_cutout_data", "vs_point_cutout_surface_data" } }
+    };
+    data = data && (cutout || wind);
+    const char *vs = data ? vertex_data[point][cutout][surface]
+        : vertex[point][cutout][surface];
     const char *fs = point
         ? (cutout ? "fs_point_cutout" : (discard ? "fs_point" : "fs"))
-        : (cutout ? "fs_cutout" : "fs");
+        : (cutout ? "fs_cutout" : (range ? "fs_range" : "fs"));
     WGPUPipelineLayout layout = gpu->shadow_pipeline_layout;
     texture_blend = texture_blend && cutout;
     if (texture_blend) {
@@ -677,6 +752,12 @@ static WGPURenderPipeline box_gpu_shadow_create(
         layout = gpu->shadow_blend_layout;
     }
 
+    if (impostor) {
+        vs = "vs_impostor";
+        fs = "fs_impostor";
+        data = true;
+    }
+
     WGPUVertexAttribute vertex_attrs[3] = {
         { .format = WGPUVertexFormat_Float32x3, .offset = 0, .shaderLocation = 0 },
         { .format = WGPUVertexFormat_Float32x3, .offset = 12, .shaderLocation = 1 },
@@ -685,7 +766,8 @@ static WGPURenderPipeline box_gpu_shadow_create(
     WGPUVertexAttribute slot_attr = {
         .format = WGPUVertexFormat_Uint32, .offset = 0, .shaderLocation = 3
     };
-    WGPUVertexBufferLayout buffers[2] = {
+    WGPUVertexAttribute data_attrs[BOX_RENDER_DATA_VECS];
+    WGPUVertexBufferLayout buffers[3] = {
         {
             .stepMode = WGPUVertexStepMode_Vertex,
             .arrayStride = sizeof(box_vertex_t),
@@ -699,6 +781,7 @@ static WGPURenderPipeline box_gpu_shadow_create(
             .attributes = &slot_attr
         }
     };
+    buffers[2] = box_gpu_vertex_data_layout(data_attrs);
     WGPUDepthStencilState depth = {
         .format = BOX_GPU_SHADOW_FORMAT,
         .depthWriteEnabled = WGPUOptionalBool_True,
@@ -708,14 +791,18 @@ static WGPURenderPipeline box_gpu_shadow_create(
     };
     WGPUFragmentState fragment = {
         .module = module,
-        .entryPoint = { .data = fs, .length = WGPU_STRLEN }
+        .entryPoint = { .data = fs, .length = WGPU_STRLEN },
+        .constantCount = range ? 1 : 0,
+        .constants = range ? &range_constant : NULL
     };
     WGPURenderPipelineDescriptor desc = {
         .layout = layout,
         .vertex = {
             .module = module,
             .entryPoint = { .data = vs, .length = WGPU_STRLEN },
-            .bufferCount = 2,
+            .constantCount = vertex_count,
+            .constants = vertex_count ? vertex_constants : NULL,
+            .bufferCount = data ? 3 : 2,
             .buffers = buffers
         },
         .primitive = {
@@ -789,8 +876,10 @@ static WGPURenderPipeline box_gpu_shadow_pipeline(
 
     WGPURenderPipeline *current[3] = { &gpu->shadow, &gpu->shadow_cutout, &gpu->shadow_clear };
     WGPURenderPipeline next[3] = {
-        box_gpu_shadow_create(gpu, s->module, false, false, false, false, false),
-        box_gpu_shadow_create(gpu, s->module, true, false, false, false, false),
+        box_gpu_shadow_create(gpu, s->module, false, false, false, false, false, false,
+            false, false, false),
+        box_gpu_shadow_create(gpu, s->module, true, false, false, false, false, false,
+            false, false, false),
         box_gpu_shadow_clear_create(gpu, s->module)
     };
     if (!box_gpu_render_pipelines_swap(current, next, 3)) {
@@ -841,8 +930,10 @@ static WGPURenderPipeline box_gpu_shadow_point_pipeline(
     bool discard = handle == BOX_RENDER_SHADER_SHADOW;
     WGPURenderPipeline *current[2] = { &gpu->shadow_point, &gpu->shadow_point_cutout };
     WGPURenderPipeline next[2] = {
-        box_gpu_shadow_create(gpu, s->module, false, true, discard, false, false),
-        box_gpu_shadow_create(gpu, s->module, true, true, discard, false, false)
+        box_gpu_shadow_create(gpu, s->module, false, true, discard, false, false, false,
+            false, false, false),
+        box_gpu_shadow_create(gpu, s->module, true, true, discard, false, false, false,
+            false, false, false)
     };
     if (!box_gpu_render_pipelines_swap(current, next, 2)) {
         goto done;
@@ -879,15 +970,24 @@ done:
     return;
 }
 
-/** Get a shadow pipeline of the alpha tested casters with a TextureBlend or of the parametric
- * surfaces, created on first use from the shader the other pipelines of the cascades, or of the
- * point light tiles, were made with, and released with them.
+/** Get a shadow pipeline of the alpha tested casters with a TextureBlend or per vertex data, of
+ * the parametric surfaces, of the casters with a WindSway or with a DrawRange, created on first
+ * use from the shader of the other pipelines of the cascades, or of the point light tiles.
+ *
+ * They are released with those pipelines.
  *
  * @param gpu The backend
  * @param point Whether to get the pipeline of the octants of the point light tiles
  * @param cutout Whether the casters are alpha tested
  * @param texture_blend Whether the alpha tested casters blend the layers of a TextureBlend
  * @param surface Whether the casters are parametric surfaces
+ * @param wind Whether the casters sway (the material_wind constant)
+ * @param data Whether the alpha tested or swaying casters read the per vertex data of their
+ * mesh (box_gpu_vertex_data); ignored without cutout or wind
+ * @param range Whether the casters have a DrawRange (the draw_range constant), ignored by the
+ * point light tiles
+ * @param impostor Whether the casters are impostor cards, which the point light tiles do not
+ * draw: the last two variants, without then with a DrawRange
  * @return The pipeline, NULL without a shader module or while it is being created
  */
 static WGPURenderPipeline box_gpu_shadow_variant(
@@ -895,10 +995,36 @@ static WGPURenderPipeline box_gpu_shadow_variant(
     bool point,
     bool cutout,
     bool texture_blend,
-    bool surface)
+    bool surface,
+    bool wind,
+    bool data,
+    bool range,
+    bool impostor)
 {
     texture_blend = texture_blend && cutout;
+    data = data && (cutout || wind);
+    range = range && !point;
     int32_t index = surface ? 1 + (int32_t)cutout + (int32_t)texture_blend : 0;
+    if (wind) {
+        index = 4 + (surface ? 3 : 0) + (int32_t)cutout + (int32_t)texture_blend;
+    }
+
+    if (range) {
+        index = 10 + (wind ? 6 : 0) + (surface ? 3 : 0) + (int32_t)cutout +
+            (int32_t)texture_blend;
+    }
+
+    if (data && cutout) {
+        index = 22 + (range ? 8 : 0) + (wind ? 4 : 0) + (surface ? 2 : 0) +
+            (int32_t)texture_blend;
+    } else if (data) {
+        index = 38 + (range ? 2 : 0) + (surface ? 1 : 0);
+    }
+
+    if (impostor) {
+        index = 42 + (int32_t)range;
+    }
+
     WGPURenderPipeline *slot = &gpu->shadow_variants[point][index];
     uint32_t handle = point && gpu->shadow_point_shader
         ? gpu->shadow_point_shader : BOX_RENDER_SHADER_SHADOW;
@@ -908,7 +1034,7 @@ static WGPURenderPipeline box_gpu_shadow_variant(
     }
 
     *slot = box_gpu_shadow_create(gpu, s->module, cutout, point,
-        handle == BOX_RENDER_SHADER_SHADOW, texture_blend, surface);
+        handle == BOX_RENDER_SHADER_SHADOW, texture_blend, surface, wind, data, range, impostor);
 done:
     return *slot;
 }
@@ -925,10 +1051,14 @@ void box_gpu_shadow_request(
     for (i = 0; i < ecs_vec_count(&packet->batches); i ++) {
         const box_render_batch_t *b = ecs_vec_get_t(&packet->batches, box_render_batch_t, i);
         bool blend = b->cutout && box_gpu_texture_blends(b);
+        bool data = (b->cutout || b->wind) && box_gpu_vertex_data(gpu, b);
+        bool range = box_render_batch_ranged(b);
         if (b->shadow && b->view == -1 && b->blend == Opaque &&
-            box_render_is_mesh(b->pipeline) && (b->surface || blend))
+            box_render_is_mesh(b->pipeline) &&
+            (b->surface || blend || b->wind || data || range || b->impostor))
         {
-            box_gpu_shadow_variant(gpu, false, b->cutout, blend, b->surface);
+            box_gpu_shadow_variant(gpu, false, b->cutout, blend, b->surface, b->wind, data,
+                range, b->impostor);
         }
     }
 
@@ -943,8 +1073,8 @@ done:
  * pipeline and the material group of their batch, whose albedo texture they sample.
  *
  * Alpha tested casters with a TextureBlend draw with a pipeline of box_gpu_shadow_variant and
- * the blend group of their batch, whose layers they blend. Parametric surfaces draw with the
- * surface pipelines of box_gpu_shadow_variant, and wait for them.
+ * the blend group of their batch, whose layers they blend. Parametric surfaces and casters with
+ * a WindSway draw with the pipelines of box_gpu_shadow_variant, and wait for them.
  *
  * @param gpu The backend
  * @param pass The shadow pass of the cascade or the atlas
@@ -972,43 +1102,52 @@ static bool box_gpu_shadow_draw(
     WGPURenderPipeline bound = NULL;
     WGPUBindGroup instances = NULL, material = NULL;
     bool result = true;
-    int32_t i;
-    for (i = 0; i < cv->draw_count; i ++) {
-        const box_gpu_cull_draw_t *d = ecs_vec_get_t(
-            &gpu->cull.draws, box_gpu_cull_draw_t, cv->first_draw + i);
-        const box_render_batch_t *b = ecs_vec_get_t(
-            &packet->batches, box_render_batch_t, d->batch);
-        bool cutout = b->cutout && alpha;
-        bool blend = cutout && box_gpu_texture_blends(b);
-        WGPURenderPipeline pipeline = cutout ? alpha : plain;
-        if (blend || b->surface) {
-            pipeline = box_gpu_shadow_variant(gpu, point, cutout, blend, b->surface);
-            result = result && pipeline != NULL;
-        }
+    int32_t i, sweep;
+    for (sweep = 0; sweep < BOX_GPU_DEPTH_SWEEPS; sweep ++) {
+        for (i = 0; i < cv->draw_count; i ++) {
+            const box_gpu_cull_draw_t *d = ecs_vec_get_t(
+                &gpu->cull.draws, box_gpu_cull_draw_t, cv->first_draw + i);
+            const box_render_batch_t *b = ecs_vec_get_t(
+                &packet->batches, box_render_batch_t, d->batch);
+            bool cutout = b->cutout && alpha;
+            bool blend = cutout && box_gpu_texture_blends(b);
+            bool data = (cutout || b->wind) && box_gpu_vertex_data(gpu, b);
+            bool range = !point && box_render_batch_ranged(b);
+            WGPURenderPipeline pipeline = cutout ? alpha : plain;
+            if (box_gpu_depth_sweep(b) != sweep || (b->impostor && (point || !alpha))) {
+                continue;
+            }
 
-        if (!pipeline && !b->surface) {
-            cutout = false;
-            pipeline = plain;
-        }
+            if (blend || b->surface || b->wind || data || range || b->impostor) {
+                pipeline = box_gpu_shadow_variant(gpu, point, cutout, blend, b->surface, b->wind,
+                    data, range, b->impostor);
+                result = result && pipeline != NULL;
+            }
 
-        if (!pipeline || d->skip) {
-            continue;
-        }
+            if (!pipeline && !b->surface && !b->wind && !range && !b->impostor) {
+                cutout = false;
+                pipeline = plain;
+            }
 
-        if (pipeline != bound) {
-            wgpuRenderPassEncoderSetPipeline(pass, pipeline);
-            bound = pipeline;
-        }
+            if (!pipeline || d->skip) {
+                continue;
+            }
 
-        WGPUBindGroup group = box_gpu_material_group(gpu, packet,
-            cutout ? b : &(box_render_batch_t){0});
-        if (group != material) {
-            wgpuRenderPassEncoderSetBindGroup(pass, 2, group, 1, &(uint32_t){0});
-            material = group;
-        }
+            if (pipeline != bound) {
+                wgpuRenderPassEncoderSetPipeline(pass, pipeline);
+                bound = pipeline;
+            }
 
-        if (box_gpu_cull_draw(gpu, pass, packet, d, 1, false, true, &instances) && counted) {
-            box_gpu_count(gpu, BOX_GPU_STAT_SHADOW_DRAW);
+            WGPUBindGroup group = box_gpu_material_group(gpu, packet,
+                cutout ? b : &(box_render_batch_t){0});
+            if (group != material) {
+                wgpuRenderPassEncoderSetBindGroup(pass, 2, group, 1, &(uint32_t){0});
+                material = group;
+            }
+
+            if (box_gpu_cull_draw(gpu, pass, packet, d, 1, false, true, &instances) && counted) {
+                box_gpu_count(gpu, BOX_GPU_STAT_SHADOW_DRAW);
+            }
         }
     }
 
@@ -1073,7 +1212,8 @@ void box_gpu_shadow_render(
             .depthClearValue = 0.0f
         };
         WGPURenderPassDescriptor desc = { .depthStencilAttachment = &depth };
-        WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &desc);
+        WGPURenderPassEncoder pass = box_gpu_profile_render_pass(gpu, encoder, &desc,
+            "shadow atlas");
         wgpuRenderPassEncoderSetBindGroup(pass, 0, group, 1, &offset);
         if (cv) {
             complete = box_gpu_shadow_draw(gpu, pass, packet, cv, gpu->shadow,
@@ -1082,6 +1222,8 @@ void box_gpu_shadow_render(
 
         wgpuRenderPassEncoderEnd(pass);
         wgpuRenderPassEncoderRelease(pass);
+        box_gpu_grass_shadow(gpu, encoder, v, i, layers[i], (const float*)ecs_vec_get_t(
+            &gpu->shadow_data, uint8_t, offset));
         box_gpu_count(gpu, BOX_GPU_STAT_CASCADE);
         if (store && complete) {
             store->valid |= 1u << i;
@@ -1211,8 +1353,10 @@ WGPUTextureView box_gpu_shadow_capture(
     }
 
     box_gpu_shadow_capture_ensure(gpu);
-    wgpuQueueWriteBuffer(gpu->queue, gpu->capture_shadow_buffer, 0, cascade->matrix,
-        sizeof(mat4));
+    uint8_t block[BOX_GPU_SHADOW_UNIFORM_SIZE] = {0};
+    ecs_os_memcpy(block, cascade->matrix, sizeof(mat4));
+    box_gpu_shadow_origin(packet->origin, block);
+    wgpuQueueWriteBuffer(gpu->queue, gpu->capture_shadow_buffer, 0, block, sizeof(block));
     WGPURenderPassDepthStencilAttachment depth = {
         .view = gpu->capture_shadow_layer,
         .depthLoadOp = WGPULoadOp_Clear,
@@ -1220,7 +1364,8 @@ WGPUTextureView box_gpu_shadow_capture(
         .depthClearValue = 0.0f
     };
     WGPURenderPassDescriptor desc = { .depthStencilAttachment = &depth };
-    WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &desc);
+    WGPURenderPassEncoder pass = box_gpu_profile_render_pass(gpu, encoder, &desc,
+        "shadow cascades");
     wgpuRenderPassEncoderSetBindGroup(pass, 0, gpu->capture_shadow_group, 1, &offset);
     if (cv) {
         box_gpu_shadow_draw(gpu, pass, packet, cv, gpu->shadow, gpu->shadow_cutout, false,
@@ -1377,8 +1522,10 @@ static void box_gpu_atlas_matrices(
             &packet->shadow_tiles, box_render_shadow_tile_t, i);
         int32_t first = *ecs_vec_get_t(&gpu->atlas_blocks, int32_t, i);
         if (tile->projection != BOX_RENDER_SHADOW_OCTAHEDRAL) {
-            ecs_os_memcpy(ecs_vec_get_t(&gpu->atlas_data, uint8_t,
-                first * BOX_GPU_CASCADE_STRIDE), tile->matrix, sizeof(mat4));
+            uint8_t *block = ecs_vec_get_t(&gpu->atlas_data, uint8_t,
+                first * BOX_GPU_CASCADE_STRIDE);
+            ecs_os_memcpy(block, tile->matrix, sizeof(mat4));
+            box_gpu_shadow_origin(packet->origin, block);
             continue;
         }
 
@@ -1391,6 +1538,7 @@ static void box_gpu_atlas_matrices(
             u[19] = (float)o;
             u[20] = tile->near_;
             u[21] = tile->far_;
+            box_gpu_shadow_origin(packet->origin, u);
         }
     }
 
@@ -1470,6 +1618,7 @@ static bool box_gpu_atlas_renders(
         all = !atlas->valid || !gpu->shadow_clear || atlas->revision != gpu->shadow_revision ||
             (point && (atlas->point_shader != gpu->shadow_point_shader ||
             atlas->point_revision != gpu->shadow_point_revision));
+        all = all || box_gpu_grass_lights(gpu, packet, a->scene);
         for (j = 0; j < a->count; j ++) {
             renders[a->first + j] = all || tiles[j].render;
             result = result || renders[a->first + j];
@@ -1495,13 +1644,16 @@ static bool box_gpu_atlas_renders(
  * @param packet The packet
  * @param index Index of the atlas in the packet, the slot of the cull views of its tiles
  * @param group Binds the matrix buffer of the tiles
+ * @param culled Whether the cull pass ran, false while the cull pipelines don't exist yet: the
+ * tiles then get no casters and the atlas can't keep them
  */
 static void box_gpu_atlas_pass(
     box_gpu_t *gpu,
     WGPUCommandEncoder encoder,
     const box_render_packet_t *packet,
     int32_t index,
-    WGPUBindGroup group)
+    WGPUBindGroup group,
+    bool culled)
 {
     const box_render_shadow_atlas_t *a = ecs_vec_get_t(
         &packet->shadow_atlases, box_render_shadow_atlas_t, index);
@@ -1530,7 +1682,7 @@ static void box_gpu_atlas_pass(
         .depthClearValue = 0.0f
     };
     WGPURenderPassDescriptor desc = { .depthStencilAttachment = &depth };
-    WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &desc);
+    WGPURenderPassEncoder pass = box_gpu_profile_render_pass(gpu, encoder, &desc, "shadow other");
     box_gpu_count(gpu, BOX_GPU_STAT_SHADOW_PASS);
     for (i = 0; i < a->count; i ++) {
         const box_render_shadow_tile_t *tile = ecs_vec_get_t(
@@ -1565,6 +1717,11 @@ static void box_gpu_atlas_pass(
             const box_gpu_cull_view_t *cv = box_gpu_cull_view(gpu, index,
                 BOX_GPU_ATLAS_FRUSTUM(i, o));
             uint32_t offset = (uint32_t)((block + o) * BOX_GPU_CASCADE_STRIDE);
+            if (!cv && !culled) {
+                kept = false;
+                continue;
+            }
+
             if (cv && !cv->draw_count) {
                 continue;
             }
@@ -1584,6 +1741,7 @@ static void box_gpu_atlas_pass(
 
     wgpuRenderPassEncoderEnd(pass);
     wgpuRenderPassEncoderRelease(pass);
+    box_gpu_grass_atlas(gpu, encoder, packet, a, renders, atlas->view, atlas->resolution);
     atlas->valid = kept;
     atlas->revision = gpu->shadow_revision;
     atlas->point_shader = point ? gpu->shadow_point_shader : 0;
@@ -1697,9 +1855,10 @@ void box_gpu_atlas_render(
     });
     WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(gpu->device, NULL);
     box_gpu_cull_record_all(gpu, encoder, NULL);
+    bool culled = !ecs_vec_count(&gpu->cull.views) || (gpu->cull.bound && gpu->cull.parallel);
     box_gpu_atlas_counts(gpu, encoder, packet);
     for (i = 0; i < count; i ++) {
-        box_gpu_atlas_pass(gpu, encoder, packet, i, group);
+        box_gpu_atlas_pass(gpu, encoder, packet, i, group, culled);
     }
 
     WGPUCommandBuffer commands = wgpuCommandEncoderFinish(encoder, NULL);

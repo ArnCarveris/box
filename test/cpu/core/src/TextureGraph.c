@@ -28,6 +28,9 @@
 /** The nebula of the background of the planet scene, a static graph on the sphere domain */
 #define GRAPH_NEBULA "test/assets/textures/graph/nebula.flecs"
 
+/** Rain on puddles: layers whose normal is a graph of TexRipples at density 1 and 0.3 */
+#define GRAPH_RIPPLES "test/assets/textures/ripples/rain.flecs"
+
 /** Node literals that leave members out */
 #define GRAPH_DEFAULTS "test/assets/textures/graph/defaults.flecs"
 
@@ -515,6 +518,7 @@ void TextureGraph_names(void) {
     test_path(world, "box.texture.nodes.Curve", ecs_id(TexCurve));
     test_path(world, "box.texture.nodes.Blocks", ecs_id(TexBlocks));
     test_path(world, "box.texture.nodes.Cells", ecs_id(TexCells));
+    test_path(world, "box.texture.nodes.Ripples", ecs_id(TexRipples));
     test_path(world, "box.texture.nodes.Blur", ecs_id(TexBlur));
     test_path(world, "box.texture.nodes.Distance", ecs_id(TexDistance));
     test_path(world, "box.texture.nodes.Noise", ecs_id(TexNoise));
@@ -1437,7 +1441,7 @@ void TextureGraph_null_backend_records(void) {
     test_assert(entry->handle != 0);
     test_bool(entry->graph_sent, true);
     test_int(null->texture_graphs, 1);
-    test_int(null->texture_node_kinds, 44);
+    test_int(null->texture_node_kinds, 47);
 
     const box_render_texture_graph_t *g = box_render_null_texture_graph(null, entry->handle);
     test_assert(g != NULL);
@@ -1486,7 +1490,7 @@ void TextureGraph_null_backend_records(void) {
     ecs_progress(world, 0);
     box_render_sync(world);
     test_int(null->texture_graphs, 1);
-    test_int(null->texture_node_kinds, 44);
+    test_int(null->texture_node_kinds, 47);
 
     ecs_fini(world);
     box_render_null_free(null);
@@ -1578,7 +1582,7 @@ void TextureGraph_null_backend_restart(void) {
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     box_render_sync(world);
-    test_int(second->texture_node_kinds, 44);
+    test_int(second->texture_node_kinds, 47);
     test_int(second->texture_graphs, 1);
     test_assert(box_render_null_texture_graph(second, handle) != NULL);
     test_int(box_render_null_texture_graph(second, handle)->node_count, 3);
@@ -1605,7 +1609,7 @@ void TextureGraph_custom_kind_sent(void) {
     make_graph(world, &tex, &uv, &constant, &math);
     ecs_progress(world, 0);
     box_render_sync(world);
-    test_int(null->texture_node_kinds, 45);
+    test_int(null->texture_node_kinds, 48);
     const box_render_texture_node_kind_t *k = box_render_null_texture_node_kind(null,
         (uint32_t)id);
     test_assert(k != NULL);
@@ -3182,4 +3186,220 @@ void TextureGraph_region_edit_keeps_structure(void) {
 
     ecs_fini(world);
     box_render_null_free(null);
+}
+
+/** TexRipples is a built in kind of the plane: a coords input, scalar time and density inputs
+ * with constants, five parameters, and its defaults when it is added */
+void TextureGraph_ripples_kind(void) {
+    // materials/textures
+    box_render_null_t *null = NULL;
+    ecs_world_t *world = world_null(&null);
+    int32_t ripples_id = kind_id(world, ecs_id(TexRipples));
+    test_assert(ripples_id > 0);
+
+    const TextureNodeKind *kind = ecs_get(world, ecs_id(TexRipples), TextureNodeKind);
+    test_int(kind->output, TexScalar);
+    test_int(kind->input_count, 3);
+    test_str(kind->inputs[0].name, "coords");
+    test_int(kind->inputs[0].type, TexVector);
+    test_bool(kind->inputs[0].fallback, false);
+    test_bool(kind->inputs[0].coords, true);
+    test_str(kind->inputs[1].name, "time");
+    test_int(kind->inputs[1].type, TexScalar);
+    test_bool(kind->inputs[1].fallback, true);
+    test_str(kind->inputs[1].value, "time_value");
+    test_str(kind->inputs[2].name, "density");
+    test_int(kind->inputs[2].type, TexScalar);
+    test_bool(kind->inputs[2].fallback, true);
+    test_str(kind->inputs[2].value, "density_value");
+    test_int(kind->param_count, 5);
+    test_str(kind->params[0].name, "count");
+    test_str(kind->params[1].name, "speed");
+    test_str(kind->params[2].name, "lifetime");
+    test_str(kind->params[3].name, "width");
+    test_str(kind->params[4].name, "seed");
+    test_int(kind->param_size, 32);
+    test_str(kind->function, "box_tex_ripples");
+    test_bool(kind->neighbourhood, false);
+    test_bool(kind->animated, false);
+
+    ecs_entity_t node = ecs_new(world);
+    ecs_add(world, node, TexRipples);
+    const TexRipples *ripples = ecs_get(world, node, TexRipples);
+    test_int(ripples->count, 64);
+    test_flt(ripples->speed, 1);
+    test_flt(ripples->lifetime, 1);
+    test_flt(ripples->width, 0.15f);
+    test_int(ripples->seed, 0);
+    test_flt(ripples->time_value, 0);
+    test_flt(ripples->density_value, 1);
+    test_assert(ripples->coords == 0 && ripples->time == 0 && ripples->density == 0);
+
+    TexRipples *mut = ecs_get_mut(world, node, TexRipples);
+    mut->count = 40;
+    mut->speed = 0.5f;
+    mut->lifetime = 2;
+    mut->width = 0.2f;
+    mut->seed = 9;
+    mut->time_value = 1.5f;
+    mut->density_value = 0.3f;
+    ecs_modified(world, node, TexRipples);
+    ecs_entity_t tex = ecs_new(world);
+    ecs_set(world, tex, TextureGraph, {.output = node, .width = 16, .height = 16});
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    test_int(ecs_get(world, tex, TextureStatus)->state, TextureReady);
+
+    const box_texture_graph_t *graph = graph_of(world, tex);
+    test_int(graph->node_count, 1);
+    test_int(graph->nodes[0].kind, ripples_id);
+    test_int(graph->nodes[0].output, TexScalar);
+    test_int(graph->nodes[0].param_size, 32 + 3 * 16);
+    int32_t count, seed;
+    float speed, lifetime, width, time, density;
+    const uint8_t *params = graph->params + graph->nodes[0].params;
+    ecs_os_memcpy(&count, params + kind->params[0].offset, 4);
+    ecs_os_memcpy(&speed, params + kind->params[1].offset, 4);
+    ecs_os_memcpy(&lifetime, params + kind->params[2].offset, 4);
+    ecs_os_memcpy(&width, params + kind->params[3].offset, 4);
+    ecs_os_memcpy(&seed, params + kind->params[4].offset, 4);
+    ecs_os_memcpy(&time, params + 32 + 16, 4);
+    ecs_os_memcpy(&density, params + 32 + 32, 4);
+    test_int(count, 40);
+    test_flt(speed, 0.5f);
+    test_flt(lifetime, 2);
+    test_flt(width, 0.2f);
+    test_int(seed, 9);
+    test_flt(time, 1.5f);
+    test_flt(density, 0.3f);
+
+    const box_render_texture_node_kind_t *k = box_render_null_texture_node_kind(null,
+        (uint32_t)ripples_id);
+    test_assert(k != NULL);
+    test_int(k->input_count, 3);
+    test_int(k->coords_inputs, 1);
+    test_assert(strstr(box_render_texture_node_kind_source(k), "fn box_tex_ripples(") != NULL);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+/** TexRipples reflects its members, so a script or the editor sets them by name */
+void TextureGraph_ripples_reflect(void) {
+    // materials/textures
+    ecs_world_t *world = world_new();
+    ecs_entity_t node = ecs_new(world);
+    ecs_add(world, node, TexRipples);
+    char *json = ecs_ptr_to_json(world, ecs_id(TexRipples), ecs_get(world, node, TexRipples));
+    test_assert(json != NULL);
+    test_assert(strstr(json, "\"count\":64") != NULL);
+    test_assert(strstr(json, "\"lifetime\":1") != NULL);
+    test_assert(strstr(json, "\"density_value\":1") != NULL);
+    test_assert(strstr(json, "\"time\"") != NULL);
+    test_assert(strstr(json, "\"speed\"") != NULL);
+    test_assert(strstr(json, "\"seed\"") != NULL);
+    ecs_os_free(json);
+
+    TexRipples *r = ecs_get_mut(world, node, TexRipples);
+    test_assert(ecs_ptr_from_json(world, ecs_id(TexRipples), r,
+        "{\"count\": 12, \"speed\": 2, \"density_value\": 0.25}", NULL) != NULL);
+    test_int(r->count, 12);
+    test_flt(r->speed, 2);
+    test_flt(r->density_value, 0.25f);
+    test_flt(r->lifetime, 1);
+
+    ecs_fini(world);
+}
+
+/** A Vector node on the time or the density of a TexRipples fails the graph, as on any scalar
+ * input, and so does DomainSphere; a TexTime on time and a scalar on density build */
+void TextureGraph_ripples_wrong_inputs(void) {
+    // materials/textures
+    ecs_world_t *world = world_new();
+    ecs_entity_t uv = ecs_entity(world, { .name = "uv" });
+    ecs_entity_t time = ecs_entity(world, { .name = "time" });
+    ecs_entity_t rain = ecs_entity(world, { .name = "rain" });
+    ecs_entity_t ripples = ecs_entity(world, { .name = "ripples" });
+    ecs_entity_t tex = ecs_entity(world, { .name = "graph" });
+    ecs_set(world, uv, TexCoords, { .scale = 1 });
+    ecs_set(world, time, TexTime, { .scale = 1 });
+    ecs_set(world, rain, TexTime, { .scale = 0, .offset = 0.3f });
+    ecs_set(world, ripples, TexRipples, { .count = 16, .speed = 1, .lifetime = 1,
+        .width = 0.15f, .time = uv, .density_value = 1 });
+    ecs_set(world, tex, TextureGraph, { .output = ripples, .width = 16 });
+    ecs_log_set_level(-4);
+    frame_status(world, tex);
+    test_failed(world, tex, "node 'uv' outputs Vector", "input 'time' of node 'ripples'");
+
+    ecs_set(world, ripples, TexRipples, { .count = 16, .speed = 1, .lifetime = 1,
+        .width = 0.15f, .time = time, .density = uv });
+    frame_status(world, tex);
+    test_failed(world, tex, "node 'uv' outputs Vector", "input 'density' of node 'ripples'");
+
+    ecs_set(world, ripples, TexRipples, { .count = 16, .speed = 1, .lifetime = 1,
+        .width = 0.15f, .coords = time, .time = time, .density = rain });
+    frame_status(world, tex);
+    test_failed(world, tex, "node 'time' outputs Scalar", "input 'coords' of node 'ripples'");
+
+    ecs_set(world, ripples, TexRipples, { .count = 16, .speed = 1, .lifetime = 1,
+        .width = 0.15f, .time = time, .density = rain });
+    ecs_set(world, tex, TextureGraph, { .output = ripples, .width = 32, .height = 16,
+        .domain = DomainSphere });
+    frame_status(world, tex);
+    test_failed(world, tex, "'ripples'", "DomainPlane");
+    ecs_log_set_level(-1);
+
+    ecs_set(world, tex, TextureGraph, { .output = ripples, .width = 16, .rate = 30 });
+    test_int(frame_status(world, tex)->state, TextureReady);
+    const box_texture_graph_t *graph = graph_of(world, tex);
+    test_int(graph->node_count, 3);
+    test_int(graph->nodes[2].kind, kind_id(world, ecs_id(TexRipples)));
+    test_assert(graph->nodes[2].inputs[0] == -1);
+    test_assert(graph->nodes[2].inputs[1] >= 0);
+    test_assert(graph->nodes[2].inputs[2] >= 0);
+    test_flt(graph->rate, 30);
+
+    ecs_fini(world);
+}
+
+/** The rain script: two layers whose normal is a TexNormal of an animated TexRipples, at
+ * density 1 and 0.3, build and the ripples read their clock from a TexTime */
+void TextureGraph_ripples_script(void) {
+    // materials/textures
+    ecs_world_t *world = world_new();
+    run_file(world, GRAPH_RIPPLES);
+    ecs_entity_t heavy = ecs_lookup(world, "rain.heavy_ripples");
+    ecs_entity_t light = ecs_lookup(world, "rain.light_ripples");
+    ecs_entity_t node = ecs_lookup(world, "rain.light_ripples.ripples");
+    ecs_entity_t time = ecs_lookup(world, "rain.light_ripples.time");
+    ecs_entity_t layer = ecs_lookup(world, "rain.light");
+    test_assert(heavy && light && node && time && layer);
+
+    const TexRipples *r = ecs_get(world, node, TexRipples);
+    test_assert(r != NULL);
+    test_assert(r->time == time);
+    test_assert(r->density == 0);
+    test_flt(r->density_value, 0.3f);
+    test_int(r->count, 256);
+    test_flt(r->speed, 0.8f);
+    test_flt(r->width, 0.15f);
+    test_int(r->seed, 5);
+    test_flt(ecs_get(world, ecs_lookup(world, "rain.heavy_ripples.ripples"),
+        TexRipples)->density_value, 1);
+
+    const PbrTextures *textures = ecs_get(world, layer, PbrTextures);
+    test_assert(textures != NULL);
+    test_assert(textures->normal == light);
+    test_assert(ecs_get(world, layer, TextureLayer) != NULL);
+
+    test_int(frame_status(world, heavy)->state, TextureReady);
+    test_int(frame_status(world, light)->state, TextureReady);
+    const box_texture_graph_t *graph = graph_of(world, light);
+    test_int(graph->node_count, 3);
+    test_int(graph->nodes[1].kind, kind_id(world, ecs_id(TexRipples)));
+    test_int(graph->nodes[2].kind, kind_id(world, ecs_id(TexNormal)));
+    test_flt(graph->rate, 30);
+    test_bool(graph->interpolate, true);
+
+    ecs_fini(world);
 }

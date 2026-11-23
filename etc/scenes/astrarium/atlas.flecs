@@ -109,6 +109,7 @@ assets {
       link {
         Position: {0, 0, -3}
         Line: {dx, dy, 0, 0, width: awake ? 2 : 1}
+
         if awake {
           Rgb: {min(255, hue.r + 40), min(255, hue.g + 40), min(255, hue.b + 40)}
           Emissive: {strength: 0.55, color: hue}
@@ -119,6 +120,7 @@ assets {
           Rgb: {ui_dim.r * 0.5, ui_dim.g * 0.5, ui_dim.b * 0.6}
           Emissive: {strength: 0, color: hue}
         }
+
         Transition: [
           Rgb: {duration: 0.4, delay: awake ? 0.32 : 0},
           Emissive: {duration: 0.4, delay: awake ? 0.32 : 0}
@@ -164,6 +166,7 @@ assets {
       Position: {0, 0, 1}
       Scale: {hk, hk, 1}
       Circle: {core}
+
       if awake {
         Rgb: {255, 250, 236}
         Emissive: {strength: 1.5, color: hue}
@@ -174,6 +177,7 @@ assets {
         Rgb: {38, 42, 62}
         Emissive: {strength: 0, color: hue}
       }
+
       Border: {width: 1, color: {ui_gold.r * 0.65, ui_gold.g * 0.65, ui_gold.b * 0.65, 255}}
       Transition: [
         Rgb: {duration: 0.35, delay: awake ? 0.42 : 0},
@@ -189,6 +193,7 @@ assets {
         Scale: {hk, hk, 1}
         Rect: {54, 54}
         Image: {texture: tex_sigil}
+
         if awake {
           Rgb: {255, 248, 226}
           Emissive: {strength: 0.9, color: hue}
@@ -196,6 +201,7 @@ assets {
           Rgb: {hue.r * 0.55, hue.g * 0.55, hue.b * 0.55}
           Emissive: {strength: 0, color: hue}
         }
+
         BlendMode: Additive
         AngularVelocity: {0, 0, 0.22}
         Transition: [Rgb: {duration: 0.5}, Scale: {duration: 0.2, timing_function: EaseOut}]
@@ -207,7 +213,8 @@ assets {
       label {
         Position: {0, 0 - core - 19, 7}
         Text: {value: name, size: keystone ? 14 : 13, font: font_display}
-        Rgb: hover || selected ? {255, 246, 224} : {ui_gold.r * 0.82, ui_gold.g * 0.82, ui_gold.b * 0.82}
+        Rgb: hover || selected ? {255, 246, 224} :
+          {ui_gold.r * 0.82, ui_gold.g * 0.82, ui_gold.b * 0.82}
         box.spatial.Ignore
       }
     }
@@ -216,6 +223,7 @@ assets {
       if from >= 0 {
         Comet comet(dx: dx, dy: dy, hue: hue)
       }
+
       Shock shock(hue: hue, size: 170, delay: 0.42)
       Pop pop(hue: hue, size: 190, delay: 0.42)
       StarSparks sparks(hue: {hue.r, hue.g, hue.b})
@@ -235,6 +243,7 @@ assets {
     prop flavor: string = ""
     prop stat: i32 = 0
     prop amount: i32 = 1
+    prop selected: bool = false
 
     Position: {x, y, 1}
     Circle: {20}
@@ -244,6 +253,12 @@ assets {
     StarFace face(
       id: id, from: from, x: x, y: y, fx: fx, fy: fy, band: band, keystone: keystone,
       hover: hover, owner: this, name: name)
+
+    async {
+      if selected {
+        atlas_sel = this
+      }
+    }
 
     async {
       while true {
@@ -308,69 +323,23 @@ assets {
     BandTitle tag_thorn(band: 2, x: 300, y: -280)
     BandTitle tag_veil(band: 3, x: -300, y: -280)
 
-    Star s0(id: 0, band: 0, x: -135, y: 72, name: "Kindling Spark", stat: 0, amount: 3,
-      flavor: "Every pyre begins as an argument between two sparks.")
-    Star s1(id: 1, from: 0, fx: -135, fy: 72, band: 0, x: -198, y: 122, name: "Ashen Oath", stat: 0, amount: 4,
-      flavor: "Sworn over a dead fire, kept by a living one.")
-    Star s2(id: 2, from: 1, fx: -198, fy: 122, band: 0, x: -268, y: 88, name: "Forge Tongue", stat: 0, amount: 4,
-      flavor: "It speaks only in the language of hammers.") {
-      async {
-        atlas_sel = this
-      }
+    for (i, s) in atlas_stars {
+      Star "s{i}"(
+        id: i,
+        from: s.from,
+        x: s.x,
+        y: s.y,
+        fx: s.from < 0 ? 0 : atlas_stars[s.from].x,
+        fy: s.from < 0 ? 0 : atlas_stars[s.from].y,
+        band: s.band,
+        keystone: s.keystone,
+        selected: s.selected,
+        name: s.name,
+        flavor: s.flavor,
+        stat: s.stat,
+        amount: s.amount
+      )
     }
-    Star s3(id: 3, from: 1, fx: -198, fy: 122, band: 0, x: -168, y: 198, name: "Cinder Crown", stat: 1, amount: 3,
-      flavor: "Worn lightly, for the wearer is mostly smoke.")
-    Star s4(id: 4, from: 2, fx: -268, fy: 88, band: 0, x: -338, y: 138, name: "Red Comet", stat: 2, amount: 4,
-      flavor: "It was late to the war, and early to the ending.")
-    Star s5(id: 5, from: 3, fx: -168, fy: 198, band: 0, x: -244, y: 228, name: "Ember Choir", stat: 0, amount: 5,
-      flavor: "Nine thousand small fires, singing in one key.")
-    Star s6(id: 6, from: 4, fx: -338, fy: 138, band: 0, x: -350, y: 232, keystone: true, name: "Heart of Cinders", stat: 0, amount: 12,
-      flavor: "What remains after the burning is the part that burns best.")
-
-    Star s7(id: 7, band: 1, x: 135, y: 72, name: "First Swell", stat: 3, amount: 3,
-      flavor: "The sea has never once been in a hurry.")
-    Star s8(id: 8, from: 7, fx: 135, fy: 72, band: 1, x: 190, y: 140, name: "Salt Memory", stat: 3, amount: 4,
-      flavor: "Water forgets nothing that ever drowned in it.")
-    Star s9(id: 9, from: 8, fx: 190, fy: 140, band: 1, x: 272, y: 104, name: "Moonward Pull", stat: 3, amount: 4,
-      flavor: "A patient hand on the hem of the world.")
-    Star s10(id: 10, from: 8, fx: 190, fy: 140, band: 1, x: 150, y: 216, name: "Pearl Lung", stat: 1, amount: 3,
-      flavor: "Breathe in the deep; it has been waiting.")
-    Star s11(id: 11, from: 9, fx: 272, fy: 104, band: 1, x: 346, y: 64, name: "Undertow", stat: 2, amount: 4,
-      flavor: "The current you cannot see is the one that carries you.")
-    Star s12(id: 12, from: 9, fx: 272, fy: 104, band: 1, x: 258, y: 204, name: "Tide Bell", stat: 3, amount: 5,
-      flavor: "Rung once by a sunken city, and heard twice.")
-    Star s13(id: 13, from: 12, fx: 258, fy: 204, band: 1, x: 354, y: 226, keystone: true, name: "Drowned Crown", stat: 3, amount: 12,
-      flavor: "A king is still a king, at any depth.")
-
-    Star s14(id: 14, band: 2, x: 135, y: -72, name: "Green Vow", stat: 1, amount: 3,
-      flavor: "Promise a seed nothing, and it will grow anyway.")
-    Star s15(id: 15, from: 14, fx: 135, fy: -72, band: 2, x: 205, y: -112, name: "Bramble Wall", stat: 1, amount: 4,
-      flavor: "The castle fell. The hedge did not.")
-    Star s16(id: 16, from: 15, fx: 205, fy: -112, band: 2, x: 176, y: -192, name: "Old Bark", stat: 1, amount: 4,
-      flavor: "Count the rings; it has outlived your questions.")
-    Star s17(id: 17, from: 15, fx: 205, fy: -112, band: 2, x: 286, y: -84, name: "Quickroot", stat: 2, amount: 3,
-      flavor: "It is already underneath you.")
-    Star s18(id: 18, from: 16, fx: 176, fy: -192, band: 2, x: 262, y: -218, name: "Rose Thane", stat: 0, amount: 4,
-      flavor: "Beautiful, armored, and entirely without mercy.")
-    Star s19(id: 19, from: 17, fx: 286, fy: -84, band: 2, x: 358, y: -138, name: "Moss Hymn", stat: 1, amount: 5,
-      flavor: "A slow song for those who plan to stay.")
-    Star s20(id: 20, from: 18, fx: 262, fy: -218, band: 2, x: 358, y: -234, keystone: true, name: "Thornfather", stat: 1, amount: 12,
-      flavor: "Every garden is a fortress that has learned patience.")
-
-    Star s21(id: 21, band: 3, x: -135, y: -72, name: "Thin Hour", stat: 2, amount: 3,
-      flavor: "There is a minute between midnight and itself.")
-    Star s22(id: 22, from: 21, fx: -135, fy: -72, band: 3, x: -196, y: -128, name: "Silk Step", stat: 2, amount: 4,
-      flavor: "Walk as if the floor were a rumor.")
-    Star s23(id: 23, from: 22, fx: -196, fy: -128, band: 3, x: -286, y: -102, name: "Lantern Moth", stat: 3, amount: 3,
-      flavor: "It follows a light that has not been lit yet.")
-    Star s24(id: 24, from: 22, fx: -196, fy: -128, band: 3, x: -160, y: -214, name: "Second Shadow", stat: 2, amount: 4,
-      flavor: "One of them is yours. Do not ask which.")
-    Star s25(id: 25, from: 23, fx: -286, fy: -102, band: 3, x: -362, y: -60, name: "Quiet Knife", stat: 0, amount: 4,
-      flavor: "The sharpest word is the one left unsaid.")
-    Star s26(id: 26, from: 23, fx: -286, fy: -102, band: 3, x: -262, y: -206, name: "Mirror Vesper", stat: 2, amount: 5,
-      flavor: "The evening star, seen from the other side.")
-    Star s27(id: 27, from: 26, fx: -262, fy: -206, band: 3, x: -358, y: -232, keystone: true, name: "The Unseen Door", stat: 2, amount: 12,
-      flavor: "It has always been open. That is what hides it.")
   }
 
   template StatBar {
@@ -398,12 +367,14 @@ assets {
       gap {
         Item: {width: {mode: Grow}}
       }
+
       if delta != 0 {
         change {
           Text: {value: delta > 0 ? "+{delta}" : "{delta}", size: 14, font: font_display}
           Rgb: delta > 0 ? {130, 244, 170} : {255, 110, 96}
         }
       }
+
       Caption amount(text: "{value}", size: 15, font: font_display, color: ui_pale)
     }
 
@@ -416,7 +387,11 @@ assets {
         Position: {0, 0, 0}
         Rect: {w, 7}
         Rgb: {6, 8, 18}
-        Border: {width: 1, radius: 3, color: {ui_gold.r * 0.34, ui_gold.g * 0.34, ui_gold.b * 0.34, 255}}
+        Border: {
+          width: 1,
+          radius: 3,
+          color: {ui_gold.r * 0.34, ui_gold.g * 0.34, ui_gold.b * 0.34, 255}
+        }
       }
 
       ghost {
@@ -455,16 +430,23 @@ assets {
     Item: {width: {mode: Grow}}
     box.spatial.Ignore
 
-    Caption name(text: band_name(band), size: 13, font: font_display, color: {hue.r * 0.92, hue.g * 0.92, hue.b * 0.92})
+    Caption name(
+      text: band_name(band),
+      size: 13,
+      font: font_display,
+      color: {hue.r * 0.92, hue.g * 0.92, hue.b * 0.92}
+    )
     gap {
       Item: {width: {mode: Grow}}
     }
-    for i in 0..7 {
+
+    for i in 0..band_stars(band) {
       "pip_{i}" {
         const lit = i < count
         Rotation: {0, 0, PI / 4}
         Item: {width: {mode: Fixed, value: 7}, height: {mode: Fixed, value: 7}}
         Rect: {1, 1}
+
         if lit {
           Rgb: {min(255, hue.r + 50), min(255, hue.g + 50), min(255, hue.b + 50)}
           Emissive: {strength: 0.7, color: hue}
@@ -472,6 +454,7 @@ assets {
           Rgb: {26, 30, 46}
           Emissive: {strength: 0, color: hue}
         }
+
         Border: {width: 1, color: {hue.r * 0.45, hue.g * 0.45, hue.b * 0.45, 255}}
         Transition: [Rgb: {duration: 0.3, delay: 0.42}, Emissive: {duration: 0.3, delay: 0.42}]
       }
@@ -496,6 +479,7 @@ assets {
     Item: {width: {mode: Fixed, value: width}, height: {mode: Fixed, value: height}}
     Rect: {1, 1}
     Scale: {k, k, 1}
+
     if !enabled {
       Rgb: {16, 18, 30}
     } else if lit {
@@ -505,6 +489,7 @@ assets {
     } else {
       Rgb: {14, 17, 34}
     }
+
     Border: {width: 1, radius: 4, color: {ui_gold.r * 0.8, ui_gold.g * 0.8, ui_gold.b * 0.8, 255}}
     Transition: [Rgb: {duration: 0.14}, Scale: {duration: 0.1}]
     ClipChildren
@@ -543,7 +528,10 @@ assets {
     Item: {width: {mode: Fixed, value: 236}, height: {mode: Fixed, value: 44}}
     box.spatial.Ignore
 
-    const label = awake ? "Awakened" : !open ? "Beyond Reach" : hero_points > 0 ? "Hold to Awaken" : "No Star Points"
+    const label = awake ? "Awakened" :
+      !open ? "Beyond Reach" :
+      hero_points > 0 ? "Hold to Awaken" :
+      "No Star Points"
 
     GildedButtonFace art(
       label: label, enabled: can, hover: hover, down: down,
@@ -564,7 +552,10 @@ assets {
         await on.press(this)
         atlas_holding = true
         atlas_hold_serial += 1
-        emit HoldStarted(serial: atlas_hold_serial, until: box.app.Status[box.app.Status].elapsed + HOLD_SECONDS)
+        emit HoldStarted(
+          serial: atlas_hold_serial,
+          until: box.app.Status[box.app.Status].elapsed + HOLD_SECONDS
+        )
         await on.release(this)
         atlas_holding = false
       }
@@ -601,6 +592,7 @@ assets {
           Position: {0, 0, 2}
           Rect: {62, 62}
           Image: {texture: tex_sigil}
+
           if awake {
             Rgb: {255, 250, 236}
             Emissive: {strength: 0.8, color: hue}
@@ -608,6 +600,7 @@ assets {
             Rgb: hue
             Emissive: {strength: 0.1, color: hue}
           }
+
           AngularVelocity: {0, 0, 0.14}
         }
       }
@@ -621,7 +614,14 @@ assets {
 
       Divider rule_a()
 
-      Caption flavor(text: s.flavor, size: 15, font: font_italic, width: 236, align: Center, color: ui_text) {
+      Caption flavor(
+        text: s.flavor,
+        size: 15,
+        font: font_italic,
+        width: 236,
+        align: Center,
+        color: ui_text
+      ) {
         Item: {width: {mode: Grow}}
       }
 
@@ -631,8 +631,17 @@ assets {
         Rect: {1, 1}
         Rgb: {6, 8, 18}
         Border: {width: 1, radius: 4, color: {hue.r * 0.5, hue.g * 0.5, hue.b * 0.5, 255}}
-        Icon glyph(tex: stat_tex(s.stat), size: 16, color: {stat_r(s.stat), stat_g(s.stat), stat_b(s.stat)})
-        Caption gain(text: "+{s.amount} {stat_name(s.stat)}", size: 16, font: font_display, color: ui_pale)
+        Icon glyph(
+          tex: stat_tex(s.stat),
+          size: 16,
+          color: {stat_r(s.stat), stat_g(s.stat), stat_b(s.stat)}
+        )
+        Caption gain(
+          text: "+{s.amount} {stat_name(s.stat)}",
+          size: 16,
+          font: font_display,
+          color: ui_pale
+        )
       }
 
       gap {
@@ -643,7 +652,9 @@ assets {
         Layout: {direction: Row, h: Center}
         Item: {width: {mode: Grow}}
         Caption line(
-          text: awake ? "This star burns for you." : open ? "One star point, and a steady hand." : "Awaken the star before it.",
+          text: awake ? "This star burns for you." :
+            open ? "One star point, and a steady hand." :
+            "Awaken the star before it.",
           size: 13, font: font_italic, color: ui_muted)
       }
 
@@ -658,7 +669,14 @@ assets {
     Rgb: {0, 0, 0}
     BlendMode: Additive
 
-    GildedButtonFace art(label: label, hover: hover, down: down, primary: false, height: 36, width: width)
+    GildedButtonFace art(
+      label: label,
+      hover: hover,
+      down: down,
+      primary: false,
+      height: 36,
+      width: width
+    )
   }
 
   template HeroLedger {
@@ -691,7 +709,12 @@ assets {
         Layout: {direction: Row, h: Center, spacing: 8, v: Middle}
         Item: {width: {mode: Grow}}
         Icon glyph(tex: tex_sigil, size: 18, color: {150, 214, 255})
-        Caption line(text: "{hero_points} star points unspent", size: 14, font: font_italic, color: ui_text)
+        Caption line(
+          text: "{hero_points} star points unspent",
+          size: 14,
+          font: font_italic,
+          color: ui_text
+        )
       }
 
       PlainButton realign(label: "Realign the Stars", width: 236) {
@@ -719,6 +742,7 @@ assets {
       Opacity: {duration: 0.45, delay: here ? 0.2 : 0, timing_function: EaseInOut},
       Scale: {duration: 0.6, delay: here ? 0.2 : 0, timing_function: EaseOut}
     ]
+
     if !here {
       box.spatial.Ignore
     }

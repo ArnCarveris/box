@@ -1,0 +1,149 @@
+using flecs.script
+using flecs.script.math
+using box.world
+using state
+using assets
+
+state {
+  export const STAND_CELL: f32 = 32
+  export const STAND_NEAR: f32 = 120
+  export const STAND_FAR: f32 = 1000
+  export const STAND_BUDGET: i32 = 16
+  export const STAND_BUDGET_MS: f32 = 3
+
+  export const STAND_DENSITY: f32 = 0.9
+  export const STAND_SPACING: f32 = 6
+  export const STAND_LOW: f32 = 190 * ISLAND_H
+  export const STAND_HIGH: f32 = 320 * ISLAND_H
+  export const STAND_STEEP: f32 = 44
+
+  export const FAR_CELL: f32 = 256
+  export const FAR_RANGE: f32 = 6000
+  export const FAR_BUDGET: i32 = 3
+  export const FAR_DENSITY: f32 = 0.34
+  export const FAR_SPACING: f32 = 9
+}
+
+assets {
+  template IslandStandCell {
+    prop cell_x: i32 = 0
+    prop cell_z: i32 = 0
+    prop level: i32 = 0
+    prop size: f32 = 32
+
+    shore {
+      Scatter: {
+        items: [
+          {island_trees.palm_0.tree, 1}, {island_trees.palm_1.tree, 1},
+          {island_trees.palm_2.tree, 1}, {island_trees.palm_3.tree, 1},
+          {island_trees.palm_young.tree, 0.7}
+        ],
+        density: 0.75, spacing: 6, mode: ScatterPoisson, seed: 8101,
+        ground: island.land, mask_channel: 1, mask_min: 0.3, mask_max: 1, mask_edge: 0.2,
+        height_min: 1.5, height_max: 22, slope_max: 30,
+        scale_min: 0.85, scale_max: 1.15, spatial_ignore: true
+      }
+    }
+
+    lowland {
+      Scatter: {
+        items: [
+          {island_trees.jungle_a_0.tree, 1}, {island_trees.jungle_a_1.tree, 1},
+          {island_trees.jungle_a_2.tree, 1}, {island_trees.jungle_b_0.tree, 1},
+          {island_trees.jungle_b_1.tree, 1}, {island_trees.jungle_b_2.tree, 1},
+          {island_trees.kapok_0.tree, 0.35}, {island_trees.kapok_1.tree, 0.35},
+          {island_trees.palm_1.tree, 0.5}, {island_trees.palm_3.tree, 0.5}
+        ],
+        density: STAND_DENSITY, spacing: STAND_SPACING, mode: ScatterPoisson, seed: 8202,
+        ground: island.land, mask_channel: 0, mask_min: 0.55, mask_max: 1, mask_edge: 0.3,
+        height_min: 1.5, height_max: STAND_LOW, slope_max: STAND_STEEP,
+        scale_min: 0.85, scale_max: 1.15, avoid: [shore], avoid_radius: 4,
+        spatial_ignore: true
+      }
+    }
+
+    montane {
+      Scatter: {
+        items: [
+          {island_trees.jungle_a_2.tree, 1}, {island_trees.jungle_b_2.tree, 1},
+          {island_trees.jungle_b_0.tree, 0.6}, {island_trees.birch_0.tree, 0.7},
+          {island_trees.birch_1.tree, 0.5}, {island_trees.fern_0.tree, 0.6},
+          {island_trees.fern_2.tree, 0.5}
+        ],
+        density: STAND_DENSITY, spacing: STAND_SPACING - 0.5, mode: ScatterPoisson, seed: 8303,
+        ground: island.land, mask_channel: 0, mask_min: 0.55, mask_max: 1, mask_edge: 0.3,
+        height_min: STAND_LOW, height_max: STAND_HIGH, slope_max: STAND_STEEP,
+        scale_min: 0.8, scale_max: 1.1, spatial_ignore: true
+      }
+    }
+
+    cloud {
+      Scatter: {
+        items: [
+          {island_trees.fern_0.tree, 1.2}, {island_trees.fern_1.tree, 1.2},
+          {island_trees.fern_2.tree, 1}, {island_trees.jungle_b_2.tree, 0.8},
+          {island_trees.jungle_a_2.tree, 0.6}, {island_trees.birch_1.tree, 0.5}
+        ],
+        density: STAND_DENSITY, spacing: STAND_SPACING - 1, mode: ScatterPoisson, seed: 8404,
+        ground: island.land, mask_channel: 0, mask_min: 0.5, mask_max: 1, mask_edge: 0.35,
+        height_min: STAND_HIGH, height_max: TREE_LINE + 60 * ISLAND_H, slope_max: STAND_STEEP,
+        scale_min: 0.7, scale_max: 1.05, spatial_ignore: true
+      }
+    }
+
+    if level == 0 {
+      young {
+        Scatter: {
+          items: [
+            {island_trees.jungle_a_young.tree, 1}, {island_trees.jungle_b_young.tree, 1}
+          ],
+          density: 0.9, spacing: 3.5, mode: ScatterPoisson, seed: 8505,
+          ground: island.land, mask_channel: 0, mask_min: 0.5, mask_max: 1, mask_edge: 0.3,
+          height_min: 1.5, height_max: STAND_HIGH, slope_max: STAND_STEEP - 6,
+          scale_min: 0.7, scale_max: 1.25, avoid: [shore, lowland, montane], avoid_radius: 3.5,
+          spatial_ignore: true
+        }
+      }
+    }
+  }
+
+  template IslandFarCell {
+    prop cell_x: i32 = 0
+    prop cell_z: i32 = 0
+    prop level: i32 = 0
+    prop size: f32 = 256
+
+    shore {
+      Scatter: {
+        items: [{IslandCanopyFarPalm, 1}],
+        density: 0.5, spacing: 7, mode: ScatterPoisson, seed: 8611,
+        ground: island.far, mask_channel: 1, mask_min: 0.3, mask_max: 1, mask_edge: 0.2,
+        height_min: 1.5 - FAR_DATA_DROP, height_max: 22 - FAR_DATA_DROP, slope_max: 30,
+        scale_min: 3, scale_max: 4.6, sink: 0 - FAR_DATA_DROP - 8.5, spatial_ignore: true
+      }
+    }
+
+    low {
+      Scatter: {
+        items: [{IslandCanopyFar, 1}],
+        density: FAR_DENSITY, spacing: FAR_SPACING, mode: ScatterPoisson, seed: 8622,
+        ground: island.far, mask_channel: 0, mask_min: 0.5, mask_max: 1, mask_edge: 0.3,
+        height_min: 1.5 - FAR_DATA_DROP,
+        height_max: STAND_HIGH - FAR_DATA_DROP,
+        slope_max: STAND_STEEP + 4,
+        scale_min: 6, scale_max: 10.5, sink: 0 - FAR_DATA_DROP - 9, spatial_ignore: true
+      }
+    }
+
+    high {
+      Scatter: {
+        items: [{IslandCanopyFarHigh, 1}],
+        density: FAR_DENSITY, spacing: FAR_SPACING - 2, mode: ScatterPoisson, seed: 8633,
+        ground: island.far, mask_channel: 0, mask_min: 0.5, mask_max: 1, mask_edge: 0.35,
+        height_min: STAND_HIGH - FAR_DATA_DROP,
+        height_max: TREE_LINE + 60 * ISLAND_H - FAR_DATA_DROP, slope_max: STAND_STEEP + 4,
+        scale_min: 4, scale_max: 7, sink: 0 - FAR_DATA_DROP - 6, spatial_ignore: true
+      }
+    }
+  }
+}

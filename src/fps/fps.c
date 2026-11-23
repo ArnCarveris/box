@@ -1,8 +1,9 @@
 /**
  * @file fps/fps.c
- * @brief Registers the box.fps module: the FpsPanel and LoadPanel singletons, the summaries of
- * the last second of frame and thread samples and the system that opens and closes the panels,
- * in a scene and view of their own, each an instance of a template of etc/fps/fps.flecs.
+ * @brief Registers the box.fps module: the FpsPanel, LoadPanel and GpuPanel singletons, the
+ * summaries of the last second of frame and thread samples, the renderer stats and the system
+ * that opens and closes the panels, in a scene and view of their own, each an instance of a
+ * template of etc/fps/fps.flecs.
  *
  * The script draws everything the panels show. C creates the scene, camera and view, places the
  * panels at the top right of the surface, loads the script and loads it again when it changes.
@@ -15,6 +16,7 @@
 #define BOX_FPS_IMPL
 #include <box.h>
 #include "load.h"
+#include "gpu.h"
 #include "../app/watch.h"
 #include "../render/preprocess.h"
 
@@ -41,7 +43,7 @@ typedef struct box_fps_chart_t {
     bool ready;                 /**< The bars, their parent and what was written are current */
 } box_fps_chart_t;
 
-/** A panel in the screen: the fps panel or the load panel */
+/** A panel in the screen: the fps, load or GPU stats panel */
 typedef struct box_fps_panel_t {
     const char *name;           /**< Name of the panel in the screen */
     const char *tmpl;           /**< Path of the template of the script it instantiates */
@@ -59,6 +61,7 @@ typedef struct box_fps_t {
     ecs_entity_t screen;        /**< Layout root that fills the surface */
     box_fps_panel_t fps;        /**< The fps panel */
     box_fps_panel_t load;       /**< The load panel */
+    box_fps_panel_t gpu;        /**< The GPU stats panel, which has no charts */
     ecs_entity_t script;        /**< Managed script of etc/fps/fps.flecs, 0 before it loads */
     char *path;                 /**< Path the script was found at, NULL before it loads */
     int32_t watch;              /**< Id of the file watch kind of the script, 0 without box.app */
@@ -541,11 +544,13 @@ static void box_fps_script_sync(
         fps->reload = false;
         box_fps_panel_reset(&fps->fps);
         box_fps_panel_reset(&fps->load);
+        box_fps_panel_reset(&fps->gpu);
         box_fps_script_load(world, fps);
     } else if (fps->reload) {
         fps->reload = false;
         box_fps_panel_reset(&fps->fps);
         box_fps_panel_reset(&fps->load);
+        box_fps_panel_reset(&fps->gpu);
         box_fps_script_reload(world, fps);
     }
 
@@ -744,12 +749,15 @@ static void box_fps_hide(
     fps->screen = 0;
     fps->fps.entity = 0;
     fps->load.entity = 0;
+    fps->gpu.entity = 0;
     fps->shown = false;
     box_fps_panel_reset(&fps->fps);
     box_fps_panel_reset(&fps->load);
+    box_fps_panel_reset(&fps->gpu);
 }
 
-/** Put the panels of the screen in their order: the fps panel above the load panel.
+/** Put the open panels of the screen in their order: the fps panel above the load panel above
+ * the GPU stats panel.
  *
  * @param world The world
  * @param fps The panel state
@@ -758,9 +766,16 @@ static void box_fps_panels_order(
     ecs_world_t *world,
     box_fps_t *fps)
 {
-    ecs_entity_t order[2] = { fps->fps.entity, fps->load.entity };
-    if (order[0] && order[1]) {
-        ecs_set_child_order(world, fps->screen, order, 2);
+    ecs_entity_t order[3];
+    int32_t count = 0;
+    order[count] = fps->fps.entity;
+    count += order[count] != 0;
+    order[count] = fps->load.entity;
+    count += order[count] != 0;
+    order[count] = fps->gpu.entity;
+    count += order[count] != 0;
+    if (count > 1) {
+        ecs_set_child_order(world, fps->screen, order, count);
     }
 }
 
@@ -798,7 +813,7 @@ static void box_fps_panel_sync(
         box_fps_panels_order(world, fps);
         if (panel == &fps->fps) {
             box_fps_summary_sync(world);
-        } else {
+        } else if (panel == &fps->load) {
             box_fps_load_summary_sync(world);
         }
     }
@@ -809,8 +824,8 @@ done:
     return;
 }
 
-/** Open and close the panels from the FpsPanel and LoadPanel singletons, keep their script
- * loaded and place them. The content is shown while a panel is open.
+/** Open and close the panels from the FpsPanel, LoadPanel and GpuPanel singletons, keep their
+ * script loaded and place them. The content is shown while a panel is open.
  *
  * @param it Iterator of the system, which has no terms
  */
@@ -821,13 +836,16 @@ static void BoxFpsUpdate(
     box_fps_t *fps = it->ctx;
     const FpsPanel *fps_panel = ecs_singleton_get(world, FpsPanel);
     const LoadPanel *load_panel = ecs_singleton_get(world, LoadPanel);
+    const GpuPanel *gpu_panel = ecs_singleton_get(world, GpuPanel);
     bool fps_open = fps_panel && fps_panel->open;
     bool load_open = load_panel && load_panel->open;
-    if (!fps_open && !load_open && fps->shown) {
+    bool gpu_open = gpu_panel && gpu_panel->open;
+    bool any = fps_open || load_open || gpu_open;
+    if (!any && fps->shown) {
         box_fps_hide(world, fps);
     }
 
-    if (!fps_open && !load_open) {
+    if (!any) {
         goto done;
     }
 
@@ -844,6 +862,7 @@ static void BoxFpsUpdate(
     box_fps_script_sync(world, fps);
     box_fps_panel_sync(world, fps, &fps->fps, fps_open);
     box_fps_panel_sync(world, fps, &fps->load, load_open);
+    box_fps_panel_sync(world, fps, &fps->gpu, gpu_open);
     box_fps_measure(world, fps);
     if (fps->relayout) {
         box_fps_layout(world, fps);
@@ -928,6 +947,7 @@ void BoxFpsImport(
     ECS_IMPORT(world, BoxUi);
     ECS_IMPORT(world, BoxSpatial);
     ECS_IMPORT(world, BoxTask);
+    ECS_IMPORT(world, BoxRender);
 
     ecs_set_name_prefix(world, "Fps");
     ECS_META_COMPONENT(world, FpsPanel);
@@ -937,6 +957,18 @@ void BoxFpsImport(
     ECS_META_COMPONENT(world, LoadSamples);
     ECS_META_COMPONENT(world, LoadStat);
     ECS_META_COMPONENT(world, LoadSummary);
+    ECS_META_COMPONENT(world, GpuPanel);
+    ECS_META_COMPONENT(world, GpuSceneStats);
+    ECS_META_COMPONENT(world, GpuCommandStats);
+    ECS_META_COMPONENT(world, GpuPacketStats);
+    ECS_META_COMPONENT(world, GpuShadowStats);
+    ECS_META_COMPONENT(world, GpuTextureGraphStats);
+    ECS_META_COMPONENT(world, GpuMeshGraphStats);
+    ECS_META_COMPONENT(world, GpuMemoryStats);
+    ECS_META_COMPONENT(world, GpuGrassLevel);
+    ECS_META_COMPONENT(world, GpuGrassStats);
+    ECS_META_COMPONENT(world, GpuTimeStats);
+    ECS_META_COMPONENT(world, GpuStats);
     ecs_set_hooks(world, FpsPanel, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, FpsSummary, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, LoadPanel, { .ctor = flecs_default_ctor });
@@ -962,6 +994,9 @@ void BoxFpsImport(
     for (i = 0; i < BOX_LOAD_ROWS; i ++) {
         fps->load.charts[i].path = box_load_bars[i];
     }
+
+    fps->gpu.name = "gpu";
+    fps->gpu.tmpl = BOX_GPU_TEMPLATE;
 
     ecs_atfini(world, box_fps_free, fps);
     ecs_singleton_add(world, FpsPanel);
@@ -1002,6 +1037,7 @@ void BoxFpsImport(
     });
 
     box_fps_load_init(world);
+    box_fps_gpu_init(world, module);
 
     ecs_system(world, {
         .entity = ecs_entity(world, { .name = "Update" }),

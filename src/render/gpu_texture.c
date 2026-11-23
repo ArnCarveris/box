@@ -12,11 +12,15 @@
  */
 
 #include "gpu.h"
+#include "gpu_texture_blend.h"
+#include <stddef.h>
 
 #ifdef BOX_RENDER_WGPU
 
 /** Layers below this one sample color: albedo and emissive, decoded from sRGB */
 #define BOX_GPU_COLOR_LAYERS (2)
+
+#define BOX_GPU_MIP_PASSES (256)
 
 /** Pixel of the default albedo, emissive and ORM layers: no occlusion, the material roughness
  * and metallic */
@@ -24,45 +28,6 @@ static const uint8_t box_gpu_white[4] = { 255, 255, 255, 255 };
 
 /** Pixel of the default normal layer, a normal along the surface normal */
 static const uint8_t box_gpu_flat[4] = { 128, 128, 255, 255 };
-
-/** Bindings of the blend group (blend_layout), fs_blend of mesh.wgsl: the emissive layer and the
- * sampler at the bindings of the plain group, then the arrays, the mask, the uniforms and the
- * heights */
-#define BOX_GPU_BLEND_EMISSIVE (1)
-#define BOX_GPU_BLEND_SAMPLER (4)
-#define BOX_GPU_BLEND_ARRAYS (5)
-#define BOX_GPU_BLEND_MASK (8)
-#define BOX_GPU_BLEND_UNIFORMS (9)
-#define BOX_GPU_BLEND_HEIGHTS (10)
-
-/** Entries of the blend group that box_gpu_texture_init makes blend_layout of.
- *
- * The fragment stage of fs_blend samples 15 of the 16 textures WebGPU guarantees: 9 of the view
- * group (gpu_draw.c), the emissive layer, the 4 arrays and the mask. */
-#define BOX_GPU_BLEND_ENTRIES (9)
-
-/** BlendUniforms flag: the mask is loaded, else layer 0 shows alone */
-#define BOX_GPU_BLEND_MASKED (1u)
-
-/** BlendUniforms flag: the mask has a single channel, which weighs layers 0 and 1 by 1 - r, r */
-#define BOX_GPU_BLEND_SINGLE (2u)
-
-/** BlendUniforms flag of layer 0, shifted by the layer for the others: the layer has a height
- * image, else it is flat at 0.5 */
-#define BOX_GPU_BLEND_HEIGHT (4u)
-
-/** BlendUniforms flag: a TileTerrain, whose mask is its grid of kind indices and whose slices
- * are the atlases of its kinds */
-#define BOX_GPU_BLEND_TILES (256u)
-
-/** BlendUniforms of mesh.wgsl */
-typedef struct box_gpu_blend_uniforms_t {
-    float transforms[BOX_RENDER_BLEND_LAYERS][4]; /**< TextureTransform of each layer */
-    uint32_t count;     /**< Slices of the arrays */
-    uint32_t flags;     /**< BOX_GPU_BLEND_MASKED, BOX_GPU_BLEND_SINGLE, BOX_GPU_BLEND_HEIGHT */
-    float contrast;     /**< TextureBlend.contrast, 0 samples no heights */
-    uint32_t pad;       /**< Unused, zero */
-} box_gpu_blend_uniforms_t;
 
 /** Color space the mip levels of a texture are averaged in */
 typedef enum box_gpu_mip_space_t {
@@ -309,6 +274,14 @@ void box_gpu_texture_init(
         }
     };
     blend[BOX_GPU_BLEND_ENTRIES - 1] = kind;
+    blend[BOX_GPU_BLEND_ENTRIES - 2] = (WGPUBindGroupLayoutEntry){
+        .binding = BOX_GPU_BLEND_BAKE,
+        .visibility = WGPUShaderStage_Fragment,
+        .texture = {
+            .sampleType = WGPUTextureSampleType_Float,
+            .viewDimension = WGPUTextureViewDimension_2DArray
+        }
+    };
     for (i = 0; i < BOX_RENDER_BLEND_SOURCES; i ++) {
         blend[4 + i] = (WGPUBindGroupLayoutEntry){
             .binding = i == BOX_RENDER_BLEND_HEIGHT
@@ -349,6 +322,7 @@ void box_gpu_texture_fini(
     int32_t w, a;
     box_gpu_materials_clear(gpu);
     box_gpu_blends_clear(gpu);
+    box_gpu_layer_layouts_fini(gpu);
     ecs_map_fini(&gpu->materials);
     ecs_map_iter_t it = ecs_map_iter(&gpu->textures);
     while (ecs_map_next(&it)) {
@@ -557,7 +531,8 @@ box_gpu_texture_t* box_gpu_texture_output(
 
     entry = ecs_os_calloc_t(box_gpu_texture_entry_t);
     result = &entry->base;
-    result->mips = box_gpu_mip_count(width, height);
+    result->mips = format == WGPUTextureFormat_R32Float ||
+        format == WGPUTextureFormat_RGBA32Float ? 1 : box_gpu_mip_count(width, height);
     WGPUTextureDescriptor desc = {
         .usage = WGPUTextureUsage_TextureBinding | WGPUTextureUsage_CopyDst |
             WGPUTextureUsage_CopySrc | WGPUTextureUsage_RenderAttachment |
@@ -609,6 +584,20 @@ void box_gpu_texture_output_written(
     *ecs_vec_append_t(NULL, &gpu->mips, uint32_t) = handle;
 done:
     return;
+}
+
+/** Test whether a texture can be sampled with filtering, which a float32 texture of a texture
+ * graph (GraphFloat, GraphFloat4) can not on the web.
+ *
+ * @param tex The texture
+ * @return True when it is filterable
+ */
+static bool box_gpu_texture_filterable(
+    const box_gpu_texture_t *tex)
+{
+    WGPUTextureFormat format = ((const box_gpu_texture_entry_t*)tex)->format;
+
+    return format != WGPUTextureFormat_R32Float && format != WGPUTextureFormat_RGBA32Float;
 }
 
 uint32_t box_gpu_texture_serial(
@@ -704,7 +693,8 @@ static void box_gpu_texture_blit(
         .colorAttachmentCount = 1,
         .colorAttachments = &attachment
     };
-    WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &pass_desc);
+    WGPURenderPassEncoder pass = box_gpu_profile_render_pass(gpu, encoder, &pass_desc,
+        "texture mips");
     wgpuRenderPassEncoderSetPipeline(pass, pipeline);
     wgpuRenderPassEncoderSetBindGroup(pass, 0, group, 0, NULL);
     wgpuRenderPassEncoderDraw(pass, 3, 1, 0, 0);
@@ -764,15 +754,6 @@ static WGPUBindGroup box_gpu_blend_group(
     const box_render_packet_t *packet,
     const box_render_batch_t *b);
 
-static void box_gpu_material_mips(
-    box_gpu_t *gpu,
-    const uint32_t *textures);
-
-static WGPUTextureView box_gpu_material_view(
-    box_gpu_t *gpu,
-    uint32_t handle,
-    int32_t slot);
-
 /** Mark the queued textures that a batch of the packet binds in a color layer.
  *
  * @param gpu The backend
@@ -820,6 +801,7 @@ void box_gpu_texture_mips(
 
     box_gpu_texture_mips_usage(gpu, packet);
     WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(gpu->device, NULL);
+    uint32_t passes = 0;
     for (i = 0; i < count; i ++) {
         uint32_t handle = *ecs_vec_get_t(&gpu->mips, uint32_t, i);
         box_gpu_texture_t *tex = ecs_map_get_deref(&gpu->textures, box_gpu_texture_t, handle);
@@ -832,6 +814,16 @@ void box_gpu_texture_mips(
             entry->space = BOX_GPU_MIP_LINEAR;
         }
 
+        if (passes && passes + tex->mips > BOX_GPU_MIP_PASSES) {
+            WGPUCommandBuffer commands = wgpuCommandEncoderFinish(encoder, NULL);
+            wgpuQueueSubmit(gpu->queue, 1, &commands);
+            wgpuCommandBufferRelease(commands);
+            wgpuCommandEncoderRelease(encoder);
+            encoder = wgpuDeviceCreateCommandEncoder(gpu->device, NULL);
+            passes = 0;
+        }
+
+        passes += tex->mips;
         box_gpu_texture_mip_chain(gpu, tex, entry->space, encoder);
         if (!tex->mipped) {
             *ecs_vec_get_t(&gpu->mips, uint32_t, kept ++) = handle;
@@ -913,7 +905,7 @@ static uint64_t box_gpu_material_hash(
  * @param gpu The backend
  * @param textures Texture handles of the layers, 0 for the default
  */
-static void box_gpu_material_mips(
+void box_gpu_material_mips(
     box_gpu_t *gpu,
     const uint32_t *textures)
 {
@@ -935,7 +927,8 @@ static void box_gpu_material_mips(
     }
 }
 
-/** Get the view a layer binds: the texture of its handle or the default of the layer.
+/** Get the view a layer binds: the texture of its handle or the default of the layer, also for
+ * a float32 texture, which a layer can not filter.
  *
  * @param gpu The backend
  * @param handle Texture handle, 0 for the default
@@ -943,7 +936,7 @@ static void box_gpu_material_mips(
  * with a white default
  * @return The view
  */
-static WGPUTextureView box_gpu_material_view(
+WGPUTextureView box_gpu_material_view(
     box_gpu_t *gpu,
     uint32_t handle,
     int32_t slot)
@@ -961,7 +954,7 @@ static WGPUTextureView box_gpu_material_view(
         goto done;
     }
 
-    if (!tex) {
+    if (!tex || !box_gpu_texture_filterable(tex)) {
         tex = slot == BOX_RENDER_TEXTURE_SLOTS - 1 ? gpu->flat : gpu->white;
     }
 
@@ -991,7 +984,7 @@ WGPUTextureView box_gpu_texture_cookie(
         : NULL;
     box_gpu_texture_graph_sampled(gpu, handle);
 
-    return tex ? tex->linear : NULL;
+    return tex && box_gpu_texture_filterable(tex) ? tex->linear : NULL;
 }
 
 WGPUBindGroup box_gpu_material_group(
@@ -1088,19 +1081,22 @@ bool box_gpu_texture_blends(
     return b->texture_blend && box_render_is_mesh(b->pipeline);
 }
 
-/** Get a texture a blend samples: an image of the backend, not the image of a target.
+/** Get a texture a blend samples: an image of the backend, not the image of a target nor a
+ * float32 texture.
  *
  * @param gpu The backend
  * @param handle Texture handle, 0 for none
  * @return The texture, NULL for none
  */
-static box_gpu_texture_t* box_gpu_blend_source(
+box_gpu_texture_t* box_gpu_blend_source(
     box_gpu_t *gpu,
     uint32_t handle)
 {
-    return handle && !(handle & BOX_RENDER_TEXTURE_TARGET)
+    box_gpu_texture_t *result = handle && !(handle & BOX_RENDER_TEXTURE_TARGET)
         ? ecs_map_get_deref(&gpu->textures, box_gpu_texture_t, handle)
         : NULL;
+
+    return result && box_gpu_texture_filterable(result) ? result : NULL;
 }
 
 /** Get the serial of the image a blend samples through a handle.
@@ -1109,13 +1105,56 @@ static box_gpu_texture_t* box_gpu_blend_source(
  * @param handle Texture handle, 0 for none
  * @return The serial, 0 for none
  */
-static uint32_t box_gpu_blend_serial(
+uint32_t box_gpu_blend_serial(
     box_gpu_t *gpu,
     uint32_t handle)
 {
     box_gpu_texture_t *tex = box_gpu_blend_source(gpu, handle);
 
     return tex ? ((box_gpu_texture_entry_t*)tex)->serial : 0;
+}
+
+/** Get the grid mesh whose mask atlas a terrain blend binds.
+ *
+ * @param gpu The backend
+ * @param blend The blend record
+ * @return The mesh, NULL for another blend or while it has no atlas
+ */
+static box_gpu_mesh_t* box_gpu_blend_terrain(
+    box_gpu_t *gpu,
+    const box_render_texture_blend_t *blend)
+{
+    box_gpu_mesh_t *result = blend->terrain
+        ? ecs_map_get_deref(&gpu->meshes, box_gpu_mesh_t, blend->terrain) : NULL;
+
+    return result && result->terrain_mask_view ? result : NULL;
+}
+
+/** Get the serial of the mask a blend group binds: the version of the mask atlas of a terrain
+ * blend, else the serial of the image of the mask.
+ *
+ * @param gpu The backend
+ * @param blend The blend record
+ * @return The serial, 0 for none
+ */
+static uint32_t box_gpu_blend_mask_serial(
+    box_gpu_t *gpu,
+    const box_render_texture_blend_t *blend)
+{
+    box_gpu_mesh_t *m = box_gpu_blend_terrain(gpu, blend);
+
+    return blend->terrain ? (m ? m->terrain_mask_version : 0)
+        : box_gpu_blend_serial(gpu, blend->mask);
+}
+
+WGPUTextureView box_gpu_blend_mask_view(
+    box_gpu_t *gpu,
+    const box_render_texture_blend_t *blend)
+{
+    box_gpu_mesh_t *m = box_gpu_blend_terrain(gpu, blend);
+    box_gpu_texture_t *mask = blend->terrain ? NULL : box_gpu_blend_source(gpu, blend->mask);
+
+    return m ? m->terrain_mask_view : mask ? mask->linear : gpu->white->linear;
 }
 
 /** Create a view of one level of one slice of a texture array.
@@ -1180,12 +1219,14 @@ static void box_gpu_blend_array_release(
  *
  * @param gpu The backend
  * @param a The array, with its map, count, quality and sources
+ * @param dirty Slices whose source changed, bit per slice
  */
 static void box_gpu_blend_array_build(
     box_gpu_t *gpu,
-    box_gpu_blend_array_t *a)
+    box_gpu_blend_array_t *a,
+    uint32_t dirty)
 {
-    box_gpu_texture_t *src[BOX_RENDER_BLEND_SLICES] = {0};
+    box_gpu_texture_t *src[BOX_GPU_ARRAY_SLICES] = {0};
     bool albedo = a->map == BOX_RENDER_BLEND_ALBEDO;
     WGPUTextureFormat srgb = BOX_GPU_TEXTURE_SRGB;
     WGPUTextureFormat format = albedo ? BOX_GPU_TEXTURE_SRGB : BOX_GPU_TEXTURE_FORMAT;
@@ -1209,35 +1250,41 @@ static void box_gpu_blend_array_build(
         height = height ? height : 1;
     }
 
-    box_gpu_blend_array_release(gpu, a);
     mips = box_gpu_mip_count(width, height);
-    WGPUTextureDescriptor desc = {
-        .usage = WGPUTextureUsage_TextureBinding | WGPUTextureUsage_RenderAttachment,
-        .dimension = WGPUTextureDimension_2D,
-        .size = { width, height, a->count },
-        .format = BOX_GPU_TEXTURE_FORMAT,
-        .mipLevelCount = mips,
-        .sampleCount = 1,
-        .viewFormatCount = albedo ? 1 : 0,
-        .viewFormats = albedo ? &srgb : NULL
-    };
-    a->texture = wgpuDeviceCreateTexture(gpu->device, &desc);
-    WGPUTextureViewDescriptor view = WGPU_TEXTURE_VIEW_DESCRIPTOR_INIT;
-    view.format = format;
-    view.dimension = WGPUTextureViewDimension_2DArray;
-    view.baseMipLevel = 0;
-    view.mipLevelCount = mips;
-    view.baseArrayLayer = 0;
-    view.arrayLayerCount = a->count;
-    view.aspect = WGPUTextureAspect_All;
-    a->view = wgpuTextureCreateView(a->texture, &view);
-    for (level = 0; level < mips; level ++) {
-        uint64_t w = width >> level, h = height >> level;
-        a->bytes += (w ? w : 1) * (h ? h : 1) * 4 * a->count;
+    if (!a->texture || wgpuTextureGetWidth(a->texture) != width ||
+        wgpuTextureGetHeight(a->texture) != height)
+    {
+        dirty = UINT32_MAX;
+        box_gpu_blend_array_release(gpu, a);
+        WGPUTextureDescriptor desc = {
+            .usage = WGPUTextureUsage_TextureBinding | WGPUTextureUsage_RenderAttachment,
+            .dimension = WGPUTextureDimension_2D,
+            .size = { width, height, a->count },
+            .format = BOX_GPU_TEXTURE_FORMAT,
+            .mipLevelCount = mips,
+            .sampleCount = 1,
+            .viewFormatCount = albedo ? 1 : 0,
+            .viewFormats = albedo ? &srgb : NULL
+        };
+        a->texture = wgpuDeviceCreateTexture(gpu->device, &desc);
+        WGPUTextureViewDescriptor view = WGPU_TEXTURE_VIEW_DESCRIPTOR_INIT;
+        view.format = format;
+        view.dimension = WGPUTextureViewDimension_2DArray;
+        view.baseMipLevel = 0;
+        view.mipLevelCount = mips;
+        view.baseArrayLayer = 0;
+        view.arrayLayerCount = a->count;
+        view.aspect = WGPUTextureAspect_All;
+        a->view = wgpuTextureCreateView(a->texture, &view);
+        for (level = 0; level < mips; level ++) {
+            uint64_t w = width >> level, h = height >> level;
+            a->bytes += (w ? w : 1) * (h ? h : 1) * 4 * a->count;
+        }
+
+        gpu->blend_bytes += a->bytes;
+        a->version ++;
     }
 
-    gpu->blend_bytes += a->bytes;
-    a->version ++;
     gpu->pending.blend_builds ++;
     WGPURenderPipeline pipeline = box_gpu_blit_pipeline(gpu, format);
     if (!pipeline) {
@@ -1251,12 +1298,22 @@ static void box_gpu_blend_array_build(
     WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(gpu->device, NULL);
     for (s = 0; s < a->count; s ++) {
         box_gpu_texture_t *tex = src[s];
-        if (!tex) {
-            tex = a->map == BOX_RENDER_BLEND_NORMAL ? gpu->flat : gpu->white;
+        if (!((dirty >> s) & 1u)) {
+            continue;
         }
 
-        WGPUTextureFormat from = ((box_gpu_texture_entry_t*)tex)->single
-            ? BOX_GPU_TEXTURE_SINGLE : format;
+        if (!tex) {
+            tex = (a->flat >> s) & 1u ? gpu->flat : gpu->white;
+        }
+
+        const box_gpu_texture_entry_t *entry = (const box_gpu_texture_entry_t*)tex;
+        WGPUTextureFormat from = entry->single ? BOX_GPU_TEXTURE_SINGLE : format;
+        if (!entry->single && entry->format != WGPUTextureFormat_Undefined &&
+            entry->format != BOX_GPU_TEXTURE_FORMAT)
+        {
+            from = entry->format;
+        }
+
         WGPUTextureView sv = box_gpu_texture_view(tex->texture, from, 0,
             tex->mipped ? tex->mips : 1);
         WGPUTextureView dv = box_gpu_blend_slice(a->texture, format, 0, s);
@@ -1267,6 +1324,10 @@ static void box_gpu_blend_array_build(
 
     for (level = 1; level < mips; level ++) {
         for (s = 0; s < a->count; s ++) {
+            if (!((dirty >> s) & 1u)) {
+                continue;
+            }
+
             WGPUTextureView sv = box_gpu_blend_slice(a->texture, format, level - 1, s);
             WGPUTextureView dv = box_gpu_blend_slice(a->texture, format, level, s);
             box_gpu_texture_blit(gpu, encoder, pipeline, sv, dv);
@@ -1281,6 +1342,69 @@ static void box_gpu_blend_array_build(
     wgpuCommandEncoderRelease(encoder);
 done:
     return;
+}
+
+/** Get a texture array of the blends and layers, created on first use and built again when an
+ * image of one of its sources changed.
+ *
+ * @param gpu The backend
+ * @param map BOX_RENDER_BLEND_ALBEDO, _ORM, _NORMAL, _HEIGHT or BOX_GPU_LAYER_MAP
+ * @param in Texture handle of each slice, 0 for the default; a target is the default
+ * @param count Slices, 1 to BOX_GPU_ARRAY_SLICES
+ * @param quality Largest dimension of a slice
+ * @param flat Slices whose default is a flat normal, bit per slice
+ * @return The array
+ */
+box_gpu_blend_array_t* box_gpu_array_get(
+    box_gpu_t *gpu,
+    uint32_t map,
+    const uint32_t *in,
+    uint32_t count,
+    uint32_t quality,
+    uint32_t flat)
+{
+    uint32_t sources[BOX_GPU_ARRAY_SLICES] = {0};
+    box_gpu_blend_array_t *a;
+    uint32_t s, dirty = 0;
+    bool stale = false;
+    for (s = 0; s < count; s ++) {
+        sources[s] = in[s] & BOX_RENDER_TEXTURE_TARGET ? 0 : in[s];
+    }
+
+    for (a = gpu->blend_arrays; a; a = a->next) {
+        if (a->map == map && a->count == count && a->quality == quality && a->flat == flat &&
+            !ecs_os_memcmp(a->sources, sources, ECS_SIZEOF(sources)))
+        {
+            break;
+        }
+    }
+
+    if (!a) {
+        a = ecs_os_calloc_t(box_gpu_blend_array_t);
+        a->map = map;
+        a->count = count;
+        a->quality = quality;
+        a->flat = flat;
+        ecs_os_memcpy(a->sources, sources, ECS_SIZEOF(sources));
+        a->next = gpu->blend_arrays;
+        gpu->blend_arrays = a;
+        gpu->pending.blend_arrays ++;
+        stale = true;
+    }
+
+    for (s = 0; s < count; s ++) {
+        if (stale || box_gpu_blend_serial(gpu, sources[s]) != a->serials[s]) {
+            dirty |= 1u << s;
+        }
+    }
+
+    if (dirty) {
+        box_gpu_blend_array_build(gpu, a, dirty);
+    }
+
+    a->used = gpu->blend_frame;
+
+    return a;
 }
 
 /** Get the array of one map of the layers of a blend, created on first use and built again
@@ -1299,44 +1423,13 @@ static box_gpu_blend_array_t* box_gpu_blend_array(
     uint32_t sources[BOX_RENDER_BLEND_SLICES] = {0};
     uint32_t count = r->count < 1 ? 1 : r->count > BOX_RENDER_BLEND_SLICES
         ? BOX_RENDER_BLEND_SLICES : r->count;
-    box_gpu_blend_array_t *a;
     uint32_t s;
-    bool stale = false;
     for (s = 0; s < count; s ++) {
-        sources[s] = r->layers[s][map] & BOX_RENDER_TEXTURE_TARGET ? 0 : r->layers[s][map];
+        sources[s] = r->layers[s][map];
     }
 
-    for (a = gpu->blend_arrays; a; a = a->next) {
-        if (a->map == map && a->count == count && a->quality == r->quality &&
-            !ecs_os_memcmp(a->sources, sources, ECS_SIZEOF(sources)))
-        {
-            break;
-        }
-    }
-
-    if (!a) {
-        a = ecs_os_calloc_t(box_gpu_blend_array_t);
-        a->map = map;
-        a->count = count;
-        a->quality = r->quality;
-        ecs_os_memcpy(a->sources, sources, ECS_SIZEOF(sources));
-        a->next = gpu->blend_arrays;
-        gpu->blend_arrays = a;
-        gpu->pending.blend_arrays ++;
-        stale = true;
-    }
-
-    for (s = 0; !stale && s < count; s ++) {
-        stale = box_gpu_blend_serial(gpu, sources[s]) != a->serials[s];
-    }
-
-    if (stale) {
-        box_gpu_blend_array_build(gpu, a);
-    }
-
-    a->used = gpu->blend_frame;
-
-    return a;
+    return box_gpu_array_get(gpu, map, sources, count, r->quality,
+        map == BOX_RENDER_BLEND_NORMAL ? UINT32_MAX : 0u);
 }
 
 /** Release a blend group and its references to its arrays.
@@ -1374,7 +1467,9 @@ static void box_gpu_blend_group_bind(
     box_gpu_t *gpu,
     box_gpu_blend_group_t *g)
 {
-    box_gpu_texture_t *mask = box_gpu_blend_source(gpu, g->blend.mask);
+    box_gpu_texture_t *mask = g->blend.terrain
+        ? NULL : box_gpu_blend_source(gpu, g->blend.mask);
+    box_gpu_mesh_t *terrain = box_gpu_blend_terrain(gpu, &g->blend);
     box_gpu_blend_uniforms_t u = {0};
     uint32_t textures[BOX_RENDER_TEXTURE_SLOTS] = { 0, g->emissive, 0, 0 };
     int32_t m;
@@ -1386,8 +1481,15 @@ static void box_gpu_blend_group_bind(
     u.count = g->arrays[0]->count;
     u.flags = (mask ? BOX_GPU_BLEND_MASKED : 0) |
         (mask && ((box_gpu_texture_entry_t*)mask)->single ? BOX_GPU_BLEND_SINGLE : 0) |
-        (g->blend.tiles ? BOX_GPU_BLEND_TILES : 0);
+        (g->blend.tiles ? BOX_GPU_BLEND_TILES : 0) |
+        (g->blend.terrain ? BOX_GPU_BLEND_TERRAIN : 0) |
+        (terrain ? BOX_GPU_BLEND_MASKED : 0);
     u.contrast = g->blend.contrast;
+    u.variation = g->blend.variation;
+    u.grass = g->grass;
+    u.terrain = terrain
+        ? terrain->terrain_mask_texels | (terrain->terrain_mask_columns << 16) : 0;
+    WGPUTextureView bake = box_gpu_terrain_bake_view(gpu, &g->blend, &u.bake, &g->bake_serial);
     for (m = 0; g->arrays[BOX_RENDER_BLEND_HEIGHT] && m < (int32_t)u.count; m ++) {
         uint32_t serial = g->arrays[BOX_RENDER_BLEND_HEIGHT]->serials[m];
         if (serial && serial != UINT32_MAX) {
@@ -1415,7 +1517,7 @@ static void box_gpu_blend_group_bind(
         },
         {
             .binding = BOX_GPU_BLEND_MASK,
-            .textureView = mask ? mask->linear : gpu->white->linear
+            .textureView = box_gpu_blend_mask_view(gpu, &g->blend)
         },
         {
             .binding = BOX_GPU_BLEND_UNIFORMS,
@@ -1428,6 +1530,10 @@ static void box_gpu_blend_group_bind(
         .binding = BOX_GPU_DRAW_KIND_BINDING,
         .buffer = gpu->draw_kinds,
         .size = 4 * sizeof(uint32_t)
+    };
+    entries[BOX_GPU_BLEND_ENTRIES - 2] = (WGPUBindGroupEntry){
+        .binding = BOX_GPU_BLEND_BAKE,
+        .textureView = bake
     };
     for (m = 0; m < BOX_RENDER_BLEND_MAPS; m ++) {
         entries[4 + m] = (WGPUBindGroupEntry){
@@ -1445,8 +1551,9 @@ static void box_gpu_blend_group_bind(
     g->versions[BOX_RENDER_BLEND_HEIGHT] = g->arrays[BOX_RENDER_BLEND_HEIGHT]
         ? g->arrays[BOX_RENDER_BLEND_HEIGHT]->version : 0;
 
-    g->mask_serial = box_gpu_blend_serial(gpu, g->blend.mask);
+    g->mask_serial = box_gpu_blend_mask_serial(gpu, &g->blend);
     g->emissive_serial = box_gpu_blend_serial(gpu, g->emissive);
+    g->bound = gpu->blend_frame;
     g->group = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
         .layout = gpu->blend_layout,
         .entryCount = BOX_GPU_BLEND_ENTRIES,
@@ -1454,8 +1561,9 @@ static void box_gpu_blend_group_bind(
     });
 }
 
-/** Get the bind group of a TextureBlend batch, created on first use. Once per packet it checks
- * the arrays and the images it binds, and binds them again when one changed.
+/** Get the blend group of a TextureBlend batch, created on first use. Once per packet it checks
+ * the arrays and the images it binds, and binds them again when one changed, and writes the far
+ * field of the Grass on the terrain of a terrain blend into its uniforms when it changed.
  *
  * The emissive layer and the mask sample loaded images only, not the image of a target. The
  * heights make an array only with a contrast above 0 and a height texture on some layer.
@@ -1466,9 +1574,9 @@ static void box_gpu_blend_group_bind(
  * @param gpu The backend
  * @param packet The packet of the batch
  * @param b The batch, box_gpu_texture_blends
- * @return The bind group
+ * @return The blend group
  */
-static WGPUBindGroup box_gpu_blend_group(
+box_gpu_blend_group_t* box_gpu_blend_group_get(
     box_gpu_t *gpu,
     const box_render_packet_t *packet,
     const box_render_batch_t *b)
@@ -1477,8 +1585,9 @@ static WGPUBindGroup box_gpu_blend_group(
     uint32_t emissive = b->textures[1] & BOX_RENDER_TEXTURE_TARGET ? 0 : b->textures[1];
     box_gpu_blend_group_t *g;
     int32_t m;
+    box_render_grass_far_t grass;
     bool heights = false;
-    bool stale;
+    bool stale, moved;
     for (g = gpu->blend_groups; g; g = g->next) {
         if (g->emissive == emissive && g->wrap == b->wrap &&
             g->anisotropy == packet->anisotropy &&
@@ -1505,12 +1614,18 @@ static WGPUBindGroup box_gpu_blend_group(
     }
 
     g->checked = gpu->blend_frame;
+    box_render_grass_far_of(packet, r->terrain, &grass);
+    moved = ecs_os_memcmp(&grass, &g->grass, ECS_SIZEOF(box_render_grass_far_t)) != 0;
+    g->grass = grass;
     for (m = 0; r->contrast > 0.0f && m < (int32_t)r->count; m ++) {
         heights |= r->layers[m][BOX_RENDER_BLEND_HEIGHT] != 0;
     }
 
-    stale = !g->group || g->mask_serial != box_gpu_blend_serial(gpu, r->mask) ||
-        g->emissive_serial != box_gpu_blend_serial(gpu, emissive);
+    uint32_t bake_layout, bake_serial;
+    box_gpu_terrain_bake_view(gpu, r, &bake_layout, &bake_serial);
+    stale = !g->group || g->mask_serial != box_gpu_blend_mask_serial(gpu, r) ||
+        g->emissive_serial != box_gpu_blend_serial(gpu, emissive) ||
+        g->bake_serial != bake_serial;
     for (m = 0; m < BOX_RENDER_BLEND_SOURCES; m ++) {
         box_gpu_blend_array_t *a = m < BOX_RENDER_BLEND_MAPS || heights
             ? box_gpu_blend_array(gpu, r, (uint32_t)m) : NULL;
@@ -1532,10 +1647,29 @@ static WGPUBindGroup box_gpu_blend_group(
 
     if (stale) {
         box_gpu_blend_group_bind(gpu, g);
+    } else if (moved && g->uniforms) {
+        wgpuQueueWriteBuffer(gpu->queue, g->uniforms,
+            offsetof(box_gpu_blend_uniforms_t, grass), &g->grass,
+            sizeof(box_render_grass_far_t));
     }
 
 done:
-    return g->group;
+    return g;
+}
+
+/** Get the bind group of a TextureBlend batch, created on first use (box_gpu_blend_group_get).
+ *
+ * @param gpu The backend
+ * @param packet The packet of the batch
+ * @param b The batch, box_gpu_texture_blends
+ * @return The bind group
+ */
+static WGPUBindGroup box_gpu_blend_group(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet,
+    const box_render_batch_t *b)
+{
+    return box_gpu_blend_group_get(gpu, packet, b)->group;
 }
 
 /** Make the bind groups and texture arrays of the TextureBlend batches of a packet, after the
@@ -1558,6 +1692,8 @@ static void box_gpu_blends_prepare(
             box_gpu_blend_group(gpu, packet, b);
         }
     }
+
+    box_gpu_layers_prepare(gpu, packet);
 
     for (gp = &gpu->blend_groups; *gp; ) {
         box_gpu_blend_group_t *g = *gp;
@@ -1587,6 +1723,7 @@ static void box_gpu_blends_prepare(
 void box_gpu_blends_clear(
     box_gpu_t *gpu)
 {
+    box_gpu_layers_clear(gpu);
     while (gpu->blend_groups) {
         box_gpu_blend_group_t *g = gpu->blend_groups;
         gpu->blend_groups = g->next;

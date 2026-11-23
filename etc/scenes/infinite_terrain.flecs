@@ -1,0 +1,32 @@
+include ui/widgets
+include infinite_terrain/state
+include infinite_terrain/materials
+include infinite_terrain/terrain
+include infinite_terrain/water
+include infinite_terrain/sky
+include infinite_terrain/player
+include infinite_terrain/view
+include infinite_terrain/hud
+
+using box.view
+
+$ {
+  box.app.FpsTarget: {120}
+  Scene: {
+    reflections: true,
+    environment: true,
+    aerial_perspective: true,
+    cookies: true,
+    shader_features: {
+      Extended: {
+        blend_modes: true,
+        water: true
+      },
+      Terrain: {
+        texture_blend: true,
+        texture_layers: true,
+        triplanar: true
+      }
+    }
+  }
+}

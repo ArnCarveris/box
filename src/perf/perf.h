@@ -11,6 +11,10 @@
 /** Target frame rate of a constructed PerfRun */
 #define BOX_PERF_FPS (60.0f)
 
+/** Grass counters of the backend statistics a run follows: the passes, their GPU nanoseconds,
+ * the passes timed, the packets read back and the blades generated and drawn per level */
+#define BOX_PERF_GRASS_COUNTS (6 + 2 * BOX_GRASS_LODS)
+
 /** State of the run in progress, shared by the observer and the systems of the module */
 typedef struct box_perf_t {
     PerfState state;      /**< Progress of the run */
@@ -29,9 +33,9 @@ typedef struct box_perf_t {
     float distance;       /**< Distance of the camera from the center */
     ecs_vec_t intervals;  /**< Measured frame intervals in milliseconds, of double */
     int64_t cull_frame;   /**< Render frame of the last culling sample, -1 for none */
-    int32_t cull_last[5]; /**< Visible, frustum culled, occlusion culled, batches skipped and
-                           *   casters skipped counts of the last sample */
-    double cull_sum[5];   /**< Sums of those counts over the samples */
+    int32_t cull_last[6]; /**< Visible, frustum culled, occlusion culled, range culled, batches
+                           *   skipped and casters skipped counts of the last sample */
+    double cull_sum[6];   /**< Sums of those counts over the samples */
     double begin;         /**< Perf clock at the start of the current frame, 0 for none */
     double os_begin;      /**< OS clock at the start of the previous frame, 0 for none */
     double cpu;           /**< Process CPU seconds when the measurement started */
@@ -47,6 +51,15 @@ typedef struct box_perf_t {
     int64_t graph_last[4]; /**< Texture graph hits, misses, evictions and updates the backend
                            *   statistics counted until the last measured frame */
     double graph_sum[5];  /**< Sums of the samples of those per frame and the cached kilobytes */
+    bool grass_sampled;   /**< grass_base and grass_last hold the counts of a measured frame */
+    int64_t grass_base[BOX_PERF_GRASS_COUNTS]; /**< Grass counters at the first measured frame */
+    int64_t grass_last[BOX_PERF_GRASS_COUNTS]; /**< Grass counters at the last measured frame */
+    ecs_vec_t grass_samples; /**< GPU milliseconds of a grass pass in the measured frames that
+                           *   read back new timestamps, of double */
+    ecs_vec_t grass_ms;   /**< GPU milliseconds of a grass pass at every measured frame, the
+                           *   latest read back, of double */
+    ecs_vec_t grass_drawn; /**< Blades drawn per packet at every measured frame, the latest read
+                           *   back, of double */
 } box_perf_t;
 
 /** Distribution of a series of durations */
@@ -54,6 +67,7 @@ typedef struct box_perf_stats_t {
     double min;   /**< Shortest duration */
     double mean;  /**< Mean duration */
     double p50;   /**< Median duration */
+    double p95;   /**< 95th percentile duration, nearest rank */
     double p99;   /**< 99th percentile duration, nearest rank */
     double max;   /**< Longest duration */
 } box_perf_stats_t;
@@ -90,13 +104,13 @@ void box_perf_stats(
  * @param world The world
  * @param run The run settings
  * @param status The completed status
- * @param intervals The frame intervals in milliseconds, of double
+ * @param perf The state of the run, its frame intervals and grass series
  * @return 0 on success, nonzero when the file could not be written
  */
 int box_perf_report(
     ecs_world_t *world,
     const PerfRun *run,
     const PerfStatus *status,
-    const ecs_vec_t *intervals);
+    const box_perf_t *perf);
 
 #endif

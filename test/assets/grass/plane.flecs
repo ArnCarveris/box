@@ -1,0 +1,42 @@
+// A meadow of Grass on the plane of its entity for the Grass tests of
+// test/gpu/render/src/Grass.c: a camera at eye height looks along -z over a brown ground box,
+// lit by a sun with shadows.
+
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.grass
+
+grass_camera {
+  Position: {0, 2.2, 0}
+  Rotation: {-0.25, 0, 0}
+  Camera: {fov: 60, near_: 0.1, far_: 2000}
+}
+
+grass_view {
+  View: {camera: grass_camera, clear: {enabled: true, color: {20, 30, 60, 255}},
+    shadows: {enabled: true}}
+}
+
+grass_sun {
+  Rotation: {0.8, 0.6, 0}
+  DirectionalLight: {intensity: 3.14}
+}
+
+grass_ambient {
+  AmbientLight: {intensity: 0.6}
+}
+
+grass_ground {
+  Position: {0, 0.45, 0}
+  Box: {1000, 0.1, 1000}
+  Rgb: {90, 60, 40}
+}
+
+meadow {
+  Position: {0, 0.5, 0}
+  Grass: {density: 24, lod: [12, 40, 120]}
+}

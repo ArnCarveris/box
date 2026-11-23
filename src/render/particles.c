@@ -53,7 +53,9 @@ typedef struct box_particle_pool_t {
     int32_t max;            /**< Clamped ParticleEmitter.max the pool was made for */
     uint32_t page;          /**< Index of its page plus one, 0 for none */
     uint32_t base;          /**< First slot of the pool in the arena */
-    uint32_t capacity;      /**< Slots of the pool */
+    uint32_t capacity;      /**< Particle slots of the pool */
+    bool card;              /**< The pool keeps the card words of ParticleCard after its
+                             *   particle slots */
     bool fresh;             /**< The range was not cleared on the backend yet */
     bool seen;              /**< The emitter is enabled in this frame */
     bool kept;              /**< The emitter of an effect instance was disabled, so the pool
@@ -78,6 +80,8 @@ typedef struct box_particle_pool_t {
     vec3 table_scale;       /**< Shape scale the table was sampled with */
     uint32_t table_seed;    /**< Seed the table was sampled with */
     vec3 last_position;     /**< World position of the emitter in the last frame */
+    vec3 shift;             /**< World offset of the shifts of the world origin that its
+                             *   particles did not get yet */
     bool has_last;          /**< last_position holds a position */
     bool linger;            /**< ParticleEmitter.linger of the last frame the emitter was seen */
     bool local;             /**< ParticleEmitter.local its particles were spawned with */
@@ -310,12 +314,24 @@ static void box_particles_arena_release(
     }
 }
 
+/** Get the slots of the range of a pool: its particle slots, and for a ParticleCard pool the
+ * slots of its card words after them.
+ *
+ * @param pool The pool, its capacity and card set
+ * @return The slots
+ */
+static uint32_t box_particles_range_slots(
+    const box_particle_pool_t *pool)
+{
+    return pool->capacity + (pool->card ? box_particle_card_slots(pool->capacity) : 0u);
+}
+
 /** Give a pool a range of slots in a page of its size: a page of that size with a free range,
  * else an empty page of as many slots, else a new page at the end of the arena.
  *
  * @param s The state
  * @param p The packet, receives the arena when it grows
- * @param pool The pool, its capacity set
+ * @param pool The pool, its capacity and card set
  */
 static void box_particles_range_alloc(
     box_render_particles_t *s,
@@ -323,14 +339,15 @@ static void box_particles_range_alloc(
     box_particle_pool_t *pool)
 {
     box_particle_page_t *page = NULL;
-    uint32_t pools = BOX_PARTICLE_PAGE_SLOTS / pool->capacity, bit;
+    uint32_t range = box_particles_range_slots(pool);
+    uint32_t pools = BOX_PARTICLE_PAGE_SLOTS / range, bit;
     int32_t i, index = -1;
     pools = pools < 1 ? 1 : pools > BOX_PARTICLE_PAGE_POOLS ? BOX_PARTICLE_PAGE_POOLS : pools;
     for (i = 0; i < ecs_vec_count(&s->pages); i ++) {
         box_particle_page_t *candidate = ecs_vec_get_t(&s->pages, box_particle_page_t, i);
         uint64_t full = candidate->pools >= 64 ? UINT64_MAX
             : (((uint64_t)1 << candidate->pools) - 1);
-        if (candidate->capacity == pool->capacity && candidate->occupied != full) {
+        if (candidate->capacity == range && candidate->occupied != full) {
             index = i;
             break;
         }
@@ -338,8 +355,8 @@ static void box_particles_range_alloc(
 
     for (i = 0; index < 0 && i < ecs_vec_count(&s->pages); i ++) {
         box_particle_page_t *candidate = ecs_vec_get_t(&s->pages, box_particle_page_t, i);
-        if (!candidate->occupied && candidate->slots == pools * pool->capacity) {
-            candidate->capacity = pool->capacity;
+        if (!candidate->occupied && candidate->slots == pools * range) {
+            candidate->capacity = range;
             candidate->pools = pools;
             index = i;
         }
@@ -349,8 +366,8 @@ static void box_particles_range_alloc(
         page = ecs_vec_append_t(NULL, &s->pages, box_particle_page_t);
         ecs_os_memset_t(page, 0, box_particle_page_t);
         page->base = s->arena_slots;
-        page->slots = pools * pool->capacity;
-        page->capacity = pool->capacity;
+        page->slots = pools * range;
+        page->capacity = range;
         page->pools = pools;
         s->arena_slots += page->slots;
         index = ecs_vec_count(&s->pages) - 1;
@@ -435,18 +452,21 @@ static void box_particles_table_free(
  * @param p The packet
  * @param e The emitter
  * @param max Clamped ParticleEmitter.max, at least 1
+ * @param card The emitter draws ParticleCard, which keeps card words
  * @return The pool
  */
 static box_particle_pool_t* box_particles_pool_new(
     box_render_particles_t *s,
     box_render_packet_t *p,
     ecs_entity_t e,
-    int32_t max)
+    int32_t max,
+    bool card)
 {
     box_particle_pool_t *result = ecs_os_calloc_t(box_particle_pool_t);
     result->entity = e;
     result->max = max;
     result->capacity = box_particles_class(max);
+    result->card = card;
     ecs_vec_init_t(NULL, &result->deaths, box_particle_death_t, 0);
     ecs_vec_init_t(NULL, &result->free_slots, uint32_t, 0);
     box_particles_range_alloc(s, p, result);
@@ -828,6 +848,7 @@ static void box_particles_forces_add(
         glm_vec3_add(ECS_CONST_CAST(float*, f->wind), sum->wind, sum->wind);
         glm_vec3_add(ECS_CONST_CAST(float*, f->drift), sum->drift, sum->drift);
         sum->drag += f->drag;
+        sum->global_wind += f->global_wind;
         sum->turbulence += f->turbulence;
         sum->turbulence_scale *= f->turbulence_scale;
     }
@@ -861,6 +882,46 @@ static void box_particles_forces(
     box_particles_forces_add(own, out);
 }
 
+/** Write the global wind of a frame into the block of a pool: the velocity of the Wind times
+ * the share into global_wind, and its gust field, the values the WindSway records pack
+ * (box_render_wind_frame), into the w of turbulence, wander and inherit.
+ *
+ * Without a share, a Wind or a speed every one of them is 0 and the integrate pass leaves the
+ * wind of the particles as it is.
+ *
+ * @param world The world
+ * @param share ParticleForces.global_wind summed over the sources, times the world scale
+ * @param out The block
+ */
+static void box_particles_block_wind(
+    const ecs_world_t *world,
+    float share,
+    box_render_particle_block_t *out)
+{
+    box_render_wind_t wind;
+    glm_vec3_zero(out->global_wind);
+    out->turbulence[3] = 0.0f;
+    out->wander[3] = 0.0f;
+    out->inherit[3] = 0.0f;
+    if (!isfinite(share) || share == 0.0f) {
+        goto done;
+    }
+
+    box_render_wind_frame(world, &wind);
+    if (!(wind.speed > 0.0f)) {
+        goto done;
+    }
+
+    out->global_wind[0] = wind.direction[0] * wind.speed * share;
+    out->global_wind[1] = wind.direction[1] * wind.speed * share;
+    out->global_wind[2] = wind.gust;
+    out->turbulence[3] = wind.frequency;
+    out->wander[3] = wind.offset[0];
+    out->inherit[3] = wind.offset[1];
+done:
+    return;
+}
+
 /** Write the forces of a frame into the block of a pool and move the frame of reference of the
  * pool by the drift of the frame, so the wander field moves with the particles.
  *
@@ -876,6 +937,7 @@ static void box_particles_forces(
  *              field, so a scaled emitter moves a scaled copy of its particles; the drag is a
  *              rate and stays; turbulence z hands it to the curves of ParticleMotion
  * @param moves Whether the integrate pass moves particles in this frame
+ * @param world The world, whose Wind singleton the global wind reads
  * @param out The block, its seed and its seconds of the frame written
  */
 static void box_particles_block_forces(
@@ -884,6 +946,7 @@ static void box_particles_block_forces(
     const ParticleForces *forces,
     float scale,
     bool moves,
+    const ecs_world_t *world,
     box_render_particle_block_t *out)
 {
     float phase[3], frequency = scale > 0 ? forces->turbulence_scale / scale : 0.0f;
@@ -900,12 +963,20 @@ static void box_particles_block_forces(
     out->turbulence[0] = forces->turbulence * scale;
     out->turbulence[1] = frequency;
     out->turbulence[2] = scale;
+    double origin[3], frame[3];
+    box_render_origin(world, origin);
+    for (c = 0; c < 3; c ++) {
+        frame[c] = pool->frame[c] - origin[c];
+    }
+
     box_particle_phase(out->seed, phase);
-    box_particle_frame_phase(phase, pool->frame, frequency, out->wander);
+    box_particle_frame_phase(phase, frame, frequency, out->wander);
     glm_vec3_scale(ECS_CONST_CAST(float*, forces->drift), scale, out->drift);
     for (c = 0; c < 3; c ++) {
         pool->frame[c] += moves ? (double)out->drift[c] * (double)out->acceleration[3] : 0.0;
     }
+
+    box_particles_block_wind(world, forces->global_wind * scale, out);
 }
 
 /** Write the parameters of an emitter for this frame but its forces.
@@ -946,7 +1017,6 @@ static void box_particles_block(
     out->color[0] = (float)emitter->color.r / 255.0f;
     out->color[1] = (float)emitter->color.g / 255.0f;
     out->color[2] = (float)emitter->color.b / 255.0f;
-    out->color[3] = 1.0f;
     out->speed[0] = emitter->speed.min * scale;
     out->speed[1] = emitter->speed.max * scale;
     out->radial[0] = emitter->radial.min * scale;
@@ -999,12 +1069,26 @@ static void box_particles_velocity(
     pool->has_last = true;
 }
 
-_Static_assert(offsetof(box_render_particle_block_t, pad1) ==
+_Static_assert(offsetof(box_render_particle_block_t, global_wind) ==
     offsetof(box_render_particle_block_t, gradient_row) + sizeof(uint32_t),
     "the curves of a block end at gradient_row");
-_Static_assert(sizeof(box_render_particle_block_t) ==
+_Static_assert(offsetof(box_render_particle_block_t, sampled) ==
     offsetof(box_render_particle_block_t, motion_force) + 4 * sizeof(float),
-    "the max curves and the motion of a block are its last members");
+    "the motion ends the curves and motion of a block");
+
+/** Write the shift of the world origin of a pool into the w lanes of its block.
+ *
+ * @param out The block
+ * @param shift World offset added to the live particles before they move
+ */
+static void box_particles_block_shift(
+    box_render_particle_block_t *out,
+    const vec3 shift)
+{
+    out->color[3] = shift[0];
+    out->variance[3] = shift[1];
+    out->ground[3] = shift[2];
+}
 
 /** The curves and motion of the block of an emitter without ParticleCurves and ParticleMotion,
  * which change nothing */
@@ -1033,11 +1117,11 @@ static void box_particles_block_still(
     box_render_particle_block_t *out)
 {
     size_t first = offsetof(box_render_particle_block_t, curve_rows);
-    size_t end = offsetof(box_render_particle_block_t, pad1);
+    size_t end = offsetof(box_render_particle_block_t, global_wind);
     ecs_os_memcpy(ECS_OFFSET(out, first), ECS_OFFSET(&box_particles_still, first),
         (ecs_size_t)(end - first));
     first = offsetof(box_render_particle_block_t, curve_max_rows);
-    end = sizeof(box_render_particle_block_t);
+    end = offsetof(box_render_particle_block_t, sampled);
     ecs_os_memcpy(ECS_OFFSET(out, first), ECS_OFFSET(&box_particles_still, first),
         (ecs_size_t)(end - first));
 }
@@ -1098,7 +1182,7 @@ static void box_particles_block_look(
         out->softness = look->softness > 0 ? look->softness * scale : 0.0f;
         out->stretch = look->stretch > 0 && scale > 0 ? look->stretch / scale : 0.0f;
         out->lit = glm_clamp(look->lit, 0.0f, 1.0f);
-        if (look->shape != ParticleSprite) {
+        if (look->shape != ParticleSprite && look->shape != ParticleCard) {
             out->look = ParticleCircle;
         }
     }
@@ -1117,7 +1201,9 @@ static uint32_t box_particles_texture(
     const ParticleAppearance *look)
 {
     uint32_t result = 0;
-    if (look && look->shape == ParticleSprite && look->texture) {
+    if (look && (look->shape == ParticleSprite || look->shape == ParticleCard) &&
+        look->texture)
+    {
         result = box_textures_handle(box_textures_get(world), look->texture);
     }
 
@@ -1252,7 +1338,9 @@ static void box_particles_emitter(
     const box_particles_light_t *lights,
     ParticleStats *stats)
 {
-    int32_t max = emitter->max > BOX_PARTICLE_MAX ? BOX_PARTICLE_MAX : emitter->max;
+    bool card = look && look->shape == ParticleCard;
+    int32_t limit = card ? BOX_PARTICLE_MAX / 2 : BOX_PARTICLE_MAX;
+    int32_t max = emitter->max > limit ? limit : emitter->max;
     box_particle_pool_t *pool = ecs_map_get_deref(&s->by_entity, box_particle_pool_t, e);
     uint32_t life_min = box_particle_us(emitter->lifetime.min);
     uint32_t life_max = box_particle_us(emitter->lifetime.max);
@@ -1269,12 +1357,13 @@ static void box_particles_emitter(
     }
 
     if (!pool) {
-        pool = box_particles_pool_new(s, p, e, max);
-    } else if (pool->max != max) {
+        pool = box_particles_pool_new(s, p, e, max, card);
+    } else if (pool->max != max || pool->card != card) {
         box_particles_range_free(s, p, pool);
         box_particles_empty(pool);
         pool->max = max;
         pool->capacity = box_particles_class(max);
+        pool->card = card;
         box_particles_range_alloc(s, p, pool);
     }
 
@@ -1348,6 +1437,7 @@ static void box_particles_emitter(
     stats->spawned += (int32_t)count;
     stats->particles += pool->live;
     if (!pool->used) {
+        glm_vec3_zero(pool->shift);
         goto done;
     }
 
@@ -1358,7 +1448,7 @@ static void box_particles_emitter(
     entry->scene = scene;
     entry->buffer = BOX_RENDER_BUFFER_PARTICLE_FIRST;
     entry->offset = pool->base * BOX_RENDER_PARTICLE_SIZE;
-    entry->capacity = pool->capacity;
+    entry->capacity = box_particles_range_slots(pool);
     entry->clear = pool->fresh;
     entry->table = pool->table ? BOX_RENDER_BUFFER_PARTICLE_TABLE_FIRST : 0;
     entry->slots = slots;
@@ -1376,7 +1466,9 @@ static void box_particles_emitter(
     float scale = box_transform_world_scale(transform);
     vec3 acceleration;
     glm_vec3_scale(ECS_CONST_CAST(float*, emitter->acceleration), scale, acceleration);
-    box_particles_block(emitter, transform, ecs_get(world, e, ParticleCollision), velocity,
+    ParticleCollision ground;
+    box_particles_block(emitter, transform,
+        box_render_particles_collision(world, e, transform, &ground), velocity,
         age_us ? p->delta : 0.0f, scale, &entry->block);
     if (timeline) {
         float speed = box_particle_timeline_speed(timeline, pool->time);
@@ -1384,7 +1476,8 @@ static void box_particles_emitter(
         entry->block.speed[1] *= speed;
     }
 
-    box_particles_block_forces(pool, acceleration, &forces, scale, moves, &entry->block);
+    box_particles_block_forces(pool, acceleration, &forces, scale, moves, world,
+        &entry->block);
     if (curves || motion || pool->curved) {
         box_particle_rows_update(&s->curves, &pool->curves, curves);
         box_particle_rows_motion_update(&s->curves, &pool->motion, motion);
@@ -1393,6 +1486,7 @@ static void box_particles_emitter(
 
     box_particles_block_look(look, pool, scale, &entry->block);
     entry->block.local = emitter->local ? 1u : 0u;
+    box_render_particles_sampled(world, e, emitter, entry);
     entry->curves = pool->curved && (box_particle_rows_used(&pool->curves) ||
         box_particle_rows_motion_used(&pool->motion))
         ? BOX_RENDER_BUFFER_PARTICLE_CURVES
@@ -1407,6 +1501,9 @@ static void box_particles_emitter(
     entry->block.delta_us = age_us;
     entry->block.life_min = life_min;
     entry->block.life_span = life_max > life_min ? life_max - life_min : 0;
+    entry->block.cards = pool->card ? pool->capacity : 0u;
+    box_particles_block_shift(&entry->block, pool->shift);
+    glm_vec3_zero(pool->shift);
     pool->fresh = false;
     if (emitter->linger) {
         pool->entry = *entry;
@@ -1461,13 +1558,15 @@ static bool box_particles_linger(
     box_render_particle_pool_t *entry = ecs_vec_append_t(
         NULL, &p->particles, box_render_particle_pool_t);
     *entry = pool->entry;
+    box_particles_block_shift(&entry->block, pool->shift);
+    glm_vec3_zero(pool->shift);
     entry->clear = false;
     entry->slots = slots;
     entry->block.acceleration[3] = delta_us ? p->delta : 0.0f;
     box_particles_forces(world, pool->entity, pool->forces, pool->has_own ? &pool->own : NULL,
         &forces);
     box_particles_block_forces(pool, pool->acceleration, &forces, pool->scale,
-        pool->live != 0, &entry->block);
+        pool->live != 0, world, &entry->block);
     entry->block.count = 0;
     entry->block.first = pool->next;
     entry->block.used = pool->used;
@@ -1554,9 +1653,10 @@ static void BoxRenderExtractParticles(
         bool timelines_shared = timelines && !ecs_field_is_self(&qit, 9);
         bool motions_shared = motions && !ecs_field_is_self(&qit, 10);
         for (i = 0; i < qit.count; i ++) {
-            WorldTransform buf;
+            WorldTransform buf, followed;
             const WorldTransform *t = shared ? &transforms[0] :
                 box_transform_world_field(world, &qit, transforms, i, &buf);
+            t = box_render_particles_follow(world, &emitters[i], t, &followed);
             box_particles_light_t light = {
                 .light = lights ? &lights[lights_shared ? 0 : i] : NULL,
                 .point = points ? &points[i] : NULL,
@@ -1743,6 +1843,31 @@ box_render_particles_t* box_render_particles_get(
     box_render_particles_t *result = box_particles_state(world);
 
     return result && result->emitters ? result : NULL;
+}
+
+void box_render_particles_shift(
+    box_render_particles_t *s,
+    ecs_entity_t scene,
+    const vec3 offset,
+    box_render_particles_shifts_t shifts,
+    void *ctx)
+{
+    int32_t i, count = s ? ecs_vec_count(&s->pools) : 0;
+    for (i = 0; i < count; i ++) {
+        box_particle_pool_t *pool = *ecs_vec_get_t(&s->pools, box_particle_pool_t*, i);
+        if (pool->scene != scene) {
+            continue;
+        }
+
+        if (!pool->lingering && shifts && !shifts(ctx, pool->entity)) {
+            continue;
+        }
+
+        glm_vec3_add(pool->last_position, ECS_CONST_CAST(float*, offset), pool->last_position);
+        if (!pool->local) {
+            glm_vec3_add(pool->shift, ECS_CONST_CAST(float*, offset), pool->shift);
+        }
+    }
 }
 
 int32_t box_render_particles_live(

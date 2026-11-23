@@ -5,11 +5,19 @@
 
 #define BOX_MATERIAL_IMPL
 #include <box.h>
+#include <math.h>
 
 ECS_TAG_DECLARE(DynamicMaterial);
 ECS_TAG_DECLARE(TextureFrame);
 ECS_TAG_DECLARE(NoShadow);
 ECS_TAG_DECLARE(LightFixture);
+
+/** Singleton through which box_material_ripple_at finds the queue of a world */
+typedef struct MaterialRippleQueue {
+    ecs_vec_t *ripples;     /**< box_material_ripple_t, freed with the world */
+} MaterialRippleQueue;
+
+static ECS_COMPONENT_DECLARE(MaterialRippleQueue);
 
 /** Construct Opacity values that are fully opaque.
  *
@@ -245,8 +253,289 @@ static void box_distortion_ctor(
     }
 }
 
+/** Construct WaterWaves values: no waves (every wavelength 0) and a detail of 1.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_water_waves_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    WaterWaves *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (WaterWaves){ .detail = BOX_MATERIAL_WATER_WAVES_DETAIL };
+    }
+}
+
+/** Construct WaterCaustics values: a strength of 1, cells of 1 world unit, a speed of 0.5 and a
+ * depth of 2.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_water_caustics_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    WaterCaustics *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (WaterCaustics){
+            .strength = BOX_MATERIAL_WATER_CAUSTICS_STRENGTH,
+            .scale = BOX_MATERIAL_WATER_CAUSTICS_SCALE,
+            .speed = BOX_MATERIAL_WATER_CAUSTICS_SPEED,
+            .depth = BOX_MATERIAL_WATER_CAUSTICS_DEPTH };
+    }
+}
+
+/** Construct WaterSpectrum values: a wind of 4 m/s along +X, a tile of 32 world units, 2
+ * cascades of 128 texels, a directionality of 0.8, an amplitude of 1, a seed of 0 and a detail of
+ * 0.25.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_water_spectrum_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    WaterSpectrum *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (WaterSpectrum){
+            .wind_speed = BOX_MATERIAL_SPECTRUM_WIND_SPEED,
+            .wind_direction = {1.0f, 0.0f},
+            .size = BOX_MATERIAL_SPECTRUM_SIZE,
+            .cascades = BOX_MATERIAL_SPECTRUM_CASCADES,
+            .resolution = BOX_MATERIAL_SPECTRUM_RESOLUTION,
+            .directionality = BOX_MATERIAL_SPECTRUM_DIRECTIONALITY,
+            .amplitude = BOX_MATERIAL_SPECTRUM_AMPLITUDE,
+            .seed = 0,
+            .detail = BOX_MATERIAL_SPECTRUM_DETAIL };
+    }
+}
+
+/** Construct WaterRipples values: a field of 32 world units and 256 cells on the Water entity, a
+ * wave speed of 2, a damping of 0.5, a strength of 1, a foam decay of 0.4, a foam spread of 0.02
+ * and no crest foam.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_water_ripples_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    WaterRipples *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (WaterRipples){
+            .size = BOX_MATERIAL_RIPPLES_SIZE,
+            .resolution = BOX_MATERIAL_RIPPLES_RESOLUTION,
+            .follow = 0,
+            .wave_speed = BOX_MATERIAL_RIPPLES_WAVE_SPEED,
+            .damping = BOX_MATERIAL_RIPPLES_DAMPING,
+            .strength = BOX_MATERIAL_RIPPLES_STRENGTH,
+            .foam_decay = BOX_MATERIAL_RIPPLES_FOAM_DECAY,
+            .foam_spread = BOX_MATERIAL_RIPPLES_FOAM_SPREAD,
+            .crest_foam = 0.0f };
+    }
+}
+
+/** Construct RippleSource values: an ellipse of half size 0.5 by 0.5, a strength of 1 and no
+ * foam.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_ripple_source_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    RippleSource *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (RippleSource){
+            .extents = { BOX_MATERIAL_RIPPLE_SOURCE_EXTENT, BOX_MATERIAL_RIPPLE_SOURCE_EXTENT },
+            .strength = BOX_MATERIAL_RIPPLE_SOURCE_STRENGTH,
+            .foam = 0.0f };
+    }
+}
+
+ecs_vec_t* box_material_ripples_queue(
+    const ecs_world_t *world)
+{
+    const ecs_world_t *real = ecs_get_world(world);
+    const MaterialRippleQueue *q = ecs_id(MaterialRippleQueue)
+        ? ecs_singleton_get(real, MaterialRippleQueue) : NULL;
+
+    return q ? q->ripples : NULL;
+}
+
+/** Queue a disturbance of the field of a Water after checking its arguments.
+ *
+ * @param world The world
+ * @param what Name of the function for the errors
+ * @param water Entity with Water and WaterRipples
+ * @param position World position of the center
+ * @param radius World units of the radius
+ * @param strength World units the water at the center sinks
+ * @param foam Foam added at the center
+ * @return Whether it was queued
+ */
+static bool box_material_disturb(
+    ecs_world_t *world,
+    const char *what,
+    ecs_entity_t water,
+    const float *position,
+    float radius,
+    float strength,
+    float foam)
+{
+    const ecs_world_t *real = ecs_get_world(world);
+    ecs_vec_t *queue = box_material_ripples_queue(real);
+    bool result = false;
+    if (!queue) {
+        goto done;
+    }
+
+    if (!water || !ecs_is_alive(real, water) || !ecs_has(real, water, WaterRipples) ||
+        !ecs_has(real, water, Water))
+    {
+        char *name = water && ecs_is_alive(real, water) ? ecs_get_path(real, water) : NULL;
+        ecs_err("%s: '%s' is not a Water with WaterRipples", what, name ? name : "0");
+        ecs_os_free(name);
+        goto done;
+    }
+
+    if (!position || !isfinite(position[0]) || !isfinite(position[1]) ||
+        !isfinite(position[2]))
+    {
+        ecs_err("%s: the position is not finite", what);
+        goto done;
+    }
+
+    if (!isfinite(radius) || radius <= 0.0f) {
+        ecs_err("%s: the radius %g is not above 0", what, (double)radius);
+        goto done;
+    }
+
+    if (!isfinite(strength) || !isfinite(foam)) {
+        ecs_err("%s: the %s is not finite", what, isfinite(strength) ? "amount" : "strength");
+        goto done;
+    }
+
+    box_material_ripple_t *r = ecs_vec_append_t(NULL, queue, box_material_ripple_t);
+    r->water = water;
+    r->position[0] = position[0];
+    r->position[1] = position[1];
+    r->position[2] = position[2];
+    r->radius = radius;
+    r->strength = strength;
+    r->foam = foam;
+    result = true;
+done:
+    return result;
+}
+
+bool box_material_ripple_at(
+    ecs_world_t *world,
+    ecs_entity_t water,
+    const float *position,
+    float radius,
+    float strength)
+{
+    return box_material_disturb(world, "ripple_at", water, position, radius, strength, 0.0f);
+}
+
+bool box_material_foam_at(
+    ecs_world_t *world,
+    ecs_entity_t water,
+    const float *position,
+    float radius,
+    float amount)
+{
+    return box_material_disturb(world, "foam_at", water, position, radius, 0.0f, amount);
+}
+
+/** The box.material.ripple_at script function.
+ *
+ * @param ctx The call context
+ * @param argc Number of arguments
+ * @param argv The water, the position, the radius and the strength
+ * @param result Receives whether the disturbance was queued
+ */
+static void box_material_ripple_at_function(
+    const ecs_function_ctx_t *ctx,
+    int32_t argc,
+    const ecs_value_t *argv,
+    ecs_value_t *result)
+{
+    ecs_entity_t water = *(ecs_entity_t*)argv[0].ptr;
+    const float *position = argv[1].ptr;
+    float radius = *(float*)argv[2].ptr;
+    float strength = *(float*)argv[3].ptr;
+    (void)argc;
+    *(bool*)result->ptr = box_material_ripple_at(ctx->world, water, position, radius,
+        strength);
+}
+
+/** The box.material.foam_at script function.
+ *
+ * @param ctx The call context
+ * @param argc Number of arguments
+ * @param argv The water, the position, the radius and the amount
+ * @param result Receives whether the splash was queued
+ */
+static void box_material_foam_at_function(
+    const ecs_function_ctx_t *ctx,
+    int32_t argc,
+    const ecs_value_t *argv,
+    ecs_value_t *result)
+{
+    ecs_entity_t water = *(ecs_entity_t*)argv[0].ptr;
+    const float *position = argv[1].ptr;
+    float radius = *(float*)argv[2].ptr;
+    float amount = *(float*)argv[3].ptr;
+    (void)argc;
+    *(bool*)result->ptr = box_material_foam_at(ctx->world, water, position, radius, amount);
+}
+
+/** Free the ripple queue of a world.
+ *
+ * @param world The world
+ * @param ctx The queue
+ */
+static void box_material_ripples_free(
+    ecs_world_t *world,
+    void *ctx)
+{
+    ecs_vec_t *queue = ctx;
+    (void)world;
+    ecs_vec_fini_t(NULL, queue, box_material_ripple_t);
+    ecs_os_free(queue);
+}
+
 /** Construct Water values: a teal shallow and a dark blue deep body, depth 3, visibility 2, a
- * refraction of 0.02 and an off white foam band of width 0.3 without texture or ripples.
+ * white absorption, a refraction of 0.02, an off white foam band of width 0.3 without
+ * texture or ripples, no scatter of a turquoise color and no shore waves of a reach of 0.3.
  *
  * @param ptr The components
  * @param count Number of components
@@ -268,6 +557,8 @@ static void box_water_ctor(
                 BOX_MATERIAL_WATER_DEEP_B },
             .depth = BOX_MATERIAL_WATER_DEPTH,
             .visibility = BOX_MATERIAL_WATER_VISIBILITY,
+            .absorption = { BOX_MATERIAL_WATER_ABSORPTION_R, BOX_MATERIAL_WATER_ABSORPTION_G,
+                BOX_MATERIAL_WATER_ABSORPTION_B },
             .refraction = BOX_MATERIAL_WATER_REFRACTION,
             .foam_color = { BOX_MATERIAL_WATER_FOAM_R, BOX_MATERIAL_WATER_FOAM_G,
                 BOX_MATERIAL_WATER_FOAM_B },
@@ -275,7 +566,12 @@ static void box_water_ctor(
             .foam_texture = 0,
             .foam_scale = BOX_MATERIAL_WATER_FOAM_SCALE,
             .ripple_scale = BOX_MATERIAL_WATER_RIPPLE_SCALE,
-            .ripple_velocity = { 0.0f, 0.0f } };
+            .ripple_velocity = { 0.0f, 0.0f },
+            .scatter_color = { BOX_MATERIAL_WATER_SCATTER_R, BOX_MATERIAL_WATER_SCATTER_G,
+                BOX_MATERIAL_WATER_SCATTER_B },
+            .scatter = BOX_MATERIAL_WATER_SCATTER,
+            .shore_period = BOX_MATERIAL_WATER_SHORE_PERIOD,
+            .shore_reach = BOX_MATERIAL_WATER_SHORE_REACH };
     }
 }
 
@@ -319,6 +615,163 @@ static void box_texture_scroll_ctor(
     }
 }
 
+/** Construct VertexOcclusion values that read the occlusion channel of foliage at full
+ * strength.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_vertex_occlusion_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    VertexOcclusion *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (VertexOcclusion){ .channel = BOX_MATERIAL_OCCLUSION_CHANNEL,
+            .strength = 1.0f };
+    }
+}
+
+/** Construct WindSway values that do not bend, with a height of 1 at a base of 0, a 2 Hz
+ * flutter of no amplitude that reaches full over 0.3 world units, and rigid branches that would
+ * swing at 0.5 Hz.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_wind_sway_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    WindSway *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (WindSway){
+            .height = BOX_MATERIAL_SWAY_HEIGHT,
+            .flutter_frequency = BOX_MATERIAL_SWAY_FLUTTER_FREQUENCY,
+            .flutter_reach = BOX_MATERIAL_SWAY_FLUTTER_REACH,
+            .branch_frequency = BOX_MATERIAL_SWAY_BRANCH_FREQUENCY };
+    }
+}
+
+/** Quantize a stiffness to 0..63, 0 when not finite.
+ *
+ * @param stiffness The stiffness, 0..1
+ * @return The quantized stiffness
+ */
+static uint32_t box_wind_sway_stiffness(
+    float stiffness)
+{
+    return isfinite(stiffness)
+        ? (uint32_t)roundf(glm_clamp(stiffness, 0.0f, 1.0f) * 63.0f) : 0u;
+}
+
+/** Grid cell of an object space coordinate of a pivot, as wind.wgsl snaps it: floor of the
+ * coordinate times BOX_MATERIAL_SWAY_GRID, exact in single precision.
+ *
+ * @param value The coordinate
+ * @return The cell, 0 when not finite
+ */
+static float box_wind_sway_cell(
+    float value)
+{
+    return isfinite(value) ? floorf(value * BOX_MATERIAL_SWAY_GRID) : 0.0f;
+}
+
+void box_wind_sway_vertex(
+    vec4 data0,
+    vec4 data2,
+    vec4 data3,
+    const vec3 pivot,
+    int32_t level,
+    float weight,
+    const vec3 *ancestors,
+    const float *stiffness)
+{
+    float w = isfinite(weight) ? glm_clamp(weight, 0.0f, 1.0f) : 0.0f;
+    uint32_t offsets[6] = {0}, packed = 0, c[3];
+    int32_t i, k;
+    if (level < 0) {
+        level = 0;
+    } else if (level > BOX_MATERIAL_SWAY_LEVELS) {
+        level = BOX_MATERIAL_SWAY_LEVELS;
+    }
+
+    glm_vec3_zero(data2);
+    for (k = 0; k < 3; k ++) {
+        data0[k] = box_wind_sway_cell(pivot[k]) / BOX_MATERIAL_SWAY_GRID;
+        if (ancestors && level >= 2) {
+            data2[k] = box_wind_sway_cell(ancestors[0][k]) / BOX_MATERIAL_SWAY_GRID;
+        }
+    }
+
+    data0[3] = (float)level + 0.5f * w;
+
+    for (i = 0; stiffness && i < level; i ++) {
+        packed |= box_wind_sway_stiffness(stiffness[i]) << (6 * i);
+    }
+
+    data2[3] = (float)packed;
+
+    for (i = 0; i < 2; i ++) {
+        for (k = 0; k < 3; k ++) {
+            float offset = 0.0f;
+            if (ancestors && level >= 3 + i) {
+                offset = box_wind_sway_cell(ancestors[1 + i][k]) -
+                    box_wind_sway_cell(ancestors[0][k]);
+            }
+
+            offset = glm_clamp(offset + (float)BOX_MATERIAL_SWAY_BIAS, 0.0f, 65535.0f);
+            offsets[i * 3 + k] = (uint32_t)offset;
+        }
+    }
+
+    c[0] = offsets[0] | (offsets[1] << 16);
+    c[1] = offsets[2] | (offsets[3] << 16);
+    c[2] = offsets[4] | (offsets[5] << 16);
+    data3[0] = (float)(c[0] & 0xFFFFFFu);
+    data3[1] = (float)((c[0] >> 24) | ((c[1] & 0xFFFFu) << 8));
+    data3[2] = (float)((c[1] >> 16) | ((c[2] & 0xFFu) << 16));
+    data3[3] = (float)(c[2] >> 8);
+}
+
+void box_wind_sway_ancestors(
+    const vec4 data2,
+    const vec4 data3,
+    vec3 ancestors[3])
+{
+    uint32_t w[4], c[3], offsets[6];
+    int32_t i, k;
+    for (i = 0; i < 4; i ++) {
+        float v = isfinite(data3[i]) ? roundf(glm_clamp(data3[i], 0.0f, 16777215.0f)) : 0.0f;
+        w[i] = (uint32_t)v;
+    }
+
+    c[0] = w[0] | (w[1] << 24);
+    c[1] = (w[1] >> 8) | (w[2] << 16);
+    c[2] = (w[2] >> 16) | (w[3] << 8);
+    for (i = 0; i < 3; i ++) {
+        offsets[i * 2] = c[i] & 0xFFFFu;
+        offsets[i * 2 + 1] = c[i] >> 16;
+    }
+
+    for (k = 0; k < 3; k ++) {
+        float parent = box_wind_sway_cell(data2[k]);
+        ancestors[0][k] = parent / BOX_MATERIAL_SWAY_GRID;
+        for (i = 0; i < 2; i ++) {
+            ancestors[1 + i][k] = (parent + (float)offsets[i * 3 + k] -
+                (float)BOX_MATERIAL_SWAY_BIAS) / BOX_MATERIAL_SWAY_GRID;
+        }
+    }
+}
+
 /** Construct TextureMapping values that keep the UVs of the mesh, with a size of 1 and no
  * blend.
  *
@@ -336,6 +789,33 @@ static void box_texture_mapping_ctor(
     (void)ti;
     for (i = 0; i < count; i ++) {
         values[i] = (TextureMapping){ .mode = MappingUv, .size = 1.0f, .blend = 0.0f };
+    }
+}
+
+/** Construct TextureLayer values that cover everything facing up by any amount, mixing the
+ * albedo and roughness of the layer, with the default contrast.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_texture_layer_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    TextureLayer *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (TextureLayer){
+            .amount = BOX_MATERIAL_LAYER_AMOUNT,
+            .direction = { 0.0f, 1.0f, 0.0f },
+            .contrast = BOX_MATERIAL_LAYER_CONTRAST,
+            .albedo = LayerMix,
+            .roughness = LayerMix,
+            .metallic = LayerKeep,
+            .occlusion = LayerKeep };
     }
 }
 
@@ -362,6 +842,16 @@ void BoxMaterialImport(
     ECS_META_COMPONENT(world, Transmission);
     ECS_META_COMPONENT(world, Distortion);
     ECS_META_COMPONENT(world, Water);
+    ECS_META_COMPONENT(world, WaterWave);
+    ECS_META_COMPONENT(world, WaterWaves);
+    ECS_META_COMPONENT(world, WaterFlow);
+    ECS_META_COMPONENT(world, WaterCaustics);
+    ECS_META_COMPONENT(world, WaterSpectrum);
+    ECS_META_COMPONENT(world, WaterRipples);
+    ECS_META_COMPONENT(world, RippleSource);
+    ECS_META_COMPONENT(world, WindSway);
+    ECS_META_COMPONENT(world, VertexReveal);
+    ECS_META_COMPONENT(world, VertexOcclusion);
     ECS_META_COMPONENT(world, BlendMode);
     ECS_META_COMPONENT(world, BackFaceMode);
     ECS_META_COMPONENT(world, PbrTextures);
@@ -377,6 +867,9 @@ void BoxMaterialImport(
     ECS_META_COMPONENT(world, TextureMappingMode);
     ECS_META_COMPONENT(world, TextureMapping);
     ECS_META_COMPONENT(world, TextureBlend);
+    ECS_META_COMPONENT(world, TextureLayerBlend);
+    ECS_META_COMPONENT(world, TextureLayer);
+    ECS_META_COMPONENT(world, TextureLayers);
     ECS_TAG_DEFINE(world, TextureFrame);
     ecs_set_name_prefix(world, NULL);
     ecs_set_scope(world, module);
@@ -395,19 +888,34 @@ void BoxMaterialImport(
     ecs_set_hooks(world, Fresnel, { .ctor = box_fresnel_ctor });
     ecs_set_hooks(world, Distortion, { .ctor = box_distortion_ctor });
     ecs_set_hooks(world, Water, { .ctor = box_water_ctor });
+    ecs_set_hooks(world, WaterWaves, { .ctor = box_water_waves_ctor });
+    ecs_add_pair(world, ecs_id(WaterWaves), EcsOnInstantiate, EcsInherit);
+    ecs_add_pair(world, ecs_id(WaterFlow), EcsOnInstantiate, EcsInherit);
+    ecs_add_pair(world, ecs_id(WaterFlow), EcsWith, ecs_id(MaterialId));
+    ecs_set_hooks(world, WaterCaustics, { .ctor = box_water_caustics_ctor });
+    ecs_add_pair(world, ecs_id(WaterCaustics), EcsOnInstantiate, EcsInherit);
+    ecs_set_hooks(world, WaterSpectrum, { .ctor = box_water_spectrum_ctor });
+    ecs_add_pair(world, ecs_id(WaterSpectrum), EcsOnInstantiate, EcsInherit);
+    ecs_set_hooks(world, WaterRipples, { .ctor = box_water_ripples_ctor });
+    ecs_set_hooks(world, RippleSource, { .ctor = box_ripple_source_ctor });
+    ecs_set_hooks(world, WindSway, { .ctor = box_wind_sway_ctor });
+    ecs_set_hooks(world, VertexOcclusion, { .ctor = box_vertex_occlusion_ctor });
+    ecs_set_hooks(world, TextureLayer, { .ctor = box_texture_layer_ctor });
     ecs_set_hooks(world, MaterialId, { .ctor = box_material_id_ctor });
     ecs_add_pair(world, ecs_id(MaterialId), EcsOnInstantiate, EcsInherit);
     ecs_add_pair(world, ecs_id(PbrTextures), EcsOnInstantiate, EcsInherit);
     ecs_add_pair(world, ecs_id(TextureBlend), EcsOnInstantiate, EcsInherit);
+    ecs_add_pair(world, ecs_id(TextureLayers), EcsOnInstantiate, EcsInherit);
 
-    ecs_entity_t materials[15] = {
+    ecs_entity_t materials[18] = {
         ecs_id(Rgb), ecs_id(PbrMaterial), ecs_id(Emissive), ecs_id(TextureTransform),
         ecs_id(AlphaCutoff), ecs_id(Transmission), ecs_id(ClearCoat), ecs_id(SpecularAnisotropy),
         ecs_id(Sheen), ecs_id(DiffuseTransmission), ecs_id(TextureMapping), ecs_id(TextureScroll),
-        ecs_id(Fresnel), ecs_id(Water), ecs_id(Distortion)
+        ecs_id(Fresnel), ecs_id(Water), ecs_id(Distortion), ecs_id(WindSway),
+        ecs_id(VertexReveal), ecs_id(VertexOcclusion)
     };
     int32_t i;
-    for (i = 0; i < 15; i ++) {
+    for (i = 0; i < 18; i ++) {
         ecs_add_pair(world, materials[i], EcsOnInstantiate, EcsInherit);
         ecs_add_pair(world, materials[i], EcsWith, ecs_id(MaterialId));
     }
@@ -415,4 +923,36 @@ void BoxMaterialImport(
     ECS_TAG_DEFINE(world, DynamicMaterial);
     ECS_TAG_DEFINE(world, NoShadow);
     ECS_TAG_DEFINE(world, LightFixture);
+
+    ecs_vec_t *queue = ecs_os_calloc_t(ecs_vec_t);
+    ecs_vec_init_t(NULL, queue, box_material_ripple_t, 0);
+    ECS_COMPONENT_DEFINE(world, MaterialRippleQueue);
+    ecs_singleton_set(world, MaterialRippleQueue, { .ripples = queue });
+    ecs_atfini(world, box_material_ripples_free, queue);
+
+    ecs_function(world, {
+        .name = "ripple_at",
+        .parent = ecs_get_scope(world),
+        .return_type = ecs_id(ecs_bool_t),
+        .params = {
+            { .name = "water", .type = ecs_id(ecs_entity_t) },
+            { .name = "position", .type = ecs_id(vec3) },
+            { .name = "radius", .type = ecs_id(ecs_f32_t) },
+            { .name = "strength", .type = ecs_id(ecs_f32_t) }
+        },
+        .callback = box_material_ripple_at_function
+    });
+
+    ecs_function(world, {
+        .name = "foam_at",
+        .parent = ecs_get_scope(world),
+        .return_type = ecs_id(ecs_bool_t),
+        .params = {
+            { .name = "water", .type = ecs_id(ecs_entity_t) },
+            { .name = "position", .type = ecs_id(vec3) },
+            { .name = "radius", .type = ecs_id(ecs_f32_t) },
+            { .name = "amount", .type = ecs_id(ecs_f32_t) }
+        },
+        .callback = box_material_foam_at_function
+    });
 }

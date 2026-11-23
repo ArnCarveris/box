@@ -1,0 +1,189 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using state
+using assets
+
+// The placement of the trees of trees.flecs, seeded and checked against the layout functions
+// of layout.flecs: mature trees on a jittered grid over the forest out to BACKDROP_START, young
+// trees and saplings on a second grid between them, and cheaper trees (DETAIL_CHEAP) on a third
+// grid in the backdrop zone. None in the clearing, on the path or in the brook bed. Beech and
+// oak grow in stands, birches along the brook, spruce and fir deeper in; the species of a spot
+// comes from forest_species_at.
+state {
+  // The grids: mature trees, young trees and saplings, the backdrop
+  export const TREE_CELL: f32 = 8.5
+  export const TREE_GRID: i32 = 13
+  export const YOUNG_CELL: f32 = 8.5
+  export const YOUNG_GRID: i32 = 13
+  export const BACKDROP_CELL: f32 = 7.5
+  export const BACKDROP_GRID: i32 = 21
+  // The backdrop trees stay within this radius, inside the tree line of ground.flecs
+  export const BACKDROP_RADIUS: f32 = 84
+
+  // The two landmark snags by the clearing
+  export const SNAG_A_X: f32 = -15.5
+  export const SNAG_A_Z: f32 = 8
+  export const SNAG_B_X: f32 = 17
+  export const SNAG_B_Z: f32 = 5
+
+  // The species that grows at (x, z), by a seeded value h of the spot: birches along the brook,
+  // spruce and fir stands deeper in, else beech and oak in stands of their own, with a few
+  // snags among them
+  fn forest_species_at(x: f64, z: f64, h: f64) -> i32 {
+    const brook = forest_brook_distance(x, z)
+    const r = sqrt(x * x + z * z)
+    const stand = forest_hash2(floor(x / 18), floor(z / 18), 7)
+    const deep = (r > 30 && stand < 0.5) || (r > 44 && stand < 0.8)
+    brook < 10 && h < 0.7 ? SPECIES_BIRCH : (
+      deep ? (h < 0.6 ? SPECIES_SPRUCE : SPECIES_FIR) : (
+      h < 0.05 ? SPECIES_SNAG : (
+      stand > 0.5 ? (h < 0.8 ? SPECIES_BEECH : SPECIES_OAK) : (h < 0.75 ? SPECIES_OAK : SPECIES_BEECH))))
+  }
+
+  // Height of a mature tree of a species by a seeded value h
+  fn forest_tree_height(species: f64, h: f64) -> f64 {
+    species < 0.5 ? 20 + 8 * h : (
+      species < 1.5 ? 17 + 7 * h : (
+      species < 2.5 ? 13 + 6 * h : (
+      species < 3.5 ? 21 + 9 * h : (
+      species < 4.5 ? 19 + 8 * h : 3 + 6 * h))))
+  }
+
+  fn forest_near(x: f64, z: f64, px: f64, pz: f64, r: f64) -> bool {
+    (x - px) * (x - px) + (z - pz) * (z - pz) < r * r
+  }
+
+  // Within r of the room the landmark snags and the boulders of ground.flecs take
+  fn forest_landmark_near(x: f64, z: f64, r: f64) -> bool {
+    const boulders = forest_near(x, z, -13, 3, 2.5 + r) || forest_near(x, z, 16, 10, 3.5 + r) ||
+      forest_near(x, z, -20, -20, 3 + r) || forest_near(x, z, 24, -24, 2.8 + r) ||
+      forest_near(x, z, -30, 14, 3.2 + r) || forest_near(x, z, 34, 18, 2.8 + r) ||
+      forest_near(x, z, -1, -11.5, 1.5 + r) || forest_near(x, z, 10, 1, 0.9 + r)
+    const snags = forest_near(x, z, SNAG_A_X, SNAG_A_Z, 4 + r) || forest_near(x, z, SNAG_B_X, SNAG_B_Z, 4 + r) ||
+      forest_near(x, z, SNAG_B_X + 4, SNAG_B_Z - 3, 3.5 + r)
+    boulders || snags
+  }
+
+  // A tree of radius r at (x, z) stays out of the clearing, the brook bed and the path, and
+  // clear of the landmark snags and the boulders of ground.flecs
+  fn forest_tree_clear(x: f64, z: f64, r: f64) -> bool {
+    forest_clearing_distance(x, z) > r + 1 && forest_free(x, z, r) && !forest_landmark_near(x, z, 0)
+  }
+
+  // Within r of the spot of the mature tree in the grid cell of (x, z)
+  fn forest_mature_near(x: f64, z: f64, r: f64) -> bool {
+    const gx = floor((x + BACKDROP_START) / TREE_CELL)
+    const gz = floor((z + BACKDROP_START) / TREE_CELL)
+    const i = gx * TREE_GRID + gz
+    const mx = (gx + 0.15 + 0.7 * forest_hash(i, 101)) * TREE_CELL - BACKDROP_START
+    const mz = (gz + 0.15 + 0.7 * forest_hash(i, 102)) * TREE_CELL - BACKDROP_START
+    forest_near(x, z, mx, mz, r)
+  }
+}
+
+forest {
+  trees {
+    // Mature trees, a jittered grid of TREE_CELL over the forest, with gaps
+    for gx in 0..TREE_GRID {
+      for gz in 0..TREE_GRID {
+        const i = gx * TREE_GRID + gz
+        const x = (gx + 0.15 + 0.7 * forest_hash(i, 101)) * TREE_CELL - BACKDROP_START
+        const z = (gz + 0.15 + 0.7 * forest_hash(i, 102)) * TREE_CELL - BACKDROP_START
+        if forest_zone(x, z) == ZONE_FOREST && forest_tree_clear(x, z, 1.5) && forest_hash(i, 103) > 0.1 {
+          const sp: i32 = forest_species_at(x, z, forest_hash(i, 104))
+          const young = forest_hash(i, 105) < 0.2
+          const h = forest_tree_height(sp, forest_hash(i, 106)) * (young ? 0.55 : 1)
+          const sl = young ? 0.8 : 0.9 + 0.2 * forest_hash(i, 110)
+          const seed: i32 = i * 7 + 3
+          const yaw = forest_hash(i, 107) * 6.2832
+          const lx = (forest_hash(i, 108) - 0.5) * 0.07
+          const lz = (forest_hash(i, 109) - 0.5) * 0.07
+          if sp == SPECIES_BEECH {
+            ForestBeech "tree_{i}"(seed: seed, height: h, slender: sl) { Position: {x, 0, z}; Rotation: {lx, yaw, lz} }
+          } else if sp == SPECIES_OAK {
+            ForestOak "tree_{i}"(seed: seed, height: h, slender: sl) { Position: {x, 0, z}; Rotation: {lx, yaw, lz} }
+          } else if sp == SPECIES_BIRCH {
+            ForestBirch "tree_{i}"(seed: seed, height: h, slender: sl) { Position: {x, 0, z}; Rotation: {lx * 1.6, yaw, lz * 1.6} }
+          } else if sp == SPECIES_SPRUCE {
+            ForestSpruce "tree_{i}"(seed: seed, height: h, slender: sl) { Position: {x, 0, z}; Rotation: {lx * 0.4, yaw, lz * 0.4} }
+          } else if sp == SPECIES_FIR {
+            ForestFir "tree_{i}"(seed: seed, height: h, slender: sl) { Position: {x, 0, z}; Rotation: {lx * 0.4, yaw, lz * 0.4} }
+          } else {
+            ForestSnag "tree_{i}"(seed: seed, height: 3 + 6 * forest_hash(i, 106), fallen: forest_hash(i, 111) < 0.4) { Position: {x, 0, z}; Rotation: {lx, yaw, lz} }
+          }
+        }
+      }
+    }
+
+    // Young trees and saplings, on a grid between the mature trees, clear of them
+    for gx in 0..YOUNG_GRID {
+      for gz in 0..YOUNG_GRID {
+        const i = gx * YOUNG_GRID + gz
+        const x = (gx + 0.5 + 0.8 * (forest_hash(i, 121) - 0.5)) * YOUNG_CELL - BACKDROP_START
+        const z = (gz + 0.5 + 0.8 * (forest_hash(i, 122) - 0.5)) * YOUNG_CELL - BACKDROP_START
+        if forest_zone(x, z) == ZONE_FOREST && forest_tree_clear(x, z, 0.8) && !forest_mature_near(x, z, 3) && forest_hash(i, 123) > 0.35 {
+          const sp: i32 = forest_species_at(x, z, forest_hash(i, 124) * 0.94 + 0.06)
+          const sapling = forest_hash(i, 125) < 0.5
+          const h = sapling ? 1.2 + 1.8 * forest_hash(i, 126) : 3.5 + 4.5 * forest_hash(i, 126)
+          const seed: i32 = i * 7 + 5001
+          const yaw = forest_hash(i, 127) * 6.2832
+          const lx = (forest_hash(i, 128) - 0.5) * 0.12
+          const lz = (forest_hash(i, 129) - 0.5) * 0.12
+          if sp == SPECIES_BEECH {
+            ForestBeech "young_{i}"(seed: seed, height: h, slender: 0.7) { Position: {x, 0, z}; Rotation: {lx, yaw, lz} }
+          } else if sp == SPECIES_OAK {
+            ForestOak "young_{i}"(seed: seed, height: h, slender: 0.65) { Position: {x, 0, z}; Rotation: {lx, yaw, lz} }
+          } else if sp == SPECIES_BIRCH {
+            ForestBirch "young_{i}"(seed: seed, height: h, slender: 0.8) { Position: {x, 0, z}; Rotation: {lx, yaw, lz} }
+          } else if sp == SPECIES_SPRUCE {
+            ForestSpruce "young_{i}"(seed: seed, height: h, slender: 0.8) { Position: {x, 0, z}; Rotation: {lx * 0.4, yaw, lz * 0.4} }
+          } else {
+            ForestFir "young_{i}"(seed: seed, height: h, slender: 0.8) { Position: {x, 0, z}; Rotation: {lx * 0.4, yaw, lz * 0.4} }
+          }
+        }
+      }
+    }
+
+    // The backdrop toward the edges of the world: cheap trees on a denser grid, mostly conifers
+    for gx in 0..BACKDROP_GRID {
+      for gz in 0..BACKDROP_GRID {
+        const i = gx * BACKDROP_GRID + gz
+        const x = (gx + 0.15 + 0.7 * forest_hash(i, 131)) * BACKDROP_CELL - WORLD_HALF
+        const z = (gz + 0.15 + 0.7 * forest_hash(i, 132)) * BACKDROP_CELL - WORLD_HALF
+        const inside = forest_in_world(x, z, 1) && sqrt(x * x + z * z) < BACKDROP_RADIUS
+        if forest_zone(x, z) == ZONE_BACKDROP && inside && forest_free(x, z, 1.5) && forest_hash(i, 133) > 0.1 {
+          const sp: i32 = forest_species_at(x, z, forest_hash(i, 134) * 0.94 + 0.06)
+          const h = forest_tree_height(sp, forest_hash(i, 136))
+          const seed: i32 = i * 7 + 9001
+          const yaw = forest_hash(i, 137) * 6.2832
+          const lx = (forest_hash(i, 138) - 0.5) * 0.05
+          const lz = (forest_hash(i, 139) - 0.5) * 0.05
+          if sp == SPECIES_BEECH {
+            ForestBeech "far_{i}"(seed: seed, height: h, detail: DETAIL_CHEAP) { Position: {x, 0, z}; Rotation: {lx, yaw, lz} }
+          } else if sp == SPECIES_OAK {
+            ForestOak "far_{i}"(seed: seed, height: h, detail: DETAIL_CHEAP) { Position: {x, 0, z}; Rotation: {lx, yaw, lz} }
+          } else if sp == SPECIES_BIRCH {
+            ForestBirch "far_{i}"(seed: seed, height: h, detail: DETAIL_CHEAP) { Position: {x, 0, z}; Rotation: {lx, yaw, lz} }
+          } else if sp == SPECIES_SPRUCE {
+            ForestSpruce "far_{i}"(seed: seed, height: h, detail: DETAIL_CHEAP) { Position: {x, 0, z}; Rotation: {lx, yaw, lz} }
+          } else {
+            ForestFir "far_{i}"(seed: seed, height: h, detail: DETAIL_CHEAP) { Position: {x, 0, z}; Rotation: {lx, yaw, lz} }
+          }
+        }
+      }
+    }
+
+    // Landmark snags: a tall one at the west edge of the clearing, and a broken trunk with its
+    // top fallen beside it at the east edge
+    ForestSnag snag_clearing(seed: 5, height: 7.5) {
+      Position: {SNAG_A_X, 0, SNAG_A_Z}
+      Rotation: {0.03, 0.8, 0}
+    }
+
+    ForestSnag snag_broken(seed: 9, height: 2.6, fallen: true) {
+      Position: {SNAG_B_X, 0, SNAG_B_Z}
+      Rotation: {0, 2.2, 0}
+    }
+  }
+}

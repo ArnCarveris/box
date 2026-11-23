@@ -2,8 +2,9 @@
 // (shadow_terminator) both share, and the loop over the lights of a fragment, with the shadows
 // of the spot and point lights (scene_punctual_shadows) and the cookie of the first directional
 // light (scene_cookies). The includer includes mesh_common.wgsl first and declares the Surface of
-// its fragments, with at least the albedo, the metallic, the occlusion, the shading normal and
-// the geometric normal, and light_lobes, the light its surface reflects of one light, whose
+// its fragments, with at least the albedo, the metallic, the occlusion, the shading normal, the
+// geometric normal and shade, the share of the first directional light the heights of a terrain
+// hold back (0 for none), and light_lobes, the light its surface reflects of one light, whose
 // lobes of the shading normal fade by shadow_terminator.
 #pragma once
 
@@ -13,6 +14,26 @@ struct Lit {
     diffuse: vec3f,
     specular: vec3f,
 };
+
+// What a view of an impostor frame (render/impostor.c) shows, unlit and without the emission:
+// view.lights.z 2 the albedo, 3 the world space normal as n * 0.5 + 0.5, 4 the depth of the
+// fragment in the box of the frame, 0 at the near plane and 1 at the far plane of the
+// orthographic camera.
+fn impostor_channel(albedo: vec3f, normal: vec3f, world: vec3f) -> Lit {
+    switch view.lights.z {
+        case 3u: {
+            return Lit(normalize(normal) * 0.5 + 0.5, vec3f(0.0));
+        }
+        case 4u: {
+            let d = -(view.view * vec4f(world, 1.0)).z;
+            let range = max(view.cluster.w - view.cluster.z, 1e-6);
+            return Lit(vec3f(clamp((d - view.cluster.z) / range, 0.0, 1.0)), vec3f(0.0));
+        }
+        default: {
+            return Lit(albedo, vec3f(0.0));
+        }
+    }
+}
 
 fn distribution_ggx(ndh: f32, a: f32) -> f32 {
     let a2 = a * a;
@@ -53,6 +74,14 @@ fn shadow_terminator(ng: vec3f, ns: vec3f, l: vec3f) -> f32 {
 
     let g = ngl / d;
     return g * (1.0 + g * (1.0 - g));
+}
+
+// Whether a light toward l reaches a side of a surface of geometric normal ng: the front lobes
+// of side 0 and the back lobe of side 1 fade by the shadow terminator, which is 0 with the light
+// behind the geometric surface of the side, so its shadows and cookie need not be read.
+fn light_reaches(ng: vec3f, l: vec3f, side: u32) -> bool {
+    let g = dot(ng, l);
+    return select(g > 0.0, g < 0.0, side == 1u);
 }
 
 // Direct light: the directional lights, then the lights of the cluster. With
@@ -125,8 +154,15 @@ fn lights_direct(s: Surface, v: vec3f, world: vec3f, cluster: u32, sides: u32,
                     }
                     radiance *= planet_light_factor(planet, l);
                 }
+                if (!light_reaches(s.geometric, l, side)) {
+                    continue;
+                }
                 if (i == 0u) {
-                    visible = shadow_factor(at, n);
+                    if (side == 1u) {
+                        visible = shadow_factor_back(at, n) * (1.0 - s.shade);
+                    } else {
+                        visible = shadow_factor(at, n) * (1.0 - s.shade);
+                    }
                     if (scene_cookies) {
                         visible *= light_cookie(at, l, n);
                     }
@@ -137,6 +173,9 @@ fn lights_direct(s: Surface, v: vec3f, world: vec3f, cluster: u32, sides: u32,
                 let delta = light.position - at;
                 let dist = length(delta);
                 l = delta / max(dist, 1e-4);
+                if (!light_reaches(s.geometric, l, side)) {
+                    continue;
+                }
                 radiance *= attenuation(light, l, dist);
                 if (scene_punctual_shadows && light.shadow < view.spot_config.x) {
                     visible = punctual_shadow(light, at, n);

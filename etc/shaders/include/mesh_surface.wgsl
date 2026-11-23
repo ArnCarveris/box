@@ -50,7 +50,7 @@ struct Layers {
 fn hard_layers(f: VertexOut, geometric: vec3f) -> Layers {
     var uv = f.uv.xy;
     if (vo_scalars(f).w != 0.0) {
-        uv = mapping_uv(f.object, f.object_normal, f.uv.xy);
+        uv = mapping_uv(f.object, f.object_normal.xyz, f.uv.xy);
     }
     var o: Layers;
     o.albedo = textureSample(albedo_map, material_sampler, uv);

@@ -1,0 +1,12 @@
+// The tree generator: the Tree template (a trunk, up to four levels of branches, a crown
+// envelope and leaf cards or needle fronds as props, grown as a bark and a foliage MeshGraph
+// shape with levels of detail), the bark and leaf materials of the species with their texture
+// graphs, and the presets of the species (TreeBeech, TreeOak, TreeBirch, TreeSpruce, TreeFir,
+// TreePine, TreeWillow and TreeSnag) with an age to grow them young.
+//
+// A scene includes this, then places the trees, such as trees.flecs. The Scene needs
+// alpha_cutout, diffuse_transmission and wind, and triplanar for the bark.
+include textures
+include materials
+include tree
+include presets

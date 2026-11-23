@@ -1,0 +1,136 @@
+// The rock library on its own: the five presets in a row on a plain floor, from left to right a
+// granite boulder, a layered sandstone slab, a mossy forest boulder, a scree pile and an outcrop,
+// with a second, smaller row of variants (other seeds and props) behind them. Every rock is one
+// MeshGraph shape.
+include rocks/library
+
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.effects
+using box.atmosphere
+using box.surface
+using box.controllers
+using box.texture
+using rocks
+
+$ {
+  box.app.FpsTarget: {60}
+  Scene: {reflections: true, environment: true, shader_features: {Extended: {texture_layers: true,
+    triplanar: true}}}
+  AmbientLight: {sky: {120, 140, 170}, ground: {60, 54, 44}, intensity: 0.2}
+}
+
+window {
+  Surface: {width: 1600, height: 900, vsync: true}
+}
+
+sun {
+  DirectionalLight: {intensity: 3 * PI}
+  Rgb: {255, 244, 228}
+}
+
+sky {
+  Atmosphere: {
+    sun: sun,
+    units_per_km: 100,
+    rayleigh: {scale_height: 8, scattering_scale: 1.2},
+    mie: {scale_height: 1.2, anisotropy: 0.8, scattering_scale: 1.2},
+    ozone_scale: 2,
+    ground_albedo: {70, 66, 56},
+    sun_disk_intensity: 4
+  }
+  TimeOfDay: {hour: 15.5, day_of_year: 200, latitude: 47, north: 200, sun: sun}
+}
+
+camera {
+  Position: {0.2, 4.1, 12.5}
+  Rotation: {-0.27, 0, 0}
+  Camera: {fov: 50, near_: 0.1, far_: 800}
+  CameraController: {speed: 4}
+}
+
+view {
+  gtao {
+    Gtao: {radius: 0.6, final_value_power: 2.2}
+  }
+
+  exposure {
+    AutoExposure: {}
+  }
+
+  bloom {
+    Bloom: {intensity: 0.15, threshold: 1}
+  }
+
+  tonemap {
+    Tonemap: {auto_exposure: exposure}
+  }
+
+  smaa {
+    Smaa: {}
+  }
+
+  View: {
+    camera: camera,
+    clear: {enabled: true, color: {150, 178, 210, 255}},
+    lighting: {
+      enabled: true,
+      atmosphere: true,
+      environment: {source: sky, intensity: 0.6, background: false}
+    },
+    shadows: {enabled: true, cascades: 3, resolution: 2048, max_distance: 60},
+    effects: [{effect: gtao}, {effect: sky}, {effect: bloom}, {effect: tonemap}, {effect: smaa}]
+  }
+}
+
+// The floor: dry earth with grit and patches of sparse grass
+rock_floor_albedo {
+  patches { nodes.Noise: {frequency: 6, octaves: 5, seed: 7} }
+  grit { nodes.Noise: {frequency: 400, octaves: 2, seed: 8} }
+  earth { nodes.Ramp: {input: patches, keys: [{0.3, {96, 82, 62}}, {0.5, {118, 102, 78}}, {0.62, {104, 104, 70}}, {0.75, {84, 96, 56}}]} }
+  speckle { nodes.Ramp: {input: grit, keys: [{0.3, {200, 200, 200}}, {0.7, {255, 255, 255}}]} }
+  color { nodes.Multiply: {a: earth, b: speckle} }
+  Graph: {output: color, width: 1024}
+}
+
+rock_floor_normal {
+  grit { nodes.Noise: {frequency: 400, octaves: 2, seed: 8} }
+  bumps { nodes.Normal: {height: grit, strength: 0.7} }
+  Graph: {output: bumps, width: 1024, format: GraphLinear}
+}
+
+rock_row {
+  ground {
+    Position: {0, -0.25, 0}
+    Box: {120, 0.5, 120}
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 1}
+    PbrTextures: {albedo: rock_floor_albedo, normal: rock_floor_normal}
+    texture.Mapping: {mode: MappingWorld, size: 12}
+  }
+
+  // The presets, left to right
+  RockGraniteBoulder granite(seed: 3, size: 2.2) { Position: {-7.2, 0, 0} }
+  RockSandstoneSlab sandstone(seed: 5, size: 2.8) { Position: {-3.6, 0, 0} }
+  RockMossyBoulder mossy(seed: 7, size: 2.1) { Position: {0, 0, 0} }
+  RockScreePile scree(seed: 9, size: 2.6) { Position: {3.6, 0, 0} }
+  RockOutcrop outcrop(seed: 11, size: 2.2) { Position: {7.6, 0, -0.6} }
+
+  // Variants of the props behind them
+  variants {
+    Position: {0, 0, -5.5}
+
+    Rock round(seed: 21, size: 1.4, roundness: 1, strength: 0.4) { Position: {-8, 0, 0} }
+    Rock craggy(seed: 22, size: 1.6, roundness: 0, cracks: 1, strength: 0.7) { Position: {-5.2, 0, 0} }
+    Rock bedded(seed: 23, size: 1.8, strata: 1, flatness: 0.3, stone: ROCK_SANDSTONE) { Position: {-2.5, 0, 0} }
+    Rock flagstone(seed: 24, size: 2, flatness: 1, cracks: 0.6, stone: ROCK_SANDSTONE) { Position: {0, 0, 0} }
+    Rock smooth(seed: 25, size: 1.4, strength: 0.3, roundness: 0.9, moss: 0.4, stone: ROCK_FOREST) { Position: {2.8, 0, 0} }
+    RockCluster sandstone_outcrop(seed: 26, size: 2, roundness: 0.35, strata: 0.85, cracks: 0.5, moss: 0.3, stone: ROCK_SANDSTONE) { Position: {6.6, 0, 0} }
+  }
+}

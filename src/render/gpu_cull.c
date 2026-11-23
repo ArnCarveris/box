@@ -25,7 +25,7 @@
 /** Workgroups along x of a cull_write dispatch at most, the WebGPU dispatch size limit */
 #define BOX_GPU_CULL_WRITE_ROW (65535)
 
-/** Words of the counters of a cull view: drawn, frustum culled and two unused */
+/** Words of the counters of a cull view: drawn, frustum culled, range culled and one unused */
 #define BOX_GPU_CULL_COUNTERS (4)
 
 /** Cull passes between two releases of the unused histories and pyramids */
@@ -137,8 +137,13 @@ void box_gpu_cull_init(
         });
     for (i = 0; i < BOX_GPU_CULL_READBACKS; i ++) {
         ecs_vec_init_t(NULL, &c->readbacks[i].records, box_gpu_cull_record_t, 0);
+        ecs_vec_init_t(NULL, &c->readbacks[i].view_args, uint32_t, 0);
+        ecs_vec_init_t(NULL, &c->readbacks[i].shadow_args, uint32_t, 0);
+        ecs_vec_init_t(NULL, &c->readbacks[i].glass, box_gpu_cull_glass_t, 0);
+        ecs_vec_init_t(NULL, &c->readbacks[i].glass_args, uint32_t, 0);
     }
 
+    ecs_vec_init_t(NULL, &c->glass, box_gpu_cull_glass_t, 0);
     ecs_vec_init_t(NULL, &c->status, box_render_cull_status_t, 0);
     ecs_vec_init_t(NULL, &c->views, box_gpu_cull_view_t, 0);
     ecs_vec_init_t(NULL, &c->draws, box_gpu_cull_draw_t, 0);
@@ -234,7 +239,13 @@ void box_gpu_cull_fini(
         box_gpu_cull_release(&r->buffer);
         r->state = BOX_GPU_READBACK_FREE;
         ecs_vec_fini_t(NULL, &r->records, box_gpu_cull_record_t);
+        ecs_vec_fini_t(NULL, &r->view_args, uint32_t);
+        ecs_vec_fini_t(NULL, &r->shadow_args, uint32_t);
+        ecs_vec_fini_t(NULL, &r->glass, box_gpu_cull_glass_t);
+        ecs_vec_fini_t(NULL, &r->glass_args, uint32_t);
     }
+
+    ecs_vec_fini_t(NULL, &c->glass, box_gpu_cull_glass_t);
 
     ecs_os_mutex_lock(gpu->lock);
     ecs_vec_fini_t(NULL, &c->status, box_render_cull_status_t);
@@ -388,6 +399,27 @@ static double box_gpu_cull_period(
 #endif
 }
 
+/** Count the triangles of a list of draw arguments read back: indices times instances, over 3.
+ *
+ * @param args The draw arguments
+ * @param list uint32_t, indices of the draw arguments
+ * @return The triangles
+ */
+static int64_t box_gpu_cull_triangles(
+    const uint32_t *args,
+    const ecs_vec_t *list)
+{
+    const uint32_t *at = ecs_vec_first(list);
+    int64_t result = 0;
+    int32_t i, count = ecs_vec_count(list);
+    for (i = 0; i < count; i ++) {
+        const uint32_t *a = &args[at[i] * BOX_GPU_CULL_ARGS];
+        result += (int64_t)a[0] * a[1];
+    }
+
+    return result / 3;
+}
+
 /** Turn the counters of a mapped copy into the status of its views.
  *
  * A view whose status is from a newer frame keeps it: copies finish mapping in any order, and
@@ -427,19 +459,32 @@ static void box_gpu_cull_publish(
 
         int32_t visible = (int32_t)words[0];
         int32_t frustum = (int32_t)words[1] + rec->untested;
-        int32_t hidden = rec->tested - visible - frustum;
+        int32_t range = (int32_t)words[2];
+        int32_t hidden = rec->tested - visible - frustum - range;
         st->status = (CullStatus){
             .frame = r->frame,
             .instances = rec->tested,
             .visible = visible,
             .frustum_culled = frustum,
             .occlusion_culled = hidden > 0 ? hidden : 0,
+            .range_culled = range,
             .batches_skipped = rec->skipped,
             .casters_skipped = rec->casters_skipped
         };
     }
 
     ecs_os_mutex_unlock(gpu->lock);
+    if (counters && r->args_words) {
+        const uint32_t *args = (const uint32_t*)ECS_OFFSET(counters, r->args_offset);
+        box_gpu_cull_glass_publish(c, r, args);
+        if (ecs_vec_count(&r->view_args) || ecs_vec_count(&r->shadow_args)) {
+            gpu->pending.view_triangles += box_gpu_cull_triangles(args, &r->view_args);
+            gpu->pending.shadow_triangles += box_gpu_cull_triangles(args, &r->shadow_args);
+            gpu->pending.triangle_reads += r->frame != c->triangle_frame;
+            c->triangle_frame = r->frame;
+        }
+    }
+
     if (counters && r->stamps) {
         const uint64_t *t = (const uint64_t*)ECS_OFFSET(counters, r->stamp_offset);
         uint64_t ticks = 0;
@@ -522,6 +567,7 @@ void box_gpu_cull_begin(
     ecs_os_mutex_lock(gpu->lock);
     c->window = gpu->cull_window;
     c->copies = gpu->cull_copies;
+    c->detail = gpu->stats_detail;
     ecs_os_mutex_unlock(gpu->lock);
     box_gpu_cull_readback_poll(gpu);
     if (!(c->stamp % BOX_GPU_CULL_PURGE)) {
@@ -1322,9 +1368,85 @@ done:
     return result;
 }
 
+/** Get the draw arguments and visible run of a level of a draw with levels of detail.
+ *
+ * @param draw The draw
+ * @param level The level
+ * @param late The late phase instead of the early or only phase, or both when merged
+ * @param base Receives the first visible entry of the run
+ * @param count Receives the entries of the run
+ * @return Index of the draw arguments of the level
+ */
+static uint32_t box_gpu_cull_lod_args(
+    const box_gpu_cull_draw_t *draw,
+    int32_t level,
+    bool late,
+    uint32_t *base,
+    uint32_t *count)
+{
+    uint32_t levels = (uint32_t)draw->levels, l = (uint32_t)level;
+    uint32_t result = draw->lod + l;
+    *base = draw->lod_base + l * draw->lod_stride;
+    *count = draw->lod_stride;
+    if (late) {
+        result = draw->lod + levels + l;
+        *base = draw->lod_base + levels * draw->lod_stride + l * draw->count;
+        *count = draw->count;
+    } else if (draw->merged) {
+        result = draw->lod + 2 * levels + l;
+    }
+
+    return result;
+}
+
+/** List the draw arguments the views and the shadow cascades of a target drew with, whose
+ * triangles the read back counts: the early and late arguments of a draw, or the arguments of
+ * its levels, which with a late phase are merged over both. Probe captures are not listed.
+ *
+ * @param c The cull state
+ * @param r The read back
+ */
+static void box_gpu_cull_args_list(
+    const box_gpu_cull_t *c,
+    box_gpu_cull_readback_t *r)
+{
+    int32_t i, d, l, count = ecs_vec_count(&c->views);
+    for (i = 0; i < count; i ++) {
+        const box_gpu_cull_view_t *cv = ecs_vec_get_t(&c->views, box_gpu_cull_view_t, i);
+        ecs_vec_t *out = cv->cascade < 0 ? &r->view_args : &r->shadow_args;
+        if (cv->flags & BOX_GPU_CULL_BAKE) {
+            continue;
+        }
+
+        for (d = cv->first_draw; d < cv->first_draw + cv->draw_count; d ++) {
+            const box_gpu_cull_draw_t *draw = ecs_vec_get_t(
+                &c->draws, box_gpu_cull_draw_t, d);
+            if (draw->args == UINT32_MAX) {
+                continue;
+            }
+
+            if (!draw->levels) {
+                *ecs_vec_append_t(NULL, out, uint32_t) = draw->args;
+                if (draw->late != UINT32_MAX) {
+                    *ecs_vec_append_t(NULL, out, uint32_t) = draw->late;
+                }
+
+                continue;
+            }
+
+            for (l = 0; l < draw->levels; l ++) {
+                uint32_t base, entries;
+                *ecs_vec_append_t(NULL, out, uint32_t) = box_gpu_cull_lod_args(
+                    draw, l, false, &base, &entries);
+            }
+        }
+    }
+}
+
 void box_gpu_cull_finish(
     box_gpu_t *gpu,
-    WGPUCommandEncoder encoder)
+    WGPUCommandEncoder encoder,
+    const box_render_packet_t *packet)
 {
     box_gpu_cull_t *c = &gpu->cull;
     int32_t i, d, count = ecs_vec_count(&c->views);
@@ -1335,12 +1457,25 @@ void box_gpu_cull_finish(
     }
 
     uint64_t stamp_offset = (size + 7) & ~(uint64_t)7;
-    r = box_gpu_cull_readback(gpu, stamp_offset + c->stamp_count * sizeof(uint64_t));
+    uint64_t args_offset = stamp_offset + c->stamp_count * sizeof(uint64_t);
+    bool glass = box_gpu_cull_glass_list(c, packet, NULL) != 0;
+    uint32_t args_words = (c->detail || glass) && c->args
+        ? (uint32_t)ecs_vec_count(&c->arg_data) : 0;
+    r = box_gpu_cull_readback(gpu, args_offset + args_words * sizeof(uint32_t));
     if (!r) {
         goto done;
     }
 
     ecs_vec_clear(&r->records);
+    ecs_vec_clear(&r->view_args);
+    ecs_vec_clear(&r->shadow_args);
+    r->args_words = 0;
+    if (args_words && c->detail) {
+        box_gpu_cull_args_list(c, r);
+    }
+
+    box_gpu_cull_glass_list(c, packet, r);
+
     for (i = 0; i < count; i ++) {
         const box_gpu_cull_view_t *cv = ecs_vec_get_t(&c->views, box_gpu_cull_view_t, i);
         if (!cv->report) {
@@ -1370,7 +1505,9 @@ void box_gpu_cull_finish(
         }
     }
 
-    if (!ecs_vec_count(&r->records)) {
+    if (!ecs_vec_count(&r->records) && !ecs_vec_count(&r->view_args) &&
+        !ecs_vec_count(&r->shadow_args))
+    {
         goto done;
     }
 
@@ -1387,6 +1524,16 @@ void box_gpu_cull_finish(
         r->used = stamp_offset + c->stamp_count * sizeof(uint64_t);
     }
 
+    if (args_words && (ecs_vec_count(&r->view_args) || ecs_vec_count(&r->shadow_args) ||
+        ecs_vec_count(&r->glass_args)))
+    {
+        wgpuCommandEncoderCopyBufferToBuffer(encoder, c->args, 0, r->buffer, args_offset,
+            (uint64_t)args_words * sizeof(uint32_t));
+        r->args_offset = args_offset;
+        r->args_words = args_words;
+        r->used = args_offset + (uint64_t)args_words * sizeof(uint32_t);
+    }
+
     r->frame = c->frame;
     r->state = BOX_GPU_READBACK_COPIED;
 done:
@@ -1394,6 +1541,9 @@ done:
 }
 
 /** Record one indirect draw of a mesh over a run of visible slots.
+ *
+ * A mesh with per vertex data binds its data stream in vertex buffer slot 2; a level of detail
+ * without data of a batch whose mesh has it does not draw, as its pipeline reads the stream.
  *
  * @param gpu The backend
  * @param pass The render pass
@@ -1425,7 +1575,8 @@ static bool box_gpu_cull_draw_mesh(
     box_gpu_mesh_t *m = ecs_map_get_deref(&gpu->meshes, box_gpu_mesh_t, handle);
     WGPUBindGroup instances = m
         ? box_gpu_instance_group(gpu, b->instances, handle, m, shading) : NULL;
-    bool result = m && instances && args != UINT32_MAX;
+    bool result = m && instances && args != UINT32_MAX &&
+        (m->data_size || !box_gpu_vertex_data(gpu, b));
     if (!result) {
         goto done;
     }
@@ -1448,6 +1599,11 @@ static bool box_gpu_cull_draw_mesh(
         c->mesh_vertex_offset = m->offset;
     }
 
+    if (m->data_size) {
+        wgpuRenderPassEncoderSetVertexBuffer(pass, 2, m->buffer, m->data_offset, m->data_size);
+        box_gpu_count(gpu, BOX_GPU_STAT_DATA_BIND);
+    }
+
     wgpuRenderPassEncoderSetVertexBuffer(pass, 1, ecs_vec_get_t(&c->pages,
         box_gpu_cull_page_t, (int32_t)page)->visible,
         (uint64_t)base * sizeof(uint32_t), (uint64_t)count * sizeof(uint32_t));
@@ -1461,37 +1617,6 @@ static bool box_gpu_cull_draw_mesh(
     wgpuRenderPassEncoderDrawIndexedIndirect(pass, c->args,
         (uint64_t)args * BOX_GPU_CULL_ARGS * sizeof(uint32_t));
 done:
-    return result;
-}
-
-/** Get the draw arguments and visible run of a level of a draw with levels of detail.
- *
- * @param draw The draw
- * @param level The level
- * @param late The late phase instead of the early or only phase, or both when merged
- * @param base Receives the first visible entry of the run
- * @param count Receives the entries of the run
- * @return Index of the draw arguments of the level
- */
-static uint32_t box_gpu_cull_lod_args(
-    const box_gpu_cull_draw_t *draw,
-    int32_t level,
-    bool late,
-    uint32_t *base,
-    uint32_t *count)
-{
-    uint32_t levels = (uint32_t)draw->levels, l = (uint32_t)level;
-    uint32_t result = draw->lod + l;
-    *base = draw->lod_base + l * draw->lod_stride;
-    *count = draw->lod_stride;
-    if (late) {
-        result = draw->lod + levels + l;
-        *base = draw->lod_base + levels * draw->lod_stride + l * draw->count;
-        *count = draw->count;
-    } else if (draw->merged) {
-        result = draw->lod + 2 * levels + l;
-    }
-
     return result;
 }
 
@@ -1535,14 +1660,16 @@ bool box_gpu_cull_draw_wire(
     uint32_t group,
     bool late,
     WGPUBuffer sequence,
+    bool shading,
     WGPUBindGroup *bound)
 {
     box_gpu_cull_t *c = &gpu->cull;
     const box_render_batch_t *b = ecs_vec_get_t(
         &packet->batches, box_render_batch_t, draw->batch);
     box_gpu_mesh_t *m = ecs_map_get_deref(&gpu->meshes, box_gpu_mesh_t, b->mesh);
-    WGPUBindGroup instances = m
-        ? box_gpu_instance_group(gpu, b->instances, b->mesh, m, false) : NULL;
+    WGPUBindGroup instances = !m ? NULL : shading
+        ? box_gpu_instance_group_material(gpu, b->instances, b->mesh, m)
+        : box_gpu_instance_group(gpu, b->instances, b->mesh, m, false);
     uint32_t args = late ? draw->late : draw->args;
     uint32_t base = late ? draw->base + draw->count : draw->base;
     bool result = m && instances && sequence && args != UINT32_MAX;

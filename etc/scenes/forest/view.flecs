@@ -1,0 +1,103 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.camera
+using box.view
+using box.effects
+using box.surface
+using box.controllers
+using box.material
+using state
+
+// At eye height in the clearing, beside the path, looking down it to where it crosses the brook
+// and to the boulder on the far bank
+camera {
+  Position: {6.5, 1.65, 7.5}
+  Rotation: {-0.06, 0.266, 0}
+  Camera: {fov: 50, near_: 0.1, far_: 1500}
+  CameraController: {speed: 4}
+}
+
+// The field of ripples and foam of the brook (brook.flecs) stays centered on the camera. It is on
+// the pool, so the water both above the cascade and CASCADE_DROP below it lies within its height
+// band. Ripples stay subtle and fade soon; foam fades slowly so the trails off the stones and
+// the cascade reach several meters downstream before they thin out
+forest {
+  brook {
+    pool {
+      WaterRipples: {
+        size: BROOK_RIPPLES_SIZE,
+        resolution: BROOK_RIPPLES_RESOLUTION,
+        follow: camera,
+        wave_speed: 1.2,
+        damping: 0.7,
+        strength: 0.5,
+        foam_decay: BROOK_FOAM_DECAY,
+        foam_spread: BROOK_FOAM_SPREAD
+      }
+    }
+  }
+}
+
+// Round shapes, sweeps and the trees (their mesh graphs) drop detail with distance (lod), the
+// trees from a few meters on.
+// A filmic chain: ambient occlusion, the height fog of the sky, bloom, auto exposure into the
+// Tony McMapface tone map, a grade that follows the season (fresh and a little green in spring,
+// warm in summer, warmer and richer in autumn, cool and muted in winter, see forest_seasonal),
+// grayer and cooler under the overcast of rain and snow (precipitation), a subtle vignette and
+// SMAA. The ambient light of the environment is a little lower under the dark canopy of summer
+// and autumn than in the bright, bare winter forest
+view {
+  occlusion { Gtao: {radius: 0.7, final_value_power: 1.8, quality: GtaoHigh} }
+  bloom { Bloom: {intensity: 0.12, threshold: 1.2, threshold_softness: 0.5} }
+  exposure {
+    AutoExposure: {min_log_luma: -10.8, exposure_compensation: 0.35, max_exposure: 20}
+  }
+
+  film { Tonemap: {auto_exposure: exposure, operator_: TonyMcMapface} }
+  grade {
+    ColorGrading: {
+      temperature: forest_seasonal(season, -0.02, 0.03, 0.05, -0.1) - 0.06 * precipitation,
+      tint: forest_seasonal(season, -0.04, 0, 0.02, 0.01),
+      contrast: forest_seasonal(season, 1.04, 1.06, 1.08, 1.02),
+      saturation: forest_seasonal(season, 1.1, 1.06, 1.04, 0.84) * (1 - 0.22 * precipitation),
+      vibrance: forest_seasonal(season, 0.18, 0.12, 0.1, 0.02),
+      lift: {0, 0, forest_seasonal(season, 0, 0, 0, 0.012)}
+    }
+  }
+  vignette { Vignette: {intensity: 0.2, radius: 0.8, smoothness: 0.5} }
+  edges { Smaa: {} }
+
+  View: {
+    camera: camera,
+    lod: {levels: 4, distances: [0, 6, 18, 40]},
+    clear: {enabled: true, color: {120, 140, 160, 255}},
+    lighting: {
+      enabled: true,
+      baked: false,
+      reflections: true,
+      atmosphere: true,
+      environment: {source: sky, intensity: forest_seasonal(season, 1.04, 1, 0.97, 1.08), background: false}
+    },
+    shadows: {
+      enabled: true,
+      cascades: 3,
+      resolution: 2048,
+      interval: [1, 2, 2],
+      max_distance: 120,
+      split_lambda: 0.8,
+      filter_size: 5,
+      fade: 0.2,
+      blend: 0.15
+    },
+    effects: [
+      {effect: occlusion},
+      {effect: sky},
+      {effect: bloom},
+      {effect: film},
+      {effect: grade},
+      {effect: vignette},
+      {effect: edges}
+    ]
+  }
+}

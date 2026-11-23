@@ -1,0 +1,251 @@
+using flecs.script
+using flecs.script.math
+using box.input
+using box.picking
+using box.ui
+using box.widgets
+using box.mesh
+using trees
+using tree_editor
+
+// Asks the loader to copy the props of the preset source into the edited tree
+event LoadPreset()
+
+tree_editor {
+  // The name of the instance of a preset in the source
+  fn preset_key(i: i32) -> string {
+    match i {
+      1: "oak"
+      2: "birch"
+      3: "spruce"
+      4: "fir"
+      5: "pine"
+      6: "willow"
+      7: "snag"
+      _: "beech"
+    }
+  }
+
+  // Points the camera at the whole tree
+  fn fit_view() {
+    dist = fit_dist(props.height, props.crown_width)
+    target_y = fit_target(props.height)
+    pitch = 0.12
+  }
+}
+
+// The loader: the preset at startup, then on every LoadPreset. The source instance of a new
+// preset, age or seed appears in the next frame.
+async {
+  mut first = true
+
+  while true {
+    if !first {
+      await LoadPreset
+    }
+
+    first = false
+    await next_frame()
+
+    const src = source.lookup(preset_key(preset))
+
+    if src != 0 {
+      const t = src.lookup("tree")
+
+      if t != 0 {
+        props = t[Tree]
+        edits = edits + 1
+        fit_view()
+      }
+    }
+  }
+}
+
+// The controls of the panel write the props, by their names: a slider in the group of a level
+// of branches writes that level, a dropdown is named after the row it sits in
+async {
+  while true {
+    const e = await on.change(hud.screen.panel)
+    const w = e.widget
+    const holder = w.parent()
+    edits = edits + 1
+
+    if w.has(Slider) {
+      const v: f32 = w[Slider.mut].current
+      const level = branch_level(holder.name())
+
+      if level > 0 {
+        set_branch_number(level, w.name(), v)
+      } else {
+        set_number(w.name(), v)
+
+        if w.name() == "age" {
+          source_seed = props.seed
+          emit LoadPreset()
+        }
+      }
+    } else if w.has(Stepper) {
+      set_number(w.name(), w[Stepper.mut].current)
+    } else if w.has(Dropdown) {
+      const i: i32 = w[Dropdown.mut].current
+      const n = holder.name()
+
+      if n == "preset" {
+        preset = i
+        source_seed = props.seed
+        emit LoadPreset()
+      } else if n == "distribution" {
+        set_distribution(branch_level(holder.parent().name()), i)
+      } else {
+        set_choice(n, i)
+      }
+    } else if w.has(Switch) {
+      set_flag(w.name(), w[Switch.mut].current)
+    }
+  }
+}
+
+// Drag on the view orbits the camera, the wheel over it zooms
+async {
+  while true {
+    const e = await on.drag(hud.screen.pad)
+    yaw = yaw - e.delta_x * 0.006
+    pitch = clamp(pitch + e.delta_y * 0.005, -0.15, 1.45)
+  }
+}
+
+async {
+  while true {
+    const e = await on.scroll(hud.screen.pad)
+
+    if e.delta_y != 0 {
+      dist = clamp(dist * clamp(1 - e.delta_y * 0.1, 0.5, 1.5), 2, 400)
+    }
+  }
+}
+
+async {
+  while true {
+    await on.pressed(actions.fit)
+    yaw = 0.5
+    fit_view()
+  }
+}
+
+async {
+  while true {
+    await on.pressed(actions.randomize)
+    const rng: Rng = {seed: props.seed * 7919 + floor(box.app.Status[box.app.Status].elapsed * 1000)}
+    props.seed = 1 + floor(rng.f(9998))
+    edits = edits + 1
+  }
+}
+
+async {
+  while true {
+    await on.pressed(actions.reset)
+    source_seed = props.seed
+    emit LoadPreset()
+  }
+}
+
+// Print: the tree as script to the console, which opens, and to the clipboard
+async {
+  while true {
+    await on.pressed(actions.print)
+    snippet = tree_snippet(props)
+    printed = printed + 1
+    box.console.Console[box.console.Console].open = true
+    const copied = box.console.run("clipboard_set \"" + snippet + "\"")
+    const shown = box.console.run("eval tree_editor.snippet")
+  }
+}
+
+async {
+  while true {
+    await on.pressed(actions.toggle_panel)
+    panel_shown = !panel_shown
+  }
+}
+
+// The tree grows from the last props once the shapes of the last growth are ready, or failed,
+// or a second passed
+async {
+  mut applied: i32 = 0 - 1
+
+  while true {
+    await next_frame()
+
+    if applied != edits {
+      applied = edits
+      grown = props
+      await next_frame()
+      await next_frame()
+
+      const tree = stage.turntable.tree
+      const started = box.app.Status[box.app.Status].elapsed
+      mut growing = true
+
+      while growing {
+        const bark = tree.lookup("bark")
+        const foliage = tree.lookup("foliage")
+        const bark_busy = bark.has(Status) && bark[Status].state == Loading
+        const foliage_busy = foliage.has(Status) && foliage[Status].state == Loading
+        growing = (bark_busy || foliage_busy) && box.app.Status[box.app.Status].elapsed - started < 1
+
+        if growing {
+          await next_frame()
+        }
+      }
+    }
+  }
+}
+
+// The turntable turns a full circle in 40 seconds
+async {
+  while true {
+    await next_frame()
+
+    if turntable {
+      spin = spin + box.app.Status[box.app.Status].delta_time * PI / 20
+    }
+  }
+}
+
+// The stats: the status of both shapes when it changes, and the frame rate over half a second
+async {
+  mut frames: i32 = 0
+  mut since: f64 = box.app.Status[box.app.Status].elapsed
+
+  while true {
+    await next_frame()
+    const tree = stage.turntable.tree
+    const bark = tree.lookup("bark")
+    const foliage = tree.lookup("foliage")
+
+    if bark.has(Status) {
+      const s = bark[Status]
+
+      if s.revision != bark_status.revision || s.state != bark_status.state {
+        bark_status = s
+      }
+    }
+
+    if foliage.has(Status) {
+      const s = foliage[Status]
+
+      if s.revision != foliage_status.revision || s.state != foliage_status.state {
+        foliage_status = s
+      }
+    }
+
+    frames = frames + 1
+    const now = box.app.Status[box.app.Status].elapsed
+
+    if now - since >= 0.5 {
+      fps = frames / (now - since)
+      frames = 0
+      since = now
+    }
+  }
+}

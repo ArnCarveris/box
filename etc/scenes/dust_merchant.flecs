@@ -18,6 +18,6 @@ include dust_merchant/logic
 
 $ {
   box.app.FpsTarget: {60}
-  box.view.Scene: {environment: true, blend_modes: true, transmission: true,
-    clear_coat: true}
+  box.view.Scene: {environment: true, shader_features: {Extended: {blend_modes: true,
+    transmission: true, clear_coat: true}}}
 }

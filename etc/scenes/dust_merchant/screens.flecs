@@ -26,16 +26,6 @@ assets {
   tex_com {}
 }
 
-state {
-  fn dest_x(i: i32) -> f32 {
-    match i { 0: -40; 1: 188; _: -196 }
-  }
-
-  fn dest_y(i: i32) -> f32 {
-    match i { 0: 30; 1: 118; _: -138 }
-  }
-}
-
 assets {
   template Blip {
     prop x: f32 = 0
@@ -49,6 +39,7 @@ assets {
 
     Position: {x, y, 2}
     Rect: {7, 7}
+
     if lit {
       Rgb: {170, 255, 200}
       Transition: [Rgb: {duration: 0.05}]
@@ -56,6 +47,7 @@ assets {
       Rgb: {6, 26, 16}
       Transition: [Rgb: {duration: 2.4, timing_function: EaseOut}]
     }
+
     BlendMode: Additive
     Ignore
   }
@@ -69,10 +61,11 @@ assets {
 
     Interactive
     Cursor: {CursorPointer}
-    Position: {dest_x(dest), dest_y(dest), 6}
+    Position: {dests[dest].x, dests[dest].y, 6}
     Rect: {196, 92}
     Rgb: {0, 0, 0}
     BlendMode: Additive
+
     if hover && !home {
       Border: {width: 1.5, color: {110, 255, 160, 255}}
     } else {
@@ -88,11 +81,23 @@ assets {
       Border: {width: 2, color: {110, 255, 160, 255}}
       Ignore
     }
+
     if home {
       core { Position: {0, 16, 1}; Circle: {5}; Rgb: NAV_INK; Ignore }
     }
-    Ink words(text: dest_name(dest), size: 30, align: Center, hue: picked || hover ? NAV_INK : NAV_DIM) { Position: {0, -8, 1} }
-    Ink code(text: home ? "CURRENT" : dest_code(dest), size: 24, align: Center, hue: NAV_DIM) { Position: {0, -30, 1} }
+
+    Ink words(
+      text: dests[dest].name,
+      size: 30,
+      align: Center,
+      hue: picked || hover ? NAV_INK : NAV_DIM
+    ) {
+      Position: {0, -8, 1}
+    }
+
+    Ink code(text: home ? "CURRENT" : dests[dest].code, size: 24, align: Center, hue: NAV_DIM) {
+      Position: {0, -30, 1}
+    }
 
     async {
       while true {
@@ -120,10 +125,15 @@ assets {
       Scale: {range_k, range_k, 1}
 
       for i in 0..9 {
-        "gx_{i}" { Stroke: {x1: (i - 4) * 100, y1: -280, x2: (i - 4) * 100, y2: 280, w: 1, hue: NAV_FAINT} }
+        "gx_{i}" {
+          Stroke: {x1: (i - 4) * 100, y1: -280, x2: (i - 4) * 100, y2: 280, w: 1, hue: NAV_FAINT}
+        }
       }
+
       for i in 0..7 {
-        "gy_{i}" { Stroke: {x1: -420, y1: (i - 3) * 80, x2: 420, y2: (i - 3) * 80, w: 1, hue: NAV_FAINT} }
+        "gy_{i}" {
+          Stroke: {x1: -420, y1: (i - 3) * 80, x2: 420, y2: (i - 3) * 80, w: 1, hue: NAV_FAINT}
+        }
       }
 
       RingLine r1(r: 90, w: 1, hue: NAV_FAINT) { Position: {0, 0, 0} }
@@ -133,6 +143,7 @@ assets {
       beam {
         Rotation: {0, 0, sweep}
         Stroke main(x1: 0, y1: 0, x2: 330, y2: 0, w: 2.5, hue: {130, 255, 170})
+
         for i in 0..7 {
           "tail_{i}" {
             Rotation: {0, 0, (i + 1) * 0.045}
@@ -154,21 +165,31 @@ assets {
 
       if course >= 0 && course != here {
         route {
-          const dx = dest_x(course) - dest_x(here)
-          const dy = dest_y(course) - dest_y(here)
-          Stroke line(x1: dest_x(here), y1: dest_y(here) + 16, x2: dest_x(here) + dx * plot, y2: dest_y(here) + 16 + dy * plot, w: 3.5, hue: {150, 255, 190})
+          const dx = dests[course].x - dests[here].x
+          const dy = dests[course].y - dests[here].y
+          Stroke line(
+            x1: dests[here].x,
+            y1: dests[here].y + 16,
+            x2: dests[here].x + dx * plot,
+            y2: dests[here].y + 16 + dy * plot,
+            w: 3.5,
+            hue: {150, 255, 190}
+          )
         }
       }
 
-      NavNode n0(dest: 0)
-      NavNode n1(dest: 1)
-      NavNode n2(dest: 2)
+      for (i, d) in dests {
+        NavNode "n{i}"(dest: i)
+      }
     }
 
     head {
       Position: {0, 274, 20}
       bar { Position: {0, 0, 0}; Rect: {800, 52}; Rgb: {4, 26, 14} }
-      Ink title(text: "NAV-COM III // SECTOR CHART", size: 36, hue: NAV_INK) { Position: {-150, 0, 1} }
+      Ink title(text: "NAV-COM III // SECTOR CHART", size: 36, hue: NAV_INK) {
+        Position: {-150, 0, 1}
+      }
+
       Ink time(text: "T+{clock:.0}", size: 32, hue: NAV_DIM) { Position: {300, 0, 1} }
     }
 
@@ -198,6 +219,7 @@ assets {
 
     Layout: {direction: Row}
     Item: {width: {mode: Grow}}
+
     if show {
       Ink a(text: name, size: 30, hue: NAV_DIM)
       grow { Item: {width: {mode: Grow}} }
@@ -212,7 +234,12 @@ assets {
     Item: {width: {mode: Fixed, value: 640}, height: {mode: Fixed, value: 480}}
 
     Ink title(text: "SYS MONITOR  BIOS 2.11", size: 34, hue: NAV_INK)
-    rule { Item: {width: {mode: Grow}, height: {mode: Fixed, value: 2}}; Rect: {1, 1}; Rgb: NAV_DIM }
+    rule {
+      Item: {width: {mode: Grow}, height: {mode: Fixed, value: 2}}
+      Rect: {1, 1}
+      Rgb: NAV_DIM
+    }
+
     SysLine l0(name: "CORE MEM 640K", show: lines > 0)
     SysLine l1(name: "BUS A  28V", show: lines > 1, ok: bus)
     SysLine l2(name: "BUS B  28V", show: lines > 2, ok: fault == false)
@@ -221,8 +248,13 @@ assets {
     SysLine l5(name: "FUEL CELLS", show: lines > 5)
     SysLine l6(name: "JUMP COMPUTER", show: lines > 6, ok: reactor > 0.4)
     grow { Item: {height: {mode: Grow}} }
+
     if lines > 6 {
-      Ink hdr(text: "REACTOR OUTPUT {reactor * 100:.0}%", size: 30, hue: reactor > 0.9 ? NAV_INK : NAV_DIM)
+      Ink hdr(
+        text: "REACTOR OUTPUT {reactor * 100:.0}%",
+        size: 30,
+        hue: reactor > 0.9 ? NAV_INK : NAV_DIM
+      )
       track {
         Layout: {}
         Item: {width: {mode: Grow}, height: {mode: Fixed, value: 26}}
@@ -231,7 +263,13 @@ assets {
         BlendMode: Additive
         Border: {width: 2, color: {32, 104, 62, 255}}
         fill {
-          Item: {h: Left, v: Middle, x: 3, width: {mode: Fixed, value: 1 + reactor * 590}, height: {mode: Fixed, value: 18}}
+          Item: {
+            h: Left,
+            v: Middle,
+            x: 3,
+            width: {mode: Fixed, value: 1 + reactor * 590},
+            height: {mode: Fixed, value: 18}
+          }
           Rect: {1, 1}
           Rgb: NAV_INK
         }
@@ -262,44 +300,38 @@ assets {
 }
 
 state {
-  fn com_oro(i: i32) -> string {
-    match i {
-      0: "-- CH 61.4 -- WEAK CARRIER"
-      1: "DUST MERCHANT THIS IS TOLL"
-      2: "STATION ORO. YOU OWE US FOR"
-      3: "THREE MONTHS OF DOCKING AND"
-      4: "ONE (1) COFFEE MACHINE."
-      5: "WE KNOW WHERE YOU DRIFT."
-      _: "-- CARRIER LOST --"
-    }
-  }
+  export const com_oro: string[] = [
+    "-- CH 61.4 -- WEAK CARRIER",
+    "DUST MERCHANT THIS IS TOLL",
+    "STATION ORO. YOU OWE US FOR",
+    "THREE MONTHS OF DOCKING AND",
+    "ONE (1) COFFEE MACHINE.",
+    "WE KNOW WHERE YOU DRIFT.",
+    "-- CARRIER LOST --"
+  ]
 
-  fn com_naur(i: i32) -> string {
-    match i {
-      0: "-- CH 61.4 -- RELAY NAU-7"
-      1: "DM-7 THE ICE GUILD SAYS HI."
-      2: "ALSO LAST BATCH OF FROST"
-      3: "WAS 30 PCT SWEPT FLOOR."
-      4: "TOLL BOARD POSTED YOUR HULL"
-      5: "NUMBER. NICE PHOTO THOUGH."
-      _: "-- CARRIER LOST --"
-    }
-  }
+  export const com_naur: string[] = [
+    "-- CH 61.4 -- RELAY NAU-7",
+    "DM-7 THE ICE GUILD SAYS HI.",
+    "ALSO LAST BATCH OF FROST",
+    "WAS 30 PCT SWEPT FLOOR.",
+    "TOLL BOARD POSTED YOUR HULL",
+    "NUMBER. NICE PHOTO THOUGH.",
+    "-- CARRIER LOST --"
+  ]
 
-  fn com_cinder(i: i32) -> string {
-    match i {
-      0: "-- CH 61.4 -- NO CALLSIGN"
-      1: "YOU THE ONE WHO BUYS ASH?"
-      2: "GOT 3 DRUMS. FOUND THEM."
-      3: "DO NOT ASK WHERE. DO NOT"
-      4: "OPEN THE PURPLE ONE. WE"
-      5: "HEAR YOU HAVE ONE ALREADY."
-      _: "-- CARRIER LOST --"
-    }
-  }
+  export const com_cinder: string[] = [
+    "-- CH 61.4 -- NO CALLSIGN",
+    "YOU THE ONE WHO BUYS ASH?",
+    "GOT 3 DRUMS. FOUND THEM.",
+    "DO NOT ASK WHERE. DO NOT",
+    "OPEN THE PURPLE ONE. WE",
+    "HEAR YOU HAVE ONE ALREADY.",
+    "-- CARRIER LOST --"
+  ]
 
-  fn com_line(i: i32) -> string {
-    match here { 0: com_oro(i); 1: com_naur(i); _: com_cinder(i) }
+  fn com_lines(d: i32) -> string[] {
+    match d { 0: com_oro; 1: com_naur; _: com_cinder }
   }
 }
 
@@ -314,15 +346,23 @@ assets {
       Position: {0, 208, 20}
       bar { Position: {0, 0, 0}; Rect: {640, 56}; Rgb: {30, 16, 4} }
       Ink title(text: "VOX-LINK  {freq:.1} MHZ", size: 36, hue: AMB_INK) { Position: {-100, 0, 1} }
-      Ink rx(text: locked ? "RX LOCK" : "SCAN", size: 32, hue: match locked { true: {255, 230, 170}; _: AMB_DIM }) { Position: {240, 0, 1} }
+      Ink rx(
+        text: locked ? "RX LOCK" : "SCAN",
+        size: 32,
+        hue: match locked { true: {255, 230, 170}; _: AMB_DIM }
+      ) { Position: {240, 0, 1} }
     }
 
     scope {
       Position: {0, 86, 0}
       Stroke mid(x1: -300, y1: 0, x2: 300, y2: 0, w: 1, hue: AMB_FAINT)
+
       for i in 0..7 {
-        "v_{i}" { Stroke: {x1: (i - 3) * 100, y1: -80, x2: (i - 3) * 100, y2: 80, w: 1, hue: AMB_FAINT} }
+        "v_{i}" {
+          Stroke: {x1: (i - 3) * 100, y1: -80, x2: (i - 3) * 100, y2: 80, w: 1, hue: AMB_FAINT}
+        }
       }
+
       for i in 0..49 {
         ScopeSeg "s_{i}"(i: i)
       }
@@ -333,10 +373,11 @@ assets {
       box_ {
         Layout: {direction: Column, spacing: 0, padding: {4, 4, 6, 6}}
         Item: {width: {mode: Fixed, value: 600}, height: {mode: Fixed, value: 210}}
+
         if locked {
-          for i in 0..7 {
+          for (i, line) in com_lines(here) {
             if com_shown > i {
-              Ink "line_{i}"(text: com_line(i), size: 28, hue: AMB_INK)
+              Ink "line_{i}"(text: line, size: 28, hue: AMB_INK)
             }
           }
         } else {

@@ -15,6 +15,7 @@
             "../../../src/render",
             "../../../src/texture",
             "../../../src/terrain",
+            "../../../src/grass",
             "../../../src/geometry"
         ]
     },
@@ -334,6 +335,73 @@
                 ]
             },
             {
+                "id": "Terrain",
+                "testcases": [
+                    "budget_nearest_first",
+                    "levels_follow_ranges",
+                    "tile_graph_window",
+                    "tile_shape",
+                    "ready_tiles_draw",
+                    "coarse_kept_until_ready",
+                    "drawn_kept_past_budget",
+                    "drops_within_budget",
+                    "origin_shift_keeps_tiles",
+                    "materials_copied",
+                    "bounded_extent",
+                    "remove_deletes_tiles",
+                    "script",
+                    "masks_graph_windows",
+                    "masks_wait_ready",
+                    "masks_blend_surface",
+                    "masks_change_remakes_tiles",
+                    "sample_window_covers_drawn",
+                    "sample_window_follows_focus",
+                    "sample_window_without_terrain",
+                    "sampled_tag"
+                ]
+            },
+            {
+                "id": "Grass",
+                "testcases": [
+                    "registered",
+                    "defaults",
+                    "script",
+                    "resolve",
+                    "resolve_clumps",
+                    "resolve_fold",
+                    "resolve_shadow",
+                    "terrain_sampled",
+                    "extract_plane",
+                    "extract_terrain",
+                    "extract_shadow",
+                    "extract_scene",
+                    "extract_wind",
+                    "far_range",
+                    "far_cover",
+                    "far_values",
+                    "far_of_terrain",
+                    "shadow_cascades",
+                    "shadow_fade",
+                    "shadow_reach"
+                ]
+            },
+            {
+                "id": "TerrainQuery",
+                "testcases": [
+                    "tiles_around_focus",
+                    "unknown_fails",
+                    "height_bilinear",
+                    "coarse_beyond_radius",
+                    "masks",
+                    "bounded",
+                    "request_beyond_radius",
+                    "terrain_position",
+                    "ray",
+                    "script",
+                    "remove_deletes_tiles"
+                ]
+            },
+            {
                 "id": "TextureGen",
                 "testcases": [
                     "noise_tiles",
@@ -388,6 +456,10 @@
                     "names_script",
                     "system_names",
                     "cells_kind",
+                    "ripples_kind",
+                    "ripples_reflect",
+                    "ripples_wrong_inputs",
+                    "ripples_script",
                     "script",
                     "script_declared_after",
                     "node_set_next_frame",
@@ -462,6 +534,22 @@
                     "region_members_reflect",
                     "region_default_whole_sphere",
                     "region_edit_keeps_structure"
+                ]
+            },
+            {
+                "id": "TextureGraphWorld",
+                "testcases": [
+                    "kinds_window",
+                    "plane_keeps_layout",
+                    "noise_window_elements",
+                    "cells_window_elements",
+                    "windows_share_structure",
+                    "spacing",
+                    "apron",
+                    "plane_kinds_fail",
+                    "float_formats",
+                    "window_reflected",
+                    "null_backend_window"
                 ]
             },
             {

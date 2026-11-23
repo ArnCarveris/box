@@ -20,6 +20,7 @@ static const char* box_gpu_tg_format_name(
     WGPUTextureFormat format)
 {
     return format == WGPUTextureFormat_R32Float ? "r32float"
+        : format == WGPUTextureFormat_RGBA32Float ? "rgba32float"
         : format == BOX_GPU_TEXTURE_FORMAT ? "rgba8unorm" : "rgba16float";
 }
 
@@ -140,7 +141,8 @@ static void box_gpu_tg_texture(
  * texture of an input without a node being a 1x1 zero texture; a function of more than one pass
  * gets the pass and the texture of the pass before it between the two.
  *
- * A sampling function gets the texture it samples last.
+ * A sampling function gets the texture it samples last. A function with a window function on
+ * the main thread gets the vec4 index of its window elements after coords.
  *
  * @param buf The code
  * @param graph The graph
@@ -172,6 +174,10 @@ static void box_gpu_tg_call(
     }
 
     ecs_strbuf_appendstr(buf, "), coords");
+    if (kind->flags & BOX_TEXTURE_NODE_WINDOW) {
+        ecs_strbuf_append(buf, ", %uu", n->window / 16);
+    }
+
     if ((kind->flags & BOX_TEXTURE_NODE_NEIGHBOURHOOD) || box_gpu_tg_passes(kind) > 1) {
         ecs_strbuf_appendstr(buf, ", texel");
         if (box_gpu_tg_passes(kind) > 1) {
@@ -262,11 +268,17 @@ char* box_gpu_tg_code(
     box_gpu_tg_append(&buf, &line,
         "\n"
         "@compute @workgroup_size(8, 8, 1)\n"
-        "fn main(@builtin(global_invocation_id) id: vec3u) {\n"
-        "    if (id.x >= box_texgraph_stage.size.x || id.y >= box_texgraph_stage.size.y) {\n"
-        "        return;\n"
-        "    }\n"
-        "    let texel = vec2i(id.xy);\n"
+        "fn main(@builtin(global_invocation_id) id: vec3u) {\n");
+    box_gpu_tg_append(&buf, &line, stage->output
+        ? "    if (id.x >= box_texgraph_stage.size.x || id.y >= box_texgraph_stage.size.y) {\n"
+          "        return;\n"
+          "    }\n"
+          "    let texel = vec2i(id.xy) + vec2i(i32(box_texgraph_stage.apron));\n"
+        : "    if (any(vec2i(id.xy) >= box_texgraph_grid())) {\n"
+          "        return;\n"
+          "    }\n"
+          "    let texel = vec2i(id.xy);\n");
+    box_gpu_tg_append(&buf, &line,
         "    let coords = box_texgraph_coords(texel);\n");
     for (k = 0; k < stage->input_count; k ++) {
         int32_t in = stage->inputs[k];
@@ -307,7 +319,7 @@ char* box_gpu_tg_code(
 
     box_gpu_tg_slot_name(name, ECS_SIZEOF(name), n, stage->slot);
     ecs_os_snprintf(text, ECS_SIZEOF(text), stage->output
-        ? "    textureStore(box_texgraph_out, texel, box_texgraph_encode(%s));\n"
+        ? "    textureStore(box_texgraph_out, vec2i(id.xy), box_texgraph_encode(%s));\n"
         : "    textureStore(box_texgraph_out, texel, %s);\n", name);
     box_gpu_tg_lines(&stage->lines, line, line, stage->root);
     box_gpu_tg_append(&buf, &line, text);

@@ -12,7 +12,7 @@ using box.transition
 using bunnyhopper
 
 $ {
-  box.view.Scene: {sheen: true}
+  box.view.Scene: {shader_features: {Extended: {sheen: true}}}
 }
 
 // Soft white fur with a sheen at grazing angles

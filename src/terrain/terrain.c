@@ -1,6 +1,7 @@
 /**
  * @file terrain/terrain.c
- * @brief The TileTerrain shape: a unit plane scaled to its grid, and the grid as an image.
+ * @brief The TileTerrain shape: a unit plane scaled to its grid, and the grid as an image; the
+ * Terrain height field is in tiles.c.
  *
  * Setting a TileTerrain writes the kind index of every tile into the TexturePixels of a child
  * texture entity, which the render extract binds as the mask of the texture_blend variant.
@@ -12,6 +13,7 @@
 #include <math.h>
 
 ECS_COMPONENT_DECLARE(TileTerrainGrid);
+ECS_TAG_DECLARE(TerrainSampled);
 
 /** Check whether a character of the grid is whitespace.
  *
@@ -235,6 +237,7 @@ void BoxTerrainImport(
     ECS_MODULE(world, BoxTerrain);
     ECS_IMPORT(world, BoxTypes);
     ECS_IMPORT(world, BoxGeometry);
+    ECS_IMPORT(world, BoxMaterial);
 
     ECS_META_COMPONENT(world, TileKind);
     ECS_META_COMPONENT(world, TileTerrain);
@@ -263,4 +266,13 @@ void BoxTerrainImport(
         .events = { EcsOnRemove },
         .callback = BoxTerrainOnRemove
     });
+
+    ECS_META_COMPONENT(world, Terrain);
+    ECS_META_COMPONENT(world, TerrainStatus);
+    ecs_add_pair(world, ecs_id(TerrainStatus), EcsOnInstantiate, EcsDontInherit);
+    ECS_TAG_DEFINE(world, TerrainSampled);
+    box_terrain_tiles_import(world);
+    ECS_META_COMPONENT(world, TerrainQueryStatus);
+    ecs_add_pair(world, ecs_id(TerrainQueryStatus), EcsOnInstantiate, EcsDontInherit);
+    box_terrain_query_import(world);
 }

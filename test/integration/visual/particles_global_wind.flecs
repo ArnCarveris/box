@@ -1,0 +1,104 @@
+// Particles in the gusty Wind (ParticleForces.global_wind) next to swaying poles (WindSway).
+// A field of slowly falling pale motes is carried to the right by the wind toward +x and drawn
+// stretched along their velocity; where a gust patch passes the motes rush ahead in long streaks
+// while the poles under it lean the furthest, as
+// both read the same gust field at the same moment. A blue column on the left has no
+// global_wind and falls straight down through the same wind.
+//
+// frames: 150
+
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.atmosphere
+using box.particle
+
+$ {
+  Scene: {shader_features: {Extended: {wind: true}}}
+  Wind: {direction: {1, 0}, speed: 2.5, gust: 0.85, gust_scale: 3}
+}
+
+camera {
+  Position: {0, 3.2, 10}
+  Rotation: {-0.22, 0, 0}
+  Camera: {fov: 55}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {40, 52, 70, 255}}}
+}
+
+sun {
+  Rotation: {0.8, 0.9, 0}
+  DirectionalLight: {intensity: 1.5 * flecs.script.math.PI}
+  Rgb: {255, 245, 230}
+}
+
+floor {
+  Position: {0, -0.1, 0}
+  Box: {20, 0.2, 10}
+  Rgb: {90, 105, 80}
+}
+
+prefab Pole {
+  Box: {0.12, 3, 0.12}
+  Rgb: {200, 70, 50}
+  WindSway: {bend: 0.12, height: 3, base: 0}
+}
+
+pole_1 : Pole {
+  Position: {-6, 1.5, -2}
+}
+pole_2 : Pole {
+  Position: {-4.5, 1.5, -2}
+}
+pole_3 : Pole {
+  Position: {-3, 1.5, -2}
+}
+pole_4 : Pole {
+  Position: {-1.5, 1.5, -2}
+}
+pole_5 : Pole {
+  Position: {0, 1.5, -2}
+}
+pole_6 : Pole {
+  Position: {1.5, 1.5, -2}
+}
+pole_7 : Pole {
+  Position: {3, 1.5, -2}
+}
+pole_8 : Pole {
+  Position: {4.5, 1.5, -2}
+}
+pole_9 : Pole {
+  Position: {6, 1.5, -2}
+}
+
+// Slow fall: gravity over drag gives a fall of about 0.4 units per second, and the drag pulls
+// the motes toward the full speed of the Wind with its gusts at each mote
+motes {
+  Position: {-2.5, 3.6, -0.5}
+  Emitter: {
+    max: 6000, rate: 900, shape: EmitterBox, extents: {7, 0.4, 2}, direction: {0, -1, 0},
+    speed: {0.2, 0.4}, lifetime: {6, 6}, size: {0.03, 0.05}, opacity: {0.8, 1},
+    color: {240, 235, 210}, seed: 7
+  }
+  Forces: {gravity: {0, -1.2, 0}, drag: 3, global_wind: 1}
+  Collision: {height: 0, die: true}
+  Appearance: {stretch: 4}
+}
+
+// The same fall without global_wind: the Wind never moves it
+still_column {
+  Position: {-7.5, 3.6, 0.5}
+  Emitter: {
+    max: 2000, rate: 150, shape: EmitterBox, extents: {0.3, 0.4, 0.3}, direction: {0, -1, 0},
+    speed: {0.2, 0.4}, lifetime: {9, 9}, size: {0.06, 0.1}, opacity: {0.8, 1},
+    color: {120, 170, 255}, seed: 8
+  }
+  Forces: {gravity: {0, -1.2, 0}, drag: 3}
+  Collision: {height: 0, die: true}
+}

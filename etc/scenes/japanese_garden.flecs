@@ -30,8 +30,8 @@ using assets
 
 $ {
   box.app.FpsTarget: {60}
-  Scene: {baked: true, reflections: true, transmission: true, sheen: true,
-    clear_coat: true, diffuse_transmission: true}
+  Scene: {baked: true, reflections: true, shader_features: {Extended: {transmission: true,
+    sheen: true, clear_coat: true, diffuse_transmission: true}}}
 }
 
 $ {
@@ -48,10 +48,24 @@ assets {
   firefly_drift {
     Clip: {duration: 4}
     rise {
-      Track: {component: Position, member: "y", target: "glow", curve: {kind: CurveCatmullRom, keys: [{0, 0}, {1.1, 0.14}, {2.3, 0.04}, {3.2, 0.18}, {4, 0}]}}
+      Track: {
+        component: Position,
+        member: "y",
+        target: "glow",
+        curve: {
+          kind: CurveCatmullRom,
+          keys: [{0, 0}, {1.1, 0.14}, {2.3, 0.04}, {3.2, 0.18}, {4, 0}]
+        }
+      }
     }
+
     sway {
-      Track: {component: Position, member: "x", target: "glow", curve: {kind: CurveCatmullRom, keys: [{0, 0}, {1.4, 0.09}, {2.7, -0.07}, {4, 0}]}}
+      Track: {
+        component: Position,
+        member: "x",
+        target: "glow",
+        curve: {kind: CurveCatmullRom, keys: [{0, 0}, {1.4, 0.09}, {2.7, -0.07}, {4, 0}]}
+      }
     }
   }
 }
@@ -100,10 +114,12 @@ japanese_garden {
     TeaHouse(variant: i + 1) {
       Position: {-10.6 + i * 7.05, 0.08, -10.25}
     }
+
     StoneLantern() {
       Position: {-13.1 + i * 7.05, 0.08, -8.05}
       Rotation: {0, -0.4, 0}
     }
+
     GardenBed(length: 4.8, flowers: 5) {
       Position: {-10.6 + i * 7.05, 0.05, -12.4}
     }
@@ -114,16 +130,19 @@ japanese_garden {
       Position: {-11.3, 0.08, -2.8 + i * 6.7}
       Rotation: {0, math.PI / 2, 0}
     }
+
     WaterBasin() { Position: {-9, 0.08, -4.5 + i * 6.7} }
     StoneLantern() { Position: {-8.8, 0.08, -0.6 + i * 6.7} }
     GardenBed(length: 4.9, flowers: 5, tint: {239, 174, 191}) {
       Position: {-14.25, 0.05, -2.8 + i * 6.7}
       Rotation: {0, math.PI / 2, 0}
     }
+
     TeaHouse(variant: i + 6, scale: 0.76) {
       Position: {3.4 + i * 6.65, 0.08, 10.2}
       Rotation: {0, math.PI, 0}
     }
+
     GardenBench() { Position: {0.6 + i * 6.65, 0.08, 11.4} }
     StoneLantern() { Position: {1.1 + i * 6.65, 0.08, 9.1} }
   }
@@ -135,7 +154,9 @@ japanese_garden {
       RoundedBox: {5.6, 0.12, 4.65, 0.15}
       Rgb: {190, 190, 173}
     }
+
     StonePagoda() { Position: {0, 0.08, -0.2} }
+
     for side in 0..2 {
       StoneLantern() { Position: {(side - 0.5) * 4.3, 0.1, 1.3} }
       FlowerBush(tint: {240, 178, 195}) { Position: {(side - 0.5) * 4.4, 0.1, -1.9} }
@@ -149,6 +170,7 @@ japanese_garden {
       RoundedBox: {5.5, 0.12, 4.6, 0.3}
       Rgb: {223, 214, 188}
     }
+
     for i in 0..18 {
       {
         Position: {-2.45 + i * 0.29, 0.11, 0}
@@ -156,6 +178,7 @@ japanese_garden {
         Rgb: {178, 183, 165}
       }
     }
+
     GardenRock(size: 1.7) { Position: {-0.7, 0.12, -0.3} }
     GardenRock(size: 1.1) { Position: {0.3, 0.12, 0.2} }
     GardenRock(size: 0.65) { Position: {-0.1, 0.12, 1} }
@@ -173,16 +196,19 @@ japanese_garden {
       Position: {0, 0, -2.9}
       Scale: {0.85, 0.85, 0.85}
     }
+
     WaterBasin() { Position: {-0.2, 0, 0.4} }
     StoneLantern() { Position: {-1.65, 0, 0.8} }
     GardenBench() { Position: {0, 0, 2.8} }
     GardenRock(size: 1) { Position: {1.4, 0, -0.4} }
+
     for i in 0..16 {
       Bamboo(height: 2.6 + math.sin(i * 2.4) * 0.6, phase: i * 0.71) {
         Position: {1.8 + math.sin(i * 1.9) * 0.55, 0, -4.5 + i * 0.56}
         Rotation: {0, 0, math.sin(i * 1.2) * 0.08}
       }
     }
+
     for i in 0..7 {
       {
         Position: {-0.8 + math.sin(i * 0.9) * 0.5, 0.11, -4 + i * 1.15}
@@ -191,6 +217,7 @@ japanese_garden {
         Rgb: GardenStone
       }
     }
+
     GardenBed(length: 4, flowers: 5, tint: {236, 194, 141}) {
       Position: {0.2, 0, 4.2}
     }
@@ -201,14 +228,17 @@ japanese_garden {
       Position: {-3.1, 0.1, 7.1 + i * 2.4}
       Scale: {1, 1 + i * 0.07, 1}
     }
+
     StoneLantern() {
       Position: {-4.85, 0.08, 7.8 + i * 2.35}
     }
+
     FlowerBush(tint: {240, 178, 195}) { Position: {-1.55, 0.08, 7.6 + i * 2.25} }
   }
 
   for i in 0..4 {
     GardenWall(length: 7.1) { Position: {-11.1 + i * 7.4, 0.04, -13.25} }
+
     for side in 0..2 {
       GardenWall(length: 6.25) {
         Position: {(side - 0.5) * 30.6, 0.04, -9.8 + i * 6.5}
@@ -225,33 +255,40 @@ japanese_garden {
     Position: {-6.2, 0.08, 8.9}
     Scale: {0.65, 0.65, 0.65}
   }
+
   CherryTree(variant: 2) {
     Position: {-0.2, 0.08, 10.8}
     Scale: {0.65, 0.65, 0.65}
   }
+
   CherryTree(variant: 3) {
     Position: {13.4, 0.08, 7.5}
     Scale: {0.7, 0.7, 0.7}
   }
+
   CherryTree(variant: 4) {
     Position: {-6.9, 0.08, -10.2}
     Scale: {0.65, 0.65, 0.65}
   }
+
   CherryTree(variant: 5) {
     Position: {0, 0.08, -10.2}
     Scale: {0.65, 0.65, 0.65}
   }
+
   GardenBed(length: 5.2, flowers: 6) { Position: {3.5, 0.07, 4.7} }
   GardenBed(length: 3.2, flowers: 4, tint: {240, 178, 195}) {
     Position: {-5.5, 0.07, -4.7}
     Rotation: {0, math.PI / 2, 0}
   }
+
   GardenBed(length: 4.5, flowers: 5) { Position: {10.9, 0.07, 12.4} }
   GardenBed(length: 4.5, flowers: 5, tint: {240, 178, 195}) { Position: {3.7, 0.07, 12.4} }
   GardenBench() {
     Position: {0.5, 0.08, 5.5}
     Rotation: {0, math.PI, 0}
   }
+
   WaterBasin() { Position: {-5.6, 0.08, 0.2} }
 
   gravel {
@@ -291,7 +328,13 @@ japanese_garden {
     Cylinder: {radius: 2.53, length: 0.06, segments: 48}
     Rgb: {150, 205, 210}
     PbrMaterial: {roughness: 0.06}
-    Transmission: {transmission_factor: 0.85, ior: 1.33, thickness_factor: 0.15, attenuation_distance: 0.9, attenuation_color: {64, 150, 150}}
+    Transmission: {
+      transmission_factor: 0.85,
+      ior: 1.33,
+      thickness_factor: 0.15,
+      attenuation_distance: 0.9,
+      attenuation_color: {64, 150, 150}
+    }
   }
 
   pond_bed {
@@ -332,7 +375,11 @@ japanese_garden {
 
   for i in 0..24 {
     GardenRock(size: 0.48 + math.sin(i * 2.4) * 0.12) {
-      Position: {2.7 + math.cos(i * math.PI / 12) * 3.48, 0.08, 1.4 + math.sin(i * math.PI / 12) * 2.4}
+      Position: {
+        2.7 + math.cos(i * math.PI / 12) * 3.48,
+        0.08,
+        1.4 + math.sin(i * math.PI / 12) * 2.4
+      }
       Rotation: {0, i * 1.2, 0}
     }
   }
@@ -352,12 +399,14 @@ japanese_garden {
         ]
       }
     }
+
     deck {
       Position: {0, 0, 0}
       Sweep: {path: deck_path, profile: GardenDeckProfile, scale: {1.28, 0.13}, rings: 64}
       Rgb: {182, 98, 68}
       PbrMaterial: {roughness: 0.6}
     }
+
     for i in 0..16 {
       const x = i * 0.36
       const arch = math.sin((i + 0.5) * math.PI / 16) * 0.61
@@ -368,6 +417,7 @@ japanese_garden {
         Rgb: {139, 72, 52}
       }
     }
+
     rail_path {
       Path3D: {
         start: {-0.18, 1.04, 0},
@@ -381,6 +431,7 @@ japanese_garden {
         ]
       }
     }
+
     for side in 0..2 {
       {
         Position: {0, 0, (side - 0.5) * 1.4}
@@ -388,6 +439,7 @@ japanese_garden {
         Rgb: GardenVermilion
         ClearCoat: GardenLacquer
       }
+
       for i in 0..5 {
         const x = -0.18 + i * 1.44
         const arch = math.sin(i * math.PI / 4) * 0.61
@@ -397,6 +449,7 @@ japanese_garden {
           Rgb: GardenVermilion
           ClearCoat: GardenLacquer
         }
+
         {
           Position: {x, 1.23 + arch, (side - 0.5) * 1.4}
           Sphere: {radius: 0.105, segments: 10, smooth: true}
@@ -413,10 +466,15 @@ japanese_garden {
       Cylinder: {radius: 0.2 + i * 0.014, length: 0.018, segments: 14}
       Rgb: {115, 170, 120}
     }
+
     if i % 2 == 0 {
       for petal in 0..5 {
         {
-          Position: {1.25 + i * 0.71 + math.cos(petal * 1.257) * 0.065, 0.27, 2.55 + math.sin(i * 1.9) * 0.37 + math.sin(petal * 1.257) * 0.065}
+          Position: {
+            1.25 + i * 0.71 + math.cos(petal * 1.257) * 0.065,
+            0.27,
+            2.55 + math.sin(i * 1.9) * 0.37 + math.sin(petal * 1.257) * 0.065
+          }
           Scale: {1, 1.2, 0.65}
           Sphere: {radius: 0.07, segments: 8, smooth: true}
           Rgb: GardenBlossom
@@ -442,6 +500,7 @@ japanese_garden {
   CherryTree(variant: 6) {
     Position: {3.55, 0.06, -3.35}
   }
+
   CherryTree(variant: 7) {
     Position: {-6, 0.06, -1.15}
     Scale: {0.7, 0.7, 0.7}
@@ -462,6 +521,7 @@ japanese_garden {
       Rgb: {170, 147, 99}
     }
   }
+
   for i in 0..3 {
     {
       Position: {0, 0.3 + i * 0.41, -5.85}
@@ -485,6 +545,7 @@ japanese_garden {
       offset: {0, 0.2, 0}
     }
   }
+
   south_path_reflection {
     Position: {1.7, 1.7, 6.5}
     ReflectionProbe: {
@@ -495,6 +556,7 @@ japanese_garden {
       offset: {0, 0.2, 0}
     }
   }
+
   west_path_reflection {
     Position: {-7.6, 1.7, -0.15}
     ReflectionProbe: {
@@ -505,6 +567,7 @@ japanese_garden {
       offset: {0, 0.2, 1.75}
     }
   }
+
   torii_path_reflection {
     Position: {-3.1, 1.7, 9.55}
     ReflectionProbe: {
@@ -567,9 +630,19 @@ japanese_garden {
     Emitter: {
       max: 260, rate: 22, shape: EmitterBox, extents: {13, 0.6, 11}, direction: {0, -1, 0},
       spread: 30, speed: {0.05, 0.2}, lifetime: {8, 12}, size: {0.04, 0.07}, opacity: {0.8, 1},
-      rotation: {0, 360}, spin: {-90, 90}, color: {247, 190, 210}, color_variance: {8, 20, 16}, seed: 47
+      rotation: {0, 360},
+      spin: {-90, 90},
+      color: {247, 190, 210},
+      color_variance: {8, 20, 16},
+      seed: 47
     }
-    Forces: {gravity: {0, -0.35, 0}, wind: {0.25, 0, 0.1}, drag: 1.2, turbulence: 0.6, turbulence_scale: 0.7}
+    Forces: {
+      gravity: {0, -0.35, 0},
+      wind: {0.25, 0, 0.1},
+      drag: 1.2,
+      turbulence: 0.6,
+      turbulence_scale: 0.7
+    }
     Collision: {height: 0.12, bounce: 0, friction: 1}
     Appearance: {shape: Circle, blend: Alpha, lit: 1}
     Curves: {opacity: {keys: [{0, 0}, {0.08, 1}, {0.85, 1}, {1, 0}]}}
@@ -597,7 +670,7 @@ view {
     camera: camera.eye,
     clear: {enabled: true, color: {51, 56, 81, 255}},
     lighting: {enabled: true, baked: true, reflections: true},
-    shadows: {enabled: true, resolution: 2048, max_distance: 85},
+    shadows: {enabled: true, cascades: 3, resolution: 2048, interval: [1, 2, 2], max_distance: 85},
     effects: [{effect: gtao}, {effect: bloom}, {effect: tonemap}, {effect: smaa}]
   }
 }

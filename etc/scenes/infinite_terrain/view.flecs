@@ -1,0 +1,73 @@
+using flecs.script
+using flecs.script.math
+using box.view
+using box.effects
+using box.light
+using box.world
+using state
+
+view {
+  occlusion { Gtao: {radius: 0.7, final_value_power: 1.8, quality: GtaoHigh} }
+  bloom { Bloom: {intensity: 0.12, threshold: 1.2, threshold_softness: 0.5} }
+  exposure {
+    AutoExposure: {min_log_luma: -10.8, exposure_compensation: 0.35, max_exposure: 20}
+  }
+
+  film { Tonemap: {auto_exposure: exposure, operator_: TonyMcMapface} }
+  grade {
+    ColorGrading: {temperature: 0.03, tint: 0, contrast: 1.06, saturation: 1.06, vibrance: 0.12}
+  }
+  vignette { Vignette: {intensity: 0.2, radius: 0.8, smoothness: 0.5} }
+  edges { Smaa: {} }
+
+  View: {
+    camera: player,
+    clear: {enabled: true, color: {120, 140, 160, 255}},
+    lighting: {
+      enabled: true,
+      baked: false,
+      reflections: true,
+      atmosphere: true,
+      environment: {source: sky, intensity: 1, background: false}
+    },
+    shadows: {
+      enabled: true,
+      cascades: 2,
+      resolution: 1536,
+      interval: [1, 2],
+      max_distance: 120,
+      split_lambda: 0.85,
+      filter_size: 5,
+      fade: 0.2,
+      blend: 0.15,
+      min_caster_texels: 12
+    },
+    effects: [
+      {effect: occlusion},
+      {effect: sky},
+      {effect: bloom},
+      {effect: film},
+      {effect: grade},
+      {effect: vignette},
+      {effect: edges}
+    ]
+  }
+}
+
+$ {
+  WorldOrigin: {enabled: true}
+}
+
+$ {
+  ReflectionBake: {
+    resolution: 128,
+    budget_ms: 1,
+    scene_probe: true,
+    scene_probe_height: 2.4,
+    follow_focus: true,
+    follow_distance: PROBE_FOLLOW,
+    follow_radius: QUERY_RADIUS,
+    environment: sky,
+    light_threshold: 4
+  }
+}

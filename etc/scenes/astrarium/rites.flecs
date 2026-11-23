@@ -43,6 +43,7 @@ assets {
       gap {
         Item: {width: {mode: Grow}}
       }
+
       Caption amount(text: readout, size: 15, font: font_display, color: ui_gold)
     }
 
@@ -55,7 +56,11 @@ assets {
         Position: {0, 0, 0}
         Rect: {room, 4}
         Rgb: {6, 8, 18}
-        Border: {width: 1, radius: 2, color: {ui_gold.r * 0.4, ui_gold.g * 0.4, ui_gold.b * 0.4, 255}}
+        Border: {
+          width: 1,
+          radius: 2,
+          color: {ui_gold.r * 0.4, ui_gold.g * 0.4, ui_gold.b * 0.4, 255}
+        }
       }
 
       for i in 0..21 {
@@ -64,6 +69,7 @@ assets {
           const big = i % 5 == 0
           Position: {(f - 0.5) * room, 0, 1}
           Rect: {1, big ? 14 : 8}
+
           if f <= t {
             Rgb: ui_pale
             Emissive: {strength: 0.5, color: {255, 196, 110}}
@@ -85,7 +91,11 @@ assets {
       thumb {
         Position: {(t - 0.5) * room, 0, 3}
 
-        Halo aura(size: hot ? 58 : 36, color: {ui_gold.r * 0.5, ui_gold.g * 0.42, ui_gold.b * 0.28}, z: 0)
+        Halo aura(
+          size: hot ? 58 : 36,
+          color: {ui_gold.r * 0.5, ui_gold.g * 0.42, ui_gold.b * 0.28},
+          z: 0
+        )
 
         gem {
           Position: {0, 0, 1}
@@ -138,7 +148,11 @@ assets {
       Item: {width: {mode: Fixed, value: 58}, height: {mode: Fixed, value: 26}}
       Rect: {1, 1}
       Rgb: on_ ? {ui_gold.r * 0.34, ui_gold.g * 0.28, ui_gold.b * 0.2} : {6, 8, 18}
-      Border: {width: 1, radius: 13, color: {ui_gold.r * 0.7, ui_gold.g * 0.7, ui_gold.b * 0.7, 255}}
+      Border: {
+        width: 1,
+        radius: 13,
+        color: {ui_gold.r * 0.7, ui_gold.g * 0.7, ui_gold.b * 0.7, 255}
+      }
       Transition: [Rgb: {duration: 0.2}]
       box.spatial.Ignore
 
@@ -146,6 +160,7 @@ assets {
         Position: {on_ ? 16 : -16, 0, 1}
         Rotation: {0, 0, on_ ? PI / 4 : 0 - PI / 4}
         Rect: {14, 14}
+
         if on_ {
           Rgb: {255, 248, 226}
           Emissive: {strength: 1.1, color: {255, 196, 110}}
@@ -153,6 +168,7 @@ assets {
           Rgb: {ui_dim.r, ui_dim.g, ui_dim.b}
           Emissive: {strength: 0, color: {255, 196, 110}}
         }
+
         Transition: [
           Position: {duration: 0.26, timing_function: EaseInOut},
           Rotation: {duration: 0.26, timing_function: EaseInOut},
@@ -253,9 +269,26 @@ assets {
     Item: {height: {mode: Grow}}
 
     Frame frame(title: "Rites of the Observatory", width: 470, gap: 11, pad: 20) {
-      Caption intro(text: "The library's own headless sliders in a new coat. Each one changes the running scene.", size: 15, font: font_italic, width: 428, color: ui_text)
+      Caption intro(
+        text: "The library's own headless sliders in a new coat. " +
+          "Each one changes the running scene.",
+        size: 15,
+        font: font_italic,
+        width: 428,
+        color: ui_text
+      )
 
-      RuneSlider aura(label: "Aura", detail: "how brightly things bloom", min: 0, max: 2, step: 0, value: 1, decimals: 2, thumb: 26, span: 428) {
+      RuneSlider aura(
+        label: "Aura",
+        detail: "how brightly things bloom",
+        min: 0,
+        max: 2,
+        step: 0,
+        value: 1,
+        decimals: 2,
+        thumb: 26,
+        span: 428
+      ) {
         async {
           while true {
             await on.change(this)
@@ -264,7 +297,18 @@ assets {
         }
       }
 
-      RuneSlider dust(label: "Starfall", detail: "motes adrift in the void", min: 0, max: 4, step: 0, value: 1, decimals: 1, suffix: "x", thumb: 26, span: 428) {
+      RuneSlider dust(
+        label: "Starfall",
+        detail: "motes adrift in the void",
+        min: 0,
+        max: 4,
+        step: 0,
+        value: 1,
+        decimals: 1,
+        suffix: "x",
+        thumb: 26,
+        span: 428
+      ) {
         async {
           while true {
             await on.change(this)
@@ -273,7 +317,18 @@ assets {
         }
       }
 
-      RuneSlider clock(label: "Clockwork", detail: "speed of the astrolabe", min: 0, max: 12, step: 0, value: 1, decimals: 1, suffix: "x", thumb: 26, span: 428) {
+      RuneSlider clock(
+        label: "Clockwork",
+        detail: "speed of the astrolabe",
+        min: 0,
+        max: 12,
+        step: 0,
+        value: 1,
+        decimals: 1,
+        suffix: "x",
+        thumb: 26,
+        span: 428
+      ) {
         async {
           while true {
             await on.change(this)
@@ -284,7 +339,11 @@ assets {
 
       Divider rule_b()
 
-      RuneToggle names(label: "Keystone Names", detail: "label the great stars on the chart", value: true) {
+      RuneToggle names(
+        label: "Keystone Names",
+        detail: "label the great stars on the chart",
+        value: true
+      ) {
         async {
           while true {
             await on.change(this)
@@ -293,7 +352,11 @@ assets {
         }
       }
 
-      RuneToggle drift(label: "Drifting Motes", detail: "the slow dust behind every screen", value: true) {
+      RuneToggle drift(
+        label: "Drifting Motes",
+        detail: "the slow dust behind every screen",
+        value: true
+      ) {
         async {
           while true {
             await on.change(this)
@@ -347,12 +410,35 @@ assets {
 
       ScrollView codex(focusable: false) {
         Item = {width: {mode: Grow}, height: {mode: Grow}}
-        CodexEntry a(title: "The Astrarium", body: "An engine of brass and patience, built to chart a sky that no longer exists. It keeps better time than the stars do.")
-        CodexEntry b(title: "The Four Bands", body: "Pyre, Tide, Thorn and Veil. Every wanderer is born owing a debt to each, and spends a lifetime deciding which to pay first.")
-        CodexEntry c(title: "Star Points", body: "Earned by living loudly. A star point spent is not lost; it is merely on fire somewhere else.")
-        CodexEntry d(title: "Realignment", body: "The sky forgives. Stars may be put back, though they remember where they were.")
-        CodexEntry e(title: "The Drowned Stars", body: "They did not fall. They sank, slowly, over ten thousand years, and the sea has not yet told anyone why.")
-        CodexEntry f(title: "A Word on Vitality", body: "It ebbs. It has always ebbed. The briars of the Thorn Aegis are the only thing known to make it stop.")
+        CodexEntry a(
+          title: "The Astrarium",
+          body: "An engine of brass and patience, built to chart a sky that no longer exists. It " +
+            "keeps better time than the stars do."
+        )
+        CodexEntry b(
+          title: "The Four Bands",
+          body: "Pyre, Tide, Thorn and Veil. Every wanderer is born owing a debt to each, and " +
+            "spends a lifetime deciding which to pay first."
+        )
+        CodexEntry c(
+          title: "Star Points",
+          body: "Earned by living loudly. A star point spent is not lost; it is merely on fire " +
+            "somewhere else."
+        )
+        CodexEntry d(
+          title: "Realignment",
+          body: "The sky forgives. Stars may be put back, though they remember where they were."
+        )
+        CodexEntry e(
+          title: "The Drowned Stars",
+          body: "They did not fall. They sank, slowly, over ten thousand years, and the sea has " +
+            "not yet told anyone why."
+        )
+        CodexEntry f(
+          title: "A Word on Vitality",
+          body: "It ebbs. It has always ebbed. The briars of the Thorn Aegis are the only thing " +
+            "known to make it stop."
+        )
       }
     }
   }

@@ -19,6 +19,20 @@
 bool box_gpu_prepass_draws(
     const box_render_batch_t *b);
 
+/** Sweeps a depth only pass draws its batches in (box_gpu_depth_sweep) */
+#define BOX_GPU_DEPTH_SWEEPS (3)
+
+/** Get the sweep of a depth only pass that draws a batch: 0 the plain meshes, 1 the alpha
+ * tested ones, 2 the impostor cards. A tiled GPU shades every fragment of an alpha tested
+ * draw that passes the depth of the draws before it, so the plain ones go first and the cards,
+ * the farthest, last.
+ *
+ * @param b The batch
+ * @return The sweep, below BOX_GPU_DEPTH_SWEEPS
+ */
+int32_t box_gpu_depth_sweep(
+    const box_render_batch_t *b);
+
 /** Get the depth prepass pipeline of a batch the prepass draws, created on first use in the
  * forward cache from the mesh shader of the batch, so a recompiled or released mesh shader
  * empties it too.

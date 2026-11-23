@@ -1,24 +1,13 @@
 // Castlewright: build a medieval castle on a meadow, written entirely in flecs script.
 //
 //   bake3 run apps/boxrun --local-env -- etc/scenes/castle.flecs
-//
-// Pick a piece from the toolbar (or press 1 to 9, 0 and P), press R to turn it and click the plot to
-// build it; drag to preview a straight line of wall or path and let go to build it. Walls and gates start as timber and are
-// rebuilt in stone, quarries are dug into the stone deposits of the plot and a cottage built next to
-// a path turns to face it. Click a piece to select it and upgrade it from the panel (or press U); no
-// piece rises above the level of the keep, and the keep rises with the number of folk in the realm. Cottages, the keep and the blacksmith eat food that farms grow: when the
-// granary runs dry, folk leave and their buildings stand abandoned until they are demolished. Close
-// a ring of walls, towers and gatehouses to make a courtyard: cottages inside it gather protection
-// and grow into houses and manors, and the keep is worth twice the prestige. The blacksmith
-// researches farming, so the same land feeds more folk, and quarrying, so the same deposit cuts
-// more stone. Grow the realm from a Hamlet to a Royal Citadel. X demolishes, Escape puts the tool
-// down. WASD moves the view, Q and E turn it, the right mouse button drags it around and the wheel
-// zooms.
 
 include castle/state
 include castle/materials
 include castle/fx
 include castle/pieces
+include castle/residences
+include castle/estates
 include castle/board
 include castle/logic
 include castle/camera
@@ -40,7 +29,7 @@ using assets
 
 $ {
   box.app.FpsTarget: {60}
-  Scene: {texture_blend: true}
+  Scene: {shader_features: {Extended: {texture_blend: true}}}
   AmbientLight: {sky: {150, 170, 200}, ground: {90, 80, 60}, intensity: 0.35}
 }
 
@@ -96,8 +85,9 @@ view {
     },
     shadows: {
       enabled: true,
-      cascades: 2,
-      resolution: 1024,
+      cascades: 3,
+      resolution: 2048,
+      interval: [1, 2, 2],
       max_distance: 200,
       split_lambda: 0.7,
       depth_bias: 2,

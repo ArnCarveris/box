@@ -79,8 +79,9 @@ static ecs_world_t* ps_world(
 {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
-    ecs_singleton_set(world, Scene, {.alpha_cutout = true, .blend_modes = true,
-        .transmission = true, .clear_coat = true, .planet_light = planet_light});
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.alpha_cutout = true,
+        .shader_features.Extended.blend_modes = true, .shader_features.Extended.transmission = true,
+        .shader_features.Extended.clear_coat = true, .planet_light = planet_light});
     App *app = ecs_singleton_get_mut(world, App);
     app->headless = true;
     ecs_singleton_modified(world, App);

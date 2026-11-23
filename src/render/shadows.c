@@ -68,6 +68,8 @@ void box_render_shadow_settings(
     for (int32_t i = 0; i < BOX_RENDER_SHADOW_CASCADES; i ++) {
         out->interval[i] = settings->interval[i] > 1 ? settings->interval[i] : 1;
     }
+
+    out->sway_interval = settings->sway_interval > 1 ? settings->sway_interval : 1;
 }
 
 void box_render_shadow_splits(
@@ -276,14 +278,19 @@ static bool box_shadows_key_equal(
  * are a multiple of its interval; every cascade renders when the view is new to the extract or
  * what its cascades are fitted to changed.
  *
+ * While casters with a WindSway sway in its scene the interval of a cascade is at most
+ * ShadowSettings.sway_interval, 1 by default: every frame.
+ *
  * @param state The state of the extract
  * @param v The view, with its shadows resolved
  * @param s The resolved settings of the view
+ * @param swaying Whether the scene of the view has casters that sway in the wind
  */
 static void box_shadows_schedule(
     box_shadows_t *state,
     box_render_view_t *v,
-    const ShadowSettings *s)
+    const ShadowSettings *s,
+    bool swaying)
 {
     box_render_view_shadows_t *out = &v->shadows;
     box_shadows_history_t *h = ecs_map_get_deref(
@@ -318,7 +325,12 @@ static void box_shadows_schedule(
     } else {
         h->count ++;
         for (i = 0; i < out->cascades; i ++) {
-            if ((h->count + i) % s->interval[i] == 0) {
+            int32_t interval = s->interval[i];
+            if (swaying && interval > s->sway_interval) {
+                interval = s->sway_interval;
+            }
+
+            if ((h->count + i) % interval == 0) {
                 out->render |= 1u << i;
             }
         }
@@ -386,7 +398,7 @@ static void box_shadows_view(
     out->near_ = near_;
     box_render_shadow_splits(near_, distance, s.split_lambda, s.cascades, out->splits);
     glm_vec3_normalize_to(v->lights.sun, out->direction);
-    box_shadows_schedule(state, v, &s);
+    box_shadows_schedule(state, v, &s, box_render_draws_swaying(world, v->scene));
 done:
     return;
 }
@@ -455,6 +467,26 @@ uint32_t box_render_shadow_rendered(
         : NULL;
 
     return h && h->seen == state->extract ? h->rendered : 0;
+}
+
+void box_render_shadows_reset(
+    ecs_world_t *world)
+{
+    ecs_entity_t system = ecs_lookup(world, "box.render.extract.Shadows");
+    const ecs_system_t *sys = system ? ecs_system_get(world, system) : NULL;
+    box_shadows_t *state = sys ? sys->ctx : NULL;
+    if (!state) {
+        goto done;
+    }
+
+    ecs_map_iter_t it = ecs_map_iter(&state->views);
+    while (ecs_map_next(&it)) {
+        box_shadows_history_t *h = ecs_map_ptr(&it);
+        h->count = -1;
+    }
+
+done:
+    return;
 }
 
 void box_render_shadows_init(

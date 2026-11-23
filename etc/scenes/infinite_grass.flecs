@@ -1,0 +1,23 @@
+include ui/widgets
+include infinite_grass/state
+include infinite_grass/materials
+include infinite_grass/terrain
+include infinite_grass/grass
+include infinite_grass/sky
+include infinite_grass/player
+include infinite_grass/view
+include infinite_grass/hud
+
+using box.view
+
+$ {
+  Scene: {
+    environment: true,
+    aerial_perspective: true,
+    cookies: true,
+    shader_features: {
+      Extended: {wind: true},
+      Terrain: {texture_blend: true}
+    }
+  }
+}

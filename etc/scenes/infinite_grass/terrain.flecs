@@ -1,0 +1,115 @@
+using flecs.script
+using flecs.script.math
+using box.material
+using box.texture
+using box.terrain
+using state
+using assets
+
+infinite_grass {
+  land {
+    // Broad valleys with flat floors between long hills
+    broad { nodes.Noise: {frequency: 0.0011, octaves: 3, seed: 5} }
+    vale {
+      nodes.Curve: {input: broad, curve: {kind: CurveCatmullRom, keys: [
+        {0, 0}, {0.36, 0.02}, {0.48, 0.14}, {0.6, 0.5}, {0.74, 0.84}, {1, 1}
+      ]}}
+    }
+
+    vale_h { nodes.Multiply: {a: vale, b_value: {80, 80, 80, 80}} }
+
+    // Rolling hills, gentler on the valley floors
+    roll { nodes.Noise: {frequency: 0.0045, octaves: 4, seed: 7} }
+    roll_h { nodes.Multiply: {a: roll, b_value: {18, 18, 18, 18}} }
+    roll_amount { nodes.Add: {a: vale, b_value: {0.35, 0.35, 0.35, 0.35}} }
+    roll_w { nodes.Multiply: {a: roll_h, b: roll_amount} }
+
+    // A few scarps where the ground steps up steeply
+    band { nodes.Noise: {frequency: 0.0016, octaves: 2, seed: 11} }
+    step {
+      nodes.Curve: {input: band, curve: {kind: CurveCatmullRom, keys: [
+        {0, 0}, {0.46, 0}, {0.49, 0.3}, {0.51, 0.7}, {0.54, 1}, {1, 1}
+      ]}}
+    }
+
+    scarp_n { nodes.Noise: {frequency: 0.0007, octaves: 2, seed: 13} }
+    scarp_where {
+      nodes.Smoothstep: {input: scarp_n, edge0_value: {0.44, 0, 0, 0}, edge1_value: {0.54, 0, 0, 0}}
+    }
+
+    scarp { nodes.Multiply: {a: step, b: scarp_where} }
+    scarp_h { nodes.Multiply: {a: scarp, b_value: {22, 22, 22, 22}} }
+
+    lumps { nodes.Noise: {frequency: 0.035, octaves: 2, seed: 15} }
+    lumps_h { nodes.Remap: {input: lumps, from_min: 0, from_max: 1, to_min: -0.6, to_max: 0.6} }
+
+    h1 { nodes.Add: {a: vale_h, b: roll_w} }
+    h2 { nodes.Add: {a: h1, b: scarp_h} }
+    height { nodes.Add: {a: h2, b: lumps_h} }
+
+    // Steep slopes: sparse tufts with patches of bare soil, more soil the steeper
+    slope { nodes.Slope: {height: height} }
+    steep {
+      nodes.Smoothstep: {input: slope, edge0_value: {0.27, 0, 0, 0}, edge1_value: {0.44, 0, 0, 0}}
+    }
+
+    patch { nodes.Noise: {frequency: 0.06, octaves: 3, seed: 17} }
+    patch_bare {
+      nodes.Smoothstep: {input: patch, edge0_value: {0.5, 0, 0, 0}, edge1_value: {0.6, 0, 0, 0}}
+    }
+
+    cliff_bare {
+      nodes.Smoothstep: {input: slope, edge0_value: {0.8, 0, 0, 0}, edge1_value: {1.2, 0, 0, 0}}
+    }
+
+    bare { nodes.Max: {a: patch_bare, b: cliff_bare} }
+    soil_w { nodes.Multiply: {a: steep, b: bare} }
+    sparse_w { nodes.Subtract: {a: steep, b: soil_w} }
+    grown { nodes.Subtract: {a_value: {1, 1, 1, 1}, b: steep} }
+
+    // Hilltops: the crests of the rolling hills and the highest ground, with ragged edges
+    ragged { nodes.Noise: {frequency: 0.03, octaves: 3, seed: 19} }
+    ragged_d {
+      nodes.Remap: {input: ragged, from_min: 0, from_max: 1, to_min: -0.06, to_max: 0.06}
+    }
+
+    crest { nodes.Add: {a: roll, b: ragged_d} }
+    crest_top {
+      nodes.Smoothstep: {input: crest, edge0_value: {0.58, 0, 0, 0}, edge1_value: {0.66, 0, 0, 0}}
+    }
+
+    high { nodes.Add: {a: vale, b: ragged_d} }
+    high_top {
+      nodes.Smoothstep: {input: high, edge0_value: {0.8, 0, 0, 0}, edge1_value: {0.9, 0, 0, 0}}
+    }
+
+    top { nodes.Max: {a: crest_top, b: high_top} }
+    short_w { nodes.Multiply: {a: grown, b: top} }
+    meadow_w { nodes.Subtract: {a: grown, b: short_w} }
+
+    masks { nodes.Combine: {r: meadow_w, g: short_w, b: sparse_w, a: soil_w} }
+
+    Terrain: {
+      height: height,
+      masks: masks,
+      tile_size: TILE_SIZE,
+      resolution: RESOLUTION,
+      levels: LEVELS,
+      lod_distance: DETAIL,
+      min_height: GROUND_MIN,
+      max_height: GROUND_MAX,
+      budget: BUDGET,
+      query_spacing: QUERY_SPACING,
+      query_radius: QUERY_RADIUS
+    }
+
+    texture.Blend: {
+      layers: [ground_meadow, ground_short, ground_sparse, ground_soil],
+      contrast: 4
+    }
+
+    texture.Mapping: {mode: MappingWorld, size: GROUND_MAP_SIZE, blend: 0.4}
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 0.95}
+  }
+}

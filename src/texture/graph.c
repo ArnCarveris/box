@@ -15,6 +15,9 @@
 /** Most nodes of a graph */
 #define BOX_TEXTURE_GRAPH_NODES (1024)
 
+/** Most texels the window of a graph on DomainWorld is grown by on each side */
+#define BOX_TEXTURE_GRAPH_APRON (1024)
+
 /** Offset basis of the 64 bit FNV-1a hash of the compiled graphs */
 #define BOX_TEXTURE_GRAPH_FNV_BASIS (14695981039346656037ull)
 
@@ -34,6 +37,10 @@ typedef struct box_texture_graph_build_t {
     ecs_vec_t textures;         /**< box_texture_graph_texture_t, the textures the nodes sample
                                  *   in node order */
     TextureGraphDomain domain;  /**< Coordinates of the texels of the graph */
+    double origin[2];           /**< World x and z of the first texel on DomainWorld */
+    float spacing[2];           /**< Meters between neighbouring texels on DomainWorld */
+    ecs_vec_t window;           /**< uint8_t, window elements of the nodes on DomainWorld, which
+                                 *   follow the parameter bytes of every node */
     char *error;                /**< Why the build failed, NULL while it did not */
     bool wait;                  /**< Wait for a node without a node component */
     bool waiting;               /**< The walk found a node without a node component, or a
@@ -115,9 +122,30 @@ static void box_texture_graph_free(
     }
 }
 
-void box_texture_graph_clear(
+/** Forget the entities the last build of a graph reached in the counts of the registry.
+ *
+ * @param t The registry
+ * @param tex The entry of the graph
+ */
+static void box_texture_reach_drop(
+    box_textures_t *t,
     box_texture_t *tex)
 {
+    const ecs_entity_t *reached = ecs_vec_first_t(&tex->reached, ecs_entity_t);
+    int32_t i, count = ecs_vec_count(&tex->reached);
+    for (i = 0; i < count; i ++) {
+        ecs_map_val_t *n = ecs_map_get(&t->reach, reached[i]);
+        if (n && !-- *n) {
+            ecs_map_remove(&t->reach, reached[i]);
+        }
+    }
+}
+
+void box_texture_graph_clear(
+    box_textures_t *t,
+    box_texture_t *tex)
+{
+    box_texture_reach_drop(t, tex);
     box_texture_graph_free(tex->graph);
     tex->graph = NULL;
     ecs_vec_fini_t(NULL, &tex->reached, ecs_entity_t);
@@ -143,6 +171,7 @@ void box_texture_graphs_fini(
     ecs_vec_fini_t(NULL, &t->graph_queued, ecs_entity_t);
     ecs_vec_fini_t(NULL, &t->graph_released, uint32_t);
     ecs_vec_fini_t(NULL, &t->reload, ecs_entity_t);
+    ecs_map_fini(&t->reach);
 }
 
 void box_texture_graph_request(
@@ -161,6 +190,10 @@ void box_texture_graphs_touch(
     ecs_entity_t e)
 {
     int32_t i;
+    if (e && !ecs_map_get(&t->reach, e)) {
+        goto done;
+    }
+
     ecs_map_iter_t it = ecs_map_iter(&t->textures);
     while (ecs_map_next(&it)) {
         box_texture_t *tex = ecs_map_ptr(&it);
@@ -178,6 +211,9 @@ void box_texture_graphs_touch(
             }
         }
     }
+
+done:
+    return;
 }
 
 /** Build again the graphs that reached a node whose node component was set or removed, also
@@ -229,7 +265,17 @@ static int box_texture_node_kind_fill(
 
     kind->function = ecs_os_strdup(desc->function);
     kind->source = ecs_os_strdup(desc->source);
-    kind->flags &= ~BOX_TEXTURE_NODE_SAMPLES;
+    kind->flags &= ~(BOX_TEXTURE_NODE_SAMPLES | BOX_TEXTURE_NODE_WINDOW);
+    kind->window = desc->window;
+    kind->window_size = desc->window ? desc->window_size : 0;
+    kind->reach = desc->reach;
+    if (desc->window) {
+        kind->flags |= BOX_TEXTURE_NODE_WINDOW;
+        if (desc->window_size < 1 || desc->window_size > BOX_TEXTURE_NODE_WINDOW_MAX) {
+            result = -1;
+        }
+    }
+
     if (desc->texture) {
         kind->flags |= BOX_TEXTURE_NODE_SAMPLES;
         kind->texture = ecs_os_strdup(desc->texture);
@@ -365,8 +411,8 @@ int32_t box_texture_node_register(
     if (box_texture_node_kind_fill(kind, desc)) {
         char *name = ecs_get_path(world, desc->component);
         ecs_err("box_texture_node_register: node kind '%s' has a parameter of an invalid size, "
-            "more than %d parameter bytes, more than %d passes or an invalid array", name,
-            BOX_TEXTURE_NODE_PARAM_BYTES, BOX_TEXTURE_NODE_PASSES);
+            "more than %d parameter bytes, more than %d passes, an invalid array or an invalid "
+            "window size", name, BOX_TEXTURE_NODE_PARAM_BYTES, BOX_TEXTURE_NODE_PASSES);
         ecs_os_free(name);
         box_texture_node_kind_strings_free(kind);
         ecs_os_free(kind);
@@ -484,6 +530,7 @@ static void box_texture_graph_reach(
 
     if (!found) {
         *ecs_vec_append_t(NULL, b->reached, ecs_entity_t) = e;
+        (*ecs_map_ensure(&b->t->reach, e)) ++;
     }
 }
 
@@ -643,10 +690,35 @@ static int32_t box_texture_graph_append(
         box_texture_graph_array(b, e, kind, ptr, params, offset);
     }
 
+    int32_t window = -1, reach = 0;
+    if (b->domain == DomainWorld && kind->window) {
+        window = ecs_vec_count(&b->window);
+        uint8_t *elements = ecs_vec_grow_t(NULL, &b->window, uint8_t, kind->window_size * 16);
+        ecs_os_memset(elements, 0, kind->window_size * 16);
+        kind->window(ptr, b->origin, (uint32_t*)elements);
+    }
+
+    if (b->domain == DomainWorld && (kind->flags & BOX_TEXTURE_NODE_NEIGHBOURHOOD)) {
+        float texel = glm_min(b->spacing[0], b->spacing[1]);
+        float texels = kind->reach ? kind->reach(ptr, texel) : (float)kind->passes;
+        if (!(texels >= 0)) {
+            char *name = box_texture_graph_name(b->world, e);
+            char *component = ecs_get_path(b->world, kind->component);
+            box_texture_graph_error(b, "node '%s' (%s) does not work on DomainWorld", name,
+                component);
+            ecs_os_free(component);
+            ecs_os_free(name);
+        }
+
+        reach = texels >= 0 ? (int32_t)ceilf(glm_min(texels, 65536.0f)) : 0;
+    }
+
     box_texture_graph_node_t *node = ecs_vec_append_t(NULL, &b->nodes,
         box_texture_graph_node_t);
     ecs_os_memset_t(node, 0, box_texture_graph_node_t);
     node->entity = e;
+    node->window = window;
+    node->reach = reach;
     node->kind = kind->id;
     node->output = box_texture_graph_output_type(kind, ptr, types);
     node->params = offset;
@@ -950,10 +1022,10 @@ static int32_t box_texture_graph_visit(
         goto done;
     }
 
-    if ((kind->flags & BOX_TEXTURE_NODE_PLANE) && b->domain == DomainSphere) {
+    if ((kind->flags & BOX_TEXTURE_NODE_PLANE) && b->domain != DomainPlane) {
         char *component = ecs_get_path(b->world, kind->component);
         box_texture_graph_error(b, "node '%s' (%s) works on DomainPlane only, the graph is on "
-            "DomainSphere", name, component);
+            "%s", name, component, b->domain == DomainWorld ? "DomainWorld" : "DomainSphere");
         ecs_os_free(component);
     }
 
@@ -1025,6 +1097,72 @@ static void box_texture_graph_region(
     out[3] = lat1;
 }
 
+/** Resolve the window of a graph on DomainWorld: its origin and the meters between its texels.
+ *
+ * @param graph The TextureGraph
+ * @param width Width of the image, capped
+ * @param height Height of the image, capped
+ * @param origin Receives the world x and z of the first texel
+ * @param spacing Receives the meters between neighbouring texels along x and z
+ */
+static void box_texture_graph_window(
+    const TextureGraph *graph,
+    int32_t width,
+    int32_t height,
+    double origin[2],
+    float spacing[2])
+{
+    const TextureGraphWindow *w = &graph->window;
+    float sx = 1, sz;
+    origin[0] = isfinite(w->x) ? w->x : 0;
+    origin[1] = isfinite(w->z) ? w->z : 0;
+    if (isfinite(w->width) && w->width > 0) {
+        sx = w->width / (float)(width > 1 ? width - 1 : 1);
+    }
+
+    sz = sx;
+    if (isfinite(w->depth) && w->depth > 0) {
+        sz = w->depth / (float)(height > 1 ? height - 1 : 1);
+    }
+
+    spacing[0] = sx;
+    spacing[1] = sz;
+}
+
+/** Get the texels the window of a graph on DomainWorld is grown by on each side: the largest sum
+ * of the reaches of the neighbourhood nodes along a path from the output, so every node reads
+ * its inputs where they were evaluated from the window itself.
+ *
+ * @param b The build, its nodes in topological order
+ * @return The texels
+ */
+static int32_t box_texture_graph_apron(
+    box_texture_graph_build_t *b)
+{
+    int32_t n = ecs_vec_count(&b->nodes), i, j, result = 0;
+    const box_texture_graph_node_t *nodes = ecs_vec_first(&b->nodes);
+    int32_t *sum = ecs_os_calloc_n(int32_t, n > 0 ? n : 1);
+    for (i = 0; i < n; i ++) {
+        int32_t deepest = 0;
+        for (j = 0; j < BOX_TEXTURE_NODE_INPUTS; j ++) {
+            int32_t in = nodes[i].inputs[j];
+            if (in >= 0 && sum[in] > deepest) {
+                deepest = sum[in];
+            }
+        }
+
+        sum[i] = nodes[i].reach + deepest;
+        if (sum[i] > BOX_TEXTURE_GRAPH_APRON) {
+            sum[i] = BOX_TEXTURE_GRAPH_APRON;
+        }
+    }
+
+    result = n > 0 ? sum[n - 1] : 0;
+    ecs_os_free(sum);
+
+    return result;
+}
+
 /** Compile the walk of a build into a graph with its hashes.
  *
  * @param b The build
@@ -1036,12 +1174,30 @@ static box_texture_graph_t* box_texture_graph_compile(
     const TextureGraph *graph)
 {
     box_texture_graph_t *result = ecs_os_calloc_t(box_texture_graph_t);
-    int32_t i;
+    int32_t i, node_bytes = ecs_vec_count(&b->params);
     box_texture_capped_size(b->world, b->t, graph->width, graph->height, &result->width,
         &result->height);
     result->domain = graph->domain;
     if (graph->domain == DomainSphere) {
         box_texture_graph_region(graph, result->region);
+    }
+
+    if (graph->domain == DomainWorld) {
+        result->origin[0] = b->origin[0];
+        result->origin[1] = b->origin[1];
+        result->spacing[0] = b->spacing[0];
+        result->spacing[1] = b->spacing[1];
+        result->apron = box_texture_graph_apron(b);
+        if (ecs_vec_count(&b->window)) {
+            ecs_os_memcpy(ecs_vec_grow_t(NULL, &b->params, uint8_t,
+                ecs_vec_count(&b->window)), ecs_vec_first(&b->window),
+                ecs_vec_count(&b->window));
+        }
+    }
+
+    for (i = 0; i < ecs_vec_count(&b->nodes); i ++) {
+        box_texture_graph_node_t *node = ecs_vec_get_t(&b->nodes, box_texture_graph_node_t, i);
+        node->window = node->window >= 0 ? node_bytes + node->window : 0;
     }
 
     result->format = graph->format;
@@ -1073,6 +1229,8 @@ static box_texture_graph_t* box_texture_graph_compile(
             ECS_SIZEOF(int32_t));
         result->structure_hash = box_texture_graph_hash(result->structure_hash, &node->output,
             ECS_SIZEOF(TextureValueType));
+        result->structure_hash = box_texture_graph_hash(result->structure_hash, &node->window,
+            ECS_SIZEOF(int32_t));
     }
 
     result->param_hash = box_texture_graph_hash(BOX_TEXTURE_GRAPH_FNV_BASIS, result->params,
@@ -1094,6 +1252,9 @@ static bool box_texture_graph_same(
 {
     bool result = a->width == b->width && a->height == b->height && a->domain == b->domain &&
         !ecs_os_memcmp(a->region, b->region, ECS_SIZEOF(a->region)) &&
+        a->origin[0] == b->origin[0] && a->origin[1] == b->origin[1] &&
+        a->spacing[0] == b->spacing[0] && a->spacing[1] == b->spacing[1] &&
+        a->apron == b->apron &&
         a->format == b->format && a->rate == b->rate &&
         a->interpolate == b->interpolate && a->structure_hash == b->structure_hash &&
         a->param_hash == b->param_hash && a->node_count == b->node_count &&
@@ -1200,11 +1361,19 @@ static void box_texture_graph_build(
         goto done;
     }
 
+    if (graph->domain == DomainWorld) {
+        int32_t width, height;
+        box_texture_capped_size(world, t, graph->width, graph->height, &width, &height);
+        box_texture_graph_window(graph, width, height, b.origin, b.spacing);
+    }
+
     b.name = ecs_get_path(world, e);
     ecs_map_init(&b.index, NULL);
+    ecs_vec_init_t(NULL, &b.window, uint8_t, 0);
     ecs_vec_init_t(NULL, &b.nodes, box_texture_graph_node_t, 0);
     ecs_vec_init_t(NULL, &b.params, uint8_t, 0);
     ecs_vec_init_t(NULL, &b.textures, box_texture_graph_texture_t, 0);
+    box_texture_reach_drop(t, tex);
     ecs_vec_clear(&tex->reached);
     if (!graph->output) {
         box_texture_graph_error(&b, "no output node");
@@ -1230,6 +1399,7 @@ static void box_texture_graph_build(
     ecs_vec_fini_t(NULL, &b.nodes, box_texture_graph_node_t);
     ecs_vec_fini_t(NULL, &b.params, uint8_t);
     ecs_vec_fini_t(NULL, &b.textures, box_texture_graph_texture_t);
+    ecs_vec_fini_t(NULL, &b.window, uint8_t);
 done:
     return;
 }
@@ -1307,6 +1477,7 @@ void box_texture_graphs_init(
     ecs_vec_init_t(NULL, &t->graph_queued, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &t->graph_released, uint32_t, 0);
     ecs_vec_init_t(NULL, &t->reload, ecs_entity_t, 0);
+    ecs_map_init(&t->reach, NULL);
     box_texture_nodes_register(world);
     ecs_system(world, {
         .entity = ecs_entity(world, {

@@ -7,7 +7,8 @@ using box.view
 using box.light
 
 $ {
-  Scene: {punctual_shadows: true, alpha_cutout: true, diffuse_transmission: true}
+  Scene: {punctual_shadows: true, shader_features: {Extended: {alpha_cutout: true,
+    diffuse_transmission: true}}}
 }
 
 // Diffuse transmission (DiffuseTransmission) of thin surfaces lit from behind by a low sun that
@@ -19,7 +20,8 @@ $ {
 // around a point light glows warm on its outside. In front, a row of white panels has a
 // factor of 0, 0.25, 0.5, 0.75 and 1 from left to right: the glow through them grows.
 backlit {
-  Scene: {punctual_shadows: true, alpha_cutout: true, diffuse_transmission: true}
+  Scene: {punctual_shadows: true, shader_features: {Extended: {alpha_cutout: true,
+    diffuse_transmission: true}}}
   AmbientLight: {sky: {90, 100, 130}, ground: {50, 45, 40}, intensity: 0.4}
 
   camera {

@@ -229,10 +229,25 @@ typedef struct box_draw_key_t {
                              *   of the 2D shape shader */
     bool polygon;           /**< Polygons (Polygon2D), drawn with the polygon variant of the 2D
                              *   shape shader */
+    bool wind;              /**< 3D shapes that have or inherit a WindSway in a scene with
+                             *   Scene.wind: their pipelines move the vertices
+                             *   (material_wind), other batches keep those without it */
+    float range[3];         /**< DrawRange near, far and fade of 3D shapes that have or whose
+                             *   ChildOf ancestor has one (box_draws_range), all 0 without: the
+                             *   cull pass drops the instances out of range and the pipelines
+                             *   dither the fades (draw_range) */
+    ecs_entity_t impostor;  /**< Entity with the Impostor whose cards the shapes are
+                             *   (ImpostorCard), 0 for other shapes: a batch of cards is
+                             *   opaque, alpha tested and draws the atlases of the impostor */
     bool texture_blend;     /**< 3D shapes with a TextureBlend (texture_blend pipeline):
                              *   textures[0] is the owner of the TextureBlend, textures[2] and
                              *   textures[3] are 0, so the key does not grow */
     ecs_entity_t textures[BOX_RENDER_TEXTURE_SLOTS]; /**< Texture entities of PbrTextures */
+    ecs_entity_t layers[BOX_RENDER_LAYERS]; /**< TextureLayers.layers of a 3D shape of a scene
+                             *   with Scene.texture_layers that is not transmissive, all 0
+                             *   without: shapes with the same layers share a batch and draw
+                             *   with the layers variants of the mesh pipelines. Follows
+                             *   textures, which the key compares with it as one block */
     uint32_t atlas;         /**< Texture handle of the glyph atlas page of a glyph batch, or 0 */
     uint32_t features;      /**< BOX_RENDER_FEATURE_* features of the scene of a 3D shape, 0 for
                              *   2D shapes and texts */
@@ -288,6 +303,8 @@ typedef struct box_draw_material_t {
                                  *   by 2D shapes */
     const TextureScroll *scroll; /**< Endless UV scrolling of a 3D shape, ignored by 2D shapes */
     double time;                /**< Total render time the scroll offsets are computed at */
+    double origin[3];           /**< Absolute position of the local origin (WorldOrigin) the
+                                 *   world space patterns are packed for, 0 without one */
     const Transmission *transmission; /**< Light passing through a 3D shape */
     const ClearCoat *clear_coat; /**< Dielectric layer over a 3D shape, ignored by 2D shapes */
     const SpecularAnisotropy *anisotropy; /**< Stretched highlight of a 3D shape, ignored by 2D
@@ -299,6 +316,21 @@ typedef struct box_draw_material_t {
     const Distortion *distortion; /**< Shimmer of the scene behind a 3D shape, ignored by 2D
                                  *   shapes and by Water */
     const Water *water;         /**< Water surface of a 3D shape, ignored by 2D shapes */
+    const WaterWaves *waves;    /**< Travelling waves of the Water, NULL without Water */
+    const WaterFlow *flow;      /**< Velocity the waves, caustics and, with its textures, the
+                                 *   normal map and foam texture move with, NULL without Water */
+    uint32_t water_waves;       /**< Set of the waves in the wave table, 0 for none */
+    const WaterCaustics *caustics; /**< Caustics of the Water, NULL without Water */
+    const WaterSpectrum *spectrum; /**< Spectrum waves of the Water, whose slopes its fragments
+                                 *   take from the view, NULL without Water */
+    float caustics_frame[2];    /**< Offset of the water frame of the caustics in cells, wrapped
+                                 *   (box_draws_water_caustics_frame), 0 for still water */
+    const WindSway *sway;       /**< Wind sway of a 3D shape, ignored by 2D shapes */
+    box_render_wind_t wind;     /**< Wind of the frame the sway is packed with, read with sway */
+    const VertexReveal *reveal; /**< Hides the parts of a 3D mesh by its per vertex data, ignored
+                                 *   by 2D shapes */
+    const VertexOcclusion *occlusion; /**< Occludes the indirect light of a 3D mesh by its per
+                                 *   vertex data, ignored by 2D shapes */
     const Tint *tint;           /**< Tint of the shape itself, applied after the inherited */
     const box_draw_tint_t *inherited; /**< Composed tints of the ancestors, NULL for none */
     const Shape2D *shape2d;     /**< Resolved 2D shape, NULL for a 3D shape */
@@ -348,6 +380,8 @@ typedef struct box_draw_transition_material_t {
     TextureScroll scroll;   /**< TextureScroll, which has no transition: the record keeps it */
     bool scrolled;          /**< The material has a TextureScroll */
     double time;            /**< Total render time the scroll offsets are computed at */
+    double origin[3];       /**< Absolute position of the local origin the world space
+                             *   patterns are packed for */
     Transmission transmission; /**< Transmission */
     ClearCoat clear_coat;   /**< ClearCoat */
     SpecularAnisotropy anisotropy; /**< SpecularAnisotropy */
@@ -357,6 +391,21 @@ typedef struct box_draw_transition_material_t {
     Distortion distortion;  /**< Distortion */
     Water water;            /**< Water, which has no transition: the record keeps it */
     bool watered;           /**< The material has a Water */
+    uint32_t water_waves;   /**< Set of the WaterWaves of the Water in the wave table, which
+                             *   has no transition: the record keeps it */
+    WaterCaustics caustics; /**< WaterCaustics, which has no transition: the record keeps it */
+    bool flowed;            /**< The Water has a WaterFlow */
+    WaterFlow flow;         /**< Its WaterFlow, read with flowed */
+    bool causticked;        /**< The Water has a WaterCaustics */
+    float caustics_frame[2]; /**< Offset of the water frame of the caustics in cells */
+    WindSway sway;          /**< WindSway, which has no transition: the record keeps it */
+    bool swayed;            /**< The material has a WindSway */
+    VertexReveal reveal;    /**< VertexReveal, which has no transition: the record keeps it */
+    bool revealed;          /**< The material has a VertexReveal */
+    VertexOcclusion occlusion; /**< VertexOcclusion, which has no transition: the record keeps
+                             *   it */
+    bool occluded;          /**< The material has a VertexOcclusion */
+    box_render_wind_t wind; /**< Wind of the frame the sway was packed with */
     Opacity opacity;        /**< Opacity of the shape itself */
     Tint tint;              /**< Tint of the shape itself */
     box_draw_tint_t inherited; /**< Tints of the ancestors, when tinted */
@@ -514,6 +563,9 @@ typedef struct box_draw_batch_t {
     float world_min[3];     /**< Minimum corner of the world bounds of its slots, padded */
     float world_max[3];     /**< Maximum corner of the world bounds of its slots, padded */
     float world_radius;     /**< Largest radius of the world box of a slot, padded */
+    float world_wind;       /**< wind_reach the world bounds were grown by */
+    float wind_reach;       /**< Largest world distance the WindSway of a slot of a wind batch
+                             *   moves a vertex in the wind of this extract (box_draws_wind) */
     uint32_t lods[BOX_LOD_LEVELS_MAX]; /**< Mesh of each level of detail the views of the packet
                              *   use, see box_render_batch_t.lods */
     int64_t record_frame;   /**< Frame of the packet its batch record was last sent in */
@@ -631,6 +683,35 @@ typedef struct box_draw_material_slot_t {
     uint8_t flags;          /**< Lists the slot is in and why it is private (materials.c) */
 } box_draw_material_slot_t;
 
+/** The phases of the WaterWaves of an owner of the material table, a set of the wave table */
+typedef struct box_draw_water_waves_state_t {
+    ecs_entity_t owner;     /**< Owner of the slot whose Water has the waves, 0 for a free set */
+    double time;            /**< Total render time the phases were integrated to */
+    double phases[4];       /**< Phase of each wave, wrapped to 0..2 pi
+                             *   (box_draws_water_waves_step) */
+} box_draw_water_waves_state_t;
+
+/** The water frame of the WaterCaustics of an owner of the material table that has a
+ * WaterFlow */
+typedef struct box_draw_water_caustics_state_t {
+    double time;            /**< Total render time the frame was integrated to */
+    double frame[2];        /**< Offset of the water frame in cells, the integral of the WaterFlow
+                             *   velocity over the scale, wrapped to 0..BOX_RENDER_CAUSTICS_PERIOD
+                             *   (box_draws_water_caustics_step) */
+} box_draw_water_caustics_state_t;
+
+/** The wave table (BOX_RENDER_BUFFER_WATER_WAVES) as the main thread integrates and packs it */
+typedef struct box_draw_water_waves_t {
+    box_draw_water_waves_state_t states[BOX_RENDER_WATER_WAVE_SETS]; /**< By set, set 0
+                             *   unused */
+    box_render_water_waves_t table[BOX_RENDER_WATER_WAVE_SETS]; /**< By set, as uploaded */
+    uint32_t used;          /**< Sets up to the highest one ever handed out plus one, which the
+                             *   send uploads */
+    bool created;           /**< The table buffer was created */
+    bool dirty;             /**< A set changed since the last upload */
+    bool full;              /**< A Water found no free set, which was logged */
+} box_draw_water_waves_t;
+
 /** The material table, slot 0 the default material, as the main thread packed it and what the
  * GPU still needs of it.
  *
@@ -664,6 +745,11 @@ typedef struct box_draw_materials_t {
     float transmission_roughness; /**< Largest roughness of the transmissive materials, 1 for a
                              *   diffuse blur, 0 without any */
     bool features_valid;    /**< transmission_roughness was computed from the records */
+    box_draw_water_waves_t *waves; /**< The wave table, NULL until a Water has WaterWaves */
+    ecs_map_t caustics;     /**< Owner whose Water has WaterCaustics and a WaterFlow to its
+                             *   box_draw_water_caustics_state_t, allocated */
+    double origin[3];       /**< Absolute position of the local origin (WorldOrigin) the
+                             *   records were packed for; a change packs every owner again */
 } box_draw_materials_t;
 
 /** The root of a changed subtree and the streams the change writes for each of its entities */
@@ -746,6 +832,12 @@ typedef struct box_render_draws_t {
                                  *   transform, which alpha tested casters read, changed in this
                                  *   extract while recording */
     bool shadow_record;         /**< Record shadow_regions, while a scene keeps shadow tiles */
+    box_render_wind_t wind;     /**< Wind of this extract */
+    bool wind_blew;             /**< The wind blew in the last extract, so the swaying casters
+                                 *   render their shadows once more where they came to rest */
+    ecs_vec_t swaying;          /**< ecs_entity_t, the scenes (0 for the default one) with a
+                                 *   ready caster batch with a WindSway while the wind blows in
+                                 *   this extract, whose shadow cascades render every frame */
     int32_t box_shadows;        /**< BoxShadowSlot values with a batch, so the paths every 2D
                                  *   shape takes (the runs, the transitions) skip the lookup of
                                  *   the slot while no shadow is drawn */
@@ -988,6 +1080,22 @@ void box_draws_shadow_movers(
     const ecs_world_t *world,
     box_render_draws_t *d);
 
+/** Follow the Wind of this extract in the batches with a WindSway (box_draw_key_t.wind):
+ * resolve the wind, compute the reach of every ready wind batch (with pivots over the diameter of
+ * the world box of a slot, which bounds the distance of a vertex from a pivot of its branch, as
+ * last computed without the reach), record the regions of its
+ * casters while the wind blows so the shadow tiles they reach render again, and list the scenes
+ * with swaying casters (swaying). Batches without one are left as they are.
+ *
+ * @param world The world
+ * @param d The state
+ * @param cache The mesh cache
+ */
+void box_draws_wind(
+    const ecs_world_t *world,
+    box_render_draws_t *d,
+    box_mesh_cache_t *cache);
+
 /** Get the transform of a slot.
  *
  * @param b The batch
@@ -1127,6 +1235,46 @@ bool box_draws_distorted(
  * @return Whether it draws with BOX_RENDER_SHADER_MESH_EXTENDED
  */
 bool box_draws_extended(
+    const ecs_world_t *world,
+    const box_render_draws_t *d,
+    ecs_entity_t e,
+    const box_draw_key_t *key);
+
+/** Check whether a shape is a tile of a Terrain, which draws with the terrain shader.
+ *
+ * @param world The world
+ * @param e The entity
+ * @return Whether it has a TerrainTile
+ */
+bool box_draws_terrain(
+    const ecs_world_t *world,
+    ecs_entity_t e);
+
+/** Get the BOX_RENDER_FEATURE_* features a 3D shape draws with: the Terrain shader features of
+ * its scene for a terrain tile (box_render_terrain_features), else the Extended ones
+ * (box_render_scene_features).
+ *
+ * @param world The world
+ * @param e The entity
+ * @param scene The scene of the shape
+ * @return The features
+ */
+uint32_t box_draws_features(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    ecs_entity_t scene);
+
+/** Get the mesh shader a 3D shape draws with: BOX_RENDER_SHADER_TERRAIN for a terrain tile,
+ * BOX_RENDER_SHADER_MESH_EXTENDED when box_draws_extended says so, else
+ * BOX_RENDER_SHADER_MESH.
+ *
+ * @param world The world
+ * @param d The state
+ * @param e The entity
+ * @param key Its key, with every field but the pipeline set
+ * @return The shader handle
+ */
+uint32_t box_draws_shader(
     const ecs_world_t *world,
     const box_render_draws_t *d,
     ecs_entity_t e,
@@ -1467,8 +1615,15 @@ void box_draws_color_unpack(
  * ClearCoat, SpecularAnisotropy and Sheen are 0 without one or at 0, a Sheen at a black color,
  * DiffuseTransmission 0 without one, its blur 0 when negative or not finite, Fresnel 0 without
  * one. A Distortion without Water packs its strength, frequency and phase, and without
- * Transmission the transmission of a factor of 1 (box_draws_distortion_pack).
+ * Transmission the transmission of a factor of 1 (box_draws_distortion_pack). A Water packs its
+ * WaterCaustics in the words of the Fresnel, which it ignores (box_draws_water_caustics_pack).
  * Opacity, tints and the 2D shape are not.
+ *
+ * The shaders wrap the projection of the absolute position of the local origin of a world mapped
+ * Water to BOX_RENDER_WATER_ORIGIN_PERIOD repeats; its ripple offset takes the whole periods that
+ * leaves out times the ripple scale as the fragments read it (a half float), so the second normal
+ * sample stays continuous across a shift of the origin, for an up facing surface: u along Z, v
+ * along -X.
  *
  * @param out The record
  * @param material Material components of the owner
@@ -1707,6 +1862,222 @@ void box_draws_material_of(
     double time,
     box_draw_material_t *out);
 
+/** Resolve a WaterWave to what it travels with: its normalized direction (+X for a zero or
+ * non finite one), its wave number k = 2 pi / wavelength and its angular frequency, speed times
+ * k, or sqrt(g k) without a speed (deep water dispersion, g BOX_MATERIAL_WATER_GRAVITY).
+ *
+ * @param wave The wave
+ * @param direction Receives the direction, NULL to skip
+ * @param k Receives the wave number, 0 for a disabled wave, NULL to skip
+ * @param omega Receives the angular frequency, 0 for a disabled wave, NULL to skip
+ * @return Whether the wave is enabled: a positive finite wavelength
+ */
+bool box_draws_water_wave_resolve(
+    const WaterWave *wave,
+    float *direction,
+    double *k,
+    double *omega);
+
+/** Get the rate a wave's phase grows with: k times the WaterFlow velocity along its direction
+ * plus its angular frequency, radians per second, 0 for a disabled wave.
+ *
+ * @param wave The wave
+ * @param flow The velocity of the surface, NULL for still water
+ * @return The rate
+ */
+double box_draws_water_wave_rate(
+    const WaterWave *wave,
+    const WaterFlow *flow);
+
+/** Wrap a phase to 0..2 pi, 0 when not finite.
+ *
+ * @param phase The phase
+ * @return The wrapped phase
+ */
+double box_draws_water_phase_wrap(
+    double phase);
+
+/** Advance the phases of the waves of a WaterWaves by a time step in double precision, at the
+ * rates of box_draws_water_wave_rate, wrapped to 0..2 pi.
+ *
+ * @param phases The phases of the BOX_MATERIAL_WATER_WAVES waves
+ * @param waves The waves
+ * @param flow The velocity of the surface, NULL for still water
+ * @param dt Seconds, a step that is not finite or negative does nothing
+ */
+void box_draws_water_waves_step(
+    double *phases,
+    const WaterWaves *waves,
+    const WaterFlow *flow,
+    double dt);
+
+/** Pack a WaterWaves with its phases into a set of the wave table: the directions normalized,
+ * the phases as f32 below 2 pi, the steepness clamped to 0..1 and a disabled wave zero.
+ *
+ * @param out The set
+ * @param waves The waves
+ * @param phases The phases of the BOX_MATERIAL_WATER_WAVES waves
+ */
+void box_draws_water_waves_pack(
+    box_render_water_waves_t *out,
+    const WaterWaves *waves,
+    const double *phases);
+
+/** Get the set of the wave table of an owner of the material table, 0 for none.
+ *
+ * @param m The table
+ * @param owner The owner
+ * @return The set
+ */
+uint32_t box_draws_water_waves_find(
+    const box_draw_materials_t *m,
+    ecs_entity_t owner);
+
+/** Get the set of the wave table of an owner whose Water has WaterWaves, or hand it a free one
+ * whose phases start as if integrated from time 0 to the time of the table. 0 when the table is
+ * full, logged once.
+ *
+ * @param m The table
+ * @param owner The owner
+ * @param waves Its waves
+ * @param flow Its WaterFlow, NULL for none
+ * @return The set
+ */
+uint32_t box_draws_water_waves_set(
+    box_draw_materials_t *m,
+    ecs_entity_t owner,
+    const WaterWaves *waves,
+    const WaterFlow *flow);
+
+/** Integrate the phases of every set of the wave table to the time of the table with the
+ * WaterWaves and WaterFlow of its owner, and free the sets whose owner is gone, no longer owns
+ * a slot or lost its Water, WaterWaves or Scene.water.
+ *
+ * @param world The world
+ * @param m The table
+ */
+void box_draws_water_waves_advance(
+    const ecs_world_t *world,
+    box_draw_materials_t *m);
+
+/** Create the buffer of the wave table if needed and upload the sets that changed.
+ *
+ * @param m The table
+ * @param p The packet
+ */
+void box_draws_water_waves_upload(
+    box_draw_materials_t *m,
+    box_render_packet_t *p);
+
+/** Free the wave table.
+ *
+ * @param m The table
+ */
+void box_draws_water_waves_fini(
+    box_draw_materials_t *m);
+
+/** Wrap an offset of the water frame of WaterCaustics to 0..BOX_RENDER_CAUSTICS_PERIOD cells,
+ * 0 when not finite.
+ *
+ * @param offset The offset in cells
+ * @return The wrapped offset
+ */
+double box_draws_water_caustics_wrap(
+    double offset);
+
+/** Get the cells per world unit of a WaterCaustics: 1 over its scale, which is at least
+ * BOX_RENDER_CAUSTICS_MIN; 1 over the default scale for a scale that is not finite.
+ *
+ * @param caustics The caustics
+ * @return The frequency
+ */
+float box_draws_water_caustics_frequency(
+    const WaterCaustics *caustics);
+
+/** Phase of the animation of WaterCaustics at a time: speed times time over
+ * BOX_RENDER_CAUSTICS_LOOP wrapped to [0, 1) in double precision, 0 when not finite.
+ *
+ * @param speed WaterCaustics.speed, cells per second
+ * @param time Total render time
+ * @return The phase
+ */
+float box_draws_water_caustics_phase(
+    float speed,
+    double time);
+
+/** Advance the water frame of WaterCaustics by a time step in double precision: the WaterFlow
+ * velocity times the frequency of the caustics times the step, wrapped
+ * (box_draws_water_caustics_wrap).
+ *
+ * @param frame The X and Z offset of the frame in cells
+ * @param caustics The caustics
+ * @param flow The velocity of the surface, NULL for still water
+ * @param dt Seconds, a step that is not finite or negative does nothing
+ */
+void box_draws_water_caustics_step(
+    double *frame,
+    const WaterCaustics *caustics,
+    const WaterFlow *flow,
+    double dt);
+
+/** Check whether the record of a Water with WaterCaustics changes every frame: it has a
+ * WaterFlow or a speed other than 0, and a strength above 0.
+ *
+ * @param caustics The caustics, NULL for none
+ * @param flow The WaterFlow, NULL for none
+ * @return Whether it moves
+ */
+bool box_draws_water_caustics_moves(
+    const WaterCaustics *caustics,
+    const WaterFlow *flow);
+
+/** Get the water frame of the WaterCaustics of an owner at the time of the table. An owner with a
+ * WaterFlow keeps its frame in the table, created as if integrated from time 0; still water has
+ * the frame 0.
+ *
+ * @param m The table
+ * @param owner The owner
+ * @param caustics Its caustics
+ * @param flow Its WaterFlow, NULL for none
+ * @param out The X and Z offset of the frame in cells
+ */
+void box_draws_water_caustics_frame(
+    box_draw_materials_t *m,
+    ecs_entity_t owner,
+    const WaterCaustics *caustics,
+    const WaterFlow *flow,
+    float *out);
+
+/** Get the water frame of the WaterCaustics of an owner the table holds without changing it.
+ *
+ * @param m The table
+ * @param owner The owner
+ * @param out The X and Z offset of the frame in cells, 0 for an owner without one
+ * @return Whether the table holds a frame of the owner
+ */
+bool box_draws_water_caustics_find(
+    const box_draw_materials_t *m,
+    ecs_entity_t owner,
+    float *out);
+
+/** Integrate the water frame of every owner with WaterCaustics and a WaterFlow to the time of
+ * the table, and forget those whose owner is gone, no longer owns a slot or lost its Water,
+ * WaterCaustics, WaterFlow or Scene.water.
+ *
+ * @param world The world
+ * @param m The table
+ */
+void box_draws_water_caustics_advance(
+    const ecs_world_t *world,
+    box_draw_materials_t *m);
+
+/** Free the water frames of the WaterCaustics.
+ *
+ * @param m The table
+ */
+void box_draws_water_caustics_fini(
+    box_draw_materials_t *m);
+
 /** Compute the rim factor of a Fresnel, the C twin of fresnel_factor of material.wgsl:
  * saturate(bias + pow(1 - saturate(ndv), power)), 1 - ndv kept above 1e-6.
  *
@@ -1731,6 +2102,26 @@ float box_draws_distortion_phase(
     float speed,
     double time);
 
+/** Phase of the shore waves of a Water at a time: time over Water.shore_period wrapped to
+ * [0, 1) in double precision, so it stays precise however long the render runs.
+ *
+ * @param period Water.shore_period, seconds
+ * @param time Total render time
+ * @return The phase, 0 for a period that is not positive and finite or a time that is not finite
+ */
+float box_draws_water_shore_phase(
+    float period,
+    double time);
+
+/** Phase of the two phase flow mapping of WaterFlow.textures at a time: time over
+ * BOX_RENDER_WATER_FLOW_PERIOD wrapped to [0, 1) in double precision.
+ *
+ * @param time Total render time
+ * @return The phase, 0 for a time that is not finite
+ */
+float box_draws_water_flow_phase(
+    double time);
+
 /** Mix factor of the deep color of a Water body, the C twin of water_depth_mix of
  * material.wgsl: 1 - exp(-3 d / depth), 1 for an infinite depth (the sky behind).
  *
@@ -1751,6 +2142,20 @@ float box_draws_water_depth_mix(
  * @return The transmittance, 0..1
  */
 float box_draws_water_transmittance(
+    float ray_length,
+    float visibility);
+
+/** Tint of one channel of the scene behind a Water, the C twin of water_absorbed of
+ * material.wgsl: absorption to the power of ray_length / visibility, 1 for an infinite ray (the
+ * sky behind, which shows nothing) and for a white absorption.
+ *
+ * @param absorption Channel of Water.absorption in linear light, 0..1
+ * @param ray_length Water along the view ray, world units
+ * @param visibility Water.visibility, at least BOX_RENDER_WATER_MIN
+ * @return The tint, 0..1
+ */
+float box_draws_water_absorption(
+    float absorption,
     float ray_length,
     float visibility);
 
@@ -1894,16 +2299,19 @@ bool box_draws_cutout(
     const AlphaCutoff *cutoff,
     const Shape2D *shape2d);
 
-/** Check whether a shape is alpha tested in its scene: box_draws_cutout, for a 3D shape only
- * when its scene has BOX_RENDER_FEATURE_ALPHA_CUTOUT.
+/** Check whether a shape is alpha tested in its scene: box_draws_cutout or a 3D shape with a
+ * VertexReveal, which discards in the alpha tested path, only when its scene has
+ * BOX_RENDER_FEATURE_ALPHA_CUTOUT.
  *
  * @param cutoff The AlphaCutoff of the shape, NULL for none
+ * @param reveal The VertexReveal of the shape, NULL for none
  * @param shape2d The resolved 2D shape, NULL for a 3D shape
  * @param features BOX_RENDER_FEATURE_* features of the scene of a 3D shape
  * @return Whether its fragments are tested against the cutoff
  */
 bool box_draws_scene_cutout(
     const AlphaCutoff *cutoff,
+    const VertexReveal *reveal,
     const Shape2D *shape2d,
     uint32_t features);
 
@@ -1945,6 +2353,33 @@ void box_draws_mark(
     box_render_draws_t *d,
     ecs_entity_t e,
     uint8_t kinds);
+
+/** Resolve the DrawRange of a shape: its own, inherited from a prefab, or else that of its
+ * nearest ChildOf ancestor that has one. A near or far that is not positive is none, and so is
+ * the fade without either.
+ *
+ * @param world The world
+ * @param e The entity
+ * @param out Receives near, far and fade, all 0 without a DrawRange
+ * @return Whether the shape has a near or a far distance
+ */
+bool box_draws_range(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    float *out);
+
+/** Make the key of a 3D shape the key of an impostor card when it has an ImpostorCard: an
+ * opaque, alpha tested mesh batch of its own per impostor, without the material features, wind,
+ * layers or bakes that the card does not draw.
+ *
+ * @param world The world
+ * @param e The entity
+ * @param key The key box_draws_key computed, changed for a card
+ */
+void box_draws_impostor_key(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    box_draw_key_t *key);
 
 /** Multiply the Opacity and compose the Tint of the ancestors, through ChildOf and Parent.
  *
@@ -2342,6 +2777,21 @@ void box_draws_send_ordered(
     box_render_packet_t *p,
     box_render_draws_t *d);
 
+/** List the instances of the draw of a batch of Terrain tiles nearest to the camera of the first
+ * view of its scene first, so the near tiles hide the far ones in the depth test; the draw of
+ * any other batch keeps the order of its slots.
+ *
+ * @param p The packet
+ * @param d The state
+ * @param b The batch
+ * @param out The draw of the batch
+ */
+void box_draws_send_nearest(
+    box_render_packet_t *p,
+    box_render_draws_t *d,
+    const box_draw_batch_t *b,
+    box_render_batch_t *out);
+
 /** Compute the local bounds of the slots of a batch with parametric surfaces: the union of the
  * bounds of each surface, and of the mesh for a slot without one. A plain mesh batch keeps no
  * surfaces, so it is not bounded and draws with the bounds of its mesh.
@@ -2477,7 +2927,8 @@ void box_draws_batch_tiles(
  * @param p The packet
  * @param d The state
  * @param b The batch
- * @param out The draw, unchanged for a batch without texture_blend
+ * @param out The draw, unchanged for a batch without texture_blend; its TextureLayers are
+ * written after it (box_draws_batch_layers)
  */
 void box_draws_batch_blend(
     box_render_packet_t *p,
@@ -2486,8 +2937,10 @@ void box_draws_batch_blend(
     box_render_batch_t *out);
 
 /** Get the entity whose TextureBlend a 3D shape draws with: the shape itself when it owns a
- * TileTerrain, else the owner of the TextureBlend it has or inherits, 0 when it has neither or
- * is no mesh shape. Alpha tested, blended, transmissive and triplanar shapes blend alike.
+ * TileTerrain, the terrain of a TerrainTile with a TextureBlend (a copy of that of its
+ * terrain), so the tiles of a terrain share a batch, else the owner of the TextureBlend it has
+ * or inherits, 0 when it has neither or is no mesh shape. Alpha tested, blended, transmissive
+ * and triplanar shapes blend alike.
  *
  * @param world The world
  * @param e The shape
@@ -2498,6 +2951,52 @@ ecs_entity_t box_draws_blend_owner(
     const ecs_world_t *world,
     ecs_entity_t e,
     const box_draw_key_t *key);
+
+/** Hash the TextureLayers of a batch key, 0 without layers.
+ *
+ * @param key The key
+ * @return The hash
+ */
+uint64_t box_draws_layers_hash(
+    const box_draw_key_t *key);
+
+/** Check whether a batch key has TextureLayers: a layer entity in some slot.
+ *
+ * @param key The key
+ * @return Whether its batch draws with the layers variants
+ */
+bool box_draws_key_layered(
+    const box_draw_key_t *key);
+
+/** Write the TextureLayers of a batch whose key has layers into the packet data of its draw.
+ *
+ * Writes the entity, values and texture handles of each layer, read from the layer entities
+ * every frame, so a change of a layer (its amount) reaches the draw and the buffer of the layer
+ * without a change of the key. A deleted layer or one without TextureLayer does nothing.
+ *
+ * @param p The packet
+ * @param d The state
+ * @param b The batch
+ * @param out The draw, unchanged for a batch without layers
+ */
+void box_draws_batch_layers(
+    box_render_packet_t *p,
+    const box_render_draws_t *d,
+    const box_draw_batch_t *b,
+    box_render_batch_t *out);
+
+/** Pack the values of a TextureLayer entity as the mesh shaders read them.
+ *
+ * @param world The world
+ * @param e The layer entity, alive with a TextureLayer
+ * @param time Total render time of the frame, which its TextureScroll moves by
+ * @param out Receives the values
+ */
+void box_draws_layer_pack(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    double time,
+    box_render_texture_layer_t *out);
 
 /** Register the glyph batches of the texts: their slots, quad mesh and observers.
  *

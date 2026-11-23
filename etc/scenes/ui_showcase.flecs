@@ -1,9 +1,6 @@
 // UI showcase: screen space, world space and render-to-texture widgets that drive input actions
-// over a 3D scene. A button, a toggle and a slider in a HUD panel, a panel in the 3D scene that
-// switches a lamp and paints the crate, a curved screen that runs a reactor, keys bound to the
-// same actions, and a crate picked in 3D. C counts, H toggles the shadows, L switches the lamp,
-// P paints the crate, R toggles the reactor, a click on the crate selects it. Fly with WASD (QE
-// for down/up), hold the right mouse button to look around.
+// over a 3D scene. C counts, H toggles the shadows, L switches the lamp, P paints the crate, R
+// toggles the reactor, a click on the crate selects it. Fly with WASD, right mouse to look.
 
 include ui/widgets
 
@@ -25,7 +22,7 @@ using box.transition
 
 $ {
   box.app.FpsTarget: {60}
-  Scene: {punctual_shadows: true, blend_modes: true}
+  Scene: {punctual_shadows: true, shader_features: {Extended: {blend_modes: true}}}
   AmbientLight: {sky: {90, 110, 140}, ground: {40, 36, 30}, intensity: 0.6}
 }
 
@@ -165,7 +162,7 @@ view {
   View: {
     camera: camera,
     clear: {enabled: true, color: {120, 150, 190, 255}},
-    shadows: {enabled: state.shadows}
+    shadows: {enabled: state.shadows, cascades: 3, resolution: 2048, interval: [1, 2, 2]}
   }
 }
 
@@ -220,7 +217,12 @@ assets {
       Border: {radius: 5, width: 2, color: hover ? {170, 200, 255, 255} : {120, 130, 150, 255}}
 
       mark {
-        Item: {h: Center, v: Middle, width: {mode: Fixed, value: 12}, height: {mode: Fixed, value: 12}}
+        Item: {
+          h: Center,
+          v: Middle,
+          width: {mode: Fixed, value: 12},
+          height: {mode: Fixed, value: 12}
+        }
         Rect: {1, 1}
         Rgb: {90, 210, 110}
         Opacity: {checked ? 1 : 0}
@@ -283,14 +285,25 @@ assets {
       }
 
       fill {
-        Item: {h: Left, v: Middle, width: {mode: Fixed, value: SliderKnob / 2 + t * (width - SliderKnob)}, height: {mode: Fixed, value: 6}}
+        Item: {
+          h: Left,
+          v: Middle,
+          width: {mode: Fixed, value: SliderKnob / 2 + t * (width - SliderKnob)},
+          height: {mode: Fixed, value: 6}
+        }
         Rect: {1, 1}
         Rgb: {250, 200, 90}
         Border: {radius: 3}
       }
 
       knob {
-        Item: {h: Left, v: Middle, x: t * (width - SliderKnob), width: {mode: Fixed, value: SliderKnob}, height: {mode: Fixed, value: SliderKnob}}
+        Item: {
+          h: Left,
+          v: Middle,
+          x: t * (width - SliderKnob),
+          width: {mode: Fixed, value: SliderKnob},
+          height: {mode: Fixed, value: SliderKnob}
+        }
         Rect: {1, 1}
         Rgb: down || hover ? {255, 236, 170} : {255, 255, 255}
         Transition: [Rgb: {duration: 0.12, timing_function: EaseOut}]
@@ -448,7 +461,6 @@ ui_showcase {
     }
   }
 
-  // The reactor core lights up while the reactor runs
   core {
     Position: {4.3, 0.6, 0.4}
     Cylinder: {segments: 32, smooth: true, radius: 0.35, length: 1.2}
@@ -462,7 +474,7 @@ ui_showcase {
   // which the curved screen below samples. Its buttons sit at opposite ends of the texture, so
   // they are on different slices of the screen
   screen_ui {
-    Scene: {punctual_shadows: true, blend_modes: true}
+    Scene: {punctual_shadows: true, shader_features: {Extended: {blend_modes: true}}}
 
     camera {
       Position: {0, 0, 100}
@@ -550,7 +562,7 @@ ui_showcase {
 // pixel is one point. Its root fills the window, so the panel anchors to the left edge
 // and stays there when the window is resized.
 hud {
-  Scene: {punctual_shadows: true, blend_modes: true}
+  Scene: {punctual_shadows: true, shader_features: {Extended: {blend_modes: true}}}
 
   camera {
     Position: {0, 0, 100}
@@ -597,7 +609,11 @@ hud {
       }
 
       hint {
-        Text: {value: "C counts, H shadows, L lamp, P paint, R reactor, click the crate", size: 13, width: 268}
+        Text: {
+          value: "C counts, H shadows, L lamp, P paint, R reactor, click the crate",
+          size: 13,
+          width: 268
+        }
         Rgb: {140, 150, 170}
         Spans: {spans: [
           {start: 0, end: 1, color: {225, 230, 240, 255}, bold: true},

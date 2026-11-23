@@ -1,0 +1,150 @@
+using flecs.script
+using flecs.script.math
+using box.material
+using box.texture
+using trees
+
+// The materials of the trees: a bark prefab and a leaf or needle prefab per species, which the
+// bark and foliage shapes of a Tree inherit. The bark is the bark texture graphs drawn with a
+// triplanar object mapping; the foliage is the card textures on the UVs of the cards, cut out by
+// their alpha, lit through and darkened inside the crown by its occlusion channel. Both sway as
+// a hierarchy from the pivots in their per vertex data (the Tree sets their WindSway from its
+// height and stiffness) and have a VertexReveal: the bark hides beyond a growth distance from
+// the root, the foliage hides its cards whose seed is below a threshold.
+//
+// The leaf prefabs are the hooks of the color and the season: a scene recolors, thins (their
+// VertexReveal threshold or AlphaCutoff) or bares every tree of a species by writing its leaf
+// prefab, or gives a Tree a leaf prefab of its own.
+trees {
+  // Meters one repeat of the bark textures covers around and up a trunk
+  export const TREE_BARK_SIZE: f32 = 1.6
+
+  // The data channels the materials read (box_mesh_vertex_data)
+  export const TREE_CHANNEL_SEED: i32 = 4
+  export const TREE_CHANNEL_GROWTH: i32 = 6
+  export const TREE_CHANNEL_OCCLUSION: i32 = 7
+
+  // Growth distance of the bark reveal: far enough that a whole tree shows
+  export const TREE_GROWTH_ALL: f32 = 10000
+
+  prefab TreeBark {
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 1}
+    VertexReveal: {channel: TREE_CHANNEL_GROWTH, threshold: TREE_GROWTH_ALL, softness: 0.05, invert: true}
+  }
+
+  prefab TreeBarkBeech : TreeBark {
+    PbrTextures: {albedo: bark_beech_albedo, normal: bark_beech_normal, orm: bark_beech_orm}
+    texture.Mapping: {mode: MappingObject, size: TREE_BARK_SIZE, blend: 0.4}
+  }
+
+  prefab TreeBarkOak : TreeBark {
+    PbrTextures: {albedo: bark_oak_albedo, normal: bark_oak_normal, orm: bark_oak_orm}
+    texture.Mapping: {mode: MappingObject, size: TREE_BARK_SIZE, blend: 0.4}
+  }
+
+  prefab TreeBarkBirch : TreeBark {
+    PbrTextures: {albedo: bark_birch_albedo, normal: bark_birch_normal, orm: bark_birch_orm}
+    texture.Mapping: {mode: MappingObject, size: TREE_BARK_SIZE * 1.2, blend: 0.4}
+  }
+
+  prefab TreeBarkSpruce : TreeBark {
+    PbrTextures: {albedo: bark_spruce_albedo, normal: bark_spruce_normal, orm: bark_spruce_orm}
+    texture.Mapping: {mode: MappingObject, size: TREE_BARK_SIZE, blend: 0.4}
+  }
+
+  // Silver fir: the smooth bark of the beech, darker and cooler
+  prefab TreeBarkFir : TreeBark {
+    Rgb: {170, 172, 178}
+    PbrTextures: {albedo: bark_beech_albedo, normal: bark_beech_normal, orm: bark_beech_orm}
+    texture.Mapping: {mode: MappingObject, size: TREE_BARK_SIZE, blend: 0.4}
+  }
+
+  // Scots pine: the scaly plates of the spruce, warmer and redder
+  prefab TreeBarkPine : TreeBark {
+    Rgb: {215, 182, 166}
+    PbrTextures: {albedo: bark_spruce_albedo, normal: bark_spruce_normal, orm: bark_spruce_orm}
+    texture.Mapping: {mode: MappingObject, size: TREE_BARK_SIZE * 1.3, blend: 0.4}
+  }
+
+  // Willow: the deep furrows of the oak, greyer
+  prefab TreeBarkWillow : TreeBark {
+    Rgb: {196, 196, 186}
+    PbrTextures: {albedo: bark_oak_albedo, normal: bark_oak_normal, orm: bark_oak_orm}
+    texture.Mapping: {mode: MappingObject, size: TREE_BARK_SIZE * 0.8, blend: 0.4}
+  }
+
+  // A dead snag: grey, split wood without bark
+  prefab TreeBarkDead : TreeBark {
+    PbrTextures: {albedo: bark_dead_albedo, normal: bark_dead_normal, orm: bark_dead_orm}
+    texture.Mapping: {mode: MappingObject, size: TREE_BARK_SIZE, blend: 0.4}
+  }
+
+  prefab TreeFoliage {
+    PbrMaterial: {roughness: 0.75}
+    AlphaCutoff: {0.3}
+    VertexReveal: {channel: TREE_CHANNEL_SEED, threshold: 0, softness: 0}
+    VertexOcclusion: {channel: TREE_CHANNEL_OCCLUSION, strength: 1}
+  }
+
+  prefab TreeLeafBeech : TreeFoliage {
+    Rgb: {86, 126, 44}
+    DiffuseTransmission: {factor: 0.65, color: {210, 255, 140}}
+    PbrTextures: {albedo: leaf_beech_albedo, normal: leaf_beech_normal}
+  }
+
+  prefab TreeLeafOak : TreeFoliage {
+    Rgb: {66, 102, 36}
+    PbrMaterial: {roughness: 0.8}
+    DiffuseTransmission: {factor: 0.5, color: {210, 255, 140}}
+    PbrTextures: {albedo: leaf_oak_albedo, normal: leaf_oak_normal}
+  }
+
+  prefab TreeLeafBirch : TreeFoliage {
+    Rgb: {104, 144, 50}
+    PbrMaterial: {roughness: 0.72}
+    DiffuseTransmission: {factor: 0.7, color: {210, 255, 140}}
+    PbrTextures: {albedo: leaf_birch_albedo, normal: leaf_birch_normal}
+  }
+
+  // Willow leaves are grey-green, silvery underneath
+  prefab TreeLeafWillow : TreeFoliage {
+    Rgb: {98, 128, 70}
+    PbrMaterial: {roughness: 0.7}
+    DiffuseTransmission: {factor: 0.55, color: {200, 226, 150}}
+    PbrTextures: {albedo: leaf_willow_albedo, normal: leaf_willow_normal}
+  }
+
+  prefab TreeNeedle : TreeFoliage {
+    PbrMaterial: {roughness: 0.85}
+    AlphaCutoff: {0.4}
+  }
+
+  prefab TreeNeedleSpruce : TreeNeedle {
+    Rgb: {52, 86, 50}
+    DiffuseTransmission: {factor: 0.15, color: {150, 200, 120}}
+    PbrTextures: {albedo: leaf_spruce_albedo, normal: leaf_spruce_normal}
+  }
+
+  prefab TreeNeedleFir : TreeNeedle {
+    Rgb: {44, 80, 54}
+    DiffuseTransmission: {factor: 0.12, color: {150, 200, 120}}
+    PbrTextures: {albedo: leaf_fir_albedo, normal: leaf_fir_normal}
+  }
+
+  // Scots pine needles are a bluer, greyer green
+  prefab TreeNeedlePine : TreeNeedle {
+    Rgb: {70, 98, 72}
+    DiffuseTransmission: {factor: 0.15, color: {160, 200, 130}}
+    PbrTextures: {albedo: leaf_pine_albedo, normal: leaf_pine_normal}
+  }
+
+  // The bare twigs left on a dead snag, grey and weathered
+  prefab TreeTwigDead : TreeFoliage {
+    Rgb: {240, 234, 226}
+    PbrMaterial: {roughness: 0.95}
+    AlphaCutoff: {0.4}
+    DiffuseTransmission: {factor: 0.05, color: {200, 180, 150}}
+    PbrTextures: {albedo: twig_dead_albedo, normal: twig_dead_normal}
+  }
+}

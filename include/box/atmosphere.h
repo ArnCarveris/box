@@ -268,6 +268,68 @@ ECS_STRUCT(TimeOfDayStatus, {
                              *   a little moonlight */
 });
 
+/** Speed of a constructed Wind, world units per second: calm */
+#define BOX_WIND_SPEED (0.0f)
+
+/** Gust of a constructed Wind: the strength varies by half its value with the gusts */
+#define BOX_WIND_GUST (0.5f)
+
+/** Gust scale of a constructed Wind: world size of a gust patch */
+#define BOX_WIND_GUST_SCALE (20.0f)
+
+/** Speed in world units per second at which the flutter of a WindSway reaches its full amount,
+ * and its flutter and branches move at their full rates */
+#define BOX_WIND_FULL_SPEED (10.0f)
+
+/** Gust patches over which the gust field repeats along each axis: the gust offset of a
+ * WindStatus wraps to this many times the gust scale */
+#define BOX_WIND_GUST_PERIOD (32.0)
+
+/** Wind that bends and flutters the vertices of the shapes with a WindSway, a singleton for every
+  * scene with Scene.shader_features.Extended.wind. Adding it adds WindStatus, which the engine
+  * advances.
+ *
+ * The strength of the wind at a point is its speed times a gust factor between 1 - gust and
+ * 1 + gust, read from a field of broad bands stretched across the wind, a few gust_scale world
+ * units wide, with finer detail of a quarter of that. The field travels along the direction at
+ * the speed, so gusts roll across a forest as waves: grass and crowns lean further as a gust
+ * front reaches them, their branches swing and their leaves flutter more, and they settle after
+ * it passed. Between the gusts the plants sway gently around their lean, faster as the wind
+ * grows, in a slow wave that travels along the direction.
+ *
+ * The engine integrates the offset of the field and the phase of the sway on the CPU in double
+ * precision, wrapped to their periods (WindStatus), so the motion stays smooth after hours, a
+ * change of the speed changes how fast the phases advance without a jump, and a fixed delta
+ * time renders the same frames every run. A speed of 0 leaves every vertex where it is.
+ */
+ECS_STRUCT(Wind, {
+    vec2 direction;         /**< World X and Z the wind blows toward, normalized by the engine,
+                             *   default {1, 0}; a zero or not finite direction is {1, 0} */
+    float speed;            /**< World units per second, default 0 for calm; not finite or
+                             *   negative is 0 */
+    float gust;             /**< How much the strength varies with the gusts, 0 (steady) to 1,
+                             *   default 0.5; clamped to 0..1 */
+    float gust_scale;       /**< World size of a gust patch, default 20; at least 0.01 */
+});
+
+/** State of the Wind, written by the engine next to it and read by the renderer.
+ *
+ * Every frame the offset moves along the direction by the speed times the frame delta, wrapped
+ * to BOX_WIND_GUST_PERIOD times the gust scale; the sway phase advances by its frequency, which
+ * grows with the speed, times the delta, wrapped to 0..1; time counts the seconds the wind was
+ * advanced; clock advances by the delta times a rate that grows with the speed, from a sixth
+ * in a calm to 1 at BOX_WIND_FULL_SPEED (a third at 2 m/s), the clock of the flutter and the
+ * branches of a WindSway, whose frequencies are their rates at full wind. Setting the Wind
+ * keeps the status, so the motion goes on smoothly from where it was.
+ */
+ECS_STRUCT(WindStatus, {
+    double offset_x;        /**< World units along X the gust field moved, wrapped */
+    double offset_z;        /**< World units along Z the gust field moved, wrapped */
+    double sway;            /**< Phase of the sway, 0..1 */
+    double time;            /**< Seconds the wind was advanced */
+    double clock;           /**< Seconds of the flutter and branches, slower in a light wind */
+});
+
 /** Register the box.atmosphere module.
  *
  * Makes the light extract attenuate the sun and moon of every scene with a valid Atmosphere by

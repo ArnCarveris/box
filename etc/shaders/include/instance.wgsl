@@ -36,3 +36,24 @@ fn instance_frame(t: InstanceTransform, model: mat4x4f) -> mat4x4f {
     }
     return result;
 }
+
+// Whether the record of the frame stream of an instance places it under a texture frame: it is
+// not zero and not the record of its transform, which a shape without a frame has
+// (box_draws_frame_record), so that it projects from its world position.
+fn instance_framed(frame: InstanceTransform, transform: InstanceTransform) -> bool {
+    let placed = any(frame.rows[0].xyz != vec3f(0.0)) || any(frame.rows[1].xyz != vec3f(0.0));
+    let own = all(frame.rows[0] == transform.rows[0]) &&
+        all(frame.rows[1] == transform.rows[1]) && all(frame.rows[2] == transform.rows[2]);
+    return placed && !own;
+}
+
+// Per vertex data of a mesh that has it (Mesh3.data0 to data3, box_mesh_vertex_data and
+// box_mesh_vertex_data_upper), a vertex stream of its own that only the _data entry points read:
+// the pipelines of the batches whose mesh has data (box_gpu_vertex_data) bind it as the third
+// vertex buffer.
+struct VertexData {
+    @location(4) data0: vec4f,
+    @location(5) data1: vec4f,
+    @location(6) data2: vec4f,
+    @location(7) data3: vec4f,
+};

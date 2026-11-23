@@ -1,0 +1,270 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+
+assets {
+  template LoafAlbedo {
+    prop bake: f32 = 0.5
+    prop tone: entity = 0
+    prop fine_noise: entity = 0
+    prop top: entity = 0
+    prop opened: entity = 0
+    prop lip: entity = 0
+    prop flour_speck: entity = 0
+    prop dusted: entity = 0
+
+    top_light {
+      nodes.Ramp: {
+        input: tone,
+        keys: [{0.3, {224, 176, 104}}, {0.5, {206, 150, 78}}, {0.7, {176, 114, 52}}]
+      }
+    }
+
+    top_dark {
+      nodes.Ramp: {
+        input: tone,
+        keys: [{0.3, {146, 82, 32}}, {0.5, {112, 58, 22}}, {0.7, {70, 34, 12}}]
+      }
+    }
+
+    top_color { nodes.Mix: {a: top_light, b: top_dark, factor_value: {bake, bake, bake, bake}} }
+    under_light {
+      nodes.Ramp: {input: tone, keys: [{0.3, {236, 210, 162}}, {0.7, {218, 182, 126}}]}
+    }
+
+    under_dark {
+      nodes.Ramp: {input: tone, keys: [{0.3, {206, 166, 108}}, {0.7, {170, 118, 62}}]}
+    }
+
+    under_color {
+      nodes.Mix: {a: under_light, b: under_dark, factor_value: {bake, bake, bake, bake}}
+    }
+
+    crust_color { nodes.Mix: {a: under_color, b: top_color, factor: top} }
+    crumb_light {
+      nodes.Ramp: {input: fine_noise, keys: [{0.3, {242, 220, 168}}, {0.7, {226, 190, 128}}]}
+    }
+
+    crumb_dark {
+      nodes.Ramp: {input: fine_noise, keys: [{0.3, {226, 184, 118}}, {0.7, {198, 148, 84}}]}
+    }
+
+    crumb_color {
+      nodes.Mix: {a: crumb_light, b: crumb_dark, factor_value: {bake, bake, bake, bake}}
+    }
+
+    lip_light { nodes.Ramp: {input: tone, keys: [{0.3, {184, 116, 52}}, {0.7, {148, 86, 36}}]} }
+    lip_dark { nodes.Ramp: {input: tone, keys: [{0.3, {104, 54, 20}}, {0.7, {66, 32, 12}}]} }
+    lip_color { nodes.Mix: {a: lip_light, b: lip_dark, factor_value: {bake, bake, bake, bake}} }
+    flour_color {
+      nodes.Ramp: {input: flour_speck, keys: [{0.3, {226, 214, 192}}, {0.7, {242, 234, 218}}]}
+    }
+
+    with_crumb { nodes.Mix: {a: crust_color, b: crumb_color, factor: opened} }
+    with_lip { nodes.Mix: {a: with_crumb, b: lip_color, factor: lip} }
+    with_flour { nodes.Mix: {a: with_lip, b: flour_color, factor: dusted} }
+    Graph: {output: with_flour, width: 512, height: 1024}
+  }
+
+  template BaguetteLoaf {
+    prop length: f32 = 1.2
+    prop thickness: f32 = 0.085
+    prop height: f32 = 0.8
+    prop taper: f32 = 0.5
+    prop cuts: i32 = 5
+    prop angle: f32 = 25
+    prop opening: f32 = 0.36
+    prop bake: f32 = 0.5
+    prop flour: f32 = 0.15
+    prop crust: f32 = 2
+    prop seed: i32 = 3
+
+    const half: f32 = length / 2
+    const bend: f32 = taper * half
+    const tip: f32 = thickness * 0.1
+    const arc: f32 = length - 2 * bend + 2 * sqrt(bend * bend + thickness * thickness)
+    const girth: f32 = 2 * PI * thickness
+    const pitch: f32 = (length - 1.1 * bend) / (cuts + 0.35)
+    const slant: f32 = angle * PI / 180
+    const reach: f32 = 0.675 * pitch * sin(slant)
+    const odd: f32 = (cuts % 2) * 0.5
+    const last: f32 = (cuts - 1) * 0.5
+    const stretch: f32 = max(1, round(arc / girth))
+    const sd: i32 = seed * 16
+
+    profile {
+      Path2D: {start: {tip, 0 - half}, segments: [
+        {kind: CubicBezier, control1: {thickness * 0.35, 0 - half + bend * 0.05},
+          control2: {thickness * 0.99, 0 - half + bend * 0.5}, end: {thickness, 0 - half + bend}},
+        {kind: Line, end: {thickness, half - bend}},
+        {kind: CubicBezier, control1: {thickness * 0.99, half - bend * 0.5},
+          control2: {thickness * 0.35, half - bend * 0.05}, end: {tip, half}}
+      ]}
+    }
+
+    alb {}
+    nrm {}
+    orm {}
+
+    uv { nodes.Coords: {} }
+    around { nodes.Split: {input: uv, channel: ChannelR} }
+    along { nodes.Split: {input: uv, channel: ChannelG} }
+    grid { nodes.Transform: {scale: {1, stretch, 1}} }
+    body_noise { nodes.Noise: {coords: grid, frequency: 10, octaves: 4, seed: sd + 1} }
+    fine_noise { nodes.Noise: {coords: grid, frequency: 48, octaves: 2, seed: sd + 2} }
+    blister_noise {
+      nodes.Noise: {coords: grid, frequency: 24, octaves: 2, fractal: NoiseBillow, seed: sd + 3}
+    }
+
+    flour_noise { nodes.Noise: {coords: grid, frequency: 14, octaves: 3, seed: sd + 4} }
+    flour_speck { nodes.Noise: {coords: grid, frequency: 96, octaves: 1, seed: sd + 5} }
+
+    from_top { nodes.Add: {a: around, b_value: {-0.75, 0, 0, 0}} }
+    cross { nodes.Multiply: {a: from_top, b_value: {girth, 0, 0, 0}} }
+    lengthwise {
+      nodes.Remap: {input: along, from_min: 0, from_max: 1, to_min: 0 - arc / 2, to_max: arc / 2}
+    }
+
+    shear { nodes.Multiply: {a: cross, b_value: {0 - cos(slant) / sin(slant), 0, 0, 0}} }
+    slanted { nodes.Add: {a: lengthwise, b: shear} }
+    slot { nodes.Multiply: {a: slanted, b_value: {1 / pitch, 0, 0, 0}} }
+    slot_shift { nodes.Add: {a: slot, b_value: {odd, 0, 0, 0}} }
+    slot_fract { nodes.Fract: {input: slot_shift} }
+    across { nodes.Add: {a: slot_fract, b_value: {-0.5, 0, 0, 0}} }
+    slot_floor { nodes.Floor: {input: slot_shift} }
+    slot_index { nodes.Add: {a: slot_floor, b_value: {0.5 - odd, 0, 0, 0}} }
+    slot_dist { nodes.Abs: {input: slot_index} }
+    keep {
+      nodes.Remap: {
+        input: slot_dist,
+        from_min: last + 0.4,
+        from_max: last + 0.6,
+        to_min: 1,
+        to_max: 0,
+        clamp: true
+      }
+    }
+
+    lens_x { nodes.Multiply: {a: cross, b_value: {1 / reach, 0, 0, 0}} }
+    lens_x2 { nodes.Multiply: {a: lens_x, b: lens_x} }
+    lens {
+      nodes.Remap: {input: lens_x2, from_min: 0, from_max: 1, to_min: 1, to_max: 0, clamp: true}
+    }
+
+    lens_soft {
+      nodes.Smoothstep: {input: lens, edge0_value: {0, 0, 0, 0}, edge1_value: {0.3, 0, 0, 0}}
+    }
+
+    across_abs { nodes.Abs: {input: across} }
+    half_width { nodes.Multiply: {a: lens, b_value: {opening, 0, 0, 0}} }
+    edge_dist { nodes.Subtract: {a: across_abs, b: half_width} }
+    open_ramp {
+      nodes.Remap: {
+        input: edge_dist,
+        from_min: -0.1,
+        from_max: 0,
+        to_min: 1,
+        to_max: 0,
+        clamp: true
+      }
+    }
+
+    open_soft {
+      nodes.Smoothstep: {input: open_ramp, edge0_value: {0, 0, 0, 0}, edge1_value: {1, 0, 0, 0}}
+    }
+
+    opened { nodes.Multiply: {a: open_soft, b: keep} }
+    edge_abs { nodes.Abs: {input: edge_dist} }
+    lip_ramp {
+      nodes.Remap: {input: edge_abs, from_min: 0, from_max: 0.12, to_min: 1, to_max: 0, clamp: true}
+    }
+
+    lip_side {
+      nodes.Smoothstep: {input: across, edge0_value: {-0.02, 0, 0, 0}, edge1_value: {0.06, 0, 0, 0}}
+    }
+
+    lip_one { nodes.Multiply: {a: lip_ramp, b: lip_side} }
+    lip_kept { nodes.Multiply: {a: lip_one, b: keep} }
+    lip { nodes.Multiply: {a: lip_kept, b: lens_soft} }
+
+    turn { nodes.Multiply: {a: from_top, b_value: {2 * PI, 0, 0, 0}} }
+    turn_cos { nodes.Cos: {input: turn} }
+    top {
+      nodes.Smoothstep: {input: turn_cos, edge0_value: {-0.4, 0, 0, 0}, edge1_value: {0.6, 0, 0, 0}}
+    }
+
+    tone { nodes.Mix: {a: body_noise, b: fine_noise, factor_value: {0.35, 0, 0, 0}} }
+    flour_patch {
+      nodes.Smoothstep: {
+        input: flour_noise,
+        edge0_value: {0.62 - 0.3 * flour, 0, 0, 0},
+        edge1_value: {0.9 - 0.3 * flour, 0, 0, 0}
+      }
+    }
+
+    flour_grain {
+      nodes.Remap: {
+        input: flour_speck,
+        from_min: 0.35,
+        from_max: 0.65,
+        to_min: 0.2,
+        to_max: 1,
+        clamp: true
+      }
+    }
+
+    flour_mask0 { nodes.Multiply: {a: flour_patch, b: flour_grain} }
+    flour_mask1 { nodes.Multiply: {a: flour_mask0, b_value: {min(1, flour * 1.2) * 0.8, 0, 0, 0}} }
+    flour_open { nodes.Remap: {input: opened, from_min: 0, from_max: 1, to_min: 1, to_max: 0.3} }
+    dusted { nodes.Multiply: {a: flour_mask1, b: flour_open} }
+
+    alb {
+      LoafAlbedo: {
+        bake: bake,
+        tone: tone,
+        fine_noise: fine_noise,
+        top: top,
+        opened: opened,
+        lip: lip,
+        flour_speck: flour_speck,
+        dusted: dusted
+      }
+    }
+
+    nrm {
+      relief { nodes.Mix: {a: body_noise, b: blister_noise, factor_value: {0.35, 0, 0, 0}} }
+      lip_rise { nodes.Multiply: {a: lip, b_value: {0.7, 0, 0, 0}} }
+      open_sink { nodes.Multiply: {a: opened, b_value: {-0.45, 0, 0, 0}} }
+      crumb_bumps { nodes.Multiply: {a: opened, b: fine_noise} }
+      crumb_rise { nodes.Multiply: {a: crumb_bumps, b_value: {0.3, 0, 0, 0}} }
+      with_lip { nodes.Add: {a: relief, b: lip_rise} }
+      with_open { nodes.Add: {a: with_lip, b: open_sink} }
+      with_crumb { nodes.Add: {a: with_open, b: crumb_rise} }
+      normal { nodes.Normal: {height: with_crumb, strength: crust} }
+      Graph: {output: normal, width: 512, height: 1024, format: GraphLinear}
+    }
+
+    orm {
+      rough_open {
+        nodes.Remap: {input: opened, from_min: 0, from_max: 1, to_min: 0.6, to_max: 0.95}
+      }
+
+      rough_flour { nodes.Mix: {a: rough_open, b_value: {1, 0, 0, 0}, factor: dusted} }
+      packed { nodes.Combine: {r_value: 1, g: rough_flour, b_value: 0, a_value: 1} }
+      Graph: {output: packed, width: 256, height: 512, format: GraphLinear}
+    }
+
+    crust_shape {
+      Position: {0, thickness * height * 0.88, 0}
+      Rotation: {PI / 2, 0, 0}
+      Scale: {1, 1, height}
+      Lathe: {profile: profile, cap_start: true, cap_end: true, segments: 48, rings: 64}
+      Rgb: {255, 255, 255}
+      PbrMaterial: {roughness: 1}
+      PbrTextures: {albedo: alb, normal: nrm, orm: orm}
+    }
+  }
+}

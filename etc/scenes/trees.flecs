@@ -1,0 +1,220 @@
+// The tree generator on its own: one mature tree of each preset in a row on a meadow, from left
+// to right a beech, an oak, a birch, a spruce, a fir, a pine, a weeping willow and a dead snag,
+// with a row of young trees and a row of saplings of the same presets behind them, in a light
+// breeze. Every tree is two MeshGraph shapes, its bark and its foliage.
+//
+// The camera sees the whole row from 100 m. The cameras scope has a view of every mature tree
+// from 30 m (cameras.beech.at_30 and so on), from 5 m under its crown (cameras.beech.at_5) and
+// from 5 m beside its crown (cameras.beech.crown_5), and of the young trees and the saplings
+// from behind (cameras.young_left and young_right, cameras.saplings_left and saplings_right).
+include trees/generator
+
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.effects
+using box.atmosphere
+using box.surface
+using box.controllers
+using box.texture
+using trees
+
+// Meters between the trees of a row, and the X of the first
+const TREE_SPACING: f32 = 16
+const TREE_ROW_X: f32 = -56
+
+$ {
+  box.app.FpsTarget: {60}
+  Scene: {
+    reflections: true,
+    environment: true,
+    aerial_perspective: true,
+    shader_features: {
+      Extended: {
+        alpha_cutout: true,
+        triplanar: true,
+        diffuse_transmission: true,
+        wind: true
+      }
+    }
+  }
+  AmbientLight: {sky: {120, 140, 170}, ground: {60, 64, 44}, intensity: 0.2}
+  Wind: {direction: {1, 0.3}, speed: 3, gust: 0.5, gust_scale: 30}
+}
+
+window {
+  Surface: {width: 1600, height: 900, vsync: true}
+}
+
+sun {
+  DirectionalLight: {intensity: 3 * PI}
+  Rgb: {255, 244, 228}
+}
+
+sky {
+  Atmosphere: {
+    sun: sun,
+    units_per_km: 1000,
+    rayleigh: {scale_height: 8, scattering_scale: 1},
+    mie: {scale_height: 1.2, anisotropy: 0.8, scattering_scale: 1},
+    ozone_scale: 1,
+    ground_albedo: {60, 70, 50},
+    sun_disk_intensity: 4
+  }
+  TimeOfDay: {hour: 15, day_of_year: 190, latitude: 50, north: 200, sun: sun}
+}
+
+camera {
+  Position: {0, 14, 105}
+  Rotation: {-0.03, 0, 0}
+  Camera: {fov: 60, near_: 0.1, far_: 2000}
+  CameraController: {speed: 8}
+}
+
+// The views of a mature tree at x across the row, h high: at_30 sees all of it from 30 m, at_5
+// looks up its trunk into its crown from 5 m, crown_5 looks at the leaves or needles of its crown
+// from 5 m beside it at the height of the crown
+template TreeCameras {
+  prop x: f32 = 0
+  prop h: f32 = 20
+
+  const y = 3 + h * 0.2
+
+  at_30 {
+    Position: {x, y, 30}
+    Rotation: {atan2(h * 0.5 - y, 30), 0, 0}
+    Camera: {fov: 60, near_: 0.1, far_: 2000}
+  }
+
+  at_5 {
+    Position: {x + 2.5, 1.7, 4.3}
+    Rotation: {0.5, 0.52, 0}
+    Camera: {fov: 70, near_: 0.05, far_: 2000}
+  }
+
+  crown_5 {
+    Position: {x, h * 0.75, h * 0.3 + 5}
+    Rotation: {0.1, 0, 0}
+    Camera: {fov: 70, near_: 0.05, far_: 2000}
+  }
+}
+
+cameras {
+  TreeCameras beech(x: TREE_ROW_X, h: 24) { Position: {0, 0, 0} }
+  TreeCameras oak(x: TREE_ROW_X + TREE_SPACING, h: 21) { Position: {0, 0, 0} }
+  TreeCameras birch(x: TREE_ROW_X + TREE_SPACING * 2, h: 19) { Position: {0, 0, 0} }
+  TreeCameras spruce(x: TREE_ROW_X + TREE_SPACING * 3, h: 28) { Position: {0, 0, 0} }
+  TreeCameras fir(x: TREE_ROW_X + TREE_SPACING * 4, h: 30) { Position: {0, 0, 0} }
+  TreeCameras pine(x: TREE_ROW_X + TREE_SPACING * 5, h: 24) { Position: {0, 0, 0} }
+  TreeCameras willow(x: TREE_ROW_X + TREE_SPACING * 6, h: 13) { Position: {0, 0, 0} }
+  TreeCameras snag(x: TREE_ROW_X + TREE_SPACING * 7, h: 11) { Position: {0, 0, 0} }
+
+  // The young trees and the saplings from behind, the left and the right half of the rows
+  young_left { Position: {-28, 5, -78}; Rotation: {0.02, PI, 0}; Camera: {fov: 60, near_: 0.1, far_: 2000} }
+  young_right { Position: {28, 5, -78}; Rotation: {0.02, PI, 0}; Camera: {fov: 60, near_: 0.1, far_: 2000} }
+  saplings_left { Position: {-36, 2, -52}; Rotation: {-0.08, PI, 0}; Camera: {fov: 60, near_: 0.1, far_: 2000} }
+  saplings_right { Position: {20, 2, -52}; Rotation: {-0.08, PI, 0}; Camera: {fov: 60, near_: 0.1, far_: 2000} }
+}
+
+view {
+  gtao {
+    Gtao: {radius: 0.8, final_value_power: 2}
+  }
+
+  exposure {
+    AutoExposure: {}
+  }
+
+  bloom {
+    Bloom: {intensity: 0.12, threshold: 1}
+  }
+
+  tonemap {
+    Tonemap: {auto_exposure: exposure}
+  }
+
+  smaa {
+    Smaa: {}
+  }
+
+  View: {
+    camera: camera,
+    clear: {enabled: true, color: {150, 178, 210, 255}},
+    lighting: {
+      enabled: true,
+      atmosphere: true,
+      environment: {source: sky, intensity: 0.6, background: false}
+    },
+    shadows: {enabled: true, cascades: 4, resolution: 2048, max_distance: 200},
+    effects: [{effect: gtao}, {effect: sky}, {effect: bloom}, {effect: tonemap}, {effect: smaa}]
+  }
+}
+
+// The meadow: short grass in patches of greener and drier green
+tree_meadow_albedo {
+  patches { nodes.Noise: {frequency: 5, octaves: 5, seed: 41} }
+  blades { nodes.Noise: {frequency: 500, octaves: 2, seed: 42} }
+  grass { nodes.Ramp: {input: patches, keys: [{0.3, {72, 92, 40}}, {0.5, {86, 106, 46}}, {0.65, {100, 108, 54}}, {0.8, {78, 98, 42}}]} }
+  speckle { nodes.Ramp: {input: blades, keys: [{0.3, {190, 190, 190}}, {0.7, {255, 255, 255}}]} }
+  color { nodes.Multiply: {a: grass, b: speckle} }
+  Graph: {output: color, width: 1024}
+}
+
+tree_meadow_normal {
+  blades { nodes.Noise: {frequency: 500, octaves: 2, seed: 42} }
+  bumps { nodes.Normal: {height: blades, strength: 0.8} }
+  Graph: {output: bumps, width: 1024, format: GraphLinear}
+}
+
+tree_row {
+  ground {
+    Position: {0, -0.25, 0}
+    Box: {800, 0.5, 800}
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 1}
+    PbrTextures: {albedo: tree_meadow_albedo, normal: tree_meadow_normal}
+    texture.Mapping: {mode: MappingWorld, size: 8}
+  }
+
+  // The mature presets, left to right
+  TreeBeech beech(seed: 1) { Position: {TREE_ROW_X, 0, 0} }
+  TreeOak oak(seed: 2) { Position: {TREE_ROW_X + TREE_SPACING, 0, 0} }
+  TreeBirch birch(seed: 3) { Position: {TREE_ROW_X + TREE_SPACING * 2, 0, 0} }
+  TreeSpruce spruce(seed: 4) { Position: {TREE_ROW_X + TREE_SPACING * 3, 0, 0} }
+  TreeFir fir(seed: 5) { Position: {TREE_ROW_X + TREE_SPACING * 4, 0, 0} }
+  TreePine pine(seed: 6) { Position: {TREE_ROW_X + TREE_SPACING * 5, 0, 0} }
+  TreeWillow willow(seed: 7) { Position: {TREE_ROW_X + TREE_SPACING * 6, 0, 0} }
+  TreeSnag snag(seed: 8) { Position: {TREE_ROW_X + TREE_SPACING * 7, 0, 0} }
+
+  // Young trees behind them
+  young {
+    Position: {0, 0, -26}
+
+    TreeBeech beech(seed: 11, age: 0.4) { Position: {TREE_ROW_X, 0, 0} }
+    TreeOak oak(seed: 12, age: 0.4) { Position: {TREE_ROW_X + TREE_SPACING, 0, 0} }
+    TreeBirch birch(seed: 13, age: 0.4) { Position: {TREE_ROW_X + TREE_SPACING * 2, 0, 0} }
+    TreeSpruce spruce(seed: 14, age: 0.4) { Position: {TREE_ROW_X + TREE_SPACING * 3, 0, 0} }
+    TreeFir fir(seed: 15, age: 0.4) { Position: {TREE_ROW_X + TREE_SPACING * 4, 0, 0} }
+    TreePine pine(seed: 16, age: 0.4) { Position: {TREE_ROW_X + TREE_SPACING * 5, 0, 0} }
+    TreeWillow willow(seed: 17, age: 0.4) { Position: {TREE_ROW_X + TREE_SPACING * 6, 0, 0} }
+    TreeSnag snag(seed: 18, age: 0.5) { Position: {TREE_ROW_X + TREE_SPACING * 7, 0, 0} }
+  }
+
+  // Saplings behind those
+  saplings {
+    Position: {0, 0, -40}
+
+    TreeBeech beech(seed: 21, age: 0.12) { Position: {TREE_ROW_X, 0, 0} }
+    TreeOak oak(seed: 22, age: 0.12) { Position: {TREE_ROW_X + TREE_SPACING, 0, 0} }
+    TreeBirch birch(seed: 23, age: 0.12) { Position: {TREE_ROW_X + TREE_SPACING * 2, 0, 0} }
+    TreeSpruce spruce(seed: 24, age: 0.1) { Position: {TREE_ROW_X + TREE_SPACING * 3, 0, 0} }
+    TreeFir fir(seed: 25, age: 0.1) { Position: {TREE_ROW_X + TREE_SPACING * 4, 0, 0} }
+    TreePine pine(seed: 26, age: 0.12) { Position: {TREE_ROW_X + TREE_SPACING * 5, 0, 0} }
+    TreeWillow willow(seed: 27, age: 0.2) { Position: {TREE_ROW_X + TREE_SPACING * 6, 0, 0} }
+  }
+}

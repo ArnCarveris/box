@@ -2,9 +2,9 @@
  * @file render/fog_volumes.c
  * @brief Gives every lit view the FogVolumes of its scene in its frustum, for the light extract.
  *
- * The volumes are collected once per frame; a view with LightSettings.fog_volumes gets those of
- * the scene of its camera that may be in its frustum, back to front by the distance of their
- * centers from the camera, at most BOX_RENDER_FOG_VOLUMES_MAX of the nearest.
+ * A lit view gets the volumes of its scene in its frustum and its unbounded ones, back to front,
+ * at most BOX_RENDER_FOG_VOLUMES_MAX, unbounded ones before the nearest bounded ones, and its
+ * fog distance. The size and slices of its froxel grid (froxel.wgsl) are computed here.
  *
  * The offset the wind moves the noise by is computed from the time of the packet in double
  * precision and wrapped to the period of the noise, so drifting fog stays smooth after hours.
@@ -26,6 +26,7 @@ typedef struct box_fog_volume_t {
 
 /** A fog volume a view sees, by its distance from the camera */
 typedef struct box_fog_order_t {
+    bool unbounded;         /**< Whether it fills all space, kept before every bounded one */
     float distance;         /**< Distance of its center from the camera */
     int32_t index;          /**< Index of the volume in the volumes of the frame */
 } box_fog_order_t;
@@ -241,17 +242,19 @@ void box_render_fog_offset(
 
 /** Write the record of a FogVolume: its box placed by the rotation and position of the world
  * transform, scale ignored, its values clamped to their ranges and the offset of its noise at a
- * time.
+ * time, moved back by the absolute position of the local origin.
  *
  * @param fog The FogVolume
  * @param transform World transform of the entity
  * @param time Seconds the world has advanced in total, the time of the packet
+ * @param origin Absolute position of the local origin (WorldOrigin)
  * @param out Receives the record
  */
 static void box_fog_record(
     const FogVolume *fog,
     const WorldTransform *transform,
     double time,
+    const double *origin,
     box_render_fog_volume_t *out)
 {
     int32_t k;
@@ -278,10 +281,21 @@ static void box_fog_record(
     out->sun_inscatter = glm_max(fog->sun_inscatter, 0.0f);
     out->ambient_inscatter = glm_max(fog->ambient_inscatter, 0.0f);
     out->light_inscatter = glm_max(fog->light_inscatter, 0.0f);
-    out->steps = fog->steps < 4 ? 4 : fog->steps > 128 ? 128 : fog->steps;
     out->noise_strength = glm_clamp(fog->noise_strength, 0.0f, 1.0f);
     out->noise_scale = glm_max(fog->noise_scale, BOX_RENDER_FOG_NOISE_SCALE_MIN);
+    out->shape = fog->shape == FogVolumeEllipsoid || fog->shape == FogVolumeUnbounded
+        ? (uint32_t)fog->shape : (uint32_t)FogVolumeBox;
+    out->height_falloff = glm_max(fog->height_falloff, 0.0f);
+    out->edge_noise = glm_clamp(fog->edge_noise, 0.0f, 1.0f);
     box_render_fog_offset(fog, time, out->offset);
+    if (origin[0] != 0.0 || origin[1] != 0.0 || origin[2] != 0.0) {
+        double period = BOX_RENDER_FOG_NOISE_PERIOD * (double)out->noise_scale;
+        for (k = 0; k < 3; k ++) {
+            out->offset[k] = box_render_origin_wrap_float(
+                (double)out->offset[k] - origin[k], period);
+        }
+    }
+
     out->color[0] = box_fog_linear(fog->color.r);
     out->color[1] = box_fog_linear(fog->color.g);
     out->color[2] = box_fog_linear(fog->color.b);
@@ -298,6 +312,8 @@ static void box_fog_collect(
     box_render_fog_t *l,
     double time)
 {
+    double origin[3];
+    box_render_origin(world, origin);
     ecs_vec_clear(&l->fog_volumes);
     ecs_iter_t it = ecs_query_iter(world, l->query);
     while (ecs_query_next(&it)) {
@@ -309,12 +325,13 @@ static void box_fog_collect(
             f->scene = box_render_scene_field(&it, 2, i);
             WorldTransform buf;
             box_fog_record(&fogs[i], box_transform_world_field(world, &it, transforms, i, &buf),
-                time, &f->record);
+                time, origin, &f->record);
         }
     }
 }
 
-/** Order fog volumes by their distance from the camera, nearest first, then by index.
+/** Order fog volumes the unbounded ones first, then by their distance from the camera, nearest
+ * first, then by index.
  *
  * @param a The first volume
  * @param b The second volume
@@ -325,7 +342,11 @@ static int box_fog_cmp(
     const void *b)
 {
     const box_fog_order_t *x = a, *y = b;
-    int result = (x->distance > y->distance) - (x->distance < y->distance);
+    int result = (int)y->unbounded - (int)x->unbounded;
+    if (!result) {
+        result = (x->distance > y->distance) - (x->distance < y->distance);
+    }
+
     if (!result) {
         result = (x->index > y->index) - (x->index < y->index);
     }
@@ -426,6 +447,7 @@ void box_render_fog_views(
             : NULL;
         v->fog_first = ecs_vec_count(&p->fog_volumes);
         v->fog_count = 0;
+        v->fog_distance = box_render_fog_distance(view ? view->lighting.fog_distance : 0);
         if (!fog_count || !view || !view->lighting.enabled || !view->lighting.fog_volumes ||
             !box_camera_has_depth(&v->camera_data))
         {
@@ -436,14 +458,16 @@ void box_render_fog_views(
         ecs_vec_clear(&l->fog_order);
         for (j = 0; j < fog_count; j ++) {
             const box_fog_volume_t *f = &fogs[j];
-            if (f->scene != v->scene || !box_view_sees(v, f->record.center, 0,
-                ECS_CONST_CAST(vec4*, f->record.axes), f->record.extent))
+            bool unbounded = f->record.shape == (uint32_t)FogVolumeUnbounded;
+            if (f->scene != v->scene || (!unbounded && !box_view_sees(v, f->record.center, 0,
+                ECS_CONST_CAST(vec4*, f->record.axes), f->record.extent)))
             {
                 continue;
             }
 
             box_fog_order_t *o = ecs_vec_append_t(
                 NULL, &l->fog_order, box_fog_order_t);
+            o->unbounded = unbounded;
             o->distance = glm_vec3_distance(ECS_CONST_CAST(float*, eye),
                 ECS_CONST_CAST(float*, f->record.center));
             o->index = j;
@@ -520,6 +544,58 @@ void box_render_fog_free(
         ecs_vec_fini_t(NULL, &fog->fog_over_next, ecs_entity_t);
         ecs_os_free(fog);
     }
+}
+
+float box_render_fog_distance(
+    float distance)
+{
+    return distance == 0 ? (float)BOX_FROXEL_DISTANCE_DEFAULT
+        : glm_max(distance, (float)BOX_FROXEL_DISTANCE_MIN);
+}
+
+void box_render_froxel_grid(
+    int32_t width,
+    int32_t height,
+    int32_t *out)
+{
+    int32_t edge = width > height ? width : height;
+    int32_t tile = (edge + BOX_FROXEL_CELLS_MAX - 1) / BOX_FROXEL_CELLS_MAX;
+    width = width > 1 ? width : 1;
+    height = height > 1 ? height : 1;
+    tile = tile > BOX_FROXEL_TILE_MIN ? tile : BOX_FROXEL_TILE_MIN;
+    out[0] = (width + tile - 1) / tile;
+    out[1] = (height + tile - 1) / tile;
+    out[2] = tile;
+}
+
+float box_render_froxel_depth(
+    float share,
+    float near_,
+    float far_,
+    bool ortho)
+{
+    float x = share;
+    if (!ortho) {
+        x = (exp2f((float)BOX_FROXEL_EXPONENT * share) - 1.0f) /
+            (exp2f((float)BOX_FROXEL_EXPONENT) - 1.0f);
+    }
+
+    return near_ + (far_ - near_) * x;
+}
+
+float box_render_froxel_share(
+    float depth,
+    float near_,
+    float far_,
+    bool ortho)
+{
+    float x = glm_clamp((depth - near_) / glm_max(far_ - near_, 1e-6f), 0.0f, 1.0f);
+    if (!ortho) {
+        x = log2f(1.0f + x * (exp2f((float)BOX_FROXEL_EXPONENT) - 1.0f)) /
+            (float)BOX_FROXEL_EXPONENT;
+    }
+
+    return x;
 }
 
 bool box_render_view_sees(

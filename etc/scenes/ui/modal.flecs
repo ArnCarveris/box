@@ -55,19 +55,9 @@ template CloseButton : HeadlessButton {
 }
 
 // Behavior of a modal dialog: current is whether it is open, open its initial value. While open
-// it floats (Float) centered on the root of its layout tree, over every widget wherever it
-// is declared, above its child backdrop, a float as large as that root. Both are Interactive
-// InputBlockers, so they handle the pointer themselves and no click, scroll or hover reaches the
-// widgets or the 3D scene under them. The dialog is a FocusScope: the focus moves to its first
-// focusable child, else to its close button, Tab stays inside it, and it goes back to the widget
-// that had it when the dialog closes (or is cleared when none had it). A press that clears the
-// focus while it is open, such as one on the backdrop, moves it back in.
+// it floats centered over its backdrop, and both block the input to everything under them.
 //
-// The close button (heading.close, a CloseButton of the styled template), Escape and, with
-// dismiss, a press on the backdrop close it: they set current to false and report a change.
-// While closed it is an empty clip, so neither it nor its children are drawn, picked or reached
-// with Tab. The focus follows current in the frames after it changes, so setting the mut from C
-// or the terminal opens and closes the dialog too, without a change event.
+// The close button, Escape and, with dismiss, a press on the backdrop close it with a change.
 template HeadlessModal {
   prop open: bool = false
   prop title: string = ""
@@ -122,8 +112,10 @@ template HeadlessModal {
   async {
     while true {
       await ui.delay(0)
+
       if current != active {
         active = current
+
         if current {
           returns = ui.focused()
           inside = none
@@ -132,6 +124,7 @@ template HeadlessModal {
           settle = 0
           const back = returns
           returns = none
+
           if back != none {
             await focus(back)
           } else if ui.focused() == inside {
@@ -140,8 +133,10 @@ template HeadlessModal {
         }
       } else if current && settle > 0 {
         settle = settle - 1
+
         if settle == 0 {
           const first = ui.first_focusable(this, this.lookup("heading"))
+
           if first != none {
             await focus(first)
           } else {
@@ -161,6 +156,7 @@ template HeadlessModal {
   async {
     while true {
       const e = await on.focus(this)
+
       if e.target != this {
         inside = e.target
       }
@@ -171,6 +167,7 @@ template HeadlessModal {
     while true {
       const e = await on.activate(this)
       const a = ui.activation(e)
+
       if current && a != 0 {
         if a.name() == "close" && a.parent().name() == "heading" {
           if a.parent().parent() == this {
@@ -185,6 +182,7 @@ template HeadlessModal {
   async {
     while true {
       const e = await on.key_down(this)
+
       if current && e.key == "Escape" && !e.repeat {
         current = false
         await ui.changed(this)
@@ -195,6 +193,7 @@ template HeadlessModal {
   async {
     while true {
       const e = await on.press(backdrop)
+
       if current && dismiss && e.target == backdrop {
         current = false
         await ui.changed(this)
@@ -203,11 +202,8 @@ template HeadlessModal {
   }
 }
 
-// A modal dialog: the backdrop dims the window with the backdrop color of the theme, the dialog
-// is a panel with the title and a CloseButton at the right of it above the children of the
-// instance, laid out in a column. A width fixes the dialog, 0 fits it to the children. Its
-// surface is the child surface, a float as large as the dialog drawn over the backdrop and under
-// the title and the children; a press on it goes to the dialog and does not dismiss it.
+// A modal dialog: a dimmed backdrop under a panel with the title and a CloseButton above the
+// children, in a column. A width fixes the dialog, 0 fits it to the children.
 template Modal : HeadlessModal {
   const t = box.ui.theme[Theme]
   const pad = t.padding * 2

@@ -11,7 +11,7 @@ using box.transition
 using yeon
 
 $ {
-  Scene: {blend_modes: true}
+  Scene: {shader_features: {Extended: {blend_modes: true}}}
 }
 
 const lostAlpha: f32 = 70.0 / 255.0
@@ -42,7 +42,7 @@ template YeonHud {
   const over = YeonGameState?[(YeonGameState, Over)]
 
   ui {
-    Scene: {blend_modes: true}
+    Scene: {shader_features: {Extended: {blend_modes: true}}}
 
     camera {
       Position: {0, 0, 100}

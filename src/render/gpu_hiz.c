@@ -665,7 +665,7 @@ void box_gpu_hiz_build(
         .entryCount = 1 + BOX_GPU_HIZ_STEP,
         .entries = entries
     });
-    WGPUComputePassEncoder pass = wgpuCommandEncoderBeginComputePass(encoder, NULL);
+    WGPUComputePassEncoder pass = box_gpu_profile_compute_pass(gpu, encoder, "hiz");
     box_gpu_hiz_dispatch(pass, c->hiz_first, first, hiz, 0, 2);
     for (i = BOX_GPU_HIZ_STEP; i < hiz->levels; i += BOX_GPU_HIZ_STEP) {
         box_gpu_hiz_dispatch(pass, c->hiz_reduce, hiz->reduce[i], hiz, i, 1);

@@ -211,6 +211,9 @@ static void box_reflection_bake_ctor(
             .budget_ms = 1.0f,
             .scene_probe = true,
             .scene_probe_height = 2.0f,
+            .follow_distance = 16.0f,
+            .follow_radius = 64.0f,
+            .follow_blend = 0.5f,
             .light_threshold = 2.0f,
             .color_threshold = 0.05f
         };
@@ -267,8 +270,8 @@ static void box_planar_reflection_ctor(
 /** Construct FogVolume values.
  *
  * A white box of 5 units each way with a density of 0.1 that scatters all it extinguishes, a
- * forward phase of 0.3, faces that fade over 1 unit, full sun, ambient, point and spot light, 24
- * march steps and no noise, whose billows would be 4 units across.
+ * forward phase of 0.3, faces that fade over 1 unit, full sun, ambient, point and spot light
+ * and no noise, whose billows would be 4 units across.
  *
  * @param ptr The components
  * @param count Number of components
@@ -293,10 +296,12 @@ static void box_fog_volume_ctor(
             .sun_inscatter = 1.0f,
             .ambient_inscatter = 1.0f,
             .light_inscatter = 1.0f,
-            .steps = 24,
             .noise_strength = 0.0f,
             .noise_scale = 4.0f,
-            .wind = {0.0f, 0.0f, 0.0f}
+            .wind = {0.0f, 0.0f, 0.0f},
+            .shape = FogVolumeBox,
+            .height_falloff = 0.0f,
+            .edge_noise = 0.0f
         };
     }
 }
@@ -446,6 +451,7 @@ void BoxLightImport(
     ecs_set_hooks(world, ReflectionProbe, { .ctor = box_reflection_probe_ctor });
     ECS_META_COMPONENT(world, PlanarReflection);
     ecs_set_hooks(world, PlanarReflection, { .ctor = box_planar_reflection_ctor });
+    ECS_META_COMPONENT(world, FogVolumeShape);
     ECS_META_COMPONENT(world, FogVolume);
     ecs_set_hooks(world, FogVolume, { .ctor = box_fog_volume_ctor });
     ECS_META_COMPONENT(world, StarField);

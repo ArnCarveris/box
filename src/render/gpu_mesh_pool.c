@@ -3,7 +3,8 @@
  * @brief Pool of large buffers the vertices and indices of meshes are suballocated from.
  *
  * Each page is a buffer with a sorted list of free ranges. A range is taken from the first page
- * that fits it, and a new page is created when none does.
+ * that fits it, and a new page is created when none does. The per vertex data of a mesh that has
+ * it is a range of its own after its vertices, a vertex stream only its draws bind.
  */
 
 #include "gpu.h"
@@ -147,6 +148,58 @@ void box_gpu_mesh_pool_free(
         ecs_os_memmove_n(r + 1, r, box_gpu_mesh_range_t, count - i);
         *r = (box_gpu_mesh_range_t){ .offset = offset, .size = size };
     }
+}
+
+void box_gpu_mesh_bounds(
+    box_gpu_mesh_t *m,
+    const box_vertex_t *vertices,
+    uint32_t count)
+{
+    vec3 lo, hi;
+    uint32_t i;
+    glm_vec3_copy(ECS_CONST_CAST(float*, vertices[0].position), lo);
+    glm_vec3_copy(lo, hi);
+    for (i = 1; i < count; i ++) {
+        glm_vec3_minv(lo, ECS_CONST_CAST(float*, vertices[i].position), lo);
+        glm_vec3_maxv(hi, ECS_CONST_CAST(float*, vertices[i].position), hi);
+    }
+
+    glm_vec3_center(lo, hi, m->center);
+    glm_vec3_sub(hi, m->center, m->extent);
+}
+
+bool box_gpu_vertex_data(
+    const box_gpu_t *gpu,
+    const box_render_batch_t *b)
+{
+    const box_gpu_mesh_t *m = box_render_is_mesh(b->pipeline)
+        ? ecs_map_get_deref(&gpu->meshes, box_gpu_mesh_t, b->mesh) : NULL;
+
+    return m && m->data_size;
+}
+
+WGPUVertexBufferLayout box_gpu_vertex_data_layout(
+    WGPUVertexAttribute *attrs)
+{
+    attrs[0] = (WGPUVertexAttribute){
+        .format = WGPUVertexFormat_Float32x4, .offset = 0, .shaderLocation = 4
+    };
+    attrs[1] = (WGPUVertexAttribute){
+        .format = WGPUVertexFormat_Float32x4, .offset = sizeof(vec4), .shaderLocation = 5
+    };
+    attrs[2] = (WGPUVertexAttribute){
+        .format = WGPUVertexFormat_Float32x4, .offset = 2 * sizeof(vec4), .shaderLocation = 6
+    };
+    attrs[3] = (WGPUVertexAttribute){
+        .format = WGPUVertexFormat_Float32x4, .offset = 3 * sizeof(vec4), .shaderLocation = 7
+    };
+
+    return (WGPUVertexBufferLayout){
+        .stepMode = WGPUVertexStepMode_Vertex,
+        .arrayStride = BOX_RENDER_DATA_VECS * sizeof(vec4),
+        .attributeCount = BOX_RENDER_DATA_VECS,
+        .attributes = attrs
+    };
 }
 
 WGPUBuffer box_gpu_mesh_pool_buffer(

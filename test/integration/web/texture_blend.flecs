@@ -14,7 +14,7 @@ using box.light
 using box.surface
 
 $ {
-  Scene: {texture_blend: true}
+  Scene: {shader_features: {Extended: {texture_blend: true}}}
 }
 
 window {

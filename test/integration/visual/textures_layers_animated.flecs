@@ -1,0 +1,85 @@
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+using box.camera
+using box.view
+using box.light
+
+// texture.Layers from an animated texture graph: a moss green layer whose mask is noise that
+// evolves with the world time (1 s in), on a sphere, a box and a plane, with a blue box without
+// layers. The pattern differs from frame to frame; the shapes do not change batches.
+//
+// frames: 60
+$ {
+  Scene: {shader_features: {Extended: {texture_layers: true}}}
+}
+
+camera {
+  Position: {0, 2.6, 6}
+  Rotation: {-0.35, 0, 0}
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {120, 140, 170, 255}}}
+}
+
+$ {
+  AmbientLight: {sky: {150, 165, 190}, ground: {60, 56, 50}, intensity: 0.7}
+}
+
+sun {
+  Rotation: {0.8, 0.6, 0}
+  DirectionalLight: {intensity: 1.3 * flecs.script.math.PI}
+}
+
+moss_mask {
+  t { nodes.Time: {scale: 0.5} }
+  n { nodes.Noise: {frequency: 5, octaves: 3, evolve: t} }
+  edge {
+    nodes.Remap: {input: n, from_min: 0.4, from_max: 0.6, to_min: 0, to_max: 1, clamp: true}
+  }
+
+  Graph: {output: edge, width: 256, format: GraphSingle}
+}
+
+moss {
+  texture.Layer: {amount: 1, facing: 0, mask: moss_mask, contrast: 8, albedo: LayerMix,
+    roughness: LayerMix}
+  Rgb: {70, 120, 40}
+  PbrMaterial: {roughness: 0.95}
+  texture.Mapping: {mode: MappingWorld, size: 2, blend: 0.4}
+}
+
+floor {
+  Position: {0, -0.1, 0}
+  Box: {10, 0.2, 6}
+  Rgb: {170, 160, 150}
+  PbrMaterial: {roughness: 0.8}
+  texture.Layers: {layers: [moss]}
+}
+
+ball {
+  Position: {-1.8, 0.8, 0}
+  Sphere: {radius: 0.8, smooth: true, segments: 32}
+  Rgb: {200, 200, 200}
+  PbrMaterial: {roughness: 0.6}
+  texture.Layers: {layers: [moss]}
+}
+
+crate {
+  Position: {0.4, 0.6, 0}
+  Rotation: {0, 0.5, 0}
+  Box: {1.2, 1.2, 1.2}
+  Rgb: {190, 150, 110}
+  PbrMaterial: {roughness: 0.7}
+  texture.Layers: {layers: [moss]}
+}
+
+plain {
+  Position: {2.4, 0.5, 0}
+  Box: {1, 1, 1}
+  Rgb: {60, 90, 200}
+  PbrMaterial: {roughness: 0.5}
+}

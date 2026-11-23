@@ -19,6 +19,7 @@ assets {
         ]
       }
     }
+
     for wire in 0..3 {
       {
         Position: {0, 0, (wire - 1) * 0.53}

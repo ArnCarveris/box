@@ -1,10 +1,5 @@
-// Cornell box: a white room with a red and a green wall, lit by a spot light in the ceiling
-// whose cone reaches only the middle of the floor. Everything else is lit by baked indirect
-// light, so the white surfaces next to the red wall turn pink and those next to the green wall
-// turn green as the bounces bake. The room is made of quads that face inward: the bake sees a
-// closed room, the camera looks in through the front. Fly with WASD (QE for down/up, Shift to
-// go faster), hold the right mouse button to look around. Set Bake.bounces to 0, 1 or
-// 3 to compare.
+// Cornell box lit by a ceiling spot light and baked indirect light, so the white surfaces turn
+// pink and green next to the colored walls. Set Bake.bounces to 0, 1 or 3 to compare.
 
 using box.transform
 using box.geometry

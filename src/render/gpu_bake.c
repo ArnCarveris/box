@@ -641,7 +641,7 @@ static void box_gpu_bake_draws(
                 .region = b->stride,
                 .count = rb->instance_count,
                 .pipeline = box_gpu_forward_pipeline(gpu, BOX_GPU_HDR_FORMAT, rb, false),
-                .material = box_gpu_material_group(gpu, packet, rb),
+                .material = box_gpu_forward_group(gpu, packet, rb),
                 .kind = box_gpu_draw_kind(rb, false),
                 .instances = box_gpu_instance_group(gpu, rb->instances, rb->mesh, m, true),
                 .page = box_gpu_instance_group(gpu, rb->instances, 0, NULL, false),
@@ -649,6 +649,8 @@ static void box_gpu_bake_draws(
                 .mesh = m->id,
                 .vertex_offset = m->offset,
                 .vertex_size = m->vertex_size,
+                .data_offset = m->data_offset,
+                .data_size = m->data_size,
                 .index_offset = m->index_offset,
                 .index_size = m->index_size
             };
@@ -897,6 +899,7 @@ static void box_gpu_bake_face(
     ecs_os_memset_t(u, 0, box_gpu_view_uniforms_t);
     glm_mat4_mul(proj, rv->view_matrix, u->view_proj);
     glm_mat4_inv(u->view_proj, u->inv_view_proj);
+    glm_mat4_copy(u->view_proj, u->prev_view_proj);
     glm_vec3_copy(eye, u->camera);
     u->camera[3] = 1;
     u->reflection[1] = 1;
@@ -905,6 +908,7 @@ static void box_gpu_bake_face(
     u->viewport[2] = 1.0f / edge;
     u->viewport[3] = 1.0f / edge;
     box_gpu_light_uniforms(gpu, rv, proj, u);
+    box_gpu_origin_split(gpu->origin, u->origin);
     u->grid[0] = 1;
     u->grid[1] = 1;
     u->grid[2] = 1;
@@ -1033,6 +1037,12 @@ static WGPURenderBundle box_gpu_bake_bundle(
 
         wgpuRenderBundleEncoderSetVertexBuffer(
             e, 0, draw->buffer, draw->vertex_offset, draw->vertex_size);
+        if (draw->data_size) {
+            wgpuRenderBundleEncoderSetVertexBuffer(
+                e, 2, draw->buffer, draw->data_offset, draw->data_size);
+            box_gpu_count(gpu, BOX_GPU_STAT_DATA_BIND);
+        }
+
         wgpuRenderBundleEncoderSetVertexBuffer(e, 1, b->slots, first * sizeof(uint32_t),
             (uint64_t)draw->count * sizeof(uint32_t));
         wgpuRenderBundleEncoderSetIndexBuffer(

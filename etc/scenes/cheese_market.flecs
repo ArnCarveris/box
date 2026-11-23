@@ -33,8 +33,8 @@ using assets
 $ {
   box.app.FpsTarget: {60}
   Scene: {baked: true, reflections: true, environment: true, aerial_perspective: true,
-    transmission: true, sheen: true, clear_coat: true, anisotropy: true,
-    diffuse_transmission: true}
+    shader_features: {Extended: {transmission: true, sheen: true, clear_coat: true,
+    anisotropy: true, diffuse_transmission: true}}}
 }
 
 window {
@@ -66,8 +66,21 @@ sky {
 
 $ {
   AmbientLight: {sky: {171, 193, 211}, ground: {119, 99, 72}, intensity: 0.35}
-  Bake: {environment: sky, probe_spacing: 1, bounds_padding: 0.3, bounces: 1, capture_size: 64, budget_ms: 8}
-  ReflectionBake: {resolution: 128, budget_ms: 2, scene_probe: true, scene_probe_height: 2.5, environment: sky}
+  Bake: {
+    environment: sky,
+    probe_spacing: 1,
+    bounds_padding: 0.3,
+    bounces: 1,
+    capture_size: 64,
+    budget_ms: 8
+  }
+  ReflectionBake: {
+    resolution: 128,
+    budget_ms: 2,
+    scene_probe: true,
+    scene_probe_height: 2.5,
+    environment: sky
+  }
 }
 
 cheese_market {
@@ -76,11 +89,13 @@ cheese_market {
     RoundedBox: {28, 0.95, 24, 0.35}
     Rgb: {132, 119, 100}
   }
+
   mortar {
     Position: {0, 0.01, 0}
     RoundedBox: {27.6, 0.14, 23.6, 0.25}
     Rgb: {147, 139, 117}
   }
+
   for row in 0..44 {
     for col in 0..39 {
       const tone = (row * 17 + col * 13) % 5
@@ -93,6 +108,7 @@ cheese_market {
       }
     }
   }
+
   for side in 0..2 {
     for i in 0..40 {
       {
@@ -101,6 +117,7 @@ cheese_market {
         Rgb: MarketStone
       }
     }
+
     for i in 0..46 {
       {
         Position: {(i - 22.5) * 0.59, 0.13, (side - 0.5) * 23.5}
@@ -114,13 +131,21 @@ cheese_market {
   CheeseShop(label: "MAISON DU COMTE", tint: {215, 157, 120}, awning: {81, 124, 111}, height: 6.3) {
     Position: {-0.6, 0.18, -8.6}
   }
+
   CheeseShop(label: "BEURRE & CREME", tint: {231, 212, 166}, awning: {210, 157, 60}, height: 4.9) {
     Position: {5.9, 0.18, -8.6}
   }
 
   CheeseStall(tint: {81, 124, 111}) { Position: {-10.3, 0.18, -0.7}; Rotation: {0, 0.28, 0} }
-  CheeseStall(tint: {179, 91, 57}, variant: 1) { Position: {8.9, 0.18, -1.1}; Rotation: {0, -math.PI / 2, 0} }
-  CheeseStall(tint: {211, 163, 64}, variant: 2) { Position: {8.9, 0.18, 5.1}; Rotation: {0, -math.PI / 2, 0} }
+  CheeseStall(tint: {179, 91, 57}, variant: 1) {
+    Position: {8.9, 0.18, -1.1}
+    Rotation: {0, -math.PI / 2, 0}
+  }
+
+  CheeseStall(tint: {211, 163, 64}, variant: 2) {
+    Position: {8.9, 0.18, 5.1}
+    Rotation: {0, -math.PI / 2, 0}
+  }
 
   fountain_court {
     Position: {-0.3, 0.18, 0.8}
@@ -129,6 +154,7 @@ cheese_market {
       Cylinder: {radius: 2.65, length: 0.08, segments: 48}
       Rgb: {149, 149, 124}
     }
+
     for i in 0..40 {
       {
         Position: {math.sin(i * math.PI / 20) * 2.48, 0.055, math.cos(i * math.PI / 20) * 2.48}
@@ -137,6 +163,7 @@ cheese_market {
         Rgb: MarketCream
       }
     }
+
     MarketFountain() { Position: {0, 0.08, 0} }
   }
 
@@ -155,18 +182,22 @@ cheese_market {
         PbrMaterial: {metallic: 0.8, roughness: 0.2}
         SpecularAnisotropy: {strength: 0.6, rotation: 0}
       }
+
       handle {
         Position: {0, 0.008, -0.28}
         RoundedBox: {0.08, 0.055, 0.21, 0.02}
         Rgb: MarketOak
       }
     }
+
     ChalkBoard() { Position: {2.5, 0, 0.2}; Rotation: {0, -0.3, 0} }
     MarketCrate() { Position: {-2.55, 0, -0.1}; Rotation: {0, 0.2, 0} }
     MarketCrate(filled: false) { Position: {-2.53, 0.58, -0.08}; Rotation: {0, -0.08, 0} }
+
     for i in 0..3 {
       Baguette() { Position: {-2.8 + i * 0.25, 0.99, -0.07}; Rotation: {-0.3, -0.2, 0} }
     }
+
     MilkCan() { Position: {-1.75, 0, -0.95} }
     MilkCan() { Position: {-1.2, 0, -0.9}; Scale: {0.8, 0.8, 0.8} }
     FlowerPot(size: 1.2) { Position: {2.65, 0, -1} }
@@ -189,12 +220,17 @@ cheese_market {
     CheeseWheel(radius: 0.35, height: 0.22) { Position: {-4.15 + i * 0.9, 1.21, -4.1} }
     MarketCrate() { Position: {10.8, 0.18 + i * 0.58, 1}; Rotation: {0, 0.05 + i * 0.06, 0} }
   }
+
   MarketBarrel() { Position: {6.8, 0.18, 8.7} }
   MarketBarrel() { Position: {7.7, 0.18, 9.1} }
   FlowerPot(size: 1.3) { Position: {7.7, 1.21, 9.1} }
   MilkCan() { Position: {6.3, 0.18, 9.5} }
   MilkCan() { Position: {6.75, 0.18, 9.8}; Scale: {0.8, 0.8, 0.8} }
-  ChalkBoard(label: "DEGUSTATION\n\nCHEESE\n& BREAD\n\nBON APPETIT") { Position: {0.4, 0.18, 7.1}; Rotation: {0, -0.35, 0} }
+  ChalkBoard(label: "DEGUSTATION\n\nCHEESE\n& BREAD\n\nBON APPETIT") {
+    Position: {0.4, 0.18, 7.1}
+    Rotation: {0, -0.35, 0}
+  }
+
   ChalkBoard() { Position: {-4.1, 0.18, -3.35} }
 
   for row in 0..2 {
@@ -204,11 +240,17 @@ cheese_market {
         Cylinder: {radius: 0.065, length: 4.4, segments: 12}
         Rgb: MarketOak
       }
+
       MarketLantern() { Position: {(side - 0.5) * 20.4, 4.24, -3.5 + row * 10.2} }
     }
+
     MarketBunting(length: 20.4, flags: 28) { Position: {0, 4.4, -3.5 + row * 10.2} }
   }
-  MarketBunting(length: 10.2, flags: 16) { Position: {10.2, 4.4, 1.6}; Rotation: {0, math.PI / 2, 0} }
+
+  MarketBunting(length: 10.2, flags: 16) {
+    Position: {10.2, 4.4, 1.6}
+    Rotation: {0, math.PI / 2, 0}
+  }
 
   for side in 0..2 {
     for i in 0..4 {
@@ -217,11 +259,13 @@ cheese_market {
         RoundedBox: {3.5, 0.9, 0.4, 0.06}
         Rgb: MarketStone
       }
+
       {
         Position: {-5.8 + i * 3.85, 1.09, (side - 0.5) * 22.6}
         Box: {3.65, 0.14, 0.55}
         Rgb: {222, 206, 173}
       }
+
       FlowerPot(size: 0.8, tint: {206, 143, 167}) {
         Position: {-5.8 + i * 3.85, 1.16, (side - 0.5) * 22.6}
       }
@@ -230,11 +274,24 @@ cheese_market {
 
   courtyard_reflection {
     Position: {-0.3, 1.8, 1.6}
-    ReflectionProbe: {extent: {6.9, 3, 6}, blend: 1, priority: 1, projection: {7.6, 2.8, 6.8}, offset: {0, -0.2, 0}}
+    ReflectionProbe: {
+      extent: {6.9, 3, 6},
+      blend: 1,
+      priority: 1,
+      projection: {7.6, 2.8, 6.8},
+      offset: {0, -0.2, 0}
+    }
   }
+
   fountain_reflection {
     Position: {-0.3, 1.2, 0.8}
-    ReflectionProbe: {extent: {2, 1.4, 2}, blend: 0.5, priority: 2, projection: {7.5, 3.4, 6.5}, offset: {0, -0.35, 0.9}}
+    ReflectionProbe: {
+      extent: {2, 1.4, 2},
+      blend: 0.5,
+      priority: 2,
+      projection: {7.5, 3.4, 6.5},
+      offset: {0, -0.35, 0.9}
+    }
   }
 }
 
@@ -265,7 +322,7 @@ view {
       atmosphere: true,
       environment: {source: sky, intensity: 0.6, yaw: 0, background: false}
     },
-    shadows: {enabled: true, resolution: 2048, max_distance: 90},
+    shadows: {enabled: true, cascades: 3, resolution: 2048, interval: [1, 2, 2], max_distance: 90},
     effects: [
       {effect: gtao},
       {effect: sky},

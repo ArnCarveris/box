@@ -68,17 +68,20 @@ async {
     song_beats = max(s.beats, 1)
 
     const ready = status.state == SongReady
+
     if loaded != ready {
       loaded = ready
     }
 
     const shows = playing && ready && se.has(Rgb)
+
     if lit != shows {
       lit = shows
     }
 
     if shows {
       const c = se[Rgb]
+
       if color.r != c.r || color.g != c.g || color.b != c.b {
         color = c
       }

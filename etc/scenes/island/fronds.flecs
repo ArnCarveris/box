@@ -1,0 +1,75 @@
+using flecs.script
+using flecs.script.math
+using box.material
+using box.texture
+using state
+using assets
+
+assets {
+  template IslandFrondMap {
+    prop map: i32 = 0
+
+    uv { nodes.Coords: {} }
+    u { nodes.Split: {input: uv, channel: ChannelR} }
+    v { nodes.Split: {input: uv, channel: ChannelG} }
+    t { nodes.Subtract: {a_value: {1, 1, 1, 1}, b: v} }
+    off { nodes.Subtract: {a: u, b_value: {0.5, 0.5, 0.5, 0.5}} }
+    half { nodes.Abs: {input: off} }
+    side { nodes.Multiply: {a: half, b_value: {2, 2, 2, 2}} }
+    width {
+      nodes.Curve: {input: t, curve: {kind: CurveCatmullRom, keys: [
+        {0, 0.1}, {0.08, 0.5}, {0.3, 0.92}, {0.6, 0.98}, {0.85, 0.7}, {0.97, 0.3}, {1, 0}
+      ]}}
+    }
+
+    edge { nodes.Subtract: {a: width, b: side} }
+    inside {
+      nodes.Smoothstep: {input: edge, edge0_value: {0, 0, 0, 0}, edge1_value: {0.07, 0, 0, 0}}
+    }
+
+    along { nodes.Multiply: {a: t, b_value: {24, 24, 24, 24}} }
+    slant { nodes.Multiply: {a: side, b_value: {6, 6, 6, 6}} }
+    phase { nodes.Subtract: {a: along, b: slant} }
+    turns { nodes.Multiply: {a: phase, b_value: {6.2832, 6.2832, 6.2832, 6.2832}} }
+    wave { nodes.Sin: {input: turns} }
+    gap { nodes.Remap: {input: side, from_min: 0, from_max: 1, to_min: -1.3, to_max: 0.1} }
+    blade_d { nodes.Subtract: {a: wave, b: gap} }
+    blade {
+      nodes.Smoothstep: {input: blade_d, edge0_value: {0, 0, 0, 0}, edge1_value: {0.3, 0, 0, 0}}
+    }
+
+    leaflets { nodes.Multiply: {a: blade, b: inside} }
+    rib {
+      nodes.Smoothstep: {input: side, edge0_value: {0.07, 0, 0, 0}, edge1_value: {0.03, 0, 0, 0}}
+    }
+
+    rib_len {
+      nodes.Smoothstep: {input: t, edge0_value: {1, 0, 0, 0}, edge1_value: {0.96, 0, 0, 0}}
+    }
+
+    midrib { nodes.Multiply: {a: rib, b: rib_len} }
+    cover { nodes.Max: {a: leaflets, b: midrib} }
+
+    if map == MAP_ALBEDO {
+      shade { nodes.Remap: {input: wave, from_min: -1, from_max: 1, to_min: 0.2, to_max: 1} }
+      tone {
+        nodes.Ramp: {input: shade, keys: [{0.2, {120, 130, 104}}, {0.6, {190, 200, 170}},
+          {1, {236, 240, 214}}]}
+      }
+
+      color { nodes.Mix: {a: tone, b_value: {0.72, 0.68, 0.42, 1}, factor: midrib} }
+      r { nodes.Split: {input: color, channel: ChannelR} }
+      g { nodes.Split: {input: color, channel: ChannelG} }
+      b { nodes.Split: {input: color, channel: ChannelB} }
+      rgba { nodes.Combine: {r: r, g: g, b: b, a: cover} }
+      Graph: {output: rgba, width: 256, height: 1024}
+    } else {
+      relief { nodes.Multiply: {a: wave, b: leaflets} }
+      bumps { nodes.Normal: {height: relief, strength: 1.5} }
+      Graph: {output: bumps, width: 256, height: 1024, format: GraphLinear}
+    }
+  }
+
+  IslandFrondMap island_frond_albedo(map: MAP_ALBEDO)
+  IslandFrondMap island_frond_normal(map: MAP_NORMAL)
+}

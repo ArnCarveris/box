@@ -270,7 +270,8 @@ static uint64_t box_gpu_cull_draw_slots(
 
 /** Append the level job of a draw with levels of detail for a phase (box_gpu_cull_lod_job_t).
  *
- * The job of the late phase goes to the late jobs of the group, which follow its other jobs.
+ * The job of the late phase goes to the late jobs of the group, which follow its other jobs. A
+ * batch with a DrawRange passes it on, as its passes dither the crossfade between its levels.
  *
  * @param gpu The backend
  * @param packet The packet
@@ -308,8 +309,12 @@ static void box_gpu_cull_lod_add(
         job->fixture = d->lod + 2 * levels + 1;
         if (late) {
             job->exclude = d->lod_base + 1;
-            job->pad = d->lod_stride;
+            job->reach = d->lod_stride;
         }
+    }
+
+    if (box_render_batch_ranged(b)) {
+        ecs_os_memcpy_n(job->range, b->range, float, 3);
     }
 
     if (b->bounded) {
@@ -422,8 +427,16 @@ static uint32_t box_gpu_cull_job(
     job->history = history;
     job->mask = mask;
     job->fixture = b->fixture ? 1u : 0u;
+    if (b->wind && b->wind_reach > 0.0f) {
+        ecs_os_memcpy(&job->reach, &b->wind_reach, ECS_SIZEOF(float));
+    }
+
     if (c->exclude_page && b->instances == c->exclude_page) {
         job->exclude = c->exclude_slot + 1u;
+    }
+
+    if (b->range[0] > 0.0f || b->range[1] > 0.0f) {
+        ecs_os_memcpy_n(job->range, b->range, float, 3);
     }
 
     if (b->bounded) {
@@ -1207,7 +1220,8 @@ static void box_gpu_cull_frustum_all(
 }
 
 /** Give the groups of a view the levels of detail of the view (LodSettings), picked by the
- * distance from a camera, until box_gpu_cull_lod_end.
+ * distance from a camera, until box_gpu_cull_lod_end. The camera is also the one the draw
+ * ranges of the instances are measured from, with or without levels.
  *
  * @param c The cull state
  * @param v The view
@@ -1221,16 +1235,18 @@ static void box_gpu_cull_lod_begin(
     box_gpu_cull_uniforms_t *base)
 {
     int32_t i;
+    glm_vec3_copy(ECS_CONST_CAST(float*, camera), base->camera);
+    base->camera[3] = 1.0f;
     c->lod_levels = v->lod.levels > 1 ? v->lod.levels : 0;
     if (!c->lod_levels) {
         goto done;
     }
 
-    glm_vec3_copy(ECS_CONST_CAST(float*, camera), base->camera);
-    base->camera[3] = 1.0f;
-    for (i = 0; i < BOX_LOD_LEVELS_MAX; i ++) {
+    for (i = 1; i < BOX_LOD_LEVELS_MAX; i ++) {
         base->lod[i] = v->lod.distances[i];
     }
+
+    base->lod[0] = v->lod.fade;
 
 done:
     return;

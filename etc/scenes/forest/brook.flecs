@@ -1,0 +1,697 @@
+using flecs.script
+using flecs.script.math
+using box.app
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+using box.light
+using box.particle
+using state
+using assets
+
+// The brook in its bed (layout.flecs, ground.flecs), flowing east (+X): the water in lengths
+// along the centerline, each flowing along its chord, a calm pool above the cascade that the
+// footbridge crosses, which mirrors the trees and the sky, and a calm reach below it. The ripples
+// and the foam lace travel with the flow, and caustics play on the bed in the sun.
+//
+// Pebbles and stones lie on the bed, mossy stones break the surface and shed foam trails
+// downstream, the banks are wet and dark with roots and overhanging turf, and at CASCADE_X the
+// cascade pours white water, spray and mist, churning foam that the current carries off. The
+// field of ripples and foam that the stones and the cascade feed follows the camera (view.flecs).
+state {
+  // The water lengths: one for every BROOK_SEG meters of X, BROOK_WATER_HALF wide to either side
+  // of their chord, their edges under the banks. The pool (POOL_X0 to CASCADE_X) and the calm
+  // reach (CALM_X0 to CALM_X1) are one length each; the pool is the PlanarReflection of the brook
+  export const BROOK_SEG: f32 = 4
+  export const BROOK_SEGS: i32 = 40
+  export const BROOK_WATER_HALF: f32 = 1.6
+
+  // Speed of the water in m/s: in the pool, in the calm reach, in the run and below the cascade
+  export const FLOW_POOL: f32 = 0.12
+  export const FLOW_CALM: f32 = 0.2
+  export const FLOW_RUN: f32 = 0.5
+  export const FLOW_FALL: f32 = 1.2
+
+  // Meters of water one repeat of the ripple normal covers along the flow
+  export const RIPPLE_ALONG: f32 = 4
+
+  // The field of ripples and foam of the brook: BROOK_RIPPLES_SIZE meters around the camera in
+  // cells of about 5 cm. Foam fades by BROOK_FOAM_DECAY a second, so a trail off a stone in the
+  // run reaches several meters before it thins out into lace
+  export const BROOK_RIPPLES_SIZE: f32 = 48
+  export const BROOK_RIPPLES_RESOLUTION: i32 = 1024
+  export const BROOK_FOAM_DECAY: f32 = 0.25
+  export const BROOK_FOAM_SPREAD: f32 = 0.006
+
+  // Seconds between the clumps of foam the foot of the fall throws off (the async block at the
+  // end)
+  export const BROOK_PUFF_EVERY: f64 = 0.15
+
+  // The pebbles and stones of the bed and the banks lie within BROOK_DETAIL_X of the origin
+  export const BROOK_DETAIL_X: f32 = 44
+
+  // X of a point at distance d to the north (+Z) of the brook centerline at x
+  fn forest_brook_off_x(x: f64, d: f64) -> f64 {
+    const s = forest_brook_slope(x)
+    x - s * d / sqrt(1 + s * s)
+  }
+
+  // Z of a point at distance d to the north (+Z) of the brook centerline at x
+  fn forest_brook_off_z(x: f64, d: f64) -> f64 {
+    const s = forest_brook_slope(x)
+    forest_brook_z(x) + d / sqrt(1 + s * s)
+  }
+
+  // Yaw that turns local +X downstream along the brook at x
+  fn forest_brook_yaw(x: f64) -> f64 {
+    atan2(0 - forest_brook_slope(x), 1)
+  }
+
+  // Yaw that turns local +X along the chord of the centerline from x0 to x1
+  fn forest_brook_chord_yaw(x0: f64, x1: f64) -> f64 {
+    atan2(0 - (forest_brook_z(x1) - forest_brook_z(x0)), x1 - x0)
+  }
+
+  // Length of that chord
+  fn forest_brook_chord(x0: f64, x1: f64) -> f64 {
+    const dz = forest_brook_z(x1) - forest_brook_z(x0)
+    sqrt((x1 - x0) * (x1 - x0) + dz * dz)
+  }
+
+  // X and Z of the velocity of water flowing at speed along the chord from x0 to x1
+  fn forest_brook_flow_x(x0: f64, x1: f64, speed: f64) -> f64 {
+    speed * (x1 - x0) / forest_brook_chord(x0, x1)
+  }
+
+  fn forest_brook_flow_z(x0: f64, x1: f64, speed: f64) -> f64 {
+    speed * (forest_brook_z(x1) - forest_brook_z(x0)) / forest_brook_chord(x0, x1)
+  }
+
+}
+
+assets {
+  // The ripples of the water and the foam that breaks up its edges
+  forest_ripple_h {
+    Gen: {
+      width: 256,
+      height: 256,
+      seed: 61,
+      layers: [
+        {kind: GenNoise, frequency: 6, octaves: 4, amount: 1},
+        {kind: GenNoise, frequency: 24, octaves: 2, amount: 0.25, seed: 1}
+      ]
+    }
+  }
+
+  forest_ripple_n { Gen: {source: forest_ripple_h, output: GenNormal, strength: 1.4} }
+
+  // Foam lace at two scales: high on the walls between small bubbles and away from the middle
+  // of larger holes, broken up into clumps by noise. The foam covers the highest parts first, so
+  // thin foam is a web of bubble walls around holes and thick foam closes them
+  forest_foam_lace_h {
+    Gen: {
+      width: 512,
+      height: 512,
+      seed: 64,
+      layers: [
+        {kind: GenCells, count: 26, amount: 0.5},
+        {kind: GenCells, count: 380, distance: GenEdge, edge: 0.45, amount: -0.45, seed: 1},
+        {kind: GenCells, count: 1500, distance: GenEdge, edge: 0.5, amount: -0.15, seed: 2},
+        {kind: GenNoise, frequency: 6, octaves: 3, amount: 0.4, seed: 3}
+      ]
+    }
+  }
+
+  // Wood of the footbridge: grain streaks along the boards and beams
+  forest_wood_h {
+    Gen: {
+      width: 256,
+      height: 256,
+      seed: 63,
+      layers: [
+        {kind: GenNoise, frequency: 24, octaves: 3, amount: 0.7},
+        {kind: GenNoise, frequency: 4, octaves: 2, amount: 0.3, seed: 1}
+      ]
+    }
+  }
+
+  forest_wood {
+    Gen: {
+      source: forest_wood_h,
+      output: GenAlbedo,
+      colors: [
+        {0, {58, 44, 32}}, {0.45, {104, 82, 60}}, {0.75, {128, 106, 80}}, {1, {150, 128, 100}}
+      ]
+    }
+  }
+
+  forest_wood_n { Gen: {source: forest_wood_h, output: GenNormal, strength: 2.2} }
+
+  // The water of the brook: clear and brownish green, the bed shows through it; a thin band of
+  // foam where it is shallow, against the banks and around the stones, and the foam of the field
+  // of ripples (view.flecs), both broken up into lace. Caustics of cells a few decimeters wide
+  // play on the shallow bed where the sun reaches it.
+  //
+  // The lengths share the texture space of the world, so the ripples and the foam lace run on
+  // across the seams between them. The ripple normal is stretched along the brook (world +X,
+  // which MappingWorld maps to -V on a surface facing up); the WaterFlow of each length moves it
+  // and the foam lace downstream
+  prefab ForestBrookWater {
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 0.04}
+    Water: {
+      shallow_color: {92, 122, 96},
+      deep_color: {28, 52, 44},
+      depth: 0.7,
+      visibility: 3.2,
+      absorption: {150, 162, 118},
+      refraction: 0.012,
+      foam_color: {204, 210, 202},
+      foam_width: 0.018,
+      foam_texture: forest_foam_lace_h,
+      foam_scale: 1.5,
+      ripple_scale: 2.6,
+      ripple_velocity: {0.02, 0.08}
+    }
+    WaterCaustics: {strength: 1.3, scale: 0.3, speed: 0.6, depth: 0.7}
+    PbrTextures: {normal: forest_ripple_n}
+    texture.Mapping: {mode: MappingWorld, size: 1}
+    texture.Transform: {scale_x: 0.8, scale_y: 1 / RIPPLE_ALONG}
+    texture.Layers: {layers: [layer_rain_rings]}
+    NoShadow
+  }
+
+  // Streaks of the white water of the cascade: white foam and clear greenish water, stretched
+  // along the fall by the Transform of ForestFallWater
+  forest_fall_streaks {
+    Gen: {
+      source: forest_ripple_h,
+      output: GenAlbedo,
+      colors: [
+        {0, {120, 150, 140}}, {0.4, {170, 196, 188}}, {0.6, {236, 242, 240}}, {1, {252, 252, 250}}
+      ]
+    }
+  }
+
+  // White water of the cascade, swept along its fall (v along it), its streaks pouring down
+  prefab ForestFallWater {
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 0.3}
+    PbrTextures: {albedo: forest_fall_streaks, normal: forest_ripple_n}
+    texture.Transform: {scale_x: 3, scale_y: 0.35}
+    texture.Scroll: {velocity: {0, -1.6}}
+    Opacity: {0.6}
+    NoShadow
+  }
+
+  // Wet stones of the bed: darker, with a film of water on them. Under the water no snow
+  // settles on them
+  prefab ForestBedStone {
+    Rgb: {150, 146, 136}
+    PbrMaterial: {roughness: 0.6}
+    ClearCoat: {strength: 0.7, roughness: 0.12}
+    PbrTextures: {albedo: rock_albedo, normal: rock_normal, orm: rock_orm}
+    texture.Mapping: {mode: MappingObject, size: 1.5, blend: 0.35}
+    texture.Layers: {layers: [layer_wet]}
+  }
+
+  // Wet dark earth of the banks at the water line
+  prefab ForestWetBank {
+    Rgb: {110, 96, 82}
+    PbrMaterial: {roughness: 0.55}
+    ClearCoat: {strength: 0.6, roughness: 0.18}
+    PbrTextures: {albedo: litter_albedo, normal: litter_normal, orm: litter_orm}
+    texture.Mapping: {mode: MappingWorld, size: 4, blend: 0.4}
+    texture.Layers: {layers: [layer_wet, layer_snow]}
+  }
+
+  // Mossy turf of the banks that overhangs the water
+  prefab ForestTurf {
+    Rgb: {230, 236, 220}
+    PbrMaterial: {roughness: 1}
+    PbrTextures: {albedo: moss_albedo, normal: moss_normal, orm: moss_orm}
+    texture.Mapping: {mode: MappingWorld, size: 6, blend: 0.4}
+    texture.Layers: {layers: [layer_wet, layer_snow]}
+  }
+
+  // Roots out of the banks
+  prefab ForestRoot {
+    Rgb: {92, 72, 56}
+    PbrMaterial: {roughness: 0.8}
+    PbrTextures: {albedo: forest_wood, normal: forest_wood_n}
+    texture.Transform: {scale_x: 1, scale_y: 3}
+    texture.Layers: {layers: [layer_wet, layer_snow]}
+  }
+
+  // Boards of the footbridge along local X, and beams along local Z, the grain along them
+  prefab ForestBoard {
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 0.82}
+    PbrTextures: {albedo: forest_wood, normal: forest_wood_n}
+    texture.Mapping: {mode: MappingObject, size: 1}
+    texture.Transform: {scale_x: 2, scale_y: 0.2}
+    texture.Layers: {layers: [layer_wet, layer_snow]}
+  }
+
+  prefab ForestBeam {
+    Rgb: {200, 196, 190}
+    PbrMaterial: {roughness: 0.86}
+    PbrTextures: {albedo: forest_wood, normal: forest_wood_n}
+    texture.Mapping: {mode: MappingObject, size: 1}
+    texture.Transform: {scale_x: 0.2, scale_y: 2}
+    texture.Layers: {layers: [layer_wet, layer_snow]}
+  }
+
+  // A mossy stone that breaks the surface, its local origin on the water: size meters across,
+  // its half height sy times half its size, its top top above the water. It stands in the current
+  // as a RippleSource the size of its footprint at the waterline, so small standing ripples form
+  // around it and a foam trail streams off it downstream
+  template ForestBrookStone {
+    prop size: f32 = 0.6
+    prop sy: f32 = 0.7
+    prop top: f32 = 0.1
+    prop tilt_x: f32 = 0
+    prop tilt_z: f32 = 0
+
+    const ry = size * sy * 0.5
+    const k = clamp((ry - top) / ry, 0, 0.98)
+    const wl = sqrt(1 - k * k)
+
+    rock : ForestBoulder {
+      Position: {0, top - ry, 0}
+      Rotation: {tilt_x, 0, tilt_z}
+      Scale: {size * 0.55, ry, size * 0.45}
+      IcoSphere: {radius: 1, segments: 2, smooth: true}
+    }
+
+    wake {
+      Position: {0, 0, 0}
+      RippleSource: {extents: {size * 0.55 * wl, size * 0.45 * wl}, strength: 0.25, foam: 1.4}
+    }
+  }
+
+  // The section of the white water of the cascade, a flat lens across the brook
+  prefab forest_fall_shape { Path2D: {start: {-0.45, 0}, segments: [
+    {kind: CubicBezier, end: {0.45, 0}, control1: {-0.45, 0.05}, control2: {0.45, 0.05}}
+    {kind: CubicBezier, end: {-0.45, 0}, control1: {0.45, -0.05}, control2: {-0.45, -0.05}}
+  ], closed: true} }
+  prefab forest_fall_section { Profile2D: {outer: forest_fall_shape} }
+}
+
+forest {
+  brook {
+    // The water: a length along the chord of the centerline for every BROOK_SEG meters of X, a
+    // little longer so the lengths overlap in the bends, every other one 3 mm higher so the
+    // overlaps never fight.
+    //
+    // Each one flows along its chord, its ripples and foam with it, so the flow follows the bends
+    for i in 0..BROOK_SEGS {
+      const x0 = i * BROOK_SEG - WORLD_HALF
+      const x1 = x0 + BROOK_SEG
+      const in_pool = x1 > POOL_X0 && x0 < CASCADE_X
+      const in_calm = x1 > CALM_X0 && x0 < CALM_X1
+
+      if !in_pool && !in_calm {
+        const len = forest_brook_chord(x0, x1)
+        const below = x0 >= CASCADE_X && x0 < CASCADE_X + BROOK_SEG
+        const flow = below ? FLOW_FALL : FLOW_RUN * (0.8 + 0.4 * forest_hash(i, 71))
+
+        "water_{i}" : ForestBrookWater {
+          Position: {
+            (x0 + x1) / 2,
+            forest_brook_water_y(x0 + 0.5) - 0.005 + (i % 2) * 0.003,
+            (forest_brook_z(x0) + forest_brook_z(x1)) / 2
+          }
+          Rotation: {0, forest_brook_chord_yaw(x0, x1), 0}
+          Box: {len + 0.2, 0.01, 2 * BROOK_WATER_HALF}
+          WaterFlow: {
+            velocity: {forest_brook_flow_x(x0, x1, flow), forest_brook_flow_z(x0, x1, flow)},
+            textures: true
+          }
+        }
+      }
+    }
+
+    // The calm pool above the cascade, under the footbridge: slow, smooth, a mirror of the trees
+    // and the sky. It ends at the lip of the ledge. The pool and the calm reach sit 3 mm off the
+    // lengths they overlap
+    pool : ForestBrookWater {
+      Position: {
+        (POOL_X0 + CASCADE_X) / 2 - 0.05,
+        BROOK_WATER_Y - 0.002,
+        (forest_brook_z(POOL_X0) + forest_brook_z(CASCADE_X)) / 2
+      }
+      Rotation: {0, forest_brook_chord_yaw(POOL_X0, CASCADE_X), 0}
+      Box: {forest_brook_chord(POOL_X0, CASCADE_X) + 0.1, 0.01, 2 * BROOK_WATER_HALF}
+      PbrMaterial: {roughness: 0.02}
+      WaterFlow: {
+        velocity: {
+          forest_brook_flow_x(POOL_X0, CASCADE_X, FLOW_POOL),
+          forest_brook_flow_z(POOL_X0, CASCADE_X, FLOW_POOL)
+        },
+        textures: true
+      }
+      PlanarReflection: {resolution: 0.5, clip_offset: 0.03, distortion: 0.02}
+    }
+
+    // The calm reach downstream. It reflects the scene probe and the sky, not a PlanarReflection
+    // of its own: a mirrored image draws every tree in its frustum again, with no occlusion
+    // culling, which costs more than the reach farther from the clearing shows
+    calm : ForestBrookWater {
+      Position: {
+        (CALM_X0 + CALM_X1) / 2,
+        BROOK_WATER_Y - CASCADE_DROP - 0.005,
+        (forest_brook_z(CALM_X0) + forest_brook_z(CALM_X1)) / 2
+      }
+      Rotation: {0, forest_brook_chord_yaw(CALM_X0, CALM_X1), 0}
+      Box: {forest_brook_chord(CALM_X0, CALM_X1) + 0.2, 0.01, 2 * BROOK_WATER_HALF}
+      PbrMaterial: {roughness: 0.03}
+      WaterFlow: {
+        velocity: {
+          forest_brook_flow_x(CALM_X0, CALM_X1, FLOW_CALM),
+          forest_brook_flow_z(CALM_X0, CALM_X1, FLOW_CALM)
+        },
+        textures: true
+      }
+    }
+
+    // Pebbles and rounded stones on the bed under the water, more small ones than big ones, off
+    // the ledge of the cascade
+    for i in 0..280 {
+      const x = (forest_hash(i, 101) * 2 - 1) * BROOK_DETAIL_X
+      const d = (forest_hash(i, 102) * 2 - 1) * (BROOK_HALF_WIDTH - 0.05)
+      const h = forest_hash(i, 103)
+      const s = 0.05 + h * h * 0.22
+
+      if abs(x - CASCADE_X) > 0.8 {
+        "pebble_{i}" : ForestBedStone {
+          Position: {
+            forest_brook_off_x(x, d),
+            forest_brook_bed_y_at(x, d) + s * 0.12,
+            forest_brook_off_z(x, d)
+          }
+          Rotation: {
+            forest_hash(i, 104) * 0.4 - 0.2,
+            forest_hash(i, 105) * 6.28,
+            forest_hash(i, 106) * 0.4 - 0.2
+          }
+          Scale: {s, s * (0.45 + forest_hash(i, 107) * 0.2), s * (0.7 + forest_hash(i, 108) * 0.3)}
+          IcoSphere: {radius: 1, segments: 1, smooth: true}
+        }
+      }
+    }
+
+    // Mossy stones that break the surface, foam streaming off them; off the footbridge and the
+    // cascade
+    for i in 0..22 {
+      const x = (forest_hash(i, 111) * 2 - 1) * (BROOK_DETAIL_X - 4)
+      const d = (forest_hash(i, 112) * 2 - 1) * 0.75
+      const size = 0.5 + forest_hash(i, 113) * 0.35
+      const sy = 0.6 + forest_hash(i, 114) * 0.2
+      const clear = abs(x - CROSSING_X) > BRIDGE_HALF_WIDTH + size && abs(x - CASCADE_X) > 1.2
+
+      if clear {
+        ForestBrookStone "stone_{i}"(
+          size: size,
+          sy: sy,
+          top: 0.08 + forest_hash(i, 115) * 0.06,
+          tilt_x: forest_hash(i, 116) * 0.3 - 0.15,
+          tilt_z: forest_hash(i, 118) * 0.3 - 0.15
+        ) {
+          Position: {forest_brook_off_x(x, d), forest_brook_water_y(x), forest_brook_off_z(x, d)}
+          Rotation: {0, forest_hash(i, 117) * 6.28, 0}
+        }
+      }
+    }
+
+    // Wet dark banks at the water line to either side, lumps of wet earth half under the water
+    for i in 0..110 {
+      const side = i % 2 == 0 ? -1 : 1
+      const x = (floor(i / 2) + forest_hash(i, 121) * 0.6) * 1.6 - BROOK_DETAIL_X
+      const d = side * (BROOK_HALF_WIDTH + 0.05 + forest_hash(i, 122) * 0.12)
+
+      if abs(x - CASCADE_X) > 0.6 {
+        "wet_{i}" : ForestWetBank {
+          Position: {
+            forest_brook_off_x(x, d),
+            forest_brook_water_y(x) - 0.03,
+            forest_brook_off_z(x, d)
+          }
+          Rotation: {0, forest_brook_yaw(x) + forest_hash(i, 123) * 0.3 - 0.15, 0}
+          Scale: {0.9 + forest_hash(i, 124) * 0.5, 0.07 + forest_hash(i, 125) * 0.04, 0.3}
+          IcoSphere: {radius: 1, segments: 2, smooth: true}
+        }
+      }
+    }
+
+    // Overhanging turf at the top of the banks, its edge out over the slope toward the water,
+    // off the footbridge
+    for i in 0..56 {
+      const side = forest_hash(i, 131) < 0.5 ? -1 : 1
+      const x = (i + forest_hash(i, 132) * 0.7) * 1.5 - BROOK_DETAIL_X + 1
+      const d = side * (BROOK_BANK - 0.2 + forest_hash(i, 133) * 0.15)
+
+      if abs(x - CROSSING_X) > BRIDGE_HALF_WIDTH + 1 && abs(x - CASCADE_X) > 1.2 {
+        "turf_{i}" : ForestTurf {
+          Position: {forest_brook_off_x(x, d), -0.03, forest_brook_off_z(x, d)}
+          Rotation: {0, forest_brook_yaw(x) + forest_hash(i, 134) * 0.4 - 0.2, side * 0.08}
+          Scale: {0.7 + forest_hash(i, 135) * 0.5, 0.1 + forest_hash(i, 136) * 0.04, 0.5}
+          IcoSphere: {radius: 1, segments: 2, smooth: true}
+        }
+      }
+    }
+
+    // Roots out of the banks, reaching down toward the water. Each is turned along the brook at
+    // its foot, its axis (local Y) tilted out over the slope by a roll about the brook
+    for i in 0..26 {
+      const side = forest_hash(i, 141) < 0.5 ? -1 : 1
+      const x = (i + forest_hash(i, 142) * 0.8) * 3.2 - BROOK_DETAIL_X + 2
+      const d = side * (BROOK_STEP + 0.55 + forest_hash(i, 143) * 0.3)
+      const len = 0.9 + forest_hash(i, 144) * 0.6
+      // Close to the slope of the bank, a little steeper
+      const tilt = 1.38 + forest_hash(i, 145) * 0.12
+
+      if abs(x - CROSSING_X) > BRIDGE_HALF_WIDTH + 1 && abs(x - CASCADE_X) > 1.2 {
+        "root_{i}" {
+          Position: {
+            forest_brook_off_x(x, d),
+            forest_brook_bed_y_at(x, d) + 0.03,
+            forest_brook_off_z(x, d)
+          }
+          Rotation: {0, forest_brook_yaw(x) + forest_hash(i, 146) * 0.5 - 0.25, 0}
+
+          wood : ForestRoot {
+            Position: {0, 0, 0}
+            Rotation: {side * tilt, 0, 0}
+            Cylinder: {length: len, radius: 0.025 + forest_hash(i, 147) * 0.025, segments: 6}
+          }
+        }
+      }
+    }
+
+    // The cascade: a ledge of rock across the brook at CASCADE_X, turned along the pool that ends
+    // at its lip, mossy stones on the lip and to either side that close the step of the banks,
+    // and the water pouring over it into the white water below
+    cascade {
+      Position: {CASCADE_X, 0, forest_brook_z(CASCADE_X)}
+      Rotation: {0, forest_brook_chord_yaw(POOL_X0, CASCADE_X), 0}
+
+      const ledge_top = BROOK_WATER_Y - 0.02
+      const ledge_bottom = BROOK_BED_Y - CASCADE_DROP - 0.1
+
+      ledge : ForestBedStone {
+        Position: {-0.3, (ledge_top + ledge_bottom) / 2, 0}
+        Box: {0.6, ledge_top - ledge_bottom, 2 * BROOK_BANK + 0.4}
+      }
+
+      // Stones on the lip, the water pours between them and foams against them
+      for k in 0..4 {
+        const zk = match k {
+          0: -1.0
+          1: -0.62
+          2: 0.58
+          _: 1.2
+        }
+        const size = 0.42 + forest_hash(k, 151) * 0.2
+
+        "lip_{k}" : ForestBoulder {
+          Position: {-0.15 + forest_hash(k, 152) * 0.15, BROOK_WATER_Y - 0.02, zk}
+          Rotation: {0, forest_hash(k, 153) * 6.28, 0}
+          Scale: {size * 0.5, size * 0.32, size * 0.42}
+          IcoSphere: {radius: 1, segments: 2, smooth: true}
+          RippleSource: {extents: {0.9, 0.9}, strength: 0.4, foam: 0.4}
+        }
+      }
+
+      // The banks to either side of the step
+      for k in 0..2 {
+        const side = k == 0 ? -1 : 1
+
+        "bank_{k}" : ForestBoulder {
+          Position: {0.05, -0.12, side * 1.95}
+          Rotation: {0, 0.6 + k * 1.9, 0}
+          Scale: {0.75, 0.42, 0.8}
+          IcoSphere: {radius: 1, segments: 2, smooth: true}
+        }
+
+        "bank_low_{k}" : ForestBoulder {
+          Position: {0.5, BROOK_WATER_Y - CASCADE_DROP + 0.05, side * 1.35}
+          Rotation: {0, 1.3 + k * 2.2, 0}
+          Scale: {0.45, 0.28, 0.4}
+          IcoSphere: {radius: 1, segments: 2, smooth: true}
+        }
+      }
+
+      // The fall of the water over the lip, local +X downstream, from the pool down to the water
+      // below, CASCADE_DROP lower
+      fall_path { Path3D: {start: {-0.1, BROOK_WATER_Y + 0.01, 0}, segments: [
+        {kind: CubicBezier, end: {0.32, BROOK_WATER_Y - CASCADE_DROP - 0.02, 0},
+          control1: {0.1, BROOK_WATER_Y + 0.01, 0}, control2: {0.22, BROOK_WATER_Y - 0.2, 0}}
+      ]} }
+
+      // The water over the lip, the main chute and a narrow spill
+      fall : ForestFallWater {
+        Position: {0, 0, -0.02}
+        Sweep: {
+          path: fall_path,
+          profile: assets.forest_fall_section,
+          taper: 1.25,
+          segments: 6,
+          rings: 16
+        }
+      }
+
+      spill : ForestFallWater {
+        Position: {0, 0, 0.9}
+        Sweep: {
+          path: fall_path,
+          profile: assets.forest_fall_section,
+          scale: {0.3, 0.6},
+          taper: 1.4,
+          segments: 4,
+          rings: 12
+        }
+      }
+
+      // The foot of the fall: the falling water churns white foam across the brook, which the fast
+      // water below carries off downstream
+      foot {
+        Position: {0.45, BROOK_WATER_Y - CASCADE_DROP, 0.1}
+        RippleSource: {extents: {0.25, 0.65}, strength: 0.5, foam: 0.55}
+      }
+
+      // White water churning at the foot of the fall
+      churn {
+        Position: {0.4, BROOK_WATER_Y - CASCADE_DROP + 0.03, 0}
+        Emitter: {
+          max: 360, rate: 180, shape: EmitterBox, extents: {0.2, 0.02, 0.5},
+          direction: {1, 0.7, 0}, spread: 55, speed: {0.2, 0.7},
+          lifetime: {0.6, 1.3}, size: {0.07, 0.2}, opacity: {0.5, 0.9},
+          acceleration: {0, -2.5, 0}, color: {236, 242, 240}, seed: 21
+        }
+        Appearance: {softness: 0.06, lit: 1}
+        Curves: {
+          opacity: {keys: [{0, 0}, {0.1, 1}, {0.6, 0.7}, {1, 0}]}
+          size: {keys: [{0, 0.6}, {1, 1.6}]}
+        }
+        Collision: {height: BROOK_WATER_Y - CASCADE_DROP - 0.01, bounce: 0, friction: 1}
+      }
+
+      // Fine spray thrown up from the foot of the fall that catches the light
+      spray {
+        Position: {0.3, BROOK_WATER_Y - CASCADE_DROP + 0.06, 0}
+        Emitter: {
+          max: 500, rate: 260, shape: EmitterBox, extents: {0.1, 0.03, 0.45},
+          direction: {0.6, 1, 0}, spread: 40, speed: {0.9, 2.1},
+          lifetime: {0.5, 1}, size: {0.02, 0.045}, opacity: {0.6, 1},
+          acceleration: {0, -9.8, 0}, color: {248, 252, 255}, seed: 22
+        }
+        Appearance: {stretch: 0.03, lit: 1}
+        Curves: {opacity: {keys: [{0, 0}, {0.1, 1}, {0.7, 0.8}, {1, 0}]}}
+        Collision: {height: BROOK_WATER_Y - CASCADE_DROP - 0.01, die: true}
+      }
+
+      // A faint mist over the foot of the fall
+      mist {
+        Position: {0.6, BROOK_WATER_Y - CASCADE_DROP + 0.15, 0}
+        Emitter: {
+          max: 60, rate: 14, shape: EmitterBox, extents: {0.35, 0.08, 0.6},
+          direction: {0.3, 1, 0}, spread: 50, speed: {0.05, 0.2},
+          lifetime: {2, 3.5}, size: {0.3, 0.7}, opacity: {0.04, 0.09},
+          color: {236, 244, 248}, seed: 23
+        }
+        Appearance: {softness: 0.3, lit: 1}
+        Curves: {opacity: {keys: [{0, 0}, {0.3, 1}, {1, 0}]}, size: {keys: [{0, 0.6}, {1, 1.6}]}}
+      }
+    }
+
+    // The footbridge where the path crosses: two beams on sills on the banks, boards across them
+    // and a handrail to either side; local +Z along the path
+    bridge {
+      Position: {CROSSING_X, 0, CROSSING_Z}
+      Rotation: {0, atan2(forest_path_slope(CROSSING_Z), 1), 0}
+
+      for k in 0..2 {
+        const side = k == 0 ? -1 : 1
+
+        "sill_{k}" : ForestBoard {
+          Position: {0, 0.07, side * (BRIDGE_HALF_SPAN - 0.35)}
+          Box: {2 * BRIDGE_HALF_WIDTH + 0.5, 0.16, 0.3}
+        }
+
+        "beam_{k}" : ForestBeam {
+          Position: {side * (BRIDGE_HALF_WIDTH - 0.2), 0.24, 0}
+          Box: {0.16, 0.18, 2 * BRIDGE_HALF_SPAN}
+        }
+
+        "rail_{k}" : ForestBeam {
+          Position: {side * BRIDGE_HALF_WIDTH, 1.02, 0}
+          Box: {0.07, 0.07, 2 * BRIDGE_HALF_SPAN - 0.5}
+        }
+
+        // Posts on the ends of the boards
+        for j in 0..3 {
+          "post_{k}_{j}" : ForestBeam {
+            Position: {side * BRIDGE_HALF_WIDTH, 0.72, (j - 1) * (BRIDGE_HALF_SPAN - 0.3)}
+            Box: {0.09, 0.68, 0.09}
+          }
+        }
+      }
+
+      for j in 0..30 {
+        const z = (j + 0.5) / 30 * (2 * BRIDGE_HALF_SPAN - 0.1) - BRIDGE_HALF_SPAN + 0.05
+
+        "board_{j}" : ForestBoard {
+          Position: {forest_hash(j, 161) * 0.06 - 0.03, 0.355 + forest_hash(j, 162) * 0.01, z}
+          Rotation: {0, forest_hash(j, 163) * 0.04 - 0.02, 0}
+          Box: {2 * BRIDGE_HALF_WIDTH + 0.1, 0.045, 0.2}
+        }
+      }
+    }
+  }
+}
+
+// The foot of the fall throws off clumps of white foam: every BROOK_PUFF_EVERY seconds a puff
+// of a changing size lands at a changing place across the brook (box.material.foam_at on the
+// field of ripples, view.flecs), so the foam the fast water carries off comes in clumps that
+// drift downstream and break into lace instead of a steady sheet
+async {
+  mut t: f64 = 0
+  mut puffs: f64 = 0
+
+  while true {
+    await next_frame()
+    t += box.app.Status[box.app.Status].delta_time
+
+    if t / state.BROOK_PUFF_EVERY > puffs {
+      puffs += 1
+      const d = (state.forest_hash(puffs, 181) - 0.5) * 1.5
+      const x = state.CASCADE_X + 0.55 + state.forest_hash(puffs, 182) * 0.3
+      const size = state.forest_hash(puffs, 183)
+      const f = box.material.foam_at(forest.brook.pool,
+        {state.forest_brook_off_x(x, d), 0, state.forest_brook_off_z(x, d)},
+        0.12 + size * 0.2, 0.5 + size * 0.6)
+    }
+  }
+}

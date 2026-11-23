@@ -1,0 +1,239 @@
+using flecs.script
+using flecs.script.math
+using state
+
+// The layout of the forest, as constants and functions that place things. The world is
+// WORLD_SIZE meters square around the origin, in meters, Y up. A clearing lies around the origin,
+// where the camera starts. A brook runs along X across the south (-Z) side of the clearing and
+// on into the forest at both ends; a footpath runs along Z through the clearing and crosses the
+// brook. The forest grows all around, denser toward the edges (BACKDROP_START), and beyond the
+// world a tree line and hills close the horizon (ground.flecs).
+//
+// The ground is at Y = 0 in the clearing and close to it in the forest, where gentle mounds rise
+// a little; particles collide with the plane Y = 0. The brook bed is cut below 0
+// (forest_brook_bed_y); its water is at forest_brook_water_y. The brook flows east (+X) and drops
+// CASCADE_DROP over a rock ledge at CASCADE_X: east of it its bed and water are that much lower.
+//
+// The layout mask of the forest floor (floor.flecs) evaluates the same curves on the GPU,
+// from the same constants, so the path and the pebbles of the floor line up with these
+// functions.
+state {
+  export const WORLD_SIZE: f32 = 160
+  export const WORLD_HALF: f32 = WORLD_SIZE / 2
+
+  // The forest thickens into a cheaper backdrop past BACKDROP_START from the origin along X or Z
+  export const BACKDROP_START: f32 = 55
+
+  // The clearing: within CLEARING_R of the origin, the edge waving in and out by the two terms
+  // of forest_clearing_edge
+  export const CLEARING_R: f32 = 12.5
+  export const CLEARING_A1: f32 = 1.2
+  export const CLEARING_K1: f32 = 0.31
+  export const CLEARING_P1: f32 = 0.4
+  export const CLEARING_A2: f32 = 1
+  export const CLEARING_K2: f32 = 0.27
+  export const CLEARING_P2: f32 = 1.1
+
+  // The brook: its centerline is at z = forest_brook_z(x), BROOK_Z plus two sines, from one
+  // edge of the world to the other. The water is BROOK_HALF_WIDTH to either side of it at
+  // BROOK_WATER_Y. The bed is flat at BROOK_BED_Y out to BROOK_BED_HALF, rises steeply to
+  // BROOK_STEP_Y at BROOK_STEP and gently to the floor at BROOK_BANK; flat rims BROOK_RIM_Y
+  // above the floor reach out to BROOK_RIM.
+  export const BROOK_Z: f32 = -9
+  export const BROOK_A1: f32 = 4
+  export const BROOK_K1: f32 = 0.042
+  export const BROOK_P1: f32 = 0.5
+  export const BROOK_A2: f32 = 1.5
+  export const BROOK_K2: f32 = 0.11
+  export const BROOK_P2: f32 = 2.1
+  export const BROOK_HALF_WIDTH: f32 = 1.1
+  export const BROOK_WATER_Y: f32 = -0.2
+  export const BROOK_BED_Y: f32 = -0.4
+  export const BROOK_BED_HALF: f32 = 0.6
+  export const BROOK_STEP: f32 = 1.3
+  export const BROOK_STEP_Y: f32 = -0.14
+  export const BROOK_BANK: f32 = 2.6
+  export const BROOK_RIM: f32 = 3.9
+  export const BROOK_RIM_Y: f32 = 0.01
+  // The forest floor stays FLOOR_GAP along Z clear of the centerline (ground.flecs)
+  export const FLOOR_GAP: f32 = 3
+
+  // The cascade: at CASCADE_X the brook drops CASCADE_DROP over a rock ledge, downstream of it
+  // the bed and the water are that much lower (forest_brook_drop). Above it the brook widens
+  // into a calm pool from POOL_X0 to the ledge, which the footpath crosses on a footbridge;
+  // a second calm reach runs from CALM_X0 to CALM_X1 downstream (brook.flecs)
+  export const CASCADE_X: f32 = 8
+  export const CASCADE_DROP: f32 = 0.45
+  export const POOL_X0: f32 = -4
+  export const CALM_X0: f32 = 16
+  export const CALM_X1: f32 = 28
+
+  // The footbridge spans BRIDGE_HALF_SPAN along the path to either side of the crossing, over
+  // the banks, and is BRIDGE_HALF_WIDTH wide to either side of the path
+  export const BRIDGE_HALF_SPAN: f32 = 3.5
+  export const BRIDGE_HALF_WIDTH: f32 = 0.65
+
+  // The footpath: its centerline is at x = forest_path_x(z), PATH_X plus two sines; the worn
+  // ground is PATH_HALF_WIDTH to either side
+  export const PATH_X: f32 = 1.5
+  export const PATH_A1: f32 = 2
+  export const PATH_K1: f32 = 0.045
+  export const PATH_P1: f32 = 0.8
+  export const PATH_A2: f32 = 1
+  export const PATH_K2: f32 = 0.12
+  export const PATH_P2: f32 = 2.4
+  export const PATH_HALF_WIDTH: f32 = 0.65
+
+  // Zones of forest_zone
+  export const ZONE_CLEARING: i32 = 0
+  export const ZONE_FOREST: i32 = 1
+  export const ZONE_BACKDROP: i32 = 2
+
+  // Z of the brook centerline at x
+  fn forest_brook_z(x: f64) -> f64 {
+    BROOK_Z + BROOK_A1 * sin(BROOK_K1 * x + BROOK_P1) + BROOK_A2 * sin(BROOK_K2 * x + BROOK_P2)
+  }
+
+  // dz/dx of the brook centerline at x
+  fn forest_brook_slope(x: f64) -> f64 {
+    (BROOK_A1 * BROOK_K1 * cos(BROOK_K1 * x + BROOK_P1) +
+      BROOK_A2 * BROOK_K2 * cos(BROOK_K2 * x + BROOK_P2))
+  }
+
+  // Distance from (x, z) to the brook centerline, close to exact within a few meters of it
+  fn forest_brook_distance(x: f64, z: f64) -> f64 {
+    const s = forest_brook_slope(x)
+    abs(z - forest_brook_z(x)) / sqrt(1 + s * s)
+  }
+
+  // Which side of the brook (x, z) is on: 1 north (+Z), -1 south
+  fn forest_brook_side(x: f64, z: f64) -> f64 {
+    z >= forest_brook_z(x) ? 1 : -1
+  }
+
+  // How much lower the bed and the water of the brook are at x than above the cascade
+  fn forest_brook_drop(x: f64) -> f64 {
+    x >= CASCADE_X ? CASCADE_DROP : 0
+  }
+
+  // Height of the water of the brook at x
+  fn forest_brook_water_y(x: f64) -> f64 {
+    BROOK_WATER_Y - forest_brook_drop(x)
+  }
+
+  // Height of the brook bed at a distance from its centerline where it is drop lower than above
+  // the cascade, 0 past BROOK_BANK, as the slabs of the bed in ground.flecs: the bottom and the
+  // inner banks are drop lower, the outer banks rise from there to the floor
+  fn forest_brook_bed_y_drop(d: f64, drop: f64) -> f64 {
+    const a = abs(d)
+    a >= BROOK_BANK ? 0 : (
+      a >= BROOK_STEP ? forest_lerp(BROOK_STEP_Y - drop, 0, (a - BROOK_STEP) / (BROOK_BANK - BROOK_STEP)) : (
+      a >= BROOK_BED_HALF ? forest_lerp(BROOK_BED_Y, BROOK_STEP_Y, (a - BROOK_BED_HALF) / (BROOK_STEP - BROOK_BED_HALF)) - drop :
+      BROOK_BED_Y - drop))
+  }
+
+  // Height of the brook bed above the cascade at a distance from its centerline
+  fn forest_brook_bed_y(d: f64) -> f64 {
+    forest_brook_bed_y_drop(d, 0)
+  }
+
+  // Height of the brook bed at x at a distance d from its centerline
+  fn forest_brook_bed_y_at(x: f64, d: f64) -> f64 {
+    forest_brook_bed_y_drop(d, forest_brook_drop(x))
+  }
+
+  // X of the path centerline at z
+  fn forest_path_x(z: f64) -> f64 {
+    PATH_X + PATH_A1 * sin(PATH_K1 * z + PATH_P1) + PATH_A2 * sin(PATH_K2 * z + PATH_P2)
+  }
+
+  // dx/dz of the path centerline at z
+  fn forest_path_slope(z: f64) -> f64 {
+    PATH_A1 * PATH_K1 * cos(PATH_K1 * z + PATH_P1) + PATH_A2 * PATH_K2 * cos(PATH_K2 * z + PATH_P2)
+  }
+
+  // Distance from (x, z) to the path centerline
+  fn forest_path_distance(x: f64, z: f64) -> f64 {
+    const s = forest_path_slope(z)
+    abs(x - forest_path_x(z)) / sqrt(1 + s * s)
+  }
+
+  // Radius of the clearing edge at (x, z)
+  fn forest_clearing_edge(x: f64, z: f64) -> f64 {
+    (CLEARING_R + CLEARING_A1 * sin(CLEARING_K1 * x + CLEARING_P1) +
+      CLEARING_A2 * cos(CLEARING_K2 * z + CLEARING_P2))
+  }
+
+  // Distance from (x, z) out of the clearing, below 0 inside it
+  fn forest_clearing_distance(x: f64, z: f64) -> f64 {
+    sqrt(x * x + z * z) - forest_clearing_edge(x, z)
+  }
+
+  fn forest_in_clearing(x: f64, z: f64) -> bool {
+    forest_clearing_distance(x, z) < 0
+  }
+
+  // Zone of (x, z): ZONE_CLEARING, ZONE_FOREST or ZONE_BACKDROP toward the edges
+  fn forest_zone(x: f64, z: f64) -> i32 {
+    forest_in_clearing(x, z) ? ZONE_CLEARING : (
+      max(abs(x), abs(z)) > BACKDROP_START ? ZONE_BACKDROP : ZONE_FOREST)
+  }
+
+  // Inside the world
+  fn forest_in_world(x: f64, z: f64, margin: f64) -> bool {
+    abs(x) < WORLD_HALF - margin && abs(z) < WORLD_HALF - margin
+  }
+
+  // Something of radius r at (x, z) stays out of the brook bed and off the path
+  fn forest_free(x: f64, z: f64, r: f64) -> bool {
+    forest_brook_distance(x, z) > BROOK_BANK + r && forest_path_distance(x, z) > PATH_HALF_WIDTH + r
+  }
+
+  // Height of the ground at (x, z): 0, or the brook bed. The mounds of ground.flecs rise up to
+  // half a meter above it in the forest, away from the clearing, brook and path
+  fn forest_ground_y(x: f64, z: f64) -> f64 {
+    forest_brook_bed_y_at(x, forest_brook_distance(x, z))
+  }
+
+  // The gentle mounds of the forest floor (ground.flecs): flattened spheres rx by ry by rz,
+  // turned by their yaw, their middle 0.55 ry below the floor, so they rise 0.45 ry above it.
+  // A mound is only placed away from the clearing, the brook and the path
+  export const MOUND_COUNT: i32 = 48
+
+  fn forest_mound_x(i: f64) -> f64 {
+    (forest_hash(i, 1) * 2 - 1) * (WORLD_HALF - 8)
+  }
+
+  fn forest_mound_z(i: f64) -> f64 {
+    (forest_hash(i, 2) * 2 - 1) * (WORLD_HALF - 8)
+  }
+
+  fn forest_mound_rx(i: f64) -> f64 {
+    2.5 + forest_hash(i, 3) * 3.5
+  }
+
+  fn forest_mound_rz(i: f64) -> f64 {
+    forest_mound_rx(i) * (0.7 + forest_hash(i, 4) * 0.5)
+  }
+
+  fn forest_mound_ry(i: f64) -> f64 {
+    0.45 + forest_hash(i, 5) * 0.55
+  }
+
+  fn forest_mound_yaw(i: f64) -> f64 {
+    forest_hash(i, 6) * 6.28
+  }
+
+  fn forest_mound_placed(i: f64) -> bool {
+    const x = forest_mound_x(i)
+    const z = forest_mound_z(i)
+    const rx = forest_mound_rx(i)
+    forest_clearing_distance(x, z) > rx + 2 && forest_free(x, z, rx + 1)
+  }
+
+  // Where the footpath crosses the brook: the path and the brook centerlines, each nearly
+  // straight there, met by alternating between them
+  export const CROSSING_X: f32 = forest_path_x(forest_brook_z(forest_path_x(forest_brook_z(
+    forest_path_x(forest_brook_z(PATH_X))))))
+  export const CROSSING_Z: f32 = forest_brook_z(CROSSING_X)
+}

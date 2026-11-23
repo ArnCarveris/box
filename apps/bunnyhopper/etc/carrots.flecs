@@ -10,7 +10,7 @@ using box.material
 using bunnyhopper
 
 $ {
-  box.view.Scene: {diffuse_transmission: true}
+  box.view.Scene: {shader_features: {Extended: {diffuse_transmission: true}}}
 }
 
 // Depth the carrot reaches into the ground

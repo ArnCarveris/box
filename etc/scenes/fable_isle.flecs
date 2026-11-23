@@ -10,6 +10,7 @@ include fable_isle/village
 include fable_isle/hud
 include fable_isle/audio
 include fable_isle/creatures
+include fable_isle/whale
 
 using flecs.script
 using flecs.script.math
@@ -31,7 +32,15 @@ window { Surface: {width: 1600, height: 1000, vsync: true} }
 sun {
   DirectionalLight: {intensity: 3 * PI}
   Rgb: {255, 248, 236}
-  Cookie: {texture: isle_cloud_h, size: 460, height: 400, threshold: 0.42, softness: 0.1, strength: 0.42, velocity: {3 + wind * 12, 1.5 + wind * 5}}
+  Cookie: {
+    texture: isle_cloud_h,
+    size: 460,
+    height: 400,
+    threshold: 0.42,
+    softness: 0.1,
+    strength: 0.42,
+    velocity: {3 + wind * 12, 1.5 + wind * 5}
+  }
 }
 
 moon {
@@ -68,14 +77,36 @@ sky {
   }
 }
 
-cloud_sea { CloudLayer: {texture: isle_cloud_h, size: 2600, altitude: -170, threshold: 0.58, softness: 0.05, velocity: {4 + wind * 14, 2 + wind * 6}} }
-cloud_high { CloudLayer: {texture: isle_cloud_h, size: 9000, altitude: 1600, threshold: 0.7, softness: 0.16, density: 0.5, offset: {700, 300}, velocity: {6 + wind * 20, 3}} }
+cloud_sea {
+  CloudLayer: {
+    texture: isle_cloud_h,
+    size: 2600,
+    altitude: -170,
+    threshold: 0.58,
+    softness: 0.05,
+    velocity: {4 + wind * 14, 2 + wind * 6}
+  }
+}
+
+cloud_high {
+  CloudLayer: {
+    texture: isle_cloud_h,
+    size: 9000,
+    altitude: 1600,
+    threshold: 0.7,
+    softness: 0.16,
+    density: 0.5,
+    offset: {700, 300},
+    velocity: {6 + wind * 20, 3}
+  }
+}
 
 $ {
   box.app.FpsTarget: {60}
   Scene: {reflections: true, punctual_shadows: true, environment: true, aerial_perspective: true,
-    blend_modes: true, transmission: true, triplanar: true, clear_coat: true, sheen: true,
-    diffuse_transmission: true, texture_scroll: true, water: true, fresnel: true, alpha_cutout: true, cookies: true}
+    cookies: true, shader_features: {Extended: {blend_modes: true, transmission: true,
+    triplanar: true, clear_coat: true, sheen: true, diffuse_transmission: true,
+    texture_scroll: true, water: true, fresnel: true, alpha_cutout: true}}}
 }
 
 rig {
@@ -107,17 +138,41 @@ isle {
 view {
   isle_contact { Gtao: {radius: 0.8, final_value_power: 2} }
   isle_bloom { Bloom: {intensity: 0.16, threshold: 1.2, threshold_softness: 0.5} }
-  isle_exposure { AutoExposure: {min_log_luma: -11, min_brightness: 0.16, max_brightness: 0.4, exposure_compensation: -1.5 + 2 * daylight, max_exposure: 5} }
+  isle_exposure {
+    AutoExposure: {
+      min_log_luma: -11,
+      min_brightness: 0.16,
+      max_brightness: 0.4,
+      exposure_compensation: -1.5 + 2 * daylight,
+      max_exposure: 5
+    }
+  }
+
   isle_film { Tonemap: {auto_exposure: isle_exposure, operator_: TonyMcMapface} }
   isle_grade { ColorGrading: {contrast: 1.03, saturation: 1.05} }
   isle_edges { Smaa: {} }
 
   View: {
-    camera: cam_pick == CAM_TRAIN ? isle.lookup("railway").lookup("pivot").lookup("loco").lookup("cam") : cam_pick == CAM_BALLOON ? isle.lookup("skylife").lookup("balloon_0").lookup("rig").lookup("cam") : rig.arm.eye,
+    camera: cam_pick == CAM_TRAIN ?
+      isle.lookup("railway").lookup("pivot").lookup("loco").lookup("cam") :
+      cam_pick == CAM_BALLOON ?
+      isle.lookup("skylife").lookup("balloon_0").lookup("rig").lookup("cam") : rig.arm.eye,
     clear: {enabled: true, color: {10, 12, 20, 255}},
-    lighting: {enabled: true, reflections: true, atmosphere: true, environment: {source: sky, intensity: 1, background: false}},
-    shadows: {enabled: true, resolution: 4096, max_distance: 220},
-    effects: [{effect: isle_contact}, {effect: sky}, {effect: isle_bloom}, {effect: isle_film}, {effect: isle_grade}, {effect: isle_edges}]
+    lighting: {
+      enabled: true,
+      reflections: true,
+      atmosphere: true,
+      environment: {source: sky, intensity: 1, background: false}
+    },
+    shadows: {enabled: true, cascades: 3, resolution: 2048, interval: [1, 2, 2], max_distance: 220},
+    effects: [
+      {effect: isle_contact},
+      {effect: sky},
+      {effect: isle_bloom},
+      {effect: isle_film},
+      {effect: isle_grade},
+      {effect: isle_edges}
+    ]
   }
 }
 
@@ -128,10 +183,13 @@ async {
     await next_frame()
     const status = sky[TimeOfDayStatus]
     const dark = status.sun_altitude < -2
+
     if dark != night {
       night = dark
     }
+
     const level = round(clamp((status.sun_altitude + 8) / 8, 0, 1) * 40) / 40
+
     if level != daylight {
       daylight = level
     }

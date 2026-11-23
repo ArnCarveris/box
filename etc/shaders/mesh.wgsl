@@ -7,6 +7,9 @@
 #include "include/mesh_direct.wgsl"
 #include "include/mesh_surface.wgsl"
 #include "include/mesh_blend.wgsl"
+#ifdef BOX_TEXTURE_LAYERS
+#include "include/mesh_layers.wgsl"
+#endif
 
 // The texture layers apply on front faces; a back face keeps the material constants, is
 // unoccluded and faces the camera. The occlusion scales the indirect light only. geometric is
@@ -21,6 +24,7 @@ struct Surface {
     emissive: vec3f,
     normal: vec3f,
     geometric: vec3f,
+    shade: f32,
 };
 
 fn surface(f: VertexOut, front: bool) -> Surface {
@@ -73,11 +77,16 @@ fn light_lobes(s: Surface, v: vec3f, l: vec3f, radiance: vec3f, side: u32) -> Li
     return Lit(diffuse * radiance * shaded, specular * radiance * shaded);
 }
 
-// An unlit view shows the albedo as the diffuse part and the emission as the specular one. The
-// split sum scale and bias already integrate the Fresnel over the GGX lobe of the roughness, so
-// the grazing reflection of a rough surface fades without a roughness aware f90. What the lobe
-// reflects is not available to the diffuse term, as 1 - F in light_lobes().
+// An unlit view shows the albedo as the diffuse part and the emission as the specular one, a
+// view of an impostor frame its channel (impostor_channel). The split sum scale and bias already
+// integrate the Fresnel over the GGX lobe of the roughness, so the grazing reflection of a rough
+// surface fades without a roughness aware f90. What the lobe reflects is not available to the
+// diffuse term, as 1 - F in light_lobes().
 fn shade(s: Surface, v: vec3f, world: vec3f) -> Lit {
+    if (view.lights.z > 1u) {
+        return impostor_channel(s.albedo, s.normal, world);
+    }
+
     if (view.lights.z == 0u) {
         return Lit(s.albedo, s.emissive);
     }
@@ -102,9 +111,11 @@ fn shade(s: Surface, v: vec3f, world: vec3f) -> Lit {
 }
 
 fn lit(f: VertexOut, shaded: Surface) -> vec4f {
+    range_fragment(f);
     planet_fragment(f);
     var s = shaded;
     area_fragment(f.world, s.geometric);
+    s.occlusion *= vo_occlusion(f);
     if (kind.blend_mode == 0u) {
         s.occlusion = min(s.occlusion, view_occlusion(f.pos));
     }
@@ -116,6 +127,10 @@ fn lit(f: VertexOut, shaded: Surface) -> vec4f {
         color = aerial_perspective(color, s.alpha, f.pos, f.world);
     }
 
+    if (view.fog_grid.w > 0.0) {
+        color = fog_blended(color, s.alpha, f.pos, f.world);
+    }
+
     return output(color, s.alpha);
 }
 
@@ -125,7 +140,7 @@ fn lit(f: VertexOut, shaded: Surface) -> vec4f {
 
 @fragment fn fs_cutout(f: VertexOut, @builtin(front_facing) front: bool) -> @location(0) vec4f {
     let s = surface(f, front);
-    if (s.alpha < vo_scalars(f).x) {
+    if (cut_out(f, s.alpha)) {
         discard;
     }
 
@@ -143,9 +158,72 @@ fn lit(f: VertexOut, shaded: Surface) -> vec4f {
     let geometric = normalize(f.normal);
     let b = blend_fragment(f);
     let albedo = blend_fragment_albedo(b);
-    if (f.color.a * albedo.a < vo_scalars(f).x) {
+    if (cut_out(f, f.color.a * albedo.a)) {
         discard;
     }
 
     return lit(f, surface_of(f, front, geometric, blend_maps(geometric, b, albedo, front)));
 }
+
+#ifdef BOX_TEXTURE_LAYERS
+// The surface after the TextureLayers of the batch, whose maps are slices of maps from first. A
+// back face keeps its surface; the layers do not change the alpha.
+fn layered(f: VertexOut, front: bool, s: Surface, maps: texture_2d_array<f32>, first: u32,
+    low: f32) -> Surface {
+    var o = s;
+    let l = apply_layers(maps, first, f, LayerSurface(s.albedo, s.metallic, s.roughness,
+        s.occlusion, s.normal, s.geometric, low));
+    if (front) {
+        o.albedo = l.albedo;
+        o.metallic = l.metallic;
+        o.roughness = l.roughness;
+        o.occlusion = l.occlusion;
+        o.normal = l.normal;
+    }
+    return o;
+}
+
+@fragment fn fs_layers(f: VertexOut, @builtin(front_facing) front: bool) -> @location(0) vec4f {
+    return lit(f, layered(f, front, surface(f, front), layer_maps, 0u, 0.0));
+}
+
+@fragment fn fs_cutout_layers(f: VertexOut, @builtin(front_facing) front: bool)
+    -> @location(0) vec4f
+{
+    let s = surface(f, front);
+    if (cut_out(f, s.alpha)) {
+        discard;
+    }
+
+    return lit(f, layered(f, front, s, layer_maps, 0u, 0.0));
+}
+
+@fragment fn fs_blend_layers(f: VertexOut, @builtin(front_facing) front: bool)
+    -> @location(0) vec4f
+{
+    let geometric = normalize(f.normal);
+    let b = blend_fragment(f);
+    var albedo = vec4f(0.0);
+    if (front || kind.alpha_cutout != 0u) {
+        albedo = blend_fragment_albedo(b);
+    }
+    let s = surface_of(f, front, geometric, blend_maps(geometric, b, albedo, front));
+    return lit(f, layered(f, front, s, blend_heights, blending.count, blend_low(b)));
+}
+
+@fragment fn fs_blend_cutout_layers(f: VertexOut, @builtin(front_facing) front: bool)
+    -> @location(0) vec4f
+{
+    let geometric = normalize(f.normal);
+    let b = blend_fragment(f);
+    let albedo = blend_fragment_albedo(b);
+    if (cut_out(f, f.color.a * albedo.a)) {
+        discard;
+    }
+
+    let s = surface_of(f, front, geometric, blend_maps(geometric, b, albedo, front));
+    return lit(f, layered(f, front, s, blend_heights, blending.count, blend_low(b)));
+}
+#endif
+
+#include "include/mesh_impostor.wgsl"

@@ -45,17 +45,29 @@ assets {
   tex_tidecaller { Path: {path: "etc/scenes/astrarium/assets/icons/tidecaller.svg", width: 192} }
   tex_thornreaver { Path: {path: "etc/scenes/astrarium/assets/icons/thornreaver.svg", width: 192} }
   tex_ash_dirk { Path: {path: "etc/scenes/astrarium/assets/icons/ash_dirk.svg", width: 192} }
-  tex_drowned_heart { Path: {path: "etc/scenes/astrarium/assets/icons/drowned_heart.svg", width: 192} }
+  tex_drowned_heart {
+    Path: {path: "etc/scenes/astrarium/assets/icons/drowned_heart.svg", width: 192}
+  }
+
   tex_moon_prism { Path: {path: "etc/scenes/astrarium/assets/icons/moon_prism.svg", width: 192} }
   tex_sun_lens { Path: {path: "etc/scenes/astrarium/assets/icons/sun_lens.svg", width: 192} }
   tex_nine_comets { Path: {path: "etc/scenes/astrarium/assets/icons/nine_comets.svg", width: 192} }
   tex_vesper { Path: {path: "etc/scenes/astrarium/assets/icons/vesper.svg", width: 192} }
   tex_last_light { Path: {path: "etc/scenes/astrarium/assets/icons/last_light.svg", width: 192} }
-  tex_serpent_loop { Path: {path: "etc/scenes/astrarium/assets/icons/serpent_loop.svg", width: 192} }
+  tex_serpent_loop {
+    Path: {path: "etc/scenes/astrarium/assets/icons/serpent_loop.svg", width: 192}
+  }
+
   tex_iron_vow { Path: {path: "etc/scenes/astrarium/assets/icons/iron_vow.svg", width: 192} }
   tex_moth_blade { Path: {path: "etc/scenes/astrarium/assets/icons/moth_blade.svg", width: 192} }
-  tex_star_compass { Path: {path: "etc/scenes/astrarium/assets/icons/star_compass.svg", width: 192} }
-  tex_thorn_circlet { Path: {path: "etc/scenes/astrarium/assets/icons/thorn_circlet.svg", width: 192} }
+  tex_star_compass {
+    Path: {path: "etc/scenes/astrarium/assets/icons/star_compass.svg", width: 192}
+  }
+
+  tex_thorn_circlet {
+    Path: {path: "etc/scenes/astrarium/assets/icons/thorn_circlet.svg", width: 192}
+  }
+
   tex_mirror_loop { Path: {path: "etc/scenes/astrarium/assets/icons/mirror_loop.svg", width: 192} }
   relic_texture {}
 }

@@ -1,0 +1,109 @@
+// The forest library on its own: one tree of each species and a few of each plant on a plain
+// floor, with the HUD sliders of the library. Nothing of the clearing, the brook or the layout
+// of the forest scene.
+include ui/widgets
+include trees/generator
+include forest/library
+
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.camera
+using box.view
+using box.controllers
+using state
+using assets
+
+$ {
+  box.app.FpsTarget: {60}
+  Scene: {
+    reflections: true,
+    environment: true,
+    aerial_perspective: true,
+    shader_features: {
+      Extended: {
+        alpha_cutout: true,
+        blend_modes: true,
+        texture_blend: true,
+        texture_layers: true,
+        triplanar: true,
+        diffuse_transmission: true,
+        wind: true
+      }
+    }
+  }
+}
+
+camera {
+  Position: {0, 2.2, 16}
+  Rotation: {0.12, 0, 0}
+  Camera: {fov: 60, near_: 0.1, far_: 1500}
+  CameraController: {speed: 4}
+}
+
+view {
+  View: {
+    camera: camera,
+    lighting: {
+      enabled: true,
+      atmosphere: true,
+      environment: {source: sky, background: false}
+    },
+    shadows: {enabled: true, cascades: 4, resolution: 4096, max_distance: 80},
+    effects: [{effect: sky}]
+  }
+}
+
+library_test {
+  ground : ForestOuterFloor {
+    Position: {0, -0.25, 0}
+    Box: {200, 0.5, 200}
+  }
+
+  // One tree of each species in a row
+  ForestBeech beech(seed: 0.3, height: 15, slender: 0.8) { Position: {-25, 0, -22} }
+  ForestOak oak(seed: 0.5, height: 13, slender: 0.8) { Position: {-14, 0, -24} }
+  ForestBirch birch(seed: 0.7, height: 12, slender: 0.8) { Position: {-4, 0, -21} }
+  ForestSpruce spruce(seed: 0.2, height: 15, slender: 0.8) { Position: {6, 0, -24} }
+  ForestFir fir(seed: 0.4, height: 14, slender: 0.8) { Position: {16, 0, -22} }
+  ForestSnag snag(seed: 5, height: 7) { Position: {25, 0, -20} }
+
+  // Plants in front of them
+  for i in 0..24 {
+    const x = 5 + (i % 8) * 0.55 + forest_hash(i, 1) * 0.3
+    const z = 9 + floor(i / 8) * 0.6 + forest_hash(i, 2) * 0.3
+    "grass_{i}" : ForestGrass {
+      Position: {x, 0, z}
+      Rotation: {0, forest_hash(i, 3) * 6.28, 0}
+      Scale: {0.5, 0.4, 0.5}
+      ForestPlant: {kind: PLANT_GRASS, seed: forest_hash(i, 4)}
+    }
+  }
+
+  sedge : ForestSedge { Position: {-3.5, 0, 7}; Scale: {0.6, 0.45, 0.6}; ForestPlant: {kind: PLANT_SEDGE, seed: 0.5} }
+  flower_a : ForestFlower { Position: {-2.6, 0, 8}; Scale: {0.5, 0.45, 0.5}; ForestPlant: {kind: PLANT_FLOWER, seed: 0.5} }
+  flower_b : ForestFlowerWhite { Position: {-2, 0, 7.4}; Scale: {0.5, 0.45, 0.5}; ForestPlant: {kind: PLANT_FLOWER, seed: 0.5} }
+  flower_c : ForestFlowerViolet { Position: {-1.4, 0, 8.2}; Scale: {0.5, 0.45, 0.5}; ForestPlant: {kind: PLANT_FLOWER, seed: 0.5} }
+  reed : ForestReed { Position: {-0.6, 0, 7.2}; Scale: {0.45, 1, 0.45}; ForestPlant: {kind: PLANT_REED, seed: 0.5} }
+  fern_a : ForestFern { Position: {0.6, 0, 7}; Scale: {0.9, 0.9, 0.9}; ForestPlant: {kind: PLANT_FERN, seed: 0.5} }
+  fern_b : ForestFern { Position: {1.8, 0, 6.2}; Rotation: {0, 2, 0}; Scale: {0.8, 0.8, 0.8}; ForestPlant: {kind: PLANT_FERN, seed: 0.6} }
+  litter : ForestLitter { Position: {3, 0, 8}; ForestPlant: {kind: PLANT_LITTER, seed: 0.5} }
+  moss : ForestMoss { Position: {3.8, -0.05, 9}; Scale: {0.5, 0.2, 0.4}; ForestPlant: {kind: PLANT_MOSS, seed: 0.5} }
+  rock : ForestRock { Position: {4.6, 0.06, 8.6}; Scale: {0.35, 0.22, 0.3}; ForestPlant: {kind: PLANT_ROCK, seed: 0.5} }
+  ForestFallenTwig twig(seed: 0.4, length: 0.9) { Position: {2.4, 0, 9.4}; Rotation: {0, 1, 0} }
+
+  mushrooms {
+    Position: {1, 0, 9.6}
+    ForestPlant: {kind: PLANT_MUSHROOM, seed: 0.5}
+    ForestMushroom m0(size: 0.12, agaric: true, tilt: 0.1) { Position: {0, 0, 0} }
+    ForestMushroom m1(size: 0.09, agaric: true, tilt: -0.1) { Position: {0.15, 0, 0.1} }
+    ForestMushroom m2(size: 0.07, agaric: false, tilt: 0) { Position: {-0.15, 0, 0.12} }
+  }
+
+  ForestShrub shrub_hazel(seed: 0.3, size: 1.6, elder: false) { Position: {-6, 0, 2} }
+  ForestShrub shrub_elder(seed: 0.6, size: 1.4, elder: true) { Position: {7, 0, 2} }
+  ForestLog log(seed: 0.4, length: 4, radius: 0.28, species: SPECIES_BEECH) { Position: {-3, 0, 2}; Rotation: {0, 1.4, 0} }
+  ForestStump stump(seed: 0.5, radius: 0.4, height: 0.6, species: SPECIES_OAK) { Position: {3.5, 0, 3} }
+  ForestBoulderStone boulder(size: 1.6, seed: 3) { Position: {10, 0, -4} }
+}

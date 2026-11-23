@@ -1,0 +1,240 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using box.light
+using box.texture
+using state
+using assets
+using trees
+
+// The bark materials of the trees and the wood of the snags, from the bark texture graphs of the
+// tree library (trees/bark): albedo, normal, height (for the moss blend) and ORM, with a
+// MappingObject, so the bark keeps its size on a scaled tree. A trunk material, on the bark of a
+// tree (trees.flecs) or a log, blends its bark with the moss of the floor by
+// forest_bark_moss_mask: moss over the foot of the trunk and in patches higher up. Dead branches
+// show the bark alone.
+state {
+  // Path units of a trunk the moss mask spans: the mask runs from the foot of the trunk (v 0)
+  // up, so its moss stays at the foot of every trunk shorter than this
+  export const BARK_MASK_SIZE: f32 = 24
+
+  // Times the bark repeats over BARK_MASK_SIZE (a tile of 1.3 path units) and the moss
+  export const BARK_TILES: f32 = 18
+  export const BARK_MOSS_TILES: f32 = 40
+
+  // Path units of one bark tile on a branch
+  export const BARK_LIMB_TILE: f32 = 1.6
+}
+
+assets {
+
+  // Moss on a trunk, single channel: thick over its foot, where v (lengths up the trunk over
+  // BARK_MASK_SIZE) is small, thinning in patches up to about two meters, and a few patches
+  // higher up. The mask runs once around the trunk every BARK_MASK_SIZE path units, so its
+  // patches are squeezed across to show at the girth of a trunk
+  forest_bark_moss_mask {
+    uv { nodes.Coords: {} }
+    v { nodes.Split: {input: uv, channel: ChannelG} }
+    foot { nodes.Smoothstep: {input: v, edge0_value: {0.09, 0, 0, 0}, edge1_value: {0.015, 0, 0, 0}} }
+    narrow { nodes.Transform: {coords: uv, scale: {16, 2, 1}} }
+    patch_n { nodes.Noise: {coords: narrow, frequency: 4, octaves: 3, seed: 251} }
+    patch { nodes.Smoothstep: {input: patch_n, edge0_value: {0.38, 0, 0, 0}, edge1_value: {0.62, 0, 0, 0}} }
+    patchy { nodes.Remap: {input: patch, from_min: 0, from_max: 1, to_min: 0.3, to_max: 1, clamp: true} }
+    lower { nodes.Multiply: {a: foot, b: patchy} }
+    high_n { nodes.Noise: {coords: narrow, frequency: 6, octaves: 3, seed: 252} }
+    high_s { nodes.Smoothstep: {input: high_n, edge0_value: {0.68, 0, 0, 0}, edge1_value: {0.76, 0, 0, 0}} }
+    high { nodes.Multiply: {a: high_s, b_value: {0.8, 0, 0, 0}} }
+    moss { nodes.Max: {a: lower, b: high} }
+    Graph: {output: moss, width: 512, format: GraphSingle}
+  }
+
+  // Shelf fungus: on a flattened sphere, concentric bands from the dark brown middle of the top
+  // (v 0) to the cream rim (v 0.5), and pale pores underneath
+  forest_fungus_albedo {
+    uv { nodes.Coords: {} }
+    v { nodes.Split: {input: uv, channel: ChannelG} }
+    bands_a { nodes.Multiply: {a: v, b_value: {80, 0, 0, 0}} }
+    bands_s { nodes.Sin: {input: bands_a} }
+    bands { nodes.Remap: {input: bands_s, from_min: -1, from_max: 1, to_min: 0.8, to_max: 1, clamp: true} }
+    zones {
+      nodes.Ramp: {
+        input: v,
+        keys: [
+          {0, {70, 44, 26}}, {0.2, {110, 72, 40}}, {0.36, {160, 116, 66}}, {0.46, {214, 190, 150}},
+          {0.5, {236, 222, 196}}, {0.56, {206, 192, 164}}, {1, {196, 182, 154}}
+        ]
+      }
+    }
+
+    color { nodes.Multiply: {a: zones, b: bands} }
+    Graph: {output: color, width: 256}
+  }
+
+  // Layers of the trunk blends, tiled over BARK_MASK_SIZE
+  layer_bark_beech {
+    PbrTextures: {albedo: bark_beech_albedo, normal: bark_beech_normal, orm: bark_beech_orm}
+    texture.Transform: {scale_x: BARK_TILES, scale_y: BARK_TILES}
+  }
+
+  layer_bark_oak {
+    PbrTextures: {albedo: bark_oak_albedo, normal: bark_oak_normal, orm: bark_oak_orm}
+    texture.Transform: {scale_x: BARK_TILES, scale_y: BARK_TILES}
+  }
+
+  layer_bark_birch {
+    PbrTextures: {albedo: bark_birch_albedo, normal: bark_birch_normal, orm: bark_birch_orm}
+    texture.Transform: {scale_x: BARK_TILES, scale_y: BARK_TILES}
+  }
+
+  layer_bark_spruce {
+    PbrTextures: {albedo: bark_spruce_albedo, normal: bark_spruce_normal, orm: bark_spruce_orm}
+    texture.Transform: {scale_x: BARK_TILES * 1.5, scale_y: BARK_TILES * 1.5}
+  }
+
+  layer_bark_dead {
+    PbrTextures: {albedo: bark_dead_albedo, normal: bark_dead_normal, orm: bark_dead_orm}
+    texture.Transform: {scale_x: BARK_TILES, scale_y: BARK_TILES}
+  }
+
+  layer_bark_moss {
+    PbrTextures: {albedo: moss_albedo, normal: moss_normal, orm: moss_orm}
+    texture.Transform: {scale_x: BARK_MOSS_TILES, scale_y: BARK_MOSS_TILES}
+  }
+
+  // Trunks: the bark of the species with moss over the foot
+  prefab ForestBarkBeech {
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 1}
+    WindSway: {bend: SWAY_BROADLEAF_BEND, height: SWAY_BROADLEAF_HEIGHT, base: 0}
+    texture.Blend: {
+      mask: forest_bark_moss_mask,
+      layers: [layer_bark_beech, layer_bark_moss],
+      heights: [bark_beech_height, moss_height],
+      contrast: 10
+    }
+    texture.Mapping: {mode: MappingObject, size: BARK_MASK_SIZE}
+    texture.Layers: {layers: [layer_wet, layer_snow]}
+  }
+
+  prefab ForestBarkOak {
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 1}
+    WindSway: {bend: SWAY_BROADLEAF_BEND, height: SWAY_BROADLEAF_HEIGHT, base: 0}
+    texture.Blend: {
+      mask: forest_bark_moss_mask,
+      layers: [layer_bark_oak, layer_bark_moss],
+      heights: [bark_oak_height, moss_height],
+      contrast: 10
+    }
+    texture.Mapping: {mode: MappingObject, size: BARK_MASK_SIZE}
+    texture.Layers: {layers: [layer_wet, layer_snow]}
+  }
+
+  prefab ForestBarkBirch {
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 1}
+    WindSway: {bend: SWAY_BIRCH_BEND, height: SWAY_BIRCH_HEIGHT, base: 0}
+    texture.Blend: {
+      mask: forest_bark_moss_mask,
+      layers: [layer_bark_birch, layer_bark_moss],
+      heights: [bark_birch_height, moss_height],
+      contrast: 10
+    }
+    texture.Mapping: {mode: MappingObject, size: BARK_MASK_SIZE}
+    texture.Layers: {layers: [layer_wet, layer_snow]}
+  }
+
+  prefab ForestBarkSpruce {
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 1}
+    WindSway: {bend: SWAY_CONIFER_BEND, height: SWAY_CONIFER_HEIGHT, base: 0}
+    texture.Blend: {
+      mask: forest_bark_moss_mask,
+      layers: [layer_bark_spruce, layer_bark_moss],
+      heights: [bark_spruce_height, moss_height],
+      contrast: 10
+    }
+    texture.Mapping: {mode: MappingObject, size: BARK_MASK_SIZE}
+    texture.Layers: {layers: [layer_wet, layer_snow]}
+  }
+
+  // Silver fir: the smooth bark of the beech, darker and cooler
+  prefab ForestBarkFir {
+    Rgb: {170, 172, 178}
+    PbrMaterial: {roughness: 1}
+    WindSway: {bend: SWAY_CONIFER_BEND, height: SWAY_CONIFER_HEIGHT, base: 0}
+    texture.Blend: {
+      mask: forest_bark_moss_mask,
+      layers: [layer_bark_beech, layer_bark_moss],
+      heights: [bark_beech_height, moss_height],
+      contrast: 10
+    }
+    texture.Mapping: {mode: MappingObject, size: BARK_MASK_SIZE}
+    texture.Layers: {layers: [layer_wet, layer_snow]}
+  }
+
+  prefab ForestBarkDead {
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 1}
+    texture.Blend: {
+      mask: forest_bark_moss_mask,
+      layers: [layer_bark_dead, layer_bark_moss],
+      heights: [bark_dead_height, moss_height],
+      contrast: 10
+    }
+    texture.Mapping: {mode: MappingObject, size: BARK_MASK_SIZE}
+    texture.Layers: {layers: [layer_wet, layer_snow]}
+  }
+
+  // The barks on the trees (trees.flecs), whose meshes project the mapping on the planes of the
+  // object rather than follow a path: V turned to run up from the foot, so the moss stays there,
+  // and the projections blended so the trunks show no seams
+  prefab ForestTreeBarkBeech : ForestBarkBeech {
+    texture.Mapping: {mode: MappingObject, size: BARK_MASK_SIZE, blend: 0.4}
+    texture.Transform: {scale_x: 1, scale_y: -1}
+  }
+
+  prefab ForestTreeBarkOak : ForestBarkOak {
+    texture.Mapping: {mode: MappingObject, size: BARK_MASK_SIZE, blend: 0.4}
+    texture.Transform: {scale_x: 1, scale_y: -1}
+  }
+
+  prefab ForestTreeBarkBirch : ForestBarkBirch {
+    texture.Mapping: {mode: MappingObject, size: BARK_MASK_SIZE, blend: 0.4}
+    texture.Transform: {scale_x: 1, scale_y: -1}
+  }
+
+  prefab ForestTreeBarkSpruce : ForestBarkSpruce {
+    texture.Mapping: {mode: MappingObject, size: BARK_MASK_SIZE, blend: 0.4}
+    texture.Transform: {scale_x: 1, scale_y: -1}
+  }
+
+  prefab ForestTreeBarkFir : ForestBarkFir {
+    texture.Mapping: {mode: MappingObject, size: BARK_MASK_SIZE, blend: 0.4}
+    texture.Transform: {scale_x: 1, scale_y: -1}
+  }
+
+  prefab ForestTreeBarkDead : ForestBarkDead {
+    texture.Mapping: {mode: MappingObject, size: BARK_MASK_SIZE, blend: 0.4}
+    texture.Transform: {scale_x: 1, scale_y: -1}
+  }
+
+  // Dead branches and twigs: the bark alone, a tile every BARK_LIMB_TILE path units
+  prefab ForestLimbDead {
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 1}
+    PbrTextures: {albedo: bark_dead_albedo, normal: bark_dead_normal, orm: bark_dead_orm}
+    texture.Mapping: {mode: MappingObject, size: BARK_LIMB_TILE}
+    texture.Layers: {layers: [layer_wet, layer_snow]}
+  }
+
+  // Bracket fungus on the logs
+  prefab ForestFungus {
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 0.75}
+    PbrTextures: {albedo: forest_fungus_albedo}
+    texture.Layers: {layers: [layer_wet, layer_snow]}
+  }
+}

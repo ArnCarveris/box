@@ -47,12 +47,15 @@ static ecs_world_t* water_world(
 {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
-    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
-        .punctual_shadows = true, .cookies = true, .environment = true,
-        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
-        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
-        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true,
-        .fresnel = true, .water = water});
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true, .punctual_shadows = true,
+        .cookies = true, .environment = true, .aerial_perspective = true,
+        .shader_features.Extended.alpha_cutout = true, .shader_features.Extended.blend_modes = true,
+        .shader_features.Extended.transmission = true,
+        .shader_features.Extended.texture_blend = true, .shader_features.Extended.triplanar = true,
+        .shader_features.Extended.sheen = true, .shader_features.Extended.clear_coat = true,
+        .shader_features.Extended.anisotropy = true,
+        .shader_features.Extended.diffuse_transmission = true,
+        .shader_features.Extended.fresnel = true, .shader_features.Extended.water = water});
     App *app = ecs_singleton_get_mut(world, App);
     app->headless = true;
     ecs_singleton_modified(world, App);
@@ -127,7 +130,7 @@ static ecs_entity_t water_glow(
 }
 
 /** Get the Water of the cases: no foam, no refraction, a body that hides what is behind it
- * (visibility 0.001), a green shallow and a blue deep color of depth 3.
+ * (visibility 0.001), a white absorption, a green shallow and a blue deep color of depth 3.
  *
  * @return The Water
  */
@@ -138,6 +141,7 @@ static Water water_default(void)
         .deep_color = {0, 0, 255},
         .depth = 3,
         .visibility = 0.001f,
+        .absorption = {255, 255, 255},
         .refraction = 0,
         .foam_color = {255, 255, 255},
         .foam_width = 0,
@@ -350,6 +354,80 @@ void Water_object_fades_with_depth(void) {
     ecs_fini(world);
 }
 
+/** Render the slope made white under clear water of a black body and an absorption.
+ *
+ * @param absorption Water.absorption
+ * @param file Name of the PNG
+ * @return The pixels, RGBA, freed with stbi_image_free
+ */
+static unsigned char* water_absorption_render(
+    Rgb absorption,
+    const char *file)
+{
+    ecs_world_t *world = water_world(true, (rgba){0, 0, 0, 255});
+    ecs_entity_t slope = water_slope(world);
+    ecs_set(world, slope, Rgb, {255, 255, 255});
+    Water w = water_default();
+    w.shallow_color = (Rgb){0, 0, 0};
+    w.deep_color = (Rgb){0, 0, 0};
+    w.visibility = 8;
+    w.absorption = absorption;
+    ecs_entity_t plane = water_plane(world, &w);
+
+    // Smooth water, so the blur of the snapshot does not mix the depths
+    ecs_set(world, plane, PbrMaterial, {.metallic = 0, .roughness = 0.05f});
+    unsigned char *px = water_render(world, file);
+    unsigned char *copy = ecs_os_malloc(WATER_SIZE * WATER_SIZE * 4);
+    memcpy(copy, px, WATER_SIZE * WATER_SIZE * 4);
+    stbi_image_free(px);
+    ecs_fini(world);
+
+    return copy;
+}
+
+void Water_absorption_tints_with_depth(void) {
+    // A blue absorption turns the white floor blue, more where the water is deeper
+    unsigned char *px = water_absorption_render((Rgb){40, 120, 255}, "water_absorption.png");
+
+    // x = 3.5 is 0.125 deep, x = -5 is 2.25 deep
+    const unsigned char *shallow = water_px(px, water_col(3.5f, 0));
+    const unsigned char *deep = water_px(px, water_col(-5, 0));
+    printf("absorbed shallow %d %d %d, deep %d %d %d\n", shallow[0], shallow[1], shallow[2],
+        deep[0], deep[1], deep[2]);
+    test_assert(shallow[2] > 60);
+    test_assert(deep[2] > 30);
+    test_assert(deep[2] > deep[1]);
+    test_assert(deep[1] > deep[0]);
+    test_assert(deep[2] > deep[0] + 25);
+
+    // The tint grows with the depth: the blue leads the red more relative to the brightness
+    float shallow_ratio = (float)shallow[0] / (float)(shallow[2] > 0 ? shallow[2] : 1);
+    float deep_ratio = (float)deep[0] / (float)(deep[2] > 0 ? deep[2] : 1);
+    printf("red over blue shallow %f, deep %f\n", shallow_ratio, deep_ratio);
+    test_assert(shallow_ratio > 0.85f);
+    test_assert(deep_ratio < shallow_ratio - 0.2f);
+
+    ecs_os_free(px);
+}
+
+void Water_absorption_white_keeps_colors(void) {
+    // A white absorption keeps the white floor gray at every depth
+    unsigned char *px = water_absorption_render((Rgb){255, 255, 255},
+        "water_absorption_white.png");
+    int32_t cols[] = {water_col(3.5f, 0), water_col(0, 0), water_col(-5, 0)};
+    int32_t i;
+    for (i = 0; i < 3; i ++) {
+        const unsigned char *p = water_px(px, cols[i]);
+        printf("white absorption %d: %d %d %d\n", cols[i], p[0], p[1], p[2]);
+        test_assert(abs(p[0] - p[2]) <= 3);
+        test_assert(abs(p[1] - p[2]) <= 3);
+    }
+
+    test_assert(water_px(px, cols[0])[0] > water_px(px, cols[2])[0]);
+
+    ecs_os_free(px);
+}
+
 void Water_foam_at_shore(void) {
     ecs_world_t *world = water_world(true, (rgba){0, 0, 0, 255});
     water_slope(world);
@@ -552,7 +630,8 @@ void Water_still_uploads_nothing(void) {
     box_render_null_t *null = box_render_null_new();
     box_render_backend_t backend = box_render_null_backend(null);
     box_render_set_backend(world, &backend);
-    ecs_singleton_set(world, Scene, {.water = true, .transmission = true});
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.water = true,
+        .shader_features.Extended.transmission = true});
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, WATER_EYE, 0});
     ecs_set(world, camera, Rotation, {-GLM_PI_2f, 0, 0});

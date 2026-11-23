@@ -77,15 +77,21 @@ state {
   }
 
   fn hill_spot(x: f64, z: f64) -> bool {
-    dist2(x, z, -31, 70) < 9 || dist2(x, z, -5, 80) < 9 || dist2(x, z, 12, 52) < 9 || dist2(x, z, -36, 48) < 9 || dist2(x, z, 50, 50) < 9 || dist2(x, z, -38, 88) < 9 || dist2(x, z, 48, 60) < 9 || dist2(x, z, 60, 88) < 9 || dist2(x, z, 4, 92) < 9 || dist2(x, z, -30, 86) < 16 || dist2(x, z, -26, 79) < 64 || (abs(x + 22) < 3 && z > 60 && z < 80)
+    dist2(x, z, -31, 70) < 9 || dist2(x, z, -5, 80) < 9 || dist2(x, z, 12, 52) < 9 ||
+      dist2(x, z, -36, 48) < 9 || dist2(x, z, 50, 50) < 9 || dist2(x, z, -38, 88) < 9 ||
+      dist2(x, z, 48, 60) < 9 || dist2(x, z, 60, 88) < 9 || dist2(x, z, 4, 92) < 9 ||
+      dist2(x, z, -30, 86) < 16 || dist2(x, z, -26, 79) < 64 ||
+      (abs(x + 22) < 3 && z > 60 && z < 80)
   }
 
   fn wood_spot(x: f64, z: f64) -> bool {
-    dist2(x, z, -36, -70) < 9 || dist2(x, z, 6, -90) < 9 || dist2(x, z, 44, -82) < 9 || dist2(x, z, -6, -48) < 9
+    dist2(x, z, -36, -70) < 9 || dist2(x, z, 6, -90) < 9 || dist2(x, z, 44, -82) < 9 ||
+      dist2(x, z, -6, -48) < 9
   }
 
   fn forest_clear(x: f64, z: f64) -> bool {
-    on_ns_road(x, z) || camp_spot(x, z) || shrine_spot(x, z) || grove_spot(x, z) || wood_spot(x, z) || abs(x - river_x(z)) < 5
+    on_ns_road(x, z) || camp_spot(x, z) || shrine_spot(x, z) || grove_spot(x, z) ||
+      wood_spot(x, z) || abs(x - river_x(z)) < 5
   }
 
   fn quarry_spot(x: f64, z: f64) -> bool {
@@ -97,7 +103,8 @@ state {
   }
 
   fn hills_clear(x: f64, z: f64) -> bool {
-    on_ns_road(x, z) || quarry_spot(x, z) || pasture_spot(x, z) || hill_spot(x, z) || abs(x - river_x(z)) < 5
+    on_ns_road(x, z) || quarry_spot(x, z) || pasture_spot(x, z) || hill_spot(x, z) ||
+      abs(x - river_x(z)) < 5
   }
 
   fn tree_x(i: i32, j: i32) -> f64 {

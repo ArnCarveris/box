@@ -1,0 +1,73 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+
+// Unbounded fog: a FogVolumeUnbounded volume fills the whole scene without a box to size. Two rows
+// of pillars line an avenue on a ground plane that recedes far past the fog distance of the view,
+// and a low sun from the side casts shafts between the pillars through the fog. The fog thins
+// with height_falloff above its base at the ground and carries light noise, so the tops of the
+// pillars stand clearer than their feet. The shadows end at 60 units, inside the fog distance of
+// 100: the shafts fade out there without a ring, and the far pillars and the horizon fade into
+// the fog. The visual runner captures frame 30, after the history of the froxel grid has
+// converged, with a fixed delta of 1/60 s, so the wind has moved the noise by the same distance
+// on every run.
+// frames: 30
+
+camera {
+  Position: {0, 2, 12}
+  Rotation: {0.05, 0, 0}
+  Camera: {fov: 55, far_: 1000}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {120, 140, 170, 255}}, shadows: {enabled: true, max_distance: 60}}
+}
+
+$ {
+  AmbientLight: {sky: {70, 80, 100}, ground: {40, 36, 32}}
+}
+
+sun {
+  Rotation: {0.25, 0.9, 0}
+  DirectionalLight: {intensity: 1.2 * flecs.script.math.PI}
+  Rgb: {255, 220, 170}
+}
+
+ground {
+  Position: {0, -0.1, -200}
+  Box: {600, 0.2, 600}
+  Rgb: {120, 112, 100}
+  PbrMaterial: {roughness: 1}
+}
+
+// Pillars every 6 units along both sides of the avenue, 8 units tall
+for i in 0..20 {
+  {
+    Position: {-5, 4, 4 - i * 6}
+    Box: {1, 8, 1}
+    Rgb: {170, 160, 150}
+  }
+
+  {
+    Position: {5, 4, 4 - i * 6}
+    Box: {1, 8, 1}
+    Rgb: {170, 160, 150}
+  }
+}
+
+fog {
+  Position: {0, 0, 0}
+  FogVolume: {
+    shape: FogVolumeUnbounded
+    density: 0.04
+    height_falloff: 0.15
+    color: {235, 238, 245}
+    asymmetry: 0.4
+    noise_strength: 0.3
+    noise_scale: 8
+    wind: {0.6, 0, -0.3}
+  }
+}

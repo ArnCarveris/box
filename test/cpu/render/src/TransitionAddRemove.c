@@ -411,7 +411,8 @@ static void tr_test_mesh(
     ecs_world_t *world = tr_scene(&null);
     ecs_entity_t id = tr_id(c);
     ecs_size_t size = box_render_transition_layout(c)->size;
-    ecs_singleton_set(world, Scene, {.fresnel = true, .distortion = true});
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.fresnel = true,
+        .shader_features.Extended.distortion = true});
     ecs_entity_t e = ecs_new(world);
     float target[BOX_RENDER_TRANSITION_VALUE / 4], neutral[BOX_RENDER_TRANSITION_VALUE / 4];
     float mid[BOX_RENDER_TRANSITION_VALUE / 4];
@@ -655,11 +656,14 @@ void TransitionAddRemove_opacity_add_mesh(void) {
     // engine_core/transition
     box_render_null_t *null;
     ecs_world_t *world = tr_scene(&null);
-    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
-        .punctual_shadows = true, .cookies = true, .environment = true,
-        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
-        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
-        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true, .punctual_shadows = true,
+        .cookies = true, .environment = true, .aerial_perspective = true,
+        .shader_features.Extended.alpha_cutout = true, .shader_features.Extended.blend_modes = true,
+        .shader_features.Extended.transmission = true,
+        .shader_features.Extended.texture_blend = true, .shader_features.Extended.triplanar = true,
+        .shader_features.Extended.sheen = true, .shader_features.Extended.clear_coat = true,
+        .shader_features.Extended.anisotropy = true,
+        .shader_features.Extended.diffuse_transmission = true});
     ecs_entity_t e = tr_shape(world, 0, 0);
     box_render_mesh_shading_t rendered;
     int32_t i;
@@ -691,11 +695,14 @@ void TransitionAddRemove_opacity_remove_mesh(void) {
     // engine_core/transition
     box_render_null_t *null;
     ecs_world_t *world = tr_scene(&null);
-    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
-        .punctual_shadows = true, .cookies = true, .environment = true,
-        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
-        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
-        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true, .punctual_shadows = true,
+        .cookies = true, .environment = true, .aerial_perspective = true,
+        .shader_features.Extended.alpha_cutout = true, .shader_features.Extended.blend_modes = true,
+        .shader_features.Extended.transmission = true,
+        .shader_features.Extended.texture_blend = true, .shader_features.Extended.triplanar = true,
+        .shader_features.Extended.sheen = true, .shader_features.Extended.clear_coat = true,
+        .shader_features.Extended.anisotropy = true,
+        .shader_features.Extended.diffuse_transmission = true});
     ecs_entity_t e = tr_shape(world, 0, 0);
     box_render_mesh_shading_t rendered;
     int32_t i;
@@ -818,7 +825,7 @@ void TransitionAddRemove_fresnel_remove_during_add(void) {
     // engine_core/transition
     box_render_null_t *null;
     ecs_world_t *world = tr_scene(&null);
-    ecs_singleton_set(world, Scene, {.fresnel = true});
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.fresnel = true});
     ecs_entity_t e = ecs_new(world);
     float target[BOX_RENDER_TRANSITION_VALUE / 4], neutral[BOX_RENDER_TRANSITION_VALUE / 4];
     float from[BOX_RENDER_TRANSITION_VALUE / 4], mid[BOX_RENDER_TRANSITION_VALUE / 4];
@@ -865,7 +872,7 @@ void TransitionAddRemove_fresnel_remove_transition(void) {
     // engine_core/transition
     box_render_null_t *null;
     ecs_world_t *world = tr_scene(&null);
-    ecs_singleton_set(world, Scene, {.fresnel = true});
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.fresnel = true});
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Position, {0, 0, 0});
     ecs_set(world, e, Box, {1, 2, 3});
@@ -926,7 +933,7 @@ void TransitionAddRemove_distortion_remove_keeps_transmissive(void) {
     // engine_core/transition
     box_render_null_t *null;
     ecs_world_t *world = tr_scene(&null);
-    ecs_singleton_set(world, Scene, {.distortion = true});
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.distortion = true});
     ecs_entity_t e = ecs_new(world);
     int32_t i;
     ecs_set(world, e, Position, {0, 0, 0});

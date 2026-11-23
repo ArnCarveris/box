@@ -1,0 +1,35 @@
+using flecs.script
+using state
+using assets
+
+island_trees {
+  palm_0 { IslandTree: {species: ISLAND_PALM, seed: 3, height: 11} }
+  palm_1 { IslandTree: {species: ISLAND_PALM, seed: 8, height: 14} }
+  palm_2 { IslandTree: {species: ISLAND_PALM, seed: 15, height: 8.5} }
+  palm_3 { IslandTree: {species: ISLAND_PALM, seed: 22, height: 12.5} }
+  palm_young { IslandTree: {species: ISLAND_PALM, seed: 31, height: 4.5, impostor: false} }
+
+  kapok_0 { IslandTree: {species: ISLAND_KAPOK, seed: 5, height: 34} }
+  kapok_1 { IslandTree: {species: ISLAND_KAPOK, seed: 12, height: 29} }
+
+  jungle_a_0 { IslandTree: {species: ISLAND_JUNGLE_A, seed: 3, height: 24} }
+  jungle_a_1 { IslandTree: {species: ISLAND_JUNGLE_A, seed: 11, height: 27, slender: 0.95} }
+  jungle_a_2 { IslandTree: {species: ISLAND_JUNGLE_A, seed: 19, height: 20, slender: 1.05} }
+  jungle_a_young {
+    IslandTree: {species: ISLAND_JUNGLE_A, seed: 33, height: 9, slender: 0.7, impostor: false}
+  }
+
+  jungle_b_0 { IslandTree: {species: ISLAND_JUNGLE_B, seed: 5, height: 21, slender: 1.05} }
+  jungle_b_1 { IslandTree: {species: ISLAND_JUNGLE_B, seed: 13, height: 24} }
+  jungle_b_2 { IslandTree: {species: ISLAND_JUNGLE_B, seed: 22, height: 18, slender: 1.1} }
+  jungle_b_young {
+    IslandTree: {species: ISLAND_JUNGLE_B, seed: 35, height: 7.5, slender: 0.65, impostor: false}
+  }
+
+  birch_0 { IslandTree: {species: ISLAND_BIRCH, seed: 7, height: 16, slender: 0.95} }
+  birch_1 { IslandTree: {species: ISLAND_BIRCH, seed: 15, height: 13, slender: 0.9} }
+
+  fern_0 { IslandTree: {species: ISLAND_TREE_FERN, seed: 4, height: 6} }
+  fern_1 { IslandTree: {species: ISLAND_TREE_FERN, seed: 9, height: 4.2} }
+  fern_2 { IslandTree: {species: ISLAND_TREE_FERN, seed: 14, height: 7.5} }
+}

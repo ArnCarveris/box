@@ -1,0 +1,81 @@
+using box.transform
+using box.material
+using box.texture
+using box.terrain
+using box.camera
+using box.view
+using box.light
+using box.world
+using box.atmosphere
+using box.grass
+
+// A Grass on the low rolling hills of a Terrain with a TextureBlend of soil and rock, seen from the
+// ground toward the horizon in a gusty Wind: the blades near the camera carry on as the far field
+// of the terrain, one continuous field with no ring where the blades end, gust waves rolling over
+// it as bands of brightness, and bare rock where the mask channel of the grass is empty.
+//
+// frames: 60
+$ {
+  Scene: {shader_features: {Terrain: {texture_blend: true}}}
+  Wind: {direction: {1, 0.3}, speed: 9, gust: 0.6, gust_scale: 12}
+}
+
+camera {
+  Position: {0, 2.5, 0}
+  Rotation: {-0.08, 0.4, 0}
+  Camera: {fov: 60, near_: 0.05, far_: 8000}
+  WorldFocus
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {120, 160, 210, 255}},
+    shadows: {enabled: true}}
+}
+
+sun {
+  Rotation: {0.6, 2.4, 0}
+  DirectionalLight: {intensity: 3 * flecs.script.math.PI}
+  Rgb: {255, 245, 225}
+}
+
+$ {
+  AmbientLight: {sky: {150, 175, 210}, ground: {70, 64, 56}, intensity: 0.6}
+}
+
+soil_albedo {
+  n { nodes.Noise: {frequency: 12, octaves: 3, seed: 2} }
+  color { nodes.Ramp: {input: n, keys: [{0.2, {70, 55, 35}}, {0.8, {105, 85, 55}}]} }
+  Graph: {output: color, width: 256}
+}
+
+rock_albedo {
+  n { nodes.Noise: {frequency: 8, octaves: 4, seed: 1} }
+  color { nodes.Ramp: {input: n, keys: [{0.2, {120, 116, 110}}, {0.8, {175, 170, 160}}]} }
+  Graph: {output: color, width: 256}
+}
+
+soil { PbrTextures: {albedo: soil_albedo} }
+rock { PbrTextures: {albedo: rock_albedo} }
+
+hills {
+  broad  { nodes.Noise: {frequency: 0.002, octaves: 4, seed: 3} }
+  height { nodes.Multiply: {a: broad, b_value: {6, 6, 6, 6}} }
+  spots  { nodes.Noise: {frequency: 0.004, octaves: 2, seed: 7} }
+  bare   {
+    nodes.Smoothstep: {input: spots, edge0_value: {0.62, 0, 0, 0}, edge1_value: {0.7, 0, 0, 0}}
+  }
+  grown  { nodes.Subtract: {a_value: {1, 1, 1, 1}, b: bare} }
+  masks  { nodes.Combine: {r: grown, g: bare, b_value: 0, a_value: 0} }
+  Position: {0, -6, 0}
+  Terrain: {height: height, masks: masks, tile_size: 32, resolution: 65, levels: 7,
+    lod_distance: 128, min_height: -10, max_height: 20, budget: 96}
+  texture.Blend: {layers: [soil, rock]}
+  texture.Mapping: {mode: MappingWorld, size: 6}
+  Rgb: {255, 255, 255}
+  PbrMaterial: {roughness: 0.95}
+}
+
+meadow {
+  Grass: {terrain: hills, mask: 0, density: 48, min_height: 0.3, max_height: 0.7,
+    lod: [20, 60, 200], variation: 0.8}
+}

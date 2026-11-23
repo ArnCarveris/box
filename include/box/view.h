@@ -43,6 +43,10 @@ ECS_STRUCT(EnvironmentSettings, {
  *
  * baked, reflections and atmosphere only take effect for the features the Scene of the view
  * enables; turning them off does not compile other pipelines.
+ *
+ * The FogVolumes of a view render through a froxel grid from the near plane of its camera to
+ * fog_distance beyond it: fog farther away is not drawn, and a longer distance makes the depth
+ * slices of the grid thicker.
  */
 ECS_STRUCT(LightSettings, {
     bool enabled;           /**< Enable lighting for the view */
@@ -55,6 +59,8 @@ ECS_STRUCT(LightSettings, {
                              *   geometry and the aerial perspective of the 3D meshes, View
                              *   ctor sets true */
     bool fog_volumes;       /**< Render the FogVolumes of the scene, View ctor sets true */
+    float fog_distance;     /**< World units the FogVolumes reach from the near plane, View
+                             *   ctor sets 100; 0 is 100, else at least 1 */
     EnvironmentSettings environment; /**< Environment the view is lit with, used only when
                                       *   the view is lit */
     ecs_entity_t scene;     /**< Scene whose lights and shadows light the view, 0 for its own */
@@ -95,6 +101,11 @@ ECS_STRUCT(ShadowSettings, {
                           *   cascades, max_distance, split_lambda or min_caster_texels change;
                           *   moved, added or removed casters show up to interval - 1 frames
                           *   late. Default 1 */
+    int32_t sway_interval; /**< Most frames a cascade uses one render for while casters with a
+                          *   WindSway sway in the scene, whatever its interval: 1 (or 0)
+                          *   renders every cascade every frame so their shadows never lag,
+                          *   2 lets a cascade with an interval of 2 or more render every
+                          *   other frame, and so on. Default 1 */
 });
 
 /** Culling settings of a view, applied as specified: all zero draws every instance.
@@ -250,11 +261,17 @@ ECS_STRUCT(ViewDebug, {
  *
  * Level 0 starts at distance 0, level i at distances[i] in world units, ascending; distances[0]
  * is not used. A View, constructed or a C literal, has levels 0: every shape at full detail.
+ *
+ * With a fade an instance near distances[i] draws both levels i - 1 and i with the screen door
+ * dither of a DrawRange, so the levels crossfade instead of popping. This applies to shapes with
+ * a DrawRange (or the instances of an Impostor), whose passes dither; the others switch at once.
  */
 ECS_STRUCT(LodSettings, {
     int32_t levels;     /**< Number of levels, 0 or 1 for none, at most BOX_LOD_LEVELS_MAX */
     float distances[4]; /**< Distance from the camera at which level i starts, for levels 1 to
                          *   levels - 1 */
+    float fade;         /**< Half width of the crossfade around distances[i] as a share of it,
+                         *   from 0 for a hard switch to at most 0.5 */
 });
 
 /** Element in view effects array. */
@@ -302,14 +319,55 @@ ECS_STRUCT(View, {
     LodSettings lod;                /**< Levels of detail, default none */
 });
 
+/** Throws away the history of a view: added to a View entity, from C or a script, for a cut. The
+ * frame that renders next starts the temporal effects of the view over, as its first frame does,
+ * and the renderer removes the tag. A moving camera is not a cut: effects reproject instead.
+ */
+extern ECS_TAG_DECLARE(HistoryReset);
+
+/** Material features of a mesh shader of a scene (SceneShaderFeatures), all false by default
+ * for the smallest shaders. A shape that needs a feature that is off draws as if it did not have
+ * it. */
+ECS_STRUCT(ShaderFeatures, {
+    bool alpha_cutout;      /**< AlphaCutoff, else alpha tested shapes draw opaque */
+    bool blend_modes;       /**< BlendMode and Opacity below 1, else the shapes draw opaque */
+    bool transmission;      /**< Transmission */
+    bool texture_blend;     /**< TextureBlend, else the shapes draw with their PbrTextures */
+    bool triplanar;         /**< A TextureMapping blend above 0, else the hard projection */
+    bool sheen;             /**< Sheen */
+    bool clear_coat;        /**< ClearCoat */
+    bool anisotropy;        /**< SpecularAnisotropy */
+    bool diffuse_transmission; /**< DiffuseTransmission */
+    bool fresnel;           /**< Fresnel */
+    bool water;             /**< Water, else the shapes draw as without it */
+    bool distortion;        /**< Distortion, else the shapes draw as without it */
+    bool texture_scroll;    /**< TextureScroll, else the shapes draw as without it */
+    bool wind;              /**< WindSway moved by the Wind, else the shapes draw as without it
+                             *   with the shaders of a scene without it */
+    bool texture_layers;    /**< TextureLayers, drawn with their own variants of the mesh
+                             *   shaders, else the shapes draw as without them; the shapes
+                             *   without TextureLayers draw the same either way */
+});
+
+/** The material features of each mesh shader of a scene, by the name of the shader. In script
+ * {Extended: {triplanar: true}, Terrain: {texture_blend: true}}. */
+ECS_STRUCT(SceneShaderFeatures, {
+    ShaderFeatures Extended; /**< The mesh shaders that draw every 3D shape but the tiles of a
+                             *   Terrain */
+    ShaderFeatures Terrain; /**< The terrain shader, which always draws the tiles of a Terrain
+                             *   (box/terrain.h); it reads texture_blend, triplanar and
+                             *   texture_layers only */
+});
+
 /** Component added to scene root.
  * A view renders only the scene of its camera, lit by the lights of that scene.
  *
  * An entity belongs to its nearest ancestor with Scene (itself included), so scenes nest;
  * entities outside any Scene belong to the default scene, whose features the singleton holds.
  *
- * Its members are the features the mesh shaders of the scene support, all false by default for
- * the smallest shaders. A shape that needs a feature that is off draws as if it did not have it.
+ * Its members are the lighting features of every mesh shader of the scene and the material
+ * features of each of them, all false by default for the smallest shaders. A shape that needs a
+ * feature that is off draws as if it did not have it.
  */
 ECS_STRUCT(Scene, {
     bool baked;             /**< Probe volume irradiance with the visibility of the probes, for
@@ -323,25 +381,13 @@ ECS_STRUCT(Scene, {
                              *   view (LightSettings.environment), else the hemisphere ambient */
     bool aerial_perspective; /**< Aerial perspective of the Atmosphere on the 3D meshes, for the
                              *   views with LightSettings.atmosphere */
-    bool alpha_cutout;      /**< AlphaCutoff, else alpha tested shapes draw opaque */
-    bool blend_modes;       /**< BlendMode and Opacity below 1, else the shapes draw opaque */
-    bool transmission;      /**< Transmission */
-    bool texture_blend;     /**< TextureBlend, else the shapes draw with their PbrTextures */
-    bool triplanar;         /**< A TextureMapping blend above 0, else the hard projection */
-    bool sheen;             /**< Sheen */
-    bool clear_coat;        /**< ClearCoat */
-    bool anisotropy;        /**< SpecularAnisotropy */
-    bool diffuse_transmission; /**< DiffuseTransmission */
-    bool fresnel;           /**< Fresnel */
-    bool water;             /**< Water, else the shapes draw as without it */
-    bool distortion;        /**< Distortion, else the shapes draw as without it */
     bool planar_reflections; /**< PlanarReflection: the views render the mirrored images and the
                              *   shapes of the planes reflect them, else no reflection pass runs
                              *   and the shapes draw as without it */
-    bool texture_scroll;    /**< TextureScroll, else the shapes draw as without it */
     bool planet_light;      /**< The sun of a PlanetAtmosphere attenuated by its transmittance on
                              *   the meshes at or below its entity, else they are lit as
                              *   without it */
+    SceneShaderFeatures shader_features; /**< Material features of each mesh shader */
 });
 
 /** Compare the render order of two views: by order, then by entity id.

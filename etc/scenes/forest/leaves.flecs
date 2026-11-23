@@ -1,0 +1,205 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using box.light
+using box.texture
+using state
+using assets
+using trees
+
+// The leaves of the forest trees and shrubs. The card textures are those of the tree library
+// (trees/cards): data per level, an albedo that is a light, nearly neutral detail with the
+// coverage as alpha, and the normals. The color comes from the Rgb of the leaf prefab, so the
+// season recolors every leaf of a species by changing its prefab (the B prefabs a little
+// later), and thins a crown card by card by the VertexReveal of its prefab, which hides the
+// cards whose seed (TREE_CHANNEL_SEED) is below its threshold.
+state {
+  // The leaf colors of the broadleaf species (0, OAK, BIRCH) by channel: fresh lime
+  // in spring, deep green in summer, copper beech, russet oak and golden birch in autumn
+  fn forest_leaf_r(species: f64, season: f64) -> f64 {
+    species < 0.5 ? forest_foliage(season, 138, 86, 190, 120) : (
+      species < 1.5 ? forest_foliage(season, 124, 66, 160, 112) : forest_foliage(season, 150, 104, 222, 156))
+  }
+
+  fn forest_leaf_g(species: f64, season: f64) -> f64 {
+    species < 0.5 ? forest_foliage(season, 180, 126, 94, 74) : (
+      species < 1.5 ? forest_foliage(season, 164, 102, 106, 80) : forest_foliage(season, 188, 144, 176, 122))
+  }
+
+  fn forest_leaf_b(species: f64, season: f64) -> f64 {
+    species < 0.5 ? forest_foliage(season, 58, 44, 26, 38) : (
+      species < 1.5 ? forest_foliage(season, 52, 36, 34, 42) : forest_foliage(season, 66, 50, 40, 58))
+  }
+
+  // The share of the cards of a crown of a species the season hides: a few while the leaves come
+  // out in spring, none in summer, more in autumn (the birch first, the oak holds on longest),
+  // all in winter
+  fn forest_leaf_thin(species: f64, season: f64) -> f64 {
+    species < 0.5 ? forest_seasonal(season, 0.12, 0, 0.2, LEAF_BARE) : (
+      species < 1.5 ? forest_seasonal(season, 0.16, 0, 0.14, LEAF_BARE) : forest_seasonal(season, 0.1, 0, 0.28, LEAF_BARE))
+  }
+
+  // The AlphaCutoff of the leaves of a species, which thins the cards that are left leaf by
+  // leaf: small leaves while they come out in spring, full in summer, dropping in autumn
+  fn forest_leaf_cutoff(species: f64, season: f64) -> f64 {
+    species < 0.5 ? forest_seasonal(season, 0.6, LEAF_FULL, 0.78, LEAF_KEEP_MIN) : (
+      species < 1.5 ? forest_seasonal(season, 0.7, LEAF_FULL, 0.7, LEAF_KEEP_MIN) : forest_seasonal(season, 0.55, LEAF_FULL, 0.82, LEAF_KEEP_MIN))
+  }
+
+  // The B clusters of a crown turn and drop a little later than the others, so an autumn crown
+  // is mottled
+  export const LEAF_LAG: f32 = 0.18
+
+  // The light through the leaves: green, golden in autumn
+  fn forest_leaf_glow_r(season: f64) -> f64 {
+    forest_seasonal(season, 226, 210, 255, 210)
+  }
+
+  fn forest_leaf_glow_g(season: f64) -> f64 {
+    forest_seasonal(season, 255, 255, 196, 200)
+  }
+
+  fn forest_leaf_glow_b(season: f64) -> f64 {
+    forest_seasonal(season, 150, 140, 110, 180)
+  }
+
+}
+
+assets {
+  // Three cards from one stem, for the leaves of the shrubs (undergrowth.flecs): a card and two more, a
+  // little smaller, turned 60 degrees to either side about the stem and tilted and spun off it,
+  // so a cluster has depth from every side. Its origin is the stem of all three
+  prefab ForestCardTripleMesh {
+    Mesh3: {
+      vertices: [
+        {-0.5, 0, 0.1}, {0, 0, 0}, {0.5, 0, 0.1},
+        {-0.5, 0.5, 0.08}, {0, 0.5, -0.02}, {0.5, 0.5, 0.08},
+        {-0.5, 0.98, -0.06}, {0, 0.98, -0.16}, {0.5, 0.98, -0.06},
+        {-0.5, 0, 0.1}, {0, 0, 0}, {0.5, 0, 0.1},
+        {-0.5, 0.5, 0.08}, {0, 0.5, -0.02}, {0.5, 0.5, 0.08},
+        {-0.5, 0.98, -0.06}, {0, 0.98, -0.16}, {0.5, 0.98, -0.06},
+        {-0.171, -0.17, 0.378}, {0, 0, 0}, {0.317, 0.118, -0.295},
+        {-0.155, 0.23, 0.561}, {0.016, 0.4, 0.183}, {0.334, 0.518, -0.111},
+        {-0.228, 0.645, 0.687}, {-0.056, 0.816, 0.309}, {0.261, 0.934, 0.014},
+        {-0.171, -0.17, 0.378}, {0, 0, 0}, {0.317, 0.118, -0.295},
+        {-0.155, 0.23, 0.561}, {0.016, 0.4, 0.183}, {0.334, 0.518, -0.111},
+        {-0.228, 0.645, 0.687}, {-0.056, 0.816, 0.309}, {0.261, 0.934, 0.014},
+        {-0.28, 0.098, -0.28}, {0, 0, 0}, {0.145, -0.133, 0.357},
+        {-0.28, 0.474, -0.144}, {0, 0.376, 0.136}, {0.145, 0.244, 0.494},
+        {-0.198, 0.857, -0.06}, {0.082, 0.759, 0.22}, {0.227, 0.626, 0.578},
+        {-0.28, 0.098, -0.28}, {0, 0, 0}, {0.145, -0.133, 0.357},
+        {-0.28, 0.474, -0.144}, {0, 0.376, 0.136}, {0.145, 0.244, 0.494},
+        {-0.198, 0.857, -0.06}, {0.082, 0.759, 0.22}, {0.227, 0.626, 0.578}
+      ],
+      normals: [
+        {0.196, -0.04, 0.98}, {0, -0.04, 0.999}, {-0.196, -0.04, 0.98},
+        {0.196, 0.2, 0.96}, {0, 0.2, 0.98}, {-0.196, 0.2, 0.96},
+        {0.195, 0.319, 0.927}, {0, 0.319, 0.948}, {-0.195, 0.319, 0.927},
+        {-0.196, 0.04, -0.98}, {0, 0.04, -0.999}, {0.196, 0.04, -0.98},
+        {-0.196, -0.2, -0.96}, {0, -0.2, -0.98}, {0.196, -0.2, -0.96},
+        {-0.195, -0.319, -0.927}, {0, -0.319, -0.948}, {0.195, -0.319, -0.927},
+        {0.918, -0.261, 0.299}, {0.825, -0.331, 0.458}, {0.7, -0.39, 0.598},
+        {0.918, -0.04, 0.394}, {0.826, -0.11, 0.553}, {0.701, -0.168, 0.693},
+        {0.899, 0.076, 0.43}, {0.808, 0.006, 0.59}, {0.682, -0.052, 0.729},
+        {-0.918, 0.261, -0.299}, {-0.825, 0.331, -0.458}, {-0.7, 0.39, -0.598},
+        {-0.918, 0.04, -0.394}, {-0.826, 0.11, -0.553}, {-0.701, 0.168, -0.693},
+        {-0.899, -0.076, -0.43}, {-0.808, -0.006, -0.59}, {-0.682, 0.052, -0.729},
+        {-0.724, -0.308, 0.617}, {-0.844, -0.255, 0.471}, {-0.932, -0.195, 0.305},
+        {-0.715, -0.08, 0.694}, {-0.836, -0.027, 0.548}, {-0.924, 0.033, 0.382},
+        {-0.692, 0.039, 0.721}, {-0.813, 0.091, 0.575}, {-0.9, 0.151, 0.41},
+        {0.724, 0.308, -0.617}, {0.844, 0.255, -0.471}, {0.932, 0.195, -0.305},
+        {0.715, 0.08, -0.694}, {0.836, 0.027, -0.548}, {0.924, -0.033, -0.382},
+        {0.692, -0.039, -0.721}, {0.813, -0.091, -0.575}, {0.9, -0.151, -0.41}
+      ],
+      uvs: [
+        {0, 1}, {0.5, 1}, {1, 1}, {0, 0.5}, {0.5, 0.5}, {1, 0.5}, {0, 0}, {0.5, 0}, {1, 0},
+        {0, 1}, {0.5, 1}, {1, 1}, {0, 0.5}, {0.5, 0.5}, {1, 0.5}, {0, 0}, {0.5, 0}, {1, 0},
+        {0, 1}, {0.5, 1}, {1, 1}, {0, 0.5}, {0.5, 0.5}, {1, 0.5}, {0, 0}, {0.5, 0}, {1, 0},
+        {0, 1}, {0.5, 1}, {1, 1}, {0, 0.5}, {0.5, 0.5}, {1, 0.5}, {0, 0}, {0.5, 0}, {1, 0},
+        {0, 1}, {0.5, 1}, {1, 1}, {0, 0.5}, {0.5, 0.5}, {1, 0.5}, {0, 0}, {0.5, 0}, {1, 0},
+        {0, 1}, {0.5, 1}, {1, 1}, {0, 0.5}, {0.5, 0.5}, {1, 0.5}, {0, 0}, {0.5, 0}, {1, 0}
+      ],
+      indices: [
+        0, 1, 4, 0, 4, 3, 1, 2, 5, 1, 5, 4, 3, 4, 7, 3, 7, 6, 4, 5, 8, 4, 8, 7,
+        9, 13, 10, 9, 12, 13, 10, 14, 11, 10, 13, 14, 12, 16, 13, 12, 15, 16, 13, 17, 14, 13, 16, 17,
+        18, 19, 22, 18, 22, 21, 19, 20, 23, 19, 23, 22, 21, 22, 25, 21, 25, 24, 22, 23, 26, 22, 26, 25,
+        27, 31, 28, 27, 30, 31, 28, 32, 29, 28, 31, 32, 30, 34, 31, 30, 33, 34, 31, 35, 32, 31, 34, 35,
+        36, 37, 40, 36, 40, 39, 37, 38, 41, 37, 41, 40, 39, 40, 43, 39, 43, 42, 40, 41, 44, 40, 44, 43,
+        45, 49, 46, 45, 48, 49, 46, 50, 47, 46, 49, 50, 48, 52, 49, 48, 51, 52, 49, 53, 50, 49, 52, 53
+      ]
+    }
+  }
+
+  // The foliage of the trees of each species: the materials of the foliage shapes of the trees
+  // (trees.flecs), from the leaf and needle materials of the tree library. The season recolors
+  // and thins a species through the Rgb, AlphaCutoff, DiffuseTransmission and VertexReveal of
+  // its prefabs; the B prefabs, on every other tree, lag behind a little. The prefabs the season
+  // changes are NoBake: the reflection probes would otherwise look up every shape that inherits
+  // a changed material, every frame the slider moves
+  prefab ForestLeafBeech : TreeLeafBeech {
+    Rgb: {forest_leaf_r(0, season), forest_leaf_g(0, season), forest_leaf_b(0, season)}
+    AlphaCutoff: {forest_leaf_cutoff(0, season)}
+    VertexReveal: {channel: TREE_CHANNEL_SEED, threshold: forest_leaf_thin(0, season), softness: 0}
+    DiffuseTransmission: {factor: 0.65, color: {forest_leaf_glow_r(season), forest_leaf_glow_g(season), forest_leaf_glow_b(season)}}
+    texture.Layers: {layers: [layer_wet_foliage, layer_snow_foliage]}
+    NoBake
+  }
+
+  prefab ForestLeafBeechB : ForestLeafBeech {
+    Rgb: {forest_leaf_r(0, season - LEAF_LAG), forest_leaf_g(0, season - LEAF_LAG), forest_leaf_b(0, season - LEAF_LAG)}
+    AlphaCutoff: {forest_leaf_cutoff(0, season - LEAF_LAG)}
+    VertexReveal: {channel: TREE_CHANNEL_SEED, threshold: forest_leaf_thin(0, season - LEAF_LAG), softness: 0}
+    PbrTextures: {albedo: leaf_beech_b_albedo, normal: leaf_beech_b_normal}
+    NoBake
+  }
+
+  prefab ForestLeafOak : TreeLeafOak {
+    Rgb: {forest_leaf_r(1, season), forest_leaf_g(1, season), forest_leaf_b(1, season)}
+    AlphaCutoff: {forest_leaf_cutoff(1, season)}
+    VertexReveal: {channel: TREE_CHANNEL_SEED, threshold: forest_leaf_thin(1, season), softness: 0}
+    DiffuseTransmission: {factor: 0.5, color: {forest_leaf_glow_r(season), forest_leaf_glow_g(season), forest_leaf_glow_b(season)}}
+    texture.Layers: {layers: [layer_wet_foliage, layer_snow_foliage]}
+    NoBake
+  }
+
+  prefab ForestLeafOakB : ForestLeafOak {
+    Rgb: {forest_leaf_r(1, season - LEAF_LAG), forest_leaf_g(1, season - LEAF_LAG), forest_leaf_b(1, season - LEAF_LAG)}
+    AlphaCutoff: {forest_leaf_cutoff(1, season - LEAF_LAG)}
+    VertexReveal: {channel: TREE_CHANNEL_SEED, threshold: forest_leaf_thin(1, season - LEAF_LAG), softness: 0}
+    PbrTextures: {albedo: leaf_oak_b_albedo, normal: leaf_oak_b_normal}
+    NoBake
+  }
+
+  prefab ForestLeafBirch : TreeLeafBirch {
+    Rgb: {forest_leaf_r(2, season), forest_leaf_g(2, season), forest_leaf_b(2, season)}
+    AlphaCutoff: {forest_leaf_cutoff(2, season)}
+    VertexReveal: {channel: TREE_CHANNEL_SEED, threshold: forest_leaf_thin(2, season), softness: 0}
+    DiffuseTransmission: {factor: 0.7, color: {forest_leaf_glow_r(season), forest_leaf_glow_g(season), forest_leaf_glow_b(season)}}
+    texture.Layers: {layers: [layer_wet_foliage, layer_snow_foliage]}
+    NoBake
+  }
+
+  prefab ForestLeafBirchB : ForestLeafBirch {
+    Rgb: {forest_leaf_r(2, season - LEAF_LAG), forest_leaf_g(2, season - LEAF_LAG), forest_leaf_b(2, season - LEAF_LAG)}
+    AlphaCutoff: {forest_leaf_cutoff(2, season - LEAF_LAG)}
+    VertexReveal: {channel: TREE_CHANNEL_SEED, threshold: forest_leaf_thin(2, season - LEAF_LAG), softness: 0}
+    PbrTextures: {albedo: leaf_birch_b_albedo, normal: leaf_birch_b_normal}
+    NoBake
+  }
+
+  // The needles stay green all year
+  prefab ForestNeedleSpruce : TreeNeedleSpruce {
+    texture.Layers: {layers: [layer_wet_foliage, layer_snow_foliage]}
+  }
+
+  prefab ForestNeedleFir : TreeNeedleFir {
+    texture.Layers: {layers: [layer_wet_foliage, layer_snow_foliage]}
+  }
+
+  // The bare twigs left on the snags
+  prefab ForestTwigDead : TreeTwigDead {
+    texture.Layers: {layers: [layer_wet_foliage, layer_snow_foliage]}
+  }
+}

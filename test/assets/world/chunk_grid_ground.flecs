@@ -1,0 +1,27 @@
+// A terrain and a template for the ChunkGrid.ground test of test/cpu/scene/src/ChunkGrid.c: the
+// chunk puts a rock at the height of the terrain at the center of its cell. Runs after
+// chunk_grid.flecs; the test stores the heights of the terrain itself.
+
+using box.transform
+using box.texture
+using box.terrain
+
+ground_terrain {
+  flat { nodes.Constant: {value: {0, 0, 0, 0}} }
+  Terrain: {height: flat, tile_size: 16, resolution: 17, levels: 2, budget: 1000,
+            query_radius: 16}
+}
+
+// A chunk with a rock on the ground at the center of its cell
+template GroundChunk {
+  prop cell_x: i32 = 0
+  prop cell_z: i32 = 0
+  prop size: f32 = 0
+
+  const x = cell_x * size + size / 2
+  const z = cell_z * size + size / 2
+
+  rock {
+    Position: {size / 2, box.terrain.height(ground_terrain, x, z), size / 2}
+  }
+}

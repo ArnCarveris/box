@@ -1,0 +1,91 @@
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+using box.camera
+using box.view
+using box.light
+
+// Isolation of texture.Layers, with Scene.texture_layers: the shapes on the right carry a full
+// snow layer, the shapes on the left have none. The left half must match the left half of
+// textures_layers_isolation_off, which renders the same shapes with the feature off.
+$ {
+  Scene: {shader_features: {Extended: {alpha_cutout: true, texture_blend: true,
+    texture_layers: true}}}
+}
+
+camera {
+  Position: {0, 3, 8}
+  Rotation: {-0.3, 0, 0}
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {110, 130, 160, 255}}}
+}
+
+$ {
+  AmbientLight: {sky: {150, 165, 190}, ground: {60, 56, 50}, intensity: 0.6}
+}
+
+sun {
+  Rotation: {0.8, 0.5, 0}
+  DirectionalLight: {intensity: 1.4 * flecs.script.math.PI}
+}
+
+mask { Path: {path: "test/integration/visual/assets/blend_mask.png"} }
+checker { Path: {path: "test/integration/visual/assets/checker.png"} }
+stripes { Path: {path: "test/integration/visual/assets/stripes.png"} }
+leaf_tex { Path: {path: "test/integration/visual/assets/leaf.png"} }
+
+snow {
+  texture.Layer: {amount: 1, facing: 0.3, albedo: LayerMix, roughness: LayerMix}
+  Rgb: {250, 250, 255}
+  PbrMaterial: {roughness: 0.9}
+}
+
+checker_layer { PbrTextures: {albedo: checker} }
+stripes_layer { PbrTextures: {albedo: stripes} }
+
+prefab Crate {
+  Box: {1, 1, 1}
+  Rgb: {190, 140, 100}
+  PbrMaterial: {roughness: 0.6}
+  PbrTextures: {albedo: checker}
+}
+
+prefab Ball {
+  Sphere: {radius: 0.55, smooth: true, segments: 32}
+  Rgb: {120, 160, 220}
+  PbrMaterial: {roughness: 0.4}
+}
+
+prefab Leaf {
+  Quad: {1.2, 1.2}
+  Rgb: {100, 170, 80}
+  PbrTextures: {albedo: leaf_tex}
+  AlphaCutoff: {value: 0.5}
+  BackFaceMode: {BackFacePlain}
+}
+
+prefab Panel {
+  Quad: {1.4, 1.4}
+  Rgb: {230, 230, 230}
+  texture.Blend: {mask: mask, layers: [checker_layer, stripes_layer]}
+}
+
+// Left half: no layers
+crate_l : Crate { Position: {-3.6, 0.5, 0} }
+ball_l : Ball { Position: {-2.2, 0.55, 0.6} }
+leaf_l : Leaf { Position: {-1.2, 0.8, -0.4}; Rotation: {-0.6, 0, 0} }
+panel_l : Panel { Position: {-2.6, 1.9, -1}; Rotation: {-0.4, 0, 0} }
+
+// Right half: the same shapes under full snow
+crate_r : Crate { Position: {1.6, 0.5, 0}; texture.Layers: {layers: [snow]} }
+ball_r : Ball { Position: {3, 0.55, 0.6}; texture.Layers: {layers: [snow]} }
+leaf_r : Leaf { Position: {4, 0.8, -0.4}; Rotation: {-0.6, 0, 0}; texture.Layers: {layers: [snow]} }
+panel_r : Panel {
+  Position: {2.6, 1.9, -1}
+  Rotation: {-0.4, 0, 0}
+  texture.Layers: {layers: [snow]}
+}

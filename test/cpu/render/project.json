@@ -10,12 +10,46 @@
     "lang.c": {
         "include": [
             "../../../src/render",
+            "../../../src/texture",
             "../../../src/geometry",
             "../../../src/spatial"
         ]
     },
     "test": {
         "testsuites": [
+            {
+                "id": "ImpostorCards",
+                "testcases": [
+                    "none_before_ready",
+                    "card_per_instance",
+                    "children_fade_out",
+                    "one_batch_per_prefab",
+                    "packet_batch_binds_atlases",
+                    "mesh_holds_grid",
+                    "distance_change_updates_ranges",
+                    "owned_range_kept",
+                    "remove_impostor_removes_cards",
+                    "zero_distance_draws_full",
+                    "follow_instances",
+                    "bake_copy_has_no_card"
+                ]
+            },
+            {
+                "id": "DrawRangeKey",
+                "testcases": [
+                    "none",
+                    "own",
+                    "invalid_values_ignored",
+                    "from_parent",
+                    "nearest_ancestor",
+                    "from_prefab",
+                    "prefab_child",
+                    "different_ranges_split_batches",
+                    "removed",
+                    "kept_by_tint",
+                    "packet_batch"
+                ]
+            },
             {
                 "id": "Camera",
                 "testcases": [
@@ -86,8 +120,14 @@
                     "fresnel_factor",
                     "water_defaults",
                     "water_pack",
+                    "water_scatter_defaults",
+                    "water_scatter_pack",
+                    "water_shore_defaults",
+                    "water_shore_pack",
+                    "water_shore_wrap",
                     "water_depth_mix",
                     "water_transmittance",
+                    "water_absorption",
                     "water_foam",
                     "distortion_defaults",
                     "distortion_pack",
@@ -115,7 +155,19 @@
                     "offset_wraps",
                     "offset_negative_wind",
                     "offset_zero_wind",
-                    "offset_record"
+                    "offset_record",
+                    "fog_distance",
+                    "froxel_grid_size",
+                    "froxel_slices",
+                    "falloff_script_keeps_others",
+                    "falloff_record",
+                    "falloff_clamped",
+                    "unbounded_script",
+                    "unbounded_not_culled",
+                    "unbounded_kept_over_limit",
+                    "unbounded_other_scene_none",
+                    "unbounded_unlit_view_none",
+                    "unbounded_view_disabled_none"
                 ]
             },
             {
@@ -212,17 +264,6 @@
                     "view_with_reflections_lists_probes",
                     "unlit_view_lists_none",
                     "probes_wait_for_capture"
-                ]
-            },
-            {
-                "id": "ReflectionScenes",
-                "testcases": [
-                    "garden_places_probes",
-                    "garden_capture_points_inside_boxes",
-                    "garden_capture_points_in_open_space",
-                    "garden_inner_probes_higher_priority",
-                    "garden_few_overlapping_probes",
-                    "garden_probes_have_glossy_surfaces"
                 ]
             },
             {
@@ -727,7 +768,28 @@
                     "defaults_script",
                     "script_set",
                     "resolve",
+                    "resolve_fade",
                     "packet"
+                ]
+            },
+            {
+                "id": "ViewHistory",
+                "testcases": [
+                    "first_frame_invalid",
+                    "second_frame_valid",
+                    "frame_index_counts_frames",
+                    "same_frame_twice",
+                    "moving_camera_keeps_history",
+                    "resize_resets",
+                    "camera_entity_resets",
+                    "projection_change_resets",
+                    "history_reset_resets",
+                    "history_reset_from_script",
+                    "two_views_independent",
+                    "sweep_drops_unrendered_view",
+                    "sequence_2d_deterministic_in_range",
+                    "sequence_3d_deterministic_in_range",
+                    "sequence_2d_covers_square"
                 ]
             },
             {
@@ -1109,6 +1171,181 @@
                     "no_shadow_ancestor_keeps_key",
                     "light_fixture_ancestor_keeps_key",
                     "fade_with_other_change_rekeys"
+                ]
+            },
+            {
+                "id": "WaterWaves",
+                "testcases": [
+                    "defaults",
+                    "resolve",
+                    "phase_wrapped",
+                    "phase_frame_split",
+                    "phase_continuous_velocity",
+                    "pack",
+                    "moving_record",
+                    "without_water",
+                    "water_off",
+                    "prefab_instances",
+                    "flow_textures_defaults",
+                    "flow_textures_pack",
+                    "flow_textures_record",
+                    "flow_textures_water_off"
+                ]
+            },
+            {
+                "id": "WaterCaustics",
+                "testcases": [
+                    "defaults",
+                    "frame_wrapped",
+                    "pack",
+                    "record_flag",
+                    "frame_follows_flow",
+                    "without_water",
+                    "water_off",
+                    "prefab_instances"
+                ]
+            },
+            {
+                "id": "WaterRipples",
+                "testcases": [
+                    "defaults",
+                    "reflection",
+                    "function_registered",
+                    "function_checks_arguments",
+                    "resolution_rounded",
+                    "relative_velocity",
+                    "source_relative_to_flow",
+                    "window_whole_cells",
+                    "window_in_water_frame",
+                    "fixed_steps",
+                    "wave_speed_clamped",
+                    "ripple_at_next_step",
+                    "no_field",
+                    "one_field_per_scene",
+                    "foam_function_registered",
+                    "foam_function_checks_arguments",
+                    "foam_terms",
+                    "foam_in_record",
+                    "source_foam",
+                    "foam_at_next_step",
+                    "flow_inside",
+                    "flow_at_seams",
+                    "flow_outside",
+                    "flows_collected",
+                    "flows_limit",
+                    "flows_with_frame",
+                    "source_relative_to_local_flow"
+                ]
+            },
+            {
+                "id": "WaterSpectrum",
+                "testcases": [
+                    "defaults",
+                    "reflection",
+                    "inherited",
+                    "resolution_rounded",
+                    "cascades_clamped",
+                    "params_validated",
+                    "omega_quantized",
+                    "density",
+                    "variance_grows_with_wind",
+                    "time_wraps",
+                    "record",
+                    "regenerates_on_change",
+                    "frame_follows_flow",
+                    "no_spectrum",
+                    "one_spectrum_per_scene",
+                    "instances_share",
+                    "removed",
+                    "material_flag"
+                ]
+            },
+            {
+                "id": "Wind",
+                "testcases": [
+                    "defaults",
+                    "sway_defaults",
+                    "resolve",
+                    "advance_wraps",
+                    "speed_change_continuous",
+                    "system_fixed_delta",
+                    "pack",
+                    "flutter_phase_wraps",
+                    "clock_rate",
+                    "reach",
+                    "pack_pivots",
+                    "pack_local_base",
+                    "reach_pivots",
+                    "sway_vertex",
+                    "sway_ancestors",
+                    "scene_feature",
+                    "batches",
+                    "calm_and_removed",
+                    "spot_tile_kept_without_sway",
+                    "spot_tile_renders_with_sway",
+                    "cascades_render_with_sway"
+                ]
+            },
+            {
+                "id": "VertexReveal",
+                "testcases": [
+                    "defaults",
+                    "pack",
+                    "mesh_upload",
+                    "batches",
+                    "threshold_animates",
+                    "occlusion_defaults",
+                    "occlusion_pack"
+                ]
+            },
+            {
+                "id": "TextureLayers",
+                "testcases": [
+                    "defaults",
+                    "scene_feature",
+                    "pack",
+                    "altitude_pack",
+                    "batches_without_feature",
+                    "batches",
+                    "add_remove",
+                    "amount_animates",
+                    "record_maps",
+                    "ignored",
+                    "water"
+                ]
+            },
+            {
+                "id": "TextureReadback",
+                "testcases": [
+                    "texel_formats",
+                    "texel_clamps",
+                    "sample_bilinear",
+                    "sample_clamp",
+                    "sample_wrap",
+                    "sample_rgba8",
+                    "sample_empty",
+                    "defaults",
+                    "before_copy",
+                    "pixels_copy",
+                    "single_channel",
+                    "level",
+                    "follows_revision",
+                    "remove_frees",
+                    "script_sample"
+                ]
+            },
+            {
+                "id": "WorldOriginShading",
+                "testcases": [
+                    "wrap",
+                    "origin_of_world",
+                    "mapping_pack",
+                    "mapping_record",
+                    "water_ripple_pack",
+                    "mapping_continuous",
+                    "layer_pack",
+                    "wind_frame",
+                    "wind_pack_base"
                 ]
             }
         ]

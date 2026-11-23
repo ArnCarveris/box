@@ -1,0 +1,40 @@
+// A bounded terrain of rolling noise hills, 512 m across, in green under a sun with shadows, seen
+// from a camera south of it that is the focus, against a dark blue clear.
+
+using box.transform
+using box.material
+using box.texture
+using box.terrain
+using box.camera
+using box.view
+using box.light
+using box.world
+
+terrain_bounded {
+  camera {
+    Position: {0, 260, 420}
+    Rotation: {-0.55, 0, 0}
+    Camera: {fov: 60, near_: 1, far_: 3000}
+    WorldFocus
+  }
+
+  view {
+    View: {camera: camera, clear: {enabled: true, color: {20, 30, 60, 255}},
+           shadows: {enabled: true}}
+  }
+
+  sun {
+    Rotation: {1.0, 0.6, 0}
+    DirectionalLight: {intensity: 3.14}
+  }
+
+  hills {
+    noise     { nodes.Noise: {frequency: 0.006, octaves: 4, seed: 7} }
+    elevation { nodes.Remap: {input: noise, from_min: 0, from_max: 1, to_min: -10,
+                              to_max: 110} }
+    Terrain: {height: elevation, tile_size: 32, resolution: 33, levels: 4, lod_distance: 192,
+              extent: 256, min_height: -20, max_height: 120, budget: 64}
+    Rgb: {120, 140, 90}
+    PbrMaterial: {roughness: 1}
+  }
+}

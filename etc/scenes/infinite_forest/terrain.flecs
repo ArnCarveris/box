@@ -1,0 +1,414 @@
+using flecs.script
+using flecs.script.math
+using box.material
+using box.texture
+using box.terrain
+using box.render
+using state
+using assets
+
+// The ground of the infinite forest: an endless Terrain whose heights and masks are texture graphs over
+// the absolute world (DomainWorld), so it never repeats and stays the same across shifts of the
+// WorldOrigin.
+//
+// Heights in meters, from the largest features to the smallest:
+// - mountain ranges: ridged noise under a very low frequency range mask that lifts their
+//   foothills, rising several hundred meters above the forest, kilometers apart
+// - terraces: broad noise through a stepped curve, flat shelves joined by gentle rises
+// - the rolling forest floor: low frequency fbm, and finer bumps outside the clearings
+// - escarpments: a steep step in a curve of a band noise, a rock wall tens of meters tall where
+//   a second noise lets it stand, tapering into a slope where it does not, with crags on its face
+// - clearings: the cells of a TexCells nearest their point, for about half of the cells,
+//   flattened (no bumps)
+// - trails: the edges between the cells of another TexCells (CellsEdge), sunk a little into the
+//   ground
+// - landmark sites: near the points of a third TexCells, on flat ground, the hollow of a pond or
+//   a knoll in a small glade, for the landmarks of landmarks.flecs
+// - brooks: the edges between the cells of a fourth TexCells of BROOK_SIZE, in broad valleys
+//   that lower the ground around them, where the rock walls, crags, bumps and sites give way.
+//   Each has a bed sunk under the blurred ground, leveled across the brook and stepped in
+//   terraces of BROOK_STEP along it, and banks that rise to the valley; they end toward the
+//   mountain ranges
+// The TexCells of the clearings, the trails and the brooks read warped coordinates, so the
+// clearings are not round and the trails and the brooks wind.
+//
+// Masks, four weights that add up to 1 and paint the TextureBlend of materials.flecs:
+// red the forest floor, green the grass of the clearings, the glades and the alpine meadows
+// (where later scatter keeps the trees out), blue the dirt of the trails, the scree, the beds
+// of the ponds and the banks of the brooks, alpha the rock of the steep slopes and walls and the
+// stones of the beds of the brooks.
+//
+// The brooks of brooks.flecs read infinite_forest.brooks, a second Terrain of the same graph that only
+// serves queries and draws no tiles: its height is that of the land BROOK_DATA_DROP meters
+// lower, and its masks are the brook values the land has no channel left for: red the meters to
+// the middle of the nearest brook, green the height of the bed there.
+infinite_forest {
+  land {
+    // Rolling forest floor
+    roll { nodes.Noise: {frequency: 0.0032, octaves: 4, seed: 21} }
+    roll_h { nodes.Multiply: {a: roll, b_value: {34, 34, 34, 34}} }
+
+    // Terraces: shelves of the broad noise
+    broad { nodes.Noise: {frequency: 0.0009, octaves: 3, seed: 23} }
+    terraces {
+      nodes.Curve: {input: broad, curve: {keys: [
+        {0, 0}, {0.36, 0.1}, {0.42, 0.12}, {0.49, 0.24}, {0.55, 0.26}, {0.62, 0.38},
+        {0.68, 0.4}, {1, 0.6}
+      ]}}
+    }
+
+    terraces_h { nodes.Multiply: {a: terraces, b_value: {110, 110, 110, 110}} }
+
+    // The cells of the clearings and the trails are warped by a noise, so the clearings are not
+    // round and the trails wind
+    coords { nodes.Coords: {} }
+    meander { nodes.Noise: {channels: 3, frequency: 0.004, octaves: 2, seed: 25} }
+    warped { nodes.Warp: {coords: coords, offset: meander, amount_value: 36} }
+
+    // Clearings: near the point of about half of the cells, fading out at their rim
+    clear_cells { nodes.Cells: {distance: CellsNearest, size: 300, seed: 31, coords: warped} }
+    clear_d { nodes.Split: {input: clear_cells, channel: ChannelR} }
+    clear_r { nodes.Split: {input: clear_cells, channel: ChannelB} }
+    clear_in {
+      nodes.Smoothstep: {input: clear_d, edge0_value: {0.19, 0, 0, 0}, edge1_value: {0.11, 0, 0, 0}}
+    }
+
+    clear_kept {
+      nodes.Smoothstep: {input: clear_r, edge0_value: {0.5, 0, 0, 0}, edge1_value: {0.46, 0, 0, 0}}
+    }
+
+    clearing { nodes.Multiply: {a: clear_in, b: clear_kept} }
+
+    // Mountain ranges: ridged noise under a very low frequency mask, on foothills it lifts
+    range_n { nodes.Noise: {frequency: 0.00021, octaves: 2, seed: 51} }
+    range {
+      nodes.Smoothstep: {input: range_n, edge0_value: {0.54, 0, 0, 0}, edge1_value: {0.72, 0, 0, 0}}
+    }
+
+    ridges { nodes.Noise: {frequency: 0.0008, octaves: 6, fractal: NoiseRidged, seed: 52} }
+    peaks_r { nodes.Multiply: {a: ridges, b: range} }
+    peaks_h { nodes.Multiply: {a: peaks_r, b_value: {560, 560, 560, 560}} }
+    foothills_h { nodes.Multiply: {a: range, b_value: {90, 90, 90, 90}} }
+
+    // Brooks along the edges between the cells of a TexCells of BROOK_SIZE meters, warped so they
+    // meander: brook_x is F2 - F1 in meters, 0 on an edge, and over the length of its gradient
+    // it is about the meters to the edge, brook_d0. The blur and the floor of the length keep
+    // that from growing where the texels straddle the edge. Toward the mountain ranges brook_d
+    // grows, so a brook narrows and ends before them
+    brook_bend { nodes.Noise: {channels: 3, frequency: 0.0025, octaves: 2, seed: 81} }
+    brook_coords { nodes.Warp: {coords: coords, offset: brook_bend, amount_value: 60} }
+    brook_near {
+      nodes.Cells: {distance: CellsNearest, size: BROOK_SIZE, seed: 83, coords: brook_coords}
+    }
+
+    brook_second {
+      nodes.Cells: {distance: CellsSecond, size: BROOK_SIZE, seed: 83, coords: brook_coords}
+    }
+
+    brook_f1 { nodes.Split: {input: brook_near, channel: ChannelR} }
+    brook_f2 { nodes.Split: {input: brook_second, channel: ChannelR} }
+    brook_e { nodes.Subtract: {a: brook_f2, b: brook_f1} }
+    brook_x {
+      nodes.Multiply: {a: brook_e, b_value: {BROOK_SIZE, BROOK_SIZE, BROOK_SIZE, BROOK_SIZE}}
+    }
+
+    brook_g { nodes.Gradient: {height: brook_x} }
+    brook_gl { nodes.Length: {input: brook_g} }
+    brook_gb { nodes.Blur: {input: brook_gl, radius: 3} }
+    brook_gc { nodes.Max: {a: brook_gb, b_value: {0.7, 0.7, 0.7, 0.7}} }
+    brook_d0 { nodes.Divide: {a: brook_x, b: brook_gc} }
+    brook_away {
+      nodes.Smoothstep: {input: range_n, edge0_value: {0.53, 0, 0, 0}, edge1_value: {0.58, 0, 0, 0}}
+    }
+
+    brook_far { nodes.Multiply: {a: brook_away, b_value: {160, 160, 160, 160}} }
+    brook_d { nodes.Add: {a: brook_d0, b: brook_far} }
+
+    // The valley of a brook: the ground sinks within about 150 meters of it, and within 40
+    // meters the walls, the bumps and the sites give way
+    brook_vale {
+      nodes.Smoothstep: {input: brook_d, edge0_value: {150, 0, 0, 0}, edge1_value: {20, 0, 0, 0}}
+    }
+
+    brook_vale_h { nodes.Multiply: {a: brook_vale, b_value: {-10, -10, -10, -10}} }
+    brook_v {
+      nodes.Smoothstep: {input: brook_d, edge0_value: {40, 0, 0, 0}, edge1_value: {16, 0, 0, 0}}
+    }
+
+    brook_open { nodes.Subtract: {a_value: {1, 1, 1, 1}, b: brook_v} }
+
+    // Escarpments: a band noise steps up where it crosses 0.5; the wall stands where the second
+    // noise is high and leans into a slope where it is low, and gives way to the valleys of the
+    // brooks
+    band_n { nodes.Noise: {frequency: 0.0014, octaves: 2, seed: 41} }
+    jag { nodes.Noise: {frequency: 0.012, octaves: 3, seed: 43} }
+    jag_d { nodes.Remap: {input: jag, from_min: 0, from_max: 1, to_min: -0.012, to_max: 0.012} }
+    band { nodes.Add: {a: band_n, b: jag_d} }
+    step {
+      nodes.Curve: {input: band, curve: {keys: [
+        {0, 0}, {0.494, 0}, {0.4975, 0.4}, {0.4995, 0.48}, {0.503, 0.94}, {0.506, 1}, {1, 1}
+      ]}}
+    }
+
+    wall_n { nodes.Noise: {frequency: 0.0011, octaves: 2, seed: 42} }
+    wall_where {
+      nodes.Smoothstep: {input: wall_n, edge0_value: {0.44, 0, 0, 0}, edge1_value: {0.58, 0, 0, 0}}
+    }
+
+    wall_ok { nodes.Multiply: {a: wall_where, b: brook_open} }
+    wall_s { nodes.Multiply: {a: step, b: wall_ok} }
+    wall_h { nodes.Multiply: {a: wall_s, b_value: {38, 38, 38, 38}} }
+
+    // Buttresses and gullies on the face of the wall
+    face_lo {
+      nodes.Smoothstep: {input: band, edge0_value: {0.49, 0, 0, 0}, edge1_value: {0.497, 0, 0, 0}}
+    }
+
+    face_hi {
+      nodes.Smoothstep: {input: band, edge0_value: {0.51, 0, 0, 0}, edge1_value: {0.503, 0, 0, 0}}
+    }
+
+    face_b { nodes.Multiply: {a: face_lo, b: face_hi} }
+    face { nodes.Multiply: {a: face_b, b: wall_ok} }
+    crags { nodes.Noise: {frequency: 0.045, octaves: 3, fractal: NoiseRidged, seed: 44} }
+    crags_f { nodes.Multiply: {a: crags, b: face} }
+    crags_h { nodes.Multiply: {a: crags_f, b_value: {6, 6, 6, 6}} }
+
+    // Trails along the edges of the cells: 1 on the trail, 0 off it
+    trail_cells { nodes.Cells: {distance: CellsEdge, size: 190, edge: 0.1, seed: 61, coords: warped} }
+    trail_e { nodes.Split: {input: trail_cells, channel: ChannelR} }
+    track {
+      nodes.Remap: {input: trail_e, from_min: 0.03, from_max: 0.1, to_min: 1, to_max: 0, clamp: true}
+    }
+
+    trail_h { nodes.Multiply: {a: track, b_value: {-0.35, -0.35, -0.35, -0.35}} }
+
+    h1 { nodes.Add: {a: roll_h, b: terraces_h} }
+    h2 { nodes.Add: {a: h1, b: brook_vale_h} }
+    h3 { nodes.Add: {a: h2, b: wall_h} }
+    h3c { nodes.Add: {a: h3, b: crags_h} }
+    h4 { nodes.Add: {a: h3c, b: peaks_h} }
+    h5 { nodes.Add: {a: h4, b: foothills_h} }
+
+    // Landmark sites: near the point of some cells of a third TexCells, away from the rock
+    // walls, a pond in a hollow or a knoll, each in a small glade. The points keep to the middle
+    // of their cells (jitter), so a site never reaches the edge of its cell. The slope is
+    // blurred so that it changes little across a site, which keeps it whole.
+    site_cells { nodes.Cells: {distance: CellsNearest, size: 230, jitter: 0.5, seed: 71} }
+    site_d { nodes.Split: {input: site_cells, channel: ChannelR} }
+    site_r { nodes.Split: {input: site_cells, channel: ChannelB} }
+    site_slope { nodes.Slope: {height: h5} }
+    site_slope_b { nodes.Blur: {input: site_slope, radius: 24} }
+    site_flat {
+      nodes.Smoothstep: {input: site_slope_b, edge0_value: {0.3, 0, 0, 0}, edge1_value: {0.2, 0, 0, 0}}
+    }
+
+    pond_r {
+      nodes.Smoothstep: {input: site_r, edge0_value: {0.145, 0, 0, 0}, edge1_value: {0.135, 0, 0, 0}}
+    }
+
+    site_r_in {
+      nodes.Smoothstep: {input: site_r, edge0_value: {0.405, 0, 0, 0}, edge1_value: {0.395, 0, 0, 0}}
+    }
+
+    site_any { nodes.Multiply: {a: site_r_in, b: site_flat} }
+    pond_sel { nodes.Multiply: {a: pond_r, b: site_flat} }
+    knoll_sel { nodes.Subtract: {a: site_any, b: pond_sel} }
+
+    // The hollow of the pond, with a flat bed, and the knoll
+    hollow {
+      nodes.Smoothstep: {input: site_d, edge0_value: {0.1, 0, 0, 0}, edge1_value: {0.02, 0, 0, 0}}
+    }
+
+    hollow_s { nodes.Multiply: {a: hollow, b: pond_sel} }
+    hollow_h { nodes.Multiply: {a: hollow_s, b_value: {-2.8, -2.8, -2.8, -2.8}} }
+    knoll {
+      nodes.Smoothstep: {input: site_d, edge0_value: {0.17, 0, 0, 0}, edge1_value: {0, 0, 0, 0}}
+    }
+
+    knoll_s { nodes.Multiply: {a: knoll, b: knoll_sel} }
+    knoll_h { nodes.Multiply: {a: knoll_s, b_value: {4.5, 4.5, 4.5, 4.5}} }
+    site_k { nodes.Add: {a: hollow_h, b: knoll_h} }
+    site_h { nodes.Multiply: {a: site_k, b: brook_open} }
+
+    // The glade of the site, and the mud of the bed of the pond
+    glade_in {
+      nodes.Smoothstep: {input: site_d, edge0_value: {0.16, 0, 0, 0}, edge1_value: {0.09, 0, 0, 0}}
+    }
+
+    glade { nodes.Multiply: {a: glade_in, b: site_any} }
+    bed_in {
+      nodes.Smoothstep: {input: site_d, edge0_value: {0.075, 0, 0, 0}, edge1_value: {0.055, 0, 0, 0}}
+    }
+
+    bed { nodes.Multiply: {a: bed_in, b: pond_sel} }
+    opening { nodes.Max: {a: clearing, b: glade} }
+    wooded { nodes.Subtract: {a_value: {1, 1, 1, 1}, b: opening} }
+
+    // Bumps of the forest floor, smoothed out in the clearings and the glades
+    bumps { nodes.Noise: {frequency: 0.018, octaves: 3, seed: 22} }
+    bumps_c { nodes.Remap: {input: bumps, from_min: 0, from_max: 1, to_min: -4, to_max: 4} }
+    bumps_w { nodes.Multiply: {a: bumps_c, b: wooded} }
+    bumps_h { nodes.Multiply: {a: bumps_w, b: brook_open} }
+
+    h6 { nodes.Add: {a: h5, b: bumps_h} }
+    h7 { nodes.Add: {a: h6, b: site_h} }
+    h8 { nodes.Add: {a: h7, b: trail_h} }
+
+    // The bed of a brook: the ground blurred and sunk, leveled across the brook by taking the
+    // height at the middle (the height less the distance times its slope away from the
+    // middle), so the water stands level from bank to bank. It steps down in terraces of
+    // BROOK_STEP, and the banks rise from the bed along brook_rise: the water BROOK_DEPTH over a
+    // terrace reaches 1.2 to 1.6 meters to either side of the middle. The brook cuts the ground
+    // only where it is lower, so the ground keeps its shape further out
+    brook_blur { nodes.Blur: {input: h5, radius: 24} }
+    brook_sunk { nodes.Add: {a: brook_blur, b_value: {-4.5, -4.5, -4.5, -4.5}} }
+    brook_sg { nodes.Gradient: {height: brook_sunk} }
+    brook_n { nodes.Normalize: {input: brook_g} }
+    brook_tilt { nodes.Dot: {a: brook_sg, b: brook_n} }
+    brook_lift { nodes.Multiply: {a: brook_tilt, b: brook_d0} }
+    brook_bed { nodes.Subtract: {a: brook_sunk, b: brook_lift} }
+    brook_q {
+      nodes.Divide: {a: brook_bed, b_value: {BROOK_STEP, BROOK_STEP, BROOK_STEP, BROOK_STEP}}
+    }
+
+    brook_qf { nodes.Floor: {input: brook_q} }
+    brook_steps {
+      nodes.Multiply: {a: brook_qf, b_value: {BROOK_STEP, BROOK_STEP, BROOK_STEP, BROOK_STEP}}
+    }
+
+    brook_rise {
+      nodes.Curve: {input: brook_d, curve: {kind: CurveCatmullRom, keys: [
+        {0, -0.5}, {0.9, -0.42}, {1.5, 0.1}, {2.2, 0.6}, {3, 1}, {4.5, 1.35}, {8, 1.9},
+        {14, 3.2}, {22, 5}, {32, 8}, {45, 16}, {60, 40}, {80, 200}, {100, 1000}
+      ]}}
+    }
+
+    brook_bank { nodes.Add: {a: brook_bed, b: brook_rise} }
+    brook_cut { nodes.Max: {a: brook_steps, b: brook_bank} }
+    height { nodes.Min: {a: h8, b: brook_cut} }
+
+    // Rock on the steep slopes and walls
+    slope { nodes.Slope: {height: height} }
+    rock {
+      nodes.Smoothstep: {input: slope, edge0_value: {0.72, 0, 0, 0}, edge1_value: {1.15, 0, 0, 0}}
+    }
+
+    open { nodes.Subtract: {a_value: {1, 1, 1, 1}, b: rock} }
+
+    // Scree at the foot of the walls, on the low side of the step, and on the mountain slopes
+    foot_lo {
+      nodes.Smoothstep: {input: band, edge0_value: {0.476, 0, 0, 0}, edge1_value: {0.489, 0, 0, 0}}
+    }
+
+    foot_hi {
+      nodes.Smoothstep: {input: band, edge0_value: {0.505, 0, 0, 0}, edge1_value: {0.496, 0, 0, 0}}
+    }
+
+    foot_b { nodes.Multiply: {a: foot_lo, b: foot_hi} }
+    foot { nodes.Multiply: {a: foot_b, b: wall_ok} }
+    talus_s {
+      nodes.Smoothstep: {input: slope, edge0_value: {0.48, 0, 0, 0}, edge1_value: {0.72, 0, 0, 0}}
+    }
+
+    talus { nodes.Multiply: {a: talus_s, b: range} }
+    scree { nodes.Max: {a: foot, b: talus} }
+    scree_w { nodes.Multiply: {a: scree, b: open} }
+    rest_a { nodes.Subtract: {a: open, b: scree_w} }
+
+    // Trails, where the ground is not steep
+    trail_w { nodes.Multiply: {a: track, b: rest_a} }
+    rest_b { nodes.Subtract: {a: rest_a, b: trail_w} }
+
+    // Mud on the bed of the ponds
+    bed_w { nodes.Multiply: {a: bed, b: rest_b} }
+    rest_c { nodes.Subtract: {a: rest_b, b: bed_w} }
+
+    // The wet earth of the banks of the brooks, and the stones of their beds in the middle
+    brook_bank_m {
+      nodes.Smoothstep: {input: brook_d, edge0_value: {5.5, 0, 0, 0}, edge1_value: {2.4, 0, 0, 0}}
+    }
+
+    brook_core_m {
+      nodes.Smoothstep: {input: brook_d, edge0_value: {2.4, 0, 0, 0}, edge1_value: {1.2, 0, 0, 0}}
+    }
+
+    brook_w { nodes.Multiply: {a: brook_bank_m, b: rest_c} }
+    rest_d { nodes.Subtract: {a: rest_c, b: brook_w} }
+    brook_core_w { nodes.Multiply: {a: brook_w, b: brook_core_m} }
+    brook_stone_w { nodes.Multiply: {a: brook_core_w, b_value: {0.55, 0.55, 0.55, 0.55}} }
+    brook_mud_w { nodes.Subtract: {a: brook_w, b: brook_stone_w} }
+
+    // Grass in the clearings, the glades and above the tree line
+    alpine {
+      nodes.Smoothstep: {input: height, edge0_value: {210, 0, 0, 0}, edge1_value: {300, 0, 0, 0}}
+    }
+
+    meadow_a { nodes.Max: {a: clearing, b: alpine} }
+    meadow { nodes.Max: {a: meadow_a, b: glade} }
+    grass_w { nodes.Multiply: {a: meadow, b: rest_d} }
+    floor_w { nodes.Subtract: {a: rest_d, b: grass_w} }
+
+    scree_dirt { nodes.Multiply: {a: scree_w, b_value: {0.4, 0.4, 0.4, 0.4}} }
+    scree_rock { nodes.Multiply: {a: scree_w, b_value: {0.6, 0.6, 0.6, 0.6}} }
+    dirt_a { nodes.Add: {a: trail_w, b: scree_dirt} }
+    dirt_b { nodes.Add: {a: dirt_a, b: bed_w} }
+    dirt_w { nodes.Add: {a: dirt_b, b: brook_mud_w} }
+    rock_a { nodes.Add: {a: rock, b: scree_rock} }
+    rock_w { nodes.Add: {a: rock_a, b: brook_stone_w} }
+    masks { nodes.Combine: {r: floor_w, g: grass_w, b: dirt_w, a: rock_w} }
+
+    Terrain: {
+      height: height,
+      masks: masks,
+      tile_size: TERRAIN_TILE,
+      resolution: TERRAIN_RESOLUTION,
+      levels: TERRAIN_LEVELS,
+      lod_distance: TERRAIN_DETAIL,
+      min_height: GROUND_MIN,
+      max_height: GROUND_MAX,
+      budget: TERRAIN_BUDGET,
+      query_spacing: TERRAIN_QUERY_SPACING,
+      query_radius: TERRAIN_QUERY_RADIUS,
+      query_hold: TERRAIN_QUERY_HOLD
+    }
+
+    texture.Blend: {
+      layers: [infinite_forest_floor, infinite_forest_grass, infinite_forest_dirt, infinite_forest_rock],
+      heights: [litter_height, infinite_forest_grass_height, path_height, rock_height],
+      contrast: 6,
+      variation: 0.4
+    }
+
+    texture.Mapping: {mode: MappingWorld, size: GROUND_MAP_SIZE, blend: 0.15}
+    texture.Layers: {layers: [infinite_forest_peak_snow, layer_wet, layer_snow]}
+    Rgb: {212, 206, 196}
+    PbrMaterial: {roughness: 0.95}
+
+    // What infinite_forest.brooks reads: the land BROOK_DATA_DROP meters lower, the meters to the
+    // middle of the nearest brook and the height of its bed
+    brook_data_h { nodes.Subtract: {a: height, b_value: {BROOK_DATA_DROP, 0, 0, 0}} }
+
+    brook_data { nodes.Combine: {r: brook_d, g: brook_bed} }
+  }
+
+  // The query terrain of the brooks: its CPU heights and masks at the spacing of the land within
+  // BROOK_QUERY_RADIUS of the focus, and where the cells of brooks.flecs ask for them
+  brooks {
+    Terrain: {
+      height: infinite_forest.land.brook_data_h,
+      masks: infinite_forest.land.brook_data,
+      tile_size: 1024,
+      resolution: 5,
+      levels: 1,
+      lod_distance: 3072,
+      min_height: GROUND_MIN - BROOK_DATA_DROP,
+      max_height: GROUND_MAX - BROOK_DATA_DROP,
+      budget: TERRAIN_BUDGET,
+      query_spacing: TERRAIN_QUERY_SPACING,
+      query_radius: BROOK_QUERY_RADIUS,
+      query_only: true,
+      query_hold: TERRAIN_QUERY_HOLD
+    }
+  }
+}

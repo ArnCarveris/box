@@ -11,6 +11,6 @@ using box.light
 
 $ {
   box.app.FpsTarget: {60}
-  Scene: {blend_modes: true, fresnel: true, planet_light: true}
+  Scene: {planet_light: true, shader_features: {Extended: {blend_modes: true, fresnel: true}}}
   AmbientLight: {sky: {26, 30, 44}, ground: {10, 10, 16}, intensity: 0.12}
 }

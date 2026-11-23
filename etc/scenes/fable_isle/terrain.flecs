@@ -15,21 +15,52 @@ assets {
   prefab IsleLakeWater {
     Rgb: {255, 255, 255}
     PbrMaterial: {roughness: 0.05}
-    Water: {shallow_color: {74, 188, 184}, deep_color: {22, 74, 112}, depth: 2.2, visibility: 2.6, refraction: 0.015, foam_width: 0.22, ripple_scale: 2.3, ripple_velocity: {0.02, 0.013}}
+    Water: {
+      shallow_color: {74, 188, 184},
+      deep_color: {22, 74, 112},
+      depth: 2.2,
+      visibility: 2.6,
+      refraction: 0.015,
+      foam_width: 0.22,
+      ripple_scale: 2.3,
+      ripple_velocity: {0.02, 0.013}
+    }
     PbrTextures: {normal: isle_wave_n}
     texture.Mapping: {mode: MappingWorld, size: 5}
     texture.Scroll: {velocity: {0.012, 0.02}}
   }
+
   prefab IsleBrookWater {
     Rgb: {255, 255, 255}
     PbrMaterial: {roughness: 0.05}
-    Water: {shallow_color: {96, 200, 196}, deep_color: {40, 120, 150}, depth: 0.5, visibility: 0.5, refraction: 0.01, foam_width: 0}
+    Water: {
+      shallow_color: {96, 200, 196},
+      deep_color: {40, 120, 150},
+      depth: 0.5,
+      visibility: 0.5,
+      refraction: 0.01,
+      foam_width: 0
+    }
     PbrTextures: {normal: isle_wave_n}
     texture.Scroll: {velocity: {0.9, 0}}
     texture.Transform: {scale_x: 6, scale_y: 0.6}
   }
-  prefab IsleIce { Rgb: {206, 232, 246}; PbrMaterial: {metallic: 0.1, roughness: 0.14}; ClearCoat: {strength: 0.8, roughness: 0.08}; PbrTextures: {normal: isle_rock_n}; texture.Mapping: {mode: MappingWorld, size: 7}; Sheen: {color: {230, 244, 255}, roughness: 0.3} }
-  prefab IsleEarth { Rgb: {104, 76, 54}; PbrMaterial: {roughness: 1}; PbrTextures: {normal: isle_rock_n}; texture.Mapping: {mode: MappingWorld, size: 5, blend: 0.3} }
+
+  prefab IsleIce {
+    Rgb: {206, 232, 246}
+    PbrMaterial: {metallic: 0.1, roughness: 0.14}
+    ClearCoat: {strength: 0.8, roughness: 0.08}
+    PbrTextures: {normal: isle_rock_n}
+    texture.Mapping: {mode: MappingWorld, size: 7}
+    Sheen: {color: {230, 244, 255}, roughness: 0.3}
+  }
+
+  prefab IsleEarth {
+    Rgb: {104, 76, 54}
+    PbrMaterial: {roughness: 1}
+    PbrTextures: {normal: isle_rock_n}
+    texture.Mapping: {mode: MappingWorld, size: 5, blend: 0.3}
+  }
 
   prefab IsleFallWater {
     Rgb: {214, 238, 250}
@@ -39,6 +70,7 @@ assets {
     texture.Transform: {scale_x: 2, scale_y: 5}
     texture.Scroll: {velocity: {0, -1.6}}
   }
+
   isle_fall_shape { Path2D: {start: {-0.75, 0}, segments: [
     {kind: CubicBezier, end: {0.75, 0}, control1: {-0.75, 0.22}, control2: {0.75, 0.22}}
     {kind: CubicBezier, end: {-0.75, 0}, control1: {0.75, -0.22}, control2: {-0.75, -0.22}}
@@ -94,86 +126,193 @@ assets {
     prop seed: f32 = 0
     (IsA, IsleRock)
     Rotation: {rnd(seed, 1) * 3, rnd(seed, 2) * 6, rnd(seed, 3) * 3}
-    Scale: {s * (0.8 + rnd(seed, 4) * 0.5), s * (0.55 + rnd(seed, 5) * 0.4), s * (0.8 + rnd(seed, 6) * 0.5)}
+    Scale: {
+      s * (0.8 + rnd(seed, 4) * 0.5),
+      s * (0.55 + rnd(seed, 5) * 0.4),
+      s * (0.8 + rnd(seed, 6) * 0.5)
+    }
     IcoSphere: {radius: 1, segments: 1}
   }
 
-  template IsleTerrain {
-    lake_bed : IsleSand { Position: {0, 0, 0}; Lathe: {profile: isle_bed_profile, segments: 64, rings: 12} }
-    top : IsleGrass { Position: {0, 0, 0}; Lathe: {profile: isle_top_profile, segments: 96, rings: 4} }
-    earth : IsleEarth { Position: {0, 0, 0}; Lathe: {profile: isle_earth_profile, segments: 48, rings: 3} }
-    rock : IsleRockDark { Position: {0, 0, 0}; Lathe: {profile: isle_rock_profile, segments: 18, rings: 3} }
+  template IsleTerrainGround {
+    lake_bed : IsleSand {
+      Position: {0, 0, 0}
+      Lathe: {profile: isle_bed_profile, segments: 64, rings: 12}
+    }
+
+    top : IsleGrass {
+      Position: {0, 0, 0}
+      Lathe: {profile: isle_top_profile, segments: 96, rings: 4}
+    }
+
+    earth : IsleEarth {
+      Position: {0, 0, 0}
+      Lathe: {profile: isle_earth_profile, segments: 48, rings: 3}
+    }
+
+    rock : IsleRockDark {
+      Position: {0, 0, 0}
+      Lathe: {profile: isle_rock_profile, segments: 18, rings: 3}
+    }
 
     if season == WINTER {
       ice : IsleIce { Position: {0, -0.22, 0}; Cylinder: {radius: 8.5, length: 0.06, segments: 64} }
+
       for i in 0..7 {
         const a = i * GOLDEN + 0.7
         const r = 1.5 + rnd(i, 51) * 5.2
-        "drift_{i}" : IsleSnow { Position: {r * cos(a), -0.2, r * sin(a)}; Rotation: {0, rnd(i, 53) * 6, 0}; Scale: {1.4 + rnd(i, 55) * 1.6, 0.07, 0.8 + rnd(i, 57) * 0.9}; IcoSphere: {radius: 1, segments: 2, smooth: true}; Ignore }
+        "drift_{i}" : IsleSnow {
+          Position: {r * cos(a), -0.2, r * sin(a)}
+          Rotation: {0, rnd(i, 53) * 6, 0}
+          Scale: {1.4 + rnd(i, 55) * 1.6, 0.07, 0.8 + rnd(i, 57) * 0.9}
+          IcoSphere: {radius: 1, segments: 2, smooth: true}
+          Ignore
+        }
       }
     } else {
-      lake : IsleLakeWater { Position: {0, -0.25, 0}; Cylinder: {radius: 8.45, length: 0.02, segments: 64}; NoShadow }
+      lake : IsleLakeWater {
+        Position: {0, -0.25, 0}
+        Cylinder: {radius: 8.45, length: 0.02, segments: 64}
+        NoShadow
+      }
     }
 
     hill {
       Position: {px(RAIL_R, HILL_A), 0, pz(RAIL_R, HILL_A)}
-      dome : IsleGrass { Position: {0, 0, 0}; Lathe: {profile: isle_hill_top_profile, segments: 48, rings: 8} }
-      cliff : IsleRock { Position: {0, 0, 0}; Lathe: {profile: isle_hill_cliff_profile, segments: 48, rings: 3} }
+      dome : IsleGrass {
+        Position: {0, 0, 0}
+        Lathe: {profile: isle_hill_top_profile, segments: 48, rings: 8}
+      }
+
+      cliff : IsleRock {
+        Position: {0, 0, 0}
+        Lathe: {profile: isle_hill_cliff_profile, segments: 48, rings: 3}
+      }
+
       for i in 0..14 {
         const a = i * GOLDEN + 0.4
         const r = 7.9 + rnd(i, 3) * 0.9
         const clear = abs(sin(a)) > 0.45 && !(sin(a) > 0.9)
+
         if clear {
-          IsleBoulder "scree_{i}"(s: 0.5 + rnd(i, 9) * 0.7, seed: i + 40) { Position: {r * cos(a), 0.2, r * sin(a)} }
+          IsleBoulder "scree_{i}"(s: 0.5 + rnd(i, 9) * 0.7, seed: i + 40) {
+            Position: {r * cos(a), 0.2, r * sin(a)}
+          }
         }
       }
+
       stairs {
         Position: {0, 0, 0}
+
         for s in 0..2 {
           const sx = s == 0 ? -0.7 : 0.7
-          "stringer_{s}" : IsleWoodDark { Position: {sx, 3.22, 8.75}; Rotation: {0.876, 0, 0}; Box: {0.1, 0.26, 8.7} }
-          "rail_{s}" : IsleWood { Position: {sx, 4.2, 8.75}; Rotation: {0.876, 0, 0}; Box: {0.07, 0.07, 8.7} }
+          "stringer_{s}" : IsleWoodDark {
+            Position: {sx, 3.22, 8.75}
+            Rotation: {0.876, 0, 0}
+            Box: {0.1, 0.26, 8.7}
+          }
+
+          "rail_{s}" : IsleWood {
+            Position: {sx, 4.2, 8.75}
+            Rotation: {0.876, 0, 0}
+            Box: {0.07, 0.07, 8.7}
+          }
+
           for k in 0..6 {
             const t = k / 5.0
-            "post_{s}_{k}" : IsleWood { Position: {sx, 6.6 * t + 0.5, 11.5 - 5.5 * t}; Box: {0.08, 1.0, 0.08} }
+            "post_{s}_{k}" : IsleWood {
+              Position: {sx, 6.6 * t + 0.5, 11.5 - 5.5 * t}
+              Box: {0.08, 1.0, 0.08}
+            }
           }
+
           "leg_a_{s}" : IsleWoodDark { Position: {sx, 1.2, 9.6}; Box: {0.14, 2.4, 0.14} }
           "leg_b_{s}" : IsleWoodDark { Position: {sx, 2.3, 8.2}; Box: {0.14, 4.6, 0.14} }
         }
+
         for i in 0..17 {
           const t = (i + 0.5) / 17
-          "step_{i}" : IsleWood { Position: {0, 6.6 * t + 0.1, 11.5 - 5.5 * t}; Box: {1.36, 0.07, 0.4}; Ignore }
+          "step_{i}" : IsleWood {
+            Position: {0, 6.6 * t + 0.1, 11.5 - 5.5 * t}
+            Box: {1.36, 0.07, 0.4}
+            Ignore
+          }
         }
+
         landing : IsleWood { Position: {0, 6.68, 5.5}; Box: {1.7, 0.1, 1.5} }
         foot : IsleCobble { Position: {0, 0.03, 12.4}; Box: {1.8, 0.06, 1.8} }
       }
     }
+  }
 
+  template IsleTerrain : IsleTerrainGround {
     brook {
       Position: {px(19.4, BROOK_A), 0, pz(19.4, BROOK_A)}
       Rotation: {0, 0 - BROOK_A, 0}
       bed : IsleCobble { Position: {0, 0.005, 0}; Box: {22, 0.03, 2.1} }
-      water : IsleBrookWater { Position: {0, 0.045, 0}; Rotation: {0 - HALF_PI, 0, 0}; Quad: {22, 1.6}; NoShadow }
+      water : IsleBrookWater {
+        Position: {0, 0.045, 0}
+        Rotation: {0 - HALF_PI, 0, 0}
+        Quad: {22, 1.6}
+        NoShadow
+      }
+
       for i in 0..40 {
         const side = i % 2 == 0 ? -1 : 1
         const along = (floor(i / 2) + rnd(i, 7) * 0.8) * 1.1 - 10.8
         const sz = 0.16 + rnd(i, 2) * 0.2
         const on_rail = abs(along + 19.4 - RAIL_R) < 1.9
+
         if !on_rail {
-          IsleBoulder "bank_{i}"(s: sz, seed: i) { Position: {along, sz * 0.3, side * (0.95 + rnd(i, 5) * 0.25)}; Ignore }
+          IsleBoulder "bank_{i}"(s: sz, seed: i) {
+            Position: {along, sz * 0.3, side * (0.95 + rnd(i, 5) * 0.25)}
+            Ignore
+          }
         }
       }
-      mouth_a : IsleRock { Position: {-11.2, 0.05, -1.3}; Scale: {0.9, 0.45, 0.7}; IcoSphere: {radius: 1, segments: 1} }
-      mouth_b : IsleRock { Position: {-11.3, 0.05, 1.35}; Scale: {0.7, 0.5, 0.9}; IcoSphere: {radius: 1, segments: 1} }
-      lip_a : IsleRock { Position: {10.7, -0.1, -1.5}; Scale: {1.1, 0.7, 0.9}; IcoSphere: {radius: 1, segments: 1} }
-      lip_b : IsleRock { Position: {10.6, -0.1, 1.5}; Scale: {1.0, 0.8, 1.0}; IcoSphere: {radius: 1, segments: 1} }
+
+      mouth_a : IsleRock {
+        Position: {-11.2, 0.05, -1.3}
+        Scale: {0.9, 0.45, 0.7}
+        IcoSphere: {radius: 1, segments: 1}
+      }
+
+      mouth_b : IsleRock {
+        Position: {-11.3, 0.05, 1.35}
+        Scale: {0.7, 0.5, 0.9}
+        IcoSphere: {radius: 1, segments: 1}
+      }
+
+      lip_a : IsleRock {
+        Position: {10.7, -0.1, -1.5}
+        Scale: {1.1, 0.7, 0.9}
+        IcoSphere: {radius: 1, segments: 1}
+      }
+
+      lip_b : IsleRock {
+        Position: {10.6, -0.1, 1.5}
+        Scale: {1.0, 0.8, 1.0}
+        IcoSphere: {radius: 1, segments: 1}
+      }
     }
 
     falls {
       Position: {px(30.25, BROOK_A), 0, pz(30.25, BROOK_A)}
       Rotation: {0, 0 - BROOK_A, 0}
       Ignore
-      ribbon : IsleFallWater { Position: {0, 0, 0}; Sweep: {path: isle_fall_path, profile: isle_fall_section, taper: 1.9, segments: 6, rings: 28}; Opacity: {0.6}; NoShadow }
+      ribbon : IsleFallWater {
+        Position: {0, 0, 0}
+        Sweep: {
+          path: isle_fall_path,
+          profile: isle_fall_section,
+          taper: 1.9,
+          segments: 6,
+          rings: 28
+        }
+        Opacity: {0.6}
+        NoShadow
+      }
+
       sheet {
         Position: {0.1, 0.06, 0}
         Emitter: {
@@ -188,6 +327,7 @@ assets {
           size: {keys: [{0, 0.8}, {0.5, 1.2}, {1, 4}]}
         }
       }
+
       mist {
         Position: {2.4, -14, 0}
         Emitter: {
@@ -214,6 +354,7 @@ assets {
           IcoSphere: {radius: 1, segments: 1}
         }
       }
+
       for i in 0..9 {
         const a = i * 0.698 + 0.2
         const r = 27.5 + rnd(i, 23) * 2
@@ -224,6 +365,7 @@ assets {
           Cone: {radius: s, length: 3 + rnd(i, 37) * 4, segments: 6}
         }
       }
+
       for i in 0..7 {
         const a = i * 0.9 + 0.5
         const r = 38 + rnd(i, 41) * 9

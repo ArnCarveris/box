@@ -41,7 +41,12 @@
                     "world_scale_forces",
                     "world_scale_forces_one_unchanged",
                     "world_scale_forces_non_uniform",
-                    "world_scale_forces_linger"
+                    "world_scale_forces_linger",
+                    "follow_offsets_model",
+                    "follow_ground_keeps_height",
+                    "ground_sampled_terrain",
+                    "collision_sampled_terrain",
+                    "collision_other_terrain_than_ground"
                 ]
             },
             {
@@ -462,6 +467,54 @@
                     "showcase_chimney",
                     "mistakes",
                     "first_mistake_only"
+                ]
+            },
+            {
+                "id": "Card",
+                "testcases": [
+                    "enum_reflects",
+                    "script_value",
+                    "block",
+                    "other_shapes_unchanged",
+                    "pool_bytes",
+                    "max_clamped",
+                    "shape_change_empties_pool",
+                    "orientation_unit",
+                    "orientation_spread",
+                    "same_seed_same_draws",
+                    "other_seed_other_draws",
+                    "streams_own",
+                    "turn_keeps_axis",
+                    "turn_shows_edge",
+                    "turn_full_circle",
+                    "ease",
+                    "flat_lies_flat",
+                    "flat_keeps_heading",
+                    "flat_zero_unchanged",
+                    "rest_stops_turning",
+                    "in_air_turns",
+                    "rests",
+                    "word"
+                ]
+            },
+            {
+                "id": "GlobalWind",
+                "testcases": [
+                    "c_default",
+                    "reflects",
+                    "block_packed",
+                    "block_follows_wind",
+                    "no_share_untouched",
+                    "shares_add_up",
+                    "world_scale",
+                    "linger",
+                    "gust_range",
+                    "gust_period",
+                    "gust_bands",
+                    "gust_travels",
+                    "velocity",
+                    "step_drifts_with_wind",
+                    "local_space"
                 ]
             }
         ]

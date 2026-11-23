@@ -7,7 +7,7 @@ using box.curve
 using yeon
 
 $ {
-  box.view.Scene: {diffuse_transmission: true}
+  box.view.Scene: {shader_features: {Extended: {diffuse_transmission: true}}}
 }
 
 const hanji: Rgb = {246, 240, 225}

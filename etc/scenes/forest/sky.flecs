@@ -1,0 +1,200 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.material
+using box.light
+using box.effects
+using box.atmosphere
+using state
+using assets
+
+// Sky and light. TimeOfDay points the sun and moon from the hour and season of the state: the
+// season sets the day of the year, so the summer sun stands high and the winter sun low. North
+// is turned so that the late afternoon sun shines from ahead and to the right of the start view
+// (toward the brook, -Z), through the trees of the far bank. Precipitation thickens the clouds,
+// dims the sun and adds haze; the wind drives the clouds. The season tints the sun, the green
+// or brown of the ground the sky sees, the haze and the fog: clear in spring, a summer haze,
+// misty in autumn, cold and pale in winter.
+//
+// There is no light Bake: the sun moves with the sliders, and a bake converges only after the
+// sun rests (a turn of light_threshold rebakes every probe), so the ambient light comes from the
+// atmosphere environment instead. A ReflectionBake gives the brook and wet surfaces a scene
+// probe that recaptures as the sun turns.
+state {
+  // Latitude of the forest and the yaw of north (TimeOfDay.north)
+  export const LATITUDE: f32 = 47
+  export const NORTH: f32 = 48
+
+  // Cumulus and the high veil
+  export const CLOUD_SIZE: f32 = 5000
+  export const CLOUD_ALTITUDE: f32 = 1800
+
+  // Coverage threshold of the cumulus layer: lower is more cloud, fair weather cumulus in
+  // summer, more cloud in autumn and winter
+  fn forest_cloud_threshold(season: f64, p: f64) -> f64 {
+    forest_seasonal(season, 0.6, 0.63, 0.57, 0.56) - 0.34 * p
+  }
+
+  // Cloud drift in m/s along X and Z for a wind, along the Wind (wind.flecs): the wind aloft
+  // is stronger than in the forest, and still in a calm
+  fn forest_cloud_drift_x(w: f64) -> f64 {
+    w * 2.6 * WIND_DIR_X
+  }
+
+  fn forest_cloud_drift_z(w: f64) -> f64 {
+    w * 2.6 * WIND_DIR_Z
+  }
+
+  // Velocity of the cumulus and of the cookie on the sun that casts their shadows in m/s along X
+  // and Z: the wind drives it (ForestWind), kept up to date by atmosphere.flecs
+  export mut cloud_velocity_x: f32 = forest_cloud_drift_x(START_WIND)
+  export mut cloud_velocity_z: f32 = forest_cloud_drift_z(START_WIND)
+
+  // Declination of the sun in degrees in a season (0 at the equinoxes, see forest_day_of_year)
+  fn forest_sun_declination(season: f64) -> f64 {
+    23.44 * sin(forest_season_wrap(season) * PI / 2)
+  }
+
+  // Elevation of the sun in degrees above the horizon at a season and hour, as TimeOfDay sets it
+  fn forest_sun_elevation(season: f64, hour: f64) -> f64 {
+    const d = forest_sun_declination(season) * PI / 180
+    const l = LATITUDE * PI / 180
+    const h = (hour - 12) * PI / 12
+    asin(sin(l) * sin(d) + cos(l) * cos(d) * cos(h)) * 180 / PI
+  }
+
+  // Hour of sunrise and of sunset in a season
+  fn forest_sunrise(season: f64) -> f64 {
+    const d = forest_sun_declination(season) * PI / 180
+    const l = LATITUDE * PI / 180
+    12 - acos(clamp(0 - tan(l) * tan(d), -1, 1)) * 12 / PI
+  }
+
+  fn forest_sunset(season: f64) -> f64 {
+    24 - forest_sunrise(season)
+  }
+
+  // How much the sun lights the air, 0..1: none below the horizon, all of it in the low sun,
+  // a little at its highest
+  fn forest_beam(season: f64, hour: f64) -> f64 {
+    const e = forest_sun_elevation(season, hour)
+    forest_smooth(-1, 4, e) * (0.12 + 0.88 * (1 - forest_smooth(14, 44, e)))
+  }
+
+  // Daylight, 0..1: 0 at night, 1 from just after sunrise to just before sunset
+  fn forest_daylight(season: f64, hour: f64) -> f64 {
+    forest_smooth(-6, 3, forest_sun_elevation(season, hour))
+  }
+
+  // The haze the low sun lights, 0.55 at a high sun to 1 at a low one, for the HeightFog
+  fn forest_haze(season: f64, hour: f64) -> f64 {
+    0.55 + 0.45 * (1 - forest_smooth(15, 45, forest_sun_elevation(season, hour)))
+  }
+}
+
+sun {
+  DirectionalLight: {intensity: 2.8 * PI * (1 - 0.94 * min(1, precipitation * 1.6))}
+  Rgb: {255, forest_seasonal(season, 251, 249, 238, 248), forest_seasonal(season, 240, 236, 212, 252)}
+  Cookie: {
+    texture: forest_clouds,
+    size: CLOUD_SIZE,
+    height: CLOUD_ALTITUDE,
+    threshold: forest_cloud_threshold(season, precipitation),
+    softness: 0.14,
+    strength: 0.4 + 0.5 * precipitation,
+    velocity: {cloud_velocity_x, cloud_velocity_z}
+  }
+}
+
+moon {
+  DirectionalLight: {intensity: 0.4 * PI}
+  Rgb: {190, 210, 255}
+}
+
+sky {
+  Atmosphere: {
+    sun: sun,
+    moon: moon,
+    units_per_km: 1000,
+    sea_level: 0,
+    ground_altitude: 0.4,
+    rayleigh: {scale_height: 8, scattering_scale: 1},
+    mie: {
+      scale_height: 1.2,
+      anisotropy: 0.78,
+      scattering_scale: forest_seasonal(season, 1.25, 1.45, 1.7, 1.15) + 1.1 * precipitation,
+      tint: {255, 240 + 12 * precipitation, 222 + 26 * precipitation}
+    },
+    ozone_scale: 1,
+    ground_albedo: {forest_seasonal(season, 62, 58, 92, 74), forest_seasonal(season, 88, 80, 72, 70), forest_seasonal(season, 46, 46, 40, 64)},
+    night_intensity: 0.03,
+    sun_disk_intensity: 6,
+    sun_radius: 0.6,
+    moon_disk_intensity: 12,
+    moon_radius: 0.6
+  }
+  TimeOfDay: {
+    hour: hour,
+    day_of_year: forest_day_of_year(season),
+    latitude: LATITUDE,
+    north: NORTH,
+    sun: sun,
+    moon: moon
+  }
+  HeightFog: {
+    density: forest_seasonal(season, 0.0035, 0.003, 0.0055, 0.0045) * forest_haze(season, hour) +
+      0.014 * precipitation,
+    falloff: forest_seasonal(season, 0.09, 0.09, 0.1, 0.1),
+    base_height: 0,
+    max_opacity: forest_seasonal(season, 0.4, 0.38, 0.46, 0.44) + 0.3 * precipitation,
+    atmosphere: sky
+  }
+}
+
+cloud_low {
+  CloudLayer: {
+    texture: forest_clouds,
+    size: CLOUD_SIZE,
+    altitude: CLOUD_ALTITUDE,
+    threshold: forest_cloud_threshold(season, precipitation),
+    softness: 0.14,
+    density: 0.85 + 0.15 * precipitation,
+    velocity: {cloud_velocity_x, cloud_velocity_z}
+  }
+}
+
+cloud_high {
+  CloudLayer: {
+    texture: forest_clouds,
+    size: 16000,
+    altitude: 7000,
+    threshold: 0.7 - 0.2 * precipitation,
+    softness: 0.18,
+    density: 0.45,
+    offset: {900, 400},
+    velocity: {cloud_velocity_x * 2, cloud_velocity_z * 2}
+  }
+}
+
+// The meshes take their ambient light from the atmosphere environment; the particles (falling
+// leaves, rain, snow, motes, insects) and the fog volumes (shafts, mist) take it from the
+// AmbientLight of the scene. It follows the daylight, so they darken at night with everything
+// else instead of glowing in the dark, and dims a little under the overcast
+$ {
+  AmbientLight: {
+    sky: {118, 130, 149},
+    ground: {79, 74, 68},
+    intensity: (0.025 + 0.975 * forest_daylight(season, hour)) * (1 - 0.3 * precipitation)
+  }
+}
+
+$ {
+  ReflectionBake: {
+    resolution: 128,
+    budget_ms: 1,
+    scene_probe: true,
+    scene_probe_height: 2.4,
+    environment: sky,
+    light_threshold: 4
+  }
+}

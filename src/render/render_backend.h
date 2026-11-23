@@ -49,7 +49,13 @@ typedef struct box_render_gpu_stats_t {
                                  *   that draws a debug item (View.debug), after its effects;
                                  *   their draw calls count among draws */
     int32_t fog_volumes;        /**< Fog volumes drawn, one per volume of a view in each frame
-                                 *   it renders; their draw calls count among draws */
+                                 *   it injects into its froxel grid; the apply draw calls of
+                                 *   the grids count among draws */
+    int32_t fog_dispatches;     /**< Compute dispatches of the froxel grids of the fog volumes,
+                                 *   inject and integrate: two per frame of a view with volumes
+                                 *   however many it has */
+    int32_t fog_grid[3];        /**< Cells across, cells down and slices of the last froxel
+                                 *   grid injected, 0 before the first */
     int32_t star_fields;        /**< Star fields drawn, one per StarField of a view in each
                                  *   frame it renders; their draw calls count among draws */
     int32_t transmission_snapshots; /**< Snapshots recorded for transmission, per frame of a
@@ -72,6 +78,9 @@ typedef struct box_render_gpu_stats_t {
     int32_t instance_binds;     /**< Instance bind groups set in the cull, depth prepass,
                                  *   forward, shadow and capture passes, only when the page or
                                  *   surface assets differ from the ones bound last in the pass */
+    int32_t data_binds;         /**< Per vertex data streams bound in the depth prepass,
+                                 *   forward, shadow and capture passes, one per draw of a mesh
+                                 *   with data (Mesh3.data0 to data3); never for a mesh without */
     int32_t cull_dispatches;    /**< Compute dispatches the cull passes of views recorded:
                                  *   cull_instances, cull_ordered, cull_scan and cull_write,
                                  *   not the pyramid reductions nor the probe capture culls */
@@ -96,6 +105,29 @@ typedef struct box_render_gpu_stats_t {
                                  *   queries */
     int32_t atmosphere_passes[BOX_RENDER_ATMOS_PASSES]; /**< Passes whose GPU time
                                  *   atmosphere_ns holds */
+    int32_t grass_passes;       /**< Compute passes that placed the grass blades of a view,
+                                 *   one per frame of a lit view whose scene has a Grass, plus
+                                 *   one before the depth pyramid of a view that culls by
+                                 *   occlusion for the blades that cast into its cascades, and
+                                 *   those that placed the blades that cast into light tiles */
+    int64_t grass_ns;           /**< GPU time of the grass compute passes and of the passes that
+                                 *   draw the blades into the shadows read back, 0 without
+                                 *   timestamp queries */
+    int32_t grass_timed;        /**< Grass passes whose GPU time grass_ns holds */
+    int32_t grass_cascades;     /**< Cascades of the directional light the grass blades cast
+                                 *   into, one per pass that drew them */
+    int32_t grass_tiles;        /**< Spot and point light tiles the grass blades cast into */
+    int64_t grass_generated[BOX_GRASS_LODS]; /**< Blades the grass passes placed in the patches
+                                 *   the views saw, per level of detail, read back */
+    int64_t grass_drawn[BOX_GRASS_LODS]; /**< Blades of those the views drew per level of
+                                 *   detail, read back */
+    int64_t grass_culled_patches; /**< Patches in the frustum of a view that culls by
+                                 *   occlusion that placed no blades as they were behind its
+                                 *   depth pyramid, read back */
+    int64_t grass_culled_blades; /**< Blades in the frustum of such a view dropped as they were
+                                 *   behind it, read back */
+    int32_t grass_reads;        /**< Packets whose blades grass_generated, grass_drawn and the
+                                 *   culled patches and blades hold */
     int32_t shadow_tiles;       /**< Shadow atlas tiles rendered */
     int32_t shadow_reused;      /**< Shadow atlas tiles kept from an earlier frame instead of
                                  *   rendered */
@@ -152,6 +184,40 @@ typedef struct box_render_gpu_stats_t {
                                  *   texture_graph_evaluations */
     int64_t texture_graph_cached_bytes; /**< Bytes of the cached values now, in use or not */
     int32_t texture_graph_cached; /**< Cached values now */
+    int32_t packets;            /**< Packets rendered */
+    int32_t pipelines_cached;   /**< Pipelines in the pipeline cache now, built or building */
+    int32_t api_render_passes;  /**< Render passes begun through the webgpu API */
+    int32_t api_compute_passes; /**< Compute passes begun through the webgpu API */
+    int32_t api_pipelines;      /**< Pipelines set in passes and bundles */
+    int32_t api_bind_groups;    /**< Bind groups set in passes and bundles */
+    int32_t api_buffer_binds;   /**< Vertex and index buffers set in passes and bundles */
+    int32_t api_draws;          /**< Draw calls of every kind, direct and indirect */
+    int64_t api_triangles;      /**< Vertices of the direct draws times their instances, over
+                                 *   3; the triangles of indirect draws are read back */
+    int32_t api_dispatches;     /**< Compute dispatches of every kind */
+    int64_t api_workgroups;     /**< Workgroups of the direct dispatches */
+    int32_t api_copies;         /**< Copies between buffers and textures in command encoders */
+    int64_t api_copy_bytes;     /**< Bytes of the copies between buffers */
+    int32_t api_writes;         /**< Buffer and texture writes on the queue */
+    int64_t api_write_bytes;    /**< Bytes of the writes on the queue */
+    int32_t api_submits;        /**< Submits on the queue */
+    int32_t api_command_buffers; /**< Command buffers submitted */
+    int32_t api_bundles;        /**< Render bundles executed */
+    int64_t view_triangles;     /**< Triangles the indirect draws of views drew after culling,
+                                 *   read back while box_render_gpu_stats_detail is on */
+    int64_t shadow_triangles;   /**< Triangles the indirect draws of shadow cascades drew after
+                                 *   culling, read back like view_triangles */
+    int32_t triangle_reads;     /**< Frames whose triangles view_triangles and
+                                 *   shadow_triangles hold */
+    int32_t packet_resources;   /**< Resource creates, updates and destroys of the packets */
+    int32_t packet_uploads;     /**< Uploads of the packets */
+    int32_t packet_scatters;    /**< Scatters of the packets */
+    int32_t packet_copies;      /**< Copies between buffers of the packets */
+    int32_t packet_composes;    /**< Composes of the packets */
+    int32_t packet_batches;     /**< Batches of the packets */
+    int32_t packet_views;       /**< Views of the packets */
+    int64_t packet_bytes;       /**< Bytes of data the resources and uploads of the packets
+                                 *   point into */
 } box_render_gpu_stats_t;
 
 /** GPU time of the probe captures the GPU backend measured since the last time it was taken */
@@ -265,6 +331,116 @@ bool box_render_gpu_read_planar(
     int32_t *height,
     float *out,
     int32_t count);
+
+/** The window of a field of WaterRipples the backend last stepped */
+typedef struct box_render_ripples_read_t {
+    int32_t resolution;     /**< Cells per side */
+    float cell;             /**< World units of a cell */
+    float corner[2];        /**< World XZ of the corner of the window: cell x, z covers
+                             *   corner + (x, z) * cell .. corner + (x + 1, z + 1) * cell */
+    float height;           /**< World Y of the Water */
+} box_render_ripples_read_t;
+
+/** Copy the heights of the field of WaterRipples of a Water into memory, waiting for the copy,
+ * in the order of its window: cell x, z of the window at out[z * resolution + x]. Only call this
+ * when the main thread renders, after box_render_sync, as box_render_gpu_read_buffer.
+ *
+ * @param world The world
+ * @param water The Water entity
+ * @param info Receives the window, NULL for none
+ * @param out Receives resolution squared heights in world units, NULL to only get the window
+ * @param count Floats out holds
+ * @return Whether the field exists and, with out, its heights were copied
+ */
+bool box_render_gpu_read_ripples(
+    ecs_world_t *world,
+    ecs_entity_t water,
+    box_render_ripples_read_t *info,
+    float *out,
+    int32_t count);
+
+/** Copy the foam of the field of WaterRipples of a Water into memory like
+ * box_render_gpu_read_ripples copies its heights: cell x, z of the window at
+ * out[z * resolution + x], 0..1.
+ *
+ * @param world The world
+ * @param water The Water entity
+ * @param info Receives the window, NULL for none
+ * @param out Receives resolution squared foam values, NULL to only get the window
+ * @param count Floats out holds
+ * @return Whether the field exists and, with out, its foam was copied
+ */
+bool box_render_gpu_read_ripple_foam(
+    ecs_world_t *world,
+    ecs_entity_t water,
+    box_render_ripples_read_t *info,
+    float *out,
+    int32_t count);
+
+/** Copy the velocity of the water of the field of WaterRipples of a Water into memory like
+ * box_render_gpu_read_ripples copies its heights, two floats per cell: the world velocity X and Z
+ * of cell x, z of the window at out[(z * resolution + x) * 2], world units per second, as the
+ * flow pass last wrote it.
+ *
+ * @param world The world
+ * @param water The Water entity
+ * @param info Receives the window, NULL for none
+ * @param out Receives twice resolution squared floats, NULL to only get the window
+ * @param count Floats out holds
+ * @return Whether the field exists and, with out, its velocity was copied
+ */
+bool box_render_gpu_read_ripple_flow(
+    ecs_world_t *world,
+    ecs_entity_t water,
+    box_render_ripples_read_t *info,
+    float *out,
+    int32_t count);
+
+/** Copy a cascade of the spectrum of the WaterSpectrum owned by an entity into memory, waiting
+ * for the copy, as the backend last evolved it: four floats per texel of its largest mip, the
+ * slope along X and Z, the height and the square of the slope of texel x, z at
+ * out[(z * resolution + x) * 4]. Texel x, z covers the world XZ
+ * (x, z) * size / resolution - offset of the tile of the cascade. Only call this when the main
+ * thread renders, after box_render_sync, as box_render_gpu_read_buffer.
+ *
+ * @param world The world
+ * @param water The entity that owns the WaterSpectrum
+ * @param cascade The cascade
+ * @param resolution Receives the texels per side, NULL for none
+ * @param out Receives four times resolution squared floats, NULL to only get the resolution
+ * @param count Floats out holds
+ * @return Whether the spectrum and the cascade exist and, with out, it was copied
+ */
+bool box_render_gpu_read_spectrum(
+    ecs_world_t *world,
+    ecs_entity_t water,
+    int32_t cascade,
+    int32_t *resolution,
+    float *out,
+    int32_t count);
+
+/** Run the inverse FFT of the spectrum shader on a square grid of complex values and copy the
+ * result into memory, waiting for it, for tests: two complex values per texel, in[(z *
+ * resolution + x) * 4] the first (real, imaginary) and in[... + 2] the second; out receives,
+ * per texel at out[(z * resolution + x) * 4], the real and imaginary parts of the transform of
+ * the first, the real part of the transform of the second and the sum of the squares of the
+ * first two, sum over (u, v) of in(u, v) e^(2 pi i (u x + v z) / resolution), without
+ * normalization, rounded to half floats as the slopes of a spectrum are. Needs the spectrum
+ * shader, which the backend creates once a packet has a WaterSpectrum. Only call this when the
+ * main thread renders, after box_render_sync.
+ *
+ * @param world The world
+ * @param resolution Texels per side, a power of two from
+ * BOX_MATERIAL_SPECTRUM_RESOLUTION_MIN to BOX_MATERIAL_SPECTRUM_RESOLUTION_MAX
+ * @param in Four times resolution squared floats
+ * @param out Receives four times resolution squared floats
+ * @return Whether the shader was ready and the result copied
+ */
+bool box_render_gpu_spectrum_fft(
+    ecs_world_t *world,
+    int32_t resolution,
+    const float *in,
+    float *out);
 
 /** Copy the L2 SH irradiance of a reflection probe cubemap slot into memory, waiting for the
  * copy.
@@ -414,6 +590,9 @@ typedef struct box_render_texture_graph_node_t {
     uint32_t param_size;        /**< Bytes of the node in the parameter block */
     int32_t texture;            /**< Index of the texture a node of a sampling kind samples in
                                  *   the textures of the graph, -1 for none */
+    uint32_t window;            /**< Offset of the window elements of a node of a kind with a
+                                 *   window function on DomainWorld in the parameter block,
+                                 *   after the bytes of every node; 0 for none */
 } box_render_texture_graph_node_t;
 
 /** Flag of a texture of a compiled texture graph whose color channels read as stored, not
@@ -454,6 +633,12 @@ typedef struct box_render_texture_graph_t {
     float region[4];            /**< Longitude start and end, latitude start and end of the
                                  *   image on the sphere in radians, resolved (whole sphere
                                  *   (0, 2 pi, -pi / 2, pi / 2) by default), 0 on the plane */
+    double origin[2];           /**< World x and z of the first texel on DomainWorld, 0 else */
+    float spacing[2];           /**< Meters between neighbouring texels along x and z on
+                                 *   DomainWorld, 0 else */
+    uint32_t apron;             /**< Texels the stages before the output grow the image by on
+                                 *   each side on DomainWorld for the reach of the neighbourhood
+                                 *   nodes, 0 else */
 } box_render_texture_graph_t;
 
 /** Get the nodes of a compiled texture graph.
@@ -649,6 +834,19 @@ bool box_render_gpu_stats(
     ecs_world_t *world,
     box_render_gpu_stats_t *stats);
 
+/** Turn on or off the counters of the GPU backend of a world that cost GPU work: the triangles
+ * the indirect draws drew, which the read back of the cull counters then also copies.
+ *
+ * Applies from the next cull pass; off by default.
+ *
+ * @param world The world
+ * @param detail Whether the costly counters are on
+ * @return Whether the world renders with the GPU backend
+ */
+bool box_render_gpu_stats_detail(
+    ecs_world_t *world,
+    bool detail);
+
 /** Check whether the GPU backend of a world may still write the capture of a file: its packet
  * rendered and the readback of the image is still mapping.
  *
@@ -817,6 +1015,62 @@ uint64_t box_render_gpu_buffer_size(
     ecs_world_t *world,
     uint32_t handle);
 
+/** A grass blade the GPU backend placed, read back for tests */
+typedef struct box_render_grass_blade_t {
+    float position[3];          /**< Local world position of its base in the packet that
+                                 *   placed it */
+    float yaw;                  /**< Angle of its facing around the vertical in radians */
+    float height;               /**< Height in meters, shrunk where it fades out */
+    float width;                /**< Width at its base in meters, widened with distance and
+                                 *   to about a pixel */
+    float tint[3];              /**< Factor of its color from the variation over the world */
+    float stiffness;            /**< How stiffly it resists the wind, 0 to 1, in sixteenths */
+    float phase;                /**< Phase of the swing of its clump in the wind, 0 to 1, in
+                                 *   sixteenths */
+    int32_t level;              /**< Level of detail it is drawn with */
+} box_render_grass_blade_t;
+
+/** Read back the blades of a Grass as the last view that placed them left them, waiting for the
+ * copy, for tests. Only call this when the main thread renders, after box_render_sync.
+ *
+ * @param world The world
+ * @param grass The Grass entity
+ * @param out Receives box_render_grass_blade_t, the blades of level 0 first
+ * @return Whether the backend placed blades of the Grass and they were read
+ */
+bool box_render_gpu_grass_blades(
+    ecs_world_t *world,
+    ecs_entity_t grass,
+    ecs_vec_t *out);
+
+/** Run a compute shader that reads a terrain with TerrainSampled (terrain_sample.wgsl) and copy
+ * what it wrote into memory, waiting for the copy, for tests.
+ *
+ * The shader file is preprocessed as the engine shaders are; its entry point main gets the
+ * bindings of the terrain of the last packet at group 0, its input as a read only storage buffer
+ * at group 1 binding 0 and its output as a read write storage buffer at group 1 binding 1. Only
+ * call this when the main thread renders, after box_render_sync, as box_render_gpu_read_buffer.
+ *
+ * @param world The world
+ * @param terrain The terrain entity, with TerrainSampled
+ * @param path The WGSL file
+ * @param in The input, NULL when in_size is 0
+ * @param in_size Bytes of the input, a multiple of 4, 0 for an empty buffer
+ * @param out Receives the output
+ * @param out_size Bytes of the output, a multiple of 4
+ * @param groups Workgroups dispatched along x
+ * @return Whether the last packet sampled the terrain and the output was copied
+ */
+bool box_render_gpu_terrain_compute(
+    ecs_world_t *world,
+    ecs_entity_t terrain,
+    const char *path,
+    const void *in,
+    uint32_t in_size,
+    void *out,
+    uint32_t out_size,
+    uint32_t groups);
+
 /** Read back what the cull pass of a view kept in the last target the GPU backend rendered.
  *
  * Only call this when the main thread renders (RenderSettings.main_thread), after
@@ -884,5 +1138,142 @@ bool box_render_gpu_cull_status(
  */
 void box_render_cull_status_init(
     ecs_world_t *world);
+
+/** Frames the temporal sequences of a view cycle over (box_render_temporal_sequence_2d, 3d and
+ * TEMPORAL_SEQUENCE_LENGTH of etc/shaders/include/temporal.wgsl) */
+#define BOX_RENDER_TEMPORAL_LENGTH (16)
+
+/** What a view renders a frame with about the frame before it, the temporal members of View in
+ * etc/shaders/include/lights.wgsl */
+typedef struct box_render_temporal_t {
+    mat4 prev_view_proj;        /**< View projection of the previous frame the view rendered,
+                                 *   the one of this frame when the history is not valid */
+    vec4 prev_camera;           /**< World position of the camera in that frame, w 1 */
+    uint32_t frame_index;       /**< Frames rendered since the last reset, 0 on a reset */
+    bool valid;                 /**< The previous frame is the history of this one */
+    int64_t prev_frame;         /**< Packet frame of the previous frame the view rendered, -1
+                                 *   for none */
+} box_render_temporal_t;
+
+/** History of a view in a target, kept by a backend from frame to frame */
+typedef struct box_render_history_t {
+    uint32_t target;            /**< Handle of the target */
+    ecs_entity_t view;          /**< View entity, 0 for a capture without a view */
+    int64_t frame;              /**< Packet frame the view last rendered in */
+    ecs_entity_t camera;        /**< Camera entity of that frame */
+    int32_t width;              /**< Render width of that frame */
+    int32_t height;             /**< Render height of that frame */
+    mat4 proj;                  /**< Projection of that frame */
+    mat4 view_proj;             /**< View projection of that frame */
+    vec4 camera_position;       /**< World position of the camera in that frame, w 1 */
+    box_render_temporal_t current; /**< What the view rendered that frame with */
+} box_render_history_t;
+
+/** Advance the history of a view in a target to a frame and get what the frame renders with.
+ *
+ * The history restarts, invalid and at frame index 0, on the first frame of the view in the
+ * target, and when the render size, the camera entity or the projection changed or the view has
+ * history_reset. A second call in the same frame returns what the first one did.
+ *
+ * @param histories box_render_history_t of the backend
+ * @param target Handle of the target
+ * @param v The view
+ * @param frame Packet frame
+ * @param width Render width
+ * @param height Render height
+ * @param proj Projection the view renders the target with
+ * @return The temporal state of the frame, valid until the next call
+ */
+const box_render_temporal_t* box_render_history_update(
+    ecs_vec_t *histories,
+    uint32_t target,
+    const box_render_view_t *v,
+    int64_t frame,
+    int32_t width,
+    int32_t height,
+    const mat4 proj);
+
+/** Find the history of a view in a target.
+ *
+ * @param histories box_render_history_t of the backend
+ * @param target Handle of the target, 0 for the first target of the view
+ * @param view View entity
+ * @return The history, NULL for none
+ */
+const box_render_history_t* box_render_history_find(
+    const ecs_vec_t *histories,
+    uint32_t target,
+    ecs_entity_t view);
+
+/** Drop the histories of the views that did not render in a frame.
+ *
+ * @param histories box_render_history_t of the backend
+ * @param frame Packet frame that rendered
+ */
+void box_render_history_sweep(
+    ecs_vec_t *histories,
+    int64_t frame);
+
+/** Point of the 2D low discrepancy sequence of a frame index, the R2 sequence over
+ * BOX_RENDER_TEMPORAL_LENGTH frames, as temporal_sequence_2d of temporal.wgsl.
+ *
+ * @param index Frame index
+ * @param out Receives the point, each coordinate in [0, 1)
+ */
+void box_render_temporal_sequence_2d(
+    uint32_t index,
+    float *out);
+
+/** Point of the 3D low discrepancy sequence of a frame index, Halton 2, 3, 5 over
+ * BOX_RENDER_TEMPORAL_LENGTH frames, as temporal_sequence_3d of temporal.wgsl.
+ *
+ * @param index Frame index
+ * @param out Receives the point, each coordinate in (0, 1)
+ */
+void box_render_temporal_sequence_3d(
+    uint32_t index,
+    float *out);
+
+/** A history texture pair of the GPU backend, for tests */
+typedef struct box_render_gpu_history_pair_t {
+    uint32_t target;            /**< Handle of the target */
+    ecs_entity_t view;          /**< View entity */
+    uint32_t consumer;          /**< Consumer kind, BOX_GPU_HISTORY_* */
+    ecs_entity_t entity;        /**< Entity of the consumer, such as the Bloom effect */
+    uint32_t width;             /**< Width of the textures */
+    uint32_t height;            /**< Height of the textures */
+    uint32_t depth;             /**< Depth of 3D textures, 1 for 2D */
+    uint32_t format;            /**< WGPUTextureFormat of the textures */
+    const void *read;           /**< Texture view read in the last frame it was used */
+    const void *write;          /**< Texture view written in that frame */
+    bool valid;                 /**< The read view held the frame before */
+    int64_t frame;              /**< Packet frame it was last used in */
+} box_render_gpu_history_pair_t;
+
+/** Get the history of a view the GPU backend keeps, for tests. Only call this after
+ * box_render_sync, while the render thread is idle.
+ *
+ * @param world The world
+ * @param view The view entity
+ * @param out Receives the history of the first target that renders the view
+ * @return Whether the world renders with the GPU backend and the view has a history
+ */
+bool box_render_gpu_view_history(
+    ecs_world_t *world,
+    ecs_entity_t view,
+    box_render_history_t *out);
+
+/** Get the history texture pairs of the GPU backend, for tests. Only call this after
+ * box_render_sync, while the render thread is idle.
+ *
+ * @param world The world
+ * @param out Receives the pairs, NULL to only count them
+ * @param capacity Pairs out holds
+ * @return The pairs of the backend, 0 without the GPU backend
+ */
+int32_t box_render_gpu_history_pairs(
+    ecs_world_t *world,
+    box_render_gpu_history_pair_t *out,
+    int32_t capacity);
 
 #endif

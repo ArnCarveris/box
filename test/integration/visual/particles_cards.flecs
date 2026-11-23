@@ -1,0 +1,81 @@
+// Falling leaves as ParticleCard: lit leaf cards tumble around axes of their own onto a ground
+// plane under a sun, showing faces and edges, and lie flat once they rest; a burst lies flat in
+// front. On the right additive petal cards tumble in the air without a ground.
+
+// frames: 180
+
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.texture
+using box.particle
+
+camera {
+  Position: {0, 2.4, 8}
+  Rotation: {-0.22, 0, 0}
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {120, 150, 190, 255}}}
+}
+
+$ {
+  AmbientLight: {sky: {90, 100, 120}, ground: {50, 45, 35}}
+}
+
+sun {
+  Rotation: {0.9, 0.5, 0}
+  DirectionalLight: {intensity: 2.5 * flecs.script.math.PI}
+  Rgb: {255, 240, 215}
+}
+
+leaf_tex {
+  Path: {path: "test/integration/visual/assets/leaf.png"}
+}
+
+ground {
+  Position: {0, -0.1, 0}
+  Box: {14, 0.2, 8}
+  Rgb: {92, 78, 52}
+}
+
+falling {
+  Position: {-1, 4.5, -0.5}
+  Emitter: {
+    max: 400, rate: 40, shape: EmitterBox, extents: {3.5, 0.3, 1.5}, direction: {0, 0, 0},
+    lifetime: {20, 20}, size: {0.35, 0.5}, rotation: {0, 360}, spin: {120, 300},
+    color: {255, 255, 255}, color_variance: {30, 50, 10}, seed: 7
+  }
+  Forces: {drag: 2.5, turbulence: 2.5, turbulence_scale: 0.8}
+  Collision: {bounce: 0.05, friction: 0.7}
+  Appearance: {shape: Card, texture: leaf_tex, lit: 1}
+}
+
+fallen {
+  Position: {-1, 0.25, 1.5}
+  Emitter: {
+    max: 100, rate: 0, shape: EmitterBox, extents: {3, 0.1, 1}, direction: {0, 0, 0},
+    lifetime: {20, 20}, size: {0.4, 0.55}, rotation: {0, 360}, spin: {60, 180},
+    color: {255, 210, 160}, color_variance: {20, 40, 10}, seed: 3
+  }
+  Burst: {count: 40}
+  Forces: {drag: 1}
+  Collision: {bounce: 0.05, friction: 0.8}
+  Appearance: {shape: Card, texture: leaf_tex, lit: 1}
+}
+
+petals {
+  Position: {4, 2.2, 0}
+  Emitter: {
+    max: 200, rate: 60, shape: EmitterSphere, radius: 0.8, spread: 180,
+    speed: {0.2, 0.5}, lifetime: {4, 4}, size: {0.25, 0.3}, rotation: {0, 360},
+    spin: {200, 400}, color: {255, 150, 190}, opacity: {0.4, 0.6}, seed: 11
+  }
+  Forces: {gravity: {0, 0, 0}, turbulence: 1}
+  Appearance: {shape: Card, blend: Additive, texture: leaf_tex}
+  Curves: {opacity: {keys: [{0, 0}, {0.1, 1}, {0.8, 1}, {1, 0}]}}
+}

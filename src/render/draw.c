@@ -12,6 +12,7 @@
  */
 
 #include "draw.h"
+#include "../terrain/terrain.h"
 
 ECS_COMPONENT_DECLARE(DrawSlot);
 
@@ -87,6 +88,7 @@ static void box_draws_free(
     ecs_vec_fini_t(NULL, &d->blended, int32_t);
     ecs_vec_fini_t(NULL, &d->sorted, box_draw_sorted_t);
     ecs_vec_fini_t(NULL, &d->shadow_regions, box_render_shadow_region_t);
+    ecs_vec_fini_t(NULL, &d->swaying, ecs_entity_t);
     ecs_vec_fini_t(NULL, &d->shadow_materials, uint32_t);
     ecs_vec_fini_t(NULL, &d->dirty, ecs_entity_t);
     ecs_vec_fini_t(NULL, &d->moved, box_draw_moved_t);
@@ -722,21 +724,27 @@ static ecs_entity_t box_draws_scene(
     return result;
 }
 
-/** Check whether a scene bakes its lighting or reflections, so captures tell its static shapes
- * apart.
+/** Set the bake flag of a key, so captures tell static shapes apart: an opaque shape that
+ * doesn't move, in a scene whose root (or the singleton) has LightBake or ReflectionBake. Then
+ * make the key that of an impostor card when the shape is one.
  *
  * @param world The world
- * @param scene The scene, 0 for the default scene
- * @return Whether the scene root, or for the default scene the singleton, has LightBake or
- *         ReflectionBake
+ * @param e The entity
+ * @param allowed Whether the shape can bake at all, false for 2D shapes
+ * @param key The key, its scene and blend computed
  */
-static bool box_draws_baked(
-    const ecs_world_t *world,
-    ecs_entity_t scene)
+static void box_draws_key_bake(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    bool allowed,
+    box_draw_key_t *key)
 {
-    bool light = ecs_has(world, scene ? scene : ecs_id(LightBake), LightBake);
-
-    return light || ecs_has(world, scene ? scene : ecs_id(ReflectionBake), ReflectionBake);
+    key->bake = allowed && key->blend == Opaque && !ecs_has_id(world, e, DynamicTransform) &&
+        !ecs_has_id(world, e, TransitionTransform) && !ecs_has_id(world, e, ManualTransform) &&
+        !ecs_has_id(world, e, NoBake) && !box_projection_anchored(world, e) &&
+        (ecs_has(world, key->scene ? key->scene : ecs_id(LightBake), LightBake) ||
+         ecs_has(world, key->scene ? key->scene : ecs_id(ReflectionBake), ReflectionBake));
+    box_draws_impostor_key(world, e, key);
 }
 
 /** Mark every shape in the batches of the scene of the entities of an observer event, after
@@ -816,7 +824,9 @@ ecs_entity_t box_draws_blend_owner(
         goto done;
     }
 
-    result = ecs_get_target_for_id(world, e, EcsIsA, ecs_id(TextureBlend));
+    const TerrainTile *tile = ecs_id(TerrainTile) ? ecs_get(world, e, TerrainTile) : NULL;
+    result = tile && tile->terrain ? tile->terrain
+        : ecs_get_target_for_id(world, e, EcsIsA, ecs_id(TextureBlend));
 done:
     return result;
 }
@@ -824,8 +834,8 @@ done:
 /** Compute the batch key of a shape.
  *
  * A shape under an active Opacity transition (TransitionOpacity) is keyed as if its alpha were
- * below 1. A 3D shape draws with the extended mesh shader when box_draws_extended says so; the
- * Scene features that are off are ignored.
+ * below 1. A 3D shape draws with the mesh shader box_draws_shader picks, with the features
+ * box_draws_features gives; the Scene features that are off are ignored.
  *
  * A 3D shape that has or inherits Transmission, Distortion (box_draws_distorted), or Water
  * with Scene.water (without its TextureBlend), is transmissive: it draws in the sorted blended
@@ -853,8 +863,9 @@ static void box_draws_key(
     bool fading = ecs_has_id(world, e, TransitionOpacity);
     ecs_os_memset_t(key, 0, box_draw_key_t);
     key->scene = box_draws_scene(world, d, e);
-    key->features = shape2d ? 0u : box_render_scene_features(world, key->scene);
-    key->cutout = box_draws_scene_cutout(ecs_get(world, e, AlphaCutoff), shape2d, key->features);
+    key->features = shape2d ? 0u : box_draws_features(world, e, key->scene);
+    key->cutout = box_draws_scene_cutout(ecs_get(world, e, AlphaCutoff),
+        ecs_get(world, e, VertexReveal), shape2d, key->features);
     key->blend = box_draws_scene_blend(ecs_get(world, e, BlendMode), fading ? 0.0f : alpha,
         key->cutout, shape2d, key->features);
     key->back_face = back_face ? (uint8_t)*back_face : (uint8_t)BackFaceCull;
@@ -895,6 +906,12 @@ static void box_draws_key(
         !ecs_get_target_for_id(world, e, EcsChildOf, NoShadow);
     key->fixture = key->shadow && (ecs_has_id(world, e, LightFixture) ||
         ecs_get_target_for_id(world, e, EcsChildOf, LightFixture) != 0);
+    key->wind = !shape2d && (key->features & BOX_RENDER_FEATURE_WIND) &&
+        ecs_get(world, e, WindSway) != NULL;
+    if (!shape2d) {
+        box_draws_range(world, e, key->range);
+    }
+
     key->transmissive = !shape2d && (key->features & BOX_RENDER_FEATURE_TRANSMISSION) &&
         ecs_get(world, e, Transmission) != NULL;
     key->transmissive = key->transmissive ||
@@ -924,8 +941,15 @@ static void box_draws_key(
         key->textures[3] = 0;
     }
 
-    if (!shape2d && box_draws_extended(world, d, e, key)) {
-        key->pipeline = BOX_RENDER_SHADER_MESH_EXTENDED;
+    if (!shape2d) {
+        key->pipeline = box_draws_shader(world, d, e, key);
+    }
+
+    const TextureLayers *layers = shape2d || (key->transmissive && !key->water) ||
+        !box_render_is_mesh(key->pipeline) || !(key->features & BOX_RENDER_FEATURE_TEXTURE_LAYERS)
+        ? NULL : ecs_get(world, e, TextureLayers);
+    if (layers) {
+        ecs_os_memcpy_n(key->layers, layers->layers, ecs_entity_t, BOX_RENDER_LAYERS);
     }
 
     bool planet_light = key->features & BOX_RENDER_FEATURE_PLANET_LIGHT;
@@ -935,10 +959,7 @@ static void box_draws_key(
         key->atmosphere = key->blend != Opaque ? planet : 0;
     }
 
-    key->bake = !shape2d && key->blend == Opaque && !ecs_has_id(world, e, DynamicTransform) &&
-        !ecs_has_id(world, e, TransitionTransform) &&
-        !ecs_has_id(world, e, ManualTransform) && !ecs_has_id(world, e, NoBake) &&
-        !box_projection_anchored(world, e) && box_draws_baked(world, key->scene);
+    box_draws_key_bake(world, e, !shape2d, key);
 }
 
 /** Update the fields of the key of a 3D shape that follow its blend and its alpha test, for a
@@ -959,7 +980,8 @@ static void box_draws_key_blend(
 {
     bool fading = ecs_has_id(world, e, TransitionOpacity);
     bool planet_light = key->features & BOX_RENDER_FEATURE_PLANET_LIGHT;
-    key->cutout = box_draws_scene_cutout(material->cutoff, NULL, key->features);
+    key->cutout = box_draws_scene_cutout(material->cutoff, material->reveal, NULL,
+        key->features);
     key->blend = box_draws_scene_blend(ecs_get(world, e, BlendMode),
         fading ? 0.0f : box_draws_alpha(material), key->cutout, NULL, key->features);
     key->planet = 0;
@@ -970,10 +992,7 @@ static void box_draws_key_blend(
         key->atmosphere = key->blend != Opaque ? planet : 0;
     }
 
-    key->bake = key->blend == Opaque && !ecs_has_id(world, e, DynamicTransform) &&
-        !ecs_has_id(world, e, TransitionTransform) &&
-        !ecs_has_id(world, e, ManualTransform) && !ecs_has_id(world, e, NoBake) &&
-        !box_projection_anchored(world, e) && box_draws_baked(world, key->scene);
+    box_draws_key_bake(world, e, true, key);
 }
 
 /** Check whether a shape whose change is its material slot, or the Opacity or Tint of an
@@ -995,8 +1014,8 @@ static bool box_draws_blend_kept(
     bool result = key->transmissive;
     if (!result) {
         bool fading = ecs_has_id(world, e, TransitionOpacity);
-        bool cutout = box_draws_scene_cutout(material->cutoff, material->shape2d,
-            key->features);
+        bool cutout = box_draws_scene_cutout(material->cutoff, material->reveal,
+            material->shape2d, key->features);
         result = cutout == key->cutout && box_draws_scene_blend(ecs_get(world, e, BlendMode),
             fading ? 0.0f : box_draws_alpha(material), cutout, material->shape2d,
             key->features) == key->blend;
@@ -1110,6 +1129,7 @@ static void box_draws_update_shape(
             material = (box_draw_material_t){
                 .opacity = faded ? ecs_get(world, e, Opacity) : NULL,
                 .cutoff = faded ? ecs_get(world, e, AlphaCutoff) : NULL,
+                .reveal = faded ? ecs_get(world, e, VertexReveal) : NULL,
                 .tint = faded ? ecs_get(world, e, Tint) : NULL,
                 .inherited = s->tinted ? &s->tint : NULL, .fade = s->fade
             };
@@ -1239,10 +1259,10 @@ write:
         box_render_mesh_shading_t *out = box_draws_slot_mesh_shading(b, s->slot);
         box_draws_mesh_shading(out, out->material, &material);
     } else if (kinds & BOX_DRAW_SHADING) {
-        box_draws_mesh_shading(box_draws_slot_mesh_shading(b, s->slot),
-            box_draws_planet_material(
-                box_draws_material_id(world, d, e, true, b->key.dynamic_material),
-                b->key.planet), &material);
+        box_render_mesh_shading_t *out = box_draws_slot_mesh_shading(b, s->slot);
+        box_draws_mesh_shading(out, box_draws_planet_material(
+            box_draws_material_id(world, d, e, true, b->key.dynamic_material),
+            b->key.planet), &material);
     }
 
     if (kinds & BOX_DRAW_SURFACE) {
@@ -1275,10 +1295,14 @@ void box_draws_shape_material(
         .uv = ecs_get(world, e, TextureTransform),
         .transmission = ecs_get(world, e, Transmission),
         .shape2d = ecs_get(world, e, Shape2D),
-        .tint = ecs_get(world, e, Tint),
+        .tint = ecs_get(world, e, Tint), .occlusion = ecs_get(world, e, VertexOcclusion),
         .inherited = s->tinted ? &s->tint : NULL,
         .fade = s->fade
     };
+    if (!out->shape2d) {
+        out->reveal = ecs_get(world, e, VertexReveal);
+    }
+
     if (out->shape2d) {
         out->border = ecs_get(world, e, Border);
         out->border_radius = out->border && out->shape2d->kind == BOX_SHAPE2D_RECT &&
@@ -1499,6 +1523,14 @@ static void box_draws_material_observers(
         }},
         .events = { EcsOnSet, EcsOnRemove } }, BoxDrawsOnShading);
 
+    box_draws_observer(world, d, "DrawsOnTextureLayers", (ecs_observer_desc_t){
+        .query.terms = {{
+            .id = ecs_id(TextureLayers),
+            .src.id = EcsSelf | EcsUp,
+            .trav = EcsIsA
+        }},
+        .events = { EcsOnSet, EcsOnRemove } }, BoxDrawsOnShading);
+
     box_draws_observer(world, d, "DrawsOnTileTerrain", (ecs_observer_desc_t){
         .query.terms = {{ .id = ecs_id(TileTerrain) }},
         .events = { EcsOnSet, EcsOnRemove } }, BoxDrawsOnShading);
@@ -1509,6 +1541,13 @@ static void box_draws_material_observers(
     box_draws_observer(world, d, "DrawsOnTint", (ecs_observer_desc_t){
         .query.terms = {{ .id = ecs_id(Tint) }},
         .events = { EcsOnSet, EcsOnRemove } }, BoxDrawsOnShadingMove);
+    box_draws_observer(world, d, "DrawsOnDrawRange", (ecs_observer_desc_t){
+        .query.terms = {{
+            .id = ecs_id(DrawRange),
+            .src.id = EcsSelf | EcsUp,
+            .trav = EcsIsA
+        }},
+        .events = { EcsOnSet, EcsOnRemove } }, BoxDrawsOnMove);
 }
 
 /** Register the observers that collect changed entities and changed subtrees.
@@ -1773,6 +1812,7 @@ void box_render_draws_init(
     ecs_vec_init_t(NULL, &d->blended, int32_t, 0);
     ecs_vec_init_t(NULL, &d->sorted, box_draw_sorted_t, 0);
     ecs_vec_init_t(NULL, &d->shadow_regions, box_render_shadow_region_t, 0);
+    ecs_vec_init_t(NULL, &d->swaying, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &d->shadow_materials, uint32_t, 0);
     ecs_vec_init_t(NULL, &d->planets, ecs_entity_t, 0);
     ecs_map_init(&d->lookup, NULL);
@@ -1861,6 +1901,20 @@ ecs_vec_t* box_render_draws_shadow_regions(
     box_render_draws_t *d = box_draws_state(world);
 
     return d ? &d->shadow_regions : NULL;
+}
+
+bool box_render_draws_swaying(
+    const ecs_world_t *world,
+    ecs_entity_t scene)
+{
+    box_render_draws_t *d = box_draws_state(world);
+    int32_t i, count = d ? ecs_vec_count(&d->swaying) : 0;
+    bool result = false;
+    for (i = 0; i < count && !result; i ++) {
+        result = *ecs_vec_get_t(&d->swaying, ecs_entity_t, i) == scene;
+    }
+
+    return result;
 }
 
 void box_render_draws_shadow_record(

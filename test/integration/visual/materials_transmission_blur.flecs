@@ -12,7 +12,8 @@ using box.light
 using box.atmosphere
 
 $ {
-  Scene: {aerial_perspective: true, transmission: true, diffuse_transmission: true}
+  Scene: {aerial_perspective: true, shader_features: {Extended: {transmission: true,
+    diffuse_transmission: true}}}
 }
 
 camera {

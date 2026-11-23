@@ -55,6 +55,9 @@ static ecs_world_t* bare_world(
 {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
     test_assert(ecs_script(world, { .code = scene }) != 0);
     ecs_progress(world, 0);
     ecs_progress(world, 0);

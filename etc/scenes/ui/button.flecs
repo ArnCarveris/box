@@ -40,6 +40,7 @@ template HeadlessPressable {
   async {
     while true {
       const e = await on.focus(this)
+
       if e.target == this {
         focused = true
       }
@@ -49,6 +50,7 @@ template HeadlessPressable {
   async {
     while true {
       const e = await on.blur(this)
+
       if e.target == this {
         focused = false
         down = false
@@ -59,6 +61,7 @@ template HeadlessPressable {
   async {
     while true {
       const e = await on.key_down(this)
+
       if e.key == " " && !e.repeat {
         down = true
       }
@@ -68,6 +71,7 @@ template HeadlessPressable {
   async {
     while true {
       const e = await on.key_up(this)
+
       if e.key == " " {
         down = false
       }
@@ -75,10 +79,9 @@ template HeadlessPressable {
   }
 }
 
-// Behavior of a push button. A click, Enter or Space activates it: with an action the
-// ActionTrigger taps it, without one the button reports a change (ui.changed). Space shows the
-// pressed look while it is down. The pointer shows a hand over it, a crossed circle while it is
-// disabled.
+// Behavior of a push button. A click, Enter or Space activates it: the ActionTrigger taps its
+// action, or without one the button reports a change (ui.changed). Space shows the pressed look
+// while down. The pointer shows a hand over it, a crossed circle while disabled.
 template HeadlessButton : HeadlessPressable {
   prop label: string = "Button"
   prop action: entity = 0
@@ -95,8 +98,10 @@ template HeadlessButton : HeadlessPressable {
   async {
     while true {
       const e = await on.activate(this)
+
       if ui.activation(e) == this {
         down = false
+
         if !disabled && action == 0 {
           await ui.changed(this)
         }
@@ -116,6 +121,7 @@ template Button : HeadlessButton {
   const pad = t.padding * 1.5
   const filled = variant == "primary" || variant == "danger"
   const edge = ring ? t.focus : t.border
+  const idle = down ? t.pressed : hover ? t.hover : t.surface
 
   Layout: {direction: Row, padding: {0, 0, pad, pad}, h: Center, v: Middle}
   Item: {
@@ -123,9 +129,8 @@ template Button : HeadlessButton {
     height: {mode: Fixed, value: t.control_height}
   }
   Rect: {1, 1}
-  Rgb: variant == "danger" ? t.danger : filled ? t.accent : down ? t.pressed : hover ? t.hover : t.surface
+  Rgb: variant == "danger" ? t.danger : filled ? t.accent : idle
 
-  // A filled button lightens while hovered and darkens while pressed
   Tint: filled && down ? {0, 0, 0, 60} : {255, 255, 255, filled && hover ? 40 : 0}
   Transition: [Rgb: WidgetFade, Tint: WidgetFade]
 

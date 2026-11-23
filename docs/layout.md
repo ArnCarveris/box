@@ -36,7 +36,7 @@ window { Surface: {width: 1280, height: 720} }
 
 // Screen space: ortho camera at ortho_scale 1, one logical pixel = one point
 hud {
-  Scene: {blend_modes: true}
+  Scene: {shader_features: {Extended: {blend_modes: true}}}
   camera { Position: {0, 0, 100}; Camera: {ortho: true, ortho_scale: 1} }
 
   screen {
