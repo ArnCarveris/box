@@ -76,19 +76,19 @@ fn area_fragment(world: vec3f, geometric: vec3f) {
     fragment_record = u32(header.z) + AREA_RECORD * u32(area);
 }
 
+// Whether the fragment is in an area with an ambient of its own, which stands in for the sky.
+fn area_enclosed() -> bool {
+    return fragment_area >= 0 && area_block[fragment_record].x >= 0.0;
+}
+
 // Ambient light of the fragment in a direction: that of its area, or the scene's ambient for
 // the outdoors and without areas.
 fn ambient_area(dir: vec3f, scene: vec3f) -> vec3f {
-    if (fragment_area < 0) {
+    if (!area_enclosed()) {
         return scene;
     }
 
-    let r = area_block[fragment_record];
-    if (r.x < 0.0) {
-        return scene;
-    }
-
-    return r.rgb * (0.7 + 0.3 * dir.y);
+    return area_block[fragment_record].rgb * (0.7 + 0.3 * dir.y);
 }
 
 // Whether a point or spot light of the clusters lights the fragment directly: a light outside

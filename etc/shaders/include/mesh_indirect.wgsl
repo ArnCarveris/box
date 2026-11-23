@@ -251,7 +251,8 @@ fn environment_radiance(spec: vec3f, roughness: f32, grid: vec3f) -> vec3f {
 
 // Indirect specular light from the reflection probes of a cluster, in blend order: each one takes
 // its fade weight of the weight still left. The scene probe, last in the probe buffer, takes what
-// is left, else the environment of the view, else the fallback.
+// is left, else the environment of the view outside the areas, else the fallback: inside an area
+// its ambient, as a room does not reflect the sky.
 fn reflections(world: vec3f, spec: vec3f, roughness: f32, cluster: u32, fallback: vec3f) -> vec3f {
     let mip = roughness * f32(textureNumLevels(reflection_cubes) - 1u);
     var sum = vec3f(0.0);
@@ -276,7 +277,7 @@ fn reflections(world: vec3f, spec: vec3f, roughness: f32, cluster: u32, fallback
         var rest = fallback;
         if (view.reflection.x > view.grid.w && reflection_probes[last].ready != 0u) {
             rest = scene_probe_radiance(reflection_probes[last], world, spec, mip, fallback);
-        } else if (scene_environment && view.environment.w > 0.0) {
+        } else if (scene_environment && view.environment.w > 0.0 && !area_enclosed()) {
             rest = environment_radiance(spec, roughness, fallback);
         }
 
@@ -298,7 +299,7 @@ fn indirect_light(world: vec3f, n: vec3f, spec: vec3f, roughness: f32, cluster: 
 
     if (scene_reflections && view.reflection.x > 0u) {
         e.specular = reflections(world, spec, roughness, cluster, e.specular);
-    } else if (scene_environment && view.environment.w > 0.0) {
+    } else if (scene_environment && view.environment.w > 0.0 && !area_enclosed()) {
         e.specular = environment_radiance(spec, roughness, e.specular);
     }
 
@@ -454,7 +455,7 @@ fn reflections_lobes(world: vec3f, spec: vec3f, roughness: f32, fallback: vec3f,
                 rest_coat = scene_probe_radiance(reflection_probes[last], world, spec_coat,
                     mip_coat, coat_fallback);
             }
-        } else if (scene_environment && view.environment.w > 0.0) {
+        } else if (scene_environment && view.environment.w > 0.0 && !area_enclosed()) {
             rest = environment_radiance(spec, roughness, fallback);
             if (coat) {
                 rest_coat = environment_radiance(spec_coat, coat_roughness, coat_fallback);
@@ -483,7 +484,7 @@ fn indirect_lobes(world: vec3f, n: vec3f, spec: vec3f, roughness: f32, cluster: 
             coat_roughness, e.coat, cluster);
         e.specular = r.base;
         e.coat = r.coat;
-    } else if (scene_environment && view.environment.w > 0.0) {
+    } else if (scene_environment && view.environment.w > 0.0 && !area_enclosed()) {
         e.specular = environment_radiance(spec, roughness, e.specular);
         if (coat) {
             e.coat = environment_radiance(spec_coat, coat_roughness, e.coat);
