@@ -209,7 +209,11 @@
                     "from_zero",
                     "cell_placed",
                     "cell_shift_exact",
-                    "cell_cost"
+                    "cell_cost",
+                    "frame_rotates_to_body",
+                    "frame_scales_with_altitude",
+                    "frame_rotate_off_restores",
+                    "frame_altitude_precise"
                 ]
             },
             {

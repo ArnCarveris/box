@@ -888,3 +888,148 @@ void WorldOrigin_cell_cost(void) {
     printf("Static root shift: 1k %.3f ms + frame %.3f ms, 100k %.3f ms + frame %.3f ms\n",
         shift_ms[2], frame_ms[2], shift_ms[3], frame_ms[3]);
 }
+
+/** Create a world whose origin turns its frame to a body of radius 1000 at the absolute origin,
+ * with the focus at absolute X 1100.
+ *
+ * @param focus Receives the focus
+ * @param body Receives the body
+ * @return The world
+ */
+static ecs_world_t* origin_frame_world(
+    ecs_entity_t *focus,
+    ecs_entity_t *body)
+{
+    ecs_world_t *world = origin_world(100000, 50);
+    WorldOrigin *o = ecs_singleton_get_mut(world, WorldOrigin);
+    o->rotate = true;
+    ecs_singleton_modified(world, WorldOrigin);
+    *body = origin_entity(world, 0, 0, 0);
+    ecs_set(world, *body, WorldBody, {1000});
+    *focus = origin_entity(world, 1100, 0, 0);
+    ecs_add(world, *focus, WorldFocus);
+
+    return world;
+}
+
+void WorldOrigin_frame_rotates_to_body(void) {
+    // scenes/world_origin
+    ecs_entity_t focus, body;
+    ecs_world_t *world = origin_frame_world(&focus, &body);
+    ecs_progress(world, 0);
+
+    const WorldOriginStatus *s = ecs_singleton_get(world, WorldOriginStatus);
+    test_int(s->reason, 'R');
+    test_assert(s->body == body);
+    test_assert(fabs(s->altitude - 100.0) < 1e-9);
+    const Position *f = ecs_get(world, focus, Position);
+    test_assert(fabsf(f->x) < 1e-3f && fabsf(f->y) < 1e-3f && fabsf(f->z) < 1e-3f);
+    const Position *b = ecs_get(world, body, Position);
+    test_assert(fabsf(b->x) < 1e-3f);
+    test_assert(fabsf(b->y + 1100.0f) < 1e-3f);
+    test_assert(fabsf(b->z) < 1e-3f);
+
+    double absolute[3];
+    box_world_to_absolute(world, (vec3){0, 10, 0}, absolute);
+    test_assert(fabs(absolute[0] - 1110.0) < 1e-9);
+    test_assert(fabs(absolute[1]) < 1e-9);
+
+    int32_t shifts = ecs_singleton_get(world, WorldOriginStatus)->shifts;
+    ecs_progress(world, 0);
+    test_int(ecs_singleton_get(world, WorldOriginStatus)->shifts, shifts);
+
+    ecs_fini(world);
+}
+
+void WorldOrigin_frame_scales_with_altitude(void) {
+    // scenes/world_origin
+    ecs_world_t *world = origin_world(100000, 50);
+    WorldOrigin *o = ecs_singleton_get_mut(world, WorldOrigin);
+    o->scale = true;
+    o->scale_base = 64;
+    ecs_singleton_modified(world, WorldOrigin);
+    ecs_entity_t body = origin_entity(world, 0, 0, 0);
+    ecs_set(world, body, WorldBody, {10});
+    ecs_entity_t focus = origin_entity(world, 0, 1034, 0);
+    ecs_add(world, focus, WorldFocus);
+    ecs_progress(world, 0);
+
+    o = ecs_singleton_get_mut(world, WorldOrigin);
+    test_assert(o->meters_per_unit == 16.0);
+    test_assert(o->y == 1034.0);
+    test_int(ecs_singleton_get(world, WorldOriginStatus)->reason, 'S');
+    test_flt(ecs_get(world, body, Position)->y, -1034.0f / 16.0f);
+    test_flt(ecs_get(world, body, Scale)->x, 1.0f / 16.0f);
+    test_flt(ecs_get(world, focus, Position)->y, 0);
+
+    double absolute[3];
+    box_world_to_absolute(world, (vec3){0, 10, 0}, absolute);
+    test_assert(absolute[1] == 1034.0 + 160.0);
+
+    o->scale = false;
+    ecs_singleton_modified(world, WorldOrigin);
+    ecs_progress(world, 0);
+    test_assert(ecs_singleton_get(world, WorldOrigin)->meters_per_unit == 1.0);
+    test_flt(ecs_get(world, body, Scale)->x, 1.0f);
+    test_flt(ecs_get(world, body, Position)->y, -1034.0f);
+
+    ecs_fini(world);
+}
+
+void WorldOrigin_frame_rotate_off_restores(void) {
+    // scenes/world_origin
+    ecs_entity_t focus, body;
+    ecs_world_t *world = origin_frame_world(&focus, &body);
+    ecs_entity_t probe = origin_entity(world, 1100, 0, 5);
+    ecs_set(world, probe, Rotation, {GLM_PI_2f, 0.7f, 0});
+    ecs_progress(world, 0);
+    test_int(ecs_singleton_get(world, WorldOriginStatus)->reason, 'R');
+    test_assert(fabsf(ecs_get(world, probe, Position)->z - 5.0f) < 1e-3f);
+
+    WorldOrigin *o = ecs_singleton_get_mut(world, WorldOrigin);
+    o->rotate = false;
+    ecs_singleton_modified(world, WorldOrigin);
+    ecs_progress(world, 0);
+
+    o = ecs_singleton_get_mut(world, WorldOrigin);
+    test_int(ecs_singleton_get(world, WorldOriginStatus)->reason, 'R');
+    test_assert(fabs(o->q[0]) < 1e-12 && fabs(o->q[1]) < 1e-12 && fabs(o->q[2]) < 1e-12);
+    test_assert(fabsf(ecs_get(world, body, Position)->x + 1100.0f) < 1e-3f);
+
+    const WorldTransform *after = ecs_get(world, probe, WorldTransform);
+    mat4 identity;
+    glm_euler_yxz((vec3){GLM_PI_2f, 0.7f, 0}, identity);
+    for (int32_t c = 0; c < 3; c ++) {
+        for (int32_t r = 0; r < 3; r ++) {
+            test_assert(fabsf(after->m[c][r] - identity[c][r]) < 1e-5f);
+        }
+    }
+
+    test_assert(fabsf(after->m[3][0]) < 1e-3f);
+    test_assert(fabsf(after->m[3][2] - 5.0f) < 1e-3f);
+
+    ecs_fini(world);
+}
+
+void WorldOrigin_frame_altitude_precise(void) {
+    // scenes/world_origin
+    ecs_world_t *world = origin_world(100000, 50);
+    WorldOrigin *o = ecs_singleton_get_mut(world, WorldOrigin);
+    o->rotate = true;
+    ecs_singleton_modified(world, WorldOrigin);
+    box_world_origin_shift(world, 0, (double[3]){0, 1.7e6, 0});
+
+    ecs_entity_t moon = ecs_new(world);
+    ecs_set(world, moon, WorldCell, {0, 0, 0});
+    ecs_set(world, moon, WorldBody, {1.7e6});
+    ecs_entity_t focus = origin_entity(world, 0, 1.7f, 0);
+    ecs_add(world, focus, WorldFocus);
+    ecs_progress(world, 0);
+
+    const WorldOriginStatus *s = ecs_singleton_get(world, WorldOriginStatus);
+    test_assert(s->body == moon);
+    test_assert(fabs(s->altitude - (double)1.7f) < 1e-9);
+    test_int(s->shifts, 1);
+
+    ecs_fini(world);
+}

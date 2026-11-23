@@ -29,7 +29,13 @@ static void box_world_origin_ctor(
         values[i] = (WorldOrigin){
             .threshold = BOX_WORLD_ORIGIN_THRESHOLD,
             .step = BOX_WORLD_ORIGIN_STEP,
-            .enabled = true
+            .enabled = true,
+            .q = {0, 0, 0, 1},
+            .meters_per_unit = 1.0,
+            .rotate_angle = 0.25f,
+            .rotate_range = 3.0f,
+            .scale_base = 64.0f,
+            .scale_max = 44
         };
     }
 }
@@ -186,10 +192,10 @@ void box_world_to_absolute(
     const vec3 local,
     double out[3])
 {
-    const WorldOrigin *o = ecs_singleton_get(world, WorldOrigin);
-    out[0] = (o ? o->x : 0.0) + (double)local[0];
-    out[1] = (o ? o->y : 0.0) + (double)local[1];
-    out[2] = (o ? o->z : 0.0) + (double)local[2];
+    box_world_frame_t frame;
+    double l[3] = { local[0], local[1], local[2] };
+    box_world_frame_get(world, &frame);
+    box_world_frame_to_absolute(&frame, l, out);
 }
 
 void box_world_to_local(
@@ -197,10 +203,13 @@ void box_world_to_local(
     const double absolute[3],
     vec3 out)
 {
-    const WorldOrigin *o = ecs_singleton_get(world, WorldOrigin);
-    out[0] = (float)(absolute[0] - (o ? o->x : 0.0));
-    out[1] = (float)(absolute[1] - (o ? o->y : 0.0));
-    out[2] = (float)(absolute[2] - (o ? o->z : 0.0));
+    box_world_frame_t frame;
+    double l[3];
+    box_world_frame_get(world, &frame);
+    box_world_frame_to_local(&frame, absolute, l);
+    out[0] = (float)l[0];
+    out[1] = (float)l[1];
+    out[2] = (float)l[2];
 }
 
 /** Get one axis of the absolute position of the local origin.
@@ -308,6 +317,7 @@ void BoxWorldImport(
     ECS_META_COMPONENT(world, WorldOriginStatus);
     ECS_META_COMPONENT(world, WorldOriginShift);
     ECS_META_COMPONENT(world, WorldCell);
+    ECS_META_COMPONENT(world, WorldBody);
     ECS_META_COMPONENT(world, ChunkGrid);
     ECS_META_COMPONENT(world, ChunkGridStatus);
     ECS_META_COMPONENT(world, ChunkGridCell);

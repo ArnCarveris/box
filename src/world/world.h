@@ -49,16 +49,121 @@ bool box_world_position(
 void box_world_cell_import(
     ecs_world_t *world);
 
-/** Get the Position of a WorldCell root for an absolute origin: the corner of its cell
- * relative to the origin, computed in f64.
+
+/** The frame of the local origin in f64: absolute = t + s * R * local */
+typedef struct box_world_frame_t {
+    double t[3];         /**< Absolute position of the origin */
+    double q[4];         /**< Rotation, a unit quaternion x y z w */
+    double r[3][3];      /**< The rotation as a matrix: r[c] is the absolute direction of the
+                          *   local axis c */
+    double s;            /**< Absolute meters per local unit */
+} box_world_frame_t;
+
+/** Get the frame of the WorldOrigin singleton: the identity without one, an unset rotation
+ * or a scale of 0 or less as the identity.
+ *
+ * @param world The world
+ * @param out Receives the frame
+ */
+void box_world_frame_get(
+    const ecs_world_t *world,
+    box_world_frame_t *out);
+
+/** Set a frame from its origin, rotation and scale, normalizing the rotation.
+ *
+ * @param frame The frame
+ * @param t Absolute position of the origin
+ * @param q Rotation, a quaternion x y z w; all 0 for the identity
+ * @param s Meters per local unit; 0 or less for 1
+ */
+void box_world_frame_set(
+    box_world_frame_t *frame,
+    const double t[3],
+    const double q[4],
+    double s);
+
+/** Check whether a frame has no rotation and a scale of 1.
+ *
+ * @param frame The frame
+ * @return Whether it only translates
+ */
+bool box_world_frame_is_translation(
+    const box_world_frame_t *frame);
+
+/** Get the absolute position of a local position in a frame.
+ *
+ * @param frame The frame
+ * @param local The local position
+ * @param out Receives the absolute position
+ */
+void box_world_frame_to_absolute(
+    const box_world_frame_t *frame,
+    const double local[3],
+    double out[3]);
+
+/** Get the local position of an absolute position in a frame.
+ *
+ * @param frame The frame
+ * @param absolute The absolute position
+ * @param out Receives the local position
+ */
+void box_world_frame_to_local(
+    const box_world_frame_t *frame,
+    const double absolute[3],
+    double out[3]);
+
+/** Get the shortest-arc rotation that turns one unit direction onto another, without twist.
+ *
+ * @param from The unit direction it turns
+ * @param to The unit direction it turns onto
+ * @param out Receives the rotation, a quaternion x y z w
+ */
+void box_world_quat_from_to(
+    const double from[3],
+    const double to[3],
+    double out[4]);
+
+/** Multiply two rotations: out turns by b, then by a.
+ *
+ * @param a The rotation applied second, a quaternion x y z w
+ * @param b The rotation applied first
+ * @param out Receives the product, which can be a or b
+ */
+void box_world_quat_mul(
+    const double a[4],
+    const double b[4],
+    double out[4]);
+
+/** Get the rotation of a Rotation (yaw, then pitch, then roll) as a quaternion.
+ *
+ * @param r The Euler angles
+ * @param out Receives the rotation, a quaternion x y z w
+ */
+void box_world_quat_of_rotation(
+    const Rotation *r,
+    double out[4]);
+
+/** Get the Rotation (yaw, then pitch, then roll) of a unit quaternion. The angles give the same
+ * orientation at any pitch; at a pitch of 90 degrees, where yaw and roll turn about one axis,
+ * the roll is 0.
+ *
+ * @param q The rotation, a quaternion x y z w
+ * @param out Receives the Euler angles
+ */
+void box_world_rotation_of_quat(
+    const double q[4],
+    Rotation *out);
+
+/** Get the Position of a WorldCell root in a frame: the corner of its cell in local units,
+ * computed in f64.
  *
  * @param cell The cell
- * @param origin The absolute position of the local origin
+ * @param frame The frame of the local origin
  * @param out Receives the position
  */
 void box_world_cell_position(
     const WorldCell *cell,
-    const double origin[3],
+    const box_world_frame_t *frame,
     Position *out);
 
 /** Register the rebase system and the queries of the shift.

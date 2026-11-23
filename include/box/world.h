@@ -44,9 +44,9 @@ extern ECS_TAG_DECLARE(WorldOriginFixed);
 
 /** Singleton with the absolute world position of the local origin and when it shifts.
  *
- * Absolute = origin + local. When the first focus is beyond threshold along an axis, the origin
- * moves along it by the whole steps nearest to the focus and the content of the scene of the
- * focus moves back by as much, in EcsPostUpdate before the transforms are computed.
+ * Absolute = origin + R * local * meters_per_unit. Past threshold the origin moves by whole
+ * steps toward the first focus and its scene moves back, in EcsPostUpdate; a change of the
+ * rotation or scale (rotate, scale) moves it to the focus and turns and scales the roots.
  *
  * Without the singleton nothing shifts and the origin is zero. The constructor sets the
  * defaults; values apply as specified, a threshold or step of 0 or less never shifts.
@@ -63,6 +63,22 @@ ECS_STRUCT(WorldOrigin, {
     bool from_zero;      /**< Debug: pin the origin to the absolute origin, shifting back to it
                           *   and never away, to show the precision lost far from it, default
                           *   false */
+    double q[4];         /**< Rotation of the frame of the local origin in the absolute world,
+                          *   a quaternion x y z w; 0 0 0 0 reads as the identity */
+    double meters_per_unit; /**< Scale of the frame: absolute meters per local unit, 0 or less
+                          *   reads as 1 */
+    bool rotate;         /**< Turn the frame so its +Y stays on the local vertical of the nearest
+                          *   WorldBody while the focus is within rotate_range radii of its
+                          *   surface; off turns it back to the identity, default false */
+    float rotate_angle;  /**< Degrees between the up of the frame and the vertical that turn
+                          *   it, default 0.25 */
+    float rotate_range;  /**< Altitude in radii of the body within which the frame turns,
+                          *   default 3 */
+    bool scale;          /**< Keep meters_per_unit at the power of two that follows the
+                          *   altitude over the nearest WorldBody; off sets it back to 1,
+                          *   default false */
+    float scale_base;    /**< Altitude in local units the scale aims at, default 64 */
+    int32_t scale_max;   /**< Greatest exponent of the scale, default 44 */
 });
 
 /** Shifts of the world origin so far, written by the engine next to WorldOrigin */
@@ -72,19 +88,35 @@ ECS_STRUCT(WorldOriginStatus, {
     double y;            /**< Y the origin moved by in the last shift */
     double z;            /**< Z the origin moved by in the last shift */
     char reason;         /**< Why the last shift happened: 'T' the threshold, 'O' every_frame,
-                          *   'Z' from_zero, 'M' a box_world_origin_shift call, 0 for none */
+                          *   'Z' from_zero, 'M' a box_world_origin_shift call, 'R' the
+                          *   rotation of the frame, 'S' its scale, 0 for none */
     int32_t written;     /**< Components the last shift wrote */
     float ms;            /**< Milliseconds the last shift took */
+    ecs_entity_t body;   /**< WorldBody nearest to the focus this frame, 0 for none */
+    double altitude;     /**< Altitude of the focus over the surface of body in meters,
+                          *   computed in f64 from absolute positions */
+});
+
+/** A sphere such as a planet that the frame of the world origin follows (WorldOrigin.rotate
+ * and WorldOrigin.scale).
+ *
+ * Its center is the absolute position of its entity: the corner of the cell of a WorldCell
+ * root, exact at any distance, else the world position of the entity.
+ */
+ECS_STRUCT(WorldBody, {
+    double radius;       /**< Radius in meters */
 });
 
 /** Anchors a root entity at a whole cell of the absolute world: its frame is at the absolute
  * position cell * BOX_WORLD_CELL_SIZE, exact at any distance, and its descendants are placed
  * relative to it in f32.
  *
- * The engine owns the Position of the root: it is the corner of the cell relative to the local
- * origin, computed in f64 when the WorldCell is set and on every shift of the origin. A
- * WorldCell root has DynamicTransform, so its descendants move with it on the GPU: a shift writes
- * the Position of the root and nothing of its descendants, however many there are.
+ * The engine owns the Position of the root: the corner of the cell relative to the local
+ * origin in f64, set with the WorldCell and on every shift. It has DynamicTransform, so a
+ * shift writes the root and none of its descendants, which move with it on the GPU.
+ *
+ * It has Rotation and Scale too, which the engine sets to the inverse of the rotation and scale
+ * of the frame of the local origin (WorldOrigin.rotate, WorldOrigin.scale).
  */
 ECS_STRUCT(WorldCell, {
     int32_t x;           /**< Absolute cell along X */
@@ -102,6 +134,8 @@ ECS_STRUCT(WorldOriginShift, {
     double y;            /**< Y the origin moved by */
     double z;            /**< Z the origin moved by */
     ecs_entity_t scene;  /**< Scene whose content moved, 0 for the default scene */
+    bool frame;          /**< The rotation or scale of the frame changed too, so local
+                          *   positions moved by more than the offset */
 });
 
 /** Most ring radii of a ChunkGrid */
@@ -295,7 +329,8 @@ int32_t box_world_focus(
     box_world_focus_t *out,
     int32_t max);
 
-/** Get the absolute world position of a local position: origin + local.
+/** Get the absolute world position of a local position: origin + R * local *
+ * meters_per_unit.
  *
  * @param world The world
  * @param local The local position
@@ -306,7 +341,8 @@ void box_world_to_absolute(
     const vec3 local,
     double out[3]);
 
-/** Get the local position of an absolute world position: absolute - origin.
+/** Get the local position of an absolute world position:
+ * R^T * (absolute - origin) / meters_per_unit.
  *
  * @param world The world
  * @param absolute The absolute position
