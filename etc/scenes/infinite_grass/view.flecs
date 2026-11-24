@@ -6,11 +6,26 @@ using box.light
 using box.world
 using state
 
+fn grass_daylight(hour: f64) -> f64 {
+  const d = 23.44 * sin((DAY_OF_YEAR - 80) * 2 * PI / 365) * PI / 180
+  const l = LATITUDE * PI / 180
+  const h = (hour - 12) * PI / 12
+  const e = asin(sin(l) * sin(d) + cos(l) * cos(d) * cos(h)) * 180 / PI
+  const t = clamp((e + 6) / 9, 0, 1)
+  t * t * (3 - 2 * t)
+}
+
 view {
   occlusion { Gtao: {radius: 0.7, final_value_power: 1.8, quality: GtaoHigh} }
   bloom { Bloom: {intensity: 0.12, threshold: 1.2, threshold_softness: 0.5} }
   exposure {
-    AutoExposure: {min_log_luma: -10.8, exposure_compensation: 0.35, max_exposure: 20}
+    AutoExposure: {
+      min_log_luma: -10.8,
+      low_percentile: 0.1,
+      high_percentile: 0.65,
+      exposure_compensation: 0.2 - 2.5 * (1 - grass_daylight(hour)),
+      max_exposure: 20
+    }
   }
 
   film { Tonemap: {auto_exposure: exposure, operator_: TonyMcMapface} }

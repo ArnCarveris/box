@@ -17,7 +17,13 @@ using state
 // frame, and the small casters stay out of them; the mountains need none.
 view {
   exposure {
-    AutoExposure: {min_log_luma: -10.8, exposure_compensation: 0.35, max_exposure: 20}
+    AutoExposure: {
+      min_log_luma: -10.8,
+      low_percentile: 0.1,
+      high_percentile: 0.65,
+      exposure_compensation: -0.25 - 2.5 * (1 - forest_daylight(season, hour)),
+      max_exposure: 20
+    }
   }
 
   film { Tonemap: {auto_exposure: exposure, operator_: TonyMcMapface} }
