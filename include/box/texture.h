@@ -1103,9 +1103,9 @@ ECS_STRUCT(TexGradient, {
  * carry a wave whose crests run down the slope, blended over the lattice.
  *
  * The slope is the uphill gradient of the height, such as a TexGradient of it. The gullies are
- * slope * scale to a lattice cell, so steep ground has finer gullies. Where that is below 0.5
- * the value fades to 0, so flat ground stays flat. Each octave follows the gullies of the
- * octaves before it by branch, so small gullies run into large ones.
+ * slope * scale to a lattice cell, at most one, so steeper ground has finer gullies up to one
+ * per cell. Where that is below 0.5 the value fades to 0, so flat ground stays flat. Each octave
+ * follows the gullies of the octaves before it by branch, so small gullies run into large ones.
  *
  * On DomainPlane the lattice repeats with a whole number of cells across the image in each
  * octave, as TexNoise. On DomainWorld the frequency is in lattice cells per meter and the
@@ -1136,8 +1136,8 @@ ECS_STRUCT(TexErosion, {
     float gain;          /**< Amplitude factor from one octave to the next, 0.5 when the
                           *   component is added */
     int32_t seed;        /**< Seed of the lattice */
-    float scale;         /**< Gullies per lattice cell per unit of slope, 1 when the component
-                          *   is added */
+    float scale;         /**< Gullies per lattice cell per unit of slope, at most one per cell
+                          *   in every octave, 1 when the component is added */
     float branch;        /**< How much an octave follows the gullies of the octaves before it,
                           *   1 when the component is added, 0 for the slope alone */
 });

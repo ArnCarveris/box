@@ -76,7 +76,10 @@ infinite_forest {
     ridges_p { nodes.Power: {a: ridges, b_value: {1.5, 1.5, 1.5, 1.5}} }
     peaks_r { nodes.Multiply: {a: ridges_p, b: range} }
     peaks_m { nodes.Multiply: {a: peaks_r, b_value: {640, 640, 640, 640}} }
-    peaks_g { nodes.Gradient: {height: peaks_m} }
+    flow_n { nodes.Noise: {coords: ridge_c, frequency: 0.0007, octaves: 2, seed: 52} }
+    flow_r { nodes.Multiply: {a: flow_n, b: range} }
+    flow_m { nodes.Multiply: {a: flow_r, b_value: {1600, 1600, 1600, 1600}} }
+    peaks_g { nodes.Gradient: {height: flow_m} }
     gullies {
       nodes.Erosion: {
         slope: peaks_g,
@@ -452,7 +455,8 @@ infinite_forest {
     brook_sg { nodes.Gradient: {height: brook_ground} }
     brook_n { nodes.Normalize: {input: brook_g} }
     brook_tilt { nodes.Dot: {a: brook_sg, b: brook_n} }
-    brook_lift { nodes.Multiply: {a: brook_tilt, b: brook_d0} }
+    brook_level { nodes.Min: {a: brook_d0, b_value: {8, 8, 8, 8}} }
+    brook_lift { nodes.Multiply: {a: brook_tilt, b: brook_level} }
     brook_bed { nodes.Subtract: {a: brook_sunk, b: brook_lift} }
     brook_q {
       nodes.Divide: {a: brook_bed, b_value: {BROOK_STEP, BROOK_STEP, BROOK_STEP, BROOK_STEP}}
