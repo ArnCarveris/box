@@ -189,13 +189,17 @@ fn edge_eroded(fog: FogVolume, e: f32, v: f32) -> f32 {
 }
 
 // Density of a volume at a point p of the world, of the share of the volume it covers there
-// (edge) and the share its height leaves (height_share).
-fn density(fog: FogVolume, cover: f32, p: vec3f, h: f32) -> f32 {
+// (edge) and the share its height leaves (height_share). The noise is sampled at the mip of
+// footprint, the size of the cell in the world, so a far cell reads the noise averaged over it,
+// which its jittered history converges to, instead of a point of texels much finer than it.
+fn density(fog: FogVolume, cover: f32, p: vec3f, h: f32, footprint: f32) -> f32 {
     var value = fog.density * cover * h;
     if (value > 0.0 && fog.noise_strength > 0.0) {
         let uvw = (p - fog.offset) / fog.noise_scale;
-        let n = textureSampleLevel(noise, noise_sampler, uvw, 0.0).r;
-        let detail = textureSampleLevel(noise, noise_sampler, uvw * 3.1 + vec3f(0.37), 0.0).r;
+        let lod = log2(footprint / fog.noise_scale * f32(BOX_FROXEL_NOISE_SIZE));
+        let n = textureSampleLevel(noise, noise_sampler, uvw, max(lod, 0.0)).r;
+        let detail = textureSampleLevel(noise, noise_sampler, uvw * 3.1 + vec3f(0.37),
+            max(lod + log2(3.1), 0.0)).r;
         let v = n * 0.75 + detail * 0.25;
         value *= mix(1.0, saturate(v * 2.0), fog.noise_strength);
         // The faded border is a threshold on the same noise: the cover is the edge factor of
@@ -397,6 +401,9 @@ fn inject(@builtin(global_invocation_id) id: vec3u) {
     let corner_b = froxel_ray(froxel_cell_point_uv(id.xy, vec2f(1.0)));
     let reach = max(length(corner_a.origin + corner_a.dir * far_ - center),
         length(corner_b.origin + corner_b.dir * far_ - center));
+    // Half the largest extent of the cell, along its ray or across it, about the width of a
+    // cell: the mip of the whole extent averages the noise over more than the cell.
+    let footprint = max(length(b - a) * 0.5, reach);
     var occupied = false;
     var lit = false;
     var local = false;
@@ -438,7 +445,7 @@ fn inject(@builtin(global_invocation_id) id: vec3u) {
             }
         }
 
-        let sigma = density(fog, cover, p, h);
+        let sigma = density(fog, cover, p, h, footprint);
         if (sigma <= 0.0) {
             continue;
         }

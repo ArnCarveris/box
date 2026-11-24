@@ -223,6 +223,29 @@ void box_render_fog_noise(
     ecs_os_free(values);
 }
 
+void box_render_fog_noise_mip(
+    const uint8_t *src,
+    int32_t size,
+    uint8_t *dst)
+{
+    int32_t half = size / 2, x, y, z;
+    for (z = 0; z < half; z ++) {
+        for (y = 0; y < half; y ++) {
+            const uint8_t *r00 = &src[((2 * z) * size + 2 * y) * size];
+            const uint8_t *r01 = r00 + size;
+            const uint8_t *r10 = r00 + size * size;
+            const uint8_t *r11 = r10 + size;
+            uint8_t *row = &dst[(z * half + y) * half];
+            for (x = 0; x < half; x ++) {
+                int32_t i = 2 * x;
+                int32_t sum = r00[i] + r00[i + 1] + r01[i] + r01[i + 1] +
+                    r10[i] + r10[i + 1] + r11[i] + r11[i + 1];
+                row[x] = (uint8_t)((sum + 4) / 8);
+            }
+        }
+    }
+}
+
 void box_render_fog_offset(
     const FogVolume *fog,
     double time,

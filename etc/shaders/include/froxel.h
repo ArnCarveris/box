@@ -40,6 +40,10 @@
  * Cells no volume reaches take no history, so a removed volume leaves nothing behind at all */
 #define BOX_FROXEL_HISTORY_BLEND 0.85
 
+/** Texels along each edge of the noise texture of the fog volumes, a power of two: its mip chain
+ * halves it down to one texel */
+#define BOX_FROXEL_NOISE_SIZE 64
+
 /** Edge of the workgroup of the light injection, which runs one thread per cell */
 #define BOX_FROXEL_INJECT_GROUP 4
 

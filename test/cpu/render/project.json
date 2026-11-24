@@ -142,6 +142,7 @@
                     "partial_noise_keeps_others",
                     "noise_record",
                     "noise_texture",
+                    "noise_mips",
                     "light_inscatter_script_keeps_others",
                     "rotated_record",
                     "clamped_values",

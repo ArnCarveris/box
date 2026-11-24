@@ -350,7 +350,7 @@ void box_render_fog_free(
     box_render_fog_t *fog);
 
 /** Texels along each edge of the fog volume noise texture */
-#define BOX_RENDER_FOG_NOISE_SIZE (64)
+#define BOX_RENDER_FOG_NOISE_SIZE (BOX_FROXEL_NOISE_SIZE)
 
 /** Generate the texels of the fog volume noise texture, the same on every call and platform.
  *
@@ -365,6 +365,19 @@ void box_render_fog_free(
  */
 void box_render_fog_noise(
     uint8_t *out);
+
+/** Downsample a level of the fog volume noise texture to the next level of its mip chain, each
+ * texel the rounded mean of the 2x2x2 texels it covers. The edge is even, so no texel averages
+ * across the edge where the texture repeats and the chain tiles like the texture.
+ *
+ * @param src The texels of the level, size^3, x fastest, then y, then z
+ * @param size Texels along each edge of the level, even
+ * @param dst Receives the (size / 2)^3 texels of the next level, may be src
+ */
+void box_render_fog_noise_mip(
+    const uint8_t *src,
+    int32_t size,
+    uint8_t *dst);
 
 /** Give every lit view with LightSettings.fog_volumes the FogVolumes of the scene of its camera
  * that may be in its frustum and the FogVolumeUnbounded ones, which are never culled, back to

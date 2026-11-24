@@ -401,6 +401,41 @@ void FogVolume_noise_texture(void) {
     ecs_os_free(b);
 }
 
+/** The mip chain of the noise texture keeps its mean down to one texel, and a texel of a level
+ * averages only the texels it covers, so none crosses the edge where the texture repeats. */
+void FogVolume_noise_mips(void) {
+    // fog_volume/noise
+    int32_t n = BOX_RENDER_FOG_NOISE_SIZE, count = n * n * n, i, levels = 0;
+    ecs_os_set_api_defaults();
+    uint8_t *a = ecs_os_malloc(count), *b = ecs_os_malloc(count);
+    box_render_fog_noise(a);
+    double sum = 0;
+    for (i = 0; i < count; i ++) {
+        sum += a[i];
+    }
+
+    for (; n > 1; n /= 2, levels ++) {
+        box_render_fog_noise_mip(a, n, a);
+    }
+
+    test_int(levels, 6);
+    test_assert(fabs((double)a[0] - sum / count) <= 2.0);
+
+    n = BOX_RENDER_FOG_NOISE_SIZE;
+    ecs_os_memset(a, 0, count);
+    for (i = 0; i < n * n; i ++) {
+        a[i * n] = 255;
+    }
+
+    box_render_fog_noise_mip(a, n, b);
+    for (i = 0; i < count / 8; i ++) {
+        test_int(b[i], i % (n / 2) ? 0 : 128);
+    }
+
+    ecs_os_free(a);
+    ecs_os_free(b);
+}
+
 void FogVolume_rotated_record(void) {
     // fog_volume/extract
     box_render_null_t *null;

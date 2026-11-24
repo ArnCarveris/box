@@ -101,10 +101,13 @@ struct box_gpu_fog_volumes_t {
                                      *   in a compute stage, so no volume draws */
 };
 
-/** Create an R8 3D texture that the compute stage samples, filled with texels.
+/** Create an R8 3D texture that the compute stage samples, filled with texels, and its mip
+ * chain down to levels, each level the 2x2x2 mean of the one above (box_render_fog_noise_mip).
+ * The queue copies the texels of a level as it writes it, so the next level replaces them.
  *
  * @param gpu The backend
- * @param size Texels along each edge
+ * @param size Texels along each edge, a power of two of at least 2^(levels - 1)
+ * @param levels Mip levels, 1 for the texels alone
  * @param texels The texels, x fastest, then y, then z
  * @param view Receives the view of the texture
  * @return The texture
@@ -112,6 +115,7 @@ struct box_gpu_fog_volumes_t {
 static WGPUTexture box_gpu_fog_texture(
     box_gpu_t *gpu,
     uint32_t size,
+    uint32_t levels,
     const uint8_t *texels,
     WGPUTextureView *view)
 {
@@ -120,18 +124,34 @@ static WGPUTexture box_gpu_fog_texture(
         .dimension = WGPUTextureDimension_3D,
         .size = { size, size, size },
         .format = WGPUTextureFormat_R8Unorm,
-        .mipLevelCount = 1,
+        .mipLevelCount = levels,
         .sampleCount = 1
     });
-    WGPUTexelCopyTextureInfo dst = { .texture = result, .aspect = WGPUTextureAspect_All };
-    WGPUTexelCopyBufferLayout layout = { .bytesPerRow = size, .rowsPerImage = size };
-    WGPUExtent3D extent = { size, size, size };
-    wgpuQueueWriteTexture(gpu->queue, &dst, texels, (size_t)size * size * size, &layout,
-        &extent);
+    uint8_t *mip = levels > 1 ? ecs_os_malloc((size_t)size * size * size / 8) : NULL;
+    const uint8_t *level = texels;
+    uint32_t i;
+    for (i = 0; i < levels; i ++) {
+        WGPUTexelCopyTextureInfo dst = {
+            .texture = result,
+            .mipLevel = i,
+            .aspect = WGPUTextureAspect_All
+        };
+        WGPUTexelCopyBufferLayout layout = { .bytesPerRow = size, .rowsPerImage = size };
+        WGPUExtent3D extent = { size, size, size };
+        wgpuQueueWriteTexture(gpu->queue, &dst, level, (size_t)size * size * size, &layout,
+            &extent);
+        if (i + 1 < levels) {
+            box_render_fog_noise_mip(level, (int32_t)size, mip);
+            level = mip;
+            size /= 2;
+        }
+    }
+
+    ecs_os_free(mip);
     *view = wgpuTextureCreateView(result, &(WGPUTextureViewDescriptor){
         .format = WGPUTextureFormat_R8Unorm,
         .dimension = WGPUTextureViewDimension_3D,
-        .mipLevelCount = 1,
+        .mipLevelCount = levels,
         .arrayLayerCount = 1,
         .aspect = WGPUTextureAspect_All
     });
@@ -154,7 +174,12 @@ static WGPUTextureView box_gpu_fog_noise(
         const size_t n = BOX_RENDER_FOG_NOISE_SIZE;
         uint8_t *texels = ecs_os_malloc(n * n * n);
         box_render_fog_noise(texels);
-        f->noise = box_gpu_fog_texture(gpu, (uint32_t)n, texels, &f->noise_view);
+        uint32_t levels = 1;
+        while ((n >> levels) > 0) {
+            levels ++;
+        }
+
+        f->noise = box_gpu_fog_texture(gpu, (uint32_t)n, levels, texels, &f->noise_view);
         ecs_os_free(texels);
     }
 
@@ -371,7 +396,7 @@ void box_gpu_fog_volumes_init(
         .lodMaxClamp = 32.0f,
         .maxAnisotropy = 1
     });
-    f->placeholder = box_gpu_fog_texture(gpu, 1, &placeholder, &f->placeholder_view);
+    f->placeholder = box_gpu_fog_texture(gpu, 1, 1, &placeholder, &f->placeholder_view);
     f->no_grid = box_gpu_fog_no_grid(gpu, &f->no_grid_view);
     WGPUBindGroupLayout inject_groups[2] = { gpu->view_layout, f->inject_layout };
     WGPUBindGroupLayout integrate_groups[2] = {

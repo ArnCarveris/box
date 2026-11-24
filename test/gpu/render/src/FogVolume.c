@@ -1315,14 +1315,16 @@ void FogVolume_noise_zero_unchanged(void) {
 }
 
 /** Noise of strength 1 varies the fog across the wall, which a strength of 0 fogs evenly,
- * around about the same mean, in a frame of cells sampled at their centers. */
+ * around about the same mean, in a frame of cells sampled at their centers. Its billows are a
+ * few cells wide: a cell samples the noise averaged over its size, so billows finer than it
+ * even out. */
 void FogVolume_noise_varies(void) {
     // fog_volume/noise
     double mean[2], deviation[2], neighbours[2];
     int32_t k;
     for (k = 0; k < 2; k ++) {
         ecs_world_t *world = fv_world(0);
-        fv_noise_volume(world, (float)k, 4, (float[]){0, 0, 0});
+        fv_noise_volume(world, (float)k, 12, (float[]){0, 0, 0});
         unsigned char *px = fv_render_still(world,
             k ? "fog_noise_one.png" : "fog_noise_none.png");
         fv_measure(px, &mean[k], &deviation[k], &neighbours[k]);
@@ -1347,7 +1349,7 @@ void FogVolume_noise_scale(void) {
     int32_t k;
     for (k = 0; k < 2; k ++) {
         ecs_world_t *world = fv_world(0);
-        fv_noise_volume(world, 1, k ? 32.0f : 4.0f, (float[]){0, 0, 0});
+        fv_noise_volume(world, 1, k ? 64.0f : 8.0f, (float[]){0, 0, 0});
         unsigned char *px = fv_render_still(world,
             k ? "fog_noise_large.png" : "fog_noise_small.png");
         fv_measure(px, &mean[k], &deviation[k], &neighbours[k]);
@@ -1355,7 +1357,7 @@ void FogVolume_noise_scale(void) {
         ecs_fini(world);
     }
 
-    printf("scale 4: neighbours %.2f deviation %.2f, scale 32: neighbours %.2f deviation %.2f\n",
+    printf("scale 8: neighbours %.2f deviation %.2f, scale 64: neighbours %.2f deviation %.2f\n",
         neighbours[0], deviation[0], neighbours[1], deviation[1]);
     test_assert(deviation[0] > 4.0);
     test_assert(deviation[1] > 4.0);
@@ -1414,7 +1416,7 @@ void FogVolume_wind_moves(void) {
  * time would blend with billows from elsewhere. */
 void FogVolume_wind_period(void) {
     // fog_volume/noise
-    const float scale = 4, speed = 2;
+    const float scale = 12, speed = 2;
     const float period = 10 * scale / speed;
     ecs_world_t *world = fv_world(0);
     fv_noise_volume(world, 1, scale, (float[]){speed, 0, 0});
@@ -1496,7 +1498,7 @@ void FogVolume_noise_deterministic(void) {
 void FogVolume_noise_device_loss(void) {
     // fog_volume/noise
     ecs_world_t *world = fv_world(0);
-    fv_noise_volume(world, 1, 4, (float[]){0, 0, 0});
+    fv_noise_volume(world, 1, 12, (float[]){0, 0, 0});
     unsigned char *before = fv_render_still(world, "fog_noise_lost.png");
     double mean, deviation, neighbours;
     fv_measure(before, &mean, &deviation, &neighbours);
