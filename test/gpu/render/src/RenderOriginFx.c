@@ -33,6 +33,13 @@
  * differently */
 #define FX_CLOSE_DIFF (4)
 
+/** Pixels of two images of grass that may differ by more than FX_CLOSE_DIFF, a hundredth of
+ * them: those a blade edge passes within the rounding of its place */
+#define FX_EDGE_PIXELS (FX_WIDTH * FX_HEIGHT / 100)
+
+/** Largest difference of the means of the channels of two images of grass */
+#define FX_EDGE_MEAN (0.1)
+
 /** Worlds a test renders side by side at most */
 #define FX_WORLDS (4)
 
@@ -152,6 +159,124 @@ static ecs_world_t* fx_ship_scene(
     fx_emitter(world, *ship, 0, ride);
 
     return world;
+}
+
+/** Turn on the shadows of every view of a world.
+ *
+ * @param world The world
+ */
+static void fx_shadows(
+    ecs_world_t *world)
+{
+    ecs_entity_t views[FX_WORLDS];
+    int32_t count = 0, i;
+    ecs_iter_t it = ecs_each(world, View);
+    while (ecs_each_next(&it)) {
+        for (i = 0; i < it.count && count < FX_WORLDS; i ++) {
+            views[count ++] = it.entities[i];
+        }
+    }
+
+    for (i = 0; i < count; i ++) {
+        View *v = ecs_get_mut(world, views[i], View);
+        v->shadows.enabled = true;
+        ecs_modified(world, views[i], View);
+    }
+}
+
+/** Create a world of a meadow of Grass on a brown floor at FX_X, in a wind with gusts, seen by
+ * a camera, the blades casting shadows into the cascades of the view when it has them.
+ *
+ * @param shadows Whether the view has shadows
+ * @param camera Receives the camera, NULL for none
+ * @return The world
+ */
+static ecs_world_t* fx_grass_scene(
+    bool shadows,
+    ecs_entity_t *camera)
+{
+    ecs_world_t *world = fx_world();
+    ecs_entity_t floor = ecs_new(world);
+    ecs_set(world, floor, Position, {FX_X, -0.1f, 0});
+    ecs_set(world, floor, Box, {200, 0.2f, 200});
+    ecs_set(world, floor, Rgb, {90, 60, 40});
+    ecs_set(world, floor, PbrMaterial, {.roughness = 1});
+
+    ecs_entity_t meadow = ecs_new(world);
+    ecs_set(world, meadow, Position, {FX_X, 0, 0});
+    Grass *g = ecs_ensure(world, meadow, Grass);
+    g->density = 48;
+    g->min_width = 0.05f;
+    g->max_width = 0.09f;
+    g->lod[0] = 8;
+    g->lod[1] = 20;
+    g->lod[2] = 40;
+    g->seed = 3;
+    g->shadow_distance = 12;
+    ecs_modified(world, meadow, Grass);
+    ecs_singleton_set(world, Wind, {.direction = {1, 0}, .speed = 8, .gust = 0.5f,
+        .gust_scale = 10});
+
+    ecs_entity_t c = fx_camera(world, 0, FX_X);
+    if (shadows) {
+        fx_shadows(world);
+    }
+
+    if (camera) {
+        *camera = c;
+    }
+
+    return world;
+}
+
+/** Check that an image shows the grass: a share of its pixels green.
+ *
+ * @param px The image
+ */
+static void fx_expect_grass(
+    const unsigned char *px)
+{
+    int32_t green = 0, i;
+    for (i = 0; i < FX_WIDTH * FX_HEIGHT; i ++) {
+        const unsigned char *p = &px[i * 4];
+        green += p[1] > p[0] + 8 && p[1] > p[2] + 8;
+    }
+
+    test_assert(green * 4 > FX_WIDTH * FX_HEIGHT);
+}
+
+/** Check that two images of grass match: every pixel to within FX_CLOSE_DIFF in every channel
+ * but at most FX_EDGE_PIXELS, where the edge of a blade about a pixel wide passes the center of
+ * the pixel within the rounding of its place, and the mean of the channels to within
+ * FX_EDGE_MEAN.
+ *
+ * @param a The first image
+ * @param b The second image
+ */
+static void fx_expect_edges(
+    const unsigned char *a,
+    const unsigned char *b)
+{
+    int32_t edges = 0, i, c;
+    double sum = 0;
+    for (i = 0; i < FX_WIDTH * FX_HEIGHT; i ++) {
+        int32_t worst = 0;
+        for (c = 0; c < 3; c ++) {
+            int32_t d = (int)a[i * 4 + c] - (int)b[i * 4 + c];
+            worst = abs(d) > worst ? abs(d) : worst;
+            sum += d;
+        }
+
+        edges += worst > FX_CLOSE_DIFF;
+    }
+
+    double mean = fabs(sum) / (FX_WIDTH * FX_HEIGHT * 3);
+    if (edges > FX_EDGE_PIXELS || mean > FX_EDGE_MEAN) {
+        printf("%d pixels differ, mean difference %.3f\n", edges, mean);
+    }
+
+    test_assert(edges <= FX_EDGE_PIXELS);
+    test_assert(mean <= FX_EDGE_MEAN);
 }
 
 /** Draw a world relative to a render origin that follows an entity, without shifts of the
@@ -364,4 +489,71 @@ void RenderOriginFx_particles_ride_moves_with_mover(void) {
     test_assert(ecs_get(worlds[1], ships[1], Position)->z < -2.5f);
     test_assert(behind > 64);
     fx_free(worlds, 4, px);
+}
+
+
+void RenderOriginFx_grass_render_follow_same_image(void) {
+    // render/world_origin
+    /* A meadow of grass at X 3000 that bends in a gusty wind and casts shadows, drawn relative
+     * to a render origin that follows the camera, matches the one drawn without it, every
+     * frame. */
+    ecs_world_t *worlds[2] = { fx_grass_scene(true, NULL), fx_grass_scene(true, NULL) };
+    unsigned char *px[2] = {0};
+    fx_render_follow(worlds[1], 0);
+    for (int32_t i = 0; i < 16; i ++) {
+        fx_step(worlds, 2, px);
+        fx_expect_edges(px[0], px[1]);
+    }
+
+    fx_expect_grass(px[0]);
+    fx_free(worlds, 2, px);
+}
+
+void RenderOriginFx_grass_shift_same_image(void) {
+    // render/world_origin
+    /* A shift of the world origin halfway, by no whole number of cells, leaves the blades,
+     * their clumps and colors and the gusts of the wind where they were: the meadow matches
+     * the one that never shifts, both drawn relative to a render origin that follows the
+     * camera. The view has no shadows: the cascades snap to the texels of the local frame, so
+     * their edges move by up to a texel across a shift. */
+    ecs_world_t *worlds[2] = { fx_grass_scene(false, NULL), fx_grass_scene(false, NULL) };
+    unsigned char *px[2] = {0};
+    fx_render_follow(worlds[0], 0);
+    fx_render_follow(worlds[1], 0);
+    for (int32_t i = 0; i < 24; i ++) {
+        if (i == 12) {
+            box_world_origin_shift(worlds[1], 0, (double[3]){ 2816.375, 0, -255.625 });
+        }
+
+        fx_step(worlds, 2, px);
+        fx_expect_edges(px[0], px[1]);
+    }
+
+    test_int(ecs_singleton_get(worlds[1], WorldOriginStatus)->shifts, 1);
+    fx_expect_grass(px[0]);
+    fx_free(worlds, 2, px);
+}
+
+void RenderOriginFx_grass_render_follow_moving_continuous(void) {
+    // render/world_origin
+    /* The camera flies over the meadow, the render origin following it and so moving every
+     * frame: every frame matches the same flight drawn without a render origin. */
+    ecs_entity_t cameras[2];
+    ecs_world_t *worlds[2] = {
+        fx_grass_scene(true, &cameras[0]), fx_grass_scene(true, &cameras[1])
+    };
+    unsigned char *px[2] = {0};
+    fx_render_follow(worlds[1], 0);
+    for (int32_t w = 0; w < 2; w ++) {
+        ecs_set(worlds[w], cameras[w], Velocity, {7, 0, -5});
+    }
+
+    for (int32_t i = 0; i < 30; i ++) {
+        fx_step(worlds, 2, px);
+        fx_expect_edges(px[0], px[1]);
+    }
+
+    test_assert(ecs_get(worlds[1], cameras[1], Position)->x > FX_X + 3.0f);
+    fx_expect_grass(px[0]);
+    fx_free(worlds, 2, px);
 }

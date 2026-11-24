@@ -6,6 +6,10 @@
 // rows turning around the vertical as the blade curls. A blade seen edge on widens in view space
 // so it keeps covering about as many pixels.
 //
+// A blade bends, shades and is placed in the local frame of the packet, and its clip position is
+// render_view_proj of its root relative to the render origin plus its shape around the root, so
+// it keeps its precision near the render origin. The shadow casters stay in the local frame.
+//
 // A blade shorter than the fold height of its Grass folds into a V: the first half of its strip
 // runs from the tip of one half down to the root and the second half from the root up to the tip
 // of the other, the two sharing the stem up to the fold between their first and second segment
@@ -254,6 +258,7 @@ fn grass_to_eye(world: vec3f) -> vec3f {
 // The shape of a vertex of a blade: where it is and how it turns.
 struct GrassShape {
     world: vec3f,       // Local world position
+    relative: vec3f,    // Position relative to the origin grass_shape was given
     normal: vec3f,      // Normal of the blade without its rounding, on its front
     across: vec3f,      // Direction across the blade at its row
     side: f32,          // -1 and 1 on its edges, 0 at its tip
@@ -268,9 +273,12 @@ fn grass_blade_of(vertex: u32, instance: u32) -> GrassBlade {
     return blades[lod * params.config.w + instance];
 }
 
-// The shape of a vertex of a blade of a level, with the index of the vertex within its level and
-// the direction toward the eye the blade widens across when seen edge on.
-fn grass_shape(b: GrassBlade, lod: u32, v: u32, eye: vec3f) -> GrassShape {
+// The shape of a vertex of a blade of a level, with the index of the vertex within its level, the
+// direction toward the eye the blade widens across when seen edge on and the local position its
+// relative position is taken from: the root of the blade minus it, plus the shape around the
+// root, so the shape keeps its precision near that origin. An origin of 0 gives the world
+// position bit for bit.
+fn grass_shape(b: GrassBlade, lod: u32, v: u32, eye: vec3f, origin: vec3f) -> GrassShape {
     var out: GrassShape;
     let segments = grass_segments(lod);
     let row = min(v / 2u, segments);
@@ -345,6 +353,7 @@ fn grass_shape(b: GrassBlade, lod: u32, v: u32, eye: vec3f) -> GrassShape {
     }
 
     let spine = b.position + local;
+    let relative_spine = (b.position - origin) + local;
 
     // Wider toward the base, narrowing faster toward the tip, a half of a folded blade from its
     // fold as a whole blade from its root; seen edge on the blade widens across the eye
@@ -358,8 +367,10 @@ fn grass_shape(b: GrassBlade, lod: u32, v: u32, eye: vec3f) -> GrassShape {
     let edge = abs(dot(across_xz, eye_xz));
     let screen = vec3f(-eye_xz.y, 0.0, eye_xz.x);
     let order = select(-1.0, 1.0, dot(across, screen) >= 0.0);
-    out.world = spine + across * (side * half_width) +
-        screen * (order * side * half_width * EDGE_WIDEN * edge * edge);
+    let width_side = across * (side * half_width);
+    let width_eye = screen * (order * side * half_width * EDGE_WIDEN * edge * edge);
+    out.world = spine + width_side + width_eye;
+    out.relative = relative_spine + width_side + width_eye;
     out.normal = normalize(cross(across, tangent));
     out.across = across;
     out.side = side;
@@ -372,7 +383,8 @@ fn vs(@builtin(vertex_index) vertex: u32, @builtin(instance_index) instance: u32
     var out: VertexOut;
     let lod = min(vertex / GRASS_LOD_VERTICES, GRASS_LODS - 1u);
     let b = grass_blade_of(vertex, instance);
-    let s = grass_shape(b, lod, vertex % GRASS_LOD_VERTICES, grass_to_eye(b.position));
+    let s = grass_shape(b, lod, vertex % GRASS_LOD_VERTICES, grass_to_eye(b.position),
+        view.render_delta.xyz);
 
     // Normals flatten with distance and where the blade is only a few pixels wide
     let d = length(view.camera.xyz - b.position);
@@ -382,7 +394,7 @@ fn vs(@builtin(vertex_index) vertex: u32, @builtin(instance_index) instance: u32
     out.normal = s.normal;
     out.rounding = s.across * (s.side * ROUND * (1.0 - out.flatten));
     out.world = s.world;
-    out.clip = view.view_proj * vec4f(s.world, 1.0);
+    out.clip = view.render_view_proj * vec4f(s.relative, 1.0);
     out.along = s.along;
     out.up = s.up;
     out.gust = s.gust;
@@ -404,7 +416,8 @@ fn grass_to_light(world: vec3f) -> vec3f {
 fn grass_caster(vertex: u32, instance: u32) -> vec3f {
     let lod = min(vertex / GRASS_LOD_VERTICES, GRASS_LODS - 1u);
     let b = grass_blade_of(vertex, instance);
-    return grass_shape(b, lod, vertex % GRASS_LOD_VERTICES, grass_to_light(b.position)).world;
+    return grass_shape(b, lod, vertex % GRASS_LOD_VERTICES, grass_to_light(b.position),
+        vec3f(0.0)).world;
 }
 
 // A blade that casts a shadow into a cascade of the directional light or a spot light tile, the

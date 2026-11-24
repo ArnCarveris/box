@@ -2209,7 +2209,10 @@
                 "testcases": [
                     "particles_render_follow_same_image",
                     "particles_shift_same_image",
-                    "particles_ride_moves_with_mover"
+                    "particles_ride_moves_with_mover",
+                    "grass_render_follow_same_image",
+                    "grass_shift_same_image",
+                    "grass_render_follow_moving_continuous"
                 ]
             }
         ]
