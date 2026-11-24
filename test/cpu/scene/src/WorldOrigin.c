@@ -1059,3 +1059,30 @@ void WorldOrigin_collect_skips_child_tables(void) {
 
     ecs_fini(world);
 }
+
+void WorldOrigin_spatial_manual_root_stays(void) {
+    // scenes/world_origin
+    ecs_world_t *world = origin_world(100000, 50);
+    ecs_entity_t manual = ecs_new(world);
+    ecs_add(world, manual, ManualTransform);
+    WorldTransform t;
+    glm_mat4_identity(t.m);
+    t.m[3][0] = 500;
+    ecs_set_ptr(world, manual, WorldTransform, &t);
+    ecs_set(world, manual, Box, {2, 2, 2});
+    ecs_entity_t moved = origin_entity(world, 500, 0, 5);
+    ecs_set(world, moved, Box, {2, 2, 2});
+    ecs_progress(world, 0);
+
+    box_world_origin_shift(world, 0, (double[3]){50, 0, 0});
+    ecs_progress(world, 0);
+
+    vec3 min, max;
+    ecs_entity_t scene = 1;
+    test_assert(box_spatial_bounds(world, manual, &scene, min, max));
+    test_flt(min[0], 499);
+    test_assert(box_spatial_bounds(world, moved, &scene, min, max));
+    test_flt(min[0], 449);
+
+    ecs_fini(world);
+}

@@ -214,7 +214,8 @@
                     "frame_scales_with_altitude",
                     "frame_rotate_off_restores",
                     "frame_altitude_precise",
-                    "collect_skips_child_tables"
+                    "collect_skips_child_tables",
+                    "spatial_manual_root_stays"
                 ]
             },
             {

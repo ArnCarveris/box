@@ -15,6 +15,8 @@ typedef struct box_world_shift_t {
     const ecs_world_t *world; /**< The world */
     ecs_map_t roots;          /**< Root entities that move, to 1 */
     ecs_vec_t list;           /**< ecs_entity_t, the same roots in the order they were found */
+    bool stays;               /**< A root of the scene stays where it is, so not everything in
+                               *   the scene moves */
 } box_world_shift_t;
 
 /** Check whether the ancestors of a root, or the root itself, keep it out of a shift: it is
@@ -41,6 +43,40 @@ static bool box_world_stays(
 
 /** Path of the cached query of the tables whose entities can be roots */
 #define BOX_WORLD_ROOTS_QUERY "box.world.RebaseRoots"
+
+/** Path of the cached query of the roots placed without a Position, which a shift leaves */
+#define BOX_WORLD_STILL_QUERY "box.world.RebaseStill"
+
+/** Check whether a scene has a root placed without a Position, such as a ManualTransform root
+ * with only its WorldTransform, which a shift leaves where it is.
+ *
+ * @param world The world
+ * @param scene The scene
+ * @return Whether it has one
+ */
+static bool box_world_scene_has_still(
+    const ecs_world_t *world,
+    ecs_entity_t scene)
+{
+    ecs_entity_t e = ecs_lookup(world, BOX_WORLD_STILL_QUERY);
+    const ecs_query_t *q = e ? ecs_query_get(world, e) : NULL;
+    bool result = false;
+    int32_t i;
+    ecs_assert(q != NULL, ECS_INTERNAL_ERROR, BOX_WORLD_STILL_QUERY);
+
+    ecs_iter_t it = ecs_query_iter(world, q);
+    while (!result && ecs_query_next(&it)) {
+        for (i = 0; i < it.count && !result; i ++) {
+            result = box_world_scene_of(world, it.entities[i]) == scene;
+        }
+    }
+
+    if (result) {
+        ecs_iter_fini(&it);
+    }
+
+    return result;
+}
 
 /** Collect the roots of a scene that a shift moves: the entities with a Position whose
  * ancestors have no WorldTransform and that box_world_stays does not keep.
@@ -69,9 +105,12 @@ static int32_t box_world_shift_collect(
         tables ++;
         for (i = 0; i < it.count; i ++) {
             ecs_entity_t root = it.entities[i];
-            if (!box_world_is_root(world, root) || box_world_stays(world, root) ||
-                box_world_scene_of(world, root) != scene)
-            {
+            if (!box_world_is_root(world, root) || box_world_scene_of(world, root) != scene) {
+                continue;
+            }
+
+            if (box_world_stays(world, root)) {
+                shift->stays = true;
                 continue;
             }
 
@@ -79,6 +118,8 @@ static int32_t box_world_shift_collect(
             *ecs_vec_append_t(NULL, &shift->list, ecs_entity_t) = root;
         }
     }
+
+    shift->stays = shift->stays || box_world_scene_has_still(world, scene);
 
     return tables;
 }
@@ -487,7 +528,7 @@ static void box_world_origin_shift_to(
 
     if (!map.linear) {
         vec3 delta = { (float)map.d[0], (float)map.d[1], (float)map.d[2] };
-        box_spatial_shift(world, scene, delta, box_world_shifted, &shift);
+        box_spatial_shift(world, scene, delta, shift.stays ? box_world_shifted : NULL, &shift);
         box_render_particles_shift(box_render_particles_get(world), scene, delta,
             box_world_particles_shifted, &shift);
         box_render_bake_shift(world, scene, delta);
@@ -801,6 +842,23 @@ done:
 void box_world_origin_import(
     ecs_world_t *world)
 {
+    ecs_query(world, {
+        .entity = ecs_entity(world, { .name = "RebaseStill" }),
+        .terms = {
+            { .id = ecs_id(WorldTransform), .inout = EcsInOutNone },
+            { .id = ecs_id(Position), .inout = EcsInOutNone, .oper = EcsNot },
+            {
+                .id = ecs_id(WorldTransform),
+                .src.id = EcsUp,
+                .trav = EcsChildOf,
+                .inout = EcsInOutNone,
+                .oper = EcsNot
+            }
+        },
+        .flags = EcsQueryMatchDisabled,
+        .cache_kind = EcsQueryCacheAuto
+    });
+
     ecs_query(world, {
         .entity = ecs_entity(world, { .name = "RebaseRoots" }),
         .terms = {
