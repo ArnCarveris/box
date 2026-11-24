@@ -2471,15 +2471,46 @@ uint32_t box_render_impostor_atlas(
     ecs_entity_t impostor,
     ImpostorChannel channel);
 
-/** Card of an Impostor (ImpostorDraw), set on the card prefab of the impostor that the card of
- * each of its instances inherits. The shapes with it draw as one alpha tested card that shows
- * the atlases of the impostor, in a batch of their own. */
-typedef struct ImpostorCard {
-    ecs_entity_t impostor;      /**< Entity with the Impostor */
-} ImpostorCard;
+/** Set the cards of an impostor (ImpostorDraw): the prefab whose mesh and material they draw
+ * and the distance beyond which they draw, or remove every card of the impostor.
+ *
+ * A change of the prefab or the range writes the cards again; a change of the range also gives
+ * the shapes below the instances their new far end.
+ *
+ * @param world The world
+ * @param impostor The entity with the Impostor
+ * @param card The prefab of the cards, 0 to remove the cards of the impostor
+ * @param distance Distance beyond which the cards draw, which the instances end at
+ * @param fade Half width of the crossfade around the distance
+ */
+void box_render_draws_impostor(
+    ecs_world_t *world,
+    ecs_entity_t impostor,
+    ecs_entity_t card,
+    float distance,
+    float fade);
 
-/** Component id of ImpostorCard */
-extern ECS_COMPONENT_DECLARE(ImpostorCard);
+/** Give an instance of the prefab of an impostor a card: a slot in the card batch of the
+ * impostor at the transform of the instance, which no entity holds. Nothing happens when the
+ * instance has a card or the impostor has no cards (box_render_draws_impostor).
+ *
+ * @param world The world
+ * @param impostor The entity with the Impostor
+ * @param inst The instance
+ */
+void box_render_draws_card_add(
+    ecs_world_t *world,
+    ecs_entity_t impostor,
+    ecs_entity_t inst);
+
+/** Remove the card of an instance, giving back its slot at once.
+ *
+ * @param world The world
+ * @param inst The instance, which may be gone
+ */
+void box_render_draws_card_remove(
+    ecs_world_t *world,
+    ecs_entity_t inst);
 
 /** Ask for a capture in the next extracted frame.
  *

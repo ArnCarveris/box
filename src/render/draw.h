@@ -236,8 +236,8 @@ typedef struct box_draw_key_t {
                              *   ChildOf ancestor has one (box_draws_range), all 0 without: the
                              *   cull pass drops the instances out of range and the pipelines
                              *   dither the fades (draw_range) */
-    ecs_entity_t impostor;  /**< Entity with the Impostor whose cards the shapes are
-                             *   (ImpostorCard), 0 for other shapes: a batch of cards is
+    ecs_entity_t impostor;  /**< Entity with the Impostor whose cards the batch draws, one per
+                             *   instance (box_draws_card), 0 for shapes: a batch of cards is
                              *   opaque, alpha tested and draws the atlases of the impostor */
     bool texture_blend;     /**< 3D shapes with a TextureBlend (texture_blend pipeline):
                              *   textures[0] is the owner of the TextureBlend, textures[2] and
@@ -855,6 +855,11 @@ typedef struct box_render_draws_t {
     ecs_map_t frame_poses;      /**< Texture frame to its index in frame_cache plus one */
     ecs_vec_t frame_cache;      /**< box_draw_frame_pose_t, the frames of the live records */
     int64_t tick;               /**< Extracts run, which tells the frame poses of this one apart */
+    ecs_map_t cards;            /**< Instance of the prefab of an impostor to its card, the
+                                 *   slot in the card batch of the impostor that it draws */
+    ecs_map_t impostors;        /**< Entity with Impostor to the prefab and range of its cards */
+    ecs_map_t card_sources;     /**< Prefab of the cards of an impostor to the impostor */
+    ecs_vec_t cards_dirty;      /**< ecs_entity_t, instances whose card may have changed */
     int32_t refs;               /**< Observers and systems that use the state */
 } box_render_draws_t;
 
@@ -2355,6 +2360,8 @@ void box_draws_mark(
  * nearest ChildOf ancestor that has one. A near or far that is not positive is none, and so is
  * the fade without either.
  *
+ * At an instance with a card (box_draws_card_range) the range ends where the card starts.
+ *
  * @param world The world
  * @param e The entity
  * @param out Receives near, far and fade, all 0 without a DrawRange
@@ -2365,18 +2372,118 @@ bool box_draws_range(
     ecs_entity_t e,
     float *out);
 
-/** Make the key of a 3D shape the key of an impostor card when it has an ImpostorCard: an
- * opaque, alpha tested mesh batch of its own per impostor, without the material features, wind,
- * layers or bakes that the card does not draw.
+/** Resolve the DrawRange of a shape as box_draws_range, with the state of the draw extract.
  *
  * @param world The world
+ * @param d The state, NULL without the draw extract
  * @param e The entity
- * @param key The key box_draws_key computed, changed for a card
+ * @param out Receives near, far and fade, all 0 without a DrawRange
+ * @return Whether the shape has a near or a far distance
  */
-void box_draws_impostor_key(
+bool box_draws_range_of(
     const ecs_world_t *world,
+    const box_render_draws_t *d,
     ecs_entity_t e,
-    box_draw_key_t *key);
+    float *out);
+
+/** Compose the Opacity and the Tint of an ancestor after those of the nearer ancestors.
+ *
+ * @param opacity Its Opacity, NULL for none
+ * @param t Its Tint, NULL for none
+ * @param fade The product of the Opacity of the nearer ancestors, receives it with this one
+ * @param tint The tints of the nearer ancestors, receives them with this one
+ */
+void box_draws_fade_step(
+    const Opacity *opacity,
+    const Tint *t,
+    float *fade,
+    box_draw_tint_t *tint);
+
+/** Create the state of the impostor cards.
+ *
+ * @param d The state
+ */
+void box_draws_cards_init(
+    box_render_draws_t *d);
+
+/** Free the state of the impostor cards.
+ *
+ * @param d The state
+ */
+void box_draws_cards_fini(
+    box_render_draws_t *d);
+
+/** Mark the card of an entity as changed when the entity is an instance with a card, or every
+ * card of an impostor when the entity is the prefab of its cards.
+ *
+ * @param d The state
+ * @param e The entity
+ * @param kinds box_draw_kind_t, the streams the change writes
+ */
+void box_draws_card_mark(
+    box_render_draws_t *d,
+    ecs_entity_t e,
+    uint8_t kinds);
+
+/** Get the slot record of an entity in a batch: the card of an instance in a card batch, else
+ * the DrawSlot of the shape.
+ *
+ * @param world The world
+ * @param d The state
+ * @param b The batch
+ * @param e The entity of a slot of the batch
+ * @return The slot record, NULL for none
+ */
+DrawSlot* box_draws_slot_of(
+    ecs_world_t *world,
+    const box_render_draws_t *d,
+    const box_draw_batch_t *b,
+    ecs_entity_t e);
+
+/** Get the range of the shapes of an entity that is an instance with a card: its own range,
+ * with the far end no farther than the distance of the impostor and its fade.
+ *
+ * @param d The state, NULL without the draw extract
+ * @param e The entity
+ * @param own The DrawRange of the entity, owned or inherited, NULL for none
+ * @param out Receives the range of an instance with a card
+ * @return out for an instance with a card, else own
+ */
+const DrawRange* box_draws_card_range(
+    const box_render_draws_t *d,
+    ecs_entity_t e,
+    const DrawRange *own,
+    DrawRange *out);
+
+/** Bring the changed cards into the batches of their keys and write their instances. The cards
+ * of the batches that upload every frame are written every frame.
+ *
+ * @param world The world
+ * @param d The state
+ */
+void box_draws_cards_update(
+    ecs_world_t *world,
+    box_render_draws_t *d);
+
+/** Get the slot of the card of an instance.
+ *
+ * @param d The state
+ * @param inst The instance
+ * @return The slot, NULL when the instance has no card
+ */
+const DrawSlot* box_draws_card(
+    const box_render_draws_t *d,
+    ecs_entity_t inst);
+
+/** Get the prefab with the mesh and material of the cards of an impostor.
+ *
+ * @param d The state
+ * @param impostor The entity with the Impostor
+ * @return The prefab, 0 while the impostor has no cards
+ */
+ecs_entity_t box_draws_card_source(
+    const box_render_draws_t *d,
+    ecs_entity_t impostor);
 
 /** Multiply the Opacity and compose the Tint of the ancestors, through ChildOf and Parent.
  *

@@ -31,7 +31,11 @@
                     "remove_impostor_removes_cards",
                     "zero_distance_draws_full",
                     "follow_instances",
-                    "bake_copy_has_no_card"
+                    "bake_copy_has_no_card",
+                    "instances_keep_table",
+                    "card_follows_instance",
+                    "disabled_instance_hides_card",
+                    "deleted_instance_frees_card"
                 ]
             },
             {

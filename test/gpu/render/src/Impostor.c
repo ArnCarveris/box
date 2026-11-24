@@ -16,6 +16,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "render.h"
+#include "draw.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_STATIC
@@ -783,7 +784,8 @@ void Impostor_card_matches_full_render(void) {
     ecs_world_t *world = impostor_draw_world("Panel", (Position){0, 0, -40}, &panel, &inst);
     impostor_view(world, (Position){0, 0, 0}, 0, 12, false);
     impostor_wait(world, panel, 1);
-    test_assert(ecs_owns(world, inst, DrawRange));
+    test_assert(!ecs_owns(world, inst, DrawRange));
+    test_assert(box_draws_card(box_draws_state(world), inst) != NULL);
 
     /* Far beyond the instance the hierarchy draws, nearer than it the card */
     impostor_range(world, panel, 1000, 1);
@@ -829,7 +831,8 @@ void Impostor_crossfade_covers_once(void) {
     ecs_world_t *world = impostor_draw_world("Panel", (Position){0, 0, -40}, &panel, &inst);
     impostor_view(world, (Position){0, 0, 0}, 0, 12, false);
     impostor_wait(world, panel, 1);
-    test_assert(ecs_owns(world, inst, DrawRange));
+    test_assert(!ecs_owns(world, inst, DrawRange));
+    test_assert(box_draws_card(box_draws_state(world), inst) != NULL);
     impostor_range(world, panel, 1000, 1);
     unsigned char *full = impostor_capture(world, "impostor_fade_full.png", IMPOSTOR_IMAGE);
 

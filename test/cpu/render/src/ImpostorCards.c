@@ -1,8 +1,9 @@
 /**
  * @file ImpostorCards.c
  * @brief Tests for the cards of the impostors (ImpostorDraw): once a bake is ready every instance
- * of the prefab gets a card beyond the distance and a DrawRange that ends there, all cards of a
- * prefab share one batch that binds the atlases, and the ranges follow the Impostor.
+ * of the prefab gets a card beyond the distance, a slot of the draws that no entity holds, and
+ * its shapes end there; all cards of a prefab share one batch that binds the atlases, and the
+ * ranges follow the Impostor.
  *
  * Every case renders with the null backend, which bakes the atlases without drawing them, and
  * reads the entities, batches and packets of the extract.
@@ -119,31 +120,33 @@ static void cards_wait(
     cards_frame(world);
 }
 
-/** Get the card of an instance.
+/** Get the slot of the card of an instance.
  *
  * @param world The world
  * @param inst The instance
- * @return The card, 0 for none
+ * @return The slot, NULL when the instance has no card
  */
-static ecs_entity_t cards_card_of(
+static const DrawSlot* cards_card_of(
     ecs_world_t *world,
     ecs_entity_t inst)
 {
-    ecs_entity_t result = 0;
-    int32_t found = 0;
-    ecs_iter_t it = ecs_children(world, inst);
-    while (ecs_children_next(&it)) {
-        for (int32_t i = 0; i < it.count; i ++) {
-            if (ecs_has(world, it.entities[i], ImpostorCard)) {
-                result = it.entities[i];
-                found ++;
-            }
-        }
-    }
+    return box_draws_card(box_draws_state(world), inst);
+}
 
-    test_assert(found <= 1);
+/** Get the batch of the card of an instance.
+ *
+ * @param world The world
+ * @param inst The instance
+ * @return The batch of its card
+ */
+static box_draw_batch_t* cards_card_batch(
+    ecs_world_t *world,
+    ecs_entity_t inst)
+{
+    const DrawSlot *slot = cards_card_of(world, inst);
+    test_assert(slot != NULL && slot->batch >= 0);
 
-    return result;
+    return box_draws_batch(box_draws_state(world), slot->batch);
 }
 
 /** Get the batch of a shape.
@@ -162,7 +165,7 @@ static box_draw_batch_t* cards_batch_of(
     return box_draws_batch(box_draws_state(world), slot->batch);
 }
 
-/** Check the owned DrawRange of an entity.
+/** Check the range the shapes of an entity resolve (box_draws_range).
  *
  * @param world The world
  * @param e The entity
@@ -177,11 +180,30 @@ static void cards_range(
     float far,
     float fade)
 {
-    const DrawRange *r = ecs_get(world, e, DrawRange);
-    test_assert(r != NULL);
-    test_flt(r->near_, near);
-    test_flt(r->far_, far);
-    test_flt(r->fade, fade);
+    float r[3];
+    test_bool(box_draws_range(world, e, r), true);
+    test_flt(r[0], near);
+    test_flt(r[1], far);
+    test_flt(r[2], fade);
+}
+
+/** Check the range of the batch of the card of an instance.
+ *
+ * @param world The world
+ * @param inst The instance
+ * @param near Expected near
+ * @param fade Expected fade
+ */
+static void cards_card_range(
+    ecs_world_t *world,
+    ecs_entity_t inst,
+    float near,
+    float fade)
+{
+    const box_draw_batch_t *b = cards_card_batch(world, inst);
+    test_flt(b->key.range[0], near);
+    test_flt(b->key.range[1], 0);
+    test_flt(b->key.range[2], fade);
 }
 
 void ImpostorCards_none_before_ready(void) {
@@ -194,7 +216,7 @@ void ImpostorCards_none_before_ready(void) {
     test_assert(s != NULL);
     test_bool(s->ready, false);
     test_assert(!ecs_owns(world, inst, DrawRange));
-    test_assert(cards_card_of(world, inst) == 0);
+    test_assert(cards_card_of(world, inst) == NULL);
     box_render_draws_stats_t stats;
     box_render_draws_stats(world, &stats);
     test_int(stats.impostors, 0);
@@ -212,12 +234,11 @@ void ImpostorCards_card_per_instance(void) {
     cards_wait(world, prefab);
     ecs_entity_t insts[3] = {a, b, c};
     for (int32_t i = 0; i < 3; i ++) {
-        ecs_entity_t card = cards_card_of(world, insts[i]);
-        test_assert(card != 0);
-        test_assert(ecs_get(world, card, ImpostorCard)->impostor == prefab);
-        test_assert(ecs_owns(world, insts[i], DrawRange));
+        test_assert(cards_card_batch(world, insts[i])->key.impostor == prefab);
+        test_assert(!ecs_owns(world, insts[i], DrawRange));
+        test_int(ecs_count_id(world, ecs_childof(insts[i])), 1);
         cards_range(world, insts[i], 0, 50, 5);
-        cards_range(world, card, 50, 0, 5);
+        cards_card_range(world, insts[i], 50, 5);
     }
 
     ecs_fini(world);
@@ -260,16 +281,16 @@ void ImpostorCards_one_batch_per_prefab(void) {
     ecs_entity_t lone = cards_instance(world, other, 20);
     cards_wait(world, prefab);
     cards_wait(world, other);
-    box_draw_batch_t *first = cards_batch_of(world, cards_card_of(world, insts[0]));
+    box_draw_batch_t *first = cards_card_batch(world, insts[0]);
     test_assert(first->key.impostor == prefab);
     test_bool(first->key.cutout, true);
     test_int(first->key.blend, Opaque);
     test_flt(first->key.range[0], 50);
     for (int32_t i = 1; i < 4; i ++) {
-        test_assert(cards_batch_of(world, cards_card_of(world, insts[i])) == first);
+        test_assert(cards_card_batch(world, insts[i]) == first);
     }
 
-    box_draw_batch_t *second = cards_batch_of(world, cards_card_of(world, lone));
+    box_draw_batch_t *second = cards_card_batch(world, lone);
     test_assert(second != first);
     test_assert(second->key.impostor == other);
     box_render_draws_stats_t stats;
@@ -324,8 +345,9 @@ void ImpostorCards_mesh_holds_grid(void) {
     ecs_entity_t prefab = cards_prefab(world, 50, 5);
     ecs_entity_t inst = cards_instance(world, prefab, 0);
     cards_wait(world, prefab);
+    test_assert(cards_card_of(world, inst) != NULL);
     const ImpostorStatus *s = ecs_get(world, prefab, ImpostorStatus);
-    const Mesh3 *m = ecs_get(world, cards_card_of(world, inst), Mesh3);
+    const Mesh3 *m = ecs_get(world, box_draws_card_source(box_draws_state(world), prefab), Mesh3);
     test_assert(m != NULL);
     test_int(ecs_vec_count(&m->vertices), 4);
     test_int(ecs_vec_count(&m->indices), 6);
@@ -369,9 +391,7 @@ void ImpostorCards_distance_change_updates_ranges(void) {
     cards_frame(world);
     cards_frame(world);
     cards_range(world, inst, 0, 80, 2);
-    ecs_entity_t card = cards_card_of(world, inst);
-    cards_range(world, card, 80, 0, 2);
-    test_flt(cards_batch_of(world, card)->key.range[0], 80);
+    cards_card_range(world, inst, 80, 2);
     test_int(ecs_get(world, prefab, ImpostorStatus)->revision, revision);
     ecs_fini(world);
     box_render_null_free(null);
@@ -385,10 +405,14 @@ void ImpostorCards_owned_range_kept(void) {
     ecs_set(world, inst, DrawRange, {.near_ = 1, .far_ = 200, .fade = 2});
     cards_wait(world, prefab);
     cards_range(world, inst, 1, 50, 5);
+    const DrawRange *own = ecs_get(world, inst, DrawRange);
+    test_flt(own->near_, 1);
+    test_flt(own->far_, 200);
+    test_flt(own->fade, 2);
     ecs_remove(world, prefab, Impostor);
     cards_frame(world);
     cards_range(world, inst, 1, 200, 2);
-    test_assert(cards_card_of(world, inst) == 0);
+    test_assert(cards_card_of(world, inst) == NULL);
     ecs_fini(world);
     box_render_null_free(null);
 }
@@ -399,11 +423,11 @@ void ImpostorCards_remove_impostor_removes_cards(void) {
     ecs_entity_t prefab = cards_prefab(world, 50, 5);
     ecs_entity_t inst = cards_instance(world, prefab, 0);
     cards_wait(world, prefab);
-    test_assert(cards_card_of(world, inst) != 0);
+    test_assert(cards_card_of(world, inst) != NULL);
     ecs_remove(world, prefab, Impostor);
     cards_frame(world);
     cards_frame(world);
-    test_assert(cards_card_of(world, inst) == 0);
+    test_assert(cards_card_of(world, inst) == NULL);
     test_assert(!ecs_owns(world, inst, DrawRange));
     float range[3];
     test_bool(box_draws_range(world, inst, range), false);
@@ -421,11 +445,11 @@ void ImpostorCards_zero_distance_draws_full(void) {
     ecs_entity_t prefab = cards_prefab(world, 50, 5);
     ecs_entity_t inst = cards_instance(world, prefab, 0);
     cards_wait(world, prefab);
-    test_assert(cards_card_of(world, inst) != 0);
+    test_assert(cards_card_of(world, inst) != NULL);
     ecs_set(world, prefab, Impostor, {.frames = 4, .resolution = 16, .hemisphere = true,
         .distance = 0, .fade = 5});
     cards_frame(world);
-    test_assert(cards_card_of(world, inst) == 0);
+    test_assert(cards_card_of(world, inst) == NULL);
     test_assert(!ecs_owns(world, inst, DrawRange));
     ecs_fini(world);
     box_render_null_free(null);
@@ -445,7 +469,7 @@ void ImpostorCards_follow_instances(void) {
     ecs_entity_t c = cards_instance(world, prefab, 8);
     cards_frame(world);
     cards_frame(world);
-    test_assert(cards_card_of(world, c) != 0);
+    test_assert(cards_card_of(world, c) != NULL);
     cards_range(world, c, 0, 50, 5);
     box_render_draws_stats(world, &stats);
     test_int(stats.impostors, 3);
@@ -455,7 +479,7 @@ void ImpostorCards_follow_instances(void) {
     cards_frame(world);
     box_render_draws_stats(world, &stats);
     test_int(stats.impostors, 2);
-    test_assert(cards_card_of(world, a) != 0);
+    test_assert(cards_card_of(world, a) != NULL);
     ecs_fini(world);
     box_render_null_free(null);
 }
@@ -470,12 +494,90 @@ void ImpostorCards_bake_copy_has_no_card(void) {
     ecs_iter_t it = ecs_each_id(world, ecs_pair(EcsIsA, prefab));
     while (ecs_each_next(&it)) {
         for (int32_t i = 0; i < it.count; i ++) {
-            cards += cards_card_of(world, it.entities[i]) != 0;
+            cards += cards_card_of(world, it.entities[i]) != NULL;
         }
     }
 
     test_int(cards, 1);
     test_assert(ecs_count_id(world, ecs_pair(EcsIsA, prefab)) >= 2);
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void ImpostorCards_instances_keep_table(void) {
+    box_render_null_t *null;
+    ecs_world_t *world = cards_world(&null);
+    ecs_entity_t prefab = cards_prefab(world, 50, 5);
+    ecs_entity_t a = cards_instance(world, prefab, 0);
+    ecs_entity_t b = cards_instance(world, prefab, 4);
+    cards_frame(world);
+    ecs_table_t *table = ecs_get_table(world, a);
+    test_assert(ecs_get_table(world, b) == table);
+    int32_t children = ecs_count_id(world, ecs_childof(a)) + ecs_count_id(world, ecs_childof(b));
+    cards_wait(world, prefab);
+    test_assert(cards_card_of(world, a) != NULL);
+    test_assert(cards_card_of(world, b) != NULL);
+    test_assert(ecs_get_table(world, a) == table);
+    test_assert(ecs_get_table(world, b) == table);
+    test_int(ecs_count_id(world, ecs_childof(a)) + ecs_count_id(world, ecs_childof(b)), children);
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void ImpostorCards_card_follows_instance(void) {
+    box_render_null_t *null;
+    ecs_world_t *world = cards_world(&null);
+    ecs_entity_t prefab = cards_prefab(world, 50, 5);
+    ecs_entity_t inst = cards_instance(world, prefab, 0);
+    cards_wait(world, prefab);
+    ecs_set(world, inst, Position, {7, 2, -120});
+    cards_frame(world);
+    const DrawSlot *slot = cards_card_of(world, inst);
+    box_draw_batch_t *b = cards_card_batch(world, inst);
+    const box_render_transform_t *t = box_draws_slot_transform(b, slot->slot);
+    test_flt(t->rows[0][3], 7);
+    test_flt(t->rows[1][3], 2);
+    test_flt(t->rows[2][3], -120);
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void ImpostorCards_disabled_instance_hides_card(void) {
+    box_render_null_t *null;
+    ecs_world_t *world = cards_world(&null);
+    ecs_entity_t prefab = cards_prefab(world, 50, 5);
+    ecs_entity_t inst = cards_instance(world, prefab, 0);
+    cards_wait(world, prefab);
+    box_render_draws_stats_t stats;
+    ecs_enable(world, inst, false);
+    cards_frame(world);
+    test_assert(cards_card_of(world, inst) != NULL);
+    test_int(cards_card_of(world, inst)->batch, -1);
+    box_render_draws_stats(world, &stats);
+    test_int(stats.impostors, 0);
+    ecs_enable(world, inst, true);
+    cards_frame(world);
+    test_assert(cards_card_of(world, inst)->batch >= 0);
+    box_render_draws_stats(world, &stats);
+    test_int(stats.impostors, 1);
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void ImpostorCards_deleted_instance_frees_card(void) {
+    box_render_null_t *null;
+    ecs_world_t *world = cards_world(&null);
+    ecs_entity_t prefab = cards_prefab(world, 50, 5);
+    ecs_entity_t a = cards_instance(world, prefab, 0);
+    ecs_entity_t b = cards_instance(world, prefab, 4);
+    cards_wait(world, prefab);
+    box_draw_batch_t *batch = cards_card_batch(world, b);
+    test_int(ecs_vec_count(&batch->entities), 2);
+    ecs_delete(world, a);
+    test_assert(cards_card_of(world, a) == NULL);
+    test_int(ecs_vec_count(&batch->entities), 1);
+    test_assert(*ecs_vec_get_t(&batch->entities, ecs_entity_t, 0) == b);
+    test_int(cards_card_of(world, b)->slot, 0);
     ecs_fini(world);
     box_render_null_free(null);
 }

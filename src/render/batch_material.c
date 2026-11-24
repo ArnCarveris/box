@@ -1566,46 +1566,26 @@ void box_draws_batch_textures(
     out->wrap = b->key.wrap;
 }
 
-void box_draws_impostor_key(
-    const ecs_world_t *world,
-    ecs_entity_t e,
-    box_draw_key_t *key)
-{
-    const ImpostorCard *card = ecs_id(ImpostorCard) ? ecs_get(world, e, ImpostorCard) : NULL;
-    if (!card || !card->impostor || key->pipeline == BOX_RENDER_SHADER_SHAPE2D) {
-        goto done;
-    }
-
-    key->impostor = card->impostor;
-    key->pipeline = BOX_RENDER_SHADER_MESH;
-    key->blend = Opaque;
-    key->cutout = true;
-    key->transmissive = false;
-    key->water = false;
-    key->foam = 0;
-    key->texture_blend = false;
-    key->wind = false;
-    key->frame = false;
-    key->bake = false;
-    key->atmosphere = 0;
-    key->wrap = WrapClamp;
-    key->back_face = BackFacePlain;
-    ecs_os_memset_n(key->textures, 0, ecs_entity_t, BOX_RENDER_TEXTURE_SLOTS);
-    ecs_os_memset_n(key->layers, 0, ecs_entity_t, BOX_RENDER_LAYERS);
-done:
-    return;
-}
-
 bool box_draws_range(
     const ecs_world_t *world,
     ecs_entity_t e,
     float *out)
 {
+    return box_draws_range_of(world, box_draws_state(world), e, out);
+}
+
+bool box_draws_range_of(
+    const ecs_world_t *world,
+    const box_render_draws_t *d,
+    ecs_entity_t e,
+    float *out)
+{
     const DrawRange *range = NULL;
+    DrawRange card;
     ecs_entity_t cur = e;
     out[0] = out[1] = out[2] = 0.0f;
     while (cur && !range) {
-        range = ecs_get(world, cur, DrawRange);
+        range = box_draws_card_range(d, cur, ecs_get(world, cur, DrawRange), &card);
         cur = ecs_get_parent(world, cur);
     }
 

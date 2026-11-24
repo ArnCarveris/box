@@ -99,6 +99,7 @@ static void box_draws_free(
     box_draws_clips_fini(d);
     box_draws_materials_fini(d);
     box_draws_movers_fini(d);
+    box_draws_cards_fini(d);
     ecs_os_free(d);
 done:
     return;
@@ -119,6 +120,7 @@ static DrawSlot* box_draws_mark_slot(
     uint8_t kinds)
 {
     DrawSlot *s = ecs_get_mut(world, e, DrawSlot);
+    box_draws_card_mark(d, e, kinds);
     if (!s) {
         goto done;
     }
@@ -443,14 +445,7 @@ done:
     return;
 }
 
-/** Compose the Opacity and the Tint of an ancestor after those of the nearer ancestors.
- *
- * @param opacity Its Opacity, NULL for none
- * @param t Its Tint, NULL for none
- * @param fade The product of the Opacity of the nearer ancestors, receives it with this one
- * @param tint The tints of the nearer ancestors, receives them with this one
- */
-static void box_draws_fade_step(
+void box_draws_fade_step(
     const Opacity *opacity,
     const Tint *t,
     float *fade,
@@ -725,8 +720,7 @@ static ecs_entity_t box_draws_scene(
 }
 
 /** Set the bake flag of a key, so captures tell static shapes apart: an opaque shape that
- * doesn't move, in a scene whose root (or the singleton) has LightBake or ReflectionBake. Then
- * make the key that of an impostor card when the shape is one.
+ * doesn't move, in a scene whose root (or the singleton) has LightBake or ReflectionBake.
  *
  * @param world The world
  * @param e The entity
@@ -744,7 +738,6 @@ static void box_draws_key_bake(
         !ecs_has_id(world, e, NoBake) && !box_projection_anchored(world, e) &&
         (ecs_has(world, key->scene ? key->scene : ecs_id(LightBake), LightBake) ||
          ecs_has(world, key->scene ? key->scene : ecs_id(ReflectionBake), ReflectionBake));
-    box_draws_impostor_key(world, e, key);
 }
 
 /** Mark every shape in the batches of the scene of the entities of an observer event, after
@@ -909,7 +902,7 @@ static void box_draws_key(
     key->wind = !shape2d && (key->features & BOX_RENDER_FEATURE_WIND) &&
         ecs_get(world, e, WindSway) != NULL;
     if (!shape2d) {
-        box_draws_range(world, e, key->range);
+        box_draws_range_of(world, d, e, key->range);
     }
 
     key->transmissive = !shape2d && (key->features & BOX_RENDER_FEATURE_TRANSMISSION) &&
@@ -1365,6 +1358,7 @@ static void box_draws_process(
 
     d->scene_table = NULL;
     ecs_vec_clear(&d->dirty);
+    box_draws_cards_update(world, d);
 }
 
 /** Update the batches with what changed and send what the views of the frame draw.
@@ -1821,6 +1815,7 @@ void box_render_draws_init(
     box_draws_clips_init(d);
     box_draws_materials_init(d);
     box_draws_movers_init(d);
+    box_draws_cards_init(d);
     box_draws_store_init(&d->stores[BOX_DRAWS_STORE_MESH], &(box_draw_layout_t){
         .streams = BOX_RENDER_INSTANCE_STREAMS_PLAIN,
         .stride = {
@@ -1929,62 +1924,6 @@ void box_render_draws_shadow_record(
             ecs_vec_clear(&d->shadow_materials);
         }
     }
-}
-
-bool box_render_draws_instance(
-    const ecs_world_t *world,
-    ecs_entity_t e,
-    uint32_t *page,
-    uint32_t *slot)
-{
-    box_render_draws_t *d = box_draws_state(world);
-    const DrawSlot *ds = d && ecs_is_alive(world, e) ? ecs_get(world, e, DrawSlot) : NULL;
-    const box_draw_batch_t *b = NULL;
-    bool result = false;
-    if (!ds || ds->batch < 0 || ds->batch >= ecs_vec_count(&d->batches)) {
-        goto done;
-    }
-
-    b = ecs_vec_get_t(&d->batches, box_draw_batch_t, ds->batch);
-    if (!b->alive || b->page < 0 || ds->slot < 0) {
-        goto done;
-    }
-
-    *page = box_draws_store_handle(box_draws_batch_store(d, b), b->page,
-        BOX_RENDER_STREAM_TRANSFORM);
-    *slot = b->first + (uint32_t)ds->slot;
-    result = true;
-done:
-    return result;
-}
-
-bool box_render_draws_instance_transform(
-    const ecs_world_t *world,
-    ecs_entity_t e,
-    vec4 *rows)
-{
-    box_render_draws_t *d = box_draws_state(world);
-    const DrawSlot *ds = d && ecs_is_alive(world, e) ? ecs_get(world, e, DrawSlot) : NULL;
-    box_draw_batch_t *b = NULL;
-    bool result = false;
-    int32_t i;
-    if (!ds || ds->batch < 0 || ds->batch >= ecs_vec_count(&d->batches)) {
-        goto done;
-    }
-
-    b = ecs_vec_get_t(&d->batches, box_draw_batch_t, ds->batch);
-    if (!b->alive || b->page < 0 || ds->slot < 0 || ds->slot >= ecs_vec_count(&b->transforms)) {
-        goto done;
-    }
-
-    const box_render_transform_t *t = box_draws_slot_transform(b, ds->slot);
-    for (i = 0; i < 3; i ++) {
-        glm_vec4_copy(ECS_CONST_CAST(float*, t->rows[i]), rows[i]);
-    }
-
-    result = true;
-done:
-    return result;
 }
 
 void box_render_draws_stats(
