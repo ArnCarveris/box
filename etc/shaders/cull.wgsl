@@ -48,7 +48,9 @@ struct Job {
     // most, which the world box of each instance grows by; 0 for the other batches. The level
     // jobs of cull_lod use it otherwise.
     reach: u32,
-    // DrawRange near, far and fade of the batch, 0 for none (draw_range.wgsl).
+    // DrawRange near, far and fade of the batch, 0 for none (draw_range.wgsl); w: the levels a
+    // job of cull_lod adds to the level of an instance, without a crossfade, 1 for the casters
+    // of a shadow, whose texels do not resolve the finer level.
     range: vec4f,
 };
 
@@ -110,6 +112,7 @@ const LIST_WORDS: u32 = 4u;
 @group(0) @binding(11) var hiz_dst1: texture_storage_2d<r32float, write>;
 @group(0) @binding(12) var hiz_dst2: texture_storage_2d<r32float, write>;
 @group(0) @binding(13) var hiz_dst3: texture_storage_2d<r32float, write>;
+@group(0) @binding(14) var hiz_sampler: sampler;
 
 // Scan words per workgroup and frustum of a parallel dispatch: two mask words and the count,
 // which cull_scan replaces with the offset of the workgroup.
@@ -632,7 +635,7 @@ fn lod_append(job: Job, level: u32, slot: u32) {
 // The job reads its fields as:
 //   first, count, args: first visible entry, instances at most and arguments of the draw
 //   base, history, list: first entry of the level runs, entries of a run, first level arguments
-//   mask: levels; center, extent: bounds of the mesh
+//   mask: levels; center, extent: bounds of the mesh; range: DrawRange, w the level bias
 //   fixture: first merged arguments plus one, counted with the level arguments, 0 for none
 //   exclude, pad: for a late job the first entry of the early runs plus one and their entries,
 //   which it appends to at the merged count, 0 for none
@@ -650,7 +653,8 @@ fn cull_lod(
     let job = jobs[cull.jobs.x + group.y];
     let total = min(atomicLoad(&args[job.args * ARGS + 1u]), job.count);
     let levels = min(job.mask, LOD_LEVELS);
-    let fade = select(0.0, cull.lod.x, range_set(job.range));
+    let bias = u32(job.range.w);
+    let fade = select(0.0, cull.lod.x, range_set(job.range) && bias == 0u);
     for (var i = group.x * 64u + local; i < total; i += groups.x * 64u) {
         let slot = visible_slots[job.first + i];
         let m = instance_model(transforms[slot_of(slot)]);
@@ -664,6 +668,8 @@ fn cull_lod(
                 level = l;
             }
         }
+
+        level = min(level + bias, levels - 1u);
 
         var edge = 0u;
         if (fade > 0.0 && range_of(slot) == 0u) {
@@ -730,6 +736,22 @@ fn hiz_rest(local: vec2u, group: vec2u, size: vec2u) {
     }
 }
 
+// Farthest depth of the depth pixels from lo up to hi, at most three by three: the minimum of
+// the gathers of the first and the last two by two pixels, which overlap for three. An axis of
+// one pixel, where the depth is as large as the first level, drops the second column or row.
+fn hiz_gather(lo: vec2u, hi: vec2u) -> f32 {
+    let depth = vec2f(textureDimensions(hiz_depth));
+    let last = max(hi, lo + 2u) - 2u;
+    let g = min(
+        min(textureGather(hiz_depth, hiz_sampler, (vec2f(lo) + 1.0) / depth),
+            textureGather(hiz_depth, hiz_sampler, (vec2f(vec2u(last.x, lo.y)) + 1.0) / depth)),
+        min(textureGather(hiz_depth, hiz_sampler, (vec2f(vec2u(lo.x, last.y)) + 1.0) / depth),
+            textureGather(hiz_depth, hiz_sampler, (vec2f(last) + 1.0) / depth)));
+    let wide = hi > lo + 1u;
+    return min(min(g.w, select(1.0, g.z, wide.x)),
+        min(select(1.0, g.x, wide.y), select(1.0, g.y, all(wide))));
+}
+
 // First four levels of the pyramid from the depth of the early phase, two by two texels of the
 // first level per invocation. The first level has a power of two size no larger than the depth,
 // so a texel covers up to three by three depth pixels: every pixel its area touches.
@@ -744,24 +766,16 @@ fn hiz_first(
     let at = id * 2u;
     var texels = vec4f(1.0);
     if (all(at < size)) {
-        let lo = at * depth / size;
-        let split_lo = (at + 1u) * depth / size;
-        let split_hi = min(((at + 1u) * depth + size - 1u) / size, depth);
-        let hi = min(((at + 2u) * depth + size - 1u) / size, depth);
-        for (var y = lo.y; y < hi.y; y++) {
-            for (var x = lo.x; x < hi.x; x++) {
-                let d = textureLoad(hiz_depth, vec2u(x, y), 0);
-                let left = x < split_hi.x;
-                let right = x >= split_lo.x;
-                let top = y < split_hi.y;
-                let bottom = y >= split_lo.y;
-                texels.x = select(texels.x, min(texels.x, d), left && top);
-                texels.y = select(texels.y, min(texels.y, d), right && top);
-                texels.z = select(texels.z, min(texels.z, d), left && bottom);
-                texels.w = select(texels.w, min(texels.w, d), right && bottom);
-            }
-        }
-
+        let shift = countTrailingZeros(size);
+        let lo = (at * depth) >> shift;
+        let split_lo = ((at + 1u) * depth) >> shift;
+        let split_hi = min(((at + 1u) * depth + size - 1u) >> shift, depth);
+        let hi = min(((at + 2u) * depth + size - 1u) >> shift, depth);
+        texels = vec4f(
+            hiz_gather(lo, split_hi),
+            hiz_gather(vec2u(split_lo.x, lo.y), vec2u(hi.x, split_hi.y)),
+            hiz_gather(vec2u(lo.x, split_lo.y), vec2u(split_hi.x, hi.y)),
+            hiz_gather(split_lo, hi));
         textureStore(hiz_dst, at, vec4f(texels.x, 0.0, 0.0, 0.0));
         if (at.x + 1u < size.x) {
             textureStore(hiz_dst, at + vec2u(1u, 0u), vec4f(texels.y, 0.0, 0.0, 0.0));

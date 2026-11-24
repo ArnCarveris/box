@@ -156,9 +156,8 @@ fn triplanar(f: VertexOut, geometric: vec3f) -> Layers {
         }
         let uv = planes[k] + f.uv.xy;
         o.albedo += w[k] * textureSampleGrad(albedo_map, material_sampler, uv, gx[k], gy[k]);
-        o.emissive += w[k] * textureSampleGrad(emissive_map, material_sampler, uv, gx[k],
-            gy[k]).rgb;
-        o.orm += w[k] * textureSampleGrad(orm_map, material_sampler, uv, gx[k], gy[k]).rgb;
+        o.emissive += w[k] * emissive_grad(uv, gx[k], gy[k]);
+        o.orm += w[k] * orm_grad(uv, gx[k], gy[k]);
         let m = textureSampleGrad(normal_map, material_sampler, normal_uv(f, uv), gx[k],
             gy[k]).xyz * 2.0 - 1.0;
         let tangent = tangent_along(mapping_rotate(vo_rotation(f), mapping_tangent(k, s)),
@@ -251,8 +250,7 @@ fn blend_triplanar(f: VertexOut, geometric: vec3f, front: bool) -> Layers {
         if (!front) {
             continue;
         }
-        o.emissive += w[k] * textureSampleGrad(emissive_map, material_sampler, uv, gx[k],
-            gy[k]).rgb;
+        o.emissive += w[k] * emissive_grad(uv, gx[k], gy[k]);
         o.orm += w[k] * b.orm;
         let m = b.normal;
         normal += w[k] * (tangent * m.x + bitangent * m.y + geometric * m.z);

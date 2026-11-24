@@ -50,7 +50,7 @@ view {
       cascades: 2,
       resolution: 1024,
       interval: [4, 4],
-      sway_interval: 4,
+      sway_interval: [4, 4],
       max_distance: 120,
       split_lambda: 0.85,
       filter_size: 3,

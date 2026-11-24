@@ -110,6 +110,33 @@ static size_t box_gpu_terrain_constants(
     return BOX_RENDER_MESH_OVERRIDES_PLAIN + 1;
 }
 
+/** Append the material_emissive_map and material_orm_map constants of the fragment stage of the
+ * mesh shaders, which skip the samples of the maps a batch does not bind.
+ *
+ * @param emissive_map Whether the batch binds an emissive map
+ * @param orm_map Whether the batch binds an ORM map
+ * @param out The constants, with room for two more
+ * @param count The number of constants in out
+ * @return The number of constants with the two appended
+ */
+static size_t box_gpu_map_constants(
+    bool emissive_map,
+    bool orm_map,
+    WGPUConstantEntry *out,
+    size_t count)
+{
+    out[count] = (WGPUConstantEntry){
+        .key = { .data = "material_emissive_map", .length = WGPU_STRLEN },
+        .value = emissive_map ? 1.0 : 0.0
+    };
+    out[count + 1] = (WGPUConstantEntry){
+        .key = { .data = "material_orm_map", .length = WGPU_STRLEN },
+        .value = orm_map ? 1.0 : 0.0
+    };
+
+    return count + 2;
+}
+
 /** Create the forward pipeline of a shader, color format, blend mode, back face mode, alpha
  * test and depth mode.
  *
@@ -165,10 +192,16 @@ static size_t box_gpu_terrain_constants(
  * @param data Whether the mesh has per vertex data: the vs_data and vs_surface_data entry points
  * read it from a third vertex buffer (box_gpu_vertex_data); ignored by the 2D shape shader
  * @param range Whether the instances have a DrawRange (the draw_range constant of both stages
- * of the mesh shaders), which dithers their fades; ignored by the 2D shape shader
+ * of the mesh shaders), which dithers their fades; ignored by the 2D shape shader. With equal
+ * only the vertex stage gets it: the Equal test already rejects what the prepass dithered out,
+ * and a fragment stage that can discard loses early depth
  * @param impostor Whether the instances are impostor cards: vs_impostor and fs_impostor of the
  * mesh shader (fs_impostor_equal after a depth prepass) with the per vertex data and no face
  * culling
+ * @param emissive_map Whether the batch binds an emissive map (the material_emissive_map
+ * constant of the fragment stage of the mesh shaders); ignored by the other shaders
+ * @param orm_map Whether the batch binds an ORM map (material_orm_map); ignored by the other
+ * shaders
  * @return The pipeline
  */
 static WGPURenderPipeline box_gpu_forward_create(
@@ -194,7 +227,9 @@ static WGPURenderPipeline box_gpu_forward_create(
     bool layers,
     bool data,
     bool range,
-    bool impostor)
+    bool impostor,
+    bool emissive_map,
+    bool orm_map)
 {
     bool shape2d = handle == BOX_RENDER_SHADER_SHAPE2D;
     bool extended = handle == BOX_RENDER_SHADER_MESH_EXTENDED;
@@ -328,7 +363,7 @@ static WGPURenderPipeline box_gpu_forward_create(
         vertex_constants[vertex_count ++] = range_constant;
     }
 
-    WGPUConstantEntry constants[BOX_RENDER_MESH_OVERRIDES + 1];
+    WGPUConstantEntry constants[BOX_RENDER_MESH_OVERRIDES + 3];
     box_gpu_feature_constants((features & BOX_RENDER_OVERRIDE_SCENE) |
         (transmissive && extended ? BOX_RENDER_OVERRIDE_TRANSMISSIVE : 0u) |
         (water ? BOX_RENDER_OVERRIDE_WATER : 0u) |
@@ -340,8 +375,12 @@ static WGPURenderPipeline box_gpu_forward_create(
             constants);
     }
 
-    if (range) {
+    if (range && !equal) {
         constants[fragment_count ++] = range_constant;
+    }
+
+    if (mesh && !terrain && !impostor) {
+        fragment_count = box_gpu_map_constants(emissive_map, orm_map, constants, fragment_count);
     }
 
     WGPUFragmentState fragment = {
@@ -598,6 +637,10 @@ typedef enum box_gpu_depth_mode_t {
  * override)
  * @param impostor Whether the pipeline draws impostor cards (the _impostor entry points), which
  * are opaque and take the blend value 15 that no BlendMode has
+ * @param emissive_map Whether the fragment stage samples the emissive map
+ * (material_emissive_map), true for the pipelines without the constant
+ * @param orm_map Whether the fragment stage samples the ORM map (material_orm_map), true for
+ * the pipelines without the constant
  * @return The key, distinct for every distinct pipeline
  */
 static uint64_t box_gpu_forward_key(
@@ -618,9 +661,11 @@ static uint64_t box_gpu_forward_key(
     bool layers,
     bool data,
     bool range,
-    bool impostor)
+    bool impostor,
+    bool emissive_map,
+    bool orm_map)
 {
-    ecs_assert((uint32_t)format < (1u << 20), ECS_INTERNAL_ERROR, NULL);
+    ecs_assert((uint32_t)format < (1u << 18), ECS_INTERNAL_ERROR, NULL);
     ecs_assert(shader < (1u << 11), ECS_INTERNAL_ERROR, NULL);
     blend = impostor ? 15u : blend;
     ecs_assert(features <= BOX_RENDER_OVERRIDE_SCENE, ECS_INTERNAL_ERROR, NULL);
@@ -630,7 +675,8 @@ static uint64_t box_gpu_forward_key(
         ((uint64_t)surface << 49) | ((uint64_t)mirrored << 48) | ((uint64_t)features << 33) |
         ((uint64_t)texture_blend << 32) |
         ((uint64_t)transmissive << 31) | ((uint64_t)wind << 30) | ((uint64_t)layers << 29) |
-        ((uint64_t)range << 28) | ((uint64_t)format << 8) | ((uint64_t)blend << 4) |
+        ((uint64_t)range << 28) | ((uint64_t)!emissive_map << 27) | ((uint64_t)!orm_map << 26) |
+        ((uint64_t)format << 8) | ((uint64_t)blend << 4) |
         ((uint64_t)depth << 2) |
         (cutout ? 2u : 0u) | (back_face == BackFaceCull ? 0u : 1u);
 }
@@ -721,6 +767,7 @@ WGPURenderPipeline box_gpu_forward_pipeline_mirrored(
     ecs_map_val_t *cached;
     uint64_t key;
     bool texture_blend, cutout, surface, water, distortion, wind, layers, data, range, impostor;
+    bool maps, emissive_map, orm_map;
     if (b->blend > Max) {
         goto done;
     }
@@ -743,13 +790,16 @@ WGPURenderPipeline box_gpu_forward_pipeline_mirrored(
     data = mesh && box_gpu_vertex_data(gpu, b);
     range = mesh && box_render_batch_ranged(b);
     impostor = b->impostor && b->pipeline == BOX_RENDER_SHADER_MESH && !layers;
+    maps = !mesh || impostor || b->pipeline == BOX_RENDER_SHADER_TERRAIN;
+    emissive_map = maps || b->textures[1];
+    orm_map = maps || texture_blend || b->textures[2];
 
     key = box_gpu_forward_key(b->pipeline, format, b->blend, b->back_face,
         shape2d ? b->box_shadow : cutout,
         shape2d ? b->slice : b->transmissive,
         shape2d ? b->polygon : texture_blend, surface,
         equal ? BOX_GPU_DEPTH_EQUAL : BOX_GPU_DEPTH_GREATER, features, mirrored, water,
-        distortion, wind, layers, data, range, impostor);
+        distortion, wind, layers, data, range, impostor, emissive_map, orm_map);
     cached = ecs_map_get(&gpu->forward, key);
     if (cached && *cached) {
         result = (WGPURenderPipeline)(uintptr_t)*cached;
@@ -760,7 +810,7 @@ WGPURenderPipeline box_gpu_forward_pipeline_mirrored(
         format, b->blend, b->back_face, cutout, b->transmissive, water, distortion, equal,
         b->box_shadow,
         b->slice, texture_blend, b->polygon, surface, features, mirrored, wind, layers, data,
-        range, impostor));
+        range, impostor, emissive_map, orm_map));
 done:
     return result;
 }
@@ -794,7 +844,7 @@ WGPURenderPipeline box_gpu_terrain_bake_pipeline(
     key = box_gpu_forward_key(b->pipeline, BOX_GPU_TERRAIN_BAKE_FORMAT,
         BOX_GPU_TERRAIN_BAKE_BLEND, BackFacePlain, false, false, true, true,
         BOX_GPU_DEPTH_PREPASS, features & BOX_RENDER_OVERRIDE_SCENE, false, false, false,
-        false, layers, false, false, false);
+        false, layers, false, false, false, true, true);
     cached = ecs_map_get(&gpu->forward, key);
     if (cached && *cached) {
         result = (WGPURenderPipeline)(uintptr_t)*cached;
@@ -913,7 +963,7 @@ WGPURenderPipeline box_gpu_prepass_pipeline(
     key = box_gpu_forward_key(b->pipeline, count, Opaque, b->back_face, b->cutout,
         false, texture_blend, b->surface,
         count != WGPUTextureFormat_Undefined ? BOX_GPU_DEPTH_COUNT : BOX_GPU_DEPTH_PREPASS, 0,
-        false, false, false, b->wind, layers, data, range, impostor);
+        false, false, false, b->wind, layers, data, range, impostor, true, true);
     cached = ecs_map_get(&gpu->forward, key);
     if (cached && *cached) {
         result = (WGPURenderPipeline)(uintptr_t)*cached;

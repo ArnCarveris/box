@@ -15,12 +15,7 @@
 
 #ifdef BOX_RENDER_WGPU
 
-/** Convert a display encoded channel to linear light.
- *
- * @param value The channel
- * @return The linear value
- */
-static float box_gpu_fx_linear(
+float box_gpu_fx_linear(
     uint8_t value)
 {
     float c = (float)value / 255.0f;
@@ -1423,95 +1418,6 @@ done:
     return result;
 }
 
-/** Get the projection a view renders its target with.
- *
- * @param ctx The chain
- * @param proj Receives the projection
- */
-static void box_gpu_fx_projection(
-    const box_gpu_fx_ctx_t *ctx,
-    mat4 proj)
-{
-    box_camera_projection(&ctx->v->camera_data,
-        (float)ctx->t->desc.point_width, (float)ctx->t->desc.point_height, proj);
-}
-
-/** Highest phase asymmetry of the glow of a fog colored by the atmosphere */
-#define BOX_GPU_FOG_ANISOTROPY_MAX (0.92f)
-
-/** Record the height fog pass, lit by the sun and ambient light of the scene of the view, or
- * colored by the sky of a view that renders the atmosphere the fog refers to:
- * the in scatter color the atmosphere wrote for the view, toward its main light.
- *
- * @param gpu The backend
- * @param ctx The chain
- * @param e The pass
- * @return Whether the image was written to the output
- */
-static bool box_gpu_fx_fog(
-    box_gpu_t *gpu,
-    const box_gpu_fx_ctx_t *ctx,
-    const box_render_effect_t *e)
-{
-    const HeightFog *f = &e->fog;
-    const box_render_view_lights_t *l = &ctx->v->lights;
-    box_gpu_fog_uniforms_t u;
-    box_gpu_fx_state_t *s = box_gpu_fx_state(gpu, ctx, e->entity, (int32_t)e->kind);
-    mat4 proj, view_proj;
-    int32_t c;
-    ecs_os_memset_t(&u, 0, box_gpu_fog_uniforms_t);
-    box_gpu_fx_projection(ctx, proj);
-    glm_mat4_mul(proj, ECS_CONST_CAST(vec4*, ctx->v->view_matrix), view_proj);
-    glm_mat4_inv(view_proj, u.inv_view_proj);
-    u.color[0] = box_gpu_fx_linear(f->color.r);
-    u.color[1] = box_gpu_fx_linear(f->color.g);
-    u.color[2] = box_gpu_fx_linear(f->color.b);
-    u.color[3] = f->density;
-    u.params[0] = f->falloff;
-    u.params[1] = f->base_height;
-    u.params[2] = f->max_opacity;
-    u.params[3] = l->enabled ? 1.0f : 0.0f;
-    if (l->directional && glm_vec3_norm(ECS_CONST_CAST(float*, l->sun)) > 1e-6f) {
-        glm_vec3_normalize_to(ECS_CONST_CAST(float*, l->sun), u.sun);
-        u.sun[3] = 1.0f;
-    }
-
-    for (c = 0; c < 3; c ++) {
-        u.sun_color[c] = l->sun_color[c] / GLM_PIf * f->sun_inscatter;
-        u.ambient[c] = (l->ambient_sky[c] + l->ambient_ground[c]) * 0.5f * f->ambient_inscatter;
-    }
-
-    WGPUTextureView sky = f->atmosphere && f->atmosphere == ctx->v->atmos.entity
-        ? box_gpu_atmosphere_fog(gpu, ctx->t, ctx->packet, ctx->v)
-        : NULL;
-    if (sky) {
-        const box_render_view_atmos_t *a = &ctx->v->atmos;
-        glm_vec4_zero(u.sun);
-        if (glm_vec3_norm(ECS_CONST_CAST(float*, a->fog_light)) > 1e-6f) {
-            glm_vec3_normalize_to(ECS_CONST_CAST(float*, a->fog_light), u.sun);
-            u.sun[3] = 1.0f;
-        }
-
-        u.atmos[0] = 1.0f;
-        u.atmos[1] = glm_clamp(a->mie_anisotropy, 0.0f, BOX_GPU_FOG_ANISOTROPY_MAX);
-        u.atmos[2] = f->sun_inscatter;
-        u.atmos[3] = f->ambient_inscatter;
-    }
-
-    box_gpu_fx_uniforms(gpu, s, &u, sizeof(u));
-
-    return box_gpu_fx_draw(gpu, ctx, &(box_gpu_fx_pass_t){
-        .shader = BOX_RENDER_SHADER_FOG,
-        .entry = "fs",
-        .input = ctx->input,
-        .aux = sky,
-        .uniforms = s->uniforms,
-        .output = ctx->output,
-        .format = ctx->format,
-        .blend = ctx->blend
-    });
-}
-
 /** Record an SMAA pass, with the bindings of the SMAA layout.
  *
  * @param gpu The backend
@@ -1903,6 +1809,10 @@ void box_gpu_effects_run(
         ctx.output = last ? color : ft->hdr_views[current ^ 1];
         ctx.format = last ? t->format : BOX_GPU_HDR_FORMAT;
         ctx.blend = last ? final : BOX_GPU_FX_REPLACE;
+        if (!i && e->kind == BOX_RENDER_EFFECT_FOG && box_gpu_fog_volumes_height_fog(gpu, t, v)) {
+            continue;
+        }
+
         if (fused && box_gpu_fx_tonemap(gpu, &ctx, e, grading, vignette)) {
             i += fused;
         } else if (fused || !box_gpu_fx_effect(gpu, &ctx, e)) {

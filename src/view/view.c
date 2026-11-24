@@ -52,7 +52,7 @@ static void box_view_ctor(
             .fade = 0.2f,
             .blend = 0.1f,
             .interval = {1, 1, 1, 1},
-            .sway_interval = 1
+            .sway_interval = {1, 1, 1, 1}
         };
         values[i].culling = (CullSettings){
             .enabled = true,

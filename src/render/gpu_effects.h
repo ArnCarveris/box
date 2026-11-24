@@ -283,18 +283,6 @@ typedef struct box_gpu_dof_uniforms_t {
                                      *   unused */
 } box_gpu_dof_uniforms_t;
 
-/** Uniforms of the fog pass, matching Fog in etc/shaders/fog.wgsl */
-typedef struct box_gpu_fog_uniforms_t {
-    mat4 inv_view_proj;             /**< Inverse of the projection times the view matrix */
-    float color[4];                 /**< Linear fog color, density */
-    float params[4];                /**< Falloff, base height, max opacity, 1 when lit */
-    float sun[4];                   /**< Direction toward the sun, 1 when there is one */
-    float sun_color[4];             /**< Sun radiance times its inscatter */
-    float ambient[4];               /**< Ambient light times its inscatter */
-    float atmos[4];                 /**< 1 for the color of the atmosphere, phase g, sun and
-                                     *   ambient inscatter */
-} box_gpu_fog_uniforms_t;
-
 /** Create a 2D image that passes render into and sample.
  *
  * @param gpu The backend
@@ -365,6 +353,27 @@ void box_gpu_fx_uniforms(
  */
 void box_gpu_fx_dof_release(
     box_gpu_fx_target_t *ft);
+
+/** Convert a display encoded channel to linear light.
+ *
+ * @param value The channel
+ * @return The linear value
+ */
+float box_gpu_fx_linear(
+    uint8_t value);
+
+/** Record a height fog pass, lit by the sun and ambient light of the scene of the view, or
+ * colored by the sky of a view that renders the atmosphere the fog refers to.
+ *
+ * @param gpu The backend
+ * @param ctx The chain
+ * @param e The pass
+ * @return Whether the image was written to the output
+ */
+bool box_gpu_fx_fog(
+    box_gpu_t *gpu,
+    const box_gpu_fx_ctx_t *ctx,
+    const box_render_effect_t *e);
 
 /** Record an FXAA pass.
  *

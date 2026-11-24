@@ -13,8 +13,9 @@ using state
 // sky, auto exposure into the Tony McMapface tone map, the grade of the season and the weather,
 // a vignette and FXAA. The aerial perspective of the sky hazes the terrain over the kilometers
 // so it fades into the sky instead of ending. The trees draw at coarser levels of detail with
-// the distance, two shadow cascades reach over the near forest, each rendered every fourth
-// frame, and the small casters stay out of them; the mountains need none.
+// the distance, two shadow cascades reach over the near forest, the near one rendered every
+// fourth frame and the far one every eighth, and the small casters stay out of them; the
+// mountains need none.
 view {
   exposure {
     AutoExposure: {
@@ -43,7 +44,7 @@ view {
 
   View: {
     camera: player,
-    lod: {levels: 4, distances: [0, 6, 18, 40], fade: 0.25},
+    lod: {levels: 4, distances: [0, 6, 18, 40], fade: 0.15},
     clear: {enabled: true, color: {120, 140, 160, 255}},
     lighting: {
       enabled: true,
@@ -57,8 +58,8 @@ view {
       enabled: true,
       cascades: 2,
       resolution: 1024,
-      interval: [4, 4],
-      sway_interval: 4,
+      interval: [4, 8],
+      sway_interval: [4, 8],
       max_distance: 120,
       split_lambda: 0.85,
       filter_size: 3,

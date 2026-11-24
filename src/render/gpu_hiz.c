@@ -24,7 +24,7 @@ void box_gpu_hiz_init(
     box_gpu_t *gpu)
 {
     box_gpu_cull_t *c = &gpu->cull;
-    WGPUBindGroupLayoutEntry first[1 + BOX_GPU_HIZ_STEP] = {
+    WGPUBindGroupLayoutEntry first[2 + BOX_GPU_HIZ_STEP] = {
         {
             .binding = 8,
             .visibility = WGPUShaderStage_Compute,
@@ -32,6 +32,11 @@ void box_gpu_hiz_init(
                 .sampleType = WGPUTextureSampleType_Depth,
                 .viewDimension = WGPUTextureViewDimension_2D
             }
+        },
+        {
+            .binding = 14,
+            .visibility = WGPUShaderStage_Compute,
+            .sampler = { .type = WGPUSamplerBindingType_NonFiltering }
         }
     };
     WGPUBindGroupLayoutEntry reduce[1 + BOX_GPU_HIZ_STEP] = {
@@ -46,7 +51,7 @@ void box_gpu_hiz_init(
     };
     int32_t i;
     for (i = 0; i < BOX_GPU_HIZ_STEP; i ++) {
-        first[1 + i] = (WGPUBindGroupLayoutEntry){
+        first[2 + i] = (WGPUBindGroupLayoutEntry){
             .binding = 10 + (uint32_t)i,
             .visibility = WGPUShaderStage_Compute,
             .storageTexture = {
@@ -55,7 +60,7 @@ void box_gpu_hiz_init(
                 .viewDimension = WGPUTextureViewDimension_2D
             }
         };
-        reduce[1 + i] = first[1 + i];
+        reduce[1 + i] = first[2 + i];
     }
 
     WGPUBindGroupLayoutEntry history[2] = {
@@ -74,7 +79,7 @@ void box_gpu_hiz_init(
         }
     };
     c->hiz_first_layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
-        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 1 + BOX_GPU_HIZ_STEP, .entries = first });
+        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 2 + BOX_GPU_HIZ_STEP, .entries = first });
     c->hiz_reduce_layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
         &(WGPUBindGroupLayoutDescriptor){
             .entryCount = 1 + BOX_GPU_HIZ_STEP,
@@ -92,6 +97,16 @@ void box_gpu_hiz_init(
             .bindGroupLayoutCount = 1,
             .bindGroupLayouts = &c->hiz_reduce_layout
         });
+    c->hiz_sampler = wgpuDeviceCreateSampler(gpu->device, &(WGPUSamplerDescriptor){
+        .addressModeU = WGPUAddressMode_ClampToEdge,
+        .addressModeV = WGPUAddressMode_ClampToEdge,
+        .addressModeW = WGPUAddressMode_ClampToEdge,
+        .magFilter = WGPUFilterMode_Nearest,
+        .minFilter = WGPUFilterMode_Nearest,
+        .mipmapFilter = WGPUMipmapFilterMode_Nearest,
+        .lodMaxClamp = 32.0f,
+        .maxAnisotropy = 1
+    });
     c->empty_history = wgpuDeviceCreateBuffer(gpu->device, &(WGPUBufferDescriptor){
         .usage = WGPUBufferUsage_Storage,
         .size = 16
@@ -236,6 +251,7 @@ void box_gpu_hiz_fini(
     wgpuPipelineLayoutRelease(c->hiz_first_pipeline_layout);
     wgpuPipelineLayoutRelease(c->hiz_reduce_pipeline_layout);
     wgpuBindGroupLayoutRelease(c->hiz_first_layout);
+    wgpuSamplerRelease(c->hiz_sampler);
     wgpuBindGroupLayoutRelease(c->hiz_reduce_layout);
     wgpuBindGroupLayoutRelease(c->history_layout);
     c->empty_group = NULL;
@@ -334,7 +350,8 @@ static box_gpu_hiz_t* box_gpu_hiz_create(
 
     hiz->id = ++ c->next_hiz;
     hiz->texture = wgpuDeviceCreateTexture(gpu->device, &(WGPUTextureDescriptor){
-        .usage = WGPUTextureUsage_TextureBinding | WGPUTextureUsage_StorageBinding,
+        .usage = WGPUTextureUsage_TextureBinding | WGPUTextureUsage_StorageBinding |
+            WGPUTextureUsage_CopySrc,
         .dimension = WGPUTextureDimension_2D,
         .size = { width, height, 1 },
         .format = WGPUTextureFormat_R32Float,
@@ -656,13 +673,14 @@ void box_gpu_hiz_build(
         goto done;
     }
 
-    WGPUBindGroupEntry entries[1 + BOX_GPU_HIZ_STEP] = {
-        { .binding = 8, .textureView = depth }
+    WGPUBindGroupEntry entries[2 + BOX_GPU_HIZ_STEP] = {
+        { .binding = 8, .textureView = depth },
+        { .binding = 14, .sampler = c->hiz_sampler }
     };
-    box_gpu_hiz_targets(c, hiz, 0, &entries[1]);
+    box_gpu_hiz_targets(c, hiz, 0, &entries[2]);
     WGPUBindGroup first = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
         .layout = c->hiz_first_layout,
-        .entryCount = 1 + BOX_GPU_HIZ_STEP,
+        .entryCount = 2 + BOX_GPU_HIZ_STEP,
         .entries = entries
     });
     WGPUComputePassEncoder pass = box_gpu_profile_compute_pass(gpu, encoder, "hiz");
@@ -701,6 +719,242 @@ void box_gpu_hiz_purge(
             it = ecs_map_iter(&c->histories);
         }
     }
+}
+
+/** Shader that writes a depth image into a depth texture, one depth per pixel */
+static const char *box_gpu_hiz_fill_wgsl =
+    "override width: u32;\n"
+    "@group(0) @binding(0) var<storage, read> depths: array<f32>;\n"
+    "@vertex fn vs(@builtin(vertex_index) i: u32) -> @builtin(position) vec4f {\n"
+    "    let uv = vec2f(f32((i << 1u) & 2u), f32(i & 2u));\n"
+    "    return vec4f(uv * 2.0 - 1.0, 0.0, 1.0);\n"
+    "}\n"
+    "@fragment fn fs(@builtin(position) p: vec4f) -> @builtin(frag_depth) f32 {\n"
+    "    let at = vec2u(p.xy);\n"
+    "    return depths[at.y * width + at.x];\n"
+    "}\n";
+
+/** Draw a depth image into a depth texture.
+ *
+ * @param gpu The backend
+ * @param encoder The encoder
+ * @param width Width of the image
+ * @param height Height of the image
+ * @param depth The depths, row by row
+ * @param target View of a Depth32Float texture of the size of the image
+ */
+static void box_gpu_hiz_fill(
+    box_gpu_t *gpu,
+    WGPUCommandEncoder encoder,
+    uint32_t width,
+    uint32_t height,
+    const float *depth,
+    WGPUTextureView target)
+{
+    uint64_t size = (uint64_t)width * height * sizeof(float);
+    WGPUBuffer buffer = wgpuDeviceCreateBuffer(gpu->device, &(WGPUBufferDescriptor){
+        .usage = WGPUBufferUsage_Storage | WGPUBufferUsage_CopyDst,
+        .size = size
+    });
+    wgpuQueueWriteBuffer(gpu->queue, buffer, 0, depth, (size_t)size);
+    WGPUShaderSourceWGSL wgsl = {
+        .chain = { .sType = WGPUSType_ShaderSourceWGSL },
+        .code = { .data = box_gpu_hiz_fill_wgsl, .length = WGPU_STRLEN }
+    };
+    WGPUShaderModule module = wgpuDeviceCreateShaderModule(gpu->device,
+        &(WGPUShaderModuleDescriptor){ .nextInChain = &wgsl.chain });
+    WGPUBindGroupLayout layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
+        &(WGPUBindGroupLayoutDescriptor){
+            .entryCount = 1,
+            .entries = &(WGPUBindGroupLayoutEntry){
+                .binding = 0,
+                .visibility = WGPUShaderStage_Fragment,
+                .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
+            }
+        });
+    WGPUPipelineLayout pipeline_layout = wgpuDeviceCreatePipelineLayout(gpu->device,
+        &(WGPUPipelineLayoutDescriptor){ .bindGroupLayoutCount = 1, .bindGroupLayouts = &layout });
+    WGPUConstantEntry constant = {
+        .key = { .data = "width", .length = WGPU_STRLEN },
+        .value = (double)width
+    };
+    WGPURenderPipeline pipeline = wgpuDeviceCreateRenderPipeline(gpu->device,
+        &(WGPURenderPipelineDescriptor){
+            .layout = pipeline_layout,
+            .vertex = {
+                .module = module,
+                .entryPoint = { .data = "vs", .length = WGPU_STRLEN }
+            },
+            .primitive = { .topology = WGPUPrimitiveTopology_TriangleList },
+            .depthStencil = &(WGPUDepthStencilState){
+                .format = WGPUTextureFormat_Depth32Float,
+                .depthWriteEnabled = WGPUOptionalBool_True,
+                .depthCompare = WGPUCompareFunction_Always
+            },
+            .multisample = { .count = 1, .mask = 0xffffffff },
+            .fragment = &(WGPUFragmentState){
+                .module = module,
+                .entryPoint = { .data = "fs", .length = WGPU_STRLEN },
+                .constantCount = 1,
+                .constants = &constant
+            }
+        });
+    WGPUBindGroup group = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
+        .layout = layout,
+        .entryCount = 1,
+        .entries = &(WGPUBindGroupEntry){ .binding = 0, .buffer = buffer, .size = size }
+    });
+    WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder,
+        &(WGPURenderPassDescriptor){
+            .depthStencilAttachment = &(WGPURenderPassDepthStencilAttachment){
+                .view = target,
+                .depthLoadOp = WGPULoadOp_Clear,
+                .depthStoreOp = WGPUStoreOp_Store,
+                .depthClearValue = 0.0f
+            }
+        });
+    wgpuRenderPassEncoderSetPipeline(pass, pipeline);
+    wgpuRenderPassEncoderSetBindGroup(pass, 0, group, 0, NULL);
+    wgpuRenderPassEncoderDraw(pass, 3, 1, 0, 0);
+    wgpuRenderPassEncoderEnd(pass);
+    wgpuRenderPassEncoderRelease(pass);
+    wgpuBindGroupRelease(group);
+    wgpuRenderPipelineRelease(pipeline);
+    wgpuPipelineLayoutRelease(pipeline_layout);
+    wgpuBindGroupLayoutRelease(layout);
+    wgpuShaderModuleRelease(module);
+    wgpuBufferRelease(buffer);
+}
+
+int32_t box_render_gpu_hiz_levels(
+    ecs_world_t *world,
+    int32_t width,
+    int32_t height,
+    const float *depth,
+    float *out,
+    int32_t capacity)
+{
+    int32_t result = 0;
+    box_render_gpu_stats_t stats;
+    WGPUTexture texture = NULL;
+    WGPUTextureView view = NULL;
+    WGPUBuffer buffer = NULL;
+    uint32_t l, offsets[BOX_GPU_HIZ_LEVELS], total = 0, at = 0;
+    if (!box_render_gpu_stats(world, &stats) || !stats.ready || width < 1 || height < 1) {
+        goto done;
+    }
+
+    box_gpu_t *gpu = box_render_get_backend(world)->ctx;
+    bool renders = ecs_os_thread_self() == gpu->thread;
+    ecs_assert(renders, ECS_INVALID_OPERATION,
+        "box_render_gpu_hiz_levels needs RenderSettings.main_thread and box_render_sync");
+    if (!renders || !gpu->cull.hiz_first || !gpu->cull.hiz_reduce) {
+        goto done;
+    }
+
+    box_gpu_hiz_t *hiz = box_gpu_hiz_get(gpu, width, height);
+    for (l = 0; l < hiz->levels; l ++) {
+        uint32_t w = hiz->width >> l, h = hiz->height >> l;
+        w = w ? w : 1;
+        h = h ? h : 1;
+        offsets[l] = total;
+        total += ((w * 4 + 255) & ~255u) * h;
+        at += w * h;
+    }
+
+    if ((int32_t)at > capacity) {
+        goto done;
+    }
+
+    texture = wgpuDeviceCreateTexture(gpu->device, &(WGPUTextureDescriptor){
+        .usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding,
+        .dimension = WGPUTextureDimension_2D,
+        .size = { (uint32_t)width, (uint32_t)height, 1 },
+        .format = WGPUTextureFormat_Depth32Float,
+        .mipLevelCount = 1,
+        .sampleCount = 1
+    });
+    view = wgpuTextureCreateView(texture, NULL);
+    buffer = wgpuDeviceCreateBuffer(gpu->device, &(WGPUBufferDescriptor){
+        .usage = WGPUBufferUsage_CopySrc | WGPUBufferUsage_CopyDst,
+        .size = total
+    });
+    WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(gpu->device, NULL);
+    box_gpu_hiz_fill(gpu, encoder, (uint32_t)width, (uint32_t)height, depth, view);
+    box_gpu_hiz_build(gpu, encoder, hiz, view);
+    for (l = 0; l < hiz->levels; l ++) {
+        uint32_t w = hiz->width >> l, h = hiz->height >> l;
+        w = w ? w : 1;
+        h = h ? h : 1;
+        wgpuCommandEncoderCopyTextureToBuffer(encoder,
+            &(WGPUTexelCopyTextureInfo){ .texture = hiz->texture, .mipLevel = l },
+            &(WGPUTexelCopyBufferInfo){
+                .buffer = buffer,
+                .layout = {
+                    .offset = offsets[l],
+                    .bytesPerRow = (w * 4 + 255) & ~255u,
+                    .rowsPerImage = h
+                }
+            },
+            &(WGPUExtent3D){ w, h, 1 });
+    }
+
+    WGPUCommandBuffer commands = wgpuCommandEncoderFinish(encoder, NULL);
+    wgpuQueueSubmit(gpu->queue, 1, &commands);
+    wgpuCommandBufferRelease(commands);
+    wgpuCommandEncoderRelease(encoder);
+    float *texels = ecs_os_malloc((ecs_size_t)total);
+    if (box_gpu_read(gpu, buffer, 0, total, texels)) {
+        at = 0;
+        for (l = 0; l < hiz->levels; l ++) {
+            uint32_t w = hiz->width >> l, h = hiz->height >> l, y;
+            w = w ? w : 1;
+            h = h ? h : 1;
+            for (y = 0; y < h; y ++) {
+                ecs_os_memcpy(&out[at], &texels[(offsets[l] + y * ((w * 4 + 255) & ~255u)) / 4],
+                    (ecs_size_t)(w * sizeof(float)));
+                at += w;
+            }
+        }
+
+        result = (int32_t)hiz->levels;
+    }
+
+    ecs_os_free(texels);
+done:
+    if (buffer) {
+        wgpuBufferRelease(buffer);
+    }
+
+    if (view) {
+        wgpuTextureViewRelease(view);
+    }
+
+    if (texture) {
+        wgpuTextureRelease(texture);
+    }
+
+    return result;
+}
+
+#else
+
+int32_t box_render_gpu_hiz_levels(
+    ecs_world_t *world,
+    int32_t width,
+    int32_t height,
+    const float *depth,
+    float *out,
+    int32_t capacity)
+{
+    (void)world;
+    (void)width;
+    (void)height;
+    (void)depth;
+    (void)out;
+    (void)capacity;
+
+    return 0;
 }
 
 #endif

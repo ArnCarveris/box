@@ -25,7 +25,8 @@ struct Froxel {
     // x, y: render width and height in pixels, z, w: the share of the grid they cover across and
     // down, width / (grid.x * tile) and height / (grid.y * tile)
     size: vec4f,
-    // x: segment of the rays an apply draw takes, SEGMENT_* of fog_volume.wgsl
+    // x: segment of the rays an apply draw takes, SEGMENT_* of fog_volume.wgsl, y: 1 when the
+    // apply draw also applies the height fog of the view
     segment: vec4u,
     // depth_plane of the previous frame
     prev_depth_plane: vec4f,

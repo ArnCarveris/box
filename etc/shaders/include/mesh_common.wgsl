@@ -78,6 +78,12 @@ override material_wind: bool = false;
 // leave it false and never discard for it.
 override draw_range: bool = false;
 
+// The batch binds an emissive map and an ORM map (box_render_batch_t.textures), set per pipeline
+// of the mesh shaders: without one the fragment stages skip its sample and take the value of the
+// default white pixel. The terrain shader leaves them true.
+override material_emissive_map: bool = true;
+override material_orm_map: bool = true;
+
 const PI: f32 = 3.141592653589793;
 const MIN_ROUGHNESS: f32 = 0.045;
 

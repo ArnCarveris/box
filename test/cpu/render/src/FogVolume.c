@@ -871,20 +871,20 @@ static void froxel_expect(
     test_int(grid[2], tile);
 }
 
-/** The grid has a cell per 8x8 pixels up to 1920 pixels along the larger edge, larger tiles
- * beyond, so a 4K or 8K view has no more cells than a 1080p one. */
+/** The grid has a cell per 8x8 pixels up to 1280 pixels along the larger edge, larger tiles
+ * beyond, so a 1080p, 4K or 8K view has no more cells than a 720p one. */
 void FogVolume_froxel_grid_size(void) {
     // fog_volume/froxels
     froxel_expect(64, 64, 8, 8, 8);
     froxel_expect(100, 50, 13, 7, 8);
     froxel_expect(1280, 720, 160, 90, 8);
-    froxel_expect(1920, 1080, 240, 135, 8);
-    froxel_expect(1921, 1080, 214, 120, 9);
-    froxel_expect(2560, 1440, 233, 131, 11);
-    froxel_expect(3840, 2160, 240, 135, 16);
-    froxel_expect(7680, 4320, 240, 135, 32);
-    froxel_expect(1080, 1920, 135, 240, 8);
-    froxel_expect(2160, 3840, 135, 240, 16);
+    froxel_expect(1281, 720, 143, 80, 9);
+    froxel_expect(1920, 1080, 160, 90, 12);
+    froxel_expect(2560, 1440, 160, 90, 16);
+    froxel_expect(3840, 2160, 160, 90, 24);
+    froxel_expect(7680, 4320, 160, 90, 48);
+    froxel_expect(1080, 1920, 90, 160, 12);
+    froxel_expect(2160, 3840, 90, 160, 24);
     froxel_expect(1, 1, 1, 1, 8);
     froxel_expect(0, 0, 1, 1, 8);
 }

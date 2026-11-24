@@ -101,11 +101,11 @@ ECS_STRUCT(ShadowSettings, {
                           *   cascades, max_distance, split_lambda or min_caster_texels change;
                           *   moved, added or removed casters show up to interval - 1 frames
                           *   late. Default 1 */
-    int32_t sway_interval; /**< Most frames a cascade uses one render for while casters with a
-                          *   WindSway sway in the scene, whatever its interval: 1 (or 0)
-                          *   renders every cascade every frame so their shadows never lag,
-                          *   2 lets a cascade with an interval of 2 or more render every
-                          *   other frame, and so on. Default 1 */
+    int32_t sway_interval[4]; /**< Most frames each cascade uses one render for while casters
+                          *   with a WindSway sway in the scene, whatever its interval: 1 (or 0)
+                          *   renders the cascade every frame so its shadows never lag, 2 lets
+                          *   a cascade with an interval of 2 or more render every other frame,
+                          *   and so on. Default 1 */
 });
 
 /** Culling settings of a view, applied as specified: all zero draws every instance.

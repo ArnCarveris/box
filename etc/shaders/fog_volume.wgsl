@@ -28,6 +28,10 @@
 // and after its last transmissive draw the part from the camera to the surface (SEGMENT_FRONT),
 // which fogs the surface as it fogs an opaque one at its depth. The part between depths a and b
 // is T(b) / T(a) and (L(b) - L(a)) / T(a) of two lookups.
+//
+// When the first effect of a view without transmissive draws is a HeightFog, the apply draw
+// applies it after the volumes (include/height_fog.wgsl), and the view skips the fog pass: the
+// volumes take the image c to c T + L and the fog that to (c T + L) (1 - f) + I f.
 #include "include/lights.wgsl"
 #include "include/shadow.wgsl"
 #include "include/point_shadow.wgsl"
@@ -38,6 +42,7 @@
 #include "include/fullscreen.wgsl"
 #include "include/froxel.wgsl"
 #include "include/temporal.wgsl"
+#include "include/height_fog.wgsl"
 
 const PI: f32 = 3.141592653589793;
 
@@ -117,6 +122,10 @@ struct FogVolume {
 // Injected cells of the previous frame of the view, and their clamping trilinear sampler.
 @group(1) @binding(11) var history: texture_3d<f32>;
 @group(1) @binding(12) var history_sampler: sampler;
+// HeightFog of the view the apply draw applies after the volumes when Froxel.segment.y is 1,
+// and the color of the sky it takes (fog.wgsl).
+@group(1) @binding(13) var<uniform> height: HeightFog;
+@group(1) @binding(14) var height_sky: texture_2d<f32>;
 
 // Henyey-Greenstein phase of an asymmetry g times 4 pi, so isotropic scattering is 1.
 fn phase(cos_theta: f32, g: f32) -> f32 {
@@ -256,8 +265,24 @@ fn fog_shadow(p: vec3f) -> f32 {
 // Share of the sun the cell sees through the cascades: its shadow at the BOX_FROXEL_SAMPLES
 // points of the cell from a to b, offset inside their strata by offset, weighed by the density
 // there (cell_weights), so where a face of a volume meets a wall the light outside the wall does
-// not leak into the fog inside it.
-fn sun_visible(a: vec3f, b: vec3f, offset: f32) -> f32 {
+// not leak into the fog inside it. A cell its volumes cover whole weighs its points alike, and
+// with a history it takes the shadow at one of them, a stratum that moves on with the frame and
+// across the cells, which the history averages to the same share.
+fn sun_visible(id: vec3u, a: vec3f, b: vec3f, offset: f32) -> f32 {
+    var whole = history_blends();
+    for (var j = 1u; j < BOX_FROXEL_SAMPLES; j++) {
+        whole = whole && cell_weights[j] == cell_weights[0];
+    }
+
+    if (whole) {
+        if (cell_weights[0] <= 0.0) {
+            return 0.0;
+        }
+
+        let k = (temporal_frame() + id.x + id.y + id.z) % BOX_FROXEL_SAMPLES;
+        return fog_shadow(mix(a, b, froxel_sample(k, offset)));
+    }
+
     var visible = 0.0;
     var total = 0.0;
     for (var j = 0u; j < BOX_FROXEL_SAMPLES; j++) {
@@ -473,7 +498,7 @@ fn inject(@builtin(global_invocation_id) id: vec3u) {
     }
 
     if (any(sunlit > vec3f(0.0))) {
-        scatter += sunlit * sun_visible(a, b, jitter.z);
+        scatter += sunlit * sun_visible(id, a, b, jitter.z);
     }
 
     if (extinction > 0.0 && view.aerial.w > 0.0) {
@@ -646,6 +671,11 @@ fn fs(in: FullscreenOut) -> @location(0) vec4f {
             let t = max(front.a, 1e-4);
             result = vec4f(max(result.rgb - front.rgb, vec3f(0.0)) / t, saturate(result.a / t));
         }
+    }
+
+    if (froxel.segment.y != 0u) {
+        let f = height_fog(height, uv, depth, height_sky);
+        result = vec4f(mix(result.rgb, f.rgb, f.a), result.a * (1.0 - f.a));
     }
 
     return result;

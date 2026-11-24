@@ -82,7 +82,7 @@
                     "large_near_sphere_level_0",
                     "second_view_without_lod",
                     "flat_cylinder_and_box_not_reduced",
-                    "shadow_same_level",
+                    "shadow_one_level_coarser",
                     "far_lathe_and_sweep_level_2",
                     "culling_off",
                     "occlusion",
@@ -570,6 +570,7 @@
                     "file_removed_keeps_image",
                     "file_change_while_loading",
                     "gpu_emissive_layer",
+                    "gpu_emissive_layer_added",
                     "gpu_albedo_layer",
                     "gpu_wrap_repeat",
                     "gpu_wrap_clamp",
@@ -927,7 +928,9 @@
                     "camera_move_keeps_cascades",
                     "kept_cascade_sampled_with_its_matrix",
                     "enabled_interval_renders_all_first",
-                    "kept_cascade_not_overwritten_by_other_view"
+                    "kept_cascade_not_overwritten_by_other_view",
+                    "sway_renders_every_frame",
+                    "sway_interval_per_cascade"
                 ]
             },
             {
@@ -1038,7 +1041,8 @@
                     "batch_replaced_draws_at_once",
                     "frustum_only_and_disabled",
                     "hidden_caster_casts_shadow",
-                    "camera_cuts_match_frustum_only"
+                    "camera_cuts_match_frustum_only",
+                    "pyramid_matches_depth"
                 ]
             },
             {
@@ -1689,7 +1693,8 @@
                     "unbounded_shadow_shaft",
                     "unbounded_with_bounded",
                     "unbounded_orthographic",
-                    "unbounded_transmissive_pass_count"
+                    "unbounded_transmissive_pass_count",
+                    "height_fog_in_apply"
                 ]
             },
             {

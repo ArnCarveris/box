@@ -566,3 +566,132 @@ void Occlusion_camera_cuts_match_frustum_only(void) {
         stbi_image_free(frames[1][f]);
     }
 }
+
+/* The first level of a pyramid for a depth image, the farthest (smallest) depth of every pixel
+ * whose area a texel touches, and each next level the farthest of the two by two texels below
+ * it, clamped to the last texel. */
+static float* occlusion_pyramid(
+    const float *depth,
+    int32_t width,
+    int32_t height,
+    int32_t *levels_out,
+    int32_t *texels_out)
+{
+    int32_t w = 1, h = 1, x, y, sx, sy, at = 0, prev = 0, total = 0, levels = 0;
+    while (w * 2 <= width) {
+        w *= 2;
+    }
+
+    while (h * 2 <= height) {
+        h *= 2;
+    }
+
+    for (x = w, y = h; ; x = x > 1 ? x / 2 : 1, y = y > 1 ? y / 2 : 1) {
+        total += x * y;
+        levels ++;
+        if (x == 1 && y == 1) {
+            break;
+        }
+    }
+
+    float *result = ecs_os_malloc_n(float, total);
+    for (y = 0; y < h; y ++) {
+        for (x = 0; x < w; x ++) {
+            int32_t x0 = x * width / w, x1 = ((x + 1) * width + w - 1) / w;
+            int32_t y0 = y * height / h, y1 = ((y + 1) * height + h - 1) / h;
+            float far = 1.0f;
+            for (sy = y0; sy < y1 && sy < height; sy ++) {
+                for (sx = x0; sx < x1 && sx < width; sx ++) {
+                    far = depth[sy * width + sx] < far ? depth[sy * width + sx] : far;
+                }
+            }
+
+            result[at ++] = far;
+        }
+    }
+
+    while (w > 1 || h > 1) {
+        int32_t pw = w, ph = h;
+        w = w > 1 ? w / 2 : 1;
+        h = h > 1 ? h / 2 : 1;
+        for (y = 0; y < h; y ++) {
+            for (x = 0; x < w; x ++) {
+                int32_t ax = x * 2 < pw ? x * 2 : pw - 1, bx = x * 2 + 1 < pw ? x * 2 + 1 : pw - 1;
+                int32_t ay = y * 2 < ph ? y * 2 : ph - 1, by = y * 2 + 1 < ph ? y * 2 + 1 : ph - 1;
+                const float *below = &result[prev];
+                float a = below[ay * pw + ax] < below[ay * pw + bx]
+                    ? below[ay * pw + ax] : below[ay * pw + bx];
+                float b = below[by * pw + ax] < below[by * pw + bx]
+                    ? below[by * pw + ax] : below[by * pw + bx];
+                result[at ++] = a < b ? a : b;
+            }
+        }
+
+        prev = at - w * h;
+    }
+
+    *levels_out = levels;
+    *texels_out = total;
+    return result;
+}
+
+void Occlusion_pyramid_matches_depth(void) {
+    // culling/hiz
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+    ecs_singleton_set(world, RenderSettings, {.in_flight = 2, .main_thread = true});
+
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera,
+        .culling = {.enabled = true, .occlusion = true, .min_dimension_px = 1}});
+    ecs_entity_t wall = ecs_new(world);
+    ecs_set(world, wall, Position, {0, 0, -10});
+    ecs_set(world, wall, Box, {30, 30, 1});
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Surface, {.width = 64, .height = 64, .resolution_scale = 1});
+    const CullStatus *status = NULL;
+    int32_t frames = 0;
+    while (!status && frames < 5000) {
+        ecs_progress(world, 0);
+        box_render_sync(world);
+        status = ecs_get(world, view, CullStatus);
+        frames ++;
+    }
+
+    test_assert(status != NULL);
+
+    /* Sizes whose first level is smaller than the depth on both axes, as large on one axis, and
+     * the 4K render size. */
+    int32_t sizes[4][2] = {{333, 197}, {256, 100}, {97, 64}, {3840, 2160}};
+    uint32_t seed = 12345;
+    int32_t s, i;
+    for (s = 0; s < 4; s ++) {
+        int32_t width = sizes[s][0], height = sizes[s][1], levels = 0;
+        float *depth = ecs_os_malloc_n(float, width * height);
+        for (i = 0; i < width * height; i ++) {
+            seed = seed * 1664525u + 1013904223u;
+            depth[i] = (float)(seed >> 8) / (float)(1u << 24);
+        }
+
+        int32_t texels = 0;
+        float *expect = occlusion_pyramid(depth, width, height, &levels, &texels);
+        float *got = ecs_os_malloc_n(float, texels);
+        test_int(box_render_gpu_hiz_levels(world, width, height, depth, got, texels), levels);
+        int32_t off = 0;
+        for (i = 0; i < texels; i ++) {
+            off += got[i] != expect[i];
+        }
+
+        test_int(off, 0);
+        ecs_os_free(got);
+        ecs_os_free(expect);
+        ecs_os_free(depth);
+    }
+
+    ecs_fini(world);
+}

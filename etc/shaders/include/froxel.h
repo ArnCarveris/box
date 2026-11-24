@@ -17,7 +17,7 @@
 #define BOX_FROXEL_TILE_MIN 8
 
 /** Cells along the larger edge of the render size at most: a larger image takes larger tiles */
-#define BOX_FROXEL_CELLS_MAX 240
+#define BOX_FROXEL_CELLS_MAX 160
 
 /** Exponent of the slice distribution of a perspective camera: the share x of the depth range
  * of slice share t is (2^(E t) - 1) / (2^E - 1), so slices thicken exponentially from the near

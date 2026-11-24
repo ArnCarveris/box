@@ -273,18 +273,23 @@ static uint64_t box_gpu_cull_draw_slots(
  * The job of the late phase goes to the late jobs of the group, which follow its other jobs. A
  * batch with a DrawRange passes it on, as its passes dither the crossfade between its levels.
  *
+ * The draw of a shadow caster frustum takes the level after the one the camera picks, as its
+ * texels do not resolve the finer one, without a crossfade, which its shadow does not show.
+ *
  * @param gpu The backend
  * @param packet The packet
  * @param group Index of the cull group
  * @param d The draw
  * @param late Whether it sorts what the late phase kept
+ * @param casters Whether the frustum of the draw draws shadow casters
  */
 static void box_gpu_cull_lod_add(
     box_gpu_t *gpu,
     const box_render_packet_t *packet,
     int32_t group,
     const box_gpu_cull_draw_t *d,
-    bool late)
+    bool late,
+    bool casters)
 {
     box_gpu_cull_t *c = &gpu->cull;
     const box_render_batch_t *b = ecs_vec_get_t(&packet->batches, box_render_batch_t, d->batch);
@@ -316,6 +321,8 @@ static void box_gpu_cull_lod_add(
     if (box_render_batch_ranged(b)) {
         ecs_os_memcpy_n(job->range, b->range, float, 3);
     }
+
+    job->range[3] = casters ? 1.0f : 0.0f;
 
     if (b->bounded) {
         glm_vec3_copy(ECS_CONST_CAST(float*, b->center), job->center);
@@ -728,9 +735,10 @@ static void box_gpu_cull_batch_part(
                 }
             }
 
-            box_gpu_cull_lod_add(gpu, packet, group, d, false);
+            bool casters = (cv->flags & BOX_GPU_CULL_CASTERS) != 0;
+            box_gpu_cull_lod_add(gpu, packet, group, d, false, casters);
             if (twice) {
-                box_gpu_cull_lod_add(gpu, packet, group, d, true);
+                box_gpu_cull_lod_add(gpu, packet, group, d, true, casters);
             }
         }
 

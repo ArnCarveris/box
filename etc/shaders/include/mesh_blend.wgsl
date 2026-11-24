@@ -196,7 +196,7 @@ fn blend_maps(geometric: vec3f, b: BlendFragment, albedo: vec4f, front: bool) ->
     if (!front) {
         return o;
     }
-    o.emissive = textureSampleGrad(emissive_map, material_sampler, b.uv, b.gx, b.gy).rgb;
+    o.emissive = emissive_grad(b.uv, b.gx, b.gy);
     let cols = tile_cols();
     var m = vec3f(0.0);
     for (var k = 0u; k < 4u; k++) {

@@ -909,8 +909,9 @@ typedef struct box_gpu_cull_job_t {
                                      *   batch with a WindSway move at most, which the world box
                                      *   of each instance grows by; 0 for other batches */
     float range[4];                 /**< DrawRange near, far and fade of the batch, all 0 for
-                                     *   none, w unused: the instances out of range from the
-                                     *   camera of the uniforms are culled */
+                                     *   none: the instances out of range from the camera of the
+                                     *   uniforms are culled; w: levels a level job adds to the
+                                     *   level the camera picks, without a crossfade */
 } box_gpu_cull_job_t;
 
 /** Workgroups along x of a cull_lod dispatch at most; each one strides over the instances */
@@ -1100,6 +1101,7 @@ typedef struct box_gpu_cull_t {
     WGPUComputePipeline write;      /**< Writes the drawn slots of a dispatch at their offsets */
     WGPUComputePipeline lod;        /**< Sorts the drawn slots of a draw into its levels */
     WGPUBindGroupLayout hiz_first_layout; /**< Binds the depth and the first level */
+    WGPUSampler hiz_sampler;        /**< Nearest, clamping sampler the depth is gathered with */
     WGPUBindGroupLayout hiz_reduce_layout; /**< Binds a level and the level above it */
     WGPUPipelineLayout hiz_first_pipeline_layout; /**< Pipeline layout of the first level */
     WGPUPipelineLayout hiz_reduce_pipeline_layout; /**< Pipeline layout of the other levels */

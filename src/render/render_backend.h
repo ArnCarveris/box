@@ -982,6 +982,29 @@ bool box_render_gpu_cull_copies(
     ecs_world_t *world,
     int32_t copies);
 
+/** Build the depth pyramid of the GPU backend from a depth image and read back its levels,
+ * for tests. Only call this when the main thread renders (RenderSettings.main_thread), after
+ * box_render_sync and a cull pass with occlusion, which makes the pyramid shaders.
+ *
+ * The first level is the largest powers of two not larger than the image, each next level
+ * half the one before down to one texel, as the pyramid of a view of that render size.
+ *
+ * @param world The world
+ * @param width Width of the image
+ * @param height Height of the image
+ * @param depth The width * height depths, row by row
+ * @param out Receives the levels one after the other, each row by row
+ * @param capacity Texels out holds
+ * @return The levels, 0 without the GPU backend or the pyramid shaders
+ */
+int32_t box_render_gpu_hiz_levels(
+    ecs_world_t *world,
+    int32_t width,
+    int32_t height,
+    const float *depth,
+    float *out,
+    int32_t capacity);
+
 /** Make the GPU backend of a world render the octants of the point light tiles the core
  * WebGPU way, discarding the fragments outside an octant, even when the device has clip
  * distances, for tests. Applies from the next packet.

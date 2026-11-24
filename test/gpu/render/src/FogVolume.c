@@ -1953,14 +1953,14 @@ void FogVolume_fog_distance_sky(void) {
     test_assert(got[2] <= 16);
 }
 
-/** The grid has a cell per 8x8 pixels of a 720p and a 1080p view, and no more cells for a 4K
- * view, whose cells are 16 pixels. */
+/** The grid has a cell per 8x8 pixels of a 720p view, and no more cells for a 1080p or a 4K
+ * view, whose cells are 12 and 24 pixels. */
 void FogVolume_grid_size_4k(void) {
     // fog_volume/froxels
     const int32_t sizes[3][4] = {
         { 1280, 720, 160, 90 },
-        { 1920, 1080, 240, 135 },
-        { 3840, 2160, 240, 135 }
+        { 1920, 1080, 160, 90 },
+        { 3840, 2160, 160, 90 }
     };
     ecs_world_t *world = fv_world(0);
     fv_view(world, fv_camera(world, 0, 0), true);
@@ -3180,4 +3180,79 @@ void FogVolume_unbounded_transmissive_pass_count(void) {
     test_int(after.errors, before.errors);
 
     ecs_fini(world);
+}
+
+/** Render a wall through a fog volume, and the sky around it, in a view whose effects are a
+ * HeightFog and a vignette that changes nothing, in one order or the other, and count the
+ * render passes of two frames after it.
+ *
+ * @param fog_first Whether the fog is the first effect, which the apply draw of the volumes
+ * applies, else the vignette, so the fog keeps its pass
+ * @param passes Receives the render passes of two frames
+ * @param file Name of the PNG
+ * @return The pixels, RGBA, freed with stbi_image_free
+ */
+static unsigned char* fv_height_fog(
+    bool fog_first,
+    int32_t *passes,
+    const char *file)
+{
+    ecs_world_t *world = fv_world(0.3f);
+    ecs_entity_t fog = ecs_new(world);
+    ecs_set(world, fog, HeightFog, {.density = 0.03f, .falloff = 0, .max_opacity = 1,
+        .color = {255, 160, 80}, .ambient_inscatter = 1});
+    ecs_entity_t vignette = ecs_new(world);
+    ecs_set(world, vignette, Vignette, {.intensity = 0, .radius = 0.75f, .smoothness = 0.45f,
+        .roundness = 1, .center = {0.5f, 0.5f}});
+    ecs_entity_t view = ecs_new(world);
+    View value = {.camera = fv_camera(world, 0, 0),
+        .clear = {.enabled = true, .color = {0, 0, 0, 255}},
+        .lighting = {.enabled = true, .fog_volumes = true}};
+    ecs_vec_init_t(NULL, &value.effects, ViewEffect, 2);
+    *ecs_vec_append_t(NULL, &value.effects, ViewEffect) = (ViewEffect){
+        .enabled = true, .effect = fog_first ? fog : vignette };
+    *ecs_vec_append_t(NULL, &value.effects, ViewEffect) = (ViewEffect){
+        .enabled = true, .effect = fog_first ? vignette : fog };
+    ecs_set_ptr(world, view, View, &value);
+    ecs_vec_fini_t(NULL, &value.effects, ViewEffect);
+    fv_wall(world, 0, -20, 16, FV_WALL);
+    fv_volume(world, (float[]){0, 0, -10}, (float[]){3, 3, 3}, 0.1f, 0);
+    unsigned char *px = fv_render_still(world, file);
+    box_render_gpu_stats_t before = fv_frames(world, 0);
+    box_render_gpu_stats_t after = fv_frames(world, 2);
+    *passes = after.api_render_passes - before.api_render_passes;
+    test_int(after.errors, before.errors);
+    ecs_fini(world);
+
+    return px;
+}
+
+/** A HeightFog that is the first effect of a view with fog volumes is applied by the apply draw
+ * of the volumes, after them, without its pass, as its pass after the forward pass applied it:
+ * on the wall through the volume, on the wall beside it and on the sky. */
+void FogVolume_height_fog_in_apply(void) {
+    // fog_volume/draw
+    int32_t fused_passes = 0, passes = 0, x, y, c, most = 0;
+    unsigned char *fused = fv_height_fog(true, &fused_passes, "fog_height_fused.png");
+    unsigned char *px = fv_height_fog(false, &passes, "fog_height_pass.png");
+    for (y = 0; y < FV_SIZE; y ++) {
+        for (x = 0; x < FV_SIZE; x ++) {
+            for (c = 0; c < 3; c ++) {
+                most = glm_imax(most, abs(fv_px(fused, x, y)[c] - fv_px(px, x, y)[c]));
+            }
+        }
+    }
+
+    printf("height fog in apply: largest difference %d, passes %d and %d\n", most,
+        fused_passes, passes);
+    test_assert(most <= 2);
+    test_int(fused_passes + 2, passes);
+
+    // The fog shows: the sky takes its color, the wall beside the volume is between
+    const unsigned char *sky = fv_px(fused, 2, 2);
+    test_assert(sky[0] > sky[2] + 60);
+    const unsigned char *wall = fv_px(fused, 32, 20);
+    test_assert(wall[0] > wall[2] + 10);
+    stbi_image_free(fused);
+    stbi_image_free(px);
 }

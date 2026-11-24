@@ -2601,9 +2601,22 @@ typedef enum box_gpu_fog_segment_t {
                                      *   transmissive draw */
 } box_gpu_fog_segment_t;
 
+/** Uniforms of the height fog, matching HeightFog in etc/shaders/include/height_fog.wgsl */
+typedef struct box_gpu_height_fog_t {
+    mat4 inv_view_proj;             /**< Inverse of the projection times the view matrix */
+    float color[4];                 /**< Linear fog color, density */
+    float params[4];                /**< Falloff, base height, max opacity, 1 when lit */
+    float sun[4];                   /**< Direction toward the sun, 1 when there is one */
+    float sun_color[4];             /**< Sun radiance times its inscatter */
+    float ambient[4];               /**< Ambient light times its inscatter */
+    float atmos[4];                 /**< 1 for the color of the atmosphere, phase g, sun and
+                                     *   ambient inscatter */
+} box_gpu_height_fog_t;
+
 /** Apply the froxel grid the view injected in this packet (box_gpu_fog_volumes_inject), one
  * fullscreen draw that looks the grid up at the depth of each pixel. Replaces the pipeline and
- * the bind group at 1.
+ * the bind group at 1. A draw of the full segment also applies the height fog of a view whose
+ * first effect is one (box_gpu_effects_height_fog), which then skips its fog pass.
  *
  * @param gpu The backend
  * @param pass The render pass of the view, which reads its depth, with the bind group of the
@@ -2628,6 +2641,19 @@ bool box_gpu_fog_volumes_draw(
     WGPUTextureView depth,
     WGPUTextureView glass,
     box_gpu_fog_segment_t segment);
+
+/** Check whether the apply draw of the fog volumes of a view applied its height fog in this
+ * packet, so its fog pass is skipped.
+ *
+ * @param gpu The backend
+ * @param t The target
+ * @param v The view
+ * @return Whether the height fog was applied
+ */
+bool box_gpu_fog_volumes_height_fog(
+    box_gpu_t *gpu,
+    const box_gpu_target_t *t,
+    const box_render_view_t *v);
 
 /** Create the layouts of the star field draws, after the view layout.
  *
@@ -2808,6 +2834,26 @@ WGPUTextureView box_gpu_effects_begin(
  */
 WGPUTexture box_gpu_effects_image(
     box_gpu_t *gpu);
+
+/** Get the height fog the apply draw of the fog volumes of a view applies in place of its fog
+ * pass: its first effect when that is a HeightFog and the view clears its image, whose alpha
+ * the apply draw keeps.
+ *
+ * @param gpu The backend
+ * @param t The target
+ * @param packet The packet
+ * @param v The view
+ * @param u Receives the uniforms of the fog
+ * @param sky Receives the color of the sky the fog takes, a placeholder when it has none
+ * @return Whether the view has a height fog to apply
+ */
+bool box_gpu_effects_height_fog(
+    box_gpu_t *gpu,
+    const box_gpu_target_t *t,
+    const box_render_packet_t *packet,
+    const box_render_view_t *v,
+    box_gpu_height_fog_t *u,
+    WGPUTextureView *sky);
 
 /** Record the effect passes of a view over its HDR image, the last one writing the target.
  *

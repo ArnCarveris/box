@@ -426,3 +426,57 @@ void CascadeReuse_kept_cascade_not_overwritten_by_other_view(void) {
 
     ecs_fini(s.world);
 }
+
+/** Add a pole that sways in a wind that blows, with the wind feature of the scene, so the
+ * cascades of the scene cap their intervals at their ShadowSettings.sway_interval.
+ *
+ * @param s The scene
+ */
+static void reuse_sway(
+    const reuse_scene_t *s)
+{
+    ecs_singleton_set(s->world, Scene, {.shader_features.Extended.wind = true});
+    ecs_entity_t e = ecs_new(s->world);
+    ecs_set(s->world, e, Position, {3, 1.5f, 0});
+    ecs_set(s->world, e, Box, {0.3f, 3, 0.3f});
+    ecs_set(s->world, e, WindSway, {.bend = 0.05f, .height = 3, .base = 0});
+    ecs_singleton_set(s->world, Wind, {.direction = {1, 0}, .speed = 10, .gust = 0,
+        .gust_scale = 20});
+}
+
+void CascadeReuse_sway_renders_every_frame(void) {
+    // lighting/shadows
+    reuse_scene_t s;
+    int32_t i;
+    ShadowSettings settings = reuse_settings(4, 4);
+    reuse_scene(&settings, &s);
+    reuse_sway(&s);
+    for (i = 0; i < 4; i ++) {
+        reuse_expect(&s, 2, 0x3u);
+    }
+
+    ecs_fini(s.world);
+}
+
+void CascadeReuse_sway_interval_per_cascade(void) {
+    // lighting/shadows
+    reuse_scene_t s;
+    ShadowSettings settings = reuse_settings(4, 4);
+    settings.sway_interval[0] = 2;
+    settings.sway_interval[1] = 8;
+    reuse_scene(&settings, &s);
+    reuse_sway(&s);
+
+    // cascade 0 renders every other frame, cascade 1 keeps its interval of 4 since its cap is
+    // above it: it renders when frames + 1 is a multiple of 4
+    reuse_expect(&s, 2, 0x3u);
+    reuse_expect(&s, 2, 0x0u);
+    reuse_expect(&s, 2, 0x1u);
+    reuse_expect(&s, 2, 0x2u);
+    reuse_expect(&s, 2, 0x1u);
+    reuse_expect(&s, 2, 0x0u);
+    reuse_expect(&s, 2, 0x1u);
+    reuse_expect(&s, 2, 0x2u);
+
+    ecs_fini(s.world);
+}

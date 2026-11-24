@@ -235,7 +235,7 @@ void MeshLod_flat_cylinder_and_box_not_reduced(void) {
     ecs_fini(world);
 }
 
-void MeshLod_shadow_same_level(void) {
+void MeshLod_shadow_one_level_coarser(void) {
     ecs_world_t *world = world_new();
     ecs_entity_t camera = camera_new(world);
     ecs_entity_t view = ecs_new(world);
@@ -250,25 +250,30 @@ void MeshLod_shadow_same_level(void) {
     ecs_entity_t sun = ecs_new(world);
     ecs_set(world, sun, Rotation, {(float)GLM_PI_4, 0, 0});
     ecs_set(world, sun, DirectionalLight, {.intensity = GLM_PIf});
-    ecs_entity_t sphere = sphere_new(world, -60, 1);
+    ecs_entity_t near = sphere_new(world, -5, 1);
+    sphere_new(world, -20, 1);
+    sphere_new(world, -60, 1);
     frames(world, 2);
 
     box_render_cull_stats_t stats;
     test_bool(box_render_gpu_cull_frustum(world, view, -1, &stats), true);
-    test_int(stats.visible, 1);
+    test_int(stats.visible, 3);
+    test_int(stats.levels[0], 1);
+    test_int(stats.levels[1], 1);
     test_int(stats.levels[2], 1);
-    test_int(stats.indices, level_indices(world, sphere, 2));
 
     test_bool(box_render_gpu_cull_frustum(world, view, 0, &stats), true);
-    test_int(stats.visible, 1);
+    test_int(stats.visible, 3);
     test_int(stats.levels[0], 0);
-    test_int(stats.levels[2], 1);
-    test_int(stats.indices, level_indices(world, sphere, 2));
+    test_int(stats.levels[1], 1);
+    test_int(stats.levels[2], 2);
+    test_int(stats.indices, level_indices(world, near, 1) + 2 * level_indices(world, near, 2));
 
     test_bool(box_render_gpu_cull_stats(world, view, &stats), true);
-    test_int(stats.casters_visible, 1);
-    test_int(stats.casters_levels[2], 1);
-    test_int(stats.casters_indices, level_indices(world, sphere, 2));
+    test_int(stats.casters_visible, 3);
+    test_int(stats.casters_levels[0], 0);
+    test_int(stats.casters_levels[1], 1);
+    test_int(stats.casters_levels[2], 2);
 
     ecs_fini(world);
 }

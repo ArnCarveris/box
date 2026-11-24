@@ -63,6 +63,8 @@ typedef struct box_gpu_froxels_t {
     box_gpu_fog_uniforms_t previous; /**< Uniform of the frame before that one */
     float current_distance;         /**< Fog distance of current */
     float previous_distance;        /**< Fog distance of previous */
+    uint64_t height_fog;            /**< Packet the apply draw applied the height fog of the
+                                     *   view in last */
     int64_t frame;                  /**< Packet frame of current, -1 for none */
     bool has_previous;              /**< previous holds a frame */
 } box_gpu_froxels_t;
@@ -71,8 +73,8 @@ struct box_gpu_fog_volumes_t {
     WGPUBindGroupLayout inject_layout; /**< Records, uniform, noise, the cells written and the
                                      *   cells of the previous frame */
     WGPUBindGroupLayout integrate_layout; /**< Uniform, cells and the integrated grid written */
-    WGPUBindGroupLayout apply_layout; /**< Records, uniform, depth, glass depth and integrated
-                                       * grid */
+    WGPUBindGroupLayout apply_layout; /**< Records, uniform, depth, glass depth, integrated
+                                       * grid, and the height fog and its sky color */
     WGPUPipelineLayout inject_pipeline_layout; /**< View group and inject_layout */
     WGPUPipelineLayout integrate_pipeline_layout; /**< Empty group and integrate_layout */
     WGPUPipelineLayout apply_pipeline_layout; /**< View group and apply_layout */
@@ -91,6 +93,9 @@ struct box_gpu_fog_volumes_t {
     WGPUTextureView noise_view;     /**< View of the noise texture */
     WGPUTexture placeholder;        /**< Texture of one texel views without noise bind */
     WGPUTextureView placeholder_view; /**< View of the placeholder */
+    WGPUTexture no_sky;             /**< Sky color of one texel the apply draw binds without a
+                                     *   height fog */
+    WGPUTextureView no_sky_view;    /**< View of no_sky */
     WGPUTexture no_grid;            /**< Integrated grid of one texel of no light and full
                                      *   transmittance, which the view group of a view without
                                      *   fog volumes binds */
@@ -190,18 +195,24 @@ static WGPUTextureView box_gpu_fog_noise(
  * group: no scattered light and full transmittance (the half floats 0, 0, 0, 1), so their
  * blended draws are not fogged.
  *
+ * As a 2D texture, the sky color an apply draw without a height fog binds.
+ *
  * @param gpu The backend
+ * @param dimension WGPUTextureViewDimension_3D for the grid, _2D for the sky color
  * @param view Receives the view of the texture
  * @return The texture
  */
 static WGPUTexture box_gpu_fog_no_grid(
     box_gpu_t *gpu,
+    WGPUTextureViewDimension dimension,
     WGPUTextureView *view)
 {
     const uint16_t texel[4] = { 0, 0, 0, 0x3C00 };
     WGPUTexture result = wgpuDeviceCreateTexture(gpu->device, &(WGPUTextureDescriptor){
         .usage = WGPUTextureUsage_TextureBinding | WGPUTextureUsage_CopyDst,
-        .dimension = WGPUTextureDimension_3D,
+        .dimension = dimension == WGPUTextureViewDimension_3D
+            ? WGPUTextureDimension_3D
+            : WGPUTextureDimension_2D,
         .size = { 1, 1, 1 },
         .format = WGPUTextureFormat_RGBA16Float,
         .mipLevelCount = 1,
@@ -213,13 +224,90 @@ static WGPUTexture box_gpu_fog_no_grid(
     wgpuQueueWriteTexture(gpu->queue, &dst, texel, sizeof(texel), &layout, &extent);
     *view = wgpuTextureCreateView(result, &(WGPUTextureViewDescriptor){
         .format = WGPUTextureFormat_RGBA16Float,
-        .dimension = WGPUTextureViewDimension_3D,
+        .dimension = dimension,
         .mipLevelCount = 1,
         .arrayLayerCount = 1,
         .aspect = WGPUTextureAspect_All
     });
 
     return result;
+}
+
+/** Create the layout of group 1 of the apply draws: the records, the uniform, the depth, the
+ * glass depth, the integrated grid and its sampler, and the height fog and its sky color.
+ *
+ * @param gpu The backend
+ * @return The layout
+ */
+static WGPUBindGroupLayout box_gpu_fog_apply_layout(
+    box_gpu_t *gpu)
+{
+    WGPUBindGroupLayoutEntry apply[8] = {
+        {
+            .binding = 0,
+            .visibility = WGPUShaderStage_Fragment,
+            .buffer = {
+                .type = WGPUBufferBindingType_ReadOnlyStorage,
+                .minBindingSize = sizeof(box_render_fog_volume_t)
+            }
+        },
+        {
+            .binding = 1,
+            .visibility = WGPUShaderStage_Fragment,
+            .buffer = {
+                .type = WGPUBufferBindingType_Uniform,
+                .minBindingSize = BOX_GPU_FOG_UNIFORM_SIZE
+            }
+        },
+        {
+            .binding = 2,
+            .visibility = WGPUShaderStage_Fragment,
+            .texture = {
+                .sampleType = WGPUTextureSampleType_Depth,
+                .viewDimension = WGPUTextureViewDimension_2D
+            }
+        },
+        {
+            .binding = 5,
+            .visibility = WGPUShaderStage_Fragment,
+            .texture = {
+                .sampleType = WGPUTextureSampleType_Depth,
+                .viewDimension = WGPUTextureViewDimension_2D
+            }
+        },
+        {
+            .binding = 9,
+            .visibility = WGPUShaderStage_Fragment,
+            .texture = {
+                .sampleType = WGPUTextureSampleType_Float,
+                .viewDimension = WGPUTextureViewDimension_3D
+            }
+        },
+        {
+            .binding = 10,
+            .visibility = WGPUShaderStage_Fragment,
+            .sampler = { .type = WGPUSamplerBindingType_Filtering }
+        },
+        {
+            .binding = 13,
+            .visibility = WGPUShaderStage_Fragment,
+            .buffer = {
+                .type = WGPUBufferBindingType_Uniform,
+                .minBindingSize = sizeof(box_gpu_height_fog_t)
+            }
+        },
+        {
+            .binding = 14,
+            .visibility = WGPUShaderStage_Fragment,
+            .texture = {
+                .sampleType = WGPUTextureSampleType_Float,
+                .viewDimension = WGPUTextureViewDimension_2D
+            }
+        }
+    };
+
+    return wgpuDeviceCreateBindGroupLayout(gpu->device,
+        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 8, .entries = apply });
 }
 
 /** Release the textures of a grid and the grid.
@@ -323,59 +411,11 @@ void box_gpu_fog_volumes_init(
             }
         }
     };
-    WGPUBindGroupLayoutEntry apply[6] = {
-        {
-            .binding = 0,
-            .visibility = WGPUShaderStage_Fragment,
-            .buffer = {
-                .type = WGPUBufferBindingType_ReadOnlyStorage,
-                .minBindingSize = sizeof(box_render_fog_volume_t)
-            }
-        },
-        {
-            .binding = 1,
-            .visibility = WGPUShaderStage_Fragment,
-            .buffer = {
-                .type = WGPUBufferBindingType_Uniform,
-                .minBindingSize = BOX_GPU_FOG_UNIFORM_SIZE
-            }
-        },
-        {
-            .binding = 2,
-            .visibility = WGPUShaderStage_Fragment,
-            .texture = {
-                .sampleType = WGPUTextureSampleType_Depth,
-                .viewDimension = WGPUTextureViewDimension_2D
-            }
-        },
-        {
-            .binding = 5,
-            .visibility = WGPUShaderStage_Fragment,
-            .texture = {
-                .sampleType = WGPUTextureSampleType_Depth,
-                .viewDimension = WGPUTextureViewDimension_2D
-            }
-        },
-        {
-            .binding = 9,
-            .visibility = WGPUShaderStage_Fragment,
-            .texture = {
-                .sampleType = WGPUTextureSampleType_Float,
-                .viewDimension = WGPUTextureViewDimension_3D
-            }
-        },
-        {
-            .binding = 10,
-            .visibility = WGPUShaderStage_Fragment,
-            .sampler = { .type = WGPUSamplerBindingType_Filtering }
-        }
-    };
     f->inject_layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
         &(WGPUBindGroupLayoutDescriptor){ .entryCount = 7, .entries = inject });
     f->integrate_layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
         &(WGPUBindGroupLayoutDescriptor){ .entryCount = 3, .entries = integrate });
-    f->apply_layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
-        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 6, .entries = apply });
+    f->apply_layout = box_gpu_fog_apply_layout(gpu);
     f->sampler = wgpuDeviceCreateSampler(gpu->device, &(WGPUSamplerDescriptor){
         .addressModeU = WGPUAddressMode_Repeat,
         .addressModeV = WGPUAddressMode_Repeat,
@@ -397,7 +437,8 @@ void box_gpu_fog_volumes_init(
         .maxAnisotropy = 1
     });
     f->placeholder = box_gpu_fog_texture(gpu, 1, 1, &placeholder, &f->placeholder_view);
-    f->no_grid = box_gpu_fog_no_grid(gpu, &f->no_grid_view);
+    f->no_grid = box_gpu_fog_no_grid(gpu, WGPUTextureViewDimension_3D, &f->no_grid_view);
+    f->no_sky = box_gpu_fog_no_grid(gpu, WGPUTextureViewDimension_2D, &f->no_sky_view);
     WGPUBindGroupLayout inject_groups[2] = { gpu->view_layout, f->inject_layout };
     WGPUBindGroupLayout integrate_groups[2] = {
         gpu->prepass_empty_layout, f->integrate_layout
@@ -490,6 +531,8 @@ void box_gpu_fog_volumes_fini(
     }
 
     wgpuTextureViewRelease(f->placeholder_view);
+    wgpuTextureViewRelease(f->no_sky_view);
+    wgpuTextureRelease(f->no_sky);
     wgpuTextureRelease(f->placeholder);
     wgpuTextureViewRelease(f->no_grid_view);
     wgpuTextureRelease(f->no_grid);
@@ -1126,10 +1169,12 @@ bool box_gpu_fog_volumes_draw(
     WGPURenderPipeline pipeline = box_gpu_fog_volumes_ready(gpu, v)
         ? box_gpu_fog_pipeline(gpu, format)
         : NULL;
-    const box_gpu_froxels_t *g = f
+    box_gpu_froxels_t *g = f
         ? ecs_map_get_deref(&f->grids, box_gpu_froxels_t, box_gpu_froxels_key(t, v))
         : NULL;
     box_gpu_fog_uniforms_t u;
+    box_gpu_height_fog_t height;
+    WGPUTextureView sky = f ? f->no_sky_view : NULL;
     bool result = false;
     if (!glass) {
         glass = depth;
@@ -1141,17 +1186,29 @@ bool box_gpu_fog_volumes_draw(
     }
 
     box_gpu_fog_uniforms(t, v, segment, &u);
+    if (segment == BOX_GPU_FOG_SEGMENT_FULL &&
+        box_gpu_effects_height_fog(gpu, t, packet, v, &height, &sky))
+    {
+        u.segment[1] = 1;
+        g->height_fog = f->packet;
+    }
+
     uint64_t records = (uint64_t)v->fog_count * sizeof(box_render_fog_volume_t);
-    uint64_t offset = box_gpu_fog_reserve(gpu, BOX_GPU_FOG_UNIFORM_STRIDE + records);
+    uint64_t offset = box_gpu_fog_reserve(gpu, 2 * BOX_GPU_FOG_UNIFORM_STRIDE + records);
     wgpuQueueWriteBuffer(gpu->queue, f->buffer, offset, &u, sizeof(u));
-    wgpuQueueWriteBuffer(gpu->queue, f->buffer, offset + BOX_GPU_FOG_UNIFORM_STRIDE,
+    if (u.segment[1]) {
+        wgpuQueueWriteBuffer(gpu->queue, f->buffer, offset + BOX_GPU_FOG_UNIFORM_STRIDE,
+            &height, sizeof(height));
+    }
+
+    wgpuQueueWriteBuffer(gpu->queue, f->buffer, offset + 2 * BOX_GPU_FOG_UNIFORM_STRIDE,
         ecs_vec_get_t(&packet->fog_volumes, box_render_fog_volume_t, v->fog_first),
         (size_t)records);
-    WGPUBindGroupEntry entries[6] = {
+    WGPUBindGroupEntry entries[8] = {
         {
             .binding = 0,
             .buffer = f->buffer,
-            .offset = offset + BOX_GPU_FOG_UNIFORM_STRIDE,
+            .offset = offset + 2 * BOX_GPU_FOG_UNIFORM_STRIDE,
             .size = records
         },
         {
@@ -1163,11 +1220,18 @@ bool box_gpu_fog_volumes_draw(
         { .binding = 2, .textureView = depth },
         { .binding = 5, .textureView = glass },
         { .binding = 9, .textureView = g->integrated_view },
-        { .binding = 10, .sampler = f->grid_sampler }
+        { .binding = 10, .sampler = f->grid_sampler },
+        {
+            .binding = 13,
+            .buffer = f->buffer,
+            .offset = offset + BOX_GPU_FOG_UNIFORM_STRIDE,
+            .size = sizeof(box_gpu_height_fog_t)
+        },
+        { .binding = 14, .textureView = sky }
     };
     WGPUBindGroup group = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
         .layout = f->apply_layout,
-        .entryCount = 6,
+        .entryCount = 8,
         .entries = entries
     });
     wgpuRenderPassEncoderSetPipeline(pass, pipeline);
@@ -1178,6 +1242,19 @@ bool box_gpu_fog_volumes_draw(
     result = true;
 done:
     return result;
+}
+
+bool box_gpu_fog_volumes_height_fog(
+    box_gpu_t *gpu,
+    const box_gpu_target_t *t,
+    const box_render_view_t *v)
+{
+    box_gpu_fog_volumes_t *f = gpu->fog_volumes;
+    const box_gpu_froxels_t *g = f
+        ? ecs_map_get_deref(&f->grids, box_gpu_froxels_t, box_gpu_froxels_key(t, v))
+        : NULL;
+
+    return g && g->height_fog == f->packet;
 }
 
 #endif

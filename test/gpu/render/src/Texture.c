@@ -689,6 +689,82 @@ void Texture_gpu_emissive_layer(void) {
     ecs_fini(world);
 }
 
+void Texture_gpu_emissive_layer_added(void) {
+    // materials/textures
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+    const char *tmp = ecs_singleton_get(world, AppStatus)->tmp_dir;
+    char *file = flecs_asprintf("%s/halves.png", tmp);
+    uint8_t px[8 * 8 * 4];
+    int32_t i;
+    for (i = 0; i < 64; i ++) {
+        bool left = (i % 8) < 4;
+        px[i * 4 + 0] = left ? 255 : 0;
+        px[i * 4 + 1] = left ? 0 : 255;
+        px[i * 4 + 2] = 0;
+        px[i * 4 + 3] = 255;
+    }
+
+    test_assert(stbi_write_png(file, 8, 8, 4, px, 8 * 4) != 0);
+
+    ecs_entity_t tex = ecs_new(world);
+    ecs_set(world, tex, TexturePath, {.path = file});
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 6});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {
+        .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
+    ecs_entity_t quad = ecs_new(world);
+    ecs_set(world, quad, Quad, {12, 6});
+    ecs_set(world, quad, Position, {0, 0, 0});
+    ecs_set(world, quad, Rgb, {0, 0, 0});
+    ecs_set(world, quad, PbrMaterial, {.metallic = 1, .roughness = 1});
+    ecs_set(world, quad, Emissive, {.strength = 1, .color = {255, 255, 255}});
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "emissive.png",
+        .resolution_scale = 1});
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+
+    // Without a map the pipeline skips the sample: the emissive color is white on both halves
+    char *path = flecs_asprintf("%s/emissive.png", tmp);
+    int w = 0, h = 0, n = 0;
+    unsigned char *img = stbi_load(path, &w, &h, &n, 4);
+    test_assert(img != NULL);
+    unsigned char *left = &img[(16 * 64 + 12) * 4];
+    unsigned char *right = &img[(16 * 64 + 52) * 4];
+    test_assert(left[0] > 240);
+    test_assert(left[1] > 240);
+    test_assert(right[0] > 240);
+    test_assert(right[1] > 240);
+    stbi_image_free(img);
+
+    // The map added at run time switches the batch to a pipeline that samples it
+    ecs_set(world, quad, PbrTextures, {.emissive = tex});
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+
+    img = stbi_load(path, &w, &h, &n, 4);
+    test_assert(img != NULL);
+    left = &img[(16 * 64 + 12) * 4];
+    right = &img[(16 * 64 + 52) * 4];
+    test_assert(left[0] > 240);
+    test_assert(left[1] < 20);
+    test_assert(right[0] < 20);
+    test_assert(right[1] > 240);
+
+    stbi_image_free(img);
+    ecs_os_free(path);
+    ecs_os_free(file);
+    ecs_fini(world);
+}
+
 void Texture_gpu_albedo_layer(void) {
     // materials/textures
     ecs_world_t *world = ecs_init();

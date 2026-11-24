@@ -44,6 +44,22 @@ struct Layers {
     frame: Frame,
 };
 
+// The emissive and ORM layers at uv with explicit gradients, white without a map
+// (material_emissive_map, material_orm_map).
+fn emissive_grad(uv: vec2f, gx: vec2f, gy: vec2f) -> vec3f {
+    if (!material_emissive_map) {
+        return vec3f(1.0);
+    }
+    return textureSampleGrad(emissive_map, material_sampler, uv, gx, gy).rgb;
+}
+
+fn orm_grad(uv: vec2f, gx: vec2f, gy: vec2f) -> vec3f {
+    if (!material_orm_map) {
+        return vec3f(1.0);
+    }
+    return textureSampleGrad(orm_map, material_sampler, uv, gx, gy).rgb;
+}
+
 // The layers of a fragment without a triplanar blend. Only called when vo_scalars(f).w (flat) is
 // at most 1, the same for every fragment of a quad, so the implicit derivatives hold.
 @diagnostic(off, derivative_uniformity)
@@ -54,8 +70,14 @@ fn hard_layers(f: VertexOut, geometric: vec3f) -> Layers {
     }
     var o: Layers;
     o.albedo = textureSample(albedo_map, material_sampler, uv);
-    o.emissive = textureSample(emissive_map, material_sampler, uv).rgb;
-    o.orm = textureSample(orm_map, material_sampler, uv).rgb;
+    o.emissive = vec3f(1.0);
+    if (material_emissive_map) {
+        o.emissive = textureSample(emissive_map, material_sampler, uv).rgb;
+    }
+    o.orm = vec3f(1.0);
+    if (material_orm_map) {
+        o.orm = textureSample(orm_map, material_sampler, uv).rgb;
+    }
     let m = textureSample(normal_map, material_sampler, normal_uv(f, uv)).xyz * 2.0 - 1.0;
     o.frame = cotangent_frame(geometric, f.world, uv);
     o.normal = perturb(geometric, o.frame, m);
