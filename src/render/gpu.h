@@ -1769,7 +1769,9 @@ void box_gpu_shadow_upload(
     int32_t count);
 
 /** Record the shadow passes of a view: its casters drawn into every cascade that renders in
- * the packet, the others keep their depth.
+ * the packet, the others keep their depth. A kept cascade the grass casts into is restored from
+ * the copy of its casters the view's cascade store made when they last rendered, and only the
+ * grass draws into it again.
  *
  * @param gpu The backend
  * @param encoder The encoder of the frame
@@ -1785,8 +1787,8 @@ void box_gpu_shadow_render(
     int32_t slot);
 
 /** Record the passes that draw the grass blades the late compute pass of a view placed to cast
- * shadows (box_gpu_grass_record_late) into every cascade that renders in the packet, after
- * box_gpu_shadow_render drew its casters there. Nothing when its first compute pass placed them.
+ * shadows (box_gpu_grass_record_late) into every cascade that renders in the packet or that
+ * box_gpu_shadow_render restored, after it drew or restored its casters there. Nothing when its first compute pass placed them.
  *
  * @param gpu The backend
  * @param encoder The encoder of the frame

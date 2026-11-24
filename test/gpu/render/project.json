@@ -2154,6 +2154,7 @@
                     "shadow_counts_apart",
                     "lights_only_when_enabled",
                     "shadows_darken_meadow",
+                    "reused_cascades_keep_casters",
                     "culls_behind_occluder",
                     "occlusion_follows_camera",
                     "culls_behind_hills"

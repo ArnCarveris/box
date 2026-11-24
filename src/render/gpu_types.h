@@ -1282,11 +1282,14 @@ typedef struct box_gpu_cascade_store_t {
     WGPUTexture texture;            /**< BOX_GPU_SHADOW_FORMAT, a layer per cascade */
     WGPUTextureView array;          /**< Array view, sampled by the forward pass */
     WGPUTextureView layers[BOX_RENDER_SHADOW_CASCADES]; /**< View of each cascade */
+    WGPUTexture casters;            /**< Copy of the layers the grass casts into with only the
+                                     *   casters, restored before the grass draws again */
     int32_t resolution;             /**< Edge of a layer in texels */
     int32_t cascades;               /**< Layers */
     box_render_cascade_t fits[BOX_RENDER_SHADOW_CASCADES]; /**< Cascade each layer rendered
                                      *   with, or renders with in the packet */
     uint32_t valid;                 /**< Mask of the layers that hold the render of their fit */
+    uint32_t casters_valid;         /**< Mask of the layers whose casters the copy holds */
     mat4 proj;                      /**< Projection of the view the fits were made with */
     int32_t revision;               /**< Revision of the shadow shader the layers rendered with */
     int64_t frame;                  /**< Frame of the last packet that rendered the view */
@@ -1296,6 +1299,9 @@ typedef struct box_gpu_cascade_store_t {
 typedef struct box_gpu_cascade_slot_t {
     int32_t store;                  /**< Index of its cascade store, -1 for the shared map */
     uint32_t renders;               /**< Mask of the cascades that render in the packet */
+    uint32_t live;                  /**< Mask of the cascades the grass casts into */
+    uint32_t grass;                 /**< Mask of the cascades that keep their casters, restored
+                                     *   from the copy of the store, and render only the grass */
 } box_gpu_cascade_slot_t;
 
 #define BOX_GPU_ATLAS_FRUSTUM(tile, octant) ((tile) * BOX_RENDER_SHADOW_OCTANTS + (octant))

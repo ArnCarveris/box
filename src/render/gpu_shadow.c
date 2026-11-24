@@ -165,9 +165,15 @@ static void box_gpu_cascade_store_free(
         store->texture = NULL;
     }
 
+    if (store->casters) {
+        wgpuTextureRelease(store->casters);
+        store->casters = NULL;
+    }
+
     store->resolution = 0;
     store->cascades = 0;
     store->valid = 0;
+    store->casters_valid = 0;
 }
 
 /** Release the shadow map of the probe captures and its uniform buffer.
@@ -433,7 +439,8 @@ static void box_gpu_shadow_layers_create(
 {
     int32_t i;
     WGPUTextureDescriptor desc = {
-        .usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding,
+        .usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding |
+            WGPUTextureUsage_CopySrc | WGPUTextureUsage_CopyDst,
         .dimension = WGPUTextureDimension_2D,
         .size = { (uint32_t)resolution, (uint32_t)resolution, (uint32_t)cascades },
         .format = BOX_GPU_SHADOW_FORMAT,
@@ -497,6 +504,14 @@ static int32_t box_gpu_cascade_store(
         box_gpu_cascade_store_free(store);
         box_gpu_shadow_layers_create(gpu, s->resolution, s->cascades, &store->texture,
             &store->array, store->layers);
+        store->casters = wgpuDeviceCreateTexture(gpu->device, &(WGPUTextureDescriptor){
+            .usage = WGPUTextureUsage_CopySrc | WGPUTextureUsage_CopyDst,
+            .dimension = WGPUTextureDimension_2D,
+            .size = { (uint32_t)s->resolution, (uint32_t)s->resolution, (uint32_t)s->cascades },
+            .format = BOX_GPU_SHADOW_FORMAT,
+            .mipLevelCount = 1,
+            .sampleCount = 1
+        });
         store->resolution = s->resolution;
         store->cascades = s->cascades;
     }
@@ -570,6 +585,8 @@ void box_gpu_shadow_uniforms(
         &gpu->cascade_slots, box_gpu_cascade_slot_t, slot);
     cs->store = -1;
     cs->renders = 0;
+    cs->live = 0;
+    cs->grass = 0;
     if (!s->enabled || n < 1 || n > BOX_RENDER_SHADOW_CASCADES) {
         goto done;
     }
@@ -587,10 +604,13 @@ void box_gpu_shadow_uniforms(
             ecs_os_memcmp(store->proj, proj, sizeof(mat4)))
         {
             store->valid = 0;
+            store->casters_valid = 0;
         }
 
         glm_mat4_copy(proj, store->proj);
-        cs->renders &= s->render | live | ~store->valid;
+        cs->live = live & cs->renders;
+        cs->renders &= s->render | ~store->valid | (live & ~store->casters_valid);
+        cs->grass = cs->live & ~cs->renders;
     }
 
     float distance = s->splits[n - 1];
@@ -1184,6 +1204,7 @@ void box_gpu_shadow_render(
 
     if (store && store->revision != gpu->shadow_revision) {
         store->valid = 0;
+        store->casters_valid = 0;
         store->revision = gpu->shadow_revision;
     }
 
@@ -1196,14 +1217,35 @@ void box_gpu_shadow_render(
         .entries = &entry
     });
     for (i = 0; i < v->shadows.cascades; i ++) {
+        uint32_t offset = (uint32_t)((slot * BOX_RENDER_SHADOW_CASCADES + i) *
+            BOX_GPU_CASCADE_STRIDE);
+        WGPUTexelCopyTextureInfo layer = {
+            .texture = store ? store->texture : NULL,
+            .origin = { 0, 0, (uint32_t)i },
+            .aspect = WGPUTextureAspect_All
+        };
+        WGPUTexelCopyTextureInfo copy = {
+            .texture = store ? store->casters : NULL,
+            .origin = { 0, 0, (uint32_t)i },
+            .aspect = WGPUTextureAspect_All
+        };
+        WGPUExtent3D extent = store
+            ? (WGPUExtent3D){ (uint32_t)store->resolution, (uint32_t)store->resolution, 1 }
+            : (WGPUExtent3D){ 0 };
+        if (cs->grass & (1u << i)) {
+            wgpuCommandEncoderCopyTextureToTexture(encoder, &copy, &layer, &extent);
+            box_gpu_grass_shadow(gpu, encoder, v, i, layers[i], (const float*)ecs_vec_get_t(
+                &gpu->shadow_data, uint8_t, offset), false);
+            box_gpu_count(gpu, BOX_GPU_STAT_CASCADE_KEPT);
+            continue;
+        }
+
         if (!(cs->renders & (1u << i))) {
             box_gpu_count(gpu, BOX_GPU_STAT_CASCADE_KEPT);
             continue;
         }
 
         const box_gpu_cull_view_t *cv = box_gpu_cull_view(gpu, slot, i);
-        uint32_t offset = (uint32_t)((slot * BOX_RENDER_SHADOW_CASCADES + i) *
-            BOX_GPU_CASCADE_STRIDE);
         bool complete = false;
         WGPURenderPassDepthStencilAttachment depth = {
             .view = layers[i],
@@ -1222,11 +1264,18 @@ void box_gpu_shadow_render(
 
         wgpuRenderPassEncoderEnd(pass);
         wgpuRenderPassEncoderRelease(pass);
+        if (store && (cs->live & (1u << i))) {
+            wgpuCommandEncoderCopyTextureToTexture(encoder, &layer, &copy, &extent);
+        }
+
         box_gpu_grass_shadow(gpu, encoder, v, i, layers[i], (const float*)ecs_vec_get_t(
             &gpu->shadow_data, uint8_t, offset), false);
         box_gpu_count(gpu, BOX_GPU_STAT_CASCADE);
         if (store && complete) {
             store->valid |= 1u << i;
+            store->casters_valid |= cs->live & (1u << i);
+        } else if (store) {
+            store->casters_valid &= ~(1u << i);
         }
     }
 
@@ -1260,7 +1309,7 @@ void box_gpu_shadow_grass_late(
     for (i = 0; i < v->shadows.cascades; i ++) {
         uint32_t offset = (uint32_t)((slot * BOX_RENDER_SHADOW_CASCADES + i) *
             BOX_GPU_CASCADE_STRIDE);
-        if (cs->renders & (1u << i)) {
+        if ((cs->renders | cs->grass) & (1u << i)) {
             box_gpu_grass_shadow(gpu, encoder, v, i, layers[i], (const float*)ecs_vec_get_t(
                 &gpu->shadow_data, uint8_t, offset), true);
         }
@@ -1268,55 +1317,6 @@ void box_gpu_shadow_grass_late(
 
 done:
     return;
-}
-
-void box_gpu_shadow_capture_fit(
-    const float *min,
-    const float *max,
-    const float *direction,
-    box_render_cascade_t *out)
-{
-    vec3 center, forward, right, up, pole = {0, 1, 0};
-    float res = (float)BOX_GPU_CAPTURE_SHADOW_RESOLUTION;
-    int32_t i;
-    for (i = 0; i < 3; i ++) {
-        center[i] = (min[i] + max[i]) * 0.5f;
-        forward[i] = -direction[i];
-    }
-
-    float radius = glm_max(glm_vec3_distance(ECS_CONST_CAST(float*, min),
-        ECS_CONST_CAST(float*, max)) * 0.5f, 1e-3f);
-    float extent = radius * res / (res - 2.0f * (float)BOX_GPU_CAPTURE_SHADOW_MARGIN);
-    if (glm_vec3_norm(forward) < 1e-6f) {
-        glm_vec3_copy((vec3){0, -1, 0}, forward);
-    }
-
-    glm_vec3_normalize(forward);
-    if (fabsf(forward[1]) > 0.99f) {
-        glm_vec3_copy((vec3){0, 0, 1}, pole);
-    }
-
-    glm_vec3_crossn(forward, pole, right);
-    glm_vec3_cross(right, forward, up);
-    float cx = glm_vec3_dot(right, center);
-    float cy = glm_vec3_dot(up, center);
-    float cz = glm_vec3_dot(forward, center);
-    float d_near = cz - extent;
-    float d_far = cz + extent;
-    float range = d_far - d_near;
-    glm_mat4_zero(out->matrix);
-    for (i = 0; i < 3; i ++) {
-        out->matrix[i][0] = right[i] / extent;
-        out->matrix[i][1] = up[i] / extent;
-        out->matrix[i][2] = -forward[i] / range;
-    }
-
-    out->matrix[3][0] = -cx / extent;
-    out->matrix[3][1] = -cy / extent;
-    out->matrix[3][2] = d_far / range;
-    out->matrix[3][3] = 1.0f;
-    out->texel = 2.0f * extent / res;
-    out->depth_range = range;
 }
 
 /** Create the shadow map of the probe captures, its uniform buffer and bind group.

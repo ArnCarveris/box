@@ -1274,6 +1274,51 @@ void Grass_shadows_darken_meadow(void) {
     ecs_fini(world);
 }
 
+void Grass_reused_cascades_keep_casters(void) {
+    ecs_world_t *world = gr_world("test/assets/grass/plane.flecs");
+    ecs_entity_t view = gr_lookup(world, "grass_view");
+    ecs_entity_t slab = ecs_entity(world, { .name = "grass_slab" });
+    ecs_set(world, slab, Position, {0, 4, -8});
+    ecs_set(world, slab, Box, {16, 0.2f, 8});
+    gr_frames(world, 10);
+    unsigned char *px = gr_capture(world, "grass_every_frame.png");
+    double every = gr_bright(px);
+    stbi_image_free(px);
+
+    // Cascades rendered every 4th frame: the cascades the grass casts into keep their casters
+    // between those frames and only draw the grass again, so the slab still shadows the meadow
+    View *v = ecs_get_mut(world, view, View);
+    int32_t i, cascades = v->shadows.cascades;
+    for (i = 0; i < cascades; i ++) {
+        v->shadows.interval[i] = 4;
+    }
+
+    ecs_modified(world, view, View);
+    gr_frames(world, 10);
+    box_render_gpu_stats_t before = gr_stats(world);
+    for (i = 0; i < 4; i ++) {
+        char file[64];
+        ecs_os_snprintf(file, sizeof(file), "grass_reused_%d.png", i);
+        px = gr_capture(world, file);
+        double bright = gr_bright(px);
+        stbi_image_free(px);
+        printf("brightness %.2f rendering every frame, %.2f reused\n", every, bright);
+        test_assert(fabs(bright - every) < every * 0.01);
+    }
+
+    box_render_gpu_stats_t after = gr_stats(world);
+    printf("cascades %d rendered, %d kept, grass cascades %d\n",
+        after.shadow_cascades - before.shadow_cascades,
+        after.shadow_cascades_kept - before.shadow_cascades_kept,
+        after.grass_cascades - before.grass_cascades);
+    test_int(after.shadow_cascades - before.shadow_cascades, cascades);
+    test_int(after.shadow_cascades_kept - before.shadow_cascades_kept, 3 * cascades);
+    test_assert(after.grass_cascades - before.grass_cascades >= 4);
+
+    gr_expect_no_errors(world);
+    ecs_fini(world);
+}
+
 
 /** Add a wall across the meadow of the plane scene in front of the camera, which hides the
  * ground beyond it from the camera.
