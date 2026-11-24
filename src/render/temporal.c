@@ -6,6 +6,10 @@
  * A backend keeps a history per target and view: the view projection and camera position of the
  * previous frame the view rendered and the frames since its last reset. It counts rendered
  * frames, not time, so a headless run with a fixed delta time is deterministic.
+ *
+ * The history is local: after a shift of the local origin (WorldOrigin) the previous view
+ * projection and camera are taken into the new frame, so reprojection sees the same absolute
+ * positions and the history carries over.
  */
 
 #include "render.h"
@@ -122,10 +126,37 @@ static bool box_render_history_continues(
         h->height == height && !memcmp(h->proj, proj, sizeof(mat4));
 }
 
+/** Take the previous frame of a history into the frame of the local origin of this one.
+ *
+ * @param h The history, of the previous frame
+ * @param local Frame of the local origin of this frame
+ * @param t Receives the previous view projection and camera in that frame
+ */
+static void box_render_history_rebase(
+    const box_render_history_t *h,
+    const box_render_frame_t *local,
+    box_render_temporal_t *t)
+{
+    mat4 to_previous, to_current;
+    if (box_render_frame_same(&h->local, local)) {
+        glm_mat4_copy(ECS_CONST_CAST(vec4*, h->view_proj), t->prev_view_proj);
+        glm_vec4_copy(ECS_CONST_CAST(float*, h->camera_position), t->prev_camera);
+        goto done;
+    }
+
+    box_render_frame_map(local, &h->local, to_previous);
+    box_render_frame_map(&h->local, local, to_current);
+    glm_mat4_mul(ECS_CONST_CAST(vec4*, h->view_proj), to_previous, t->prev_view_proj);
+    glm_mat4_mulv(to_current, ECS_CONST_CAST(float*, h->camera_position), t->prev_camera);
+done:
+    return;
+}
+
 const box_render_temporal_t* box_render_history_update(
     ecs_vec_t *histories,
     uint32_t target,
     const box_render_view_t *v,
+    const box_render_frame_t *local,
     int64_t frame,
     int32_t width,
     int32_t height,
@@ -150,8 +181,7 @@ const box_render_temporal_t* box_render_history_update(
     glm_mat4_mul(ECS_CONST_CAST(vec4*, proj), ECS_CONST_CAST(vec4*, v->view_matrix), view_proj);
     box_render_temporal_t *t = &h->current;
     if (!first && box_render_history_continues(h, v, width, height, proj)) {
-        glm_mat4_copy(h->view_proj, t->prev_view_proj);
-        glm_vec4_copy(h->camera_position, t->prev_camera);
+        box_render_history_rebase(h, local, t);
         t->frame_index ++;
         t->valid = true;
         t->prev_frame = h->frame;
@@ -172,6 +202,7 @@ const box_render_temporal_t* box_render_history_update(
     glm_mat4_copy(view_proj, h->view_proj);
     glm_vec3_copy(ECS_CONST_CAST(float*, v->camera_transform[3]), h->camera_position);
     h->camera_position[3] = 1.0f;
+    h->local = *local;
 done:
     return &h->current;
 }

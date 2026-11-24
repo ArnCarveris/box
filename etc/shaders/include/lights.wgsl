@@ -111,6 +111,11 @@ struct View {
     // x: view depth of the near plane of the grid, y: of its far end, z: 1 for an orthographic
     // camera, w: unused
     fog_range: vec4f,
+    // view_proj of the positions relative to the render origin (local - render_delta), which the
+    // mesh passes place their vertices with, see place.wgsl; view_proj without a render origin
+    render_view_proj: mat4x4f,
+    // The render origin in local units (xyz)
+    render_delta: vec4f,
 };
 
 // shadow is the index of the tile record of a spot or point light in the shadow atlas of the

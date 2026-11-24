@@ -2186,7 +2186,9 @@
                     "shift_same_image",
                     "rebase_same_image",
                     "particles_same_image",
-                    "cell_same_image"
+                    "cell_same_image",
+                    "render_follow_same_image",
+                    "render_follow_cell_same_image"
                 ]
             },
             {
@@ -2198,7 +2200,8 @@
                     "texture_layer_shift",
                     "wind_sway_shift",
                     "fog_volume_shift",
-                    "far_origin_not_blocky"
+                    "far_origin_not_blocky",
+                    "fog_volume_shift_next_frame"
                 ]
             }
         ]

@@ -114,6 +114,7 @@ struct CullJob {
 @group(0) @binding(21) var<storage, read> bounds: array<CullBounds>;
 @group(1) @binding(0) var<storage, read> transforms: array<InstanceTransform>;
 @group(1) @binding(1) var<storage, read> surface_assets: array<vec4f>;
+@group(1) @binding(6) var<uniform> instance_page: InstancePage;
 
 const GROUP: u32 = 64u;
 const SH_COEFFICIENTS: u32 = 9u;
@@ -373,7 +374,7 @@ struct CullBox {
 };
 
 fn cull_box(job: CullJob, slot: u32) -> CullBox {
-    let m = instance_model(transforms[slot]);
+    let m = instance_model(instance_local(transforms[slot], instance_page));
     let c0 = m[0].xyz;
     let c1 = m[1].xyz;
     let c2 = m[2].xyz;

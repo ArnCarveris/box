@@ -104,6 +104,7 @@ const LIST_WORDS: u32 = 4u;
 @group(0) @binding(14) var<uniform> portals: array<vec4f, 2048>;
 @group(1) @binding(0) var<storage, read> transforms: array<InstanceTransform>;
 @group(1) @binding(1) var<storage, read> surface_assets: array<vec4f>;
+@group(1) @binding(6) var<uniform> instance_page: InstancePage;
 @group(2) @binding(0) var<storage, read_write> history: array<u32>;
 @group(2) @binding(1) var pyramid: texture_2d<f32>;
 
@@ -432,7 +433,7 @@ fn cull_instances(
     workgroupBarrier();
     if (index < job.count) {
         let slot = job_slot(job, index);
-        let m = instance_model(transforms[slot]);
+        let m = instance_model(instance_local(transforms[slot], instance_page));
         let b = bounds(job, m);
         var drawn = 0u;
         var culled = 0u;
@@ -624,7 +625,8 @@ fn cull_write(
     let bit = local % 32u;
     let frustums = countOneBits(job.mask);
     let slot = job_slot(job, index);
-    let packed = ranged_slot(slot, range_at(job, instance_model(transforms[slot])));
+    let model = instance_model(instance_local(transforms[slot], instance_page));
+    let packed = ranged_slot(slot, range_at(job, model));
     for (var k = 0u; k < frustums; k++) {
         let words = scan + (k * job_groups + part) * SCAN_WORDS;
         let low = scan_words[words];
@@ -678,7 +680,7 @@ fn cull_ordered(
                 slot = slot_lists[job.first + i];
             }
 
-            let m = instance_model(transforms[slot]);
+            let m = instance_model(instance_local(transforms[slot], instance_page));
             let range = range_at(job, m);
             let hidden = range_hidden(range);
             let d = decide(job, slot, m, bounds(job, m), f, hidden);
@@ -762,7 +764,7 @@ fn cull_lod(
     let fade = select(0.0, cull.lod.x, range_set(job.range));
     for (var i = group.x * 64u + local; i < total; i += groups.x * 64u) {
         let slot = visible_slots[job.first + i];
-        let m = instance_model(transforms[slot_of(slot)]);
+        let m = instance_model(instance_local(transforms[slot_of(slot)], instance_page));
         let center = (m * vec4f(job.center, 1.0)).xyz;
         let scale = max(max(length(m[0].xyz), length(m[1].xyz)), length(m[2].xyz));
         let radius = length(job.extent) * scale;

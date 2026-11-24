@@ -516,6 +516,9 @@ typedef struct box_draw_mover_t {
     int32_t next;           /**< Next free index, while free */
     box_render_transform_t pose; /**< Its world transform when the movers were last placed */
     box_render_transform_t was; /**< Its world transform before that */
+    double at[3];           /**< The translation of pose in f64: the exact corner of the cell
+                             *   of a WorldCell root, which the mover table takes the render
+                             *   origin from */
     float scale;            /**< Its uniform world scale when its slots were last written */
     bool moved;             /**< pose differs from was */
 } box_draw_mover_t;
@@ -850,6 +853,8 @@ typedef struct box_render_draws_t {
     uint32_t movers_size;       /**< Records the mover table on the GPU holds, 0 before it is
                                  *   created */
     bool movers_dirty;          /**< A mover moved or joined since the table was last sent */
+    double movers_delta[3];     /**< Render origin (box_render_frame_t.delta) the table was
+                                 *   last sent relative to */
     ecs_map_t locals;           /**< Entity under a mover to the hash of the local transform
                                  *   its subtree was last written with */
     ecs_map_t frame_poses;      /**< Texture frame to its index in frame_cache plus one */

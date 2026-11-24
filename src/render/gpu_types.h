@@ -1278,7 +1278,21 @@ typedef struct box_gpu_view_uniforms_t {
                                      *   down, slices, 1 when the view has fog volumes */
     vec4 fog_range;                 /**< View depth of the near plane and of the far end of
                                      *   the grid, 1 for orthographic, unused */
+    mat4 render_view_proj;          /**< view_proj of the positions relative to the render
+                                     *   origin, local - render_delta, which the mesh passes
+                                     *   place their vertices with; view_proj without one */
+    vec4 render_delta;              /**< The render origin in local units, w unused */
 } box_gpu_view_uniforms_t;
+
+/** The render origin of an instance page as the shaders take it (InstancePage of
+ * instance.wgsl), which a page binds at 6 */
+typedef struct box_gpu_instance_page_t {
+    vec4 place;                     /**< What the records of the page move by to be relative
+                                     *   to the render origin: the render origin for a page of
+                                     *   local records, 0 for a mover page */
+    vec4 delta;                     /**< The render origin in local units, which takes the
+                                     *   records back to local */
+} box_gpu_instance_page_t;
 
 _Static_assert(sizeof(box_gpu_view_uniforms_t) <= BOX_GPU_VIEW_STRIDE,
     "the uniforms of a view fit in its stride");
@@ -1641,6 +1655,8 @@ typedef struct box_gpu_t {
     ecs_vec_t shadow_data;          /**< Bytes of the cascade matrices of a target */
     double origin[3];               /**< Absolute position of the local origin of the packet
                                      *   the views are written for, which the cascades take */
+    double render_delta[3];         /**< Render origin of the packet in local units
+                                     *   (box_render_frame_t.delta) */
     WGPUTexture capture_shadow;     /**< Shadow map of the probe captures, one cascade */
     WGPUTextureView capture_shadow_view; /**< Array view the captures sample */
     WGPUTextureView capture_shadow_layer; /**< View the casters render into */
@@ -1682,6 +1698,9 @@ typedef struct box_gpu_t {
                                      *   the pages without one, all but the frame pages */
     WGPUBuffer no_materials;        /**< One default material record, the material table of
                                      *   the draws before the main thread sent one */
+    WGPUBuffer page_still;          /**< InstancePage of the pages of local transforms */
+    WGPUBuffer page_mover;          /**< InstancePage of the mover pages, whose world records
+                                     *   are relative to the render origin */
     WGPUBuffer no_water_waves;      /**< A zero wave table, bound by the view groups before
                                      *   the main thread sent one: no waves */
     box_gpu_cull_t cull;            /**< Cull pass state */

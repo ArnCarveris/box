@@ -789,7 +789,8 @@
                     "sweep_drops_unrendered_view",
                     "sequence_2d_deterministic_in_range",
                     "sequence_3d_deterministic_in_range",
-                    "sequence_2d_covers_square"
+                    "sequence_2d_covers_square",
+                    "shift_keeps_reprojection"
                 ]
             },
             {
@@ -1332,6 +1333,15 @@
                     "follows_revision",
                     "remove_frees",
                     "script_sample"
+                ]
+            },
+            {
+                "id": "RenderOrigin",
+                "testcases": [
+                    "off_by_default",
+                    "follow_camera",
+                    "follow_cell_exact",
+                    "cost_per_mover"
                 ]
             },
             {

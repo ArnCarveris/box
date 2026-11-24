@@ -61,20 +61,25 @@ fn terrain_tile(slot: u32) -> TerrainTileParams {
         surfaces[slot].p[4], surfaces[slot].p[5]);
 }
 
-// Clip position of a vertex of a tile, as vs_terrain and vs_terrain_depth place it.
+// Clip position of a vertex of a tile, as vs_terrain and vs_terrain_depth place it: relative to
+// the render origin, as place.wgsl places the meshes.
+fn terrain_relative(slot: u32, local: vec3f) -> vec4f {
+    return instance_model(instance_relative(transforms[slot], instance_page)) * vec4f(local, 1.0);
+}
+
 fn terrain_clip(slot: u32, local: vec3f) -> vec4f {
-    let world = instance_model(transforms[slot]) * vec4f(local, 1.0);
-    return view.view_proj * world;
+    return view.render_view_proj * terrain_relative(slot, local);
 }
 
 fn terrain_vertex_out(v: VertexIn) -> TerrainOut {
     let slot = slot_of(v.slot);
     let t = terrain_tile(slot);
     let placed = terrain_vertex_of(t, v.position);
-    let model = instance_model(transforms[slot]);
+    let model = instance_model(instance_local(transforms[slot], instance_page));
     let world = model * vec4f(placed.position, 1.0);
-    let p = Placed(model, placed.normal, world, view.view_proj * world, placed.position,
-        vec3f(0.0), vec4f(0.0, 0.0, 0.0, 1.0));
+    let relative = terrain_relative(slot, placed.position);
+    let p = Placed(model, placed.normal, world, view.render_view_proj * relative,
+        placed.position, vec3f(0.0), vec4f(0.0, 0.0, 0.0, 1.0), relative);
     let frame = model_frame(p);
     let shading = shadings[slot];
     let material = material_fetch(shading_material(shading));

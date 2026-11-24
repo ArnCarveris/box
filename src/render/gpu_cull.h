@@ -27,9 +27,10 @@ void box_gpu_cull_fini(
 /** Create the bind group layouts of the instance pages.
  *
  * instance_layout binds the transform stream (0), the surface assets of the mesh (1), the shading
- * stream (2), the surface stream (3), the material table (4) and the frame stream (5);
- * transform_layout every binding but the shading stream, the material table and the frame
- * stream. Only the transform stream is visible to compute.
+ * stream (2), the surface stream (3), the material table (4), the frame stream (5) and the
+ * render origin of the page (6, InstancePage of instance.wgsl); transform_layout every binding
+ * but the shading stream, the material table and the frame stream. Only the transform stream
+ * and the render origin are visible to compute.
  *
  * A plain mesh page and a 2D page have no surface stream and bind gpu->no_surfaces at 3; every
  * page but a frame page has no frame stream and binds gpu->no_frames at 5.
@@ -45,6 +46,28 @@ void box_gpu_instance_layouts_init(
  */
 void box_gpu_instance_layouts_fini(
     box_gpu_t *gpu);
+
+/** Write the render origin of the packet into the uniforms the instance pages bind at 6: a
+ * still page holds local transforms and is placed at local - delta, a mover page holds its world
+ * records relative to the render origin already (box_draws_movers_send). One write each per
+ * packet, whatever the instances.
+ *
+ * @param gpu The backend
+ * @param packet The packet
+ */
+void box_gpu_instance_pages_origin(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet);
+
+/** Fill the members of the uniforms of a view about the render origin from its view_proj:
+ * render_delta, and render_view_proj as view_proj after a move by the render origin.
+ *
+ * @param delta The render origin in local units
+ * @param u The uniforms, view_proj set
+ */
+void box_gpu_view_relative(
+    const double delta[3],
+    box_gpu_view_uniforms_t *u);
 
 /** Get the bind group of an instance page for the draws of a mesh, made on first use.
  *

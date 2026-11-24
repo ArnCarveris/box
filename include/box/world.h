@@ -79,6 +79,11 @@ ECS_STRUCT(WorldOrigin, {
                           *   default false */
     float scale_base;    /**< Altitude in local units the scale aims at, default 64 */
     int32_t scale_max;   /**< Greatest exponent of the scale, default 44 */
+    bool render;         /**< Place the meshes on the GPU relative to a render origin that
+                          *   follows render_follow every frame, apart from the shifts, at a
+                          *   cost per mover and not per entity, default false */
+    ecs_entity_t render_follow; /**< Entity the render origin follows: the cell of a WorldCell
+                          *   root, else its world position; 0 for the camera of the first View */
 });
 
 /** Shifts of the world origin so far, written by the engine next to WorldOrigin */

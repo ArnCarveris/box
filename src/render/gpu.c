@@ -591,6 +591,7 @@ static void box_gpu_render(
     box_gpu_copy(gpu, packet);
     box_gpu_upload(gpu, packet);
     box_gpu_scatter(gpu, packet);
+    box_gpu_instance_pages_origin(gpu, packet);
     box_gpu_compose(gpu, packet);
     box_gpu_atmosphere_build(gpu, packet);
     box_gpu_planet_lights_prepare(gpu, packet);

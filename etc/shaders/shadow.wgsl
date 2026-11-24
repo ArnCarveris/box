@@ -46,6 +46,8 @@ const OCTANT_AXIS: f32 = 0.57735026919;
 // Transforms relative to the texture frame, read by MappingFrame materials only: the frame pages
 // have the stream, the other pages bind one zero record.
 @group(1) @binding(5) var<storage, read> frames: array<InstanceTransform>;
+// The render origin of the page; the casters render in the local frame (instance_local).
+@group(1) @binding(6) var<uniform> instance_page: InstancePage;
 
 @group(2) @binding(0) var albedo_map: texture_2d<f32>;
 // The depth atlas of the impostor cards (fs_impostor only), at the binding of the ORM map
@@ -135,7 +137,7 @@ fn caster_wind(slot: u32, world: vec3f, model: mat4x4f) -> vec3f {
 }
 
 fn caster_world_mesh(slot: u32, vertex: vec3f) -> vec3f {
-    let model = instance_model(transforms[slot]);
+    let model = instance_model(instance_local(transforms[slot], instance_page));
     return caster_wind(slot, (model * vec4f(vertex, 1.0)).xyz, model);
 }
 
@@ -145,7 +147,7 @@ fn caster_world(slot: u32, vertex: vec3f) -> vec3f {
     if (slot < arrayLength(&surfaces)) {
         surface_data = surfaces[slot];
     }
-    let model = instance_model(transforms[slot]);
+    let model = instance_model(instance_local(transforms[slot], instance_page));
     var position = vertex;
     if (surface_data.p[19].x != 0.0) {
         position = vertex;
@@ -281,7 +283,7 @@ fn cutout_attributes(v: VertexIn, o: ptr<function, CasterOut>) {
 // position and normal: the object position and normal of the vertex.
 fn cutout_mapping(v: VertexIn, material: Material, position: vec3f, normal: vec3f,
     o: ptr<function, CasterOut>) {
-    let model = instance_model(transforms[slot_of(v.slot)]);
+    let model = instance_model(instance_local(transforms[slot_of(v.slot)], instance_page));
     let c0 = model[0].xyz;
     let c1 = model[1].xyz;
     let c2 = model[2].xyz;
@@ -304,8 +306,10 @@ fn cutout_mapping(v: VertexIn, material: Material, position: vec3f, normal: vec3
         var relative = model;
         var framed = false;
         if (slot_of(v.slot) < arrayLength(&frames)) {
-            relative = instance_frame(frames[slot_of(v.slot)], model);
             framed = instance_framed(frames[slot_of(v.slot)], transforms[slot_of(v.slot)]);
+            if (framed) {
+                relative = instance_frame(frames[slot_of(v.slot)], model);
+            }
         }
         let f = mapping_frame(material, relative, position, normal);
         (*o).object = f.object;
@@ -600,7 +604,8 @@ fn impostor_light_direction(world: vec4f) -> vec3f {
 
 @vertex fn vs_impostor(v: VertexIn, d: VertexData) -> ImpostorCasterOut {
     let slot = slot_of(v.slot);
-    let model = instance_model(transforms[slot]);
+    let local = instance_local(transforms[slot], instance_page);
+    let model = instance_model(local);
     let grid = impostor_grid(d);
     let center = model * vec4f(grid.center, 1.0);
     let e = impostor_local_direction(model, impostor_light_direction(center), grid.hemisphere);
@@ -614,9 +619,9 @@ fn impostor_light_direction(world: vec4f) -> vec3f {
         caster_range(v.slot), 0u);
     o.eye = vec4f(e, grid.half);
     o.center = vec4f(grid.center, grid.ratio);
-    o.row0 = transforms[slot].rows[0];
-    o.row1 = transforms[slot].rows[1];
-    o.row2 = transforms[slot].rows[2];
+    o.row0 = local.rows[0];
+    o.row1 = local.rows[1];
+    o.row2 = local.rows[2];
     return o;
 }
 

@@ -431,6 +431,7 @@ static void BoxRenderExtractViews(
             box_render_view_compare);
     }
 
+    box_render_origin_frame(it->world, p);
     box_render_portals(it->world, it->stage, p);
     box_render_debug_bvh(it->world, p);
 }

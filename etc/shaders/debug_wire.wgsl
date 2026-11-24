@@ -34,6 +34,7 @@ const WIRE_DATA_VECS: u32 = 4u;
 
 @group(2) @binding(0) var<storage, read> transforms: array<InstanceTransform>;
 @group(2) @binding(1) var<storage, read> surface_assets: array<vec4f>;
+@group(2) @binding(6) var<uniform> instance_page: InstancePage;
 @group(2) @binding(3) var<storage, read> surfaces: array<SurfaceData>;
 // Read by vs_wind only, which the pipelines of the batches with a WindSway use.
 @group(2) @binding(2) var<storage, read> shadings: array<MeshShading>;

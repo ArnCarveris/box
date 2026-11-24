@@ -900,6 +900,7 @@ static void box_gpu_bake_face(
     glm_mat4_mul(proj, rv->view_matrix, u->view_proj);
     glm_mat4_inv(u->view_proj, u->inv_view_proj);
     glm_mat4_copy(u->view_proj, u->prev_view_proj);
+    box_gpu_view_relative(gpu->render_delta, u);
     glm_vec3_copy(eye, u->camera);
     u->camera[3] = 1;
     u->reflection[1] = 1;

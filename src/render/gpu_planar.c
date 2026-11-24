@@ -430,6 +430,7 @@ int32_t box_gpu_planar_add(
         *r = *u;
         glm_mat4_mul(oblique, pass->view_matrix, r->view_proj);
         glm_mat4_inv(r->view_proj, r->inv_view_proj);
+        box_gpu_view_relative(gpu->render_delta, r);
         glm_mat4_mul(proj, pass->view_matrix, inv);
         glm_mat4_inv(inv, pass->sky_inv_view_proj);
         glm_vec3_copy(ECS_CONST_CAST(float*, rec->camera), r->camera);

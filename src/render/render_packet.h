@@ -2796,6 +2796,19 @@ typedef struct box_render_transition_record_t {
                                      *   padding zeroed */
 } box_render_transition_record_t;
 
+/** The frame of the local origin (WorldOrigin) of a packet and the render origin in it.
+ *
+ * Absolute = origin + scale * rotation * local. The CPU and the world space inputs of the GPU
+ * are local; the mesh passes place their vertices relative to the render origin, local - delta,
+ * and the mover table holds the movers relative to it (box_render_origin_frame).
+ */
+typedef struct box_render_frame_t {
+    double origin[3];       /**< Absolute position of the local origin */
+    double rotation[3][3];  /**< rotation[c] is the absolute direction of the local axis c */
+    double scale;           /**< Absolute meters per local unit */
+    double delta[3];        /**< Local position of the render origin, 0 without one */
+} box_render_frame_t;
+
 /** Everything the renderer needs of one frame, filled on the main thread.
  *
  * The vectors keep their storage when the packet is reused, so a frame that needs no more
@@ -2807,6 +2820,7 @@ typedef struct box_render_packet_t {
     double time;            /**< World time at the end of the frame, in seconds */
     double origin[3];       /**< Absolute position of the local origin (WorldOrigin) of the
                              *   frame, which the world space patterns of the shaders add */
+    box_render_frame_t local; /**< Frame of the local origin and the render origin in it */
     float delta;            /**< Seconds the frame advanced the world */
     float fps;              /**< Frame rate cap of the frame, box_app_fps, 0 uncapped */
     bool headless;          /**< App.headless: the frame waits for the pipelines it draws

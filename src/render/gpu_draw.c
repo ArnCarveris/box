@@ -159,10 +159,17 @@ void box_gpu_instance_layouts_init(
         .diffuse_transmission = 0u,
         .thickness = 0.0f
     };
-    WGPUBindGroupLayoutEntry entries[6] = {{
+    WGPUBindGroupLayoutEntry entries[7] = {{
         .binding = 0,
         .visibility = WGPUShaderStage_Vertex | WGPUShaderStage_Compute,
         .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
+    }, {
+        .binding = 6,
+        .visibility = WGPUShaderStage_Vertex | WGPUShaderStage_Compute,
+        .buffer = {
+            .type = WGPUBufferBindingType_Uniform,
+            .minBindingSize = sizeof(box_gpu_instance_page_t)
+        }
     }, {
         .binding = 1,
         .visibility = WGPUShaderStage_Vertex,
@@ -185,16 +192,23 @@ void box_gpu_instance_layouts_init(
         .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
     }};
     gpu->instance_layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
-        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 6, .entries = entries });
+        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 7, .entries = entries });
     gpu->transform_layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
-        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 3, .entries = entries });
+        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 4, .entries = entries });
     gpu->material_instance_layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
-        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 5, .entries = entries });
+        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 6, .entries = entries });
     gpu->no_materials = box_gpu_buffer_new(gpu, sizeof(box_render_material_t),
         WGPUBufferUsage_Storage);
     wgpuQueueWriteBuffer(gpu->queue, gpu->no_materials, 0, &fallback, sizeof(fallback));
     gpu->no_water_waves = box_gpu_buffer_new(gpu,
         BOX_RENDER_WATER_WAVE_SETS * sizeof(box_render_water_waves_t), WGPUBufferUsage_Uniform);
+    gpu->page_still = box_gpu_buffer_new(gpu, sizeof(box_gpu_instance_page_t),
+        WGPUBufferUsage_Uniform);
+    gpu->page_mover = box_gpu_buffer_new(gpu, sizeof(box_gpu_instance_page_t),
+        WGPUBufferUsage_Uniform);
+    box_gpu_instance_page_t zero = {0};
+    wgpuQueueWriteBuffer(gpu->queue, gpu->page_still, 0, &zero, sizeof(zero));
+    wgpuQueueWriteBuffer(gpu->queue, gpu->page_mover, 0, &zero, sizeof(zero));
 }
 
 void box_gpu_instance_layouts_fini(
@@ -224,6 +238,90 @@ void box_gpu_instance_layouts_fini(
         wgpuBufferRelease(gpu->no_water_waves);
         gpu->no_water_waves = NULL;
     }
+
+    if (gpu->page_still) {
+        wgpuBufferRelease(gpu->page_still);
+        gpu->page_still = NULL;
+    }
+
+    if (gpu->page_mover) {
+        wgpuBufferRelease(gpu->page_mover);
+        gpu->page_mover = NULL;
+    }
+}
+
+void box_gpu_instance_pages_origin(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet)
+{
+    const double *delta = packet->local.delta;
+    box_gpu_instance_page_t still = {0}, mover = {0};
+    int32_t i;
+    for (i = 0; i < 3; i ++) {
+        gpu->render_delta[i] = delta[i];
+        still.place[i] = (float)delta[i];
+        still.delta[i] = (float)delta[i];
+        mover.delta[i] = (float)delta[i];
+    }
+
+    if (gpu->page_still && gpu->page_mover) {
+        wgpuQueueWriteBuffer(gpu->queue, gpu->page_still, 0, &still, sizeof(still));
+        wgpuQueueWriteBuffer(gpu->queue, gpu->page_mover, 0, &mover, sizeof(mover));
+    }
+}
+
+void box_gpu_view_relative(
+    const double delta[3],
+    box_gpu_view_uniforms_t *u)
+{
+    mat4 move;
+    if (delta[0] == 0.0 && delta[1] == 0.0 && delta[2] == 0.0) {
+        glm_mat4_copy(u->view_proj, u->render_view_proj);
+        glm_vec4_zero(u->render_delta);
+        goto done;
+    }
+
+    glm_translate_make(move, (vec3){ (float)delta[0], (float)delta[1], (float)delta[2] });
+    glm_mat4_mul(u->view_proj, move, u->render_view_proj);
+    u->render_delta[0] = (float)delta[0];
+    u->render_delta[1] = (float)delta[1];
+    u->render_delta[2] = (float)delta[2];
+    u->render_delta[3] = 0.0f;
+done:
+    return;
+}
+
+/** Fill the members of the uniforms of a view about the render origin from its camera: the
+ * camera moved by minus the render origin in f64, so a camera at the render origin is at 0 and
+ * render_view_proj keeps the precision of the positions near it.
+ *
+ * @param delta The render origin in local units
+ * @param v The view
+ * @param proj Projection of the view
+ * @param u The uniforms, view_proj set
+ */
+static void box_gpu_view_render(
+    const double delta[3],
+    const box_render_view_t *v,
+    const mat4 proj,
+    box_gpu_view_uniforms_t *u)
+{
+    mat4 camera, view;
+    int32_t i;
+    box_gpu_view_relative(delta, u);
+    if (delta[0] == 0.0 && delta[1] == 0.0 && delta[2] == 0.0) {
+        goto done;
+    }
+
+    glm_mat4_copy(ECS_CONST_CAST(vec4*, v->camera_transform), camera);
+    for (i = 0; i < 3; i ++) {
+        camera[3][i] = (float)((double)v->camera_transform[3][i] - delta[i]);
+    }
+
+    glm_mat4_inv(camera, view);
+    glm_mat4_mul(ECS_CONST_CAST(vec4*, proj), view, u->render_view_proj);
+done:
+    return;
 }
 
 /** Create a bind group of the streams of an instance page and surface assets.
@@ -260,10 +358,12 @@ static WGPUBindGroup box_gpu_instance_group_new(
         frames->composed ? frames->composed : frames->buffer;
     WGPUBuffer surface_buffer = surfaces ? surfaces->buffer : gpu->no_surfaces;
     uint64_t surface_size = surfaces ? surfaces->size : sizeof(box_render_surface_t);
+    WGPUBuffer page = transforms->composed ? gpu->page_mover : gpu->page_still;
     const box_gpu_buffer_t *materials = ecs_map_get_deref(
         &gpu->buffers, box_gpu_buffer_t, BOX_RENDER_BUFFER_MATERIALS);
-    WGPUBindGroupEntry entry[6] = {
+    WGPUBindGroupEntry entry[7] = {
         {.binding = 0, .buffer = transform_buffer, .size = transforms->size},
+        {.binding = 6, .buffer = page, .size = sizeof(box_gpu_instance_page_t)},
         {.binding = 1, .buffer = assets, .size = size},
         {.binding = 3, .buffer = surface_buffer, .size = surface_size},
         {.binding = 2, .buffer = shadings->buffer, .size = shadings->size},
@@ -282,7 +382,7 @@ static WGPUBindGroup box_gpu_instance_group_new(
     WGPUBindGroupLayout layouts[3] = {
         gpu->transform_layout, gpu->instance_layout, gpu->material_instance_layout
     };
-    size_t counts[3] = { 3, 6, 5 };
+    size_t counts[3] = { 4, 7, 6 };
 
     return wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
         .layout = layouts[binds],
@@ -923,6 +1023,7 @@ static int32_t box_gpu_view_write(
             (float)t->desc.point_width, (float)t->desc.point_height, proj);
         glm_mat4_mul(proj, ECS_CONST_CAST(vec4*, v->view_matrix), u->view_proj);
         glm_mat4_inv(u->view_proj, u->inv_view_proj);
+        box_gpu_view_render(packet->local.delta, v, proj, u);
         glm_vec3_copy(ECS_CONST_CAST(float*, v->camera_transform[3]), u->camera);
         u->camera[3] = 1;
         u->viewport[0] = (float)t->desc.render_width;

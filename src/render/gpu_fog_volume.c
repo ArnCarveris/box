@@ -63,6 +63,8 @@ typedef struct box_gpu_froxels_t {
     box_gpu_fog_uniforms_t previous; /**< Uniform of the frame before that one */
     float current_distance;         /**< Fog distance of current */
     float previous_distance;        /**< Fog distance of previous */
+    box_render_frame_t current_local; /**< Frame of the local origin of current */
+    box_render_frame_t previous_local; /**< Frame of the local origin of previous */
     int64_t frame;                  /**< Packet frame of current, -1 for none */
     bool has_previous;              /**< previous holds a frame */
 } box_gpu_froxels_t;
@@ -802,6 +804,8 @@ static box_gpu_froxels_t* box_gpu_froxels_get(
     if (!result) {
         result = ecs_os_calloc_t(box_gpu_froxels_t);
         result->frame = -1;
+        box_render_frame_identity(&result->current_local);
+        box_render_frame_identity(&result->previous_local);
         ecs_map_insert_ptr(&f->grids, key, result);
     }
 
@@ -918,8 +922,8 @@ uint32_t box_gpu_fog_volumes_unfogged(
 }
 
 /** Keep the uniform of the frame a grid is injected in and fill the members of the uniform
- * about the previous frame: its slicing, and whether inject blends with its cells, which needs
- * a valid history pair of the same grid size and fog distance.
+ * about the previous frame: its slicing in the local frame of this packet (temporal.c), and
+ * whether inject blends with its cells: a valid history pair of the same size and distance.
  *
  * The injected cells of a view are kept in a ping-pong pair of gpu_history.c: inject samples
  * each cell at a point jittered inside it by the sequence of the frame and blends it with the
@@ -938,17 +942,24 @@ static void box_gpu_froxels_history(
     bool valid,
     box_gpu_fog_uniforms_t *u)
 {
-    int32_t k;
+    int32_t k, r;
+    mat4 to_previous;
     if (g->frame != packet->frame) {
         g->has_previous = g->frame >= 0;
         g->previous = g->current;
         g->previous_distance = g->current_distance;
+        g->previous_local = g->current_local;
     }
+
+    box_render_frame_map(&packet->local, &g->previous_local, to_previous);
 
     valid = valid && g->has_previous && g->previous_distance == distance &&
         !memcmp(g->previous.grid, u->grid, 3 * sizeof(uint32_t));
     for (k = 0; k < 4; k ++) {
-        u->prev_depth_plane[k] = g->previous.depth_plane[k];
+        u->prev_depth_plane[k] = 0.0f;
+        for (r = 0; r < 4; r ++) {
+            u->prev_depth_plane[k] += g->previous.depth_plane[r] * to_previous[k][r];
+        }
     }
 
     u->prev_range[0] = g->previous.range[1];
@@ -957,6 +968,7 @@ static void box_gpu_froxels_history(
     u->prev_range[3] = valid ? 1.0f : 0.0f;
     g->current = *u;
     g->current_distance = distance;
+    g->current_local = packet->local;
     g->frame = packet->frame;
 }
 

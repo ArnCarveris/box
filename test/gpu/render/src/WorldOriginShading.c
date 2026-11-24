@@ -43,6 +43,9 @@
 #define WOS_PIXEL_DIFF (12)
 #define WOS_DIFF_PERMILLE (15)
 
+/** Largest channel difference of two images that differ only by rounding */
+#define WOS_CLOSE_DIFF (4)
+
 /** Builds the content of a case in a world and returns the texture it waits for, 0 for none */
 typedef ecs_entity_t (*wos_build_t)(
     ecs_world_t *world);
@@ -224,6 +227,28 @@ static void wos_expect_same(
 
     test_assert(far * 10000 <= WOS_FAR_PER_10K * WOS_SIZE * WOS_SIZE);
     test_assert(differ * 1000 <= WOS_DIFF_PERMILLE * WOS_SIZE * WOS_SIZE);
+}
+
+/** Check that two images match to within WOS_CLOSE_DIFF in every channel.
+ *
+ * @param a The first image
+ * @param b The second image
+ */
+static void wos_expect_close(
+    const unsigned char *a,
+    const unsigned char *b)
+{
+    int32_t worst = 0, i;
+    for (i = 0; i < WOS_SIZE * WOS_SIZE * 4; i ++) {
+        int32_t d = abs((int)a[i] - (int)b[i]);
+        worst = d > worst ? d : worst;
+    }
+
+    if (worst > WOS_CLOSE_DIFF) {
+        printf("worst channel difference %d\n", worst);
+    }
+
+    test_assert(worst <= WOS_CLOSE_DIFF);
 }
 
 /** Check that an image shows a pattern: enough pixels are lit and they are not all alike.
@@ -458,6 +483,42 @@ void WorldOriginShading_wind_sway_shift(void) {
 void WorldOriginShading_fog_volume_shift(void) {
     // render/world_origin_shading
     wos_shift_same(wos_fog, (double[3]){ 256, 0, 768 });
+}
+
+void WorldOriginShading_fog_volume_shift_next_frame(void) {
+    // render/world_origin_shading
+    /* The fog volumes blend every frame with the cells of the previous one, found through the
+     * previous view projection and slicing; after a shift both are taken into the new frame
+     * (temporal.c, gpu_fog_volume.c), so every frame from the shift on matches a world that never
+     * shifted to within rounding. With a stale history the frame after the shift drops it and
+     * differs by up to 10 in a channel. */
+    ecs_world_t *a = wos_world();
+    ecs_world_t *b = wos_world();
+    wos_fog(a);
+    wos_fog(b);
+    unsigned char *pa = NULL, *pb = NULL;
+    int32_t i;
+    for (i = 0; i < WOS_SHIFT_AT; i ++) {
+        stbi_image_free(pa);
+        stbi_image_free(pb);
+        pa = wos_frame(a, "wos_a.png");
+        pb = wos_frame(b, "wos_b.png");
+    }
+
+    box_world_origin_shift(b, 0, (double[3]){ 256, 0, 768 });
+    for (i = WOS_SHIFT_AT; i < WOS_FRAMES; i ++) {
+        stbi_image_free(pa);
+        stbi_image_free(pb);
+        pa = wos_frame(a, "wos_a.png");
+        pb = wos_frame(b, "wos_b.png");
+        wos_expect_pattern(pa);
+        wos_expect_close(pa, pb);
+    }
+
+    stbi_image_free(pa);
+    stbi_image_free(pb);
+    ecs_fini(a);
+    ecs_fini(b);
 }
 
 /** Render a magnified MappingWorld plane, its content and camera at x and z of offset, with a

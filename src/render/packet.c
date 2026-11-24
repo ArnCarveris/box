@@ -10,6 +10,7 @@ void box_render_packet_init(
     box_render_packet_t *p)
 {
     ecs_os_memset_t(p, 0, box_render_packet_t);
+    box_render_frame_identity(&p->local);
     ecs_vec_init_t(NULL, &p->resources, box_render_resource_t, 0);
     ecs_vec_init_t(NULL, &p->uploads, box_render_upload_t, 0);
     ecs_vec_init_t(NULL, &p->scatters, box_render_scatter_t, 0);
@@ -107,6 +108,7 @@ void box_render_packet_reset(
     p->frame = 0;
     p->time = 0;
     p->origin[0] = p->origin[1] = p->origin[2] = 0;
+    box_render_frame_identity(&p->local);
     p->delta = 0;
     p->fps = 0;
     p->vsync = false;
@@ -198,6 +200,7 @@ void box_render_packet_copy(
     dst->origin[0] = src->origin[0];
     dst->origin[1] = src->origin[1];
     dst->origin[2] = src->origin[2];
+    dst->local = src->local;
     dst->delta = src->delta;
     dst->fps = src->fps;
     dst->vsync = src->vsync;

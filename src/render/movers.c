@@ -5,11 +5,13 @@
  * A shape that inherits DynamicTransform through DynamicTransformSpread keeps its transform
  * relative to its mover in a mover page, written when that transform changes.
  *
- * The mover table holds the world transform of every mover with slots, sent every frame a mover
- * moved, and the compose pass places the slots in the world with it.
+ * The mover table holds the world transform of every mover with slots relative to the render
+ * origin (box_render_frame_t.delta) in f64, sent every frame a mover or the render origin moved;
+ * the compose pass places the slots with it, so following the origin costs a record per mover.
  */
 
 #include "draw.h"
+#include "../world/world.h"
 #include <math.h>
 
 /** Records the mover table on the GPU holds at least, doubling from there */
@@ -98,6 +100,35 @@ box_draw_mover_t* box_draws_mover(
     return ecs_vec_get_t(&d->movers, box_draw_mover_t, (int32_t)index);
 }
 
+/** Set the f64 translation of a mover from its pose: the exact corner of the cell of a WorldCell
+ * root in the frame of the local origin, else the translation of the pose.
+ *
+ * @param world The world
+ * @param m The mover, its pose set
+ * @param frame The frame of the local origin
+ */
+static void box_draws_mover_exact(
+    const ecs_world_t *world,
+    box_draw_mover_t *m,
+    const box_world_frame_t *frame)
+{
+    const WorldCell *cell = ecs_is_alive(world, m->entity)
+        ? ecs_get(world, m->entity, WorldCell) : NULL;
+    int32_t r;
+    if (cell) {
+        double corner[3] = {
+            (double)cell->x * BOX_WORLD_CELL_SIZE,
+            (double)cell->y * BOX_WORLD_CELL_SIZE,
+            (double)cell->z * BOX_WORLD_CELL_SIZE
+        };
+        box_world_frame_to_local(frame, corner, m->at);
+    } else {
+        for (r = 0; r < 3; r ++) {
+            m->at[r] = (double)m->pose.rows[r][3];
+        }
+    }
+}
+
 /** Write the world transform of a mover as the rows of a transform.
  *
  * @param out The transform
@@ -150,7 +181,10 @@ uint32_t box_draws_mover_ref(
     WorldTransform t_buf;
     const WorldTransform *t = box_transform_world(world, mover, &t_buf);
     if (t) {
+        box_world_frame_t frame;
+        box_world_frame_get(world, &frame);
         box_draws_mover_rows(&m->pose, t);
+        box_draws_mover_exact(world, m, &frame);
         m->scale = box_transform_world_scale(t);
     }
 
@@ -189,7 +223,9 @@ void box_draws_movers_send(
     box_render_packet_t *p)
 {
     int32_t i, count = ecs_vec_count(&d->movers);
+    box_world_frame_t frame;
     (void)p;
+    box_world_frame_get(world, &frame);
     for (i = 1; i < count; i ++) {
         box_draw_mover_t *m = box_draws_mover(d, (uint32_t)i);
         box_render_transform_t pose;
@@ -214,6 +250,8 @@ void box_draws_movers_send(
             d->movers_dirty = true;
         }
 
+        box_draws_mover_exact(world, m, &frame);
+
         float scale = box_transform_world_scale(t);
         if (fabsf(scale - m->scale) > BOX_DRAWS_MOVER_SCALE_EPSILON * fabsf(m->scale)) {
             m->scale = scale;
@@ -224,8 +262,28 @@ void box_draws_movers_send(
     }
 }
 
-/** Send the mover table when a mover moved or joined, creating it larger when it outgrew its
- * buffer.
+/** Write the record of a mover relative to the render origin: its pose with the translation
+ * at - delta, computed in f64, so a mover the render origin follows is at exactly 0.
+ *
+ * @param out The record
+ * @param m The mover
+ * @param delta The render origin in the frame of the local origin
+ */
+static void box_draws_mover_record(
+    box_render_transform_t *out,
+    const box_draw_mover_t *m,
+    const double delta[3])
+{
+    int32_t r;
+    *out = m->pose;
+    for (r = 0; r < 3; r ++) {
+        out->rows[r][3] = (float)(m->at[r] - delta[r]);
+    }
+}
+
+/** Send the mover table when a mover moved or joined or the render origin moved, creating it
+ * larger when it outgrew its buffer. Index 0, the identity, holds minus the render origin, so
+ * the slots without a mover land relative to it too.
  *
  * @param d The state
  * @param p The packet
@@ -235,6 +293,14 @@ static void box_draws_movers_upload(
     box_render_packet_t *p)
 {
     int32_t i, count = ecs_vec_count(&d->movers);
+    const double *delta = p->local.delta;
+    if (ecs_os_memcmp(delta, d->movers_delta, sizeof(d->movers_delta))) {
+        d->movers_delta[0] = delta[0];
+        d->movers_delta[1] = delta[1];
+        d->movers_delta[2] = delta[2];
+        d->movers_dirty = true;
+    }
+
     if ((uint32_t)count > d->movers_size) {
         uint32_t size = d->movers_size ? d->movers_size : BOX_DRAWS_MOVERS_MIN;
         while (size < (uint32_t)count) {
@@ -254,7 +320,7 @@ static void box_draws_movers_upload(
         box_render_transform_t *out = box_render_packet_upload(p, BOX_RENDER_BUFFER_MOVERS, 0,
             size);
         for (i = 0; i < count; i ++) {
-            out[i] = box_draws_mover(d, (uint32_t)i)->pose;
+            box_draws_mover_record(&out[i], box_draws_mover(d, (uint32_t)i), delta);
         }
 
         d->stats.upload_bytes += size;

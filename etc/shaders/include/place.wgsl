@@ -1,7 +1,9 @@
 // Placement of the vertices of a mesh instance, shared by the vertex stages of mesh.wgsl and
 // debug_wire.wgsl. The includer declares view (group 0) and the transforms, surface_assets and
-// surfaces streams of the instance group (group 2, bindings 0, 1 and 3); the entry points that
-// move vertices by the wind (place_wind) also the material table (binding 4).
+// surfaces streams and the instance_page of the instance group (group 2, bindings 0, 1, 3 and
+// 6); the entry points that move vertices by the wind (place_wind) also the material table
+// (binding 4). A vertex is shaded at its local position and its clip position is placed from
+// its position relative to the render origin, which keeps the precision near it.
 #pragma once
 #include "instance.wgsl"
 #include "material.wgsl"
@@ -23,7 +25,9 @@ struct VertexIn {
 struct Placed {
     model: mat4x4f,
     normal: vec3f,
+    // The local position, which the shading takes
     world: vec4f,
+    // The clip position: render_view_proj of the position relative to the render origin
     pos: vec4f,
     // The object position, the evaluated position of a parametric surface
     local: vec3f,
@@ -34,13 +38,17 @@ struct Placed {
     // a unit quaternion which turns the world normal before the slope bends it; the identity
     // without one
     turn: vec4f,
+    // The position relative to the render origin, which pos projects
+    relative: vec4f,
 };
 
 fn place_at(v: VertexIn, position: vec3f, normal: vec3f) -> Placed {
-    let model = instance_model(transforms[slot_of(v.slot)]);
+    let t = transforms[slot_of(v.slot)];
+    let model = instance_model(instance_local(t, instance_page));
     let world = model * vec4f(position, 1.0);
-    return Placed(model, normal, world, view.view_proj * world, position, vec3f(0.0),
-        vec4f(0.0, 0.0, 0.0, 1.0));
+    let relative = instance_model(instance_relative(t, instance_page)) * vec4f(position, 1.0);
+    return Placed(model, normal, world, view.render_view_proj * relative, position, vec3f(0.0),
+        vec4f(0.0, 0.0, 0.0, 1.0), relative);
 }
 
 // A placed vertex moved by the wind (wind.wgsl): its world and clip position move, the origin of
@@ -49,7 +57,8 @@ fn place_wind(p: Placed, m: Material) -> Placed {
     var result = p;
     let w = wind_move(p.world.xyz, p.model, m, world_origin(view.origin));
     result.world = vec4f(p.world.xyz + w.offset, p.world.w);
-    result.pos = view.view_proj * result.world;
+    result.relative = vec4f(p.relative.xyz + w.offset, p.relative.w);
+    result.pos = view.render_view_proj * result.relative;
     result.slope = w.slope;
     result.turn = w.turn;
     return result;

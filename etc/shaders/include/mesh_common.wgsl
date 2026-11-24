@@ -118,6 +118,9 @@ const MIN_ROUGHNESS: f32 = 0.045;
 // Transforms relative to the texture frame, read by MappingFrame materials only: the frame
 // pages have the stream, the other pages bind one zero record.
 @group(2) @binding(5) var<storage, read> frames: array<InstanceTransform>;
+// The render origin of the page (instance.wgsl): the vertices are placed relative to it and
+// shaded in the local frame.
+@group(2) @binding(6) var<uniform> instance_page: InstancePage;
 
 // Texels per edge of the octahedral distance map of a probe.
 const VISIBILITY_SIZE: i32 = 8;
@@ -403,10 +406,11 @@ fn vertex_base(v: VertexIn, shading: MeshShading, material: Material) -> VertexS
 }
 
 // Transform of the instance of a slot relative to its texture frame, for a MappingFrame
-// material; the model matrix for a slot past the frame stream of its page.
+// material; the model matrix for a slot past the frame stream of its page or not under a frame,
+// whose record of a mover page is its world record relative to the render origin.
 fn frame_model(slot: u32, model: mat4x4f) -> mat4x4f {
     var result = model;
-    if (slot < arrayLength(&frames)) {
+    if (slot < arrayLength(&frames) && instance_framed(frames[slot], transforms[slot])) {
         result = instance_frame(frames[slot], model);
     }
     return result;

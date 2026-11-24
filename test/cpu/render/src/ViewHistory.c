@@ -11,6 +11,7 @@
 #include <box.h>
 #include <bake_test.h>
 #include <string.h>
+#include <math.h>
 #include "render.h"
 
 /** Handle of the target the cases advance the histories for */
@@ -102,8 +103,8 @@ static box_render_temporal_t history_advance(
     test_assert(v != NULL);
     box_camera_projection(&v->camera_data, (float)width, (float)height, proj);
 
-    return *box_render_history_update(histories, HISTORY_TARGET, v, null->last.frame, width,
-        height, proj);
+    return *box_render_history_update(histories, HISTORY_TARGET, v, &null->last.local,
+        null->last.frame, width, height, proj);
 }
 
 /** Run a frame into the null backend and advance the history of a view of 64x64 pixels.
@@ -472,4 +473,34 @@ void ViewHistory_sequence_2d_covers_square(void) {
         test_assert(quadrants[i] >= 2);
         test_assert(quadrants[i] <= 6);
     }
+}
+
+void ViewHistory_shift_keeps_reprojection(void) {
+    // renderer/views
+    box_render_null_t *null;
+    ecs_entity_t camera, view;
+    ecs_vec_t histories = {0};
+    mat4 first;
+    vec4 point = {3, 1, -4, 1}, before, after;
+    ecs_world_t *world = history_world(&null, &camera, &view);
+    ecs_singleton_set(world, WorldOrigin, {.enabled = false});
+    history_frame(world, null, &histories, view);
+    const box_render_history_t *h = box_render_history_find(&histories, HISTORY_TARGET, view);
+    glm_mat4_copy(ECS_CONST_CAST(vec4*, h->view_proj), first);
+    glm_mat4_mulv(first, point, before);
+
+    box_world_origin_shift(world, 0, (double[3]){ 1024, 0, -256 });
+    box_render_temporal_t t = history_frame(world, null, &histories, view);
+    test_bool(t.valid, true);
+    test_uint(t.frame_index, 1);
+    point[0] -= 1024;
+    point[2] += 256;
+    glm_mat4_mulv(t.prev_view_proj, point, after);
+    for (int32_t i = 0; i < 4; i ++) {
+        test_assert(fabsf(after[i] - before[i]) < 1e-3f);
+    }
+
+    test_assert(fabsf(t.prev_camera[0] + 1024) < 1e-3f);
+    test_assert(fabsf(t.prev_camera[2] - 261) < 1e-3f);
+    history_fini(world, null, &histories);
 }

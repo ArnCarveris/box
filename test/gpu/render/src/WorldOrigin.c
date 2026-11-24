@@ -37,16 +37,22 @@
 /** Pixels that may differ by more than 4 in a channel, per thousand */
 #define ORIGIN_DIFF_PERMILLE (10)
 
+/** Largest channel difference between two images of one world that place the same geometry,
+ * with and without a render origin */
+#define ORIGIN_CLOSE_DIFF (4)
+
 /** Create a headless world that renders on the main thread with the scene: the floor, three
  * boxes, a sun with shadows and a camera with a view.
  *
  * @param camera Receives the camera
  * @param cell Whether the floor and boxes are children of a WorldCell root at cell 1 0 0
+ * @param root Receives the WorldCell root, 0 without one; NULL to ignore it
  * @return The world
  */
 static ecs_world_t* origin_scene_in(
     ecs_entity_t *camera,
-    bool cell)
+    bool cell,
+    ecs_entity_t *root)
 {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
@@ -62,6 +68,10 @@ static ecs_world_t* origin_scene_in(
         parent = ecs_new(world);
         ecs_set(world, parent, WorldCell, {1, 0, 0});
         x -= (float)BOX_WORLD_CELL_SIZE;
+    }
+
+    if (root) {
+        *root = parent;
     }
 
     ecs_entity_t floor = parent ? ecs_new_w_pair(world, EcsChildOf, parent) : ecs_new(world);
@@ -104,7 +114,7 @@ static ecs_world_t* origin_scene_in(
 static ecs_world_t* origin_scene(
     ecs_entity_t *camera)
 {
-    return origin_scene_in(camera, false);
+    return origin_scene_in(camera, false, NULL);
 }
 
 /** Render the next frame into an image file of the temporary folder and load it.
@@ -304,7 +314,7 @@ void WorldOrigin_cell_same_image(void) {
     // render/world_origin
     ecs_entity_t camera_a, camera_b;
     ecs_world_t *a = origin_scene(&camera_a);
-    ecs_world_t *b = origin_scene_in(&camera_b, true);
+    ecs_world_t *b = origin_scene_in(&camera_b, true, NULL);
     unsigned char *pa = NULL, *pb = NULL;
     for (int32_t i = 0; i < 3; i ++) {
         stbi_image_free(pa);
@@ -326,6 +336,179 @@ void WorldOrigin_cell_same_image(void) {
     }
 
     origin_expect_same(pa, pb);
+    stbi_image_free(pa);
+    stbi_image_free(pb);
+    ecs_fini(a);
+    ecs_fini(b);
+}
+
+/** Create a world with a moving ship: a mover root at the absolute X of ORIGIN_X with three
+ * boxes and the camera as children, moving along -Z at 6 units a second over a white floor
+ * with a row of pillars, under a sun with shadows.
+ *
+ * @param ship Receives the ship
+ * @return The world
+ */
+static ecs_world_t* origin_ship_scene(
+    ecs_entity_t *ship)
+{
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+    ecs_singleton_set(world, RenderSettings, {.in_flight = 2, .main_thread = true});
+    ecs_singleton_set(world, AmbientLight, {.intensity = 0.3f});
+
+    ecs_entity_t floor = ecs_new(world);
+    ecs_set(world, floor, Position, {ORIGIN_X, -0.1f, 0});
+    ecs_set(world, floor, Box, {60, 0.2f, 60});
+    ecs_set(world, floor, Rgb, {255, 255, 255});
+    ecs_set(world, floor, PbrMaterial, {.roughness = 1});
+    for (int32_t i = 0; i < 6; i ++) {
+        ecs_entity_t pillar = ecs_new(world);
+        ecs_set(world, pillar, Position, {ORIGIN_X + 6, 1, 4 - 5 * (float)i});
+        ecs_set(world, pillar, Box, {0.6f, 2, 0.6f});
+        ecs_set(world, pillar, Rgb, {220, 200, 60});
+    }
+
+    *ship = ecs_new(world);
+    ecs_add(world, *ship, DynamicTransform);
+    ecs_set(world, *ship, Position, {ORIGIN_X, 0, 0});
+    ecs_set(world, *ship, Velocity, {0, 0, -6});
+    for (int32_t i = 0; i < 3; i ++) {
+        ecs_entity_t box = ecs_new_w_pair(world, EcsChildOf, *ship);
+        ecs_set(world, box, Position, {-4 + 4 * (float)i, 1, -2 * (float)i});
+        ecs_set(world, box, Rotation, {0, 0.3f * (float)i, 0});
+        ecs_set(world, box, Box, {1.5f, 2, 1.5f});
+        ecs_set(world, box, Rgb, {(uint8_t)(80 * i + 60), 120, 200});
+    }
+
+    ecs_entity_t sun = ecs_new(world);
+    ecs_set(world, sun, Rotation, {1.0f, 0.6f, 0});
+    ecs_set(world, sun, DirectionalLight, {.intensity = GLM_PIf});
+
+    ecs_entity_t camera = ecs_new_w_pair(world, EcsChildOf, *ship);
+    ecs_set(world, camera, Position, {0, 6, 12});
+    ecs_set(world, camera, Rotation, {-0.45f, 0, 0});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f, .far_ = 200});
+    ecs_entity_t view = ecs_new(world);
+    ecs_add(world, view, View);
+    View *v = ecs_get_mut(world, view, View);
+    v->camera = camera;
+    v->clear = (ClearSettings){.enabled = true, .color = {30, 40, 60, 255}};
+    v->shadows.enabled = true;
+    ecs_modified(world, view, View);
+
+    return world;
+}
+
+/** Make a world draw relative to a render origin that follows an entity, with a world origin
+ * that shifts by whole meters every meter its focus moves, so it shifts while the ship moves.
+ *
+ * @param world The world
+ * @param follow The entity the render origin follows, 0 for the camera
+ * @param focus The focus of the world origin
+ */
+static void origin_render_follow(
+    ecs_world_t *world,
+    ecs_entity_t follow,
+    ecs_entity_t focus)
+{
+    ecs_singleton_set(world, WorldOrigin, {.threshold = 1, .step = 1, .enabled = true,
+        .render = true, .render_follow = follow});
+    ecs_add(world, focus, WorldFocus);
+}
+
+/** Check that two images match to within ORIGIN_CLOSE_DIFF in every channel: they place the same
+ * geometry, only rounded differently.
+ *
+ * @param a The first image
+ * @param b The second image
+ */
+static void origin_expect_close(
+    const unsigned char *a,
+    const unsigned char *b)
+{
+    int32_t worst = 0, i;
+    for (i = 0; i < ORIGIN_WIDTH * ORIGIN_HEIGHT * 4; i ++) {
+        int32_t d = abs((int)a[i] - (int)b[i]);
+        worst = d > worst ? d : worst;
+    }
+
+    if (worst > ORIGIN_CLOSE_DIFF) {
+        printf("worst channel difference %d\n", worst);
+    }
+
+    test_assert(worst <= ORIGIN_CLOSE_DIFF);
+}
+
+void WorldOrigin_render_follow_same_image(void) {
+    // render/world_origin
+    /* The render origin follows the ship, or the camera on it, every frame while the world
+     * origin shifts by whole meters under them: every frame, those of the shifts included,
+     * matches the same world drawn without a render origin. */
+    ecs_entity_t ships[3];
+    ecs_world_t *worlds[3];
+    const char *files[3] = { "plain.png", "ship.png", "camera.png" };
+    for (int32_t w = 0; w < 3; w ++) {
+        worlds[w] = origin_ship_scene(&ships[w]);
+    }
+
+    origin_render_follow(worlds[0], 0, ships[0]);
+    WorldOrigin *o = ecs_singleton_get_mut(worlds[0], WorldOrigin);
+    o->render = false;
+    ecs_singleton_modified(worlds[0], WorldOrigin);
+    origin_render_follow(worlds[1], ships[1], ships[1]);
+    origin_render_follow(worlds[2], 0, ships[2]);
+    unsigned char *px[3] = {0};
+    for (int32_t i = 0; i < 24; i ++) {
+        for (int32_t w = 0; w < 3; w ++) {
+            stbi_image_free(px[w]);
+            px[w] = origin_frame(worlds[w], files[w]);
+        }
+
+        origin_expect_close(px[0], px[1]);
+        origin_expect_close(px[0], px[2]);
+    }
+
+    origin_expect_content(px[0]);
+    for (int32_t w = 0; w < 3; w ++) {
+        test_assert(ecs_singleton_get(worlds[w], WorldOriginStatus)->shifts >= 3);
+        test_assert(ecs_singleton_get(worlds[w], WorldOrigin)->x == 3000);
+    }
+
+    double z = ecs_singleton_get(worlds[1], WorldOrigin)->z;
+    test_assert(z + (double)ecs_get(worlds[1], ships[1], Position)->z < -2.0);
+    for (int32_t w = 0; w < 3; w ++) {
+        stbi_image_free(px[w]);
+        ecs_fini(worlds[w]);
+    }
+}
+
+void WorldOrigin_render_follow_cell_same_image(void) {
+    // render/world_origin
+    /* The render origin follows a WorldCell root at its exact cell, across a shift. */
+    ecs_entity_t camera_a, camera_b, root;
+    ecs_world_t *a = origin_scene(&camera_a);
+    ecs_world_t *b = origin_scene_in(&camera_b, true, &root);
+    ecs_singleton_set(b, WorldOrigin, {.enabled = false, .render = true, .render_follow = root});
+    unsigned char *pa = NULL, *pb = NULL;
+    for (int32_t i = 0; i < 6; i ++) {
+        if (i == 3) {
+            box_world_origin_shift(b, 0, (double[3]){ 2816, 0, -256 });
+        }
+
+        stbi_image_free(pa);
+        stbi_image_free(pb);
+        pa = origin_frame(a, "a.png");
+        pb = origin_frame(b, "b.png");
+        if (i > 0) {
+            origin_expect_same(pa, pb);
+        }
+    }
+
+    origin_expect_content(pa);
     stbi_image_free(pa);
     stbi_image_free(pb);
     ecs_fini(a);

@@ -655,6 +655,48 @@ void box_render_origin(
     const ecs_world_t *world,
     double out[3]);
 
+/** Set a frame to the identity: the local origin at the absolute origin, not turned or scaled,
+ * and no render origin.
+ *
+ * @param frame The frame
+ */
+void box_render_frame_identity(
+    box_render_frame_t *frame);
+
+/** Fill the frame of a packet: the frame of the WorldOrigin singleton and the render origin in
+ * it, the local position of WorldOrigin.render_follow (the exact cell of a WorldCell root) or of
+ * the camera of the first View by order, computed in f64; 0 when WorldOrigin.render is off.
+ *
+ * @param world The world
+ * @param p The packet, its views extracted
+ */
+void box_render_origin_frame(
+    const ecs_world_t *world,
+    box_render_packet_t *p);
+
+/** Get the matrix that takes the local positions of one frame to those of another, computed in
+ * f64: the same absolute position in both, to.R^T (from.origin - to.origin + from.s * from.R *
+ * local) / to.s.
+ *
+ * @param from The frame of the positions
+ * @param to The frame they are taken to
+ * @param out Receives the matrix
+ */
+void box_render_frame_map(
+    const box_render_frame_t *from,
+    const box_render_frame_t *to,
+    mat4 out);
+
+/** Check whether two frames place the local positions at the same absolute positions.
+ *
+ * @param a The first frame
+ * @param b The second frame
+ * @return Whether their origin, rotation and scale are the same
+ */
+bool box_render_frame_same(
+    const box_render_frame_t *a,
+    const box_render_frame_t *b);
+
 /** Wrap a value to [0, period) in double precision, 0 when it or the period is not finite or
  * the period not above 0.
  *

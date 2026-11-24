@@ -19,11 +19,40 @@ fn mesh_shading_tint(s: MeshShading) -> vec4f {
     return vec4f(unpack2x16unorm(s.tint_rg), unpack2x16unorm(s.tint_bk));
 }
 
+// The render origin of an instance page (box_gpu_instance_page_t), bound at 6 of its group. The
+// records of a page of local transforms are moved by place to be relative to the render origin;
+// a mover page holds them relative to it already (place 0). delta takes them back to local.
+struct InstancePage {
+    place: vec4f,
+    delta: vec4f,
+};
+
 // Model matrix of an instance, its fourth row (0, 0, 0, 1).
 fn instance_model(t: InstanceTransform) -> mat4x4f {
     let r = t.rows;
     return mat4x4f(vec4f(r[0].x, r[1].x, r[2].x, 0.0), vec4f(r[0].y, r[1].y, r[2].y, 0.0),
         vec4f(r[0].z, r[1].z, r[2].z, 0.0), vec4f(r[0].w, r[1].w, r[2].w, 1.0));
+}
+
+// A record of a page moved by an offset.
+fn instance_moved(t: InstanceTransform, offset: vec3f) -> InstanceTransform {
+    var result = t;
+    result.rows[0].w += offset.x;
+    result.rows[1].w += offset.y;
+    result.rows[2].w += offset.z;
+    return result;
+}
+
+// A record of a page in the local frame, which the CPU and the world space inputs of the GPU use
+// (lights, shadows, cull, probes, patterns); a local record exactly as stored.
+fn instance_local(t: InstanceTransform, page: InstancePage) -> InstanceTransform {
+    return instance_moved(t, page.delta.xyz - page.place.xyz);
+}
+
+// A record of a page relative to the render origin, which the mesh passes place their vertices
+// with (render_view_proj of the View); a mover record exactly as stored.
+fn instance_relative(t: InstanceTransform, page: InstancePage) -> InstanceTransform {
+    return instance_moved(t, -page.place.xyz);
 }
 
 // Transform of an instance relative to its texture frame (MappingFrame), from its record of the

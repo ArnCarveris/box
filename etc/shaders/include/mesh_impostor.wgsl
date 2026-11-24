@@ -37,7 +37,8 @@ struct ImpostorOut {
 
 fn impostor_vertex(v: VertexIn, d: VertexData) -> ImpostorOut {
     let slot = slot_of(v.slot);
-    let model = instance_model(transforms[slot]);
+    let local = instance_local(transforms[slot], instance_page);
+    let model = instance_model(local);
     let shading = shadings[slot];
     let material = material_fetch(shading_material(shading));
     let grid = impostor_grid(d);
@@ -64,9 +65,9 @@ fn impostor_vertex(v: VertexIn, d: VertexData) -> ImpostorOut {
     o.weights = vec4f(frames.weights, grid.half);
     o.eye = vec4f(e, grid.ratio);
     o.center = vec4f(grid.center, 0.0);
-    o.row0 = transforms[slot].rows[0];
-    o.row1 = transforms[slot].rows[1];
-    o.row2 = transforms[slot].rows[2];
+    o.row0 = local.rows[0];
+    o.row1 = local.rows[1];
+    o.row2 = local.rows[2];
     o.misc = vec4u(vertex_range(v.slot), shading_planet(shading),
         pack2x16unorm(vec2f(material.metallic, material.roughness)), 0u);
     return o;
