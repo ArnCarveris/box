@@ -537,7 +537,8 @@ fn segment_meets(fog: FogVolume, qa: vec3f, qb: vec3f) -> bool {
 }
 
 // Share of the density of the volumes in slice s along the ray of a uv of the image that lies
-// before share f of the slice, the share f itself where the slice is empty or evenly dense.
+// before share f of the slice, the share f itself where the slice is empty or evenly dense, in
+// closed form where a volume covers the slice whole.
 // The grid knows the density of a cell as a whole, so where a face crosses the slice of a surface
 // the lookup weighs the slice by where its density is along the ray instead of by depth: a thin
 // slab on a floor or a volume against a wall does not step where the slices cross it.
@@ -553,12 +554,23 @@ fn slice_share(uv: vec2f, s: f32, f: f32) -> f32 {
         let fog = volumes[i];
         let qa = volume_local(fog, a);
         let qb = volume_local(fog, b);
-        // A volume whose density changes with height is not even along the slice.
-        if (fog.height_falloff <= 0.0 &&
-            min(shape_inside(fog, qa), shape_inside(fog, qb)) >= max(fog.edge_fade, 1e-6))
-        {
-            before += fog.density * f;
-            total += fog.density;
+        // A volume that covers the slice whole: its density thins exponentially with height
+        // along it, the height linear in the share of the slice, so its share before f and its
+        // weight in the slice are the integrals of the exponential, f and the density without
+        // a falloff.
+        if (min(shape_inside(fog, qa), shape_inside(fog, qb)) >= max(fog.edge_fade, 1e-6)) {
+            let k = clamp(max(fog.height_falloff, 0.0) * (qb.y - qa.y), -60.0, 60.0);
+            var share = f;
+            var weight = 1.0;
+            if (abs(k) > 1e-4) {
+                let whole = 1.0 - exp(-k);
+                share = (1.0 - exp(-k * f)) / whole;
+                weight = whole / k;
+            }
+
+            let g = fog.density * height_share(fog, qa) * weight;
+            before += g * share;
+            total += g;
             continue;
         }
 
