@@ -520,6 +520,7 @@ static void box_spatial_mover_refit(
     WorldTransform buf;
     ecs_os_memcpy(m->pose, box_spatial_mover_pose(world, m, &buf), sizeof(mat4));
     glm_mat4_inv(m->pose, inv);
+    box_spatial_scene_store_point(box_spatial_scene(index, m->scene), m->pose[3], m->pose[3]);
     glm_vec3_fill(m->min, FLT_MAX);
     glm_vec3_fill(m->max, -FLT_MAX);
     box_spatial_member_t *members = ecs_vec_first(&m->members);
@@ -563,8 +564,15 @@ int32_t box_spatial_movers_place(
         WorldTransform buf;
         const float *pose = m->entity && m->item >= 0 ?
             box_spatial_mover_pose(world, m, &buf) : NULL;
-        if (pose && ecs_os_memcmp(m->pose, pose, sizeof(mat4))) {
-            ecs_os_memcpy(m->pose, pose, sizeof(mat4));
+        mat4 stored;
+        if (pose) {
+            ecs_os_memcpy(stored, pose, sizeof(mat4));
+            box_spatial_scene_store_point(box_spatial_scene(index, m->scene), stored[3],
+                stored[3]);
+        }
+
+        if (pose && ecs_os_memcmp(m->pose, stored, sizeof(mat4))) {
+            ecs_os_memcpy(m->pose, stored, sizeof(mat4));
             index->stats.moved += box_spatial_mover_leaf(index, m, i, m->scene);
             result ++;
         }

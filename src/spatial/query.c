@@ -91,6 +91,7 @@ static void box_spatial_ray_member(
     float t = 0;
     if (member->entity && !member->disabled) {
         box_spatial_member_bounds(w->world, member, min, max);
+        box_spatial_scene_store(w->scene, min, max, min, max);
         if (box_spatial_ray_bounds(w, member->entity, min, max, &t)) {
             box_spatial_ray_keep(w, member->entity, t);
         }
@@ -267,7 +268,10 @@ static bool box_spatial_ray_walk(
     w->desc = ray;
     w->reach = ray->max_distance > 0 ? ray->max_distance : FLT_MAX;
 
-    return w->scene && box_bvh_ray_init(&w->ray, ray->origin, ray->dir);
+    vec3 origin;
+    box_spatial_scene_store_point(w->scene, ray->origin, origin);
+
+    return w->scene && box_bvh_ray_init(&w->ray, origin, ray->dir);
 }
 
 /** Hit the height fields of the terrains of the scene of a ray, the terrain entity standing
@@ -364,15 +368,18 @@ int32_t box_spatial_overlap_box(
     ecs_vec_t *result)
 {
     const box_spatial_t *index = box_spatial_of(world);
+    const box_spatial_scene_t *s = index ? box_spatial_scene(index, scene) : NULL;
+    vec3 lo, hi;
+    box_spatial_scene_store(s, min, max, lo, hi);
     box_spatial_walk_t w = {
-        .scene = index ? box_spatial_scene(index, scene) : NULL,
+        .scene = s,
         .out = result,
-        .min = min,
-        .max = max
+        .min = lo,
+        .max = hi
     };
     int32_t i;
     for (i = 0; w.scene && i < BOX_SPATIAL_UI; i ++) {
-        box_bvh_overlap(&w.scene->trees[i], min, max, box_spatial_visit_box, &w);
+        box_bvh_overlap(&w.scene->trees[i], lo, hi, box_spatial_visit_box, &w);
     }
 
     return w.count;
@@ -386,15 +393,18 @@ int32_t box_spatial_overlap_sphere(
     ecs_vec_t *result)
 {
     const box_spatial_t *index = box_spatial_of(world);
+    const box_spatial_scene_t *s = index ? box_spatial_scene(index, scene) : NULL;
+    vec3 at;
+    box_spatial_scene_store_point(s, center, at);
     box_spatial_walk_t w = {
-        .scene = index ? box_spatial_scene(index, scene) : NULL,
+        .scene = s,
         .out = result,
-        .center = center,
+        .center = at,
         .radius = radius
     };
     int32_t i;
     for (i = 0; w.scene && i < BOX_SPATIAL_UI; i ++) {
-        box_bvh_sphere(&w.scene->trees[i], center, radius, box_spatial_visit_sphere, &w);
+        box_bvh_sphere(&w.scene->trees[i], at, radius, box_spatial_visit_sphere, &w);
     }
 
     return w.count;
@@ -428,8 +438,7 @@ bool box_spatial_bounds(
     const box_spatial_scene_t *s = !result && item >= 0 ? box_spatial_scene(index, in) : NULL;
     if (s) {
         const box_spatial_item_t *it = box_spatial_item(s, item);
-        glm_vec3_copy(ECS_CONST_CAST(float*, it->min), min);
-        glm_vec3_copy(ECS_CONST_CAST(float*, it->max), max);
+        box_spatial_scene_world(s, it->min, it->max, min, max);
         result = true;
     }
 
@@ -533,7 +542,8 @@ int32_t box_spatial_expand_box(
     if (tree) {
         ecs_vec_t found;
         ecs_vec_init_t(NULL, &found, int32_t, 0);
-        box_bvh_overlap_placed(tree, &m->pose[0][0], min, max, box_spatial_visit_candidate,
+        box_spatial_scene_store(box_spatial_scene(index, m->scene), min, max, lo, hi);
+        box_bvh_overlap_placed(tree, &m->pose[0][0], lo, hi, box_spatial_visit_candidate,
             &found);
         int32_t *items = ecs_vec_first(&found);
         if (ecs_vec_count(&found) > 1) {
@@ -584,13 +594,18 @@ bool box_spatial_static_bounds(
         }
     }
 
+    if (result) {
+        box_spatial_scene_world(s, min, max, min, max);
+    }
+
     return result;
 }
 
 /** Walk of the boxes of a tree for a box_spatial_box_visit_t */
 typedef struct box_spatial_tree_walk_t {
-    box_spatial_box_visit_t visit; /**< Receives the boxes */
-    void *ctx;                     /**< Context passed to visit */
+    const box_spatial_scene_t *scene; /**< Scene of the tree, whose bias places the boxes */
+    box_spatial_box_visit_t visit;    /**< Receives the boxes */
+    void *ctx;                        /**< Context passed to visit */
 } box_spatial_tree_walk_t;
 
 /** Pass a box of a tree on to the visit of a tree walk.
@@ -610,8 +625,10 @@ static bool box_spatial_tree_box(
     void *ctx)
 {
     const box_spatial_tree_walk_t *w = ctx;
+    vec3 lo, hi;
+    box_spatial_scene_world(w->scene, min, max, lo, hi);
 
-    return w->visit(min, max, depth, item != BOX_BVH_NULL, w->ctx);
+    return w->visit(lo, hi, depth, item != BOX_BVH_NULL, w->ctx);
 }
 
 int32_t box_spatial_tree_walk(
@@ -623,7 +640,7 @@ int32_t box_spatial_tree_walk(
 {
     const box_spatial_t *index = box_spatial_of(world);
     const box_spatial_scene_t *s = index ? box_spatial_scene(index, scene) : NULL;
-    box_spatial_tree_walk_t w = { .visit = visit, .ctx = ctx };
+    box_spatial_tree_walk_t w = { .scene = s, .visit = visit, .ctx = ctx };
     int32_t result = 0;
     if (s && tree >= 0 && tree < BOX_SPATIAL_TREES) {
         result = box_bvh_walk(&s->trees[tree], box_spatial_tree_box, &w);
@@ -695,7 +712,13 @@ int32_t box_spatial_mover_walk(
         }
 
         const box_bvh_t *tree = box_spatial_mover_tree(index, i);
-        if (!tree || !mover_visit(m->entity, &m->pose[0][0], ctx)) {
+        mat4 pose;
+        ecs_os_memcpy(pose, m->pose, sizeof(mat4));
+        for (int32_t k = 0; k < 3; k ++) {
+            pose[3][k] = (float)((double)pose[3][k] + s->bias[k]);
+        }
+
+        if (!tree || !mover_visit(m->entity, &pose[0][0], ctx)) {
             continue;
         }
 

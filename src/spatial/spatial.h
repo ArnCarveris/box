@@ -75,6 +75,8 @@ typedef struct box_spatial_stats_t {
     int32_t rebound;  /**< Movers and dynamic UI elements whose transform changed since the
                        *   last update */
     int32_t moved;    /**< Dynamic leaves the last update moved in their tree */
+    int32_t folds;    /**< Times a shift of the world origin folded the bias of a scene into
+                       *   its stored bounds, since the index was made */
 } box_spatial_stats_t;
 
 /** Counters of the spatial layout of a world */

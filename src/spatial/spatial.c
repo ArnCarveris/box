@@ -515,12 +515,14 @@ static void box_spatial_refresh(
     int32_t tree = ui ? BOX_SPATIAL_UI : dynamic ? BOX_SPATIAL_DYNAMIC : BOX_SPATIAL_STATIC;
     if (indexed && p->item < 0) {
         box_spatial_scene_t *s = box_spatial_scene_ensure(index, scene);
+        box_spatial_scene_store(s, min, max, min, max);
         p->scene = scene;
         p->item = box_spatial_item_add(s, e, tree, min, max, index->frame);
         box_spatial_item(s, p->item)->disabled = ecs_has_id(world, e, EcsDisabled);
     } else if (indexed) {
-        box_spatial_item_set(
-            box_spatial_scene(index, scene), p->item, tree, min, max, index->frame);
+        box_spatial_scene_t *s = box_spatial_scene(index, scene);
+        box_spatial_scene_store(s, min, max, min, max);
+        box_spatial_item_set(s, p->item, tree, min, max, index->frame);
     }
 
     index->stats.updated += indexed;
@@ -618,6 +620,7 @@ static void box_spatial_dynamic(
             }
 
             box_spatial_world_bounds(l_min, l_max, m, min, max);
+            box_spatial_scene_store(s, min, max, min, max);
             if (glm_vec3_eqv(min, ECS_CONST_CAST(float*, item->min)) &&
                 glm_vec3_eqv(max, ECS_CONST_CAST(float*, item->max)))
             {

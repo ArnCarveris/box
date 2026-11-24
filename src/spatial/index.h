@@ -92,6 +92,9 @@ typedef struct box_spatial_scene_t {
     ecs_vec_t stretched;  /**< int32_t, dynamic items whose leaf may reach ahead */
     int32_t free_item;    /**< First free item, -1 when there is none */
     int32_t count;        /**< Items in use */
+    double bias[3];       /**< World position of the origin of the stored bounds: the bounds
+                           *   of the items, the nodes of the trees and the poses of the movers
+                           *   of the scene are kept relative to it, world = stored + bias */
 } box_spatial_scene_t;
 
 /** The spatial index of a world */
@@ -280,6 +283,47 @@ void box_spatial_scene_shift(
     const vec3 offset,
     box_spatial_shifts_t shifts,
     void *ctx);
+
+/** Get the stored bounds of world bounds in a scene: world - bias.
+ *
+ * @param s The scene, NULL for no bias
+ * @param min Minimum corner of the world bounds
+ * @param max Maximum corner of the world bounds
+ * @param out_min Receives the minimum corner of the stored bounds, which can be min
+ * @param out_max Receives the maximum corner of the stored bounds, which can be max
+ */
+void box_spatial_scene_store(
+    const box_spatial_scene_t *s,
+    const vec3 min,
+    const vec3 max,
+    vec3 out_min,
+    vec3 out_max);
+
+/** Get the world bounds of stored bounds in a scene: stored + bias.
+ *
+ * @param s The scene, NULL for no bias
+ * @param min Minimum corner of the stored bounds
+ * @param max Maximum corner of the stored bounds
+ * @param out_min Receives the minimum corner of the world bounds, which can be min
+ * @param out_max Receives the maximum corner of the world bounds, which can be max
+ */
+void box_spatial_scene_world(
+    const box_spatial_scene_t *s,
+    const vec3 min,
+    const vec3 max,
+    vec3 out_min,
+    vec3 out_max);
+
+/** Get a stored point of a world point in a scene: world - bias.
+ *
+ * @param s The scene, NULL for no bias
+ * @param p The world point
+ * @param out Receives the stored point, which can be p
+ */
+void box_spatial_scene_store_point(
+    const box_spatial_scene_t *s,
+    const vec3 p,
+    vec3 out);
 
 /** Find the mover an entity moves with: the nearest of the entity and its ancestors that owns
  * DynamicTransform, or that has it without inheriting it from DynamicTransformSpread.

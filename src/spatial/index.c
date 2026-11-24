@@ -4,6 +4,7 @@
  */
 
 #include "index.h"
+#include <math.h>
 
 /** Margin of a dynamic leaf that does not depend on its size */
 #define BOX_SPATIAL_MARGIN (0.1f)
@@ -16,6 +17,10 @@
 
 /** Margins a dynamic leaf reaches ahead at most; a larger prediction is a teleport */
 #define BOX_SPATIAL_PREDICT_MAX (4.0f)
+
+/** Distance of the bias of a scene along an axis beyond which a shift folds it into the stored
+ * bounds, which keeps them within a few millimeters of precision near the local origin */
+#define BOX_SPATIAL_FOLD (16384.0)
 
 box_spatial_scene_t* box_spatial_scene(
     const box_spatial_t *index,
@@ -504,6 +509,80 @@ static void box_spatial_scene_replace_dynamic(
     }
 }
 
+void box_spatial_scene_store_point(
+    const box_spatial_scene_t *s,
+    const vec3 p,
+    vec3 out)
+{
+    int32_t i;
+    for (i = 0; i < 3; i ++) {
+        out[i] = s ? (float)((double)p[i] - s->bias[i]) : p[i];
+    }
+}
+
+void box_spatial_scene_store(
+    const box_spatial_scene_t *s,
+    const vec3 min,
+    const vec3 max,
+    vec3 out_min,
+    vec3 out_max)
+{
+    box_spatial_scene_store_point(s, min, out_min);
+    box_spatial_scene_store_point(s, max, out_max);
+}
+
+void box_spatial_scene_world(
+    const box_spatial_scene_t *s,
+    const vec3 min,
+    const vec3 max,
+    vec3 out_min,
+    vec3 out_max)
+{
+    int32_t i;
+    for (i = 0; i < 3; i ++) {
+        out_min[i] = s ? (float)((double)min[i] + s->bias[i]) : min[i];
+        out_max[i] = s ? (float)((double)max[i] + s->bias[i]) : max[i];
+    }
+}
+
+/** Fold the bias of a scene into its stored bounds, nodes and mover poses, so the stored
+ * values of what is near the local origin stay small and precise in f32.
+ *
+ * @param index The index
+ * @param s The scene
+ */
+static void box_spatial_scene_fold(
+    box_spatial_t *index,
+    box_spatial_scene_t *s)
+{
+    vec3 bias = { (float)s->bias[0], (float)s->bias[1], (float)s->bias[2] };
+    int32_t i, count = ecs_vec_count(&s->items);
+
+    for (i = 0; i < count; i ++) {
+        box_spatial_item_t *it = box_spatial_item(s, i);
+        if (it->entity) {
+            glm_vec3_add(it->min, bias, it->min);
+            glm_vec3_add(it->max, bias, it->max);
+        }
+    }
+
+    for (i = 0; i < BOX_SPATIAL_TREES; i ++) {
+        box_bvh_shift(&s->trees[i], bias);
+    }
+
+    for (i = 0; i < ecs_vec_count(&index->movers); i ++) {
+        box_spatial_mover_t *m = box_spatial_mover(index, i);
+        if (m->entity && m->scene == s->entity) {
+            glm_vec3_add(m->pose[3], bias, m->pose[3]);
+        }
+    }
+
+    s->bias[0] = 0;
+    s->bias[1] = 0;
+    s->bias[2] = 0;
+    index->stats.folds ++;
+}
+
 void box_spatial_scene_shift(
     box_spatial_t *index,
     box_spatial_scene_t *s,
@@ -512,6 +591,21 @@ void box_spatial_scene_shift(
     void *ctx)
 {
     int32_t i, count = ecs_vec_count(&s->items);
+
+    if (!shifts) {
+        bool far = false;
+        for (i = 0; i < 3; i ++) {
+            s->bias[i] += (double)offset[i];
+            far = far || fabs(s->bias[i]) > BOX_SPATIAL_FOLD;
+        }
+
+        if (far) {
+            box_spatial_scene_fold(index, s);
+        }
+
+        goto done;
+    }
+
     bool all = true;
     for (i = 0; i < count; i ++) {
         box_spatial_item_t *it = box_spatial_item(s, i);
@@ -519,7 +613,7 @@ void box_spatial_scene_shift(
             continue;
         }
 
-        if (shifts && !shifts(ctx, it->entity)) {
+        if (!shifts(ctx, it->entity)) {
             all = false;
             continue;
         }
@@ -530,7 +624,7 @@ void box_spatial_scene_shift(
 
     for (i = 0; i < ecs_vec_count(&index->movers); i ++) {
         box_spatial_mover_t *m = box_spatial_mover(index, i);
-        if (m->entity && m->scene == s->entity && (!shifts || shifts(ctx, m->entity))) {
+        if (m->entity && m->scene == s->entity && shifts(ctx, m->entity)) {
             glm_vec3_add(m->pose[3], ECS_CONST_CAST(float*, offset), m->pose[3]);
         }
     }
@@ -543,4 +637,7 @@ void box_spatial_scene_shift(
         box_spatial_scene_rebuild(index, s);
         box_spatial_scene_replace_dynamic(s);
     }
+
+done:
+    return;
 }

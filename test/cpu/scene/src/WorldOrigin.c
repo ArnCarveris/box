@@ -1086,3 +1086,45 @@ void WorldOrigin_spatial_manual_root_stays(void) {
 
     ecs_fini(world);
 }
+
+void WorldOrigin_spatial_bias_folds(void) {
+    // scenes/world_origin
+    ecs_world_t *world = origin_world(1000000, 50);
+    ecs_entity_t boxes[64];
+    for (int32_t i = 0; i < 64; i ++) {
+        boxes[i] = origin_entity(world, (float)(i * 10), 0, 0);
+        ecs_set(world, boxes[i], Box, {2, 2, 2});
+    }
+
+    ecs_progress(world, 0);
+    box_spatial_stats_t before;
+    box_spatial_stats(world, &before);
+
+    ecs_vec_t out;
+    ecs_vec_init_t(NULL, &out, ecs_entity_t, 0);
+    for (int32_t s = 1; s <= 40; s ++) {
+        box_world_origin_shift(world, 0, (double[3]){1024, 0, 0});
+        ecs_progress(world, 0);
+
+        float x = 320.0f - 1024.0f * (float)s;
+        ecs_vec_clear(&out);
+        int32_t n = box_spatial_overlap_box(world, 0,
+            (vec3){x - 0.5f, -0.5f, -0.5f}, (vec3){x + 0.5f, 0.5f, 0.5f}, &out);
+        test_int(n, 1);
+        test_uint(*ecs_vec_get_t(&out, ecs_entity_t, 0), boxes[32]);
+    }
+
+    ecs_vec_fini_t(NULL, &out, ecs_entity_t);
+
+    box_spatial_stats_t after;
+    box_spatial_stats(world, &after);
+    test_assert(after.folds >= before.folds + 2);
+
+    vec3 min, max;
+    ecs_entity_t scene = 1;
+    test_assert(box_spatial_bounds(world, boxes[0], &scene, min, max));
+    test_flt(min[0], -40960.0f - 1.0f);
+    test_flt(max[0], -40960.0f + 1.0f);
+
+    ecs_fini(world);
+}
