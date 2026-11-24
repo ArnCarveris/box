@@ -28,8 +28,8 @@ state {
   export const SEASON_CYCLE: f32 = 4
 
   // The hours the time of day slider spans
-  export const HOUR_MIN: f32 = 5
-  export const HOUR_MAX: f32 = 22
+  export const HOUR_MIN: f32 = 0
+  export const HOUR_MAX: f32 = 24
 
   // Wind in m/s
   export const WIND_MAX: f32 = 20

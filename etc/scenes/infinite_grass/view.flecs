@@ -24,6 +24,7 @@ view {
       low_percentile: 0.1,
       high_percentile: 0.65,
       exposure_compensation: 0.2 - 2.5 * (1 - grass_daylight(hour)),
+      min_exposure: 1.5 * (1 - grass_daylight(hour)),
       max_exposure: 20
     }
   }

@@ -24,11 +24,12 @@ state {
   export const MIST_X0: f32 = -42
 
   // Mist, 0..1: thick before and after sunrise, burnt off some five hours after it, rising
-  // again a little in the evening
+  // again a little in the evening and staying through the night
   fn forest_mist(season: f64, hour: f64) -> f64 {
     const rise = forest_sunrise(season)
-    const dawn = 1 - forest_smooth(rise + 1.5, rise + 5.5, hour)
-    const dusk = 0.22 * forest_smooth(forest_sunset(season) - 1.5, forest_sunset(season) + 1, hour)
+    const dawn = forest_smooth(rise - 4, rise - 0.5, hour) * (1 - forest_smooth(rise + 1.5, rise + 5.5, hour))
+    const evening = forest_smooth(forest_sunset(season) - 1.5, forest_sunset(season) + 1, hour)
+    const dusk = 0.22 * max(evening, 1 - forest_smooth(rise, rise + 2, hour))
     max(dawn, dusk)
   }
 
