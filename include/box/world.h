@@ -92,6 +92,7 @@ ECS_STRUCT(WorldOriginStatus, {
                           *   rotation of the frame, 'S' its scale, 0 for none */
     int32_t written;     /**< Components the last shift wrote */
     float ms;            /**< Milliseconds the last shift took */
+    int32_t tables;      /**< Tables the last shift looked through for roots */
     ecs_entity_t body;   /**< WorldBody nearest to the focus this frame, 0 for none */
     double altitude;     /**< Altitude of the focus over the surface of body in meters,
                           *   computed in f64 from absolute positions */

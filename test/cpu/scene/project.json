@@ -213,7 +213,8 @@
                     "frame_rotates_to_body",
                     "frame_scales_with_altitude",
                     "frame_rotate_off_restores",
-                    "frame_altitude_precise"
+                    "frame_altitude_precise",
+                    "collect_skips_child_tables"
                 ]
             },
             {

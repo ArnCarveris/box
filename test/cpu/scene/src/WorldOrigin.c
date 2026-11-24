@@ -1033,3 +1033,29 @@ void WorldOrigin_frame_altitude_precise(void) {
 
     ecs_fini(world);
 }
+
+void WorldOrigin_collect_skips_child_tables(void) {
+    // scenes/world_origin
+    ecs_world_t *world = origin_world(100, 50);
+    ecs_entity_t parents[200];
+    for (int32_t i = 0; i < 200; i ++) {
+        parents[i] = origin_entity(world, (float)i, 0, 0);
+        ecs_entity_t child = ecs_new_w_pair(world, EcsChildOf, parents[i]);
+        ecs_set(world, child, Position, {1, 0, 0});
+    }
+
+    ecs_entity_t scope = ecs_new(world);
+    ecs_entity_t scoped = ecs_new_w_pair(world, EcsChildOf, scope);
+    ecs_set(world, scoped, Position, {3, 0, 0});
+    ecs_progress(world, 0);
+
+    box_world_origin_shift(world, 0, (double[3]){50, 0, 0});
+    const WorldOriginStatus *s = ecs_singleton_get(world, WorldOriginStatus);
+    test_int(s->written, 201);
+    test_assert(s->tables < 8);
+    test_flt(ecs_get(world, parents[10], Position)->x, -40);
+    test_flt(ecs_get(world, scoped, Position)->x, -47);
+    test_flt(ecs_get(world, parents[0], Position)->x, -50);
+
+    ecs_fini(world);
+}

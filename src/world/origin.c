@@ -39,61 +39,48 @@ static bool box_world_stays(
     return result;
 }
 
-/** Check whether the entities of a table can be roots: the parent their ChildOf pair names, if
- * any, and its ancestors have no WorldTransform. A table of the children of a placed parent is
- * skipped whole, so the collection of a shift does not visit the descendants of a root.
- *
- * @param world The world
- * @param table The table
- * @return Whether its entities can be roots
- */
-static bool box_world_table_rooted(
-    const ecs_world_t *world,
-    const ecs_table_t *table)
-{
-    ecs_entity_t parent = ecs_table_get_target(world, table, EcsChildOf, 0);
-    bool result = true;
-    while (parent && result) {
-        result = !ecs_has(world, parent, WorldTransform);
-        parent = ecs_get_parent(world, parent);
-    }
-
-    return result;
-}
+/** Path of the cached query of the tables whose entities can be roots */
+#define BOX_WORLD_ROOTS_QUERY "box.world.RebaseRoots"
 
 /** Collect the roots of a scene that a shift moves: the entities with a Position whose
  * ancestors have no WorldTransform and that box_world_stays does not keep.
  *
+ * The cached query matches only the tables whose entities have no placed ancestor, so the
+ * tables of their descendants are never visited.
+ *
  * @param world The world
  * @param scene The scene
  * @param shift Receives the roots
+ * @return Tables visited
  */
-static void box_world_shift_collect(
+static int32_t box_world_shift_collect(
     const ecs_world_t *world,
     ecs_entity_t scene,
     box_world_shift_t *shift)
 {
+    ecs_entity_t e = ecs_lookup(world, BOX_WORLD_ROOTS_QUERY);
+    const ecs_query_t *q = e ? ecs_query_get(world, e) : NULL;
+    int32_t tables = 0;
     int32_t i;
-    ecs_iter_t it = ecs_each_id(ECS_CONST_CAST(ecs_world_t*, world), ecs_id(Position));
-    while (ecs_each_next(&it)) {
-        if (ecs_table_has_id(world, it.table, EcsPrefab) ||
-            !box_world_table_rooted(world, it.table))
-        {
-            continue;
-        }
+    ecs_assert(q != NULL, ECS_INTERNAL_ERROR, BOX_WORLD_ROOTS_QUERY);
 
+    ecs_iter_t it = ecs_query_iter(world, q);
+    while (ecs_query_next(&it)) {
+        tables ++;
         for (i = 0; i < it.count; i ++) {
-            ecs_entity_t e = it.entities[i];
-            if (!box_world_is_root(world, e) || box_world_stays(world, e) ||
-                box_world_scene_of(world, e) != scene)
+            ecs_entity_t root = it.entities[i];
+            if (!box_world_is_root(world, root) || box_world_stays(world, root) ||
+                box_world_scene_of(world, root) != scene)
             {
                 continue;
             }
 
-            ecs_map_insert(&shift->roots, e, 1);
-            *ecs_vec_append_t(NULL, &shift->list, ecs_entity_t) = e;
+            ecs_map_insert(&shift->roots, root, 1);
+            *ecs_vec_append_t(NULL, &shift->list, ecs_entity_t) = root;
         }
     }
+
+    return tables;
 }
 
 /** Check whether a shift moves an entity: it or an ancestor is one of its roots.
@@ -393,6 +380,7 @@ static int32_t box_world_shift_heights(
  * @param map The map of the shift
  * @param reason Why the origin moves, as WorldOriginStatus.reason
  * @param written Components the shift wrote
+ * @param tables Tables the shift looked through for roots
  * @param ms Milliseconds the shift took
  */
 static void box_world_shift_record(
@@ -403,6 +391,7 @@ static void box_world_shift_record(
     const box_world_map_t *map,
     char reason,
     int32_t written,
+    int32_t tables,
     float ms)
 {
     double offset[3] = {
@@ -449,6 +438,7 @@ static void box_world_shift_record(
     status.z = offset[2];
     status.reason = reason;
     status.written = written;
+    status.tables = tables;
     status.ms = ms;
     ecs_singleton_set_ptr(world, WorldOriginStatus, &status);
 
@@ -493,7 +483,7 @@ static void box_world_origin_shift_to(
     box_world_map_init(&from, to, &map);
     ecs_map_init(&shift.roots, NULL);
     ecs_vec_init_t(NULL, &shift.list, ecs_entity_t, 0);
-    box_world_shift_collect(world, scene, &shift);
+    int32_t tables = box_world_shift_collect(world, scene, &shift);
 
     if (!map.linear) {
         vec3 delta = { (float)map.d[0], (float)map.d[1], (float)map.d[2] };
@@ -513,7 +503,7 @@ static void box_world_origin_shift_to(
     }
 
     float ms = (float)(ecs_time_measure(&start) * 1000.0);
-    box_world_shift_record(world, scene, &from, to, &map, reason, written, ms);
+    box_world_shift_record(world, scene, &from, to, &map, reason, written, tables, ms);
 
     ecs_map_fini(&shift.roots);
     ecs_vec_fini_t(NULL, &shift.list, ecs_entity_t);
@@ -811,6 +801,22 @@ done:
 void box_world_origin_import(
     ecs_world_t *world)
 {
+    ecs_query(world, {
+        .entity = ecs_entity(world, { .name = "RebaseRoots" }),
+        .terms = {
+            { .id = ecs_id(Position), .inout = EcsInOutNone },
+            {
+                .id = ecs_id(WorldTransform),
+                .src.id = EcsUp,
+                .trav = EcsChildOf,
+                .inout = EcsInOutNone,
+                .oper = EcsNot
+            }
+        },
+        .flags = EcsQueryMatchDisabled,
+        .cache_kind = EcsQueryCacheAuto
+    });
+
     ecs_system(world, {
         .entity = ecs_entity(world, { .name = "Rebase" }),
         .phase = EcsPostUpdate,
