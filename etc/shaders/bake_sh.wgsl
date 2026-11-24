@@ -14,7 +14,8 @@ struct Params {
     ground: vec4f,
     // Volume index of each probe of the chunk, four per vector
     probes: array<vec4u, 32>,
-    // x: Baked lights, y: directional lights among them, which come first
+    // x: Baked lights, y: directional lights among them, which come first, z: 1 when the faces
+    // of the probes look along their axes
     lights: vec4u,
     // x: near plane of the faces, y: pixels per unit at depth 1, z: smallest size in pixels,
     // w: spacing of the probes of the volume
@@ -23,6 +24,8 @@ struct Params {
     positions: array<vec4f, 128>,
     // L2 SH irradiance of the environment, in the basis and order of basis()
     environment: array<vec4f, 9>,
+    // World x, y and z axes of each probe of the chunk, three per probe, with lights.z
+    axes: array<vec4f, 384>,
 };
 
 // A light as in include/lights.wgsl: position is the direction toward a directional light.
@@ -151,6 +154,18 @@ var<workgroup> irradiance: array<vec3f, 9>;
 
 // Per invocation of the cull, three faces per word in fields of ten bits.
 var<workgroup> face_scan: array<vec2u, 256>;
+
+// A world direction in the frame of the axes of a probe of the chunk, which its faces look
+// along with params.lights.z; the direction itself otherwise.
+fn probe_frame(probe: u32, d: vec3f) -> vec3f {
+    if (params.lights.z == 0u) {
+        return d;
+    }
+
+    let at = probe * 3u;
+    return vec3f(dot(d, params.axes[at].xyz), dot(d, params.axes[at + 1u].xyz),
+        dot(d, params.axes[at + 2u].xyz));
+}
 
 // Texel of the atlas that holds texel (x, y) of a face of a probe.
 fn tile(probe: u32, face: u32, x: u32, y: u32) -> vec2u {
@@ -306,12 +321,16 @@ fn direct(probe: u32, k: u32) -> vec3f {
             let dist = length(delta);
             d = delta / max(dist, 1e-4);
             c = light.color * attenuation(light, d, dist);
+            d = probe_frame(probe, d);
             let hit = surface_distance(probe, d);
             if (hit >= 0.0 && hit < dist * 0.95) {
                 c = vec3f(0.0);
             }
-        } else if (surface_distance(probe, d) >= 0.0) {
-            c = vec3f(0.0);
+        } else {
+            d = probe_frame(probe, d);
+            if (surface_distance(probe, d) >= 0.0) {
+                c = vec3f(0.0);
+            }
         }
 
         sum += c * basis(d)[k];
@@ -422,9 +441,18 @@ fn cull_block_small(b: CullBounds, eye: vec3f) -> bool {
 // Faces of a probe that draw an instance, one bit per face in the order of face_axes. Face f
 // sees along axis a = f / 2 where the depth along a is at least the distance along the other
 // two axes; the box reaches into it when it does so for each of them on its nearest corner.
-fn cull_faces(box: CullBox, eye: vec3f) -> u32 {
-    let e = box.extent;
-    let q = box.center - eye;
+// Faces that look along the axes of the probe see the box around it in those axes.
+fn cull_faces(box: CullBox, eye: vec3f, probe: u32) -> u32 {
+    var e = box.extent;
+    var q = box.center - eye;
+    if (params.lights.z != 0u) {
+        let at = probe * 3u;
+        q = probe_frame(probe, q);
+        e = vec3f(dot(box.extent, abs(params.axes[at].xyz)),
+            dot(box.extent, abs(params.axes[at + 1u].xyz)),
+            dot(box.extent, abs(params.axes[at + 2u].xyz)));
+    }
+
     let a = abs(q);
     let radius = length(e);
     let w = max(a.x, max(a.y, a.z));
@@ -470,7 +498,7 @@ fn cull(@builtin(workgroup_id) group: vec3u, @builtin(local_invocation_index) la
         var mask = 0u;
         if (i < job.count) {
             slot = cull_slot(job, i);
-            mask = cull_faces(cull_box(job, slot), eye);
+            mask = cull_faces(cull_box(job, slot), eye, probe);
         }
 
         let own = vec2u(

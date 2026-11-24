@@ -1127,6 +1127,9 @@ typedef struct box_render_view_t {
                                  *   the depth prepass and the forward pass, not in the chain */
     uint32_t volume;            /**< Probe volume the view samples, 0 for the hemisphere ambient */
     uint32_t volume_buffer;     /**< Probe buffer of the volume the view samples, 0 or 1 */
+    uint32_t area_volume;       /**< Area grid the view samples in its area and through the
+                                 *   portals of that area, 0 for none (bake_area.c) */
+    uint32_t area_volume_buffer; /**< Probe buffer of that grid, 0 or 1 */
     uint32_t reflections;       /**< Reflection probe buffer of the scene, 0 for none or when
                                  *   the view does not sample reflection probes */
     uint32_t reflection_count;  /**< Resident reflection probes in that buffer */
@@ -1338,9 +1341,18 @@ typedef enum box_render_volume_op_t {
     BOX_RENDER_VOLUME_FILL = 0, /**< Fill every probe of both buffers with sh, write the mask */
     BOX_RENDER_VOLUME_MASK = 1, /**< Write the mask only, the probes keep their values */
     BOX_RENDER_VOLUME_COPY = 2, /**< Copy probe buffer from into the other one, then the mask */
-    BOX_RENDER_VOLUME_RESIZE = 3 /**< Take the new grid, fill it with sh, keep the probes of both
+    BOX_RENDER_VOLUME_RESIZE = 3, /**< Take the new grid, fill it with sh, keep the probes of both
                                   *   buffers it shares with the old grid, then the mask */
+    BOX_RENDER_VOLUME_FRAME = 4 /**< Write the frame of an area grid only: rows, area and
+                                 *   portals, without a mask */
 } box_render_volume_op_t;
+
+/** Portals of an area grid whose openings blend it with what lies beyond them at most */
+#define BOX_RENDER_AREA_PORTALS (4)
+
+/** vec4 of a portal of an area grid: center and the area beyond, half width along the width,
+ * half height along the height, unit normal into the area */
+#define BOX_RENDER_AREA_PORTAL (4)
 
 /** Description of a BOX_RENDER_VOLUME create or update, followed by the validity mask.
  *
@@ -1365,12 +1377,22 @@ typedef struct box_render_volume_desc_t {
     uint32_t environment;   /**< BOX_RENDER_ENVIRONMENT whose SH a create, fill or resize fills
                              *   the probes with in place of sh once it was processed, 0 for
                              *   sh */
+    uint32_t turned;        /**< 1 for an area grid, whose origin, probes and portals lie in the
+                             *   frame of its mover, 0 for the grid of a scene */
+    float rows[3][4];       /**< World to grid frame rows of an area grid in this frame */
+    float area[4];          /**< Of an area grid: index of its area in the shading block, its
+                             *   portals and the distance they blend over */
+    float portals[BOX_RENDER_AREA_PORTALS * BOX_RENDER_AREA_PORTAL][4]; /**< Its portals in the
+                             *   grid frame, BOX_RENDER_AREA_PORTAL vec4 each */
 } box_render_volume_desc_t;
 
 /** A probe the backend captures: six faces around its position, projected onto its SH */
 typedef struct box_render_probe_capture_t {
     float position[3];      /**< World position of the probe */
     uint32_t index;         /**< Index of the probe in its volume */
+    bool turned;            /**< The faces look along axes, not the world axes */
+    float axes[3][3];       /**< World directions of the x, y and z axes of the probe when
+                             *   turned; its SH and visibility are in that frame */
 } box_render_probe_capture_t;
 
 /** No probe buffer: the captures of the first pass shade with a black ambient term */
@@ -1404,6 +1426,9 @@ typedef struct box_render_bake_batch_t {
                              *   or one not processed yet for the hemisphere ambient */
     float bounds_min[3];    /**< Minimum corner of the static bounds of the scene */
     float bounds_max[3];    /**< Maximum corner of the static bounds of the scene */
+    bool area;              /**< The captures of an area grid: the faces draw the carried
+                             *   batches of the scene, not the static ones, and sample the
+                             *   source as an area grid that covers every fragment */
     int32_t first;          /**< First probe of the batch in the probes of the packet */
     int32_t count;          /**< Probes of the batch */
 } box_render_bake_batch_t;
@@ -2564,6 +2589,8 @@ typedef struct box_render_batch_t {
                                  *   set with shadow */
     bool bake;                  /**< Static 3D instances without NoBake of a scene with LightBake or
                                  *   ReflectionBake, drawn by the captures */
+    bool carried;               /**< Opaque 3D instances without NoBake that a mover carries,
+                                 *   drawn by the captures of an area grid (bake_area.c) */
     bool box_shadow;            /**< The instances are the shadows of 2D shapes (BoxShadow),
                                  *   drawn with the fs_shadow entry point of the 2D shape shader */
     bool slice;                 /**< The instances are Rects with an ImageSlice, drawn with the

@@ -93,6 +93,8 @@ typedef struct box_gpu_bake_params_t {
     float positions[BOX_GPU_BAKE_CHUNK][4]; /**< World position of each probe of the chunk */
     float environment[BOX_RENDER_SH_COEFFICIENTS][4]; /**< SH irradiance of the environment,
                                      *   copied from its buffer on the GPU when size[2] is 1 */
+    float axes[BOX_GPU_BAKE_CHUNK * 3][4]; /**< World x, y and z axes of each probe of the
+                                     *   chunk when lights[2] is 1, which turns its faces */
 } box_gpu_bake_params_t;
 
 /** Uniforms of the cull of one batch of a chunk, as CullJob of etc/shaders/bake_sh.wgsl */
@@ -204,6 +206,9 @@ typedef struct box_gpu_bake_pass_t {
     box_render_cascade_t cascade;   /**< The capture cascade, fitted to the bounds */
     const box_render_probe_capture_t *probes; /**< The probes of the batch */
     int32_t count;                  /**< Probes of the batch */
+    bool carried;                   /**< The faces draw the batches a mover carries, not the
+                                     *   static ones, and the ambient group is an area grid
+                                     *   that covers every fragment (View.reflection.z) */
 } box_gpu_bake_pass_t;
 
 struct box_gpu_bake_t {

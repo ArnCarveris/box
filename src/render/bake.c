@@ -41,6 +41,9 @@
 /** Error of a LightBake whose bounces is out of range */
 #define BOX_BAKE_BOUNCES_ERROR "bounces must be 0 to 16"
 
+/** Error of a LightBake on a VisArea that no mover carries */
+#define BOX_BAKE_MOVER_ERROR "LightBake on a VisArea needs a mover (DynamicTransform) to carry it"
+
 /** Times the grid of a volume is placed again after its first placement before a warning that
  * LightBake does not follow streamed scenes */
 #define BOX_BAKE_STREAM_REGRIDS (16)
@@ -59,11 +62,36 @@ box_bake_volume_t* box_bake_find(
     int32_t i;
     for (i = 0; i < ecs_vec_count(&b->volumes); i ++) {
         box_bake_volume_t *v = ecs_vec_get_t(&b->volumes, box_bake_volume_t, i);
-        if (v->scene == scene) {
+        if (v->scene == scene && !v->area) {
             result = v;
             break;
         }
     }
+
+    return result;
+}
+
+box_bake_volume_t* box_bake_volume_add(
+    box_render_bake_t *b,
+    ecs_entity_t scene)
+{
+    box_bake_volume_t *result = ecs_vec_append_t(NULL, &b->volumes, box_bake_volume_t);
+    ecs_os_memset_t(result, 0, box_bake_volume_t);
+    result->scene = scene;
+    glm_mat4_identity(result->frame);
+    glm_mat4_identity(result->rows);
+    ecs_vec_init_t(NULL, &result->valid, uint32_t, 0);
+    ecs_vec_init_t(NULL, &result->checked, uint32_t, 0);
+    ecs_vec_init_t(NULL, &result->queue, uint32_t, 0);
+    ecs_vec_init_t(NULL, &result->flight, box_bake_flight_t, 0);
+    ecs_vec_init_t(NULL, &result->done, uint8_t, 0);
+    ecs_vec_init_t(NULL, &result->members, uint32_t, 0);
+    ecs_vec_init_t(NULL, &result->dirty, uint32_t, 0);
+    ecs_vec_init_t(NULL, &result->flags, uint8_t, 0);
+    ecs_vec_init_t(NULL, &result->shown, uint32_t, 0);
+    box_bake_light_record_init(&result->known);
+    ecs_vec_init_t(NULL, &result->cameras, vec3, 0);
+    ecs_vec_init_t(NULL, &result->sorted, vec3, 0);
 
     return result;
 }
@@ -80,21 +108,7 @@ static box_bake_volume_t* box_bake_ensure(
 {
     box_bake_volume_t *result = box_bake_find(b, scene);
     if (!result) {
-        result = ecs_vec_append_t(NULL, &b->volumes, box_bake_volume_t);
-        ecs_os_memset_t(result, 0, box_bake_volume_t);
-        result->scene = scene;
-        ecs_vec_init_t(NULL, &result->valid, uint32_t, 0);
-        ecs_vec_init_t(NULL, &result->checked, uint32_t, 0);
-        ecs_vec_init_t(NULL, &result->queue, uint32_t, 0);
-        ecs_vec_init_t(NULL, &result->flight, box_bake_flight_t, 0);
-        ecs_vec_init_t(NULL, &result->done, uint8_t, 0);
-        ecs_vec_init_t(NULL, &result->members, uint32_t, 0);
-        ecs_vec_init_t(NULL, &result->dirty, uint32_t, 0);
-        ecs_vec_init_t(NULL, &result->flags, uint8_t, 0);
-        ecs_vec_init_t(NULL, &result->shown, uint32_t, 0);
-        box_bake_light_record_init(&result->known);
-        ecs_vec_init_t(NULL, &result->cameras, vec3, 0);
-        ecs_vec_init_t(NULL, &result->sorted, vec3, 0);
+        result = box_bake_volume_add(b, scene);
     }
 
     return result;
@@ -137,7 +151,7 @@ static double box_bake_axis(
  * @param out Receives the grid
  * @return Probes of the grid
  */
-static int32_t box_bake_place(
+int32_t box_bake_place(
     const vec3 min,
     const vec3 max,
     float spacing,
@@ -175,7 +189,7 @@ done:
     return result;
 }
 
-/** Get the world position of a probe of a volume.
+/** Get the position of a probe of a volume in the frame of its grid, the world for a scene.
  *
  * @param v The volume
  * @param index Index of the probe
@@ -391,6 +405,11 @@ static void box_bake_validate(
     const box_mesh_cache_t *cache = box_mesh_cache_of(world);
     int32_t words = (v->probes + 31) / 32;
     int32_t i;
+    if (v->area) {
+        box_bake_area_validate(v);
+        goto done;
+    }
+
     ecs_vec_set_count_t(NULL, &v->valid, uint32_t, words);
     uint32_t *valid = ecs_vec_first(&v->valid);
     ecs_os_memset(valid, 0, words * ECS_SIZEOF(uint32_t));
@@ -403,6 +422,9 @@ static void box_bake_validate(
             v->valid_count ++;
         }
     }
+
+done:
+    return;
 }
 
 /** Count the probes a volume still has to bake: those of the pass being baked that were not
@@ -444,9 +466,11 @@ static void box_bake_status(
         : !status->error;
     bool held = !v->compute && !v->converged && !v->error && v->probes;
     if (status->probes != v->probes || status->baked != baked || status->pass != pass ||
-        status->converged != v->converged || status->held != held || !same_error)
+        status->converged != v->converged || status->held != held || !same_error ||
+        status->captures != v->captures)
     {
         LightBakeStatus value = *status;
+        value.captures = v->captures;
         value.probes = v->probes;
         value.baked = baked;
         value.pass = pass;
@@ -644,7 +668,7 @@ static void box_bake_handle_free(
  * @param l The lights of the view
  * @param out Receives the coefficients
  */
-static void box_bake_ambient(
+void box_bake_ambient(
     const box_render_view_lights_t *l,
     float out[BOX_RENDER_SH_COEFFICIENTS][4])
 {
@@ -725,6 +749,7 @@ static box_render_volume_desc_t* box_bake_desc(
     uint32_t size = (uint32_t)sizeof(box_render_volume_desc_t) + (uint32_t)words * 4u;
     box_render_volume_desc_t *desc = box_render_packet_resource(p, BOX_RENDER_VOLUME,
         create ? BOX_RENDER_CREATE : BOX_RENDER_UPDATE, v->handle, size);
+    ecs_os_memset_t(desc, 0, box_render_volume_desc_t);
     for (i = 0; i < 3; i ++) {
         desc->origin[i] = v->grid.origin[i];
         desc->size[i] = (uint32_t)v->grid.size[i];
@@ -737,6 +762,9 @@ static box_render_volume_desc_t* box_bake_desc(
     desc->environment = v->filled_env;
     ecs_os_memcpy(desc->sh, v->sh, ECS_SIZEOF(v->sh));
     ecs_os_memcpy(desc + 1, ecs_vec_first(&v->shown), words * ECS_SIZEOF(uint32_t));
+    if (v->area_data) {
+        box_bake_area_desc(ECS_CONST_CAST(box_bake_volume_t*, v), desc);
+    }
 
     return desc;
 }
@@ -999,22 +1027,33 @@ static void box_bake_update(
     v->placed = true;
     v->probe_spacing = bake->probe_spacing;
     v->bounds_padding = bake->bounds_padding;
-    if (probes == v->probes && !ecs_os_memcmp_t(&grid, &v->grid, box_bake_grid_t)) {
+    box_bake_regrid(it->world, b, p, v, &grid, probes);
+}
+
+void box_bake_regrid(
+    const ecs_world_t *world,
+    box_render_bake_t *b,
+    box_render_packet_t *p,
+    box_bake_volume_t *v,
+    const box_bake_grid_t *grid,
+    int32_t probes)
+{
+    if (probes == v->probes && !ecs_os_memcmp_t(grid, &v->grid, box_bake_grid_t)) {
         goto done;
     }
 
-    box_bake_stream_warn(it->world, v);
+    box_bake_stream_warn(world, v);
 
-    if (v->sent && v->probes && probes && grid.spacing == v->grid.spacing) {
-        box_bake_resize(it->world, b, p, v, &grid, probes);
+    if (v->sent && v->probes && probes && grid->spacing == v->grid.spacing) {
+        box_bake_resize(world, b, p, v, grid, probes);
         goto done;
     }
 
-    v->grid = grid;
+    v->grid = *grid;
     v->probes = probes;
     v->sent = false;
     if (probes) {
-        box_bake_validate(it->world, b, v);
+        box_bake_validate(world, b, v);
         if (!v->handle) {
             v->handle = box_bake_handle_new(b);
         }
@@ -1063,6 +1102,7 @@ static void box_bake_remove(
     box_bake_volume_t *v = ecs_vec_get_t(&b->volumes, box_bake_volume_t, index);
     int32_t last = ecs_vec_count(&b->volumes) - 1;
     box_bake_handle_free(b, p, v);
+    box_bake_area_fini(b, v, p);
     box_bake_volume_fini(v);
     if (index != last) {
         *v = *ecs_vec_get_t(&b->volumes, box_bake_volume_t, last);
@@ -1189,8 +1229,19 @@ static void box_bake_pick(
     for (i = n - 1; i >= n - count; i --) {
         box_render_probe_capture_t *out = ecs_vec_append_t(
             NULL, &p->probes, box_render_probe_capture_t);
+        ecs_os_memset_t(out, 0, box_render_probe_capture_t);
         out->index = queue[i];
         box_bake_probe_position(v, queue[i], out->position);
+        if (v->area) {
+            vec3 grid;
+            glm_vec3_copy(out->position, grid);
+            glm_mat4_mulv3(ECS_CONST_CAST(vec4*, v->frame), grid, 1.0f, out->position);
+            out->turned = true;
+            glm_vec3_copy(v->frame[0], out->axes[0]);
+            glm_vec3_copy(v->frame[1], out->axes[1]);
+            glm_vec3_copy(v->frame[2], out->axes[2]);
+        }
+
         *ecs_vec_append_t(NULL, &v->flight, box_bake_flight_t) = (box_bake_flight_t){
             .probe = queue[i], .pass = v->submitted, .packet = packet
         };
@@ -1236,8 +1287,12 @@ static const char* box_bake_error(
 {
     bool size = v->capture_size >= 1 && v->capture_size <= BOX_BAKE_SIZE_MAX;
     bool bounces = v->bounces >= 0 && v->bounces <= BOX_BAKE_BOUNCES_MAX;
+    const char *result = !size ? BOX_BAKE_SIZE_ERROR : !bounces ? BOX_BAKE_BOUNCES_ERROR : NULL;
+    if (!result && v->area && !v->mover) {
+        result = BOX_BAKE_MOVER_ERROR;
+    }
 
-    return !size ? BOX_BAKE_SIZE_ERROR : !bounces ? BOX_BAKE_BOUNCES_ERROR : NULL;
+    return result;
 }
 
 /** Add a batch of captures of the pass of a volume whose probes are queued to the packet.
@@ -1277,6 +1332,7 @@ static void box_bake_batch(
     batch->environment = v->env_handle;
     glm_vec3_copy(v->min, batch->bounds_min);
     glm_vec3_copy(v->max, batch->bounds_max);
+    batch->area = v->area != 0;
     batch->first = ecs_vec_count(&p->probes);
     batch->count = count;
     box_bake_pick(v, count, p, packet);
@@ -1396,6 +1452,7 @@ static void box_bake_captured(
         }
 
         uint8_t *done = ecs_vec_get_t(&v->done, uint8_t, (int32_t)r->probe);
+        v->captures ++;
         if (*done == r->pass) {
             (*done) ++;
             v->reported[r->pass] ++;
@@ -1592,8 +1649,16 @@ static void box_bake_display(
     for (i = 0; i < count; i ++) {
         box_render_view_t *rv = ecs_vec_get_t(&p->views, box_render_view_t, i);
         const box_bake_volume_t *v = rv->volume ? box_bake_find(b, rv->scene) : NULL;
+        int32_t a;
         if (v) {
             rv->volume_buffer = (uint32_t)v->display;
+        }
+
+        for (a = 0; rv->area_volume && a < ecs_vec_count(&b->volumes); a ++) {
+            v = ecs_vec_get_t(&b->volumes, box_bake_volume_t, a);
+            if (v->area && v->handle == rv->area_volume) {
+                rv->area_volume_buffer = (uint32_t)v->display;
+            }
         }
     }
 }
@@ -1632,8 +1697,14 @@ static void BoxRenderExtractBake(
     ecs_iter_t qit = ecs_query_iter(world, b->bakes);
     while (ecs_query_next(&qit)) {
         const LightBake *bakes = ecs_field(&qit, LightBake, 0);
+        bool areas = ecs_id(VisArea) && ecs_table_has_id(world, qit.table, ecs_id(VisArea));
         int32_t row;
-        for (row = 0; row < qit.count; row ++) {
+        for (row = 0; areas && row < qit.count; row ++) {
+            box_bake_area_update(world, b, p, box_render_scene_field(&qit, 1, row),
+                qit.entities[row], &bakes[row]);
+        }
+
+        for (row = 0; !areas && row < qit.count; row ++) {
             box_bake_volume_t *v = box_bake_ensure(b, box_render_scene_field(&qit, 1, row));
             if (v->seen) {
                 continue;
@@ -1678,16 +1749,23 @@ static void BoxRenderExtractBake(
     }
 
     box_bake_views(world, b, p);
+    box_bake_area_views(world, b, p);
     for (i = 0; i < ecs_vec_count(&b->volumes); i ++) {
         box_bake_volume_t *v = ecs_vec_get_t(&b->volumes, box_bake_volume_t, i);
         box_bake_environment(world, v);
         box_bake_send(p, v);
     }
 
+    box_bake_area_frames(b, p);
     box_bake_changes(world, b);
     b->shifting = false;
     for (i = 0; i < ecs_vec_count(&b->volumes); i ++) {
-        box_bake_lights(b, ecs_vec_get_t(&b->volumes, box_bake_volume_t, i));
+        box_bake_volume_t *v = ecs_vec_get_t(&b->volumes, box_bake_volume_t, i);
+        if (v->area) {
+            box_bake_area_lights(v);
+        } else {
+            box_bake_lights(b, v);
+        }
     }
 
     box_bake_progress(it, b, p);
@@ -1705,7 +1783,9 @@ static void box_bake_free(
     box_render_bake_t *b = ctx;
     int32_t i;
     for (i = 0; i < ecs_vec_count(&b->volumes); i ++) {
-        box_bake_volume_fini(ecs_vec_get_t(&b->volumes, box_bake_volume_t, i));
+        box_bake_volume_t *v = ecs_vec_get_t(&b->volumes, box_bake_volume_t, i);
+        box_bake_area_fini(b, v, NULL);
+        box_bake_volume_fini(v);
     }
 
     ecs_vec_fini_t(NULL, &b->volumes, box_bake_volume_t);

@@ -53,7 +53,7 @@ static uint64_t box_draws_hash(
     h ^= ((uint64_t)key->surface + (uint64_t)key->water * 2 + (uint64_t)key->frame * 4 +
         (uint64_t)key->mover * 8 + (uint64_t)key->wind * 16) * 0x85EBCA77C2B2AE63ull;
     h ^= (((uint64_t)key->foam + 1) * 0x9FB21C651E98DF25ull) ^ box_draws_layers_hash(key);
-    h ^= key->impostor * 0xD1B54A32D192ED03ull;
+    h ^= (key->impostor ^ ((uint64_t)key->carried << 63)) * 0xD1B54A32D192ED03ull;
     for (i = 0; i < BOX_RENDER_TEXTURE_SLOTS; i ++) {
         h = (h ^ (h >> 31)) * 0x9E3779B97F4A7C15ull + key->textures[i];
     }
@@ -83,7 +83,7 @@ static bool box_draws_key_eq(
     return a->scene == b->scene && a->mesh == b->mesh && a->pipeline == b->pipeline &&
         a->blend == b->blend && a->cutout == b->cutout && a->back_face == b->back_face &&
         a->transmissive == b->transmissive && a->water == b->water && a->foam == b->foam &&
-        a->dynamic_transform == b->dynamic_transform &&
+        a->dynamic_transform == b->dynamic_transform && a->carried == b->carried &&
         a->dynamic_material == b->dynamic_material && a->mover == b->mover &&
         a->wrap == b->wrap && !ecs_os_memcmp(a->textures, b->textures,
             ECS_SIZEOF(a->textures) + ECS_SIZEOF(a->layers)) &&
@@ -1304,6 +1304,7 @@ static void box_draws_send_batch(
     out->shadow = b->key.shadow;
     out->fixture = b->key.fixture;
     out->bake = b->key.bake;
+    out->carried = b->key.carried;
     out->surface = b->key.surface;
     out->wind = b->key.wind;
     out->wind_reach = b->key.wind ? b->wind_reach : 0.0f;
@@ -1511,8 +1512,7 @@ static void box_draws_scatter(
 }
 
 /** Upload the change buffer with the segment of every page and stream with changes and add one
- * scatter per page and stream, holding the changed slots of that stream of every batch in the
- * page.
+ * scatter per page and stream, holding the changed slots of that stream of each page batch.
  *
  * @param p The packet
  * @param d The state

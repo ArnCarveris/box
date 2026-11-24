@@ -1374,6 +1374,7 @@ static void box_reflect_schedule(
         box_reflect_probe_t *probe = &probes[ranks[i].index];
         box_render_probe_capture_t *out = ecs_vec_append_t(
             NULL, &p->probes, box_render_probe_capture_t);
+        ecs_os_memset_t(out, 0, box_render_probe_capture_t);
         glm_vec3_copy(probe->data.capture, out->position);
         out->index = (uint32_t)probe->slot;
         probe->ticket = s->ticket ++;

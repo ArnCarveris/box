@@ -5,6 +5,9 @@
  * A volume is a uniform with its grid, two SH buffers, the validity mask and the visibility
  * maps, bound as group 3 of the forward pass with the probe buffer the view shows. Views
  * without a volume bind a 1x1x1 volume that keeps the hemisphere.
+ *
+ * Group 3 binds a second volume at 4 to 7, the area grid of the view: the 1x1x1 volume for
+ * none. The group of a volume with an area grid is kept until a volume is created or freed.
  */
 
 #include "gpu_environment.h"
@@ -139,7 +142,79 @@ void box_gpu_volume_free(
     ecs_os_free(v);
 }
 
-/** Create a volume with its buffers and a bind group per probe buffer.
+/** Write the four group entries of a volume and one of its probe buffers.
+ *
+ * @param v The volume
+ * @param buffer The probe buffer, 0 or 1
+ * @param first Binding of the uniform, the buffers follow it
+ * @param out Receives the four entries
+ */
+static void box_gpu_volume_entries(
+    const box_gpu_volume_t *v,
+    uint32_t buffer,
+    uint32_t first,
+    WGPUBindGroupEntry *out)
+{
+    uint64_t probes = (uint64_t)v->count * BOX_GPU_VOLUME_PROBE_SIZE;
+    uint64_t valid = ((uint64_t)v->count + 3) & ~(uint64_t)3;
+    uint64_t visibility = (uint64_t)v->count * BOX_GPU_VISIBILITY_SIZE;
+    out[0] = (WGPUBindGroupEntry){
+        .binding = first, .buffer = v->grid, .size = sizeof(box_gpu_volume_uniforms_t)
+    };
+    out[1] = (WGPUBindGroupEntry){
+        .binding = first + 1, .buffer = v->probes[buffer & 1u], .size = probes
+    };
+    out[2] = (WGPUBindGroupEntry){ .binding = first + 2, .buffer = v->valid, .size = valid };
+    out[3] = (WGPUBindGroupEntry){
+        .binding = first + 3, .buffer = v->visibility, .size = visibility
+    };
+}
+
+/** Create the bind group of a volume and the area grid sampled with it.
+ *
+ * @param gpu The backend
+ * @param scene The volume at 0 to 3
+ * @param scene_buffer Its probe buffer
+ * @param area The area grid at 4 to 7
+ * @param area_buffer Its probe buffer
+ * @return The group
+ */
+static WGPUBindGroup box_gpu_volume_group_new(
+    box_gpu_t *gpu,
+    const box_gpu_volume_t *scene,
+    uint32_t scene_buffer,
+    const box_gpu_volume_t *area,
+    uint32_t area_buffer)
+{
+    WGPUBindGroupEntry entries[8];
+    box_gpu_volume_entries(scene, scene_buffer, 0, entries);
+    box_gpu_volume_entries(area, area_buffer, 4, &entries[4]);
+    WGPUBindGroupDescriptor desc = {
+        .layout = gpu->volume_layout,
+        .entryCount = 8,
+        .entries = entries
+    };
+
+    return wgpuDeviceCreateBindGroup(gpu->device, &desc);
+}
+
+/** Release the groups of the volumes with area grids, before a volume they bind goes.
+ *
+ * @param gpu The backend
+ */
+static void box_gpu_volume_pairs_clear(
+    box_gpu_t *gpu)
+{
+    int32_t i;
+    for (i = 0; i < ecs_vec_count(&gpu->volume_pairs); i ++) {
+        wgpuBindGroupRelease(ecs_vec_get_t(&gpu->volume_pairs, box_gpu_volume_pair_t, i)->group);
+    }
+
+    ecs_vec_clear(&gpu->volume_pairs);
+}
+
+/** Create a volume with its buffers and a bind group per probe buffer, which binds the 1x1x1
+ * volume as its area grid.
  *
  * @param gpu The backend
  * @param count Probes of the volume
@@ -163,21 +238,46 @@ static box_gpu_volume_t* box_gpu_volume_new(
     for (i = 0; i < 2; i ++) {
         v->probes[i] = box_gpu_volume_buffer(gpu, probes,
             WGPUBufferUsage_Storage | WGPUBufferUsage_CopySrc);
-        WGPUBindGroupEntry entries[4] = {
-            { .binding = 0, .buffer = v->grid, .size = sizeof(box_gpu_volume_uniforms_t) },
-            { .binding = 1, .buffer = v->probes[i], .size = probes },
-            { .binding = 2, .buffer = v->valid, .size = valid },
-            { .binding = 3, .buffer = v->visibility, .size = visibility }
-        };
-        WGPUBindGroupDescriptor desc = {
-            .layout = gpu->volume_layout,
-            .entryCount = 4,
-            .entries = entries
-        };
-        v->group[i] = wgpuDeviceCreateBindGroup(gpu->device, &desc);
+    }
+
+    for (i = 0; i < 2; i ++) {
+        const box_gpu_volume_t *none = gpu->no_volume ? gpu->no_volume : v;
+        v->group[i] = box_gpu_volume_group_new(gpu, v, (uint32_t)i, none, 0);
     }
 
     return v;
+}
+
+WGPUBindGroup box_gpu_volume_pair(
+    box_gpu_t *gpu,
+    const box_gpu_volume_t *scene,
+    uint32_t scene_buffer,
+    const box_gpu_volume_t *area,
+    uint32_t area_buffer)
+{
+    box_gpu_volume_pair_t *pair = NULL;
+    int32_t i;
+    scene = scene ? scene : gpu->no_volume;
+    for (i = 0; i < ecs_vec_count(&gpu->volume_pairs) && !pair; i ++) {
+        box_gpu_volume_pair_t *p = ecs_vec_get_t(&gpu->volume_pairs, box_gpu_volume_pair_t, i);
+        if (p->scene == scene && p->scene_buffer == (scene_buffer & 1u) && p->area == area &&
+            p->area_buffer == (area_buffer & 1u))
+        {
+            pair = p;
+        }
+    }
+
+    if (!pair) {
+        pair = ecs_vec_append_t(NULL, &gpu->volume_pairs, box_gpu_volume_pair_t);
+        pair->scene = scene;
+        pair->scene_buffer = scene_buffer & 1u;
+        pair->area = area;
+        pair->area_buffer = area_buffer & 1u;
+        pair->group = box_gpu_volume_group_new(gpu, scene, pair->scene_buffer, area,
+            pair->area_buffer);
+    }
+
+    return pair->group;
 }
 
 /** Write the validity of the cells of a volume, so the forward pass reads that of the eight
@@ -287,7 +387,7 @@ static void box_gpu_volume_write(
 {
     box_gpu_volume_uniforms_t u = {
         .origin = { desc->origin[0], desc->origin[1], desc->origin[2], desc->spacing },
-        .size = { desc->size[0], desc->size[1], desc->size[2], 1 }
+        .size = { desc->size[0], desc->size[1], desc->size[2], desc->turned ? 2u : 1u }
     };
     size_t size = (size_t)v->count * BOX_GPU_VOLUME_PROBE_SIZE;
     size_t texels = (size_t)v->count * BOX_GPU_VISIBILITY_TEXELS;
@@ -305,6 +405,9 @@ static void box_gpu_volume_write(
     }
 
     v->spacing = desc->spacing;
+    ecs_os_memcpy(u.rows, desc->rows, ECS_SIZEOF(u.rows));
+    ecs_os_memcpy(u.area, desc->area, ECS_SIZEOF(u.area));
+    ecs_os_memcpy(u.portals, desc->portals, ECS_SIZEOF(u.portals));
 
     wgpuQueueWriteBuffer(gpu->queue, v->grid, 0, &u, sizeof(u));
     wgpuQueueWriteBuffer(gpu->queue, v->probes[0], 0, probes, size);
@@ -398,38 +501,42 @@ done:
 void box_gpu_volume_init(
     box_gpu_t *gpu)
 {
-    WGPUBindGroupLayoutEntry entries[4] = {
-        {
-            .binding = 0,
+    WGPUBindGroupLayoutEntry entries[8];
+    WGPUBindGroupLayoutDescriptor layout = { .entryCount = 8, .entries = entries };
+    box_gpu_volume_uniforms_t none = { .size = { 1, 1, 1, 0 } };
+    uint32_t i;
+    for (i = 0; i < 8; i += 4) {
+        entries[i] = (WGPUBindGroupLayoutEntry){
+            .binding = i,
             .visibility = WGPUShaderStage_Vertex | WGPUShaderStage_Fragment,
             .buffer = {
                 .type = WGPUBufferBindingType_Uniform,
                 .minBindingSize = sizeof(box_gpu_volume_uniforms_t)
             }
-        },
-        {
-            .binding = 1,
+        };
+        entries[i + 1] = (WGPUBindGroupLayoutEntry){
+            .binding = i + 1,
             .visibility = WGPUShaderStage_Fragment,
             .buffer = {
                 .type = WGPUBufferBindingType_ReadOnlyStorage,
                 .minBindingSize = BOX_GPU_VOLUME_PROBE_SIZE
             }
-        },
-        {
-            .binding = 2,
+        };
+        entries[i + 2] = (WGPUBindGroupLayoutEntry){
+            .binding = i + 2,
             .visibility = WGPUShaderStage_Fragment,
             .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
-        },
-        {
-            .binding = 3,
+        };
+        entries[i + 3] = (WGPUBindGroupLayoutEntry){
+            .binding = i + 3,
             .visibility = WGPUShaderStage_Fragment,
             .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
-        }
-    };
-    WGPUBindGroupLayoutDescriptor layout = { .entryCount = 4, .entries = entries };
-    box_gpu_volume_uniforms_t none = { .size = { 1, 1, 1, 0 } };
+        };
+    }
+
     gpu->volume_layout = wgpuDeviceCreateBindGroupLayout(gpu->device, &layout);
     ecs_map_init(&gpu->volumes, NULL);
+    ecs_vec_init_t(NULL, &gpu->volume_pairs, box_gpu_volume_pair_t, 0);
     gpu->no_volume = box_gpu_volume_new(gpu, 1);
     wgpuQueueWriteBuffer(gpu->queue, gpu->no_volume->grid, 0, &none, sizeof(none));
 }
@@ -438,6 +545,8 @@ void box_gpu_volume_fini(
     box_gpu_t *gpu)
 {
     ecs_map_iter_t it = ecs_map_iter(&gpu->volumes);
+    box_gpu_volume_pairs_clear(gpu);
+    ecs_vec_fini_t(NULL, &gpu->volume_pairs, box_gpu_volume_pair_t);
     while (ecs_map_next(&it)) {
         box_gpu_volume_free(ecs_map_ptr(&it));
     }
@@ -467,6 +576,19 @@ void box_gpu_volume_apply(
         (uint64_t)desc->size[0] * desc->size[1] * desc->size[2] == desc->probes &&
         size >= sizeof(box_render_volume_desc_t) + words * sizeof(uint32_t);
     bool resize = valid && v && op == BOX_RENDER_UPDATE && desc->op == BOX_RENDER_VOLUME_RESIZE;
+    if (v && op == BOX_RENDER_UPDATE && desc && size >= sizeof(box_render_volume_desc_t) &&
+        desc->op == BOX_RENDER_VOLUME_FRAME)
+    {
+        box_gpu_volume_uniforms_t u;
+        ecs_os_memcpy(u.rows, desc->rows, ECS_SIZEOF(u.rows));
+        ecs_os_memcpy(u.area, desc->area, ECS_SIZEOF(u.area));
+        ecs_os_memcpy(u.portals, desc->portals, ECS_SIZEOF(u.portals));
+        wgpuQueueWriteBuffer(gpu->queue, v->grid, offsetof(box_gpu_volume_uniforms_t, rows),
+            u.rows, sizeof(u) - offsetof(box_gpu_volume_uniforms_t, rows));
+        goto done;
+    }
+
+    box_gpu_volume_pairs_clear(gpu);
     if (resize) {
         box_gpu_volume_t *grown = box_gpu_volume_new(gpu, desc->probes);
         box_gpu_volume_write(gpu, grown, desc);
@@ -516,8 +638,17 @@ WGPUBindGroup box_gpu_volume_group(
     box_gpu_volume_t *volume = v->volume
         ? ecs_map_get_deref(&gpu->volumes, box_gpu_volume_t, v->volume)
         : NULL;
+    box_gpu_volume_t *area = v->area_volume
+        ? ecs_map_get_deref(&gpu->volumes, box_gpu_volume_t, v->area_volume)
+        : NULL;
+    WGPUBindGroup result = volume
+        ? volume->group[v->volume_buffer & 1u]
+        : gpu->no_volume->group[0];
+    if (area) {
+        result = box_gpu_volume_pair(gpu, volume, v->volume_buffer, area, v->area_volume_buffer);
+    }
 
-    return volume ? volume->group[v->volume_buffer & 1u] : gpu->no_volume->group[0];
+    return result;
 }
 
 bool box_render_gpu_read_volume_sh(

@@ -153,6 +153,150 @@ fn volume_irradiance(world: vec3f, n: vec3f, spec: vec3f) -> Indirect {
         volume_resolve(specular, total, reach, spec));
 }
 
+// Whether the fragments sample the area grid of the view (bake_area.c).
+fn view_samples_area() -> bool {
+    return area_volume.size.w != 0u;
+}
+
+// Distance moments of a texel of the map of a probe of the area grid, as visibility_moments.
+fn area_visibility_moments(index: u32, x: i32, y: i32) -> vec2f {
+    var tx = x;
+    var ty = y;
+    if (tx < 0 || tx >= VISIBILITY_SIZE) {
+        tx = clamp(tx, 0, VISIBILITY_SIZE - 1);
+        ty = VISIBILITY_SIZE - 1 - ty;
+    }
+
+    if (ty < 0 || ty >= VISIBILITY_SIZE) {
+        ty = clamp(ty, 0, VISIBILITY_SIZE - 1);
+        tx = VISIBILITY_SIZE - 1 - tx;
+    }
+
+    let texels = u32(VISIBILITY_SIZE * VISIBILITY_SIZE);
+    return unpack2x16float(area_probe_visibility[index * texels + u32(tx + ty * VISIBILITY_SIZE)]);
+}
+
+// Chance that a probe of the area grid sees a point, as visibility_from, from an offset in the
+// grid frame, in which its map was captured.
+fn area_visibility_from(index: u32, offset: vec3f) -> f32 {
+    let len = length(offset);
+    let dist = len / area_volume.origin.w;
+    let t = octahedral_uv(offset / max(len, 1e-6)) * f32(VISIBILITY_SIZE) - 0.5;
+    let i = vec2i(floor(t));
+    let f = t - floor(t);
+    let m00 = area_visibility_moments(index, i.x, i.y);
+    let m10 = area_visibility_moments(index, i.x + 1, i.y);
+    let m01 = area_visibility_moments(index, i.x, i.y + 1);
+    let m11 = area_visibility_moments(index, i.x + 1, i.y + 1);
+    let m = mix(mix(m00, m10, f.x), mix(m01, m11, f.x), f.y);
+    if (len <= 1e-6 || dist <= m.x) {
+        return 1.0;
+    }
+
+    let variance = max(m.y - m.x * m.x, VISIBILITY_VARIANCE);
+    let delta = dist - m.x;
+    let p = variance / (variance + delta * delta);
+    return p * p * p;
+}
+
+// Irradiance of the area grid at a world position, blended from its 8 probes as
+// volume_irradiance blends those of the volume, in the frame of the grid: its probes were
+// captured along the axes of the mover that carries it.
+fn area_irradiance(world: vec3f, n_world: vec3f, spec_world: vec3f) -> Indirect {
+    let at = area_grid_point(world);
+    let n = area_grid_direction(n_world);
+    let spec = area_grid_direction(spec_world);
+    let size = area_volume.size.xyz;
+    let spacing = area_volume.origin.w;
+    let g = clamp((at - area_volume.origin.xyz) / spacing, vec3f(0.0), vec3f(size - 1u));
+    let base = min(vec3u(floor(g)), max(size, vec3u(2u)) - 2u);
+    let t = clamp(g - vec3f(base), vec3f(0.0), vec3f(1.0));
+    let cells = max(size, vec3u(2u)) - 1u;
+    let cell = base.x + (base.y + base.z * cells.y) * cells.x;
+    let corners = area_cell_valid[cell >> 2u] >> ((cell & 3u) * 8u);
+    let biased = at + n * (VISIBILITY_BIAS * spacing);
+    var diffuse = vec3f(0.0);
+    var specular = vec3f(0.0);
+    var total = 0.0;
+    var reach = 0.0;
+    for (var i = 0u; i < 8u; i++) {
+        let o = vec3u(i & 1u, (i >> 1u) & 1u, (i >> 2u) & 1u);
+        let p = min(base + o, size - 1u);
+        let index = p.x + (p.y + p.z * size.y) * size.x;
+        let valid = (corners >> i) & 1u;
+        let trilinear = select(1.0 - t, t, o == vec3u(1u));
+        let position = area_volume.origin.xyz + vec3f(p) * spacing;
+        let to_probe = position - at;
+        let dist = length(to_probe);
+        let reached = volume_reached(n, to_probe, dist, trilinear, valid);
+        if (reached > 0.0) {
+            let w = reached * area_visibility_from(index, biased - position);
+            let e = area_grid_probe(index);
+            diffuse += zh3_irradiance(e, n) * w;
+            specular += zh3_irradiance(e, spec) * w;
+            total += w;
+            reach += reached;
+        }
+    }
+
+    return Indirect(volume_resolve(diffuse, total, reach, n_world),
+        volume_resolve(specular, total, reach, spec_world));
+}
+
+// Weight of the area grid at a world position in x, and in y the area beyond the portal it
+// fades across there, -1 for none. The captures of an area grid (View.reflection.z) take it
+// everywhere. A fragment takes it in the area of the grid, fading over the blend distance from
+// one half on the plane of a portal of the area, inside the opening only: never through a wall.
+fn area_grid_weight(world: vec3f) -> vec2f {
+    if (view.reflection.z != 0u) {
+        return vec2f(1.0, -1.0);
+    }
+
+    if (fragment_area < 0) {
+        return vec2f(0.0, -1.0);
+    }
+
+    let p = area_grid_point(world);
+    let blend = max(area_volume.area.z, 1e-4);
+    let count = min(u32(max(area_volume.area.y, 0.0)), 4u);
+    for (var k = 0u; k < count; k++) {
+        let at = k * AREA_GRID_PORTAL;
+        let c = area_volume.portals[at];
+        let r = area_volume.portals[at + 1u].xyz;
+        let u = area_volume.portals[at + 2u].xyz;
+        let d = p - c.xyz;
+        let s = dot(d, area_volume.portals[at + 3u].xyz);
+        let wide = abs(dot(d, r)) <= dot(r, r) + AREA_LOOKUP * length(r);
+        let high = abs(dot(d, u)) <= dot(u, u) + AREA_LOOKUP * length(u);
+        if (abs(s) < blend && wide && high) {
+            return vec2f(clamp(0.5 + 0.5 * s / blend, 0.0, 1.0), c.w);
+        }
+    }
+
+    return vec2f(select(0.0, 1.0, fragment_area == i32(area_volume.area.x)), -1.0);
+}
+
+// Ambient light in a direction of an area of the shading block, as ambient_area gives it to its
+// fragments: that of the scene for the outdoors and an area that keeps it.
+fn area_ambient_of(dir: vec3f, area: i32) -> vec3f {
+    var scene = mix(view.ambient_ground.rgb, view.ambient_sky.rgb, dir.y * 0.5 + 0.5);
+    if (scene_environment) {
+        scene = ambient(dir);
+    }
+
+    let header = area_block[0];
+    if (area <= 0 || header.w == 0.0) {
+        return scene;
+    }
+
+    let record = area_block[u32(header.z) + AREA_RECORD * u32(area)];
+    if (record.x < 0.0) {
+        return scene;
+    }
+
+    return record.rgb * (0.7 + 0.3 * dir.y);
+}
+
 // A world direction or offset in the frame of the boxes of a reflection probe.
 fn probe_local(p: ReflectionProbe, v: vec3f) -> vec3f {
     return vec3f(dot(v, p.axes[0].xyz), dot(v, p.axes[1].xyz), dot(v, p.axes[2].xyz));
@@ -295,6 +439,19 @@ fn indirect_light(world: vec3f, n: vec3f, spec: vec3f, roughness: f32, cluster: 
         e = volume_irradiance(world, n, spec);
     } else {
         e = Indirect(view_ambient(n), view_ambient(spec));
+    }
+
+    if (view_samples_area()) {
+        let w = area_grid_weight(world);
+        if (w.x > 0.0) {
+            let a = area_irradiance(world, n, spec);
+            var rest = e;
+            if (w.y >= 0.0 && !view_samples_volume()) {
+                rest = Indirect(area_ambient_of(n, i32(w.y)), area_ambient_of(spec, i32(w.y)));
+            }
+
+            e = Indirect(mix(rest.diffuse, a.diffuse, w.x), mix(rest.specular, a.specular, w.x));
+        }
     }
 
     if (scene_reflections && view.reflection.x > 0u) {
@@ -477,6 +634,33 @@ fn indirect_lobes(world: vec3f, n: vec3f, spec: vec3f, roughness: f32, cluster: 
     } else {
         e = IndirectLobes(view_ambient(n), view_ambient(spec), view_ambient(-n),
             view_ambient(spec_coat));
+    }
+
+    if (view_samples_area()) {
+        let w = area_grid_weight(world);
+        if (w.x > 0.0) {
+            var rest = e;
+            if (w.y >= 0.0 && !view_samples_volume()) {
+                let o = i32(w.y);
+                rest = IndirectLobes(area_ambient_of(n, o), area_ambient_of(spec, o),
+                    area_ambient_of(-n, o), area_ambient_of(spec_coat, o));
+            }
+
+            let a = area_irradiance(world, n, spec);
+            var a_back = rest.back;
+            var a_coat = rest.coat;
+            if (back) {
+                a_back = area_irradiance(world, -n, -n).diffuse;
+            }
+
+            if (coat) {
+                a_coat = area_irradiance(world, nc, spec_coat).specular;
+            }
+
+            e = IndirectLobes(mix(rest.diffuse, a.diffuse, w.x),
+                mix(rest.specular, a.specular, w.x), mix(rest.back, a_back, w.x),
+                mix(rest.coat, a_coat, w.x));
+        }
     }
 
     if (scene_reflections && view.reflection.x > 0u) {

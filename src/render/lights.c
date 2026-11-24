@@ -52,7 +52,7 @@ static void box_lights_table_init(void)
  *
  * @param list The list
  */
-static void box_lights_list_init(
+void box_lights_list_init(
     box_light_list_t *list)
 {
     ecs_os_memset_t(list, 0, box_light_list_t);
@@ -66,7 +66,7 @@ static void box_lights_list_init(
  *
  * @param list The list
  */
-static void box_lights_list_fini(
+void box_lights_list_fini(
     box_light_list_t *list)
 {
     ecs_vec_fini_t(NULL, &list->lights, box_render_light_t);
@@ -79,7 +79,7 @@ static void box_lights_list_fini(
  *
  * @param list The list
  */
-static void box_lights_list_clear(
+void box_lights_list_clear(
     box_light_list_t *list)
 {
     ecs_vec_clear(&list->lights);
@@ -292,7 +292,7 @@ void box_lights_cone(
  * @param mode The bake mode of the light
  * @param light The light, directional when its range is 0
  */
-static void box_lights_append(
+void box_lights_append(
     box_light_list_t *list,
     ecs_entity_t e,
     LightBakeMode mode,
@@ -908,7 +908,7 @@ done:
  * @param s The list
  * @param p The packet
  */
-static void box_lights_send_list(
+void box_lights_send_list(
     box_render_lights_t *l,
     box_light_list_t *s,
     box_render_packet_t *p)
@@ -962,7 +962,7 @@ done:
  * @param list The list
  * @param p The packet, receives the destroy of the light buffer
  */
-static void box_lights_release(
+void box_lights_release(
     box_render_lights_t *l,
     box_light_list_t *list,
     box_render_packet_t *p)
@@ -1867,7 +1867,7 @@ void box_render_lights_time_of_day(
  * @param list The list
  * @param out Receives them, the ambient is kept
  */
-static void box_lights_list_view(
+void box_lights_list_view(
     const box_light_list_t *list,
     box_render_view_lights_t *out)
 {

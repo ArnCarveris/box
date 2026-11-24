@@ -112,10 +112,20 @@ typedef struct box_bake_grid_t {
     int32_t size[3];        /**< Probes per axis, 0 for a volume without probes */
 } box_bake_grid_t;
 
-/** The volume of one scene with LightBake */
+/** State of an area grid besides its volume, see bake_area.c */
+typedef struct box_bake_area_t box_bake_area_t;
+
+/** The volume of one scene with LightBake, or of one area with LightBake that a mover carries */
 typedef struct box_bake_volume_t {
     ecs_entity_t scene;     /**< Scene root, 0 for the default scene */
     ecs_entity_t entity;    /**< Entity with the LightBake of the scene */
+    ecs_entity_t area;      /**< Entity with the VisArea of an area grid, 0 for a scene */
+    ecs_entity_t mover;     /**< Mover that carries the area of an area grid, 0 for none */
+    mat4 frame;             /**< Grid frame to world in this frame: the mover without its scale
+                             *   for an area grid, whose grid, probes and lights are in it */
+    mat4 rows;              /**< World to grid frame, the inverse of frame */
+    box_bake_area_t *area_data; /**< State of an area grid, NULL for a scene */
+    int32_t captures;       /**< Probe captures the backend reported for the volume */
     uint32_t handle;        /**< Volume handle, 0 while the grid has no probes */
     int32_t probes;         /**< Probes of the grid */
     box_bake_grid_t grid;   /**< The grid the backend has */
@@ -221,7 +231,7 @@ typedef struct box_render_bake_t {
     bool task_finished;     /**< The report shows its total done and ends at the next frame */
 } box_render_bake_t;
 
-/** Find the volume of a scene.
+/** Find the volume of a scene, never that of one of its areas.
  *
  * @param b The state
  * @param scene The scene root
@@ -230,6 +240,144 @@ typedef struct box_render_bake_t {
 box_bake_volume_t* box_bake_find(
     const box_render_bake_t *b,
     ecs_entity_t scene);
+
+/** Add an empty volume of a scene to the state.
+ *
+ * @param b The state
+ * @param scene The scene root
+ * @return The volume, valid until the next volume is added
+ */
+box_bake_volume_t* box_bake_volume_add(
+    box_render_bake_t *b,
+    ecs_entity_t scene);
+
+/** Place probes on the lattice (k + 1/2) * spacing over padded bounds, spaced wider above the
+ * probes a volume can have.
+ *
+ * @param min Minimum corner of the bounds
+ * @param max Maximum corner of the bounds
+ * @param spacing Units between probes, no grid when not positive
+ * @param padding Units added on every side of the bounds
+ * @param out Receives the grid
+ * @return Probes of the grid
+ */
+int32_t box_bake_place(
+    const vec3 min,
+    const vec3 max,
+    float spacing,
+    float padding,
+    box_bake_grid_t *out);
+
+/** Take a new grid for a volume when it differs from its grid: resized on its lattice when the
+ * backend has probes of the old one, else sent again; validated either way.
+ *
+ * @param world The world
+ * @param b The state
+ * @param p The packet
+ * @param v The volume
+ * @param grid The new grid
+ * @param probes Probes of the new grid
+ */
+void box_bake_regrid(
+    const ecs_world_t *world,
+    box_render_bake_t *b,
+    box_render_packet_t *p,
+    box_bake_volume_t *v,
+    const box_bake_grid_t *grid,
+    int32_t probes);
+
+/** Write the SH irradiance of the hemisphere ambient of view lights.
+ *
+ * @param l The lights
+ * @param out Receives the coefficients
+ */
+void box_bake_ambient(
+    const box_render_view_lights_t *l,
+    float out[BOX_RENDER_SH_COEFFICIENTS][4]);
+
+/** Find the area grid of an area.
+ *
+ * @param b The state
+ * @param area Entity with the VisArea
+ * @return The volume, NULL when the area has none
+ */
+box_bake_volume_t* box_bake_find_area(
+    const box_render_bake_t *b,
+    ecs_entity_t area);
+
+/** Keep the area grid of a LightBake on a VisArea for this frame: its settings, the mover, the
+ * frame of the grid, its placement in that frame and its portals.
+ *
+ * @param world The world
+ * @param b The state
+ * @param p The packet
+ * @param scene Scene of the area
+ * @param area Entity with the VisArea and the LightBake
+ * @param bake The LightBake
+ */
+void box_bake_area_update(
+    ecs_world_t *world,
+    box_render_bake_t *b,
+    box_render_packet_t *p,
+    ecs_entity_t scene,
+    ecs_entity_t area,
+    const LightBake *bake);
+
+/** Mark the probes of an area grid inside its area as valid.
+ *
+ * @param v The volume, with its grid placed
+ */
+void box_bake_area_validate(
+    box_bake_volume_t *v);
+
+/** Point the views of the packet at the area grid of their scene nearest their camera, give the
+ * area grids of the scenes of the views their lights and collect those cameras in grid frames.
+ *
+ * @param world The world
+ * @param b The state
+ * @param p The packet
+ */
+void box_bake_area_views(
+    ecs_world_t *world,
+    box_render_bake_t *b,
+    box_render_packet_t *p);
+
+/** Write the frame, area and portals of an area grid into a volume description.
+ *
+ * @param v The volume
+ * @param desc The description
+ */
+void box_bake_area_desc(
+    box_bake_volume_t *v,
+    box_render_volume_desc_t *desc);
+
+/** Send the frame of every area grid the backend has whose frame changed since it was sent.
+ *
+ * @param b The state
+ * @param p The packet
+ */
+void box_bake_area_frames(
+    box_render_bake_t *b,
+    box_render_packet_t *p);
+
+/** Queue the probes of an area grid a change of the lights its mover carries can reach,
+ * compared in the grid frame, so a mover that moves and turns changes none.
+ *
+ * @param v The volume
+ */
+void box_bake_area_lights(
+    box_bake_volume_t *v);
+
+/** Free the state of an area grid, releasing its light buffers.
+ *
+ * @param b The state
+ * @param v The volume
+ * @param p The packet, NULL when the backend goes away with it
+ */
+void box_bake_area_fini(
+    box_render_bake_t *b,
+    box_bake_volume_t *v,
+    box_render_packet_t *p);
 
 /** Check whether a probe of a volume is one a static surface can use.
  *

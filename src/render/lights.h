@@ -313,4 +313,71 @@ void box_lights_collect_leaving(
     ecs_world_t *world,
     box_render_lights_t *l);
 
+/** Prepare an empty list of lights.
+ *
+ * @param list The list
+ */
+void box_lights_list_init(
+    box_light_list_t *list);
+
+/** Free a list of lights; its light buffer is released by the caller.
+ *
+ * @param list The list
+ */
+void box_lights_list_fini(
+    box_light_list_t *list);
+
+/** Empty a list of lights for a new frame, keeping its light buffer.
+ *
+ * @param list The list
+ */
+void box_lights_list_clear(
+    box_light_list_t *list);
+
+/** Append a light to a list.
+ *
+ * @param list The list
+ * @param e The light entity
+ * @param mode The bake mode of the light
+ * @param light The light, directional when its range is 0
+ */
+void box_lights_append(
+    box_light_list_t *list,
+    ecs_entity_t e,
+    LightBakeMode mode,
+    const box_render_light_t *light);
+
+/** Send the light buffer of a list when the backend lacks it or it changed, with a handle of
+ * the light buffers of the state.
+ *
+ * @param l The state
+ * @param s The list
+ * @param p The packet
+ */
+void box_lights_send_list(
+    box_render_lights_t *l,
+    box_light_list_t *s,
+    box_render_packet_t *p);
+
+/** Destroy the light buffer of a list when it has one.
+ *
+ * @param l The state
+ * @param list The list
+ * @param p The packet, receives the destroy of the light buffer
+ */
+void box_lights_release(
+    box_render_lights_t *l,
+    box_light_list_t *list,
+    box_render_packet_t *p);
+
+/** Point view lights at the light buffer of a list: its handle, its lights and the first
+ * directional light as the sun.
+ *
+ * @param list The list
+ * @param out Receives the lights, the ambient left as it is
+ */
+void box_lights_list_view(
+    const box_light_list_t *list,
+    box_render_view_lights_t *out);
+
 #endif

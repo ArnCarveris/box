@@ -2214,6 +2214,16 @@
                     "grass_shift_same_image",
                     "grass_render_follow_moving_continuous"
                 ]
+            },
+            {
+                "id": "AreaBake",
+                "testcases": [
+                    "ship_same_lighting_after_sailing",
+                    "door_blend_continuous",
+                    "no_leak_through_wall",
+                    "render_origin_same_image",
+                    "ship_light_no_rebake"
+                ]
             }
         ]
     }

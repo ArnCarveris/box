@@ -310,6 +310,13 @@ static inline void box_gpu_api_copy_buffer(
  * what the adapter offers: the fragment stage of the texture layer pipelines binds 13 */
 #define BOX_GPU_UNIFORM_BUFFERS (12u)
 
+/** Storage buffers per shader stage of the WebGPU default limits, which the device raises to
+ * what the adapter offers: the fragment stage of the forward pass binds 11 with an area grid */
+#define BOX_GPU_STORAGE_BUFFERS (8u)
+
+/** Storage buffers the fragment stage of the forward pass binds */
+#define BOX_GPU_FORWARD_STORAGE (11u)
+
 /** Bytes between the matrices of two cascades, the dynamic offset alignment of webgpu */
 #define BOX_GPU_CASCADE_STRIDE (256)
 
@@ -1421,11 +1428,25 @@ typedef struct box_gpu_blit_t {
     WGPURenderPipeline pipeline;    /**< The pipeline */
 } box_gpu_blit_t;
 
-/** Uniforms of a probe volume, as in Volume of etc/shaders/mesh.wgsl */
+/** Uniforms of a probe volume, as Volume of etc/shaders/include/probes.wgsl, followed by the
+ * frame of an area grid as AreaVolume reads it */
 typedef struct box_gpu_volume_uniforms_t {
     float origin[4];                /**< First probe, w is the spacing */
-    uint32_t size[4];               /**< Probes per axis, w is 1 when views sample the probes */
+    uint32_t size[4];               /**< Probes per axis, w is 1 when views sample the probes, 2
+                                     *   for an area grid in the frame of its rows */
+    float rows[3][4];               /**< World to grid frame rows of an area grid */
+    float area[4];                  /**< Its area in the shading block, portals, blend */
+    float portals[BOX_RENDER_AREA_PORTALS * BOX_RENDER_AREA_PORTAL][4]; /**< Its portals */
 } box_gpu_volume_uniforms_t;
+
+/** A bind group of a probe volume with an area grid that views sample with it */
+typedef struct box_gpu_volume_pair_t {
+    const struct box_gpu_volume_t *scene; /**< Volume of the scene, or the 1x1x1 volume */
+    uint32_t scene_buffer;          /**< Its probe buffer */
+    const struct box_gpu_volume_t *area; /**< The area grid */
+    uint32_t area_buffer;           /**< Its probe buffer */
+    WGPUBindGroup group;            /**< The group, as group 3 */
+} box_gpu_volume_pair_t;
 
 /** An irradiance probe volume: grid uniforms, two buffers with the SH of every probe, which
  * the passes of a bake read and write in turn, the validity mask and the visibility maps */
@@ -1575,8 +1596,11 @@ typedef struct box_gpu_t {
     WGPUPipelineLayout mesh_layout; /**< Pipeline layout of the forward pass */
     WGPUBindGroupLayout prepass_empty_layout; /**< An empty bind group layout */
     WGPUBindGroup prepass_empty;    /**< The empty bind group of prepass_empty_layout */
-    WGPUBindGroupLayout volume_layout; /**< Binds the probe volume a view samples */
+    WGPUBindGroupLayout volume_layout; /**< Binds the probe volume and the area grid a view
+                                     *   samples */
     ecs_map_t volumes;              /**< Handle to box_gpu_volume_t */
+    ecs_vec_t volume_pairs;         /**< box_gpu_volume_pair_t, groups of a volume with an area
+                                     *   grid, released when a volume is */
     box_gpu_volume_t *no_volume;    /**< 1x1x1 volume of the views that use the hemisphere */
     ecs_map_t reflections;          /**< Handle to box_gpu_reflect_t */
     WGPUBindGroupLayout reflect_store_layout; /**< Binds a face atlas and mip 0 of a cube array */

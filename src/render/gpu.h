@@ -774,6 +774,23 @@ WGPUBindGroup box_gpu_volume_group(
     box_gpu_t *gpu,
     const box_render_view_t *v);
 
+/** Get the bind group of a probe volume with an area grid sampled with it, kept until a volume
+ * is created or freed.
+ *
+ * @param gpu The backend
+ * @param scene The volume, NULL for the 1x1x1 volume that leaves the hemisphere ambient
+ * @param scene_buffer Its probe buffer
+ * @param area The area grid
+ * @param area_buffer Its probe buffer
+ * @return The group
+ */
+WGPUBindGroup box_gpu_volume_pair(
+    box_gpu_t *gpu,
+    const box_gpu_volume_t *scene,
+    uint32_t scene_buffer,
+    const box_gpu_volume_t *area,
+    uint32_t area_buffer);
+
 /** Create the layouts of the reflection cubemap passes.
  *
  * @param gpu The backend

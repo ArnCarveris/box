@@ -223,6 +223,8 @@ typedef struct box_draw_key_t {
                              *   pay for the frame */
     bool bake;              /**< Static 3D instances without NoBake of a scene with LightBake or
                              *   ReflectionBake, drawn by the captures */
+    bool carried;           /**< Opaque 3D instances without NoBake that a mover carries,
+                             *   drawn by the captures of an area grid */
     bool box_shadow;        /**< The shadows of 2D shapes (BoxShadow), drawn with the
                              *   fs_shadow entry point of the 2D shape shader */
     bool slice;             /**< Rects with an ImageSlice, drawn with the fs_slice entry point

@@ -724,9 +724,9 @@ static ecs_entity_t box_draws_scene(
     return result;
 }
 
-/** Set the bake flag of a key, so captures tell static shapes apart: an opaque shape that
- * doesn't move, in a scene whose root (or the singleton) has LightBake or ReflectionBake. Then
- * make the key that of an impostor card when the shape is one.
+/** Set the bake flags of a key, so captures tell static shapes (bake: opaque, not moving, in a
+ * scene whose root has LightBake or ReflectionBake) and opaque shapes a mover carries (carried,
+ * for area grids) apart. Then make the key that of an impostor card when the shape is one.
  *
  * @param world The world
  * @param e The entity
@@ -744,6 +744,8 @@ static void box_draws_key_bake(
         !ecs_has_id(world, e, NoBake) && !box_projection_anchored(world, e) &&
         (ecs_has(world, key->scene ? key->scene : ecs_id(LightBake), LightBake) ||
          ecs_has(world, key->scene ? key->scene : ecs_id(ReflectionBake), ReflectionBake));
+    key->carried = allowed && key->blend == Opaque && !ecs_has_id(world, e, NoBake) &&
+        (key->mover || ecs_has_id(world, e, DynamicTransform));
     box_draws_impostor_key(world, e, key);
 }
 
@@ -897,8 +899,7 @@ static void box_draws_key(
     bool transition = ecs_has_id(world, e, TransitionTransform);
     key->mover = !shape2d && box_draws_mover_table(world, table, false,
         ecs_pair(EcsIsA, DynamicTransformSpread));
-    key->dynamic_transform = !key->mover &&
-        (box_transform_dynamic(world, table) || transition);
+    key->dynamic_transform = !key->mover && (box_transform_dynamic(world, table) || transition);
     key->dynamic_material = ecs_has_id(world, e, DynamicMaterial) ||
         ecs_has_id(world, e, TransitionMaterial) || fading ||
         ecs_get_target_for_id(world, e, EcsChildOf, DynamicMaterial) != 0;
@@ -980,8 +981,7 @@ static void box_draws_key_blend(
 {
     bool fading = ecs_has_id(world, e, TransitionOpacity);
     bool planet_light = key->features & BOX_RENDER_FEATURE_PLANET_LIGHT;
-    key->cutout = box_draws_scene_cutout(material->cutoff, material->reveal, NULL,
-        key->features);
+    key->cutout = box_draws_scene_cutout(material->cutoff, material->reveal, NULL, key->features);
     key->blend = box_draws_scene_blend(ecs_get(world, e, BlendMode),
         fading ? 0.0f : box_draws_alpha(material), key->cutout, NULL, key->features);
     key->planet = 0;

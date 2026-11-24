@@ -1587,6 +1587,7 @@ void box_draws_impostor_key(
     key->wind = false;
     key->frame = false;
     key->bake = false;
+    key->carried = false;
     key->atmosphere = 0;
     key->wrap = WrapClamp;
     key->back_face = BackFacePlain;

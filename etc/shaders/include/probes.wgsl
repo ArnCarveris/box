@@ -24,6 +24,27 @@ struct Volume {
 @group(3) @binding(2) var<storage, read> cell_valid: array<u32>;
 @group(3) @binding(3) var<storage, read> probe_visibility: array<u32>;
 
+// vec4 of a portal of an area grid, BOX_RENDER_AREA_PORTAL.
+const AREA_GRID_PORTAL: u32 = 4u;
+
+// The area grid of a view (bake_area.c): a volume whose grid, probes and portals lie in the
+// frame of the mover that carries its area, which rows take a world point into. size.w is 2
+// for an area grid, 0 for none. area holds the index of its area in the shading block, its
+// portals and the distance they blend over; a portal is its center and the area beyond it, half
+// its width along its width, half its height along its height and its unit normal into the area.
+struct AreaVolume {
+    origin: vec4f,
+    size: vec4u,
+    rows: array<vec4f, 3>,
+    area: vec4f,
+    portals: array<vec4f, 16>,
+};
+
+@group(3) @binding(4) var<uniform> area_volume: AreaVolume;
+@group(3) @binding(5) var<storage, read> area_probes: array<vec4f>;
+@group(3) @binding(6) var<storage, read> area_cell_valid: array<u32>;
+@group(3) @binding(7) var<storage, read> area_probe_visibility: array<u32>;
+
 const SH_COEFFICIENTS: u32 = 9u;
 
 // vec4 of a probe of the volume, BOX_GPU_VOLUME_PROBE_SIZE bytes
@@ -33,4 +54,24 @@ const VOLUME_PROBE_VECTORS: u32 = 4u;
 fn volume_probe(index: u32) -> Zh3 {
     let at = index * VOLUME_PROBE_VECTORS;
     return zh3_load(probes[at], probes[at + 1u], probes[at + 2u], probes[at + 3u]);
+}
+
+// The ZH3 of a probe of the area grid, in the grid frame.
+fn area_grid_probe(index: u32) -> Zh3 {
+    let at = index * VOLUME_PROBE_VECTORS;
+    return zh3_load(area_probes[at], area_probes[at + 1u], area_probes[at + 2u],
+        area_probes[at + 3u]);
+}
+
+// A world point in the frame of the area grid.
+fn area_grid_point(p: vec3f) -> vec3f {
+    let q = vec4f(p, 1.0);
+    return vec3f(dot(area_volume.rows[0], q), dot(area_volume.rows[1], q),
+        dot(area_volume.rows[2], q));
+}
+
+// A world direction in the frame of the area grid.
+fn area_grid_direction(d: vec3f) -> vec3f {
+    return vec3f(dot(area_volume.rows[0].xyz, d), dot(area_volume.rows[1].xyz, d),
+        dot(area_volume.rows[2].xyz, d));
 }

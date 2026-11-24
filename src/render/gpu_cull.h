@@ -267,6 +267,19 @@ bool box_gpu_cull_capture_draws(
     ecs_entity_t scene,
     int32_t cascade);
 
+/** Check whether the captures of an area grid draw a batch.
+ *
+ * @param gpu The backend
+ * @param b The batch
+ * @param scene Scene of the captures
+ * @return Whether the batch has opaque meshes of the scene that a mover carries, and the
+ * backend has its mesh and storage instance buffer
+ */
+bool box_gpu_cull_carried_draws(
+    box_gpu_t *gpu,
+    const box_render_batch_t *b,
+    ecs_entity_t scene);
+
 /** Record the dispatches of every cull view in one compute pass.
  *
  * @param gpu The backend

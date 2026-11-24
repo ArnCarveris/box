@@ -1345,6 +1345,15 @@
                 ]
             },
             {
+                "id": "AreaGrid",
+                "testcases": [
+                    "grid_from_area",
+                    "mover_moves_grid_kept",
+                    "area_edit_regrids",
+                    "cost_per_child"
+                ]
+            },
+            {
                 "id": "WorldOriginShading",
                 "testcases": [
                     "wrap",

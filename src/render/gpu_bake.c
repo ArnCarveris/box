@@ -617,6 +617,7 @@ static void box_gpu_bake_jobs(
  * @param b The capture state
  * @param packet The packet
  * @param scene Scene of the captures
+ * @param carried Whether the faces draw the carried batches, not the static ones
  * @param chunk Probes per chunk
  */
 static void box_gpu_bake_draws(
@@ -624,6 +625,7 @@ static void box_gpu_bake_draws(
     box_gpu_bake_t *b,
     const box_render_packet_t *packet,
     ecs_entity_t scene,
+    bool carried,
     int32_t chunk)
 {
     int32_t i, d, count = ecs_vec_count(&packet->batches);
@@ -634,7 +636,10 @@ static void box_gpu_bake_draws(
     b->chunk = chunk;
     for (i = 0; i < count; i ++) {
         const box_render_batch_t *rb = ecs_vec_get_t(&packet->batches, box_render_batch_t, i);
-        if (box_gpu_cull_capture_draws(gpu, rb, scene, -1)) {
+        bool draws = carried
+            ? box_gpu_cull_carried_draws(gpu, rb, scene)
+            : box_gpu_cull_capture_draws(gpu, rb, scene, -1);
+        if (draws) {
             box_gpu_mesh_t *m = ecs_map_get_deref(&gpu->meshes, box_gpu_mesh_t, rb->mesh);
             *ecs_vec_append_t(NULL, &b->draws, box_gpu_bake_draw_t) = (box_gpu_bake_draw_t){
                 .batch = i,
@@ -867,7 +872,8 @@ void box_gpu_bake_submit(
 /** Write the uniforms of a face of a probe.
  *
  * The sun is shadowed by the capture cascade, which ends beyond every capture. The point and
- * spot lights are one cluster that lists them all, see box_gpu_bake_lights.
+ * spot lights are one cluster that lists them all, see box_gpu_bake_lights. A turned probe
+ * looks along its axes.
  *
  * @param gpu The backend
  * @param b The capture state
@@ -876,6 +882,7 @@ void box_gpu_bake_submit(
  * @param probe The probe
  * @param slot Slot of the face
  * @param cascade The capture cascade, NULL without a sun
+ * @param carried Whether the faces shade with an area grid that covers every fragment
  */
 static void box_gpu_bake_face(
     box_gpu_t *gpu,
@@ -884,17 +891,25 @@ static void box_gpu_bake_face(
     box_render_view_t *rv,
     const box_render_probe_capture_t *probe,
     int32_t slot,
-    const box_render_cascade_t *cascade)
+    const box_render_cascade_t *cascade,
+    bool carried)
 {
     const float (*face)[3] = box_gpu_bake_faces[slot % 6];
     box_gpu_view_uniforms_t *u = (box_gpu_view_uniforms_t*)ecs_vec_get_t(
         &b->view_data, uint8_t, slot * BOX_GPU_VIEW_STRIDE);
-    vec3 eye, center;
+    vec3 eye, center, forward, up;
+    mat3 axes = GLM_MAT3_IDENTITY_INIT;
     mat4 proj;
     float edge = (float)size;
+    if (probe->turned) {
+        glm_mat3_copy(ECS_CONST_CAST(vec3*, probe->axes), axes);
+    }
+
+    glm_mat3_mulv(axes, ECS_CONST_CAST(float*, face[0]), forward);
+    glm_mat3_mulv(axes, ECS_CONST_CAST(float*, face[1]), up);
     glm_vec3_copy(ECS_CONST_CAST(float*, probe->position), eye);
-    glm_vec3_add(eye, ECS_CONST_CAST(float*, face[0]), center);
-    glm_lookat(eye, center, ECS_CONST_CAST(float*, face[1]), rv->view_matrix);
+    glm_vec3_add(eye, forward, center);
+    glm_lookat(eye, center, up, rv->view_matrix);
     box_camera_projection(&rv->camera_data, edge, edge, proj);
     ecs_os_memset_t(u, 0, box_gpu_view_uniforms_t);
     glm_mat4_mul(proj, rv->view_matrix, u->view_proj);
@@ -904,6 +919,7 @@ static void box_gpu_bake_face(
     glm_vec3_copy(eye, u->camera);
     u->camera[3] = 1;
     u->reflection[1] = 1;
+    u->reflection[2] = carried ? 1u : 0u;
     u->viewport[0] = edge;
     u->viewport[1] = edge;
     u->viewport[2] = 1.0f / edge;
@@ -1226,6 +1242,10 @@ static void box_gpu_bake_params(
     for (i = 0; i < count; i ++) {
         params.probes[i] = probes[i].index;
         glm_vec3_copy(ECS_CONST_CAST(float*, probes[i].position), params.positions[i]);
+        params.lights[2] |= probes[i].turned ? 1u : 0u;
+        glm_vec3_copy(ECS_CONST_CAST(float*, probes[i].axes[0]), params.axes[i * 3]);
+        glm_vec3_copy(ECS_CONST_CAST(float*, probes[i].axes[1]), params.axes[i * 3 + 1]);
+        glm_vec3_copy(ECS_CONST_CAST(float*, probes[i].axes[2]), params.axes[i * 3 + 2]);
     }
 
     wgpuQueueWriteBuffer(gpu->queue, b->params, 0, &params, sizeof(params));
@@ -1348,8 +1368,7 @@ static void box_gpu_bake_project(
 }
 
 /** Record the store of the faces of a chunk of reflection captures into their cubemap slots,
- * the prefilter of their mips and the projection onto their SH, and report the probes it
- * stored.
+ * the prefilter of their mips and the projection onto their SH, and report those it stored.
  *
  * @param gpu The backend
  * @param b The capture state
@@ -1412,6 +1431,7 @@ done:
  *
  * @param packet The packet
  * @param scene Scene of the captures
+ * @param carried Whether the captures draw the carried batches, not the static ones
  * @param size Face edge of the captures in texels
  * @param count Probes of the batch
  * @return Probes per chunk, at least 1
@@ -1419,6 +1439,7 @@ done:
 static int32_t box_gpu_bake_chunk(
     const box_render_packet_t *packet,
     ecs_entity_t scene,
+    bool carried,
     int32_t size,
     int32_t count)
 {
@@ -1430,7 +1451,7 @@ static int32_t box_gpu_bake_chunk(
 
     for (i = 0; i < ecs_vec_count(&packet->batches); i ++) {
         const box_render_batch_t *b = ecs_vec_get_t(&packet->batches, box_render_batch_t, i);
-        if (b->scene == scene && b->bake && b->view == -1) {
+        if (b->scene == scene && (carried ? b->carried : b->bake) && b->view == -1) {
             instances += b->instance_count;
         }
     }
@@ -1508,7 +1529,8 @@ static void box_gpu_bake_chunk_capture(
 
     ecs_vec_set_count_t(NULL, &b->view_data, uint8_t, faces * BOX_GPU_VIEW_STRIDE);
     for (i = 0; i < faces; i ++) {
-        box_gpu_bake_face(gpu, b, pass->size, &pass->rv, &probes[i / 6], i, cascade);
+        box_gpu_bake_face(gpu, b, pass->size, &pass->rv, &probes[i / 6], i, cascade,
+            pass->carried);
     }
 
     box_gpu_bake_lights(gpu, b, ecs_vec_first(&b->view_data));
@@ -1626,7 +1648,12 @@ static void box_gpu_bake_pass_probes(
     out->spacing = out->volume ? out->volume->spacing : 1.0f;
     out->probes = ecs_vec_get_t(&packet->probes, box_render_probe_capture_t, batch->first);
     out->count = batch->count;
-    if (out->volume) {
+    out->carried = batch->area;
+    if (out->volume && batch->area) {
+        out->ambient = batch->source == BOX_RENDER_BAKE_BLACK
+            ? gpu->no_volume->group[0]
+            : box_gpu_volume_pair(gpu, NULL, 0, out->volume, (uint32_t)batch->source);
+    } else if (out->volume) {
         out->ambient = batch->source == BOX_RENDER_BAKE_BLACK
             ? gpu->no_volume->group[0]
             : out->volume->group[batch->source];
@@ -1713,7 +1740,7 @@ static void box_gpu_bake_bounds_check(
     const box_gpu_bake_pass_t *pass)
 {
     const box_render_bake_batch_t *batch = pass->bake;
-    bool same = batch && b->bounds_volume == batch->volume &&
+    bool same = batch && !pass->carried && b->bounds_volume == batch->volume &&
         b->bounds_generation == batch->generation &&
         box_gpu_bake_vec_equal(&b->bounds_jobs, &b->job_data, ECS_SIZEOF(box_gpu_bake_job_t)) &&
         box_gpu_bake_vec_equal(&b->bounds_lists, &b->list_data, ECS_SIZEOF(uint32_t));
@@ -1800,7 +1827,8 @@ static void box_gpu_bake_batch(
     bool last)
 {
     WGPUTextureView kept = box_gpu_bake_shadow_kept(b, pass), shadow = kept;
-    int32_t first, chunk = box_gpu_bake_chunk(packet, pass->scene, pass->size, pass->count);
+    int32_t first, chunk = box_gpu_bake_chunk(packet, pass->scene, pass->carried, pass->size,
+        pass->count);
     if (pass->cube) {
         int32_t layers = gpu->stats.texture_layers > 0
             ? gpu->stats.texture_layers
@@ -1809,7 +1837,7 @@ static void box_gpu_bake_batch(
     }
 
     box_gpu_bake_atlas(gpu, &b->sets[pass->kind], pass->size, chunk);
-    box_gpu_bake_draws(gpu, b, packet, pass->scene, chunk);
+    box_gpu_bake_draws(gpu, b, packet, pass->scene, pass->carried, chunk);
     box_gpu_bake_bounds_check(b, pass);
     for (first = 0; first < pass->count; first += chunk) {
         int32_t count = pass->count - first < chunk ? pass->count - first : chunk;

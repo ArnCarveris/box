@@ -1485,6 +1485,20 @@ bool box_gpu_cull_capture_draws(
     return result;
 }
 
+bool box_gpu_cull_carried_draws(
+    box_gpu_t *gpu,
+    const box_render_batch_t *b,
+    ecs_entity_t scene)
+{
+    bool result = b->scene == scene && b->carried && b->view == -1 && b->blend == Opaque &&
+        box_render_is_mesh(b->pipeline) && b->instance_count;
+    if (result) {
+        result = box_gpu_cull_ready(gpu, b);
+    }
+
+    return result;
+}
+
 void box_gpu_cull_capture_add(
     box_gpu_t *gpu,
     const box_render_packet_t *packet,

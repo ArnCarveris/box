@@ -181,6 +181,14 @@ ECS_STRUCT(ShadowAtlas, {
 /** Baked indirect lighting of a scene, placed on a Scene root or as a singleton for the default
  * scene. Adding it adds LightBakeStatus.
  *
+ * On an entity with a VisArea that a mover (DynamicTransform) carries it bakes a grid of the
+ * area in the frame of the mover instead, which keeps its light while the mover moves and
+ * turns: only the shapes and the point and spot lights the mover carries are baked into it.
+ *
+ * Light that comes in through the portals of such an area, the sun and the sky among it, is not
+ * baked: it stays dynamic (VisArea.sun and the lights through portals), and the grid blends
+ * with the light beyond each portal over a probe spacing across it.
+ *
  * A bake is bounces + 1 passes. A change of static shapes or lights rebakes the probes it can
  * reach; dynamic shapes rebake none. A capture_size outside 1 to 256 or bounces outside 0 to 16
  * bakes nothing and sets LightBakeStatus.error.
@@ -222,6 +230,8 @@ ECS_STRUCT(LightBakeStatus, {
     bool held;           /**< Work is left but LightBake.compute is false, so nothing new is
                           *   captured until it is true again */
     char *error;         /**< Why nothing is baked, such as an invalid setting, NULL for none */
+    int32_t captures;    /**< Probe captures reported since the volume was created, which stays
+                          *   the same while nothing rebakes */
 });
 
 /** Keeps a static shape out of the bake captures */

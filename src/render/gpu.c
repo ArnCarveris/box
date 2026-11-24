@@ -309,6 +309,21 @@ static void box_gpu_device_init(
             limits.maxUniformBuffersPerShaderStage = adapter.maxUniformBuffersPerShaderStage;
             desc.requiredLimits = &limits;
         }
+
+        if (adapter.maxStorageBuffersPerShaderStage != WGPU_LIMIT_U32_UNDEFINED &&
+            adapter.maxStorageBuffersPerShaderStage > BOX_GPU_STORAGE_BUFFERS)
+        {
+            limits.maxStorageBuffersPerShaderStage = adapter.maxStorageBuffersPerShaderStage;
+            desc.requiredLimits = &limits;
+        }
+
+        if (adapter.maxStorageBuffersPerShaderStage != WGPU_LIMIT_U32_UNDEFINED &&
+            adapter.maxStorageBuffersPerShaderStage < BOX_GPU_FORWARD_STORAGE)
+        {
+            ecs_err("the webgpu adapter has %u storage buffers per shader stage, the forward "
+                "pass binds %u", adapter.maxStorageBuffersPerShaderStage,
+                BOX_GPU_FORWARD_STORAGE);
+        }
     }
 
     desc.uncapturedErrorCallbackInfo.callback = box_gpu_on_error;
