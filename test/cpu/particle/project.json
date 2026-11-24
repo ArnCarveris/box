@@ -62,7 +62,9 @@
                     "ground_in_world",
                     "still_matches_world",
                     "world_space_unchanged",
-                    "change_empties_pool"
+                    "change_empties_pool",
+                    "ride_in_block",
+                    "ride_moves_with_mover"
                 ]
             },
             {

@@ -49,7 +49,7 @@ void box_render_particles_sampled(
     const ParticleCollision *collision = ecs_get(world, e, ParticleCollision);
     ecs_entity_t terrain = 0;
     uint32_t flags = 0;
-    if (emitter->local) {
+    if (entry->block.local != BOX_RENDER_PARTICLE_WORLD) {
         goto done;
     }
 

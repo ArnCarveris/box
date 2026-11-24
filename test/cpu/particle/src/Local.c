@@ -1,8 +1,8 @@
 /**
  * @file Local.c
- * @brief Tests for ParticleEmitter.local: particles kept in the space of the emitter move, turn
- * and scale with it, while gravity and the ground plane keep acting in the world, and a world
- * space emitter leaves its particles behind as before.
+ * @brief Tests for ParticleEmitter.local and ride: particles kept in the space of the emitter, or
+ * of the mover it rides, move, turn and scale with it, while gravity and the ground plane keep
+ * acting in the world, and a world space emitter leaves its particles behind as before.
  *
  * The particles of a pool are replayed on the CPU from the blocks of the packets with the C twin
  * of the integrate and spawn passes, and taken to the world through the model of the block as
@@ -118,7 +118,11 @@ static void replay_spawn(
 {
     float u[3], local[3], c[2], cone[3], world[3], offset[3], radial[3], len2, speed;
     float inverse[9];
+    mat4 model, place, em;
     int32_t i;
+    memcpy(model, b->model, sizeof(model));
+    memcpy(place, b->place, sizeof(place));
+    glm_mat4_mul(model, place, em);
     for (i = 0; i < 3; i ++) {
         u[i] = box_particle_unit(
             box_particle_hash(b->seed, index, BOX_PARTICLE_STREAM_SHAPE + (uint32_t)i));
@@ -129,8 +133,8 @@ static void replay_spawn(
     c[1] = box_particle_unit(
         box_particle_hash(b->seed, index, BOX_PARTICLE_STREAM_DIRECTION + 1u));
     box_particle_cone(b->direction, b->direction[3], c, cone);
-    box_particle_transform(b->model, cone, 0.0f, world);
-    box_particle_transform(b->model, local, 0.0f, offset);
+    box_particle_transform(em, cone, 0.0f, world);
+    box_particle_transform(em, local, 0.0f, offset);
     len2 = world[0] * world[0] + world[1] * world[1] + world[2] * world[2];
     speed = box_particle_draw(b->seed, index, BOX_PARTICLE_STREAM_SPEED, b->speed[0],
         b->speed[1]);
@@ -138,13 +142,13 @@ static void replay_spawn(
         b->radial[0], b->radial[1]), radial);
     for (i = 0; i < 3; i ++) {
         float dir = len2 > 0 ? world[i] / sqrtf(len2) : 0.0f;
-        out->position[i] = offset[i] + b->model[3][i];
+        out->position[i] = offset[i] + em[3][i];
         out->velocity[i] = dir * speed + radial[i] + b->inherit[i];
     }
 
     if (b->local) {
         box_particle_inverse(b->model, inverse);
-        memcpy(out->position, local, sizeof(local));
+        box_particle_transform(b->place, local, 1.0f, out->position);
         box_particle_mul3(inverse, out->velocity, out->velocity);
     }
 
@@ -633,4 +637,143 @@ void Local_script_value(void) {
     test_assert(e != 0);
     test_bool(ecs_get(world, e, ParticleEmitter)->local, true);
     ecs_fini(world);
+}
+
+/** Create a mover at the origin with a child that is no mover, and under it an emitter that
+ * rides the mover.
+ *
+ * @param world The world
+ * @param mover Receives the mover
+ * @return The emitter
+ */
+static ecs_entity_t ride_new(
+    ecs_world_t *world,
+    ecs_entity_t *mover)
+{
+    *mover = ecs_new(world);
+    ecs_add(world, *mover, DynamicTransform);
+    ecs_set(world, *mover, Position, {0, 0, 0});
+    ecs_entity_t arm = ecs_new_w_pair(world, EcsChildOf, *mover);
+    ecs_set(world, arm, Position, {2, 0, 0});
+    ecs_set(world, arm, Rotation, {0, 0.5f, 0});
+    ecs_entity_t e = emitter_new(world, arm, false, 2);
+    ecs_set(world, e, Position, {0, 1, 0});
+    ecs_get_mut(world, e, ParticleEmitter)->ride = true;
+    ecs_get_mut(world, e, ParticleEmitter)->inherit_velocity = 1;
+    ecs_modified(world, e, ParticleEmitter);
+
+    return e;
+}
+
+void Local_ride_in_block(void) {
+    // particle/local
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t mover;
+    ecs_entity_t e = ride_new(world, &mover);
+    ecs_entity_t alone = emitter_new(world, 0, false, 2);
+    ecs_get_mut(world, alone, ParticleEmitter)->ride = true;
+    ecs_modified(world, alone, ParticleEmitter);
+    ecs_set(world, mover, Position, {100, 0, -50});
+    ecs_set(world, mover, Rotation, {0, 1.0f, 0});
+    ecs_progress(world, DELTA);
+    box_render_sync(world);
+    ecs_set(world, mover, Position, {101, 0, -50});
+    ecs_progress(world, DELTA);
+    box_render_sync(world);
+
+    const box_render_particle_pool_t *pool = pool_of(null, e);
+    test_assert(pool != NULL);
+    test_uint(pool->block.local, 2);
+    test_flt(pool->block.inherit[0], 0);
+    test_flt(pool->block.inherit[2], 0);
+    test_uint(pool->block.sampled, 0);
+    WorldTransform mbuf, wbuf;
+    const WorldTransform *m = box_transform_world(world, mover, &mbuf);
+    const WorldTransform *w = box_transform_world(world, e, &wbuf);
+    mat4 place, placed;
+    int32_t r, c;
+    memcpy(place, pool->block.place, sizeof(place));
+    glm_mat4_mul(ECS_CONST_CAST(vec4*, m->m), place, placed);
+    for (c = 0; c < 4; c ++) {
+        for (r = 0; r < 4; r ++) {
+            test_flt(pool->block.model[c][r], m->m[c][r]);
+            test_assert(fabsf(placed[c][r] - w->m[c][r]) < 1e-4f);
+        }
+    }
+
+    // An emitter without a mover keeps the world, with the identity as its place
+    pool = pool_of(null, alone);
+    test_assert(pool != NULL);
+    test_uint(pool->block.local, 0);
+    for (c = 0; c < 4; c ++) {
+        for (r = 0; r < 4; r ++) {
+            test_flt(pool->block.place[c][r], c == r ? 1.0f : 0.0f);
+        }
+    }
+
+    // A shift of the world origin moves the world space particles only
+    box_render_particles_shift(box_render_particles_get(world), 0, (vec3){10, 0, 0}, NULL,
+        NULL);
+    ecs_progress(world, DELTA);
+    box_render_sync(world);
+    test_flt(pool_of(null, e)->block.color[3], 0);
+    test_flt(pool_of(null, alone)->block.color[3], 10);
+
+    // Leaving the mover empties the pool
+    ecs_get_mut(world, e, ParticleEmitter)->ride = false;
+    ecs_modified(world, e, ParticleEmitter);
+    ecs_progress(world, DELTA);
+    box_render_sync(world);
+    test_bool(pool_of(null, e)->clear, true);
+    test_uint(pool_of(null, e)->block.local, 0);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void Local_ride_moves_with_mover(void) {
+    // particle/local
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t mover;
+    ecs_entity_t e = ride_new(world, &mover);
+    replay_t *r = ecs_os_calloc_t(replay_t), *before = ecs_os_calloc_t(replay_t);
+    float m[4][4];
+    int32_t i, c, fresh = 0;
+    for (i = 0; i < 30; i ++) {
+        frame_replay(world, null, e, r);
+    }
+
+    test_assert(replay_live(r) >= 29);
+    *before = *r;
+    ecs_set(world, mover, Position, {5, 2, -1});
+    ecs_set(world, mover, Rotation, {0, 1.5707964f, 0});
+    frame_replay(world, null, e, r);
+    memcpy(m, ecs_get(world, mover, WorldTransform)->m, sizeof(m));
+    test_assert(check_carried(before, r, m, 1e-4f) >= 29);
+
+    // A new particle spawns in the sphere around the emitter where it is in the mover
+    WorldTransform buf;
+    const float *at = box_transform_world(world, e, &buf)->m[3];
+    for (i = 0; i < SLOTS; i ++) {
+        float d2 = 0;
+        if (!r->slots[i].remaining || before->slots[i].remaining) {
+            continue;
+        }
+
+        for (c = 0; c < 3; c ++) {
+            d2 += (r->world[i][c] - at[c]) * (r->world[i][c] - at[c]);
+        }
+
+        test_assert(d2 <= 1.0f + 1e-3f);
+        fresh ++;
+    }
+
+    test_assert(fresh >= 1);
+
+    ecs_os_free(before);
+    ecs_os_free(r);
+    ecs_fini(world);
+    box_render_null_free(null);
 }

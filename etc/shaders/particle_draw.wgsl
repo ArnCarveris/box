@@ -1,7 +1,9 @@
 // Particle draw: one instanced draw per blend and sprite of the pools of the scene of a view,
 // every instance a slot of a chunk of CHUNK slots of a pool that the chunk buffer names. A
 // circle or sprite faces the camera; a card is a quad in world space that tumbles around its
-// axis and lies flat once it rests on the ground plane.
+// axis and lies flat once it rests on the ground plane. A particle shades at its world position
+// and is placed relative to the render origin: a pool kept in the space of model through the
+// translation of model minus the render origin, which the backend takes in f64.
 #include "include/lights.wgsl"
 #include "include/shadow.wgsl"
 #include "include/cookie.wgsl"
@@ -18,7 +20,7 @@ const PI: f32 = 3.141592653589793;
 
 // The blocks of the pools of the packet, BOX_GPU_PARTICLE_STRIDE apart
 struct EmitterBlock {
-    @size(544) emitter: Emitter,
+    @size(624) emitter: Emitter,
 };
 
 // Slots of a pool one entry of the chunk buffer draws, BOX_GPU_PARTICLE_CHUNK
@@ -119,8 +121,13 @@ fn vs(@builtin(vertex_index) vertex: u32, @builtin(instance_index) instance: u32
     // A local emitter draws its particles through its current model
     var center = p.position;
     var travel = p.velocity;
+    // The center relative to the render origin, which the clip position is projected from
+    var relative = p.position - view.render_delta.xyz;
     if (emitter.gradient_max.w != 0u) {
-        center = (emitter.model * vec4f(p.position, 1.0)).xyz;
+        let placed = mat3x3f(emitter.model[0].xyz, emitter.model[1].xyz, emitter.model[2].xyz) *
+            p.position;
+        center = placed + emitter.model[3].xyz;
+        relative = placed + emitter.relative.xyz;
         travel = (emitter.model * vec4f(p.velocity, 0.0)).xyz;
     }
 
@@ -139,7 +146,7 @@ fn vs(@builtin(vertex_index) vertex: u32, @builtin(instance_index) instance: u32
     }
 
     let turned = axis_x * (corner.x * stretched) + axis_y * corner.y;
-    var world = center + (right * turned.x + up * turned.y) * (0.5 * size);
+    var spread = (right * turned.x + up * turned.y) * (0.5 * size);
     if (emitter.look.x == PARTICLE_CARD) {
         // The rotation around its axis, held at the age it came to rest once it rests
         let word = particle_card_word(emitter.gradient_max.z, emitter.life.w, slot);
@@ -187,8 +194,10 @@ fn vs(@builtin(vertex_index) vertex: u32, @builtin(instance_index) instance: u32
             lift = CARD_REST_LIFT * size * particle_card_ease(rested);
         }
 
-        world = center + (offset + widen) * (0.5 * size) + vec3f(0.0, lift, 0.0);
+        spread = (offset + widen) * (0.5 * size) + vec3f(0.0, lift, 0.0);
     }
+
+    let world = center + spread;
 
     out.uv = corner;
     if (emitter.look.x == PARTICLE_SPRITE || emitter.look.x == PARTICLE_CARD) {
@@ -198,7 +207,7 @@ fn vs(@builtin(vertex_index) vertex: u32, @builtin(instance_index) instance: u32
         out.tex = rect.xy + (corner * vec2f(0.5, -0.5) + 0.5) * rect.zw;
     }
 
-    out.clip = view.view_proj * vec4f(world, 1.0);
+    out.clip = view.render_view_proj * vec4f(relative + spread, 1.0);
     out.world = world;
     out.depth = -(view.view * vec4f(world, 1.0)).z;
     out.opacity = particle_scaled(

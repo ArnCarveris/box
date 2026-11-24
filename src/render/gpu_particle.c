@@ -19,7 +19,7 @@
 #define BOX_GPU_PARTICLE_GROUP (256u)
 
 /** Bytes between the blocks of two pools */
-#define BOX_GPU_PARTICLE_STRIDE (544u)
+#define BOX_GPU_PARTICLE_STRIDE (624u)
 
 _Static_assert(sizeof(box_render_particle_block_t) <= BOX_GPU_PARTICLE_STRIDE,
     "a particle block must fit in its stride");
@@ -846,7 +846,7 @@ static void box_gpu_particle_upload(
     int32_t count)
 {
     box_gpu_particles_t *s = gpu->particles;
-    int32_t i;
+    int32_t i, c;
     ecs_vec_set_count_t(NULL, &s->block_data, uint8_t,
         count * (int32_t)BOX_GPU_PARTICLE_STRIDE);
     ecs_os_memset(ecs_vec_first(&s->block_data), 0, count * (int32_t)BOX_GPU_PARTICLE_STRIDE);
@@ -862,6 +862,10 @@ static void box_gpu_particle_upload(
         *b = pool->block;
         b->base = pool->offset / BOX_RENDER_PARTICLE_SIZE;
         box_gpu_origin_split(packet->origin, b->origin);
+        for (c = 0; c < 3; c ++) {
+            b->relative[c] = (float)((double)b->model[3][c] - packet->local.delta[c]);
+        }
+
         b->slot_first = (uint32_t)ecs_vec_count(&s->slot_data);
         if (!pool->table || s->tables == s->no_table) {
             b->points = 0;

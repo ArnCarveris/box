@@ -98,12 +98,18 @@ struct Emitter {
     curve_max: vec4u,
     // x: first of the GRADIENT_ROWS rows of the max gradient, CURVE_CONSTANT for none, y: 1
     // when the emitter has a ParticleMotion that changes its motion, z: first slot of the pool
-    // in the particle arena, w: 1 when its particles live in the space of model
+    // in the particle arena, w: not 0 when its particles live in the space of model, 2 for
+    // the space of the mover the emitter rides
     gradient_max: vec4u,
     // Rows of the curves of the ParticleMotion, read only while gradient_max.y is 1
     motion: MotionRows,
     sampled: vec4u,
     origin: vec4i,
+    // The transform of the emitter in the space of model, the identity but for a pool that
+    // rides a mover
+    place: mat4x4f,
+    // xyz: translation of model minus the render origin, w unused
+    relative: vec4f,
 };
 
 const SAMPLED_SPAWN_GROUND: u32 = 1u;

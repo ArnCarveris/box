@@ -39,7 +39,8 @@
  * are {min, max}; a max not above min hands out min.
  */
 typedef struct box_render_particle_block_t {
-    float model[4][4];      /**< World transform of the emitter, columns */
+    float model[4][4];      /**< World transform of the emitter, of the mover it rides for a
+                             *   BOX_RENDER_PARTICLE_MOVER pool, columns */
     float direction[4];     /**< Unit direction in emitter space or zero, w the cosine of the
                              *   spread */
     float extents[4];       /**< Half size of a box, w the radius of a sphere or disc */
@@ -114,8 +115,9 @@ typedef struct box_render_particle_block_t {
                              *   motion, which the passes read the members below for */
     uint32_t base;          /**< First slot of the pool in its particle page, set by the
                              *   backend */
-    uint32_t local;         /**< 1 when the particles are spawned, moved and kept in the space
-                             *   of model, ParticleEmitter.local */
+    uint32_t local;         /**< box_render_particle_space_t the particles are spawned, moved
+                             *   and kept in; all but BOX_RENDER_PARTICLE_WORLD keep them in
+                             *   the space of model */
     uint32_t motion_rows[4]; /**< First rows of the velocity, its max, the force and its max
                              *   of the ParticleMotion, as box_particle_motion_rows_t,
                              *   BOX_PARTICLE_CURVE_CONSTANT for a constant one or none */
@@ -126,7 +128,18 @@ typedef struct box_render_particle_block_t {
     uint32_t sampled_pad[3]; /**< Zero */
     int32_t origin[4];      /**< The world origin split as box_gpu_origin_split, set by the
                              *   backend */
+    float place[4][4];      /**< Transform of the emitter in the space of model, columns: the
+                             *   identity but for a pool that rides a mover */
+    float relative[4];      /**< Translation of model minus the render origin, computed in f64
+                             *   and set by the backend, w unused */
 } box_render_particle_block_t;
+
+/** Space of the particles of a pool, box_render_particle_block_t.local */
+typedef enum box_render_particle_space_t {
+    BOX_RENDER_PARTICLE_WORLD = 0,  /**< World space */
+    BOX_RENDER_PARTICLE_EMITTER = 1, /**< The space of the emitter, ParticleEmitter.local */
+    BOX_RENDER_PARTICLE_MOVER = 2   /**< The space of the mover it rides, ParticleEmitter.ride */
+} box_render_particle_space_t;
 
 /** The spawns of a pool stand on the surface of its terrain (ParticleEmitter.ground) */
 #define BOX_RENDER_PARTICLE_SPAWN_GROUND (1u << 0)
@@ -202,6 +215,8 @@ typedef bool (*box_render_particles_shifts_t)(
 /** Move the world space particles of the pools of a scene by the offset of a shift of the
  * world origin in the next frame, and at once the last emitter positions that their inherited
  * velocity is measured from, so a shift gives them no velocity.
+ *
+ * A lingering pool kept in the space of model moves the model it runs with instead.
  *
  * @param s The state of the extract, NULL for none
  * @param scene The scene, 0 for the default scene
@@ -279,7 +294,8 @@ const ParticleCollision* box_render_particles_collision(
  * @param world The world
  * @param e The emitter
  * @param emitter Its values
- * @param entry The pool of the packet, receives the terrain and the flags of its block
+ * @param entry The pool of the packet with the space of its block, receives the terrain and
+ *              the flags of its block
  */
 void box_render_particles_sampled(
     const ecs_world_t *world,
@@ -301,6 +317,36 @@ const WorldTransform* box_render_particles_follow(
     const ParticleEmitter *emitter,
     const WorldTransform *transform,
     WorldTransform *buf);
+
+/** Find the space an emitter keeps its particles in: its own with local, else that of the mover
+ * it rides with ride, else the world.
+ *
+ * @param world The world
+ * @param e The emitter
+ * @param emitter The emitter values
+ * @param mover Receives the mover of BOX_RENDER_PARTICLE_MOVER, else 0
+ * @return The space
+ */
+box_render_particle_space_t box_render_particles_space(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    const ParticleEmitter *emitter,
+    ecs_entity_t *mover);
+
+/** Keep the particles of a block in the space of a mover: its model becomes the world transform
+ * of the mover and place the emitter in that space, from the difference of their translations
+ * so a mover far from the origin keeps the precision of the place.
+ *
+ * @param world The world
+ * @param mover The mover
+ * @param transform World transform of the emitter
+ * @param out The block
+ */
+void box_render_particles_ride(
+    const ecs_world_t *world,
+    ecs_entity_t mover,
+    const WorldTransform *transform,
+    box_render_particle_block_t *out);
 
 /** Check whether a packet runs a particle shader.
  *

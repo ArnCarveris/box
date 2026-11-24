@@ -190,6 +190,9 @@ ECS_STRUCT(ParticleEmitter, {
                              *   height of the surface at its X and Z, so the Y of the emitter
                              *   is its height above the ground; a spawn where no tile of the
                              *   terrain draws dies at once. Default 0 for none */
+    bool ride;              /**< Keep the particles in the space of the mover the emitter rides,
+                             *   its nearest ancestor owning DynamicTransform, as local keeps
+                             *   them in its own, which wins; world space without a mover */
 });
 
 /** What an emitter with ParticlePlayback does this frame */

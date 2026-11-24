@@ -20,7 +20,7 @@
 
 // The blocks of the pools of the packet, BOX_GPU_PARTICLE_STRIDE apart
 struct EmitterBlock {
-    @size(544) emitter: Emitter,
+    @size(624) emitter: Emitter,
 };
 
 // The first work item of the batch of a dispatch
@@ -201,21 +201,24 @@ fn spawn(@builtin(workgroup_id) group: vec3u, @builtin(local_invocation_id) lane
         particle_unit(particle_hash(seed, index, STREAM_DIRECTION)),
         particle_unit(particle_hash(seed, index, STREAM_DIRECTION + 1u)));
     let cone = particle_cone(emitter.direction.xyz, emitter.direction.w, c);
-    let world = (emitter.model * vec4f(cone, 0.0)).xyz;
+    // The world transform of the emitter, model itself but for a pool that rides a mover
+    let em = emitter.model * emitter.place;
+    let world = (em * vec4f(cone, 0.0)).xyz;
     let length2 = dot(world, world);
     let direction = select(vec3f(0.0), world * inverseSqrt(length2), length2 > 0.0);
     let speed = particle_draw(seed, index, STREAM_SPEED, emitter.speed_size.xy);
-    let offset = (emitter.model * vec4f(local, 0.0)).xyz;
+    let offset = (em * vec4f(local, 0.0)).xyz;
     let radial = particle_draw(seed, index, STREAM_RADIAL, emitter.opacity_radial.zw);
 
     var p: Particle;
-    p.position = (emitter.model * vec4f(local, 1.0)).xyz;
+    p.position = (em * vec4f(local, 1.0)).xyz;
     p.remaining = particle_life(seed, index, emitter.life.y, emitter.life.z);
     p.velocity = direction * speed + particle_radial(offset, radial) + emitter.inherit.xyz;
     p.index = index;
     if (emitter.gradient_max.w != 0u) {
-        // A local emitter keeps its particles in its space; its inherit is zero
-        p.position = local;
+        // A local emitter keeps its particles in the space of model, where place puts it; its
+        // inherit is zero
+        p.position = (emitter.place * vec4f(local, 1.0)).xyz;
         p.velocity = particle_inverse(emitter.model) * p.velocity;
     } else if ((emitter.sampled.x & SAMPLED_SPAWN_GROUND) != 0u) {
         let surface = terrain_sample_local(world_origin(emitter.origin), p.position.xz);

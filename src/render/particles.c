@@ -84,7 +84,8 @@ typedef struct box_particle_pool_t {
                              *   particles did not get yet */
     bool has_last;          /**< last_position holds a position */
     bool linger;            /**< ParticleEmitter.linger of the last frame the emitter was seen */
-    bool local;             /**< ParticleEmitter.local its particles were spawned with */
+    box_render_particle_space_t space; /**< Space its particles were spawned in */
+    ecs_entity_t mover;     /**< Mover a BOX_RENDER_PARTICLE_MOVER pool rides */
     bool lingering;         /**< The emitter was deleted and the pool runs out its particles,
                              *   no longer in by_entity */
     uint64_t faded;         /**< Microseconds of stopped frames since the emitter stopped, the
@@ -1000,8 +1001,10 @@ static void box_particles_block(
     box_render_particle_block_t *out)
 {
     float spread = glm_clamp(emitter->spread, 0.0f, 180.0f);
+    mat4 identity = GLM_MAT4_IDENTITY_INIT;
     ecs_os_memset_t(out, 0, box_render_particle_block_t);
     ecs_os_memcpy_t(out->model, transform->m, mat4);
+    ecs_os_memcpy_t(out->place, identity, mat4);
 
     glm_vec3_copy(ECS_CONST_CAST(float*, emitter->direction), out->direction);
     if (glm_vec3_norm2(out->direction) > 0) {
@@ -1352,6 +1355,8 @@ static void box_particles_emitter(
     uint64_t faded = UINT64_MAX;
     bool moves;
     vec3 velocity;
+    ecs_entity_t mover;
+    box_render_particle_space_t space = box_render_particles_space(world, e, emitter, &mover);
     if (max <= 0) {
         goto done;
     }
@@ -1378,10 +1383,11 @@ static void box_particles_emitter(
         pool->faded = 0;
     }
 
-    if (pool->local != emitter->local) {
+    if (pool->space != space || pool->mover != mover) {
         box_particles_empty(pool);
         pool->fresh = true;
-        pool->local = emitter->local;
+        pool->space = space;
+        pool->mover = mover;
     }
 
     pool->seen = true;
@@ -1459,7 +1465,7 @@ static void box_particles_emitter(
     ParticleForces forces;
     box_particles_forces(world, e, emitter->forces, own, &forces);
     glm_vec3_scale(velocity, emitter->inherit_velocity, velocity);
-    if (emitter->local) {
+    if (space != BOX_RENDER_PARTICLE_WORLD) {
         glm_vec3_zero(velocity);
     }
 
@@ -1485,7 +1491,11 @@ static void box_particles_emitter(
     }
 
     box_particles_block_look(look, pool, scale, &entry->block);
-    entry->block.local = emitter->local ? 1u : 0u;
+    entry->block.local = (uint32_t)space;
+    if (space == BOX_RENDER_PARTICLE_MOVER) {
+        box_render_particles_ride(world, mover, transform, &entry->block);
+    }
+
     box_render_particles_sampled(world, e, emitter, entry);
     entry->curves = pool->curved && (box_particle_rows_used(&pool->curves) ||
         box_particle_rows_motion_used(&pool->motion))
@@ -1555,6 +1565,14 @@ static bool box_particles_linger(
     }
 
     box_render_packet_reserve(p, 0, &slots);
+    if (pool->space == BOX_RENDER_PARTICLE_MOVER && ecs_is_alive(world, pool->mover)) {
+        WorldTransform buf;
+        const WorldTransform *m = box_transform_world(world, pool->mover, &buf);
+        if (m) {
+            ecs_os_memcpy_t(pool->entry.block.model, m->m, mat4);
+        }
+    }
+
     box_render_particle_pool_t *entry = ecs_vec_append_t(
         NULL, &p->particles, box_render_particle_pool_t);
     *entry = pool->entry;
@@ -1864,8 +1882,11 @@ void box_render_particles_shift(
         }
 
         glm_vec3_add(pool->last_position, ECS_CONST_CAST(float*, offset), pool->last_position);
-        if (!pool->local) {
+        if (pool->space == BOX_RENDER_PARTICLE_WORLD) {
             glm_vec3_add(pool->shift, ECS_CONST_CAST(float*, offset), pool->shift);
+        } else if (pool->lingering) {
+            float *t = pool->entry.block.model[3];
+            glm_vec3_add(t, ECS_CONST_CAST(float*, offset), t);
         }
     }
 }

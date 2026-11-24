@@ -2203,6 +2203,14 @@
                     "far_origin_not_blocky",
                     "fog_volume_shift_next_frame"
                 ]
+            },
+            {
+                "id": "RenderOriginFx",
+                "testcases": [
+                    "particles_render_follow_same_image",
+                    "particles_shift_same_image",
+                    "particles_ride_moves_with_mover"
+                ]
             }
         ]
     }
