@@ -1039,3 +1039,38 @@ void ReflectionInvalidation_quit_records_nothing(void) {
 
     ecs_fini(world);
 }
+
+void ReflectionInvalidation_mover_probe_sailing_queues_nothing(void) {
+    // reflections/invalidation
+    /* A probe a ship carries, with a light the ship carries, keeps its capture while the ship
+     * moves and turns: its place in the frame of the ship does not change. Moving it on the
+     * ship queues it. */
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t scene = scene_new(world, false);
+    ecs_entity_t ship = ecs_new_w_pair(world, EcsChildOf, scene);
+    ecs_add(world, ship, DynamicTransform);
+    ecs_set(world, ship, Position, {100, 0, 0});
+    ecs_entity_t probe = probe_new(world, ship, 0, 3);
+    light_new(world, ship, 1, 1, 6);
+    shape_new(world, ship, 0, -2);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    box_render_reflect_settle(world, scene);
+    ecs_progress(world, 0);
+    test_int(box_render_reflect_queue(world, scene, NULL, 0), 0);
+
+    for (int32_t i = 1; i <= 8; i ++) {
+        ecs_set(world, ship, Position, {100 + 30.0f * (float)i, 0, 10.0f * (float)i});
+        ecs_set(world, ship, Rotation, {0, 0.2f * (float)i, 0});
+        ecs_progress(world, 0);
+        test_int(box_render_reflect_queue(world, scene, NULL, 0), 0);
+    }
+
+    ecs_set(world, probe, Position, {1, 1, 0});
+    ecs_progress(world, 0);
+    ecs_entity_t queued[2];
+    test_int(box_render_reflect_queue(world, scene, queued, 2), 1);
+    test_uint(queued[0], probe);
+    ecs_fini(world);
+}

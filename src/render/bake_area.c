@@ -143,16 +143,7 @@ done:
     return;
 }
 
-/** Get the transform of an entity relative to the mover that carries it, composed from the
- * local transforms in between, so it does not change while only the mover moves.
- *
- * @param world The world
- * @param e The entity
- * @param mover The mover, an ancestor of the entity or the entity itself
- * @param out Receives the transform, times the scale of the mover
- * @return Whether the mover is the entity or one of its ancestors
- */
-static bool box_bake_area_relative(
+bool box_bake_relative(
     const ecs_world_t *world,
     ecs_entity_t e,
     ecs_entity_t mover,
@@ -296,7 +287,7 @@ static bool box_bake_area_outline(
     mat4 rel;
     glm_vec3_fill(out_min, FLT_MAX);
     glm_vec3_fill(out_max, -FLT_MAX);
-    if (!count || !box_bake_area_relative(world, v->area, v->mover, rel)) {
+    if (!count || !box_bake_relative(world, v->area, v->mover, rel)) {
         result = ecs_vec_count(&a->outline) != 0;
         ecs_vec_clear(&a->outline);
         glm_vec3_zero(out_min);

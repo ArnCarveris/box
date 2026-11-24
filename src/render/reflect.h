@@ -21,6 +21,9 @@ typedef struct box_reflect_probe_t {
     uint32_t ticket;        /**< Ticket of the capture in flight */
     int32_t packet;         /**< Packet of the capture in flight, as RenderStatus.submitted after
                              *   it, 0 for none */
+    ecs_entity_t mover;     /**< Mover that carries the probe, 0 for none */
+    box_render_reflection_probe_t local; /**< Boxes and capture point of a probe a mover
+                             *   carries in the frame of the mover, which keeps its capture */
 } box_reflect_probe_t;
 
 /** The probes of one scene with ReflectionBake */
@@ -66,6 +69,10 @@ typedef struct box_reflect_scene_t {
     box_render_view_lights_t lights; /**< Lights of the first view of the scene in this frame */
     uint32_t volume;        /**< Probe volume a view of the scene samples, 0 for none */
     uint32_t volume_buffer; /**< Probe buffer of that volume the views show */
+    uint32_t area_volume;   /**< Area grid a view of the scene samples, 0 for none */
+    uint32_t area_volume_buffer; /**< Probe buffer of that grid the views show */
+    int32_t captures;       /**< Captures the backend reported since the scene got its
+                             *   ReflectionBake */
     box_bake_light_record_t record; /**< Lights of the views when the scene was last viewed */
     uint32_t env_handle;    /**< Cubemap of ReflectionBake.environment the captures see where
                              *   nothing covers them, 0 for the hemisphere while it has no

@@ -295,6 +295,21 @@ void box_bake_ambient(
     const box_render_view_lights_t *l,
     float out[BOX_RENDER_SH_COEFFICIENTS][4]);
 
+/** Get the transform of an entity relative to the mover that carries it, composed from the
+ * local transforms in between, so it does not change while only the mover moves.
+ *
+ * @param world The world
+ * @param e The entity
+ * @param mover The mover, an ancestor of the entity or the entity itself
+ * @param out Receives the transform, times the scale of the mover
+ * @return Whether the mover is the entity or one of its ancestors
+ */
+bool box_bake_relative(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    ecs_entity_t mover,
+    mat4 out);
+
 /** Find the area grid of an area.
  *
  * @param b The state

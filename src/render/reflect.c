@@ -9,12 +9,13 @@
  *
  * A probe is queued for a new capture when what it shows changes: a static shape recorded by
  * bake_change.c reaches one of its boxes, a light changes in its range, the light bake shows a
- * new pass, or the probe moves. It shows its previous capture until the new one lands.
+ * new pass, or the probe moves (in the frame of the mover that carries it, if one does).
  */
 
 #include "reflect.h"
 #include "environment.h"
 #include "../spatial/spatial.h"
+#include "../portal/portal.h"
 #include <float.h>
 #include <math.h>
 #include <stdlib.h>
@@ -807,9 +808,11 @@ static void box_reflect_status(
         ? status->error && !strcmp(status->error, s->error)
         : !status->error;
     if (status->probes != probes || status->resident != s->resident ||
-        status->captured != captured || status->converged != converged || !same_error)
+        status->captured != captured || status->converged != converged || !same_error ||
+        status->captures != s->captures)
     {
         ReflectionBakeStatus value = *status;
+        value.captures = s->captures;
         value.probes = probes;
         value.resident = s->resident;
         value.captured = captured;
@@ -845,6 +848,8 @@ static void box_reflect_bakes(
         s->viewed = false;
         s->volume = 0;
         s->volume_buffer = 0;
+        s->area_volume = 0;
+        s->area_volume_buffer = 0;
         ecs_vec_clear(&s->cameras);
     }
 
@@ -925,6 +930,37 @@ static void box_reflect_bakes(
     }
 }
 
+/** Take the place of a probe in the frame of the mover that carries it, when one does, queueing
+ * it when it moved or resized there.
+ *
+ * @param world The world
+ * @param probe The probe
+ * @param value Its ReflectionProbe
+ * @return Whether a mover carries it
+ */
+static bool box_reflect_carried(
+    const ecs_world_t *world,
+    box_reflect_probe_t *probe,
+    const ReflectionProbe *value)
+{
+    WorldTransform local;
+    box_render_reflection_probe_t was = probe->local;
+    ecs_entity_t mover = box_portal_mover_of(world, probe->entity);
+    bool result = mover && box_bake_relative(world, probe->entity, mover, local.m);
+    if (result) {
+        box_reflect_place(&probe->local, value, &local);
+        if (mover != probe->mover || box_reflect_moved(&was, &probe->local, false)) {
+            box_reflect_queue(probe);
+        }
+    } else if (probe->mover) {
+        box_reflect_queue(probe);
+    }
+
+    probe->mover = result ? mover : 0;
+
+    return result;
+}
+
 /** Take the ReflectionProbe of every entity in a scene with ReflectionBake, queueing the
  * probes that moved or resized.
  *
@@ -951,7 +987,9 @@ static void box_reflect_probes(
             WorldTransform buf;
             box_reflect_place(&probe->data, &probes[row],
                 box_transform_world_field(world, &qit, transforms, row, &buf));
-            if (box_reflect_moved(&was, &probe->data, r->shifting)) {
+            if (box_reflect_carried(world, probe, &probes[row])) {
+                probe->data.local = 1;
+            } else if (box_reflect_moved(&was, &probe->data, r->shifting)) {
                 box_reflect_queue(probe);
             }
 
@@ -993,6 +1031,11 @@ static void box_reflect_views(
             if (!s->volume && rv->volume) {
                 s->volume = rv->volume;
                 s->volume_buffer = rv->volume_buffer;
+            }
+
+            if (!s->area_volume && rv->area_volume) {
+                s->area_volume = rv->area_volume;
+                s->area_volume_buffer = rv->area_volume_buffer;
             }
 
             continue;
@@ -1151,6 +1194,7 @@ static void box_reflect_captured(
             if (probe) {
                 probe->captured = true;
                 probe->packet = 0;
+                s->captures ++;
                 break;
             }
         }
@@ -1203,6 +1247,10 @@ static void box_reflect_mark_light(
                 l ? s->follow_radius + l->range : 0.0f)
             : box_reflect_reaches(&probe->data, l ? l->position : zero, zero,
                 l ? l->range : 0.0f);
+        if (probe->mover && l) {
+            continue;
+        }
+
         if (!l || !(l->range > 0) || reaches) {
             box_reflect_queue(probe);
         }
@@ -1249,7 +1297,7 @@ static void box_reflect_invalidate(
             bool reaches = !probe->entity && s->follow
                 ? box_reflect_within(probe->data.capture, center, half, s->follow_radius)
                 : box_reflect_reaches(&probe->data, center, half, 0.0f);
-            if (reaches) {
+            if (reaches && !probe->mover) {
                 box_reflect_queue(probe);
             }
         }
@@ -1323,8 +1371,75 @@ static int32_t box_reflect_budget(
     return result;
 }
 
+/** Add a batch of the captures of the probes of a scene that a mover carries or of those none
+ * does, of the first ranks.
+ *
+ * Probes a mover carries look along their axes and are lit without the directional lights,
+ * which do not move with them, over the area grid the views sample.
+ *
+ * @param p The packet
+ * @param s The scene
+ * @param ranks The ranks of the probes to capture, in capture order
+ * @param count Ranks
+ * @param carried Whether the batch captures the probes a mover carries
+ * @param packet Number of the packet, as RenderStatus.submitted after it
+ */
+static void box_reflect_batch(
+    box_render_packet_t *p,
+    box_reflect_scene_t *s,
+    const box_reflect_rank_t *ranks,
+    int32_t count,
+    bool carried,
+    int32_t packet)
+{
+    box_reflect_probe_t *probes = ecs_vec_first(&s->probes);
+    box_render_reflect_batch_t *batch = NULL;
+    int32_t i, k;
+    for (i = 0; i < count; i ++) {
+        box_reflect_probe_t *probe = &probes[ranks[i].index];
+        if ((probe->mover != 0) != carried) {
+            continue;
+        }
+
+        if (!batch) {
+            batch = ecs_vec_append_t(NULL, &p->reflections, box_render_reflect_batch_t);
+            ecs_os_memset_t(batch, 0, box_render_reflect_batch_t);
+            batch->texture = s->buffer;
+            batch->ticket = s->ticket;
+            batch->scene = s->scene;
+            batch->size = s->resolution;
+            batch->lights = s->lights;
+            batch->lights.enabled = true;
+            batch->lights.directional = carried ? 0u : batch->lights.directional;
+            batch->volume = carried ? s->area_volume : s->volume;
+            batch->volume_buffer = carried ? s->area_volume_buffer : s->volume_buffer;
+            batch->environment = s->env_handle;
+            batch->carried = carried;
+            glm_vec3_copy(s->min, batch->bounds_min);
+            glm_vec3_copy(s->max, batch->bounds_max);
+            batch->first = ecs_vec_count(&p->probes);
+        }
+
+        box_render_probe_capture_t *out = ecs_vec_append_t(
+            NULL, &p->probes, box_render_probe_capture_t);
+        ecs_os_memset_t(out, 0, box_render_probe_capture_t);
+        glm_vec3_copy(probe->data.capture, out->position);
+        out->index = (uint32_t)probe->slot;
+        out->turned = carried;
+        for (k = 0; carried && k < 3; k ++) {
+            glm_vec3_copy(probe->data.axes[k], out->axes[k]);
+        }
+
+        probe->ticket = s->ticket ++;
+        probe->packet = packet;
+        probe->queued = false;
+        batch->count ++;
+    }
+}
+
 /** Add the captures of the next resident probes of a scene that wait for one to the packet,
- * every one of them in a headless run.
+ * every one of them in a headless run: a batch of those no mover carries and one of those
+ * movers carry.
  *
  * @param r The state
  * @param p The packet
@@ -1349,41 +1464,11 @@ static void box_reflect_schedule(
     }
 
     count = headless ? n : glm_min(n, box_reflect_budget(r, s));
-    if (!count) {
-        goto done;
+    if (count) {
+        qsort(ranks, (size_t)n, sizeof(box_reflect_rank_t), box_reflect_capture_cmp);
+        box_reflect_batch(p, s, ranks, count, false, packet);
+        box_reflect_batch(p, s, ranks, count, true, packet);
     }
-
-    qsort(ranks, (size_t)n, sizeof(box_reflect_rank_t), box_reflect_capture_cmp);
-    box_render_reflect_batch_t *batch = ecs_vec_append_t(
-        NULL, &p->reflections, box_render_reflect_batch_t);
-    ecs_os_memset_t(batch, 0, box_render_reflect_batch_t);
-    batch->texture = s->buffer;
-    batch->ticket = s->ticket;
-    batch->scene = s->scene;
-    batch->size = s->resolution;
-    batch->lights = s->lights;
-    batch->lights.enabled = true;
-    batch->volume = s->volume;
-    batch->volume_buffer = s->volume_buffer;
-    batch->environment = s->env_handle;
-    glm_vec3_copy(s->min, batch->bounds_min);
-    glm_vec3_copy(s->max, batch->bounds_max);
-    batch->first = ecs_vec_count(&p->probes);
-    batch->count = count;
-    for (i = 0; i < count; i ++) {
-        box_reflect_probe_t *probe = &probes[ranks[i].index];
-        box_render_probe_capture_t *out = ecs_vec_append_t(
-            NULL, &p->probes, box_render_probe_capture_t);
-        ecs_os_memset_t(out, 0, box_render_probe_capture_t);
-        glm_vec3_copy(probe->data.capture, out->position);
-        out->index = (uint32_t)probe->slot;
-        probe->ticket = s->ticket ++;
-        probe->packet = packet;
-        probe->queued = false;
-    }
-
-done:
-    return;
 }
 
 /** Take the GPU time of the captures the backend measured into the time per probe.

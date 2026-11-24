@@ -1697,9 +1697,14 @@ static void box_gpu_bake_pass_reflect(
     out->spacing = 1.0f;
     out->probes = ecs_vec_get_t(&packet->probes, box_render_probe_capture_t, batch->first);
     out->count = batch->count;
+    out->carried = batch->carried;
     out->ambient = volume && batch->volume_buffer < 2
         ? volume->group[batch->volume_buffer]
         : gpu->no_volume->group[0];
+    if (volume && batch->carried) {
+        out->ambient = box_gpu_volume_pair(gpu, NULL, 0, volume, batch->volume_buffer);
+    }
+
     glm_vec4_copy(ECS_CONST_CAST(float*, batch->lights.ambient_sky), out->sky);
     glm_vec4_copy(ECS_CONST_CAST(float*, batch->lights.ambient_ground), out->ground);
     out->environment = box_gpu_bake_environment(gpu, batch->environment);

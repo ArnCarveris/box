@@ -151,7 +151,8 @@ struct ReflectionProbe {
     // probe followed the focus; fade 0 for none
     previous: u32,
     fade: f32,
-    pad0: u32,
+    // 1 when the cubemap of the slot looks along axes, as for a probe a mover carries
+    local: u32,
 };
 
 // Reflection probes a cluster lists at most.

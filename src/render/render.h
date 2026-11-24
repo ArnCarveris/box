@@ -2047,7 +2047,8 @@ typedef struct box_render_reflection_probe_t {
     uint32_t previous;      /**< Slot of the previous capture of the scene probe that fades out
                              *   after it followed the focus, valid while fade is above 0 */
     float fade;             /**< Weight of the previous capture, 1 to 0, 0 for none */
-    uint32_t pad;           /**< Unused */
+    uint32_t local;         /**< 1 when the cubemap of the slot looks along axes, as for a probe
+                             *   a mover carries, 0 along the world axes */
 } box_render_reflection_probe_t;
 
 /** Register the system that keeps the reflection probes of every scene with ReflectionBake.

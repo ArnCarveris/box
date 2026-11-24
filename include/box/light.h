@@ -283,6 +283,8 @@ ECS_STRUCT(ReflectionBakeStatus, {
     bool converged;       /**< Every resident probe is captured and nothing is queued */
     char *error;          /**< Why nothing is captured, such as an invalid setting, NULL for
                            *   none */
+    int32_t captures;     /**< Captures the backend reported since the ReflectionBake was
+                           *   added, which stays the same while nothing recaptures */
 });
 
 /** Reflection probe of the scene with ReflectionBake the entity is in, placed by the world
@@ -290,6 +292,9 @@ ECS_STRUCT(ReflectionBakeStatus, {
  *
  * Its boxes are centered on the entity and oriented by its rotation. Where probes overlap,
  * higher priority probes are blended first and cover lower ones; the scene probe is below all.
+ *
+ * A probe that a mover (DynamicTransform) carries captures what the mover carries along its own
+ * axes, without the directional lights, and keeps that capture while the mover moves and turns.
  */
 ECS_STRUCT(ReflectionProbe, {
     vec3 extent;          /**< Half size of the influence box, default {5, 5, 5} */

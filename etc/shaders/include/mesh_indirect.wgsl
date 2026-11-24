@@ -332,6 +332,16 @@ fn probe_direction(p: ReflectionProbe, world: vec3f, dir: vec3f) -> vec3f {
     return select(dir, result, dot(result, result) > 1e-8);
 }
 
+// A world direction in the frame of the cubemap of a reflection probe: its axes for a probe a
+// mover carries, whose captures look along them, the world axes for the others.
+fn probe_cube_direction(p: ReflectionProbe, d: vec3f) -> vec3f {
+    if (p.local == 0u) {
+        return d;
+    }
+
+    return probe_local(p, d);
+}
+
 // Irradiance over pi in a direction from the SH of the cubemap slot of a reflection probe.
 fn probe_irradiance(slot: u32, d: vec3f) -> vec3f {
     let at = slot * SH_COEFFICIENTS;
@@ -352,13 +362,13 @@ fn luminance(c: vec3f) -> f32 {
 // direction spec, within REFLECTION_NORMALIZE_MIN and REFLECTION_NORMALIZE_MAX, so a dim
 // alcove inside a bright probe does not reflect its bright light.
 fn probe_radiance(p: ReflectionProbe, world: vec3f, spec: vec3f, mip: f32, grid: vec3f) -> vec3f {
-    let d = probe_direction(p, world, normalize(spec));
+    let d = probe_cube_direction(p, probe_direction(p, world, normalize(spec)));
     let radiance = textureSampleLevel(reflection_cubes, reflection_sampler, d, p.slot, mip).rgb;
     if (!view_samples_volume()) {
         return radiance;
     }
 
-    let own = luminance(probe_irradiance(p.slot, spec));
+    let own = luminance(probe_irradiance(p.slot, probe_cube_direction(p, spec)));
     let scale = luminance(grid) / max(own, 1e-4);
     return radiance * clamp(scale, REFLECTION_NORMALIZE_MIN, REFLECTION_NORMALIZE_MAX);
 }

@@ -1375,7 +1375,8 @@
                     "recaptures_after_distance",
                     "blends_previous_capture",
                     "far_shapes_do_not_queue",
-                    "origin_shift_does_not_recapture"
+                    "origin_shift_does_not_recapture",
+                    "mover_probe_does_not_recapture"
                 ]
             },
             {

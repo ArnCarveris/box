@@ -9,6 +9,11 @@
 #include <bake_test.h>
 #include <math.h>
 #include "render.h"
+#include <stdlib.h>
+
+#define STB_IMAGE_IMPLEMENTATION
+#define STB_IMAGE_STATIC
+#include <stb_image.h>
 
 /** Distance the focus moves before the scene probe captures again in these tests */
 #define FOLLOW_DISTANCE (10.0f)
@@ -337,5 +342,109 @@ void ReflectionFollow_origin_shift_does_not_recapture(void) {
     test_assert(converge(world, scene, 50) < 50);
     capture_expect(world, scene, 4 - 256 + FOLLOW_DISTANCE + 1, FOLLOW_HEIGHT, 512);
 
+    ecs_fini(world);
+}
+
+/** Render the next frame of a world into an image file of its temporary folder and load it.
+ *
+ * @param world The world
+ * @param file Image file
+ * @param w Receives the width
+ * @param h Receives the height
+ * @return The RGBA pixels, freed with stbi_image_free
+ */
+static unsigned char* frame_image(
+    ecs_world_t *world,
+    const char *file,
+    int *w,
+    int *h)
+{
+    ecs_entity_t e = ecs_lookup(world, "follow_capture");
+    if (!e) {
+        e = ecs_entity(world, { .name = "follow_capture" });
+    }
+
+    ecs_set(world, e, Surface, {.width = 64, .height = 48,
+        .write_to_file = ECS_CONST_CAST(char*, file), .resolution_scale = 1});
+    frame(world);
+    char *path = flecs_asprintf("%s/%s", ecs_singleton_get(world, AppStatus)->tmp_dir, file);
+    int n = 0;
+    unsigned char *result = stbi_load(path, w, h, &n, 4);
+    test_assert(result != NULL);
+    ecs_os_free(path);
+
+    return result;
+}
+
+void ReflectionFollow_mover_probe_does_not_recapture(void) {
+    // reflection_probes/follow
+    /* A probe a ship carries over a mirror floor captures the cabin once and keeps that capture
+     * while the ship sails and turns, which the render origin follows: no capture is reported
+     * again and the mirror shows the same image at the dock and after the turn. */
+    ecs_world_t *world = world_new();
+    ecs_entity_t scene = ecs_new(world);
+    ecs_add(world, scene, Scene);
+    ecs_set(world, scene, ReflectionBake, {.resolution = 16, .budget_ms = 1,
+        .scene_probe = false});
+    ecs_entity_t ship = ecs_new_w_pair(world, EcsChildOf, scene);
+    ecs_add(world, ship, DynamicTransform);
+    ecs_set(world, ship, Position, {300, 0, 0});
+    ecs_set(world, ship, Rotation, {0, 0, 0});
+    ecs_entity_t floor = ecs_new_w_pair(world, EcsChildOf, ship);
+    ecs_set(world, floor, Position, {0, -0.1f, 0});
+    ecs_set(world, floor, Box, {8, 0.2f, 8});
+    ecs_set(world, floor, PbrMaterial, {.metallic = 1, .roughness = 0.05f});
+    ecs_entity_t wall = ecs_new_w_pair(world, EcsChildOf, ship);
+    ecs_set(world, wall, Position, {0, 2, -4});
+    ecs_set(world, wall, Box, {8, 4, 0.2f});
+    ecs_set(world, wall, Rgb, {220, 60, 40});
+    ecs_entity_t light = ecs_new_w_pair(world, EcsChildOf, ship);
+    ecs_set(world, light, Position, {0, 3, 0});
+    ecs_set(world, light, PointLight, {.intensity = 8, .range = 10});
+    ecs_entity_t probe = ecs_new_w_pair(world, EcsChildOf, ship);
+    ecs_set(world, probe, Position, {0, 1.5f, 0});
+    ecs_set(world, probe, ReflectionProbe, {.extent = {4, 4, 4}, .blend = 0.5f,
+        .projection = {4, 4, 4}});
+    ecs_entity_t camera = ecs_new_w_pair(world, EcsChildOf, ship);
+    ecs_set(world, camera, Position, {0, 1.5f, 3});
+    ecs_set(world, camera, Rotation, {-0.5f, 0, 0});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera, .lighting.enabled = true,
+        .lighting.reflections = true});
+    ecs_singleton_set(world, WorldOrigin, {.enabled = false, .render = true,
+        .render_follow = ship});
+    ecs_entity_t surface = ecs_entity(world, { .name = "follow_capture" });
+    ecs_set(world, surface, Surface, {.width = 64, .height = 48, .resolution_scale = 1});
+
+    test_assert(converge(world, scene, 100) < 100);
+    int32_t captures = ecs_get(world, scene, ReflectionBakeStatus)->captures;
+    test_assert(captures > 0);
+    int w = 0, h = 0, i;
+    unsigned char *dock = frame_image(world, "mover_dock.png", &w, &h);
+    unsigned char *px = NULL;
+    for (i = 1; i <= 24; i ++) {
+        float t = (float)i / 24.0f;
+        ecs_set(world, ship, Position, {300 + 500 * t, 0, 120 * t});
+        ecs_set(world, ship, Rotation, {0, GLM_PIf * 0.5f * t, 0});
+        frame(world);
+        test_int(ecs_get(world, scene, ReflectionBakeStatus)->captures, captures);
+        test_bool(ecs_get(world, scene, ReflectionBakeStatus)->converged, true);
+    }
+
+    px = frame_image(world, "mover_turned.png", &w, &h);
+    int32_t worst = 0, differ = 0;
+    for (i = 0; i < w * h * 4; i ++) {
+        int32_t d = abs((int)dock[i] - (int)px[i]);
+        worst = d > worst ? d : worst;
+        differ += d > 4;
+    }
+
+    printf("mirror after sailing: worst channel difference %d, %d channels above 4\n", worst,
+        differ);
+    test_assert(differ <= w * h * 3 / 100);
+    test_int(ecs_get(world, scene, ReflectionBakeStatus)->captures, captures);
+    stbi_image_free(dock);
+    stbi_image_free(px);
     ecs_fini(world);
 }

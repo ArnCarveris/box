@@ -253,7 +253,8 @@
                     "queued_again_not_duplicated",
                     "unrelated_changes_queue_nothing",
                     "scene_without_bake_records_nothing",
-                    "quit_records_nothing"
+                    "quit_records_nothing",
+                    "mover_probe_sailing_queues_nothing"
                 ]
             },
             {

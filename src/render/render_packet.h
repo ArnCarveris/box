@@ -1466,6 +1466,9 @@ typedef struct box_render_reflect_batch_t {
                              *   processed yet for the hemisphere ambient */
     float bounds_min[3];    /**< Minimum corner of the static bounds of the scene */
     float bounds_max[3];    /**< Maximum corner of the static bounds of the scene */
+    bool carried;           /**< The captures of probes a mover carries: the faces draw the
+                             *   carried batches, look along the axes of the probes and shade
+                             *   with volume as an area grid that covers every fragment */
     int32_t first;          /**< First probe of the batch in the probes of the packet, whose
                              *   index is the slot */
     int32_t count;          /**< Probes of the batch */
