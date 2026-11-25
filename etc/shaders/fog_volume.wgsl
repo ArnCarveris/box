@@ -10,10 +10,7 @@
 //   by the 3D sequence of the frame (temporal.wgsl), interleaved per cell, and the result is
 //   blended with the cells of the previous frame (history) at the center of the cell,
 //   reprojected into the previous grid; without one, or in a cell no volume reaches, the cell is
-//   sampled at its center alone. With a valid history a thread takes two neighbouring cells
-//   across and injects only the one of the checkerboard of the frame, (x + y + z + frame) even,
-//   and keeps the other as its previous cell reprojected to it, so each cell takes a new sample
-//   every other frame; a kept cell outside the previous grid is injected too.
+//   sampled at its center alone.
 // - integrate, one thread per column of cells, accumulates the cells front to back, each slice
 //   integrated analytically, and stores the light scattered toward the camera (rgb) and the
 //   transmittance (a) from the camera to the far side of each slice.
@@ -392,105 +389,22 @@ fn history_sample(uvw: vec3f) -> vec4f {
 }
 
 // Point a cell is sampled at this frame, from its top left near corner by 0..1 of its size
-// across, down and along its slice: the 3D sequence shifted by the noise of the cell, so
-// neighbouring cells take different points, or its center without a history. A cell is injected
-// every other frame, so it steps through the first half of the sequence at half the frame
-// index, else it would only take the points of one parity, and repeats as often as before.
+// across, down and along its slice: the 3D sequence of the frame shifted by the noise of the
+// cell, so neighbouring cells take different points, or its center without a history.
 fn cell_jitter(id: vec3u) -> vec3f {
     if (!history_blends()) {
         return vec3f(0.5);
     }
 
-    return temporal_interleaved_3d_at(vec2f(id.xy) + f32(id.z) * vec2f(17.0, 29.0),
-        temporal_frame() / 2u % (TEMPORAL_SEQUENCE_LENGTH / 2u));
-}
-
-// The unjittered center of a cell, and the distance from it to its far corners.
-struct CellBounds {
-    center: vec3f,
-    reach: f32,
-};
-
-fn cell_bounds(id: vec3u) -> CellBounds {
-    let slices = f32(froxel.grid.z);
-    let center_ray = froxel_ray(froxel_cell_uv(id.xy));
-    let far_ = froxel_depth((f32(id.z) + 1.0) / slices);
-    let corner_a = froxel_ray(froxel_cell_point_uv(id.xy, vec2f(0.0)));
-    let corner_b = froxel_ray(froxel_cell_point_uv(id.xy, vec2f(1.0)));
-    var bounds: CellBounds;
-    bounds.center = center_ray.origin + center_ray.dir * froxel_depth((f32(id.z) + 0.5) / slices);
-    bounds.reach = max(length(corner_a.origin + corner_a.dir * far_ - bounds.center),
-        length(corner_b.origin + corner_b.dir * far_ - bounds.center));
-    return bounds;
-}
-
-// Whether a volume comes near a cell, as inject_cell finds it.
-fn cell_occupied(bounds: CellBounds) -> bool {
-    for (var i = 0u; i < froxel.grid.w; i++) {
-        let fog = volumes[i];
-        if (fog.shape == FOG_SHAPE_UNBOUNDED ||
-            inside(fog, volume_local(fog, bounds.center)) > -bounds.reach)
-        {
-            return true;
-        }
-    }
-
-    return false;
-}
-
-// A cell not injected this frame: nothing where no volume comes near it, as inject_cell, else
-// its previous cell reprojected to its center, or -1 in a when that is outside the previous grid
-// so it is injected instead.
-fn kept_cell(id: vec3u) -> vec4f {
-    let bounds = cell_bounds(id);
-    if (!cell_occupied(bounds)) {
-        return vec4f(0.0);
-    }
-
-    let c = history_uvw(bounds.center);
-    if (c.w < 0.5) {
-        return vec4f(-1.0);
-    }
-
-    return history_sample(c.xyz);
+    return temporal_interleaved_3d(vec2f(id.xy) + f32(id.z) * vec2f(17.0, 29.0));
 }
 
 @compute @workgroup_size(BOX_FROXEL_INJECT_GROUP, BOX_FROXEL_INJECT_GROUP, BOX_FROXEL_INJECT_GROUP)
 fn inject(@builtin(global_invocation_id) id: vec3u) {
-    // The pair of cells of the thread, the one of the checkerboard of the frame injected and the
-    // other kept; without a history both are injected.
-    let x = id.x * 2u;
-    if (x >= froxel.grid.x || any(id.yz >= froxel.grid.yz)) {
+    if (any(id >= froxel.grid.xyz)) {
         return;
     }
 
-    let parity = (id.y + id.z + temporal_frame()) & 1u;
-    let fresh = vec3u(x + parity, id.y, id.z);
-    let kept = vec3u(x + 1u - parity, id.y, id.z);
-    var cells = 1u;
-    if (kept.x < froxel.grid.x) {
-        var cell = vec4f(-1.0);
-        if (history_blends()) {
-            cell = kept_cell(kept);
-        }
-
-        if (cell.a >= 0.0) {
-            textureStore(scatter_out, kept, cell);
-        } else {
-            cells = 2u;
-        }
-    }
-
-    for (var i = 0u; i < cells; i++) {
-        let cell = select(fresh, kept, i == 1u);
-        if (cell.x < froxel.grid.x) {
-            textureStore(scatter_out, cell, inject_cell(cell));
-        }
-    }
-}
-
-// Light a cell, blended with its previous cell.
-fn inject_cell(id: vec3u) -> vec4f {
     let jitter = cell_jitter(id);
     let uv = froxel_cell_point_uv(id.xy, jitter.xy);
     let ray = froxel_ray(uv);
@@ -505,9 +419,13 @@ fn inject_cell(id: vec3u) -> vec4f {
     // The unjittered center of the cell, and the distance from it to its far corners: a cell
     // no box comes that near holds no fog at any jittered point, so it takes no history, and a
     // volume that is removed or moved away leaves no fog behind.
-    let bounds = cell_bounds(id);
-    let center = bounds.center;
-    let reach = bounds.reach;
+    let center_ray = froxel_ray(froxel_cell_uv(id.xy));
+    let center = center_ray.origin + center_ray.dir * froxel_depth((f32(id.z) + 0.5) / slices);
+    let far_ = froxel_depth((f32(id.z) + 1.0) / slices);
+    let corner_a = froxel_ray(froxel_cell_point_uv(id.xy, vec2f(0.0)));
+    let corner_b = froxel_ray(froxel_cell_point_uv(id.xy, vec2f(1.0)));
+    let reach = max(length(corner_a.origin + corner_a.dir * far_ - center),
+        length(corner_b.origin + corner_b.dir * far_ - center));
     // Half the largest extent of the cell, along its ray or across it, about the width of a
     // cell: the mip of the whole extent averages the noise over more than the cell.
     let footprint = max(length(b - a) * 0.5, reach);
@@ -594,17 +512,15 @@ fn inject_cell(id: vec3u) -> vec4f {
         let c = history_uvw(center);
         if (c.w > 0.5) {
             // The first frames after a reset average all of them, so the cells converge from
-            // the center sample as fast as the sequence allows: a cell injected every other
-            // frame has taken (frame + 1) / 2 samples since the reset, and keeps the previous
-            // cells as long as when it was injected every frame with the square of the blend.
-            let n = f32((temporal_frame() + 1u) / 2u);
-            let blend = min(BOX_FROXEL_HISTORY_BLEND * BOX_FROXEL_HISTORY_BLEND, n / (n + 1.0));
+            // the center sample as fast as the sequence allows.
+            let n = f32(temporal_frame());
+            let blend = min(BOX_FROXEL_HISTORY_BLEND, n / (n + 1.0));
             let previous = history_sample(c.xyz);
             result = mix(result, previous, blend);
         }
     }
 
-    return result;
+    textureStore(scatter_out, id, result);
 }
 
 @compute @workgroup_size(BOX_FROXEL_INTEGRATE_GROUP, BOX_FROXEL_INTEGRATE_GROUP, 1)

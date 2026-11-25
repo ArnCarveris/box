@@ -1130,7 +1130,7 @@ void box_gpu_fog_volumes_inject(
     wgpuComputePassEncoderSetBindGroup(pass, 0, group, 1, &view_offset);
     wgpuComputePassEncoderSetBindGroup(pass, 1, inject_group, 0, NULL);
     wgpuComputePassEncoderDispatchWorkgroups(pass,
-        ((g->size[0] + 1) / 2 + BOX_FROXEL_INJECT_GROUP - 1) / BOX_FROXEL_INJECT_GROUP,
+        (g->size[0] + BOX_FROXEL_INJECT_GROUP - 1) / BOX_FROXEL_INJECT_GROUP,
         (g->size[1] + BOX_FROXEL_INJECT_GROUP - 1) / BOX_FROXEL_INJECT_GROUP,
         (g->size[2] + BOX_FROXEL_INJECT_GROUP - 1) / BOX_FROXEL_INJECT_GROUP);
     wgpuComputePassEncoderSetPipeline(pass, f->integrate);

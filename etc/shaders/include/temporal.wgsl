@@ -101,12 +101,7 @@ fn temporal_interleaved_2d(pixel: vec2f) -> vec2f {
 
 // The 3D sequence point of the current frame shifted by the noise of a pixel.
 fn temporal_interleaved_3d(pixel: vec2f) -> vec3f {
-    return temporal_interleaved_3d_at(pixel, view.temporal.x);
-}
-
-// The 3D sequence point of an index shifted by the noise of a pixel.
-fn temporal_interleaved_3d_at(pixel: vec2f, index: u32) -> vec3f {
     let n = vec3f(temporal_noise(pixel), temporal_noise(pixel + vec2f(5.588238, 3.17)),
         temporal_noise(pixel + vec2f(11.3, 7.71)));
-    return fract(temporal_sequence_3d_at(index) + n);
+    return fract(temporal_sequence_3d() + n);
 }

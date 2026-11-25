@@ -44,7 +44,7 @@
  * halves it down to one texel */
 #define BOX_FROXEL_NOISE_SIZE 64
 
-/** Edge of the workgroup of the light injection, which runs one thread per pair of cells across */
+/** Edge of the workgroup of the light injection, which runs one thread per cell */
 #define BOX_FROXEL_INJECT_GROUP 4
 
 /** Edge of the workgroup of the integration, which runs one thread per column of cells */
