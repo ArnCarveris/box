@@ -46,7 +46,9 @@ void MultiTree_static_childof_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             10.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -62,7 +64,9 @@ void MultiTree_static_childof_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             10.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -78,7 +82,9 @@ void MultiTree_static_childof_independent_trees(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             10.0f, 2.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -94,7 +100,9 @@ void MultiTree_static_childof_independent_trees(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             10.0f, 4.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -110,7 +118,9 @@ void MultiTree_static_childof_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 10.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -126,7 +136,9 @@ void MultiTree_static_childof_independent_trees(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             2.0f, 11.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -142,7 +154,9 @@ void MultiTree_static_childof_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 10.0f, 1.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -158,7 +172,9 @@ void MultiTree_static_childof_independent_trees(void) {
             3.0f, 0.0f, 0.0f, 0.0f,
             0.0f, 0.0f, 10.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -174,7 +190,9 @@ void MultiTree_static_childof_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -5.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -191,7 +209,9 @@ void MultiTree_static_childof_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -5.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -213,7 +233,9 @@ void MultiTree_static_childof_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             20.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -229,7 +251,9 @@ void MultiTree_static_childof_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             21.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -245,7 +269,9 @@ void MultiTree_static_childof_independent_trees(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             22.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -261,7 +287,9 @@ void MultiTree_static_childof_independent_trees(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             24.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -277,7 +305,9 @@ void MultiTree_static_childof_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 10.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -293,7 +323,9 @@ void MultiTree_static_childof_independent_trees(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             2.0f, 11.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -309,7 +341,9 @@ void MultiTree_static_childof_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 10.0f, 1.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -325,7 +359,9 @@ void MultiTree_static_childof_independent_trees(void) {
             3.0f, 0.0f, 0.0f, 0.0f,
             0.0f, 0.0f, 10.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -341,7 +377,9 @@ void MultiTree_static_childof_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -5.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -358,7 +396,9 @@ void MultiTree_static_childof_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -5.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -380,7 +420,9 @@ void MultiTree_static_childof_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             20.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -396,7 +438,9 @@ void MultiTree_static_childof_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             21.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -412,7 +456,9 @@ void MultiTree_static_childof_independent_trees(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             22.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -428,7 +474,9 @@ void MultiTree_static_childof_independent_trees(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             24.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -444,7 +492,9 @@ void MultiTree_static_childof_independent_trees(void) {
             0.0f, 0.0f, 4.0f, 0.0f,
             0.0f, -10.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -460,7 +510,9 @@ void MultiTree_static_childof_independent_trees(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             1.0f, -9.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -476,7 +528,9 @@ void MultiTree_static_childof_independent_trees(void) {
             0.0f, 0.0f, 4.0f, 0.0f,
             0.0f, -10.0f, 4.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -492,7 +546,9 @@ void MultiTree_static_childof_independent_trees(void) {
             3.0f, 0.0f, 0.0f, 0.0f,
             0.0f, 0.0f, 10.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -508,7 +564,9 @@ void MultiTree_static_childof_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -5.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -525,7 +583,9 @@ void MultiTree_static_childof_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -5.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -547,7 +607,9 @@ void MultiTree_static_childof_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             20.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -563,7 +625,9 @@ void MultiTree_static_childof_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             21.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -579,7 +643,9 @@ void MultiTree_static_childof_independent_trees(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             21.0f, 2.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -595,7 +661,9 @@ void MultiTree_static_childof_independent_trees(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             23.0f, 2.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -611,7 +679,9 @@ void MultiTree_static_childof_independent_trees(void) {
             0.0f, 0.0f, 4.0f, 0.0f,
             0.0f, -10.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -627,7 +697,9 @@ void MultiTree_static_childof_independent_trees(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             1.0f, -9.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -643,7 +715,9 @@ void MultiTree_static_childof_independent_trees(void) {
             0.0f, 0.0f, 4.0f, 0.0f,
             0.0f, -10.0f, 4.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -659,7 +733,9 @@ void MultiTree_static_childof_independent_trees(void) {
             3.0f, 0.0f, 0.0f, 0.0f,
             0.0f, 0.0f, 10.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -675,7 +751,9 @@ void MultiTree_static_childof_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -6.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -692,7 +770,9 @@ void MultiTree_static_childof_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -6.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -747,7 +827,9 @@ void MultiTree_static_parent_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             10.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -763,7 +845,9 @@ void MultiTree_static_parent_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             10.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -779,7 +863,9 @@ void MultiTree_static_parent_independent_trees(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             10.0f, 2.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -795,7 +881,9 @@ void MultiTree_static_parent_independent_trees(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             10.0f, 4.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -811,7 +899,9 @@ void MultiTree_static_parent_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 10.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -827,7 +917,9 @@ void MultiTree_static_parent_independent_trees(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             2.0f, 11.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -843,7 +935,9 @@ void MultiTree_static_parent_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 10.0f, 1.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -859,7 +953,9 @@ void MultiTree_static_parent_independent_trees(void) {
             3.0f, 0.0f, 0.0f, 0.0f,
             0.0f, 0.0f, 10.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -875,7 +971,9 @@ void MultiTree_static_parent_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -5.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -892,7 +990,9 @@ void MultiTree_static_parent_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -5.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -914,7 +1014,9 @@ void MultiTree_static_parent_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             20.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -930,7 +1032,9 @@ void MultiTree_static_parent_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             21.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -946,7 +1050,9 @@ void MultiTree_static_parent_independent_trees(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             22.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -962,7 +1068,9 @@ void MultiTree_static_parent_independent_trees(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             24.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -978,7 +1086,9 @@ void MultiTree_static_parent_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 10.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -994,7 +1104,9 @@ void MultiTree_static_parent_independent_trees(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             2.0f, 11.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1010,7 +1122,9 @@ void MultiTree_static_parent_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 10.0f, 1.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1026,7 +1140,9 @@ void MultiTree_static_parent_independent_trees(void) {
             3.0f, 0.0f, 0.0f, 0.0f,
             0.0f, 0.0f, 10.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1042,7 +1158,9 @@ void MultiTree_static_parent_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -5.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1059,7 +1177,9 @@ void MultiTree_static_parent_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -5.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1081,7 +1201,9 @@ void MultiTree_static_parent_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             20.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1097,7 +1219,9 @@ void MultiTree_static_parent_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             21.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1113,7 +1237,9 @@ void MultiTree_static_parent_independent_trees(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             22.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1129,7 +1255,9 @@ void MultiTree_static_parent_independent_trees(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             24.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1145,7 +1273,9 @@ void MultiTree_static_parent_independent_trees(void) {
             0.0f, 0.0f, 4.0f, 0.0f,
             0.0f, -10.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1161,7 +1291,9 @@ void MultiTree_static_parent_independent_trees(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             1.0f, -9.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1177,7 +1309,9 @@ void MultiTree_static_parent_independent_trees(void) {
             0.0f, 0.0f, 4.0f, 0.0f,
             0.0f, -10.0f, 4.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1193,7 +1327,9 @@ void MultiTree_static_parent_independent_trees(void) {
             3.0f, 0.0f, 0.0f, 0.0f,
             0.0f, 0.0f, 10.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1209,7 +1345,9 @@ void MultiTree_static_parent_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -5.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1226,7 +1364,9 @@ void MultiTree_static_parent_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -5.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1248,7 +1388,9 @@ void MultiTree_static_parent_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             20.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1264,7 +1406,9 @@ void MultiTree_static_parent_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             21.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1280,7 +1424,9 @@ void MultiTree_static_parent_independent_trees(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             21.0f, 2.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1296,7 +1442,9 @@ void MultiTree_static_parent_independent_trees(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             23.0f, 2.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1312,7 +1460,9 @@ void MultiTree_static_parent_independent_trees(void) {
             0.0f, 0.0f, 4.0f, 0.0f,
             0.0f, -10.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1328,7 +1478,9 @@ void MultiTree_static_parent_independent_trees(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             1.0f, -9.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1344,7 +1496,9 @@ void MultiTree_static_parent_independent_trees(void) {
             0.0f, 0.0f, 4.0f, 0.0f,
             0.0f, -10.0f, 4.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1360,7 +1514,9 @@ void MultiTree_static_parent_independent_trees(void) {
             3.0f, 0.0f, 0.0f, 0.0f,
             0.0f, 0.0f, 10.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1376,7 +1532,9 @@ void MultiTree_static_parent_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -6.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1393,7 +1551,9 @@ void MultiTree_static_parent_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -6.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1459,7 +1619,9 @@ void MultiTree_dynamic_childof_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             10.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1475,7 +1637,9 @@ void MultiTree_dynamic_childof_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             10.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1491,7 +1655,9 @@ void MultiTree_dynamic_childof_independent_trees(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             10.0f, 2.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1507,7 +1673,9 @@ void MultiTree_dynamic_childof_independent_trees(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             10.0f, 4.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1523,7 +1691,9 @@ void MultiTree_dynamic_childof_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 10.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1539,7 +1709,9 @@ void MultiTree_dynamic_childof_independent_trees(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             2.0f, 11.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1555,7 +1727,9 @@ void MultiTree_dynamic_childof_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 10.0f, 1.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1571,7 +1745,9 @@ void MultiTree_dynamic_childof_independent_trees(void) {
             3.0f, 0.0f, 0.0f, 0.0f,
             0.0f, 0.0f, 10.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1587,7 +1763,9 @@ void MultiTree_dynamic_childof_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -5.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1604,7 +1782,9 @@ void MultiTree_dynamic_childof_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -5.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1626,7 +1806,9 @@ void MultiTree_dynamic_childof_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             20.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1642,7 +1824,9 @@ void MultiTree_dynamic_childof_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             21.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1658,7 +1842,9 @@ void MultiTree_dynamic_childof_independent_trees(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             22.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1674,7 +1860,9 @@ void MultiTree_dynamic_childof_independent_trees(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             24.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1690,7 +1878,9 @@ void MultiTree_dynamic_childof_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 10.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1706,7 +1896,9 @@ void MultiTree_dynamic_childof_independent_trees(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             2.0f, 11.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1722,7 +1914,9 @@ void MultiTree_dynamic_childof_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 10.0f, 1.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1738,7 +1932,9 @@ void MultiTree_dynamic_childof_independent_trees(void) {
             3.0f, 0.0f, 0.0f, 0.0f,
             0.0f, 0.0f, 10.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1754,7 +1950,9 @@ void MultiTree_dynamic_childof_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -5.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1771,7 +1969,9 @@ void MultiTree_dynamic_childof_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -5.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1793,7 +1993,9 @@ void MultiTree_dynamic_childof_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             20.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1809,7 +2011,9 @@ void MultiTree_dynamic_childof_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             21.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1825,7 +2029,9 @@ void MultiTree_dynamic_childof_independent_trees(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             22.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1841,7 +2047,9 @@ void MultiTree_dynamic_childof_independent_trees(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             24.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1857,7 +2065,9 @@ void MultiTree_dynamic_childof_independent_trees(void) {
             0.0f, 0.0f, 4.0f, 0.0f,
             0.0f, -10.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1873,7 +2083,9 @@ void MultiTree_dynamic_childof_independent_trees(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             1.0f, -9.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1889,7 +2101,9 @@ void MultiTree_dynamic_childof_independent_trees(void) {
             0.0f, 0.0f, 4.0f, 0.0f,
             0.0f, -10.0f, 4.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1905,7 +2119,9 @@ void MultiTree_dynamic_childof_independent_trees(void) {
             3.0f, 0.0f, 0.0f, 0.0f,
             0.0f, 0.0f, 10.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1921,7 +2137,9 @@ void MultiTree_dynamic_childof_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -5.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1938,7 +2156,9 @@ void MultiTree_dynamic_childof_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -5.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1960,7 +2180,9 @@ void MultiTree_dynamic_childof_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             20.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1976,7 +2198,9 @@ void MultiTree_dynamic_childof_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             21.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1992,7 +2216,9 @@ void MultiTree_dynamic_childof_independent_trees(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             21.0f, 2.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2008,7 +2234,9 @@ void MultiTree_dynamic_childof_independent_trees(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             23.0f, 2.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2024,7 +2252,9 @@ void MultiTree_dynamic_childof_independent_trees(void) {
             0.0f, 0.0f, 4.0f, 0.0f,
             0.0f, -10.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2040,7 +2270,9 @@ void MultiTree_dynamic_childof_independent_trees(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             1.0f, -9.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2056,7 +2288,9 @@ void MultiTree_dynamic_childof_independent_trees(void) {
             0.0f, 0.0f, 4.0f, 0.0f,
             0.0f, -10.0f, 4.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2072,7 +2306,9 @@ void MultiTree_dynamic_childof_independent_trees(void) {
             3.0f, 0.0f, 0.0f, 0.0f,
             0.0f, 0.0f, 10.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2088,7 +2324,9 @@ void MultiTree_dynamic_childof_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -6.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2105,7 +2343,9 @@ void MultiTree_dynamic_childof_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -6.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2171,7 +2411,9 @@ void MultiTree_dynamic_parent_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             10.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2187,7 +2429,9 @@ void MultiTree_dynamic_parent_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             10.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2203,7 +2447,9 @@ void MultiTree_dynamic_parent_independent_trees(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             10.0f, 2.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2219,7 +2465,9 @@ void MultiTree_dynamic_parent_independent_trees(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             10.0f, 4.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2235,7 +2483,9 @@ void MultiTree_dynamic_parent_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 10.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2251,7 +2501,9 @@ void MultiTree_dynamic_parent_independent_trees(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             2.0f, 11.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2267,7 +2519,9 @@ void MultiTree_dynamic_parent_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 10.0f, 1.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2283,7 +2537,9 @@ void MultiTree_dynamic_parent_independent_trees(void) {
             3.0f, 0.0f, 0.0f, 0.0f,
             0.0f, 0.0f, 10.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2299,7 +2555,9 @@ void MultiTree_dynamic_parent_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -5.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2316,7 +2574,9 @@ void MultiTree_dynamic_parent_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -5.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2338,7 +2598,9 @@ void MultiTree_dynamic_parent_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             20.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2354,7 +2616,9 @@ void MultiTree_dynamic_parent_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             21.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2370,7 +2634,9 @@ void MultiTree_dynamic_parent_independent_trees(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             22.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2386,7 +2652,9 @@ void MultiTree_dynamic_parent_independent_trees(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             24.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2402,7 +2670,9 @@ void MultiTree_dynamic_parent_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 10.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2418,7 +2688,9 @@ void MultiTree_dynamic_parent_independent_trees(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             2.0f, 11.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2434,7 +2706,9 @@ void MultiTree_dynamic_parent_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 10.0f, 1.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2450,7 +2724,9 @@ void MultiTree_dynamic_parent_independent_trees(void) {
             3.0f, 0.0f, 0.0f, 0.0f,
             0.0f, 0.0f, 10.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2466,7 +2742,9 @@ void MultiTree_dynamic_parent_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -5.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2483,7 +2761,9 @@ void MultiTree_dynamic_parent_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -5.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2505,7 +2785,9 @@ void MultiTree_dynamic_parent_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             20.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2521,7 +2803,9 @@ void MultiTree_dynamic_parent_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             21.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2537,7 +2821,9 @@ void MultiTree_dynamic_parent_independent_trees(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             22.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2553,7 +2839,9 @@ void MultiTree_dynamic_parent_independent_trees(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             24.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2569,7 +2857,9 @@ void MultiTree_dynamic_parent_independent_trees(void) {
             0.0f, 0.0f, 4.0f, 0.0f,
             0.0f, -10.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2585,7 +2875,9 @@ void MultiTree_dynamic_parent_independent_trees(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             1.0f, -9.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2601,7 +2893,9 @@ void MultiTree_dynamic_parent_independent_trees(void) {
             0.0f, 0.0f, 4.0f, 0.0f,
             0.0f, -10.0f, 4.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2617,7 +2911,9 @@ void MultiTree_dynamic_parent_independent_trees(void) {
             3.0f, 0.0f, 0.0f, 0.0f,
             0.0f, 0.0f, 10.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2633,7 +2929,9 @@ void MultiTree_dynamic_parent_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -5.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2650,7 +2948,9 @@ void MultiTree_dynamic_parent_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -5.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2672,7 +2972,9 @@ void MultiTree_dynamic_parent_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             20.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2688,7 +2990,9 @@ void MultiTree_dynamic_parent_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             21.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2704,7 +3008,9 @@ void MultiTree_dynamic_parent_independent_trees(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             21.0f, 2.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2720,7 +3026,9 @@ void MultiTree_dynamic_parent_independent_trees(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             23.0f, 2.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2736,7 +3044,9 @@ void MultiTree_dynamic_parent_independent_trees(void) {
             0.0f, 0.0f, 4.0f, 0.0f,
             0.0f, -10.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2752,7 +3062,9 @@ void MultiTree_dynamic_parent_independent_trees(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             1.0f, -9.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2768,7 +3080,9 @@ void MultiTree_dynamic_parent_independent_trees(void) {
             0.0f, 0.0f, 4.0f, 0.0f,
             0.0f, -10.0f, 4.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2784,7 +3098,9 @@ void MultiTree_dynamic_parent_independent_trees(void) {
             3.0f, 0.0f, 0.0f, 0.0f,
             0.0f, 0.0f, 10.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2800,7 +3116,9 @@ void MultiTree_dynamic_parent_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -6.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2817,7 +3135,9 @@ void MultiTree_dynamic_parent_independent_trees(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -6.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2902,7 +3222,9 @@ void MultiTree_dynamic_childof_depth_group_multiple_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             10.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2918,7 +3240,9 @@ void MultiTree_dynamic_childof_depth_group_multiple_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 10.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2934,7 +3258,9 @@ void MultiTree_dynamic_childof_depth_group_multiple_tables(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             0.0f, 0.0f, 10.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2950,7 +3276,9 @@ void MultiTree_dynamic_childof_depth_group_multiple_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             11.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2966,7 +3294,9 @@ void MultiTree_dynamic_childof_depth_group_multiple_tables(void) {
             1.0f, 0.0f, 0.0f, 0.0f,
             0.0f, 11.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2982,7 +3312,9 @@ void MultiTree_dynamic_childof_depth_group_multiple_tables(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             2.0f, 0.0f, 10.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2998,7 +3330,9 @@ void MultiTree_dynamic_childof_depth_group_multiple_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             10.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3014,7 +3348,9 @@ void MultiTree_dynamic_childof_depth_group_multiple_tables(void) {
             0.0f, 1.0f, 0.0f, 0.0f,
             -1.0f, 10.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3030,7 +3366,9 @@ void MultiTree_dynamic_childof_depth_group_multiple_tables(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             0.0f, 2.0f, 10.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3046,7 +3384,9 @@ void MultiTree_dynamic_childof_depth_group_multiple_tables(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             11.0f, 0.0f, 1.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3062,7 +3402,9 @@ void MultiTree_dynamic_childof_depth_group_multiple_tables(void) {
             1.0f, 0.0f, 0.0f, 0.0f,
             0.0f, 11.0f, 1.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3078,7 +3420,9 @@ void MultiTree_dynamic_childof_depth_group_multiple_tables(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             4.0f, 0.0f, 10.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3094,7 +3438,9 @@ void MultiTree_dynamic_childof_depth_group_multiple_tables(void) {
             0.0f, -2.0f, 0.0f, 0.0f,
             11.0f, 2.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3110,7 +3456,9 @@ void MultiTree_dynamic_childof_depth_group_multiple_tables(void) {
             0.0f, 1.0f, 0.0f, 0.0f,
             -1.0f, 11.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3126,7 +3474,9 @@ void MultiTree_dynamic_childof_depth_group_multiple_tables(void) {
             0.0f, -2.0f, 0.0f, 0.0f,
             0.0f, 4.0f, 10.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3148,7 +3498,9 @@ void MultiTree_dynamic_childof_depth_group_multiple_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             10.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3164,7 +3516,9 @@ void MultiTree_dynamic_childof_depth_group_multiple_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 20.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3180,7 +3534,9 @@ void MultiTree_dynamic_childof_depth_group_multiple_tables(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             0.0f, 0.0f, 10.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3196,7 +3552,9 @@ void MultiTree_dynamic_childof_depth_group_multiple_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             11.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3212,7 +3570,9 @@ void MultiTree_dynamic_childof_depth_group_multiple_tables(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             1.0f, 20.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3228,7 +3588,9 @@ void MultiTree_dynamic_childof_depth_group_multiple_tables(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             2.0f, 0.0f, 10.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3244,7 +3606,9 @@ void MultiTree_dynamic_childof_depth_group_multiple_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             10.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3260,7 +3624,9 @@ void MultiTree_dynamic_childof_depth_group_multiple_tables(void) {
             1.0f, 0.0f, 0.0f, 0.0f,
             0.0f, 21.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3276,7 +3642,9 @@ void MultiTree_dynamic_childof_depth_group_multiple_tables(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             0.0f, 2.0f, 10.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3292,7 +3660,9 @@ void MultiTree_dynamic_childof_depth_group_multiple_tables(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             11.0f, 0.0f, 1.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3308,7 +3678,9 @@ void MultiTree_dynamic_childof_depth_group_multiple_tables(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             1.0f, 20.0f, 1.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3324,7 +3696,9 @@ void MultiTree_dynamic_childof_depth_group_multiple_tables(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             4.0f, 0.0f, 10.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3340,7 +3714,9 @@ void MultiTree_dynamic_childof_depth_group_multiple_tables(void) {
             0.0f, -2.0f, 0.0f, 0.0f,
             11.0f, 2.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3356,7 +3732,9 @@ void MultiTree_dynamic_childof_depth_group_multiple_tables(void) {
             1.0f, 0.0f, 0.0f, 0.0f,
             1.0f, 21.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3372,7 +3750,9 @@ void MultiTree_dynamic_childof_depth_group_multiple_tables(void) {
             0.0f, -2.0f, 0.0f, 0.0f,
             0.0f, 4.0f, 10.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3394,7 +3774,9 @@ void MultiTree_dynamic_childof_depth_group_multiple_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -10.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3410,7 +3792,9 @@ void MultiTree_dynamic_childof_depth_group_multiple_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 20.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3426,7 +3810,9 @@ void MultiTree_dynamic_childof_depth_group_multiple_tables(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             0.0f, 0.0f, 10.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3442,7 +3828,9 @@ void MultiTree_dynamic_childof_depth_group_multiple_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -9.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3458,7 +3846,9 @@ void MultiTree_dynamic_childof_depth_group_multiple_tables(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             1.0f, 20.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3474,7 +3864,9 @@ void MultiTree_dynamic_childof_depth_group_multiple_tables(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             2.0f, 0.0f, 10.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3490,7 +3882,9 @@ void MultiTree_dynamic_childof_depth_group_multiple_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -10.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3506,7 +3900,9 @@ void MultiTree_dynamic_childof_depth_group_multiple_tables(void) {
             1.0f, 0.0f, 0.0f, 0.0f,
             0.0f, 21.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3522,7 +3918,9 @@ void MultiTree_dynamic_childof_depth_group_multiple_tables(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             0.0f, 0.0f, 14.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3538,7 +3936,9 @@ void MultiTree_dynamic_childof_depth_group_multiple_tables(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             -9.0f, 0.0f, 1.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3554,7 +3954,9 @@ void MultiTree_dynamic_childof_depth_group_multiple_tables(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             1.0f, 20.0f, 1.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3570,7 +3972,9 @@ void MultiTree_dynamic_childof_depth_group_multiple_tables(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             4.0f, 0.0f, 10.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3586,7 +3990,9 @@ void MultiTree_dynamic_childof_depth_group_multiple_tables(void) {
             0.0f, -2.0f, 0.0f, 0.0f,
             -9.0f, 2.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3602,7 +4008,9 @@ void MultiTree_dynamic_childof_depth_group_multiple_tables(void) {
             1.0f, 0.0f, 0.0f, 0.0f,
             1.0f, 21.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3618,7 +4026,9 @@ void MultiTree_dynamic_childof_depth_group_multiple_tables(void) {
             0.0f, -2.0f, 0.0f, 0.0f,
             0.0f, 2.0f, 14.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3703,7 +4113,9 @@ void MultiTree_dynamic_parent_depth_group_multiple_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             10.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3719,7 +4131,9 @@ void MultiTree_dynamic_parent_depth_group_multiple_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 10.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3735,7 +4149,9 @@ void MultiTree_dynamic_parent_depth_group_multiple_tables(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             0.0f, 0.0f, 10.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3751,7 +4167,9 @@ void MultiTree_dynamic_parent_depth_group_multiple_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             11.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3767,7 +4185,9 @@ void MultiTree_dynamic_parent_depth_group_multiple_tables(void) {
             1.0f, 0.0f, 0.0f, 0.0f,
             0.0f, 11.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3783,7 +4203,9 @@ void MultiTree_dynamic_parent_depth_group_multiple_tables(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             2.0f, 0.0f, 10.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3799,7 +4221,9 @@ void MultiTree_dynamic_parent_depth_group_multiple_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             10.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3815,7 +4239,9 @@ void MultiTree_dynamic_parent_depth_group_multiple_tables(void) {
             0.0f, 1.0f, 0.0f, 0.0f,
             -1.0f, 10.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3831,7 +4257,9 @@ void MultiTree_dynamic_parent_depth_group_multiple_tables(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             0.0f, 2.0f, 10.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3847,7 +4275,9 @@ void MultiTree_dynamic_parent_depth_group_multiple_tables(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             11.0f, 0.0f, 1.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3863,7 +4293,9 @@ void MultiTree_dynamic_parent_depth_group_multiple_tables(void) {
             1.0f, 0.0f, 0.0f, 0.0f,
             0.0f, 11.0f, 1.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3879,7 +4311,9 @@ void MultiTree_dynamic_parent_depth_group_multiple_tables(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             4.0f, 0.0f, 10.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3895,7 +4329,9 @@ void MultiTree_dynamic_parent_depth_group_multiple_tables(void) {
             0.0f, -2.0f, 0.0f, 0.0f,
             11.0f, 2.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3911,7 +4347,9 @@ void MultiTree_dynamic_parent_depth_group_multiple_tables(void) {
             0.0f, 1.0f, 0.0f, 0.0f,
             -1.0f, 11.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3927,7 +4365,9 @@ void MultiTree_dynamic_parent_depth_group_multiple_tables(void) {
             0.0f, -2.0f, 0.0f, 0.0f,
             0.0f, 4.0f, 10.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3949,7 +4389,9 @@ void MultiTree_dynamic_parent_depth_group_multiple_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             10.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3965,7 +4407,9 @@ void MultiTree_dynamic_parent_depth_group_multiple_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 20.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3981,7 +4425,9 @@ void MultiTree_dynamic_parent_depth_group_multiple_tables(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             0.0f, 0.0f, 10.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3997,7 +4443,9 @@ void MultiTree_dynamic_parent_depth_group_multiple_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             11.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4013,7 +4461,9 @@ void MultiTree_dynamic_parent_depth_group_multiple_tables(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             1.0f, 20.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4029,7 +4479,9 @@ void MultiTree_dynamic_parent_depth_group_multiple_tables(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             2.0f, 0.0f, 10.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4045,7 +4497,9 @@ void MultiTree_dynamic_parent_depth_group_multiple_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             10.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4061,7 +4515,9 @@ void MultiTree_dynamic_parent_depth_group_multiple_tables(void) {
             1.0f, 0.0f, 0.0f, 0.0f,
             0.0f, 21.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4077,7 +4533,9 @@ void MultiTree_dynamic_parent_depth_group_multiple_tables(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             0.0f, 2.0f, 10.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4093,7 +4551,9 @@ void MultiTree_dynamic_parent_depth_group_multiple_tables(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             11.0f, 0.0f, 1.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4109,7 +4569,9 @@ void MultiTree_dynamic_parent_depth_group_multiple_tables(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             1.0f, 20.0f, 1.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4125,7 +4587,9 @@ void MultiTree_dynamic_parent_depth_group_multiple_tables(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             4.0f, 0.0f, 10.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4141,7 +4605,9 @@ void MultiTree_dynamic_parent_depth_group_multiple_tables(void) {
             0.0f, -2.0f, 0.0f, 0.0f,
             11.0f, 2.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4157,7 +4623,9 @@ void MultiTree_dynamic_parent_depth_group_multiple_tables(void) {
             1.0f, 0.0f, 0.0f, 0.0f,
             1.0f, 21.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4173,7 +4641,9 @@ void MultiTree_dynamic_parent_depth_group_multiple_tables(void) {
             0.0f, -2.0f, 0.0f, 0.0f,
             0.0f, 4.0f, 10.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4195,7 +4665,9 @@ void MultiTree_dynamic_parent_depth_group_multiple_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -10.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4211,7 +4683,9 @@ void MultiTree_dynamic_parent_depth_group_multiple_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 20.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4227,7 +4701,9 @@ void MultiTree_dynamic_parent_depth_group_multiple_tables(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             0.0f, 0.0f, 10.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4243,7 +4719,9 @@ void MultiTree_dynamic_parent_depth_group_multiple_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -9.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4259,7 +4737,9 @@ void MultiTree_dynamic_parent_depth_group_multiple_tables(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             1.0f, 20.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4275,7 +4755,9 @@ void MultiTree_dynamic_parent_depth_group_multiple_tables(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             2.0f, 0.0f, 10.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4291,7 +4773,9 @@ void MultiTree_dynamic_parent_depth_group_multiple_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -10.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4307,7 +4791,9 @@ void MultiTree_dynamic_parent_depth_group_multiple_tables(void) {
             1.0f, 0.0f, 0.0f, 0.0f,
             0.0f, 21.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4323,7 +4809,9 @@ void MultiTree_dynamic_parent_depth_group_multiple_tables(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             0.0f, 0.0f, 14.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4339,7 +4827,9 @@ void MultiTree_dynamic_parent_depth_group_multiple_tables(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             -9.0f, 0.0f, 1.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4355,7 +4845,9 @@ void MultiTree_dynamic_parent_depth_group_multiple_tables(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             1.0f, 20.0f, 1.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4371,7 +4863,9 @@ void MultiTree_dynamic_parent_depth_group_multiple_tables(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             4.0f, 0.0f, 10.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4387,7 +4881,9 @@ void MultiTree_dynamic_parent_depth_group_multiple_tables(void) {
             0.0f, -2.0f, 0.0f, 0.0f,
             -9.0f, 2.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4403,7 +4899,9 @@ void MultiTree_dynamic_parent_depth_group_multiple_tables(void) {
             1.0f, 0.0f, 0.0f, 0.0f,
             1.0f, 21.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4419,7 +4917,9 @@ void MultiTree_dynamic_parent_depth_group_multiple_tables(void) {
             0.0f, -2.0f, 0.0f, 0.0f,
             0.0f, 2.0f, 14.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);

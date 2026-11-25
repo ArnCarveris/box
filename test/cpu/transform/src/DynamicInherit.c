@@ -20,16 +20,16 @@ void DynamicInherit_childof_velocity_child_keeps_moving(void) {
     ecs_set(world, child, Velocity, {1.0f, 0.0f, 0.0f});
 
     ecs_progress(world, 1.0f);
-    test_flt(ecs_get(world, child, WorldTransform)->m[3][0], 11.0f);
+    test_flt(ecs_get(world, child, WorldTransform)->position[0], 11.0f);
 
     ecs_remove(world, parent, DynamicTransform);
     ecs_progress(world, 1.0f);
 
     test_bool(ecs_has(world, child, DynamicTransform), true);
-    test_flt(ecs_get(world, child, WorldTransform)->m[3][0], 12.0f);
+    test_flt(ecs_get(world, child, WorldTransform)->position[0], 12.0f);
 
     ecs_progress(world, 1.0f);
-    test_flt(ecs_get(world, child, WorldTransform)->m[3][0], 13.0f);
+    test_flt(ecs_get(world, child, WorldTransform)->position[0], 13.0f);
 
     ecs_fini(world);
 }
@@ -47,16 +47,16 @@ void DynamicInherit_parent_velocity_child_keeps_moving(void) {
     ecs_set(world, child, Velocity, {1.0f, 0.0f, 0.0f});
 
     ecs_progress(world, 1.0f);
-    test_flt(ecs_get(world, child, WorldTransform)->m[3][0], 11.0f);
+    test_flt(ecs_get(world, child, WorldTransform)->position[0], 11.0f);
 
     ecs_remove(world, parent, DynamicTransform);
     ecs_progress(world, 1.0f);
 
     test_bool(ecs_has(world, child, DynamicTransform), true);
-    test_flt(ecs_get(world, child, WorldTransform)->m[3][0], 12.0f);
+    test_flt(ecs_get(world, child, WorldTransform)->position[0], 12.0f);
 
     ecs_progress(world, 1.0f);
-    test_flt(ecs_get(world, child, WorldTransform)->m[3][0], 13.0f);
+    test_flt(ecs_get(world, child, WorldTransform)->position[0], 13.0f);
 
     ecs_fini(world);
 }
@@ -79,10 +79,10 @@ void DynamicInherit_childof_angular_velocity_child_keeps_rotating(void) {
     ecs_progress(world, 1.0f);
 
     test_bool(ecs_has(world, child, DynamicTransform), true);
-    test_flt(ecs_get(world, child, WorldTransform)->m[0][0], cosf(1.0f));
+    test_flt(ecs_get(world, child, WorldTransform)->basis[0][0], cosf(1.0f));
 
     ecs_progress(world, 1.0f);
-    test_flt(ecs_get(world, child, WorldTransform)->m[0][0], cosf(1.5f));
+    test_flt(ecs_get(world, child, WorldTransform)->basis[0][0], cosf(1.5f));
 
     ecs_fini(world);
 }
@@ -110,7 +110,7 @@ void DynamicInherit_childof_tagged_child_stays_dynamic(void) {
     p->x = 2.0f;
     ecs_progress(world, 0);
 
-    test_flt(ecs_get(world, child, WorldTransform)->m[3][0], 12.0f);
+    test_flt(ecs_get(world, child, WorldTransform)->position[0], 12.0f);
 
     ecs_fini(world);
 }
@@ -138,7 +138,7 @@ void DynamicInherit_parent_tagged_child_stays_dynamic(void) {
     p->x = 2.0f;
     ecs_progress(world, 0);
 
-    test_flt(ecs_get(world, child, WorldTransform)->m[3][0], 12.0f);
+    test_flt(ecs_get(world, child, WorldTransform)->position[0], 12.0f);
 
     ecs_fini(world);
 }
@@ -165,12 +165,12 @@ void DynamicInherit_childof_inherited_child_becomes_static(void) {
     ecs_set(world, child, Position, {2.0f, 0.0f, 0.0f});
     ecs_progress(world, 0);
 
-    test_flt(ecs_get(world, child, WorldTransform)->m[3][0], 12.0f);
+    test_flt(ecs_get(world, child, WorldTransform)->position[0], 12.0f);
 
     ecs_set(world, parent, Position, {20.0f, 0.0f, 0.0f});
     ecs_progress(world, 0);
 
-    test_flt(ecs_get(world, child, WorldTransform)->m[3][0], 22.0f);
+    test_flt(ecs_get(world, child, WorldTransform)->position[0], 22.0f);
 
     ecs_fini(world);
 }
@@ -190,20 +190,20 @@ void DynamicInherit_childof_velocity_grandchild_under_inherited_child(void) {
     ecs_set(world, grandchild, Velocity, {1.0f, 0.0f, 0.0f});
 
     ecs_progress(world, 1.0f);
-    test_flt(ecs_get(world, grandchild, WorldTransform)->m[3][0], 12.0f);
+    test_flt(ecs_get(world, grandchild, WorldTransform)->position[0], 12.0f);
 
     ecs_remove(world, root, DynamicTransform);
     ecs_progress(world, 1.0f);
 
     test_bool(ecs_has(world, child, DynamicTransform), false);
     test_bool(ecs_has(world, grandchild, DynamicTransform), true);
-    test_flt(ecs_get(world, grandchild, WorldTransform)->m[3][0], 13.0f);
+    test_flt(ecs_get(world, grandchild, WorldTransform)->position[0], 13.0f);
 
     ecs_set(world, child, Position, {2.0f, 0.0f, 0.0f});
     ecs_progress(world, 1.0f);
 
-    test_flt(ecs_get(world, child, WorldTransform)->m[3][0], 12.0f);
-    test_flt(ecs_get(world, grandchild, WorldTransform)->m[3][0], 15.0f);
+    test_flt(ecs_get(world, child, WorldTransform)->position[0], 12.0f);
+    test_flt(ecs_get(world, grandchild, WorldTransform)->position[0], 15.0f);
 
     ecs_fini(world);
 }
@@ -257,7 +257,7 @@ void DynamicInherit_childof_child_tagged_after_parenting_stays_dynamic(void) {
     p->x = 2.0f;
     ecs_progress(world, 0);
 
-    test_flt(ecs_get(world, child, WorldTransform)->m[3][0], 12.0f);
+    test_flt(ecs_get(world, child, WorldTransform)->position[0], 12.0f);
 
     ecs_fini(world);
 }
@@ -284,7 +284,7 @@ void DynamicInherit_parent_child_tagged_after_parenting_stays_dynamic(void) {
     p->x = 2.0f;
     ecs_progress(world, 0);
 
-    test_flt(ecs_get(world, child, WorldTransform)->m[3][0], 12.0f);
+    test_flt(ecs_get(world, child, WorldTransform)->position[0], 12.0f);
 
     ecs_fini(world);
 }
@@ -317,8 +317,8 @@ void DynamicInherit_childof_child_tagged_after_progress_stays_dynamic(void) {
     p->x = 2.0f;
     ecs_progress(world, 0);
 
-    test_flt(box_transform_world(world, child, &buf)->m[3][0], 12.0f);
-    test_flt(box_transform_world(world, grandchild, &buf)->m[3][0], 13.0f);
+    test_flt(box_transform_world(world, child, &buf)->position[0], 12.0f);
+    test_flt(box_transform_world(world, grandchild, &buf)->position[0], 13.0f);
 
     ecs_fini(world);
 }
@@ -361,12 +361,12 @@ void DynamicInherit_script_tagged_child_stays_dynamic(void) {
     p->x = 2.0f;
     ecs_progress(world, 0);
 
-    test_flt(ecs_get(world, tagged, WorldTransform)->m[3][0], 12.0f);
+    test_flt(ecs_get(world, tagged, WorldTransform)->position[0], 12.0f);
 
     ecs_set(world, parent, Position, {20.0f, 0.0f, 0.0f});
     ecs_progress(world, 0);
 
-    test_flt(ecs_get(world, untagged, WorldTransform)->m[3][0], 21.0f);
+    test_flt(ecs_get(world, untagged, WorldTransform)->position[0], 21.0f);
 
     ecs_fini(world);
 }

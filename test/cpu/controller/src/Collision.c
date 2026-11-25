@@ -110,7 +110,7 @@ void Collision_slide_along_rotated_wall(void) {
 
     const WorldTransform *t = ecs_get(world, wall, WorldTransform);
     test_assert(t != NULL);
-    float nx = t->m[2][0], nz = t->m[2][2];
+    float nx = t->basis[2][0], nz = t->basis[2][2];
     test_assert(fabsf(nx) > 0.5f);
     box_input_key(world, KeyW, true);
     for (int32_t i = 0; i < 30; i ++) {
@@ -145,7 +145,7 @@ void Collision_land_on_box(void) {
 
     const Position *p = ecs_get(world, fp, Position);
     test_flt(p->x, 0);
-    test_assert(fabsf(p->y - 2.7f) < 0.001f);
+    test_assert(fabs(p->y - 2.7f) < 0.001f);
     test_flt(p->z, 0);
     const FirstPersonController *c = ecs_get(world, fp, FirstPersonController);
     test_bool(c->grounded, true);
@@ -155,7 +155,7 @@ void Collision_land_on_box(void) {
         ecs_progress(world, 0.1f);
     }
 
-    test_assert(fabsf(ecs_get(world, fp, Position)->y - 2.7f) < 0.001f);
+    test_assert(fabs(ecs_get(world, fp, Position)->y - 2.7f) < 0.001f);
     test_bool(ecs_get(world, fp, FirstPersonController)->grounded, true);
 
     ecs_fini(world);
@@ -176,7 +176,7 @@ void Collision_walk_off_box(void) {
         ecs_progress(world, 0.1f);
     }
 
-    test_assert(fabsf(ecs_get(world, fp, Position)->y - 2.7f) < 0.001f);
+    test_assert(fabs(ecs_get(world, fp, Position)->y - 2.7f) < 0.001f);
 
     box_input_key_press(world, KeyW, 10);
     for (int32_t i = 0; i < 20; i ++) {
@@ -210,7 +210,7 @@ void Collision_step_up(void) {
 
     const Position *p = ecs_get(world, fp, Position);
     test_assert(p->z < -2.3f);
-    test_assert(fabsf(p->y - 1.9f) < 0.001f);
+    test_assert(fabs(p->y - 1.9f) < 0.001f);
     test_bool(ecs_get(world, fp, FirstPersonController)->grounded, true);
 
     ecs_fini(world);
@@ -261,7 +261,7 @@ void Collision_step_setting(void) {
 
     const Position *p = ecs_get(world, fp, Position);
     test_assert(p->z < -2.3f);
-    test_assert(fabsf(p->y - 2.2f) < 0.001f);
+    test_assert(fabs(p->y - 2.2f) < 0.001f);
 
     ecs_fini(world);
 }
@@ -285,7 +285,7 @@ void Collision_crouch_under_ceiling(void) {
     }
 
     const Position *p = ecs_get(world, fp, Position);
-    test_assert(fabsf(p->z + 3) < 0.01f);
+    test_assert(fabs(p->z + 3) < 0.01f);
     test_flt(p->y, 0.9f);
 
     box_input_key(world, KeyW, false);
@@ -295,7 +295,7 @@ void Collision_crouch_under_ceiling(void) {
     }
 
     p = ecs_get(world, fp, Position);
-    test_assert(fabsf(p->z + 3) < 0.01f);
+    test_assert(fabs(p->z + 3) < 0.01f);
     test_flt(p->y, 0.9f);
     test_bool(ecs_get(world, fp, FirstPersonController)->crouched, true);
 
@@ -389,11 +389,11 @@ void Collision_round_shapes(void) {
     }
 
     const Position *p = ecs_get(world, a, Position);
-    test_assert(fabsf(p->z + 2.7f) < 0.03f);
-    test_assert(fabsf(p->x) < 0.01f);
+    test_assert(fabs(p->z + 2.7f) < 0.03f);
+    test_assert(fabs(p->x) < 0.01f);
     p = ecs_get(world, b, Position);
-    test_assert(fabsf(p->z + 2.7f) < 0.03f);
-    test_assert(fabsf(p->x - 10) < 0.01f);
+    test_assert(fabs(p->z + 2.7f) < 0.03f);
+    test_assert(fabs(p->x - 10) < 0.01f);
 
     ecs_fini(world);
 }
@@ -475,7 +475,7 @@ void Collision_own_shape_ignored(void) {
     }
 
     const Position *p = ecs_get(world, fp, Position);
-    test_assert(fabsf(p->z + 2) < 0.001f);
+    test_assert(fabs(p->z + 2) < 0.001f);
     test_flt(p->y, 1.7f);
 
     ecs_fini(world);
@@ -499,7 +499,7 @@ void Collision_ground_below_plane(void) {
         ecs_progress(world, 0.1f);
     }
 
-    test_assert(fabsf(ecs_get(world, fp, Position)->y + 0.3f) < 0.001f);
+    test_assert(fabs(ecs_get(world, fp, Position)->y + 0.3f) < 0.001f);
     test_bool(ecs_get(world, fp, FirstPersonController)->grounded, true);
     test_flt(ecs_get(world, other, Position)->y, 1.7f);
     test_bool(ecs_get(world, other, FirstPersonController)->grounded, true);
@@ -540,7 +540,7 @@ void Collision_camera_collide(void) {
         z -= v * 0.1f;
     }
 
-    test_assert(fabsf(ecs_get(world, ghost, Position)->z - z) < 0.001f);
+    test_assert(fabs(ecs_get(world, ghost, Position)->z - z) < 0.001f);
 
     ecs_fini(world);
 }
@@ -608,8 +608,8 @@ void Collision_script_settings(void) {
         ecs_progress(world, 0.1f);
     }
 
-    test_assert(fabsf(ecs_get(world, fp, Position)->z + 2.3f) < 0.02f);
-    test_assert(fabsf(ecs_get(world, cam, Position)->z + 2.3f) < 0.02f);
+    test_assert(fabs(ecs_get(world, fp, Position)->z + 2.3f) < 0.02f);
+    test_assert(fabs(ecs_get(world, cam, Position)->z + 2.3f) < 0.02f);
 
     ecs_fini(world);
 }
@@ -670,7 +670,7 @@ void Collision_first_person_thin_wall_boost(void) {
 
     const Position *p = ecs_get(world, fp, Position);
     test_assert(p->z < -19.65f);
-    test_assert(fabsf(p->x) < 0.001f);
+    test_assert(fabs(p->x) < 0.001f);
     test_assert(fabsf(ecs_get(world, fp, FirstPersonController)->velocity[2]) < 0.01f);
 
     ecs_fini(world);
@@ -718,8 +718,8 @@ void Collision_steep_slope_blocks_walk(void) {
     ecs_progress(world, 0.1f);
 
     const WorldTransform *t = ecs_get(world, slope, WorldTransform);
-    test_assert(fabsf(t->m[1][1] - c) < 0.001f);
-    test_assert(fabsf(t->m[1][2] - s) < 0.001f);
+    test_assert(fabsf(t->basis[1][1] - c) < 0.001f);
+    test_assert(fabsf(t->basis[1][2] - s) < 0.001f);
     box_input_key(world, KeyW, true);
     for (int32_t i = 0; i < 180; i ++) {
         ecs_progress(world, 1.0f / 60.0f);
@@ -933,7 +933,7 @@ void Collision_stairs_climb(void) {
 
     const Position *p = ecs_get(world, fp, Position);
     test_assert(p->z < -5);
-    test_assert(fabsf(p->y - 2.7f) < 0.001f);
+    test_assert(fabs(p->y - 2.7f) < 0.001f);
     test_bool(ecs_get(world, fp, FirstPersonController)->grounded, true);
 
     ecs_fini(world);
@@ -955,7 +955,7 @@ void Collision_camera_rotated_thin_wall(void) {
     ecs_progress(world, 0.1f);
 
     const WorldTransform *t = ecs_get(world, wall, WorldTransform);
-    float nx = t->m[2][0], nz = t->m[2][2];
+    float nx = t->basis[2][0], nz = t->basis[2][2];
     test_assert(fabsf(nx) > 0.5f);
     test_assert(nz > 0);
     box_input_key(world, KeyW, true);
@@ -968,7 +968,7 @@ void Collision_camera_rotated_thin_wall(void) {
 
     const Position *p = ecs_get(world, cam, Position);
     test_assert(p->x * nx + (p->z + 20) * nz < 0.3f);
-    test_assert(fabsf(p->x) > 20);
+    test_assert(fabs(p->x) > 20);
     test_assert(fabsf(p->y - 1) < 0.001f);
 
     ecs_fini(world);
@@ -989,7 +989,7 @@ void Collision_first_person_rotated_thin_wall(void) {
     ecs_progress(world, 0.1f);
 
     const WorldTransform *t = ecs_get(world, wall, WorldTransform);
-    float nx = t->m[2][0], nz = t->m[2][2];
+    float nx = t->basis[2][0], nz = t->basis[2][2];
     box_input_key(world, KeyW, true);
     for (int32_t i = 0; i < 6; i ++) {
         ecs_progress(world, 0.5f);
@@ -1026,7 +1026,7 @@ void Collision_step_up_long_frame(void) {
 
     const Position *p = ecs_get(world, fp, Position);
     test_assert(p->z < -5);
-    test_assert(fabsf(p->y - 1.9f) < 0.001f);
+    test_assert(fabs(p->y - 1.9f) < 0.001f);
     test_bool(ecs_get(world, fp, FirstPersonController)->grounded, true);
 
     ecs_fini(world);
@@ -1109,8 +1109,8 @@ void Collision_steep_crease_holds(void) {
     }
 
     const Position *p = ecs_get(world, fp, Position);
-    test_assert(fabsf(p->y - (3 + 0.3f / c - 0.3f + 1.7f)) < 0.01f);
-    test_assert(fabsf(p->z + 2) < 0.01f);
+    test_assert(fabs(p->y - (3 + 0.3f / c - 0.3f + 1.7f)) < 0.01f);
+    test_assert(fabs(p->z + 2) < 0.01f);
     test_bool(ecs_get(world, fp, FirstPersonController)->grounded, true);
     test_assert(fabsf(ecs_get(world, fp, FirstPersonController)->velocity[1]) < 0.001f);
 
@@ -1179,7 +1179,7 @@ void Collision_steep_crease_walk_along(void) {
 
     const Position *p = ecs_get(world, fp, Position);
     test_assert(p->x > 2);
-    test_assert(fabsf(p->z + 2) < 0.3f);
+    test_assert(fabs(p->z + 2) < 0.3f);
     test_bool(ecs_get(world, fp, FirstPersonController)->grounded, true);
 
     ecs_fini(world);
@@ -1209,9 +1209,9 @@ void Collision_ball_through_axis(void) {
     for (int32_t i = 0; i < 30; i ++) {
         ecs_progress(world, dt);
         const Position *p = ecs_get(world, fp, Position);
-        test_assert(fabsf(p->y - 1.7f) < 0.001f);
+        test_assert(fabs(p->y - 1.7f) < 0.001f);
         test_assert(p->z > z + 0.69f);
-        test_assert(fabsf(p->x) < 0.001f);
+        test_assert(fabs(p->x) < 0.001f);
     }
 
     test_bool(ecs_get(world, fp, FirstPersonController)->grounded, true);
@@ -1241,7 +1241,7 @@ void Collision_walk_into_balls(void) {
     for (int32_t f = 0; f < 120; f ++) {
         ecs_progress(world, 1.0f / 60.0f);
         for (int32_t i = 0; i < 4; i ++) {
-            test_assert(fabsf(ecs_get(world, fp[i], Position)->y - 1.7f) < 0.001f);
+            test_assert(fabs(ecs_get(world, fp[i], Position)->y - 1.7f) < 0.001f);
         }
     }
 
@@ -1278,8 +1278,8 @@ void Collision_ground_beside_round_shapes(void) {
 
     for (int32_t i = 0; i < 60; i ++) {
         ecs_progress(world, 1.0f / 60.0f);
-        test_assert(fabsf(ecs_get(world, a, Position)->y - 1.7f) < 0.001f);
-        test_assert(fabsf(ecs_get(world, b, Position)->y - 1.7f) < 0.001f);
+        test_assert(fabs(ecs_get(world, a, Position)->y - 1.7f) < 0.001f);
+        test_assert(fabs(ecs_get(world, b, Position)->y - 1.7f) < 0.001f);
     }
 
     test_bool(ecs_get(world, a, FirstPersonController)->grounded, true);
@@ -1306,11 +1306,11 @@ void Collision_step_over_log(void) {
     for (int32_t i = 0; i < 90; i ++) {
         ecs_progress(world, 1.0f / 60.0f);
         const Position *p = ecs_get(world, fp, Position);
-        float dz = fabsf(p->z + 2);
+        float dz = fabs(p->z + 2);
         test_assert(p->y > 1.7f - 0.001f);
         if (dz < 0.1f) {
             float surface = 0.14f + sqrtf(0.44f * 0.44f - dz * dz) - 0.3f;
-            test_assert(fabsf(p->y - 1.7f - surface) < 0.01f);
+            test_assert(fabs(p->y - 1.7f - surface) < 0.01f);
         }
 
         top = p->y > top ? p->y : top;
@@ -1362,7 +1362,7 @@ void Collision_sheared_box(void) {
         }
 
         test_assert(dist > 0.29f);
-        test_assert(fabsf(p->y - 1.7f) < 0.001f);
+        test_assert(fabs(p->y - 1.7f) < 0.001f);
     }
 
     test_assert(ecs_get(world, fp, Position)->z < -5);
@@ -1397,11 +1397,11 @@ void Collision_fast_move_dense_posts(void) {
         Position before = *ecs_get(world, cam, Position);
         ecs_progress(world, 0.5f);
         const Position *p = ecs_get(world, cam, Position);
-        travelled += fabsf(p->x - before.x) + fabsf(p->z - before.z);
+        travelled += fabs(p->x - before.x) + fabs(p->z - before.z);
         for (int32_t i = 0; i < 40; i ++) {
             for (int32_t j = 0; j < 40; j ++) {
-                float dx = fabsf(p->x - (1.5f * (float)i - 30)) - 0.1f;
-                float dz = fabsf(p->z + 1.5f * (float)j + 3) - 0.1f;
+                float dx = fabs(p->x - (1.5f * (float)i - 30)) - 0.1f;
+                float dz = fabs(p->z + 1.5f * (float)j + 3) - 0.1f;
                 dx = dx > 0 ? dx : 0;
                 dz = dz > 0 ? dz : 0;
                 test_assert(sqrtf(dx * dx + dz * dz) > 0.24f);
@@ -1470,12 +1470,12 @@ void Collision_capsule_core_crossing(void) {
     for (int32_t i = 0; i < 3; i ++) {
         ecs_progress(world, 1.0f / 60.0f);
         const Position *p = ecs_get(world, fp, Position);
-        test_assert(fabsf(p->y - 1.7f) < 0.001f);
+        test_assert(fabs(p->y - 1.7f) < 0.001f);
     }
 
     const Position *p = ecs_get(world, fp, Position);
-    test_assert(fabsf(p->z) > 0.49f);
-    test_assert(fabsf(p->x) < 0.001f);
+    test_assert(fabs(p->z) > 0.49f);
+    test_assert(fabs(p->x) < 0.001f);
 
     ecs_fini(world);
 }
@@ -1677,9 +1677,9 @@ void Collision_acute_corner_still(void) {
             ecs_progress(world, dt);
             for (int32_t b = 0; b < 3; b ++) {
                 const Position *p = ecs_get(world, body[b], Position);
-                test_assert(fabsf(p->x - prev[b].x) < 0.0005f);
-                test_assert(fabsf(p->z - prev[b].z) < 0.0005f);
-                test_assert(fabsf(p->y - (b == 2 ? 1 : 1.7f)) < 0.001f);
+                test_assert(fabs(p->x - prev[b].x) < 0.0005f);
+                test_assert(fabs(p->z - prev[b].z) < 0.0005f);
+                test_assert(fabs(p->y - (b == 2 ? 1 : 1.7f)) < 0.001f);
                 prev[b] = *p;
             }
         }

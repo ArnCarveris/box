@@ -9,7 +9,7 @@ using box.terrain
 using state
 
 state {
-  export mut start_y: f32 = 120
+  export mut start_y: f64 = 120
   export mut started: bool = false
 }
 

@@ -2,6 +2,7 @@
 // rectangle (Rect, Circle) or a line segment, anti-aliased over the screen footprint of each
 // fragment so edges stay crisp at any scale, distance and angle.
 #include "include/lights.wgsl"
+#include "include/render_origin.wgsl"
 
 // BlendMode of the pipeline: the output is shaped for the blend equation it is drawn with.
 override blend_mode: u32 = 0u;
@@ -36,10 +37,14 @@ const clip_depth: u32 = 16u;
 @group(1) @binding(4) var material_sampler: sampler;
 
 // The transform stream of the instance page (InstanceTransform of instance.wgsl): the rows of
-// the model matrix.
+// the model matrix and the cell of a world record.
 struct Shape2DTransform {
     rows: array<vec4f, 3>,
+    cell: vec4i,
 };
+
+// Edge of a cell of the grid the instances are placed on (ORIGIN_CELL of instance.wgsl).
+const SHAPE2D_CELL: i32 = 1024;
 
 // The shading stream of the 2D instance page (box_render_shading_t, see instance.wgsl) with the
 // material words read as integers. color is the linear color and alpha as unorm16x4: r | g << 16,
@@ -102,9 +107,16 @@ fn pixels_per_unit(mvp: mat4x4f, clip: vec4f, dir: vec2f) -> f32 {
 
 @vertex fn vs(v: VertexIn) -> VertexOut {
     let inst = shadings[v.slot];
-    let r = transforms[v.slot].rows;
+    let t = transforms[v.slot];
+    let r = t.rows;
+    var offset = vec3f(0.0);
+    if (t.cell.w != 0) {
+        let o = render_origin(view.origin);
+        offset = vec3f(t.cell.xyz * SHAPE2D_CELL - o.whole) - o.rest;
+    }
     let model = mat4x4f(vec4f(r[0].x, r[1].x, r[2].x, 0.0), vec4f(r[0].y, r[1].y, r[2].y, 0.0),
-        vec4f(r[0].z, r[1].z, r[2].z, 0.0), vec4f(r[0].w, r[1].w, r[2].w, 1.0));
+        vec4f(r[0].z, r[1].z, r[2].z, 0.0),
+        vec4f(r[0].w + offset.x, r[1].w + offset.y, r[2].w + offset.z, 1.0));
     let mvp = view.view_proj * model;
     var origin = vec2f(0.0);
     var axis = vec2f(1.0, 0.0);

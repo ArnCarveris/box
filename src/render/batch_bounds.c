@@ -5,6 +5,9 @@
  * The local bounds of a batch with parametric surfaces are the box its cull jobs test each
  * instance with. The world bounds hold the world box of every instance, which the views that
  * cull batches by their bounds (CullSettings.bounds) test before drawing the batch.
+ *
+ * A batch keeps its world bounds relative to the origin of the world, so a move of the render
+ * origin computes none again; they are sent relative to the render origin.
  */
 
 #include "draw.h"
@@ -108,6 +111,7 @@ done:
 /** Place a box with a transform: the center and the half size of the box around it.
  *
  * @param t The transform
+ * @param origin The origin the placed box is relative to, NULL for the origin of the world
  * @param center Center of the box
  * @param extent Half size of the box
  * @param out_center Receives the placed center
@@ -115,15 +119,19 @@ done:
  */
 static void box_draws_place_box(
     const box_render_transform_t *t,
+    const double *origin,
     const float *center,
     const float *extent,
     float *out_center,
     float *out_extent)
 {
+    vec3 offset;
     int32_t r;
+    box_render_transform_offset(t, origin, offset);
     for (r = 0; r < 3; r ++) {
         const float *row = t->rows[r];
-        out_center[r] = row[0] * center[0] + row[1] * center[1] + row[2] * center[2] + row[3];
+        out_center[r] = row[0] * center[0] + row[1] * center[1] + row[2] * center[2] +
+            offset[r];
         out_extent[r] = fabsf(row[0]) * extent[0] + fabsf(row[1]) * extent[1] +
             fabsf(row[2]) * extent[2];
     }
@@ -176,7 +184,7 @@ void box_draws_groups(
             }
         }
 
-        box_draws_place_box(&t[i], local, &local[3], center, extent);
+        box_draws_place_box(&t[i], NULL, local, &local[3], center, extent);
         for (r = 0; r < 3; r ++) {
             group->min[r] = glm_min(group->min[r], center[r] - extent[r]);
             group->max[r] = glm_max(group->max[r], center[r] + extent[r]);
@@ -241,8 +249,8 @@ static void box_draws_world_bounds_movers(
             e[r] = (group->max[r] - group->min[r]) * 0.5f;
         }
 
-        box_draws_place_box(pose, c, e, center, extent);
-        box_draws_place_box(pose, zero, group->extent, slot, slot);
+        box_draws_place_box(pose, NULL, c, e, center, extent);
+        box_draws_place_box(pose, NULL, zero, group->extent, slot, slot);
         for (r = 0; r < 3; r ++) {
             finite = finite && isfinite(center[r]) && isfinite(extent[r]);
             lo[r] = glm_min(lo[r], center[r] - extent[r]);
@@ -309,7 +317,7 @@ void box_draws_shadow_movers(
             for (k = 0; k < 2; k ++) {
                 box_render_shadow_region_t *out = ecs_vec_append_t(NULL, &d->shadow_regions,
                     box_render_shadow_region_t);
-                box_draws_place_box(poses[k], c, e, center, extent);
+                box_draws_place_box(poses[k], d->origin, c, e, center, extent);
                 out->scene = b->key.scene;
                 for (r = 0; r < 3; r ++) {
                     out->min[r] = center[r] - extent[r];
@@ -352,7 +360,7 @@ static void box_draws_wind_box(
                 e[r] = (group->max[r] - group->min[r]) * 0.5f;
             }
 
-            box_draws_place_box(pose, c, e, center, extent);
+            box_draws_place_box(pose, NULL, c, e, center, extent);
             for (r = 0; r < 3; r ++) {
                 lo[r] = glm_min(lo[r], center[r] - extent[r]);
                 hi[r] = glm_max(hi[r], center[r] + extent[r]);
@@ -368,7 +376,7 @@ static void box_draws_wind_box(
         }
 
         for (i = 0; i < count; i ++) {
-            box_draws_place_box(&t[i], local, &local[3], center, extent);
+            box_draws_place_box(&t[i], NULL, local, &local[3], center, extent);
             for (r = 0; r < 3; r ++) {
                 lo[r] = glm_min(lo[r], center[r] - extent[r]);
                 hi[r] = glm_max(hi[r], center[r] + extent[r]);
@@ -412,8 +420,8 @@ static void box_draws_wind_region(
         box_render_shadow_region_t);
     out->scene = b->key.scene;
     for (r = 0; r < 3; r ++) {
-        out->min[r] = b->wind_min[r] - reach;
-        out->max[r] = b->wind_max[r] + reach;
+        out->min[r] = (float)((double)b->wind_min[r] - d->origin[r]) - reach;
+        out->max[r] = (float)((double)b->wind_max[r] - d->origin[r]) + reach;
     }
 
 done:
@@ -566,9 +574,12 @@ void box_draws_world_bounds(
 
     for (i = 0; i < count; i ++) {
         float extent2 = 0.0f;
+        vec3 offset;
+        box_render_transform_offset(&t[i], NULL, offset);
         for (r = 0; r < 3; r ++) {
             const float *row = t[i].rows[r];
-            float center = row[0] * local[0] + row[1] * local[1] + row[2] * local[2] + row[3];
+            float center = row[0] * local[0] + row[1] * local[1] + row[2] * local[2] +
+                offset[r];
             float extent = fabsf(row[0]) * local[3] + fabsf(row[1]) * local[4] +
                 fabsf(row[2]) * local[5];
             finite = finite && isfinite(center) && isfinite(extent);
@@ -595,6 +606,60 @@ void box_draws_world_bounds(
     b->world_dirty = false;
 done:
     return;
+}
+
+bool box_draws_shadow_bounds(
+    const ecs_world_t *world,
+    const box_draw_batch_t *b,
+    const double *origin,
+    const box_render_transform_t *lo,
+    const box_render_transform_t *hi,
+    const box_render_surface_t *surface,
+    box_render_shadow_region_t *out)
+{
+    const box_mesh_cache_t *cache = NULL;
+    const box_mesh_t *mesh = NULL;
+    vec3 min, max;
+    int32_t r, k;
+    bool result = false;
+    if (surface && surface->p[0][0] != 0.0f) {
+        for (r = 0; r < 3; r ++) {
+            min[r] = surface->p[22][r] - surface->p[23][r];
+            max[r] = surface->p[22][r] + surface->p[23][r];
+        }
+    } else {
+        cache = box_mesh_cache_of(world);
+        mesh = cache ? box_mesh_cache_get(cache, b->key.mesh) : NULL;
+        if (!mesh || !mesh->vertex_count) {
+            goto done;
+        }
+
+        glm_vec3_copy(ECS_CONST_CAST(float*, mesh->min), min);
+        glm_vec3_copy(ECS_CONST_CAST(float*, mesh->max), max);
+    }
+
+    out->scene = b->key.scene;
+    vec3 offset_lo, offset_hi;
+    box_render_transform_offset(lo, origin, offset_lo);
+    box_render_transform_offset(hi, origin, offset_hi);
+    for (r = 0; r < 3; r ++) {
+        const float *row_lo = lo->rows[r];
+        const float *row_hi = hi->rows[r];
+        float world_lo = 0.0f, world_hi = 0.0f;
+        for (k = 0; k < 3; k ++) {
+            float p0 = row_lo[k] * min[k], p1 = row_lo[k] * max[k];
+            float p2 = row_hi[k] * min[k], p3 = row_hi[k] * max[k];
+            world_lo += glm_min(glm_min(p0, p1), glm_min(p2, p3));
+            world_hi += glm_max(glm_max(p0, p1), glm_max(p2, p3));
+        }
+
+        out->min[r] = world_lo + offset_lo[r];
+        out->max[r] = world_hi + offset_hi[r];
+    }
+
+    result = true;
+done:
+    return result;
 }
 
 bool box_draws_layer_of(
@@ -632,7 +697,9 @@ bool box_draws_layer_of(
         }
     }
 
-    glm_vec3_copy(ECS_CONST_CAST(float*, t->m[3]), out->center);
+    out->center[0] = (float)t->position[0];
+    out->center[1] = (float)t->position[1];
+    out->center[2] = (float)t->position[2];
     out->ground = a->radius;
     out->top = a->radius * (1.0f + glm_max(a->thickness, 0.0f) / a->planet_radius);
     result = true;
@@ -645,11 +712,13 @@ bool box_draws_layer(
     const box_render_transform_t *t)
 {
     float inner = FLT_MAX, dist2 = 0.0f;
+    vec3 offset;
     int32_t r, c;
+    box_render_transform_offset(t, NULL, offset);
     for (r = 0; r < 3; r ++) {
         const float *row = t->rows[r];
         float center = row[0] * l->local_center[0] + row[1] * l->local_center[1] +
-            row[2] * l->local_center[2] + row[3];
+            row[2] * l->local_center[2] + offset[r];
         dist2 += (center - l->center[r]) * (center - l->center[r]);
     }
 
@@ -698,9 +767,11 @@ bool box_draws_screen_bounds(
         }
     }
 
+    vec3 offset;
+    box_render_transform_offset(t, d->origin, offset);
     for (r = 0; r < 3; r ++) {
         const float *row = t->rows[r];
-        world[r] = row[0] * local[0] + row[1] * local[1] + row[2] * local[2] + row[3];
+        world[r] = row[0] * local[0] + row[1] * local[1] + row[2] * local[2] + offset[r];
         world[3 + r] = fabsf(row[0]) * local[3] + fabsf(row[1]) * local[4] +
             fabsf(row[2]) * local[5];
         world[3 + r] += 1e-4f * (fabsf(world[r]) + world[3 + r]) + 1e-5f;

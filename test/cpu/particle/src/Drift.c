@@ -601,7 +601,7 @@ void Drift_effect_layers_drift(void) {
     ecs_modified(world, prefab, ParticleEmitter);
     ecs_set(world, prefab, ParticleBurst, {.count = 8});
 
-    vec3 at = {1, 0, 3};
+    dvec3 at = {1, 0, 3};
     ecs_entity_t root = box_particle_burst_at(world, prefab, at, 1);
     test_assert(root != 0);
     ecs_entity_t e[1] = { root };
@@ -728,7 +728,7 @@ static void BurstTwice(
     ecs_iter_t *it)
 {
     burst_ctx_t *ctx = it->ctx;
-    vec3 at = {2, 0, 1};
+    dvec3 at = {2, 0, 1};
     if (!ctx->frames || ctx->frames == BURST_AGAIN) {
         ctx->root = box_particle_burst_at(
             ctx->stage ? it->stage : it->world, ctx->effect, at, 1);
@@ -787,7 +787,7 @@ static void burst_from_system(
         .ctx = &ctx
     });
 
-    vec3 at = {2, 0, 1};
+    dvec3 at = {2, 0, 1};
     ecs_entity_t a_root = box_particle_burst_at(a, ecs_lookup(a, "Puff"), at, 1);
     test_assert(a_root != 0);
     ecs_entity_t b_first = 0;

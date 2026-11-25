@@ -166,7 +166,7 @@ static void frustums_of(
     int32_t i;
     box_camera_projection(ecs_get(world, camera, Camera), 64, 64, proj);
     if (ct) {
-        glm_mat4_copy(ECS_CONST_CAST(vec4*, ct->m), cam);
+        box_transform_mat4(ct, NULL, cam);
     } else {
         glm_mat4_identity(cam);
     }
@@ -175,7 +175,7 @@ static void frustums_of(
     glm_mat4_mul(proj, view, view_proj);
     planes_of(view_proj, out->planes[0]);
     if (st) {
-        glm_vec3_copy(ECS_CONST_CAST(float*, st->m[2]), direction);
+        glm_vec3_copy(ECS_CONST_CAST(float*, st->basis[2]), direction);
     } else {
         glm_vec3_copy((vec3){0, 0, 1}, direction);
     }

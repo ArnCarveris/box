@@ -416,7 +416,7 @@ void Particle_burst_renders_at_point(void) {
     // particle/effect
     ecs_world_t *world = world_new("burst.png");
     ecs_entity_t dot = dot_template_new(world);
-    vec3 at = {2, 1, 0};
+    dvec3 at = {2, 1, 0};
     test_assert(box_particle_burst_at(world, dot, at, 1) != 0);
     unsigned char *px = run(world, "burst.png", 3);
 
@@ -433,7 +433,7 @@ void Particle_two_plays_one_frame(void) {
     // particle/effect
     ecs_world_t *world = world_new("plays.png");
     ecs_entity_t dot = dot_template_new(world);
-    vec3 left = {-2, -1, 0}, right = {2, 1, 0};
+    dvec3 left = {-2, -1, 0}, right = {2, 1, 0};
     ecs_entity_t a = box_particle_burst_at(world, dot, left, 1);
     ecs_entity_t b = box_particle_burst_at(world, dot, right, 1);
     test_assert(a != 0);
@@ -495,7 +495,7 @@ void Particle_flash_lights_wall(void) {
         "  }\n"
         "}\n", NULL) == 0);
     ecs_entity_t flash = ecs_lookup(world, "Flash");
-    vec3 at = {0, 0, 0};
+    dvec3 at = {0, 0, 0};
     test_assert(box_particle_burst_at(world, flash, at, 1) != 0);
 
     unsigned char *px = run(world, "flash.png", 1);
@@ -648,7 +648,7 @@ void Particle_radial_burst_scaled(void) {
     // particle/radial
     ecs_world_t *world = world_new("radial_burst.png");
     ecs_entity_t ring = ring_template_new(world);
-    vec3 at = {0, 0, 0};
+    dvec3 at = {0, 0, 0};
     test_assert(box_particle_burst_at(world, ring, at, 2) != 0);
     unsigned char *px = run(world, "radial_burst.png", 31);
 

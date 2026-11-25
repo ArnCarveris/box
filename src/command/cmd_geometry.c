@@ -212,7 +212,7 @@ static void box_cmd_geometry_add_shape(
         goto done;
     }
 
-    ecs_os_memcpy_t(m, transform->m, mat4);
+    box_transform_mat4(transform, NULL, m);
 
     glm_mat4_pick3(m, m3);
     sign = glm_mat3_det(m3) * shape->scale[0] * shape->scale[1] * shape->scale[2];

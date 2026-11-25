@@ -213,15 +213,18 @@ static const float* box_shadow_mesh_scale(
  * the shape is, moved by the offset and scaled to the quad of the shadow.
  *
  * @param out The transform
- * @param transform World matrix of the shape, NULL for the identity
+ * @param transform World matrix of the shape relative to origin, NULL for the identity
+ * @param origin The origin the matrix is relative to, NULL for the origin of the world
  * @param box The shadow box
  */
 static void box_shadow_transform(
     box_render_transform_t *out,
     const vec4 *transform,
+    const double *origin,
     const box_shadow_box_t *box)
 {
     float scale[3] = { box->size[0] * box->scale[0], box->size[1] * box->scale[1], 1.0f };
+    dvec3 position;
     mat4 m;
     int32_t r, c;
     if (transform) {
@@ -235,8 +238,30 @@ static void box_shadow_transform(
             out->rows[r][c] = m[c][r] * scale[c];
         }
 
-        out->rows[r][3] = m[0][r] * box->scale[0] * box->offset[0] +
-            m[1][r] * box->scale[1] * box->offset[1] + m[3][r];
+        position[r] = (origin ? origin[r] : 0.0) + (double)(m[0][r] * box->scale[0] *
+            box->offset[0] + m[1][r] * box->scale[1] * box->offset[1] + m[3][r]);
+    }
+
+    box_render_transform_place(out, position);
+}
+
+/** Write the transform of a shadow from the world transform of its shape.
+ *
+ * @param out The transform
+ * @param transform World transform of the shape, NULL for the identity
+ * @param box The shadow box
+ */
+static void box_shadow_transform_world(
+    box_render_transform_t *out,
+    const WorldTransform *transform,
+    const box_shadow_box_t *box)
+{
+    mat4 m;
+    if (transform) {
+        box_transform_mat4(transform, transform->position, m);
+        box_shadow_transform(out, m, transform->position, box);
+    } else {
+        box_shadow_transform(out, NULL, NULL, box);
     }
 }
 
@@ -353,7 +378,8 @@ done:
  *
  * @param transform The transform
  * @param shading The shading
- * @param world World matrix of the shape, NULL for the identity
+ * @param world World matrix of the shape relative to origin, NULL for the identity
+ * @param origin The origin the matrix is relative to, NULL for the origin of the world
  * @param clip Clip index of the shape
  * @param rank Rank of the shadow
  */
@@ -361,12 +387,13 @@ static void box_shadow_hidden(
     box_render_transform_t *transform,
     box_render_shading_t *shading,
     const vec4 *world,
+    const double *origin,
     int32_t clip,
     uint32_t rank)
 {
     box_shadow_box_t box;
     ecs_os_memset_t(&box, 0, box_shadow_box_t);
-    box_shadow_transform(transform, world, &box);
+    box_shadow_transform(transform, world, origin, &box);
     ecs_os_memset_t(shading, 0, box_render_shading_t);
     shading->ids[0] = clip > 0 ? (uint32_t)clip : 0u;
     shading->ids[1] = rank;
@@ -397,8 +424,7 @@ static void box_shadow_write(
 {
     box_draw_batch_t *b = box_draws_batch(d, bs->batch);
     if (kinds & BOX_DRAW_TRANSFORM) {
-        box_shadow_transform(box_draws_slot_transform(b, bs->slot),
-            transform ? ECS_CONST_CAST(vec4*, transform->m) : NULL, box);
+        box_shadow_transform_world(box_draws_slot_transform(b, bs->slot), transform, box);
     }
 
     if (kinds & BOX_DRAW_SHADING) {
@@ -565,8 +591,16 @@ bool box_draws_box_shadow_transition(
         out->mesh_scale[1] = mesh->scale[1];
     }
 
-    ecs_os_memcpy(out->world, transform ? (const void*)transform->m : (const void*)identity,
-        ECS_SIZEOF(mat4));
+    if (transform) {
+        double origin[3];
+        mat4 m;
+        box_render_origin(world, origin);
+        box_transform_mat4(transform, origin, m);
+        ecs_os_memcpy(out->world, m, ECS_SIZEOF(mat4));
+    } else {
+        ecs_os_memcpy(out->world, identity, ECS_SIZEOF(mat4));
+    }
+
     ecs_os_memcpy(out->rel, identity, ECS_SIZEOF(mat4));
 done:
     return result;
@@ -577,6 +611,7 @@ void box_draws_box_shadow_patch(
     const box_draw_transition_box_shadow_t *record,
     const BoxShadow *shadow,
     mat4 world,
+    const double *origin,
     void *transform,
     void *shading)
 {
@@ -598,9 +633,9 @@ void box_draws_box_shadow_patch(
         box_shadow_shading(&out, &box, linear,
             glm_clamp(alpha * record->material.shadow_cover, 0.0f, 1.0f), (int32_t)ids[0],
             ids[1], box.polygon && isfinite(words[0]) ? (int32_t)words[0] : 0);
-        box_shadow_transform(&t, world, &box);
+        box_shadow_transform(&t, world, origin, &box);
     } else {
-        box_shadow_hidden(&t, &out, world, (int32_t)ids[0], ids[1]);
+        box_shadow_hidden(&t, &out, world, origin, (int32_t)ids[0], ids[1]);
         if (record->material.shape2d.kind == BOX_SHAPE2D_POLYGON) {
             out.material[0] = words[0];
         }
@@ -730,9 +765,14 @@ void box_draws_box_shadow_update(
         WorldTransform transform_buf;
         const WorldTransform *transform = box_transform_world(world, e, &transform_buf);
         box_draw_batch_t *b = box_draws_batch(d, bs->batch);
+        mat4 m;
+        if (transform) {
+            box_transform_mat4(transform, transform->position, m);
+        }
+
         box_shadow_hidden(box_draws_slot_transform(b, bs->slot),
-            box_draws_slot_shading(b, bs->slot),
-            transform ? ECS_CONST_CAST(vec4*, transform->m) : NULL, material.clip, bs->rank);
+            box_draws_slot_shading(b, bs->slot), transform ? m : NULL,
+            transform ? transform->position : NULL, material.clip, bs->rank);
         if (shape->kind == BOX_SHAPE2D_POLYGON) {
             box_draws_slot_shading(b, bs->slot)->material[0] = (float)s->slice;
         }

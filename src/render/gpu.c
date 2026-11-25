@@ -517,6 +517,35 @@ static void box_gpu_packet_count(
     p->packet_bytes += ecs_vec_count(&packet->data);
 }
 
+/** Take the render origin of a packet. When it moved, the grids of the probe volumes are written
+ * again and the fits of the kept shadow cascades move into the new render space; their layers
+ * keep what they rendered. Instances keep their cells, so none uploads again.
+ *
+ * @param gpu The backend
+ * @param packet The packet
+ */
+static void box_gpu_origin(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet)
+{
+    vec3 moved;
+    int32_t i, k;
+    box_dvec3_rel(packet->origin, gpu->origin, moved);
+    if (packet->origin[0] != gpu->origin[0] || packet->origin[1] != gpu->origin[1] ||
+        packet->origin[2] != gpu->origin[2])
+    {
+        box_dvec3_copy(packet->origin, gpu->origin);
+        box_gpu_volumes_origin(gpu);
+        for (i = 0; i < ecs_vec_count(&gpu->cascade_stores); i ++) {
+            box_gpu_cascade_store_t *store = ecs_vec_get_t(
+                &gpu->cascade_stores, box_gpu_cascade_store_t, i);
+            for (k = 0; k < BOX_RENDER_SHADOW_CASCADES; k ++) {
+                glm_translate(store->fits[k].matrix, moved);
+            }
+        }
+    }
+}
+
 /** Apply the resources of a packet, build its atmosphere LUTs, write and process its
  * environments, capture its probes, render its shadow atlases and render its targets.
  *
@@ -532,6 +561,7 @@ static void box_gpu_render(
     gpu->polled = false;
     gpu->forward_stamp ++;
     box_gpu_packet_count(gpu, packet);
+    box_gpu_origin(gpu, packet);
     box_gpu_pipelines_deliver(gpu, packet);
     box_gpu_shader_deliver(gpu);
     for (i = 0; i < count; i ++) {

@@ -209,16 +209,20 @@ static void box_draws_glyph(
     const box_text_glyph_t *g,
     const box_draw_material_t *material)
 {
-    mat4 m;
+    const vec3 *m = transform->basis;
+    dvec3 position;
     int32_t r;
-    glm_mat4_copy(ECS_CONST_CAST(vec4*, transform->m), m);
     for (r = 0; transform_out && r < 3; r ++) {
         transform_out->rows[r][0] = m[0][r] * g->width;
         transform_out->rows[r][1] = g->shear != 0.0f
             ? (m[0][r] * g->shear + m[1][r]) * g->height
             : m[1][r] * g->height;
         transform_out->rows[r][2] = m[2][r];
-        transform_out->rows[r][3] = m[0][r] * g->x + m[1][r] * g->y + m[3][r];
+        position[r] = transform->position[r] + (double)(m[0][r] * g->x + m[1][r] * g->y);
+    }
+
+    if (transform_out) {
+        box_render_transform_place(transform_out, position);
     }
 
     if (shading_out) {

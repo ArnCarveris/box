@@ -7,14 +7,14 @@
 // coarser ones further out. A point outside every window, outside a bounded terrain or where no
 // tile draws yet is not found.
 //
-// Positions are absolute x and z, whole meters and the rest of a meter (terrain_sample), so they
-// stay continuous across shifts of the WorldOrigin and precise far from the absolute origin; a
-// local position is the origin plus it (terrain_sample_local).
+// Positions are world x and z, whole meters and the rest of a meter (terrain_sample), so they
+// stay continuous across moves of the render origin and precise far from the origin of the
+// world; a position relative to the render origin is the origin plus it (terrain_sample_local).
 //
 // The bindings are those of terrain_sample_layout (box_gpu_terrain_sample_group) at the group
 // TERRAIN_SAMPLE_GROUP, 0 unless the includer defines it before the include.
 #pragma once
-#include "world_origin.wgsl"
+#include "render_origin.wgsl"
 
 #ifndef TERRAIN_SAMPLE_GROUP
 #define TERRAIN_SAMPLE_GROUP 0
@@ -276,8 +276,8 @@ fn terrain_sample_world(xz: vec2f) -> TerrainSample {
     return terrain_sample(vec2i(w), xz - w);
 }
 
-// What the terrain has at a local x and z of a frame whose local origin is origin (View.origin,
-// world_origin).
-fn terrain_sample_local(origin: WorldOrigin, xz: vec2f) -> TerrainSample {
+// What the terrain has at an x and z relative to the render origin (View.origin,
+// render_origin).
+fn terrain_sample_local(origin: RenderOrigin, xz: vec2f) -> TerrainSample {
     return terrain_sample(origin.whole.xz, origin.rest.xz + xz);
 }

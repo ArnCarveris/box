@@ -84,7 +84,9 @@ int32_t box_perf_bounds(
                 ECS_CONST_CAST(float*, shape[i].scale), b);
             glm_vec3_minv(a, b, lo);
             glm_vec3_maxv(a, b, hi);
-            box_perf_grow(ECS_CONST_CAST(vec4*, t->m), lo, hi, min, max);
+            mat4 m;
+            box_transform_mat4(t, NULL, m);
+            box_perf_grow(m, lo, hi, min, max);
             result ++;
         }
     }

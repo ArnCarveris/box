@@ -75,7 +75,7 @@ void box_render_star_record(
         axis[k] = 1.0f;
         if (transform) {
             vec3 column;
-            glm_vec3_copy(ECS_CONST_CAST(float*, transform->m[k]), column);
+            glm_vec3_copy(ECS_CONST_CAST(float*, transform->basis[k]), column);
             if (glm_vec3_norm(column) > 1e-12f) {
                 glm_vec3_normalize_to(column, axis);
             }

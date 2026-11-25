@@ -1,6 +1,7 @@
 /**
  * @file render/debug_bvh.c
- * @brief Boxes of the spatial index trees the debug pass of a view draws (BvhDebug).
+ * @brief Boxes of the spatial index trees the debug pass of a view draws (BvhDebug). The boxes
+ * are in the world, their poses place them relative to the render origin.
  */
 
 #include "render.h"
@@ -11,6 +12,7 @@ typedef struct box_render_bvh_walk_t {
     box_render_packet_t *p;     /**< The packet the boxes are appended to */
     const BvhDebug *settings;   /**< Settings of the view */
     uint32_t tree;              /**< The tree walked */
+    const double *origin;       /**< Render origin of the packet */
     uint32_t pose;              /**< Pose of the boxes in the poses of the view */
     int32_t count;              /**< Boxes of the view so far */
     int32_t poses;              /**< Poses of the view so far */
@@ -74,7 +76,12 @@ static bool box_render_bvh_mover(
     bool result = w->count < BOX_VIEW_DEBUG_BOXES_MAX;
     if (result) {
         float *m = ecs_vec_append_t(NULL, &w->p->debug_poses, mat4)[0][0];
+        int32_t k;
         ecs_os_memcpy(m, pose, ECS_SIZEOF(mat4));
+        for (k = 0; k < 3; k ++) {
+            m[12 + k] = (float)((double)pose[12 + k] - w->origin[k]);
+        }
+
         w->pose = (uint32_t)w->poses;
         w->poses ++;
     }
@@ -91,10 +98,14 @@ void box_render_debug_bvh(
         box_render_view_t *v = ecs_vec_get_t(&p->views, box_render_view_t, i);
         const BvhDebug *s = &v->debug.bvh;
         bool trees[BOX_SPATIAL_TREES] = { s->static_tree, s->dynamic_tree, s->ui_tree };
-        box_render_bvh_walk_t w = { .p = p, .settings = s };
+        box_render_bvh_walk_t w = { .p = p, .settings = s, .origin = p->origin };
         v->debug_box_first = ecs_vec_count(&p->debug_boxes);
         v->debug_pose_first = ecs_vec_count(&p->debug_poses);
-        glm_mat4_identity(*ecs_vec_append_t(NULL, &p->debug_poses, mat4));
+        vec4 *world_pose = *ecs_vec_append_t(NULL, &p->debug_poses, mat4);
+        glm_mat4_identity(world_pose);
+        world_pose[3][0] = (float)-p->origin[0];
+        world_pose[3][1] = (float)-p->origin[1];
+        world_pose[3][2] = (float)-p->origin[2];
         w.poses = 1;
         for (t = 0; t < BOX_SPATIAL_TREES; t ++) {
             if (trees[t]) {

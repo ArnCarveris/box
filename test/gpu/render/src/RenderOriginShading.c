@@ -1,12 +1,13 @@
 /**
- * @file WorldOriginShading.c
- * @brief Tests that the world space patterns of the shaders sample the absolute position: two
- * worlds render the same scene for the same frames, one of them shifting its world origin, and
- * their last images match within a small tolerance; and a world mapped texture at a world origin
- * of a million meters renders as the same scene at origin 0 shifted by whole texture repeats.
+ * @file RenderOriginShading.c
+ * @brief Tests that the world space patterns of the shaders sample the world position: two
+ * worlds render the same scene for the same frames, the render origin of one of them moving,
+ * and their last images match within a small tolerance; and a world mapped texture a million
+ * meters from the origin of the world renders as the same scene near it.
  *
- * The shifts are whole steps of the default WorldOrigin.step (256) that are no multiple of the
- * period of the pattern of the case, so a pattern that sampled the local position would jump.
+ * The render origin moves by whole cells (BOX_RENDER_ORIGIN_CELL), more than a cell from where it
+ * was, that are no multiple of the period of the pattern of the case, so a pattern that sampled the position relative to the
+ * render origin would jump. A WorldFocus entity holds the render origin, the camera stays.
  * The textured shapes are emissive on a black, rough metal so the light does not take part.
  */
 
@@ -29,12 +30,13 @@
 /** Seconds of a frame */
 #define WOS_DELTA (1.0f / 60.0f)
 
-/** Frames each world renders, and the frame before which the second one shifts */
+/** Frames each world renders, and the frame before which the render origin of the second one
+ * moves */
 #define WOS_FRAMES (6)
 #define WOS_SHIFT_AT (3)
 
 /** Channel difference above which a pixel counts as far off, and the pixels that may be, per
- * ten thousand: an edge pixel can rasterize differently after a shift */
+ * ten thousand: an edge pixel can rasterize differently relative to another render origin */
 #define WOS_MAX_DIFF (64)
 #define WOS_FAR_PER_10K (20)
 
@@ -77,7 +79,7 @@ static ecs_world_t* wos_world(void)
  */
 static ecs_entity_t wos_view(
     ecs_world_t *world,
-    const float *position,
+    const double *position,
     float pitch,
     float ortho)
 {
@@ -248,11 +250,11 @@ static void wos_expect_pattern(
     test_assert(hi - lo > 32);
 }
 
-/** Render a case in two worlds for WOS_FRAMES frames, the second shifting its world origin
+/** Render a case in two worlds for WOS_FRAMES frames, the render origin of the second moving
  * before frame WOS_SHIFT_AT, and check that the last images match.
  *
  * @param build Builds the case
- * @param shift The offset of the shift
+ * @param shift Where the render origin moves to, whole cells
  */
 static void wos_shift_same(
     wos_build_t build,
@@ -260,13 +262,17 @@ static void wos_shift_same(
 {
     ecs_world_t *a = wos_world();
     ecs_world_t *b = wos_world();
+    ecs_entity_t focus = ecs_new(b);
+    double origin[3];
+    ecs_set(b, focus, Position, {0, 0, 0});
+    ecs_add(b, focus, WorldFocus);
     wos_ready(a, build(a));
     wos_ready(b, build(b));
     unsigned char *pa = NULL, *pb = NULL;
     int32_t i;
     for (i = 0; i < WOS_FRAMES; i ++) {
         if (i == WOS_SHIFT_AT) {
-            box_world_origin_shift(b, 0, shift);
+            ecs_set(b, focus, Position, {shift[0], shift[1], shift[2]});
         }
 
         stbi_image_free(pa);
@@ -275,8 +281,8 @@ static void wos_shift_same(
         pb = wos_frame(b, "wos_b.png");
     }
 
-    test_int(ecs_singleton_get(b, WorldOriginStatus)->shifts, 1);
-    test_assert(ecs_singleton_get(b, WorldOrigin)->x == shift[0]);
+    box_render_origin(b, origin);
+    test_assert(origin[0] == shift[0] && origin[1] == shift[1] && origin[2] == shift[2]);
     wos_expect_pattern(pa);
     wos_expect_same(pa, pb);
     stbi_image_free(pa);
@@ -294,7 +300,7 @@ static ecs_entity_t wos_plane(
     ecs_world_t *world)
 {
     ecs_entity_t tex = wos_texture(world);
-    wos_view(world, (float[]){0.3f, 10, 0.2f}, -(float)GLM_PI_2, 8);
+    wos_view(world, (double[]){0.3f, 10, 0.2f}, -(float)GLM_PI_2, 8);
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Position, {0, 0, 0});
     ecs_set(world, e, Box, {20, 0.2f, 20});
@@ -312,7 +318,7 @@ static ecs_entity_t wos_triplanar(
     ecs_world_t *world)
 {
     ecs_entity_t tex = wos_texture(world);
-    wos_view(world, (float[]){0, 2, 4}, -0.45f, 0);
+    wos_view(world, (double[]){0, 2, 4}, -0.45f, 0);
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Position, {0.2f, 0, -0.1f});
     ecs_set(world, e, Sphere, {.segments = 32, .smooth = true, .radius = 1.5f});
@@ -331,7 +337,7 @@ static ecs_entity_t wos_frame_unframed(
     ecs_world_t *world)
 {
     ecs_entity_t tex = wos_texture(world);
-    wos_view(world, (float[]){0, 3, 5}, -0.5f, 0);
+    wos_view(world, (double[]){0, 3, 5}, -0.5f, 0);
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Position, {0.1f, 0, 0});
     ecs_set(world, e, Rotation, {0, 0.4f, 0});
@@ -351,7 +357,7 @@ static ecs_entity_t wos_layer(
     ecs_world_t *world)
 {
     ecs_entity_t tex = wos_texture(world);
-    wos_view(world, (float[]){0.3f, 10, 0.2f}, -(float)GLM_PI_2, 8);
+    wos_view(world, (double[]){0.3f, 10, 0.2f}, -(float)GLM_PI_2, 8);
     ecs_entity_t layer = ecs_new(world);
     ecs_set(world, layer, TextureLayer, {.amount = 1, .direction = {0, 1, 0}, .contrast = 8,
         .albedo = LayerMultiply, .roughness = LayerKeep, .metallic = LayerKeep,
@@ -378,7 +384,7 @@ static ecs_entity_t wos_wind(
     ecs_world_t *world)
 {
     int32_t i;
-    wos_view(world, (float[]){0, 1.5f, 5}, 0, 0);
+    wos_view(world, (double[]){0, 1.5f, 5}, 0, 0);
     ecs_singleton_set(world, Wind, {.direction = {0.8f, 0.6f}, .speed = 8, .gust = 0.8f,
         .gust_scale = 5});
     for (i = 0; i < 3; i ++) {
@@ -396,54 +402,46 @@ static ecs_entity_t wos_wind(
     return 0;
 }
 
-void WorldOriginShading_mapping_world_shift(void) {
-    // render/world_origin_shading
-    wos_shift_same(wos_plane, (double[3]){ 2816, 0, -256 });
+void RenderOriginShading_mapping_world_move(void) {
+    // render/render_origin_shading
+    wos_shift_same(wos_plane, (double[3]){ 4096, 0, -2048 });
 }
 
-void WorldOriginShading_triplanar_shift(void) {
-    // render/world_origin_shading
-    wos_shift_same(wos_triplanar, (double[3]){ 256, 512, -768 });
+void RenderOriginShading_triplanar_move(void) {
+    // render/render_origin_shading
+    wos_shift_same(wos_triplanar, (double[3]){ 2048, 2048, -4096 });
 }
 
-void WorldOriginShading_mapping_frame_shift(void) {
-    // render/world_origin_shading
-    wos_shift_same(wos_frame_unframed, (double[3]){ -768, 256, 256 });
+void RenderOriginShading_mapping_frame_move(void) {
+    // render/render_origin_shading
+    wos_shift_same(wos_frame_unframed, (double[3]){ -4096, 2048, 2048 });
 }
 
-void WorldOriginShading_texture_layer_shift(void) {
-    // render/world_origin_shading
-    wos_shift_same(wos_layer, (double[3]){ 2816, 0, 512 });
+void RenderOriginShading_texture_layer_move(void) {
+    // render/render_origin_shading
+    wos_shift_same(wos_layer, (double[3]){ 4096, 0, 2048 });
 }
 
-void WorldOriginShading_wind_sway_shift(void) {
-    // render/world_origin_shading
-    wos_shift_same(wos_wind, (double[3]){ 256, 256, -512 });
+void RenderOriginShading_wind_sway_move(void) {
+    // render/render_origin_shading
+    wos_shift_same(wos_wind, (double[3]){ 2048, 2048, -4096 });
 }
 
-/** Render a magnified MappingWorld plane, its content and camera at x and z of offset, with a
- * world origin that is not shifted to.
+/** Render a magnified MappingWorld plane, its content and camera at x and z of offset.
  *
- * @param origin X and Z of the WorldOrigin, 0 for none
- * @param offset Local X and Z of the content
+ * @param offset X and Z of the content
  * @param file Image file
  * @return The RGBA pixels, freed with stbi_image_free
  */
 static unsigned char* wos_far(
-    double origin,
-    float offset,
+    double offset,
     const char *file)
 {
     ecs_world_t *world = wos_world();
     unsigned char *result = NULL;
     int32_t i;
-    if (origin != 0) {
-        ecs_singleton_set(world, WorldOrigin, {.x = origin, .z = origin, .threshold = 2048,
-            .step = 256, .enabled = false});
-    }
-
     ecs_entity_t tex = wos_texture(world);
-    wos_view(world, (float[]){offset + 0.3f, 10, offset + 0.2f}, -(float)GLM_PI_2, 1.5f);
+    wos_view(world, (double[]){offset + 0.3, 10, offset + 0.2}, -(float)GLM_PI_2, 1.5f);
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Position, {offset, 0, offset});
     ecs_set(world, e, Box, {20, 0.2f, 20});
@@ -459,13 +457,13 @@ static unsigned char* wos_far(
     return result;
 }
 
-void WorldOriginShading_far_origin_not_blocky(void) {
-    // render/world_origin_shading
-    /* At an absolute position of a million and one units a texture of 2 units per repeat has the
-     * phase of local position 1 at origin 0: whole repeats apart. A projection of the absolute
-     * position in f32 would step by 1 / 16 unit, 4 pixels of the 1.5 unit high view. */
-    unsigned char *far = wos_far(1e6 + 1, 0, "wos_far.png");
-    unsigned char *near = wos_far(0, 1, "wos_near.png");
+void RenderOriginShading_far_origin_not_blocky(void) {
+    // render/render_origin_shading
+    /* At a world position of a million and one units a texture of 2 units per repeat has the
+     * phase of position 1: whole repeats apart. A projection of the world position in f32
+     * would step by 1 / 16 unit, 4 pixels of the 1.5 unit high view. */
+    unsigned char *far = wos_far(1e6 + 1, "wos_far.png");
+    unsigned char *near = wos_far(1, "wos_near.png");
     wos_expect_pattern(far);
     wos_expect_same(far, near);
     stbi_image_free(far);

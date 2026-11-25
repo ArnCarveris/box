@@ -17,6 +17,8 @@ struct Cull {
     // x: the half width of the crossfade around the distance of a level as a share of it, 0 for
     // none; y to w: the distance at which level i starts, for levels 1 to 3.
     lod: vec4f,
+    // The render origin as box_gpu_origin_split packs it (render_origin.wgsl)
+    origin: vec4i,
 };
 
 struct Frustum {
@@ -326,7 +328,7 @@ fn cull_instances(
     workgroupBarrier();
     if (index < job.count) {
         let slot = job_slot(job, index);
-        let m = instance_model(transforms[slot]);
+        let m = instance_model(transforms[slot], cull.origin);
         let b = bounds(job, m);
         var drawn = 0u;
         var culled = 0u;
@@ -518,7 +520,8 @@ fn cull_write(
     let bit = local % 32u;
     let frustums = countOneBits(job.mask);
     let slot = job_slot(job, index);
-    let packed = ranged_slot(slot, range_at(job, instance_model(transforms[slot])));
+    let model = instance_model(transforms[slot], cull.origin);
+    let packed = ranged_slot(slot, range_at(job, model));
     for (var k = 0u; k < frustums; k++) {
         let words = scan + (k * job_groups + part) * SCAN_WORDS;
         let low = scan_words[words];
@@ -572,7 +575,7 @@ fn cull_ordered(
                 slot = slot_lists[job.first + i];
             }
 
-            let m = instance_model(transforms[slot]);
+            let m = instance_model(transforms[slot], cull.origin);
             let range = range_at(job, m);
             let hidden = range_hidden(range);
             let d = decide(job, slot, m, bounds(job, m), f, hidden);
@@ -657,7 +660,7 @@ fn cull_lod(
     let fade = select(0.0, cull.lod.x, range_set(job.range) && bias == 0u);
     for (var i = group.x * 64u + local; i < total; i += groups.x * 64u) {
         let slot = visible_slots[job.first + i];
-        let m = instance_model(transforms[slot_of(slot)]);
+        let m = instance_model(transforms[slot_of(slot)], cull.origin);
         let center = (m * vec4f(job.center, 1.0)).xyz;
         let scale = max(max(length(m[0].xyz), length(m[1].xyz)), length(m[2].xyz));
         let radius = length(job.extent) * scale;

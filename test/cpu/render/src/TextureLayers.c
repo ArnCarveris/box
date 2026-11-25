@@ -397,7 +397,7 @@ void TextureLayers_pack(void) {
     ecs_fini(world);
 }
 
-/** A layer packs its altitude relative to the WorldOrigin and its altitude_fade, positive to
+/** A layer packs its altitude relative to the render origin and its altitude_fade, positive to
  * cover above the altitude, negative to cover below it; a fade of 0 or one that is not finite
  * packs zero, which ignores the altitude */
 void TextureLayers_altitude_pack(void) {
@@ -422,11 +422,14 @@ void TextureLayers_altitude_pack(void) {
     test_flt(altitude, 5);
     test_flt(fade, -2);
 
-    ecs_singleton_set(world, WorldOrigin, {.y = 3, .enabled = false});
+    ecs_entity_t focus = ecs_new(world);
+    ecs_set(world, focus, Position, {0, 3000, 0});
+    ecs_add(world, focus, WorldFocus);
+    ecs_progress(world, 0);
     box_draws_layer_pack(world, layer, 0.0, &v);
     memcpy(&altitude, &v.flags[1], sizeof(float));
     memcpy(&fade, &v.flags[2], sizeof(float));
-    test_flt(altitude, 2);
+    test_flt(altitude, 5 - 3072);
     test_flt(fade, -2);
 
     ecs_set(world, layer, TextureLayer, {.amount = 1, .altitude = 5, .altitude_fade = 0});

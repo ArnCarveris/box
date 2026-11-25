@@ -108,9 +108,11 @@ bool box_reflect_focus(
     int32_t i, count = box_world_focus(world, foci, BOX_REFLECT_FOCI);
     bool result = false;
     for (i = 0; !result && i < count && i < BOX_REFLECT_FOCI; i ++) {
-        const float *at = foci[i].position;
+        const double *at = foci[i].position;
         if (foci[i].scene == scene && isfinite(at[0]) && isfinite(at[1]) && isfinite(at[2])) {
-            glm_vec3_copy(foci[i].position, out);
+            out[0] = (float)at[0];
+            out[1] = (float)at[1];
+            out[2] = (float)at[2];
             result = true;
         }
     }

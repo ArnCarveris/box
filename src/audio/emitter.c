@@ -281,7 +281,7 @@ static void box_audio_emitter_play(
         }
 
         box_audio_emitter_point(em->shape, em->radius, em->extents, u, local);
-        glm_mat4_mulv3(ECS_CONST_CAST(vec4*, wt->m), local, 1.0f, play.position);
+        box_transform_point(wt, local, play.position);
         play.spatial = true;
         play.has_distances = spatial != NULL;
         if (spatial) {

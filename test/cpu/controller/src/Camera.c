@@ -346,9 +346,9 @@ void Camera_diagonal(void) {
     box_input_key(world, KeyD, true);
     ecs_progress(world, 0.5f);
     const Position *p = ecs_get(world, cam, Position);
-    test_assert(fabsf(p->x - 5.0f / sqrtf(2.0f)) < 0.0001f);
+    test_assert(fabs(p->x - 5.0f / sqrtf(2.0f)) < 0.0001f);
     test_flt(p->y, 0);
-    test_assert(fabsf(p->z + 5.0f / sqrtf(2.0f)) < 0.0001f);
+    test_assert(fabs(p->z + 5.0f / sqrtf(2.0f)) < 0.0001f);
     test_assert(fabsf(sqrtf(p->x * p->x + p->z * p->z) - 5.0f) < 0.0001f);
 
     ecs_fini(world);
@@ -379,8 +379,8 @@ void Camera_forward_follows_yaw(void) {
     box_input_key_press(world, KeyD, 1);
     ecs_progress(world, 0.5f);
     p = ecs_get(world, cam, Position);
-    test_assert(fabsf(p->x + 5) < 0.0001f);
-    test_assert(fabsf(p->z + 5) < 0.0001f);
+    test_assert(fabs(p->x + 5) < 0.0001f);
+    test_assert(fabs(p->z + 5) < 0.0001f);
 
     ecs_fini(world);
 }
@@ -543,7 +543,7 @@ void Camera_acceleration(void) {
     float v = 10 * up;
     const CameraController *c = ecs_get(world, cam, CameraController);
     test_assert(fabsf(c->velocity[0] - v) < 0.0001f);
-    test_assert(fabsf(ecs_get(world, cam, Position)->x - v * 0.5f) < 0.0001f);
+    test_assert(fabs(ecs_get(world, cam, Position)->x - v * 0.5f) < 0.0001f);
 
     ecs_progress(world, 0.5f);
     float x = v * 0.5f;
@@ -551,7 +551,7 @@ void Camera_acceleration(void) {
     x += v * 0.5f;
     c = ecs_get(world, cam, CameraController);
     test_assert(fabsf(c->velocity[0] - v) < 0.0001f);
-    test_assert(fabsf(ecs_get(world, cam, Position)->x - x) < 0.0001f);
+    test_assert(fabs(ecs_get(world, cam, Position)->x - x) < 0.0001f);
 
     box_input_key(world, KeyD, false);
     ecs_progress(world, 0.5f);
@@ -835,13 +835,13 @@ void Camera_action_hold(void) {
     ecs_progress(world, 0.5f);
     const Position *p = ecs_get(world, cam, Position);
     float d = 5.0f / sqrtf(2.0f);
-    test_assert(fabsf(p->x + d) < 0.0001f);
-    test_assert(fabsf(p->y + d) < 0.0001f);
+    test_assert(fabs(p->x + d) < 0.0001f);
+    test_assert(fabs(p->y + d) < 0.0001f);
     test_flt(p->z, 0);
 
     ecs_progress(world, 0.5f);
     p = ecs_get(world, cam, Position);
-    test_assert(fabsf(p->x + d + 5) < 0.0001f);
+    test_assert(fabs(p->x + d + 5) < 0.0001f);
     test_assert(fabsf(p->y + d) < 0.0001f);
 
     box_input_action(world, left, false);
@@ -957,7 +957,7 @@ void Camera_multiple_cameras(void) {
     box_input_key_press(world, KeyW, 1);
     ecs_progress(world, 0.5f);
     test_flt(ecs_get(world, a, Position)->z, -5);
-    test_assert(fabsf(ecs_get(world, b, Position)->z - 1) < 0.0001f);
+    test_assert(fabs(ecs_get(world, b, Position)->z - 1) < 0.0001f);
 
     ecs_fini(world);
 }
@@ -980,9 +980,9 @@ void Camera_world_transform(void) {
     box_input_key_press(world, KeyE, 1);
     ecs_progress(world, 0.5f);
     const WorldTransform *t = ecs_get(world, cam, WorldTransform);
-    test_flt(t->m[3][0], 0);
-    test_flt(t->m[3][1], 5);
-    test_flt(t->m[3][2], 0);
+    test_flt(t->position[0], 0);
+    test_flt(t->position[1], 5);
+    test_flt(t->position[2], 0);
 
     box_input_mouse_drag(world, &(box_input_sweep_t){
         .from = { 0, 0 }, .to = { -100, 0 }, .steps = 1, .button = KeyMouseRight
@@ -994,9 +994,9 @@ void Camera_world_transform(void) {
     const Rotation *r = ecs_get(world, cam, Rotation);
     test_assert(fabsf(r->y - 0.3f) < 0.0001f);
     t = ecs_get(world, cam, WorldTransform);
-    test_assert(fabsf(t->m[2][0] - sinf(0.3f)) < 0.0001f);
-    test_assert(fabsf(t->m[2][2] - cosf(0.3f)) < 0.0001f);
-    test_flt(t->m[3][1], 5);
+    test_assert(fabsf(t->basis[2][0] - sinf(0.3f)) < 0.0001f);
+    test_assert(fabsf(t->basis[2][2] - cosf(0.3f)) < 0.0001f);
+    test_flt(t->position[1], 5);
 
     ecs_fini(world);
 }
@@ -1034,7 +1034,7 @@ void Camera_script_controller(void) {
     ecs_progress(world, 0.5f);
     const Position *p = ecs_get(world, cam, Position);
     test_flt(p->y, 1);
-    test_assert(fabsf(p->z + 12 * (1.0f - expf(-3.0f)) * 0.5f) < 0.0001f);
+    test_assert(fabs(p->z + 12 * (1.0f - expf(-3.0f)) * 0.5f) < 0.0001f);
 
     ecs_fini(world);
 }
@@ -1454,7 +1454,7 @@ void Camera_ease_in(void) {
         z -= v * dt;
         const CameraController *cc = ecs_get(world, cam, CameraController);
         test_assert(fabsf(cc->velocity[2] + v) < 0.001f);
-        test_assert(fabsf(ecs_get(world, cam, Position)->z - z) < 0.001f);
+        test_assert(fabs(ecs_get(world, cam, Position)->z - z) < 0.001f);
         if (n == 1) {
             test_assert(-cc->velocity[2] < 40 * 0.1f);
         }
@@ -1491,7 +1491,7 @@ void Camera_ease_out(void) {
         float v = v0 * expf(-18.0f * n * dt);
         x += v * dt;
         test_assert(fabsf(ecs_get(world, cam, CameraController)->velocity[0] - v) < 0.001f);
-        test_assert(fabsf(ecs_get(world, cam, Position)->x - x) < 0.001f);
+        test_assert(fabs(ecs_get(world, cam, Position)->x - x) < 0.001f);
         if (n == 1) {
             test_assert(v > v0 * 0.5f);
         }
@@ -1595,8 +1595,8 @@ void Camera_wheel_zoom(void) {
     test_assert(fabsf(cc->velocity[2] + 6 * cosf(0.5f)) < 0.0001f);
     test_flt(cc->velocity[0], 0);
     const Position *p = ecs_get(world, cam, Position);
-    test_assert(fabsf(p->y - 6 * sinf(0.5f) * dt) < 0.0001f);
-    test_assert(fabsf(p->z + 6 * cosf(0.5f) * dt) < 0.0001f);
+    test_assert(fabs(p->y - 6 * sinf(0.5f) * dt) < 0.0001f);
+    test_assert(fabs(p->z + 6 * cosf(0.5f) * dt) < 0.0001f);
 
     ecs_progress(world, dt);
     cc = ecs_get(world, cam, CameraController);
@@ -1681,13 +1681,13 @@ void Camera_look_level_horizon(void) {
     test_flt(r->z, 0);
 
     const WorldTransform *t = ecs_get(world, cam, WorldTransform);
-    test_assert(fabsf(t->m[0][1]) < 0.0001f);
-    test_assert(fabsf(t->m[0][0] - cosf(0.6f)) < 0.0001f);
-    test_assert(fabsf(t->m[0][2] + sinf(0.6f)) < 0.0001f);
-    test_assert(t->m[1][1] > 0.9f);
-    test_assert(fabsf(t->m[2][0] - cosf(0.3f) * sinf(0.6f)) < 0.0001f);
-    test_assert(fabsf(t->m[2][1] - sinf(0.3f)) < 0.0001f);
-    test_assert(fabsf(t->m[2][2] - cosf(0.3f) * cosf(0.6f)) < 0.0001f);
+    test_assert(fabsf(t->basis[0][1]) < 0.0001f);
+    test_assert(fabsf(t->basis[0][0] - cosf(0.6f)) < 0.0001f);
+    test_assert(fabsf(t->basis[0][2] + sinf(0.6f)) < 0.0001f);
+    test_assert(t->basis[1][1] > 0.9f);
+    test_assert(fabsf(t->basis[2][0] - cosf(0.3f) * sinf(0.6f)) < 0.0001f);
+    test_assert(fabsf(t->basis[2][1] - sinf(0.3f)) < 0.0001f);
+    test_assert(fabsf(t->basis[2][2] - cosf(0.3f) * cosf(0.6f)) < 0.0001f);
 
     ecs_fini(world);
 }

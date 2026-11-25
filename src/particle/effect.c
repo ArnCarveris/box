@@ -44,7 +44,7 @@ typedef struct box_particle_instance_t {
     uint64_t retire;        /**< emit plus the longest lifetime of the layers, or the longest
                              *   flash when that is later */
     uint64_t flash;         /**< Microseconds of the longest flash */
-    vec3 position;          /**< World position of the play */
+    dvec3 position;         /**< World position of the play */
     float scale;            /**< Scale of the play */
     ecs_vec_t layers;       /**< box_particle_layer_t */
     ecs_vec_t entities;     /**< ecs_entity_t, the root and its descendants */
@@ -501,7 +501,7 @@ static bool box_particle_view_sees(
     box_particle_effects_t *s,
     ecs_entity_t view,
     const View *v,
-    const vec3 position,
+    const dvec3 position,
     float distance)
 {
     const Camera *c = v->camera && ecs_is_alive(world, v->camera)
@@ -510,7 +510,7 @@ static bool box_particle_view_sees(
     WorldTransform t_buf;
     const WorldTransform *t = c ? box_transform_world(world, v->camera, &t_buf) : NULL;
     mat4 transform, inverse, proj, view_proj;
-    vec4 point = { position[0], position[1], position[2], 1.0f }, clip;
+    vec4 point = { 0, 0, 0, 1.0f }, clip;
     float width, height;
     bool result = false;
     if (!c) {
@@ -518,14 +518,14 @@ static bool box_particle_view_sees(
     }
 
     if (t) {
-        glm_mat4_copy(ECS_CONST_CAST(vec4*, t->m), transform);
+        box_transform_mat4(t, t->position, transform);
+        box_dvec3_rel(position, t->position, point);
     } else {
         glm_mat4_identity(transform);
+        box_dvec3_rel(position, (dvec3){0, 0, 0}, point);
     }
 
-    if (distance > 0 &&
-        glm_vec3_distance(ECS_CONST_CAST(float*, position), transform[3]) > distance)
-    {
+    if (distance > 0 && glm_vec3_norm(point) > distance) {
         goto done;
     }
 
@@ -556,7 +556,7 @@ done:
 static bool box_particle_seen(
     const ecs_world_t *world,
     box_particle_effects_t *s,
-    const vec3 position,
+    const dvec3 position,
     float distance)
 {
     bool result = false;
@@ -586,7 +586,7 @@ static bool box_particle_seen(
  */
 static box_particle_instance_t* box_particle_nearby(
     const box_particle_effect_t *effect,
-    const vec3 position,
+    const dvec3 position,
     float distance)
 {
     box_particle_instance_t *result = NULL;
@@ -595,12 +595,14 @@ static box_particle_instance_t* box_particle_nearby(
     for (i = 0; i < ecs_vec_count(&effect->instances); i ++) {
         box_particle_instance_t *inst = *ecs_vec_get_t(
             &effect->instances, box_particle_instance_t*, i);
+        vec3 rel;
         float d;
         if (!inst->playing) {
             continue;
         }
 
-        d = glm_vec3_distance(ECS_CONST_CAST(float*, position), inst->position);
+        box_dvec3_rel(position, inst->position, rel);
+        d = glm_vec3_norm(rel);
         if (d <= best) {
             best = d;
             result = inst;
@@ -686,7 +688,7 @@ static void box_particle_play(
     ecs_world_t *world,
     box_particle_effects_t *s,
     box_particle_instance_t *inst,
-    const vec3 position,
+    const dvec3 position,
     float scale)
 {
     const Scale *base = ecs_get(world, inst->effect->template_, Scale);
@@ -698,7 +700,7 @@ static void box_particle_play(
         s->playing ++;
     }
 
-    glm_vec3_copy(ECS_CONST_CAST(float*, position), inst->position);
+    box_dvec3_copy(position, inst->position);
     inst->scale = scale;
     inst->playing = true;
     inst->held = recycle;
@@ -728,7 +730,7 @@ static void box_particle_play(
 ecs_entity_t box_particle_burst_at(
     ecs_world_t *world,
     ecs_entity_t effect,
-    const vec3 position,
+    const dvec3 position,
     float scale)
 {
     if (ecs_stage_is_readonly(world)) {
@@ -994,7 +996,7 @@ static void box_particle_burst_at_function(
     ecs_value_t *result)
 {
     ecs_entity_t effect = *(ecs_entity_t*)argv[0].ptr;
-    const float *position = argv[1].ptr;
+    const double *position = argv[1].ptr;
     float scale = *(float*)argv[2].ptr;
     (void)argc;
     *(ecs_entity_t*)result->ptr = box_particle_burst_at(ctx->world, effect, position, scale);
@@ -1049,7 +1051,7 @@ void box_particle_effects_import(
         .return_type = ecs_id(ecs_entity_t),
         .params = {
             { .name = "effect", .type = ecs_id(ecs_entity_t) },
-            { .name = "position", .type = ecs_id(vec3) },
+            { .name = "position", .type = ecs_id(dvec3) },
             { .name = "scale", .type = ecs_id(ecs_f32_t) }
         },
         .callback = box_particle_burst_at_function

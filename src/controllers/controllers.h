@@ -118,7 +118,7 @@ typedef enum box_collider_kind_t {
 typedef struct box_collider_t {
     ecs_entity_t entity;      /**< The entity of the shape */
     box_collider_kind_t kind; /**< Shape in its own frame */
-    vec3 center;              /**< Center in world space */
+    vec3 center;              /**< Center relative to the origin it was resolved for */
     vec3 axis[3];             /**< Unit axes of its frame in world space */
     vec3 half;                /**< Half extents along the axes in world units */
 } box_collider_t;
@@ -166,14 +166,19 @@ extern ECS_COMPONENT_DECLARE(ControllerRest);
  * Boxes are exact, Sphere and IcoSphere become balls, Cylinder a cylinder and Capsule a
  * capsule while their scale keeps them round; every other mesh is its oriented bounding box.
  *
+ * The collider is placed relative to an origin near the query, so that it keeps its precision
+ * anywhere in a large world.
+ *
  * @param world The world
  * @param e The shape
+ * @param origin World position its center is relative to
  * @param out The collider, written
  * @return false when the entity has no mesh
  */
 bool box_collider_resolve(
     const ecs_world_t *world,
     ecs_entity_t e,
+    const dvec3 origin,
     box_collider_t *out);
 
 /** Where a capsule touches a collider */
@@ -252,6 +257,9 @@ bool box_collider_ray(
  * Only the shapes the spatial index finds around the swept capsule are tested. A body that
  * walks into a ledge up to its step height steps onto it, and a body with a probe sticks to
  * ground below it. The velocity loses what pushes into what the body touched.
+ *
+ * The move runs relative to the feet, so it is as precise anywhere in a large world; a body
+ * that would move less than 10 micrometers stays where it is.
  *
  * @param world The world
  * @param body The body

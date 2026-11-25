@@ -37,9 +37,9 @@ state {
   export const BROOK_RIPPLES_RESOLUTION: i32 = 512
   export const BROOK_RIPPLES_NEAR: f32 = 40
 
-  export mut brook_ripple_x: f32 = 0
-  export mut brook_ripple_y: f32 = -1000
-  export mut brook_ripple_z: f32 = 0
+  export mut brook_ripple_x: f64 = 0
+  export mut brook_ripple_y: f64 = -1000
+  export mut brook_ripple_z: f64 = 0
 
   fn terrain_brook_d(x: f64, z: f64) -> f64 {
     box.terrain.mask(infinite_terrain.brooks, x, z, 0)
@@ -335,17 +335,16 @@ infinite_terrain {
 async {
   while true {
     await delay(0.25)
-    const o = WorldOrigin[WorldOrigin]
     const p = player[Position]
-    const x = p.x + o.x
-    const z = p.z + o.z
+    const x = p.x
+    const z = p.z
 
     if state.water && box.terrain.known(infinite_terrain.brooks, x, z) {
       const near = terrain_brook_d(x, z) < BROOK_RIPPLES_NEAR
       state.brook_ripple_x = p.x
       state.brook_ripple_z = p.z
       state.brook_ripple_y = near ?
-        terrain_brook_level(terrain_brook_k(terrain_brook_bed(x, z))) - o.y - 0.01 : GROUND_MIN - 100
+        terrain_brook_level(terrain_brook_k(terrain_brook_bed(x, z))) - 0.01 : GROUND_MIN - 100
     }
   }
 }

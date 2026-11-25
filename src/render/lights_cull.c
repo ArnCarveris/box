@@ -151,7 +151,8 @@ bool box_lights_culled(
         goto done;
     }
 
-    const float *center = transform->m[3];
+    vec3 center;
+    box_dvec3_rel(transform->position, s->origin, center);
     float radius = range * box_transform_world_scale(transform);
     for (i = 0; i < count && !seen; i ++) {
         const box_light_cull_view_t *cv = ecs_vec_get_t(

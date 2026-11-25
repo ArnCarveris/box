@@ -249,7 +249,7 @@ async {
     await delay(0.1)
 
     if state.canopy_listener != 0 {
-      state.canopy_altitude = clamp((state.canopy_listener[WorldTransform].m.v[13] - 20) / 60, 0, 1)
+      state.canopy_altitude = clamp((state.canopy_listener[WorldTransform].position.y - 20) / 60, 0, 1)
     }
   }
 }

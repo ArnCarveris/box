@@ -1106,14 +1106,16 @@ void ViewDebug_bvh_mover_tree_rotated(void) {
     test_int(v->debug_box_count, 31);
     const WorldTransform *t = ecs_get(world, mover, WorldTransform);
     test_assert(t != NULL);
-    test_assert(fabsf(t->m[0][1]) > 0.1f || fabsf(t->m[0][2]) > 0.1f);
+    test_assert(fabsf(t->basis[0][1]) > 0.1f || fabsf(t->basis[0][2]) > 0.1f);
+    mat4 m;
+    box_transform_mat4(t, NULL, m);
     int32_t i, k;
     for (i = 0; i < v->debug_box_count; i ++) {
         const box_render_debug_box_t *b = debug_box_of(p, v, i);
         const float *pose = debug_pose_of(p, v, b);
         test_uint(b->pose, 1);
         for (k = 0; k < 16; k ++) {
-            test_flt(pose[k], (&t->m[0][0])[k]);
+            test_flt(pose[k], (&m[0][0])[k]);
         }
 
         /* The boxes stay in the frame of the mover, not world bounds */
@@ -1137,9 +1139,10 @@ void ViewDebug_bvh_mover_tree_rotated(void) {
     v = ecs_vec_get_t(&p->views, box_render_view_t, 0);
     test_int(v->debug_box_count, 31);
     t = ecs_get(world, mover, WorldTransform);
+    box_transform_mat4(t, NULL, m);
     const float *pose = debug_pose_of(p, v, debug_box_of(p, v, 0));
     for (k = 0; k < 16; k ++) {
-        test_flt(pose[k], (&t->m[0][0])[k]);
+        test_flt(pose[k], (&m[0][0])[k]);
     }
 
     test_flt(pose[12], -4);

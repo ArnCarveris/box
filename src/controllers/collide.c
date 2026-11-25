@@ -113,7 +113,7 @@ static void box_collide_frame(
     int32_t i, j;
     for (j = 0; j < 3; j ++) {
         for (i = 0; i < 3; i ++) {
-            out->axis[j][i] = t ? t->m[j][i] : (float)(i == j);
+            out->axis[j][i] = t ? t->basis[j][i] : (float)(i == j);
             h[j][i] = out->axis[j][i] * e3[j];
         }
     }
@@ -142,6 +142,7 @@ static void box_collide_frame(
 bool box_collider_resolve(
     const ecs_world_t *world,
     ecs_entity_t e,
+    const dvec3 origin,
     box_collider_t *out)
 {
     const box_mesh_cache_t *cache = box_mesh_cache_of(world);
@@ -166,9 +167,9 @@ bool box_collider_resolve(
 
     box_collide_frame(t, e3, out);
     for (i = 0; i < 3; i ++) {
-        out->center[i] = t ? t->m[3][i] : c[i];
+        out->center[i] = (float)((t ? t->position[i] : (double)c[i]) - origin[i]);
         for (j = 0; t && j < 3; j ++) {
-            out->center[i] += t->m[j][i] * c[j];
+            out->center[i] += t->basis[j][i] * c[j];
         }
     }
 

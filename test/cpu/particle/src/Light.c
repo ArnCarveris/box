@@ -476,7 +476,7 @@ void Light_effect_layers_own_lights(void) {
         "  }\n"
         "}\n", NULL) == 0);
     ecs_entity_t lamp = ecs_lookup(world, "Lamp");
-    vec3 at = {0, 0, 0};
+    dvec3 at = {0, 0, 0};
     ecs_entity_t root = box_particle_burst_at(world, lamp, at, 1);
     test_assert(root != 0);
     ecs_entity_t glow = ecs_lookup_child(world, root, "glow");

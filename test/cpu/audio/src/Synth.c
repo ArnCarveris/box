@@ -3732,7 +3732,7 @@ void Synth_script_unison(void) {
     ecs_set(world, ears, Rotation, {0, 0, 0});
     ecs_add(world, ears, AudioListener);
     audio_run(world, 2);
-    test_bool(box_audio_play_at(world, beep, (vec3){-5, 0, 0}, 1.0f), true);
+    test_bool(box_audio_play_at(world, beep, (dvec3){-5, 0, 0}, 1.0f), true);
     start = audio_tap_count;
     audio_run(world, 6);
     test_assert(audio_peak(audio_tap_l, start, audio_tap_count) > 0.2f);
@@ -3740,7 +3740,7 @@ void Synth_script_unison(void) {
     audio_run(world, 40);
     test_int(ecs_singleton_get(world, AudioStatus)->voices, 0);
 
-    test_bool(box_audio_play_at(world, beep, (vec3){0, 0, -5}, 1.0f), true);
+    test_bool(box_audio_play_at(world, beep, (dvec3){0, 0, -5}, 1.0f), true);
     start = audio_tap_count;
     audio_run(world, 6);
     diff = 0;

@@ -29,8 +29,6 @@ typedef struct box_bake_change_t {
     ecs_entity_t scene;     /**< Scene of the old bounds */
     bool old;               /**< The shape had bounds in a scene before the change */
     bool geometry;          /**< The change can move, add or remove surfaces, not only their look */
-    bool shifted;           /**< The shape moved in a frame with a shift of the world origin,
-                             *   a move by the shift alone is no change */
     vec3 min;               /**< Minimum corner of the old bounds */
     vec3 max;               /**< Maximum corner of the old bounds */
 } box_bake_change_t;
@@ -211,7 +209,9 @@ typedef struct box_render_bake_t {
                              *   their change, kept until the next extract */
     bool reflecting;        /**< A scene has ReflectionBake, so changes are recorded without a
                              *   LightBake too */
-    bool shifting;          /**< The world origin shifted since the last extract */
+    dvec3 origin;           /**< Render origin of the extract: the grids, bounds and cameras are
+                             *   relative to the origin of the world, the captures and the
+                             *   volumes are sent relative to it */
     const void *lights_state; /**< State of the light extract, looked up once */
     ecs_map_t light_map;    /**< Light entity to its index in a light record, scratch */
     const void *backend;    /**< Context of the backend the volumes were sent to */
@@ -319,19 +319,6 @@ void box_bake_mark_all(
  */
 box_render_bake_t* box_bake_state(
     const ecs_world_t *world);
-
-/** Move the probe grid of the volume of a scene, its static bounds and its cameras by the
- * offset of a shift of the world origin, and take the moves of the static shapes in this
- * frame by the offset alone as no change, so a shift rebakes nothing.
- *
- * @param world The world
- * @param scene The scene, 0 for the default scene
- * @param offset Added to the world positions
- */
-void box_render_bake_shift(
-    ecs_world_t *world,
-    ecs_entity_t scene,
-    const vec3 offset);
 
 /** Collect the regions the shapes that changed since the last extract covered before and after
  * their change into the regions of the state, and queue the probes they can reach.

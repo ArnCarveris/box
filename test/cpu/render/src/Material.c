@@ -1474,17 +1474,16 @@ void Material_texture_mapping_frame_of(void) {
  * the position and the scale of the instance by the frame scale. */
 void Material_texture_mapping_frame_transform(void) {
     // materials/texture_mapping_frame
-    box_render_transform_t model = {{
-        {2, 0, 0, 5}, {0, 3, 0, 6}, {0, 0, 4, 7}
-    }};
+    box_render_transform_t model = {
+        {{2, 0, 0, 5}, {0, 3, 0, 6}, {0, 0, 4, 7}},
+        {0, 0, 0, 1}
+    };
     box_render_transform_t out;
     box_draws_frame(&out, &model, NULL);
     test_assert(!ecs_os_memcmp_t(&out, &model, box_render_transform_t));
 
     /* A frame at (1, 2, 3), turned by 90 degrees around z (x to y) and scaled by 2 */
-    WorldTransform frame = {{
-        {0, 2, 0, 0}, {-2, 0, 0, 0}, {0, 0, 2, 0}, {1, 2, 3, 1}
-    }};
+    WorldTransform frame = {.position = {1, 2, 3}, .basis = {{0, 2, 0}, {-2, 0, 0}, {0, 0, 2}}};
     box_draws_frame(&out, &model, &frame);
 
     /* The instance origin (5, 6, 7) is (4, 4, 4) from the frame, (4, -4, 4) in its axes,
@@ -1504,9 +1503,7 @@ void Material_texture_mapping_frame_transform(void) {
     test_flt(out.rows[2][2], 2);
 
     /* A flat frame keeps the model matrix */
-    WorldTransform flat = {{
-        {1, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 1, 0}, {1, 2, 3, 1}
-    }};
+    WorldTransform flat = {.position = {1, 2, 3}, .basis = {{1, 0, 0}, {0, 0, 0}, {0, 0, 1}}};
     box_draws_frame(&out, &model, &flat);
     test_assert(!ecs_os_memcmp_t(&out, &model, box_render_transform_t));
 }
@@ -1749,15 +1746,14 @@ void Material_texture_mapping_frame_updates(void) {
  * of 10 units covers what one unit covered without the scale. */
 void Material_texture_mapping_frame_scaled(void) {
     // materials/texture_mapping_frame
-    box_render_transform_t model = {{
-        {10, 0, 0, 20}, {0, 20, 0, 30}, {0, 0, 30, 40}
-    }};
+    box_render_transform_t model = {
+        {{10, 0, 0, 20}, {0, 20, 0, 30}, {0, 0, 30, 40}},
+        {0, 0, 0, 1}
+    };
     box_render_transform_t out;
 
     /* A frame at (10, 10, 10) scaled by 10 */
-    WorldTransform frame = {{
-        {10, 0, 0, 0}, {0, 10, 0, 0}, {0, 0, 10, 0}, {10, 10, 10, 1}
-    }};
+    WorldTransform frame = {.position = {10, 10, 10}, .basis = {{10, 0, 0}, {0, 10, 0}, {0, 0, 10}}};
     box_draws_frame(&out, &model, &frame);
     test_flt(out.rows[0][3], 1);
     test_flt(out.rows[1][3], 2);
@@ -1769,9 +1765,7 @@ void Material_texture_mapping_frame_scaled(void) {
     test_flt(out.rows[1][0], 0);
 
     /* A frame of scale 1 keeps world units */
-    WorldTransform unit = {{
-        {1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {10, 10, 10, 1}
-    }};
+    WorldTransform unit = {.position = {10, 10, 10}, .basis = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}}};
     box_draws_frame(&out, &model, &unit);
     test_flt(out.rows[0][3], 10);
     test_flt(out.rows[1][3], 20);

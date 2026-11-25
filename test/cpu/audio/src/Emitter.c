@@ -505,7 +505,8 @@ void Emitter_shape_transform(void) {
     test_assert(emitter_log_a.count >= 400);
     test_assert(emitter_log_b.count >= 400);
 
-    glm_mat4_inv(ECS_CONST_CAST(vec4*, ecs_get(world, box, WorldTransform)->m), inv);
+    box_transform_mat4(ecs_get(world, box, WorldTransform), NULL, inv);
+    glm_mat4_inv(inv, inv);
     for (i = 0; i < emitter_log_a.count; i ++) {
         const emitter_play_t *p = &emitter_log_a.plays[i];
         glm_mat4_mulv3(inv, ECS_CONST_CAST(float*, p->position), 1.0f, local);

@@ -16,9 +16,9 @@ using state
 // has no controller and a script moves it by writing its pose (course.flecs).
 state {
   // Where the player starts and whether it stands on the ground yet
-  export mut start_x: f32 = START_X
-  export mut start_y: f32 = 120
-  export mut start_z: f32 = START_Z
+  export mut start_x: f64 = START_X
+  export mut start_y: f64 = 120
+  export mut start_z: f64 = START_Z
   export mut start_yaw: f32 = 0
   export mut start_pitch: f32 = -0.04
   export mut started: bool = false

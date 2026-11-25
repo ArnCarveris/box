@@ -838,11 +838,8 @@ uint64_t box_terrain_revision(
 {
     const box_terrain_query_ctx_t *ctx = box_terrain_query_ctx(world);
     const box_textures_t *textures = box_textures_get(world);
-    const WorldOriginStatus *origin = ecs_id(WorldOriginStatus)
-        ? ecs_singleton_get(world, WorldOriginStatus) : NULL;
 
-    return (ctx ? ctx->serial : 0) + (textures ? textures->readback_serial : 0) +
-        (origin ? (uint64_t)origin->shifts : 0);
+    return (ctx ? ctx->serial : 0) + (textures ? textures->readback_serial : 0);
 }
 
 void box_terrain_query_counters(
@@ -864,15 +861,15 @@ void box_terrain_origin(
     ecs_entity_t terrain,
     double out[3])
 {
-    box_terrain_local(world, terrain, out);
+    box_terrain_position(world, terrain, out);
 }
 
 bool box_terrain_ground(
     const ecs_world_t *world,
     ecs_entity_t terrain,
-    float x,
-    float z,
-    float *y,
+    double x,
+    double z,
+    double *y,
     vec3 normal)
 {
     const box_terrain_query_t *q = box_terrain_query_get(world, terrain);
@@ -880,19 +877,18 @@ bool box_terrain_ground(
     float v[4] = { 0, 0, 0, 0 };
     bool result = false;
     if (q) {
-        box_terrain_local(world, terrain, o);
-        result = box_terrain_query_sample(world, q, (double)x - o[0], (double)z - o[2], false,
-            v, NULL);
+        box_terrain_position(world, terrain, o);
+        result = box_terrain_query_sample(world, q, x - o[0], z - o[2], false, v, NULL);
         if (y) {
-            *y = result ? (float)(o[1] + (double)v[0]) : 0.0f;
+            *y = result ? o[1] + (double)v[0] : 0.0;
         }
 
         if (normal) {
-            box_terrain_query_normal(world, q, (double)x - o[0], (double)z - o[2], normal);
+            box_terrain_query_normal(world, q, x - o[0], z - o[2], normal);
         }
     } else {
         if (y) {
-            *y = 0.0f;
+            *y = 0.0;
         }
 
         if (normal) {
@@ -952,7 +948,7 @@ static bool box_terrain_ray_clip(
  *
  * @param world The world
  * @param q The tiles of the terrain
- * @param origin Origin in the local frame of the world
+ * @param origin Origin in the world
  * @param dir Unit direction
  * @param reach Longest distance that counts
  * @param out Receives the distance of the hit
@@ -972,7 +968,7 @@ static bool box_terrain_query_ray(
     double flat, t, prev_t = 0.0, prev_diff = 0.0;
     int32_t i, count = ecs_vec_count(&q->list);
     bool result = false, any = false, prev = false;
-    box_terrain_local(world, q->entity, o);
+    box_terrain_position(world, q->entity, o);
     for (i = 0; i < 3; i ++) {
         p[i] = (double)origin[i] - o[i];
         d[i] = (double)dir[i];
@@ -1377,7 +1373,7 @@ static void box_terrain_query_update(
         goto status;
     }
 
-    box_terrain_local(world, e, local);
+    box_terrain_position(world, e, local);
     if (!q->placed || local[0] != q->local[0] || local[1] != q->local[1] ||
         local[2] != q->local[2])
     {

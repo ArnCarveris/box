@@ -2,9 +2,9 @@
  * @file TerrainSample.c
  * @brief Tests for the sampling of a Terrain on the GPU (TerrainSampled, terrain_sample.wgsl): a
  * compute shader reads the heights, normals and masks of the tiles that draw by absolute world
- * position, which match the CPU queries where the finest level draws, also after a shift of the
- * WorldOrigin, answers from coarser levels further out and finds nothing far beyond them, and a
- * terrain without the tag has no bindings.
+ * position, which match the CPU queries where the finest level draws, also far from the origin
+ * of the world, answers from coarser levels further out and finds nothing far beyond them, and
+ * a terrain without the tag has no bindings.
  *
  * The scene is test/assets/terrain/sample.flecs: smooth hills of noise with masks, the focus at
  * (32, 32). The probe is test/assets/terrain/sample_probe.wgsl.
@@ -316,50 +316,39 @@ void TerrainSample_tile_edges(void) {
     ecs_fini(world);
 }
 
-void TerrainSample_after_origin_shift(void) {
+void TerrainSample_far_from_origin(void) {
     ecs_entity_t terrain;
     ecs_world_t *world = ts_world(&terrain);
-    ecs_singleton_add(world, WorldOrigin);
-    WorldOrigin *o = ecs_singleton_get_mut(world, WorldOrigin);
-    o->enabled = false;
-    ecs_singleton_modified(world, WorldOrigin);
-    ts_wait(world, terrain, -8, -8, 72, 72);
-    double xz[TS_POINTS][2];
-    ts_result_t before[TS_POINTS], after[TS_POINTS];
-    ts_points(32, 32, 40, xz);
-    ts_probe_absolute(world, terrain, (const double (*)[2])xz, TS_POINTS, before);
+    const double x = 262144.25, z = -131072.5;
+    ecs_entity_t walker = ecs_lookup(world, "sample_walker");
+    test_assert(walker != 0);
+    ecs_set(world, walker, Position, {x + 32, 30, z + 32});
+    ts_wait(world, terrain, x - 8, z - 8, x + 72, z + 72);
 
-    // The terrain stays in the world, so its tiles stay and the samples at the same absolute
-    // positions do not change; the local y moves down by the shift
-    box_world_origin_shift(world, 0, (double[3]){ 1000.25, 8, -3000.5 });
-    ts_frame(world);
-    ts_frame(world);
-    ts_frame(world);
-    o = ecs_singleton_get_mut(world, WorldOrigin);
-    test_flt(o->x, 1000.25);
-    test_flt(o->y, 8);
-    test_flt(o->z, -3000.5);
-    ts_probe_absolute(world, terrain, (const double (*)[2])xz, TS_POINTS, after);
-    ts_expect_queries(world, terrain, (const double (*)[2])xz, after, TS_POINTS, -8.0f);
-    int32_t i;
-    for (i = 0; i < TS_POINTS; i ++) {
-        test_assert(fabsf(after[i].height - before[i].height) < 1e-4f);
-        test_assert(fabsf(after[i].y - (before[i].y - 8.0f)) < 1e-3f);
-    }
+    // The samples at world positions far from the origin of the world match the queries; the
+    // y of a sample is relative to the render origin, which follows the walker
+    double xz[TS_POINTS][2], origin[3];
+    ts_result_t far[TS_POINTS];
+    ts_points(x + 32, z + 32, 40, xz);
+    ts_probe_absolute(world, terrain, (const double (*)[2])xz, TS_POINTS, far);
+    box_render_origin(world, origin);
+    test_assert(origin[0] == 262144 && origin[1] == 0 && origin[2] == -131072);
+    ts_expect_queries(world, terrain, (const double (*)[2])xz, far, TS_POINTS, 0.0f);
 
-    // The same positions as the local position of the shifted origin plus a local x and z
-    // (terrain_sample_local): whole meters of the origin and its rest plus the local offset
+    // The same positions as the render origin plus an x and z relative to it
+    // (terrain_sample_local): the whole meters of the origin plus the offset
     ts_point_t points[TS_POINTS];
     ts_result_t local[TS_POINTS];
+    int32_t i;
     for (i = 0; i < TS_POINTS; i ++) {
-        points[i].whole[0] = 1000;
-        points[i].whole[1] = -3001;
-        points[i].rest[0] = 0.25f + (float)(xz[i][0] - 1000.25);
-        points[i].rest[1] = 0.5f + (float)(xz[i][1] + 3000.5);
+        points[i].whole[0] = (int32_t)origin[0];
+        points[i].whole[1] = (int32_t)origin[2];
+        points[i].rest[0] = (float)(xz[i][0] - origin[0]);
+        points[i].rest[1] = (float)(xz[i][1] - origin[2]);
     }
 
     ts_probe(world, terrain, points, TS_POINTS, local);
-    ts_expect_queries(world, terrain, (const double (*)[2])xz, local, TS_POINTS, -8.0f);
+    ts_expect_queries(world, terrain, (const double (*)[2])xz, local, TS_POINTS, 0.0f);
     ts_expect_no_errors(world);
     ecs_fini(world);
 }

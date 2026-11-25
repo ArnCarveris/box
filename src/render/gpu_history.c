@@ -80,7 +80,7 @@ void box_gpu_history_uniforms(
     box_gpu_view_uniforms_t *u)
 {
     const box_render_temporal_t *h = box_render_history_update(&gpu->histories, t->handle, v,
-        packet->frame, t->desc.render_width, t->desc.render_height, proj);
+        packet->origin, packet->frame, t->desc.render_width, t->desc.render_height, proj);
     glm_mat4_copy(ECS_CONST_CAST(vec4*, h->prev_view_proj), u->prev_view_proj);
     u->temporal[0] = h->frame_index;
     u->temporal[1] = h->valid ? 1u : 0u;

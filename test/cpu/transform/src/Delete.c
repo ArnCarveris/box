@@ -22,7 +22,9 @@ void Delete_static_childof_set_delete_root(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             3.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -47,7 +49,9 @@ void Delete_static_childof_set_delete_root(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             3.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -66,7 +70,9 @@ void Delete_static_childof_set_delete_root(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             3.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -100,7 +106,9 @@ void Delete_static_childof_set_delete_child(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -116,7 +124,9 @@ void Delete_static_childof_set_delete_child(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             2.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -132,7 +142,9 @@ void Delete_static_childof_set_delete_child(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -157,7 +169,9 @@ void Delete_static_childof_set_delete_child(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -173,7 +187,9 @@ void Delete_static_childof_set_delete_child(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -194,7 +210,9 @@ void Delete_static_childof_set_delete_child(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             2.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -210,7 +228,9 @@ void Delete_static_childof_set_delete_child(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             2.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -244,7 +264,9 @@ void Delete_static_childof_set_parent_delete_child(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -260,7 +282,9 @@ void Delete_static_childof_set_parent_delete_child(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             2.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -276,7 +300,9 @@ void Delete_static_childof_set_parent_delete_child(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -301,7 +327,9 @@ void Delete_static_childof_set_parent_delete_child(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             2.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -317,7 +345,9 @@ void Delete_static_childof_set_parent_delete_child(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             2.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -351,7 +381,9 @@ void Delete_static_childof_set_child_delete_parent(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -367,7 +399,9 @@ void Delete_static_childof_set_child_delete_parent(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             2.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -383,7 +417,9 @@ void Delete_static_childof_set_child_delete_parent(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             3.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -409,7 +445,9 @@ void Delete_static_childof_set_child_delete_parent(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -430,7 +468,9 @@ void Delete_static_childof_set_child_delete_parent(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             3.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -467,7 +507,9 @@ void Delete_static_childof_delete_mid_move_root(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -483,7 +525,9 @@ void Delete_static_childof_delete_mid_move_root(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -499,7 +543,9 @@ void Delete_static_childof_delete_mid_move_root(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 2.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -515,7 +561,9 @@ void Delete_static_childof_delete_mid_move_root(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -541,7 +589,9 @@ void Delete_static_childof_delete_mid_move_root(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -557,7 +607,9 @@ void Delete_static_childof_delete_mid_move_root(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -578,7 +630,9 @@ void Delete_static_childof_delete_mid_move_root(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             5.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -594,7 +648,9 @@ void Delete_static_childof_delete_mid_move_root(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             4.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -613,7 +669,9 @@ void Delete_static_childof_delete_mid_move_root(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             5.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -629,7 +687,9 @@ void Delete_static_childof_delete_mid_move_root(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             4.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -661,7 +721,9 @@ void Delete_static_childof_set_prs_delete(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             3.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -688,7 +750,9 @@ void Delete_static_childof_set_prs_delete(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             3.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -707,7 +771,9 @@ void Delete_static_childof_set_prs_delete(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             3.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -738,7 +804,9 @@ void Delete_static_parent_set_delete_root(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             3.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -763,7 +831,9 @@ void Delete_static_parent_set_delete_root(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             3.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -782,7 +852,9 @@ void Delete_static_parent_set_delete_root(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             3.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -816,7 +888,9 @@ void Delete_static_parent_set_delete_child(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -832,7 +906,9 @@ void Delete_static_parent_set_delete_child(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             2.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -848,7 +924,9 @@ void Delete_static_parent_set_delete_child(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -873,7 +951,9 @@ void Delete_static_parent_set_delete_child(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -889,7 +969,9 @@ void Delete_static_parent_set_delete_child(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -910,7 +992,9 @@ void Delete_static_parent_set_delete_child(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             2.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -926,7 +1010,9 @@ void Delete_static_parent_set_delete_child(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             2.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -960,7 +1046,9 @@ void Delete_static_parent_set_parent_delete_child(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -976,7 +1064,9 @@ void Delete_static_parent_set_parent_delete_child(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             2.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -992,7 +1082,9 @@ void Delete_static_parent_set_parent_delete_child(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1017,7 +1109,9 @@ void Delete_static_parent_set_parent_delete_child(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             2.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1033,7 +1127,9 @@ void Delete_static_parent_set_parent_delete_child(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             2.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1067,7 +1163,9 @@ void Delete_static_parent_set_child_delete_parent(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1083,7 +1181,9 @@ void Delete_static_parent_set_child_delete_parent(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             2.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1099,7 +1199,9 @@ void Delete_static_parent_set_child_delete_parent(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             3.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1125,7 +1227,9 @@ void Delete_static_parent_set_child_delete_parent(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1146,7 +1250,9 @@ void Delete_static_parent_set_child_delete_parent(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             3.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1183,7 +1289,9 @@ void Delete_static_parent_delete_mid_move_root(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1199,7 +1307,9 @@ void Delete_static_parent_delete_mid_move_root(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1215,7 +1325,9 @@ void Delete_static_parent_delete_mid_move_root(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 2.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1231,7 +1343,9 @@ void Delete_static_parent_delete_mid_move_root(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1257,7 +1371,9 @@ void Delete_static_parent_delete_mid_move_root(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1273,7 +1389,9 @@ void Delete_static_parent_delete_mid_move_root(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1294,7 +1412,9 @@ void Delete_static_parent_delete_mid_move_root(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             5.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1310,7 +1430,9 @@ void Delete_static_parent_delete_mid_move_root(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             4.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1329,7 +1451,9 @@ void Delete_static_parent_delete_mid_move_root(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             5.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1345,7 +1469,9 @@ void Delete_static_parent_delete_mid_move_root(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             4.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1377,7 +1503,9 @@ void Delete_static_parent_set_prs_delete(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             3.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1404,7 +1532,9 @@ void Delete_static_parent_set_prs_delete(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             3.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1423,7 +1553,9 @@ void Delete_static_parent_set_prs_delete(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             3.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1456,7 +1588,9 @@ void Delete_dynamic_childof_set_delete_root(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             3.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1481,7 +1615,9 @@ void Delete_dynamic_childof_set_delete_root(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             3.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1500,7 +1636,9 @@ void Delete_dynamic_childof_set_delete_root(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             3.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1537,7 +1675,9 @@ void Delete_dynamic_childof_set_delete_child(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1553,7 +1693,9 @@ void Delete_dynamic_childof_set_delete_child(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             2.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1569,7 +1711,9 @@ void Delete_dynamic_childof_set_delete_child(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1594,7 +1738,9 @@ void Delete_dynamic_childof_set_delete_child(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1610,7 +1756,9 @@ void Delete_dynamic_childof_set_delete_child(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1631,7 +1779,9 @@ void Delete_dynamic_childof_set_delete_child(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             2.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1647,7 +1797,9 @@ void Delete_dynamic_childof_set_delete_child(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             2.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1684,7 +1836,9 @@ void Delete_dynamic_childof_set_parent_delete_child(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1700,7 +1854,9 @@ void Delete_dynamic_childof_set_parent_delete_child(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             2.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1716,7 +1872,9 @@ void Delete_dynamic_childof_set_parent_delete_child(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1741,7 +1899,9 @@ void Delete_dynamic_childof_set_parent_delete_child(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             2.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1757,7 +1917,9 @@ void Delete_dynamic_childof_set_parent_delete_child(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             2.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1794,7 +1956,9 @@ void Delete_dynamic_childof_set_child_delete_parent(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1810,7 +1974,9 @@ void Delete_dynamic_childof_set_child_delete_parent(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             2.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1826,7 +1992,9 @@ void Delete_dynamic_childof_set_child_delete_parent(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             3.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1852,7 +2020,9 @@ void Delete_dynamic_childof_set_child_delete_parent(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1873,7 +2043,9 @@ void Delete_dynamic_childof_set_child_delete_parent(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             3.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1914,7 +2086,9 @@ void Delete_dynamic_childof_delete_mid_move_root(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1930,7 +2104,9 @@ void Delete_dynamic_childof_delete_mid_move_root(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1946,7 +2122,9 @@ void Delete_dynamic_childof_delete_mid_move_root(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 2.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1962,7 +2140,9 @@ void Delete_dynamic_childof_delete_mid_move_root(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1988,7 +2168,9 @@ void Delete_dynamic_childof_delete_mid_move_root(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2004,7 +2186,9 @@ void Delete_dynamic_childof_delete_mid_move_root(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2025,7 +2209,9 @@ void Delete_dynamic_childof_delete_mid_move_root(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             5.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2041,7 +2227,9 @@ void Delete_dynamic_childof_delete_mid_move_root(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             4.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2060,7 +2248,9 @@ void Delete_dynamic_childof_delete_mid_move_root(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             5.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2076,7 +2266,9 @@ void Delete_dynamic_childof_delete_mid_move_root(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             4.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2110,7 +2302,9 @@ void Delete_dynamic_childof_set_prs_delete(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             3.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2137,7 +2331,9 @@ void Delete_dynamic_childof_set_prs_delete(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             3.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2156,7 +2352,9 @@ void Delete_dynamic_childof_set_prs_delete(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             3.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2189,7 +2387,9 @@ void Delete_dynamic_parent_set_delete_root(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             3.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2214,7 +2414,9 @@ void Delete_dynamic_parent_set_delete_root(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             3.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2233,7 +2435,9 @@ void Delete_dynamic_parent_set_delete_root(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             3.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2270,7 +2474,9 @@ void Delete_dynamic_parent_set_delete_child(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2286,7 +2492,9 @@ void Delete_dynamic_parent_set_delete_child(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             2.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2302,7 +2510,9 @@ void Delete_dynamic_parent_set_delete_child(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2327,7 +2537,9 @@ void Delete_dynamic_parent_set_delete_child(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2343,7 +2555,9 @@ void Delete_dynamic_parent_set_delete_child(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2364,7 +2578,9 @@ void Delete_dynamic_parent_set_delete_child(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             2.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2380,7 +2596,9 @@ void Delete_dynamic_parent_set_delete_child(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             2.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2417,7 +2635,9 @@ void Delete_dynamic_parent_set_parent_delete_child(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2433,7 +2653,9 @@ void Delete_dynamic_parent_set_parent_delete_child(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             2.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2449,7 +2671,9 @@ void Delete_dynamic_parent_set_parent_delete_child(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2474,7 +2698,9 @@ void Delete_dynamic_parent_set_parent_delete_child(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             2.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2490,7 +2716,9 @@ void Delete_dynamic_parent_set_parent_delete_child(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             2.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2527,7 +2755,9 @@ void Delete_dynamic_parent_set_child_delete_parent(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2543,7 +2773,9 @@ void Delete_dynamic_parent_set_child_delete_parent(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             2.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2559,7 +2791,9 @@ void Delete_dynamic_parent_set_child_delete_parent(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             3.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2585,7 +2819,9 @@ void Delete_dynamic_parent_set_child_delete_parent(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2606,7 +2842,9 @@ void Delete_dynamic_parent_set_child_delete_parent(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             3.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2647,7 +2885,9 @@ void Delete_dynamic_parent_delete_mid_move_root(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2663,7 +2903,9 @@ void Delete_dynamic_parent_delete_mid_move_root(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2679,7 +2921,9 @@ void Delete_dynamic_parent_delete_mid_move_root(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 2.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2695,7 +2939,9 @@ void Delete_dynamic_parent_delete_mid_move_root(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2721,7 +2967,9 @@ void Delete_dynamic_parent_delete_mid_move_root(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2737,7 +2985,9 @@ void Delete_dynamic_parent_delete_mid_move_root(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2758,7 +3008,9 @@ void Delete_dynamic_parent_delete_mid_move_root(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             5.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2774,7 +3026,9 @@ void Delete_dynamic_parent_delete_mid_move_root(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             4.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2793,7 +3047,9 @@ void Delete_dynamic_parent_delete_mid_move_root(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             5.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2809,7 +3065,9 @@ void Delete_dynamic_parent_delete_mid_move_root(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             4.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2843,7 +3101,9 @@ void Delete_dynamic_parent_set_prs_delete(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             3.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2870,7 +3130,9 @@ void Delete_dynamic_parent_set_prs_delete(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             3.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2889,7 +3151,9 @@ void Delete_dynamic_parent_set_prs_delete(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             3.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);

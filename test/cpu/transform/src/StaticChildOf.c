@@ -21,7 +21,9 @@ void StaticChildOf_single_none(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -42,7 +44,9 @@ void StaticChildOf_single_none(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -73,7 +77,9 @@ void StaticChildOf_single_r(void) {
             0.197677f, -0.099833f, 0.97517f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -95,7 +101,9 @@ void StaticChildOf_single_r(void) {
             0.095375f, -0.29552f, 0.950564f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -126,7 +134,9 @@ void StaticChildOf_single_s(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -148,7 +158,9 @@ void StaticChildOf_single_s(void) {
             0.0f, 0.0f, 1.75f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -180,7 +192,9 @@ void StaticChildOf_single_rs(void) {
             0.395354f, -0.199667f, 1.950341f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -203,7 +217,9 @@ void StaticChildOf_single_rs(void) {
             0.166905f, -0.51716f, 1.663487f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -235,7 +251,9 @@ void StaticChildOf_depth_1_none(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -251,7 +269,9 @@ void StaticChildOf_depth_1_none(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             3.0f, 3.0f, 1.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -272,7 +292,9 @@ void StaticChildOf_depth_1_none(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -288,7 +310,9 @@ void StaticChildOf_depth_1_none(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             8.0f, 0.0f, 3.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -322,7 +346,9 @@ void StaticChildOf_depth_1_r(void) {
             0.197677f, -0.099833f, 0.97517f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -338,7 +364,9 @@ void StaticChildOf_depth_1_r(void) {
             0.469936f, -0.212352f, 0.856777f, 0.0f,
             2.811305f, 3.438818f, 1.305592f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -360,7 +388,9 @@ void StaticChildOf_depth_1_r(void) {
             0.095375f, -0.29552f, 0.950564f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -376,7 +406,9 @@ void StaticChildOf_depth_1_r(void) {
             0.391627f, -0.35077f, 0.85064f, 0.0f,
             7.50671f, 0.395787f, 3.834767f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -410,7 +442,9 @@ void StaticChildOf_depth_1_s(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -426,7 +460,9 @@ void StaticChildOf_depth_1_s(void) {
             0.0f, 0.0f, 3.0f, 0.0f,
             4.0f, 2.5f, 2.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -448,7 +484,9 @@ void StaticChildOf_depth_1_s(void) {
             0.0f, 0.0f, 1.75f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -464,7 +502,9 @@ void StaticChildOf_depth_1_s(void) {
             0.0f, 0.0f, 2.625f, 0.0f,
             9.5f, 0.0f, 4.25f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -500,7 +540,9 @@ void StaticChildOf_depth_1_rs(void) {
             0.395354f, -0.199667f, 1.950341f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -516,7 +558,9 @@ void StaticChildOf_depth_1_rs(void) {
             1.117478f, -0.265622f, 2.667615f, 0.0f,
             4.086477f, 3.157747f, 2.043789f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -539,7 +583,9 @@ void StaticChildOf_depth_1_rs(void) {
             0.166905f, -0.51716f, 1.663487f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -555,7 +601,9 @@ void StaticChildOf_depth_1_rs(void) {
             0.937227f, -0.728508f, 2.301813f, 0.0f,
             8.941413f, 0.797454f, 4.604696f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -587,7 +635,9 @@ void StaticChildOf_depth_1_none_skip_0(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             2.0f, 1.0f, 1.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -609,7 +659,9 @@ void StaticChildOf_depth_1_none_skip_0(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             7.0f, -2.0f, 3.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -642,7 +694,9 @@ void StaticChildOf_depth_1_r_skip_0(void) {
             0.242472f, -0.198669f, 0.949599f, 0.0f,
             2.0f, 1.0f, 1.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -665,7 +719,9 @@ void StaticChildOf_depth_1_r_skip_0(void) {
             0.137642f, -0.389418f, 0.910718f, 0.0f,
             7.0f, -2.0f, 3.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -698,7 +754,9 @@ void StaticChildOf_depth_1_s_skip_0(void) {
             0.0f, 0.0f, 1.5f, 0.0f,
             2.0f, 1.0f, 1.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -721,7 +779,9 @@ void StaticChildOf_depth_1_s_skip_0(void) {
             0.0f, 0.0f, 1.25f, 0.0f,
             7.0f, -2.0f, 3.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -755,7 +815,9 @@ void StaticChildOf_depth_1_rs_skip_0(void) {
             0.363709f, -0.298004f, 1.424398f, 0.0f,
             2.0f, 1.0f, 1.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -779,7 +841,9 @@ void StaticChildOf_depth_1_rs_skip_0(void) {
             0.172052f, -0.486773f, 1.138398f, 0.0f,
             7.0f, -2.0f, 3.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -810,7 +874,9 @@ void StaticChildOf_depth_1_none_skip_1(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -832,7 +898,9 @@ void StaticChildOf_depth_1_none_skip_1(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -865,7 +933,9 @@ void StaticChildOf_depth_1_r_skip_1(void) {
             0.197677f, -0.099833f, 0.97517f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -888,7 +958,9 @@ void StaticChildOf_depth_1_r_skip_1(void) {
             0.095375f, -0.29552f, 0.950564f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -921,7 +993,9 @@ void StaticChildOf_depth_1_s_skip_1(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -944,7 +1018,9 @@ void StaticChildOf_depth_1_s_skip_1(void) {
             0.0f, 0.0f, 1.75f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -978,7 +1054,9 @@ void StaticChildOf_depth_1_rs_skip_1(void) {
             0.395354f, -0.199667f, 1.950341f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1002,7 +1080,9 @@ void StaticChildOf_depth_1_rs_skip_1(void) {
             0.166905f, -0.51716f, 1.663487f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1037,7 +1117,9 @@ void StaticChildOf_depth_2_none(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1053,7 +1135,9 @@ void StaticChildOf_depth_2_none(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             3.0f, 3.0f, 1.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1069,7 +1153,9 @@ void StaticChildOf_depth_2_none(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             6.0f, 3.0f, 3.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1090,7 +1176,9 @@ void StaticChildOf_depth_2_none(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1106,7 +1194,9 @@ void StaticChildOf_depth_2_none(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             8.0f, 0.0f, 3.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1122,7 +1212,9 @@ void StaticChildOf_depth_2_none(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             11.0f, 0.0f, 5.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1159,7 +1251,9 @@ void StaticChildOf_depth_2_r(void) {
             0.197677f, -0.099833f, 0.97517f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1175,7 +1269,9 @@ void StaticChildOf_depth_2_r(void) {
             0.469936f, -0.212352f, 0.856777f, 0.0f,
             2.811305f, 3.438818f, 1.305592f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1191,7 +1287,9 @@ void StaticChildOf_depth_2_r(void) {
             0.767561f, -0.287131f, 0.573066f, 0.0f,
             5.893226f, 4.708141f, 1.680528f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1213,7 +1311,9 @@ void StaticChildOf_depth_2_r(void) {
             0.095375f, -0.29552f, 0.950564f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1229,7 +1329,9 @@ void StaticChildOf_depth_2_r(void) {
             0.391627f, -0.35077f, 0.85064f, 0.0f,
             7.50671f, 0.395787f, 3.834767f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1245,7 +1347,9 @@ void StaticChildOf_depth_2_r(void) {
             0.727032f, -0.329842f, 0.602186f, 0.0f,
             10.336314f, 1.851147f, 4.895555f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1282,7 +1386,9 @@ void StaticChildOf_depth_2_s(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1298,7 +1404,9 @@ void StaticChildOf_depth_2_s(void) {
             0.0f, 0.0f, 3.0f, 0.0f,
             4.0f, 2.5f, 2.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1314,7 +1422,9 @@ void StaticChildOf_depth_2_s(void) {
             0.0f, 0.0f, 1.5f, 0.0f,
             6.25f, 2.5f, 7.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1336,7 +1446,9 @@ void StaticChildOf_depth_2_s(void) {
             0.0f, 0.0f, 1.75f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1352,7 +1464,9 @@ void StaticChildOf_depth_2_s(void) {
             0.0f, 0.0f, 2.625f, 0.0f,
             9.5f, 0.0f, 4.25f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1368,7 +1482,9 @@ void StaticChildOf_depth_2_s(void) {
             0.0f, 0.0f, 1.3125f, 0.0f,
             12.125f, 0.0f, 8.1875f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1408,7 +1524,9 @@ void StaticChildOf_depth_2_rs(void) {
             0.395354f, -0.199667f, 1.950341f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1424,7 +1542,9 @@ void StaticChildOf_depth_2_rs(void) {
             1.117478f, -0.265622f, 2.667615f, 0.0f,
             4.086477f, 3.157747f, 2.043789f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1440,7 +1560,9 @@ void StaticChildOf_depth_2_rs(void) {
             0.686382f, -0.174489f, 0.998158f, 0.0f,
             7.615427f, 3.618857f, 5.166699f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1463,7 +1585,9 @@ void StaticChildOf_depth_2_rs(void) {
             0.166905f, -0.51716f, 1.663487f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1479,7 +1603,9 @@ void StaticChildOf_depth_2_rs(void) {
             0.937227f, -0.728508f, 2.301813f, 0.0f,
             8.941413f, 0.797454f, 4.604696f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1495,7 +1621,9 @@ void StaticChildOf_depth_2_rs(void) {
             0.717275f, -0.424165f, 0.833092f, 0.0f,
             12.419958f, 1.203863f, 7.78507f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1529,7 +1657,9 @@ void StaticChildOf_depth_2_none_skip_0(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             2.0f, 1.0f, 1.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1545,7 +1675,9 @@ void StaticChildOf_depth_2_none_skip_0(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             5.0f, 1.0f, 2.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1567,7 +1699,9 @@ void StaticChildOf_depth_2_none_skip_0(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             7.0f, -2.0f, 3.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1583,7 +1717,9 @@ void StaticChildOf_depth_2_none_skip_0(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             10.0f, -2.0f, 4.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1619,7 +1755,9 @@ void StaticChildOf_depth_2_r_skip_0(void) {
             0.242472f, -0.198669f, 0.949599f, 0.0f,
             2.0f, 1.0f, 1.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1635,7 +1773,9 @@ void StaticChildOf_depth_2_r_skip_0(void) {
             0.546537f, -0.39349f, 0.739232f, 0.0f,
             5.216563f, 1.429413f, 1.84813f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1658,7 +1798,9 @@ void StaticChildOf_depth_2_r_skip_0(void) {
             0.137642f, -0.389418f, 0.910718f, 0.0f,
             7.0f, -2.0f, 3.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1674,7 +1816,9 @@ void StaticChildOf_depth_2_r_skip_0(void) {
             0.487083f, -0.504853f, 0.712653f, 0.0f,
             10.006603f, -1.508093f, 4.402984f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1710,7 +1854,9 @@ void StaticChildOf_depth_2_s_skip_0(void) {
             0.0f, 0.0f, 1.5f, 0.0f,
             2.0f, 1.0f, 1.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1726,7 +1872,9 @@ void StaticChildOf_depth_2_s_skip_0(void) {
             0.0f, 0.0f, 0.75f, 0.0f,
             3.5f, 1.0f, 3.25f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1749,7 +1897,9 @@ void StaticChildOf_depth_2_s_skip_0(void) {
             0.0f, 0.0f, 1.25f, 0.0f,
             7.0f, -2.0f, 3.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1765,7 +1915,9 @@ void StaticChildOf_depth_2_s_skip_0(void) {
             0.0f, 0.0f, 0.625f, 0.0f,
             9.25f, -2.0f, 4.875f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1803,7 +1955,9 @@ void StaticChildOf_depth_2_rs_skip_0(void) {
             0.363709f, -0.298004f, 1.424398f, 0.0f,
             2.0f, 1.0f, 1.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1819,7 +1973,9 @@ void StaticChildOf_depth_2_rs_skip_0(void) {
             0.289857f, -0.399501f, 0.563238f, 0.0f,
             3.97199f, 0.916703f, 2.848463f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1843,7 +1999,9 @@ void StaticChildOf_depth_2_rs_skip_0(void) {
             0.172052f, -0.486773f, 1.138398f, 0.0f,
             7.0f, -2.0f, 3.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1859,7 +2017,9 @@ void StaticChildOf_depth_2_rs_skip_0(void) {
             0.299767f, -0.49754f, 0.368287f, 0.0f,
             9.358184f, -1.923134f, 4.735277f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1892,7 +2052,9 @@ void StaticChildOf_depth_2_none_skip_1(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1909,7 +2071,9 @@ void StaticChildOf_depth_2_none_skip_1(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             4.0f, 2.0f, 2.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1930,7 +2094,9 @@ void StaticChildOf_depth_2_none_skip_1(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1947,7 +2113,9 @@ void StaticChildOf_depth_2_none_skip_1(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             9.0f, -1.0f, 4.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1982,7 +2150,9 @@ void StaticChildOf_depth_2_r_skip_1(void) {
             0.197677f, -0.099833f, 0.97517f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1999,7 +2169,9 @@ void StaticChildOf_depth_2_r_skip_1(void) {
             0.526395f, -0.289011f, 0.799613f, 0.0f,
             4.122979f, 2.732381f, 1.480111f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2021,7 +2193,9 @@ void StaticChildOf_depth_2_r_skip_1(void) {
             0.095375f, -0.29552f, 0.950564f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2038,7 +2212,9 @@ void StaticChildOf_depth_2_r_skip_1(void) {
             0.463662f, -0.406612f, 0.787201f, 0.0f,
             8.869406f, -0.196665f, 4.039858f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2073,7 +2249,9 @@ void StaticChildOf_depth_2_s_skip_1(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2090,7 +2268,9 @@ void StaticChildOf_depth_2_s_skip_1(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             5.5f, 2.0f, 3.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2112,7 +2292,9 @@ void StaticChildOf_depth_2_s_skip_1(void) {
             0.0f, 0.0f, 1.75f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2129,7 +2311,9 @@ void StaticChildOf_depth_2_s_skip_1(void) {
             0.0f, 0.0f, 0.875f, 0.0f,
             11.25f, -1.0f, 5.125f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2166,7 +2350,9 @@ void StaticChildOf_depth_2_rs_skip_1(void) {
             0.395354f, -0.199667f, 1.950341f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2183,7 +2369,9 @@ void StaticChildOf_depth_2_rs_skip_1(void) {
             0.399904f, -0.099081f, 0.844698f, 0.0f,
             5.832726f, 3.023697f, 2.701545f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2206,7 +2394,9 @@ void StaticChildOf_depth_2_rs_skip_1(void) {
             0.166905f, -0.51716f, 1.663487f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2223,7 +2413,9 @@ void StaticChildOf_depth_2_rs_skip_1(void) {
             0.360686f, -0.260455f, 0.722955f, 0.0f,
             11.02146f, 0.405836f, 5.194752f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2256,7 +2448,9 @@ void StaticChildOf_depth_2_none_skip_2(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2272,7 +2466,9 @@ void StaticChildOf_depth_2_none_skip_2(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             3.0f, 3.0f, 1.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2294,7 +2490,9 @@ void StaticChildOf_depth_2_none_skip_2(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2310,7 +2508,9 @@ void StaticChildOf_depth_2_none_skip_2(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             8.0f, 0.0f, 3.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2346,7 +2546,9 @@ void StaticChildOf_depth_2_r_skip_2(void) {
             0.197677f, -0.099833f, 0.97517f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2362,7 +2564,9 @@ void StaticChildOf_depth_2_r_skip_2(void) {
             0.469936f, -0.212352f, 0.856777f, 0.0f,
             2.811305f, 3.438818f, 1.305592f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2385,7 +2589,9 @@ void StaticChildOf_depth_2_r_skip_2(void) {
             0.095375f, -0.29552f, 0.950564f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2401,7 +2607,9 @@ void StaticChildOf_depth_2_r_skip_2(void) {
             0.391627f, -0.35077f, 0.85064f, 0.0f,
             7.50671f, 0.395787f, 3.834767f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2437,7 +2645,9 @@ void StaticChildOf_depth_2_s_skip_2(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2453,7 +2663,9 @@ void StaticChildOf_depth_2_s_skip_2(void) {
             0.0f, 0.0f, 3.0f, 0.0f,
             4.0f, 2.5f, 2.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2476,7 +2688,9 @@ void StaticChildOf_depth_2_s_skip_2(void) {
             0.0f, 0.0f, 1.75f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2492,7 +2706,9 @@ void StaticChildOf_depth_2_s_skip_2(void) {
             0.0f, 0.0f, 2.625f, 0.0f,
             9.5f, 0.0f, 4.25f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2530,7 +2746,9 @@ void StaticChildOf_depth_2_rs_skip_2(void) {
             0.395354f, -0.199667f, 1.950341f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2546,7 +2764,9 @@ void StaticChildOf_depth_2_rs_skip_2(void) {
             1.117478f, -0.265622f, 2.667615f, 0.0f,
             4.086477f, 3.157747f, 2.043789f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2570,7 +2790,9 @@ void StaticChildOf_depth_2_rs_skip_2(void) {
             0.166905f, -0.51716f, 1.663487f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2586,7 +2808,9 @@ void StaticChildOf_depth_2_rs_skip_2(void) {
             0.937227f, -0.728508f, 2.301813f, 0.0f,
             8.941413f, 0.797454f, 4.604696f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2621,7 +2845,9 @@ void StaticChildOf_depth_2_none_skip_0_1(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             3.0f, 0.0f, 1.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2644,7 +2870,9 @@ void StaticChildOf_depth_2_none_skip_0_1(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             8.0f, -3.0f, 3.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2679,7 +2907,9 @@ void StaticChildOf_depth_2_r_skip_0_1(void) {
             0.282321f, -0.29552f, 0.912668f, 0.0f,
             3.0f, 0.0f, 1.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2703,7 +2933,9 @@ void StaticChildOf_depth_2_r_skip_0_1(void) {
             0.174349f, -0.479426f, 0.860089f, 0.0f,
             8.0f, -3.0f, 3.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2738,7 +2970,9 @@ void StaticChildOf_depth_2_s_skip_0_1(void) {
             0.0f, 0.0f, 0.5f, 0.0f,
             3.0f, 0.0f, 1.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2762,7 +2996,9 @@ void StaticChildOf_depth_2_s_skip_0_1(void) {
             0.0f, 0.0f, 0.25f, 0.0f,
             8.0f, -3.0f, 3.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2798,7 +3034,9 @@ void StaticChildOf_depth_2_rs_skip_0_1(void) {
             0.141161f, -0.14776f, 0.456334f, 0.0f,
             3.0f, 0.0f, 1.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2823,7 +3061,9 @@ void StaticChildOf_depth_2_rs_skip_0_1(void) {
             0.043587f, -0.119856f, 0.215022f, 0.0f,
             8.0f, -3.0f, 3.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2859,7 +3099,9 @@ void StaticChildOf_depth_3_none(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2875,7 +3117,9 @@ void StaticChildOf_depth_3_none(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             3.0f, 3.0f, 1.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2891,7 +3135,9 @@ void StaticChildOf_depth_3_none(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             6.0f, 3.0f, 3.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2907,7 +3153,9 @@ void StaticChildOf_depth_3_none(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             10.0f, 2.0f, 5.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2928,7 +3176,9 @@ void StaticChildOf_depth_3_none(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2944,7 +3194,9 @@ void StaticChildOf_depth_3_none(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             8.0f, 0.0f, 3.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2960,7 +3212,9 @@ void StaticChildOf_depth_3_none(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             11.0f, 0.0f, 5.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2976,7 +3230,9 @@ void StaticChildOf_depth_3_none(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             15.0f, -1.0f, 7.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3016,7 +3272,9 @@ void StaticChildOf_depth_3_r(void) {
             0.197677f, -0.099833f, 0.97517f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3032,7 +3290,9 @@ void StaticChildOf_depth_3_r(void) {
             0.469936f, -0.212352f, 0.856777f, 0.0f,
             2.811305f, 3.438818f, 1.305592f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3048,7 +3308,9 @@ void StaticChildOf_depth_3_r(void) {
             0.767561f, -0.287131f, 0.573066f, 0.0f,
             5.893226f, 4.708141f, 1.680528f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3064,7 +3326,9 @@ void StaticChildOf_depth_3_r(void) {
             0.957394f, -0.274406f, 0.08999f, 0.0f,
             10.005639f, 6.332136f, 0.476077f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3086,7 +3350,9 @@ void StaticChildOf_depth_3_r(void) {
             0.095375f, -0.29552f, 0.950564f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3102,7 +3368,9 @@ void StaticChildOf_depth_3_r(void) {
             0.391627f, -0.35077f, 0.85064f, 0.0f,
             7.50671f, 0.395787f, 3.834767f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3118,7 +3386,9 @@ void StaticChildOf_depth_3_r(void) {
             0.727032f, -0.329842f, 0.602186f, 0.0f,
             10.336314f, 1.851147f, 4.895555f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3134,7 +3404,9 @@ void StaticChildOf_depth_3_r(void) {
             0.967951f, -0.190211f, 0.163983f, 0.0f,
             14.317083f, 4.107589f, 4.646667f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3174,7 +3446,9 @@ void StaticChildOf_depth_3_s(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3190,7 +3464,9 @@ void StaticChildOf_depth_3_s(void) {
             0.0f, 0.0f, 3.0f, 0.0f,
             4.0f, 2.5f, 2.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3206,7 +3482,9 @@ void StaticChildOf_depth_3_s(void) {
             0.0f, 0.0f, 1.5f, 0.0f,
             6.25f, 2.5f, 7.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3222,7 +3500,9 @@ void StaticChildOf_depth_3_s(void) {
             0.0f, 0.0f, 2.25f, 0.0f,
             12.25f, 1.0f, 10.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3244,7 +3524,9 @@ void StaticChildOf_depth_3_s(void) {
             0.0f, 0.0f, 1.75f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3260,7 +3542,9 @@ void StaticChildOf_depth_3_s(void) {
             0.0f, 0.0f, 2.625f, 0.0f,
             9.5f, 0.0f, 4.25f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3276,7 +3560,9 @@ void StaticChildOf_depth_3_s(void) {
             0.0f, 0.0f, 1.3125f, 0.0f,
             12.125f, 0.0f, 8.1875f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3292,7 +3578,9 @@ void StaticChildOf_depth_3_s(void) {
             0.0f, 0.0f, 1.96875f, 0.0f,
             19.125f, -3.0f, 10.8125f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3336,7 +3624,9 @@ void StaticChildOf_depth_3_rs(void) {
             0.395354f, -0.199667f, 1.950341f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3352,7 +3642,9 @@ void StaticChildOf_depth_3_rs(void) {
             1.117478f, -0.265622f, 2.667615f, 0.0f,
             4.086477f, 3.157747f, 2.043789f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3368,7 +3660,9 @@ void StaticChildOf_depth_3_rs(void) {
             0.686382f, -0.174489f, 0.998158f, 0.0f,
             7.615427f, 3.618857f, 5.166699f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3384,7 +3678,9 @@ void StaticChildOf_depth_3_rs(void) {
             1.316493f, -0.210862f, -1.141022f, 0.0f,
             11.077468f, 6.20269f, -1.305818f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3407,7 +3703,9 @@ void StaticChildOf_depth_3_rs(void) {
             0.166905f, -0.51716f, 1.663487f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3423,7 +3721,9 @@ void StaticChildOf_depth_3_rs(void) {
             0.937227f, -0.728508f, 2.301813f, 0.0f,
             8.941413f, 0.797454f, 4.604696f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3439,7 +3739,9 @@ void StaticChildOf_depth_3_rs(void) {
             0.717275f, -0.424165f, 0.833092f, 0.0f,
             12.419958f, 1.203863f, 7.78507f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3455,7 +3757,9 @@ void StaticChildOf_depth_3_rs(void) {
             1.968016f, -0.381453f, -1.081359f, 0.0f,
             16.862834f, 6.09883f, 3.443547f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3491,7 +3795,9 @@ void StaticChildOf_depth_3_none_skip_0(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             2.0f, 1.0f, 1.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3507,7 +3813,9 @@ void StaticChildOf_depth_3_none_skip_0(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             5.0f, 1.0f, 2.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3523,7 +3831,9 @@ void StaticChildOf_depth_3_none_skip_0(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             9.0f, 0.0f, 4.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3545,7 +3855,9 @@ void StaticChildOf_depth_3_none_skip_0(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             7.0f, -2.0f, 3.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3561,7 +3873,9 @@ void StaticChildOf_depth_3_none_skip_0(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             10.0f, -2.0f, 4.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3577,7 +3891,9 @@ void StaticChildOf_depth_3_none_skip_0(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             14.0f, -3.0f, 6.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3616,7 +3932,9 @@ void StaticChildOf_depth_3_r_skip_0(void) {
             0.242472f, -0.198669f, 0.949599f, 0.0f,
             2.0f, 1.0f, 1.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3632,7 +3950,9 @@ void StaticChildOf_depth_3_r_skip_0(void) {
             0.546537f, -0.39349f, 0.739232f, 0.0f,
             5.216563f, 1.429413f, 1.84813f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3648,7 +3968,9 @@ void StaticChildOf_depth_3_r_skip_0(void) {
             0.806848f, -0.506294f, 0.304405f, 0.0f,
             9.762392f, 1.676671f, 1.324385f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3671,7 +3993,9 @@ void StaticChildOf_depth_3_r_skip_0(void) {
             0.137642f, -0.389418f, 0.910718f, 0.0f,
             7.0f, -2.0f, 3.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3687,7 +4011,9 @@ void StaticChildOf_depth_3_r_skip_0(void) {
             0.487083f, -0.504853f, 0.712653f, 0.0f,
             10.006603f, -1.508093f, 4.402984f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3703,7 +4029,9 @@ void StaticChildOf_depth_3_r_skip_0(void) {
             0.813284f, -0.493102f, 0.308901f, 0.0f,
             14.522437f, -0.768077f, 4.647162f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3742,7 +4070,9 @@ void StaticChildOf_depth_3_s_skip_0(void) {
             0.0f, 0.0f, 1.5f, 0.0f,
             2.0f, 1.0f, 1.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3758,7 +4088,9 @@ void StaticChildOf_depth_3_s_skip_0(void) {
             0.0f, 0.0f, 0.75f, 0.0f,
             3.5f, 1.0f, 3.25f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3774,7 +4106,9 @@ void StaticChildOf_depth_3_s_skip_0(void) {
             0.0f, 0.0f, 1.125f, 0.0f,
             7.5f, -2.0f, 4.75f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3797,7 +4131,9 @@ void StaticChildOf_depth_3_s_skip_0(void) {
             0.0f, 0.0f, 1.25f, 0.0f,
             7.0f, -2.0f, 3.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3813,7 +4149,9 @@ void StaticChildOf_depth_3_s_skip_0(void) {
             0.0f, 0.0f, 0.625f, 0.0f,
             9.25f, -2.0f, 4.875f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3829,7 +4167,9 @@ void StaticChildOf_depth_3_s_skip_0(void) {
             0.0f, 0.0f, 0.9375f, 0.0f,
             15.25f, -5.75f, 6.125f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3871,7 +4211,9 @@ void StaticChildOf_depth_3_rs_skip_0(void) {
             0.363709f, -0.298004f, 1.424398f, 0.0f,
             2.0f, 1.0f, 1.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3887,7 +4229,9 @@ void StaticChildOf_depth_3_rs_skip_0(void) {
             0.289857f, -0.399501f, 0.563238f, 0.0f,
             3.97199f, 0.916703f, 2.848463f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3903,7 +4247,9 @@ void StaticChildOf_depth_3_rs_skip_0(void) {
             0.907938f, -1.460868f, -0.4157f, 0.0f,
             7.347221f, 1.984648f, -0.094234f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3927,7 +4273,9 @@ void StaticChildOf_depth_3_rs_skip_0(void) {
             0.172052f, -0.486773f, 1.138398f, 0.0f,
             7.0f, -2.0f, 3.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3943,7 +4291,9 @@ void StaticChildOf_depth_3_rs_skip_0(void) {
             0.299767f, -0.49754f, 0.368287f, 0.0f,
             9.358184f, -1.923134f, 4.735277f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3959,7 +4309,9 @@ void StaticChildOf_depth_3_rs_skip_0(void) {
             1.527619f, -1.485844f, -0.76041f, 0.0f,
             14.905397f, 0.57212f, 2.961636f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3994,7 +4346,9 @@ void StaticChildOf_depth_3_none_skip_1(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4011,7 +4365,9 @@ void StaticChildOf_depth_3_none_skip_1(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             4.0f, 2.0f, 2.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4027,7 +4383,9 @@ void StaticChildOf_depth_3_none_skip_1(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             8.0f, 1.0f, 4.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4048,7 +4406,9 @@ void StaticChildOf_depth_3_none_skip_1(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4065,7 +4425,9 @@ void StaticChildOf_depth_3_none_skip_1(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             9.0f, -1.0f, 4.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4081,7 +4443,9 @@ void StaticChildOf_depth_3_none_skip_1(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             13.0f, -2.0f, 6.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4119,7 +4483,9 @@ void StaticChildOf_depth_3_r_skip_1(void) {
             0.197677f, -0.099833f, 0.97517f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4136,7 +4502,9 @@ void StaticChildOf_depth_3_r_skip_1(void) {
             0.526395f, -0.289011f, 0.799613f, 0.0f,
             4.122979f, 2.732381f, 1.480111f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4152,7 +4520,9 @@ void StaticChildOf_depth_3_r_skip_1(void) {
             0.819514f, -0.418765f, 0.391194f, 0.0f,
             8.664842f, 3.265045f, 1.18388f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4174,7 +4544,9 @@ void StaticChildOf_depth_3_r_skip_1(void) {
             0.095375f, -0.29552f, 0.950564f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4191,7 +4563,9 @@ void StaticChildOf_depth_3_r_skip_1(void) {
             0.463662f, -0.406612f, 0.787201f, 0.0f,
             8.869406f, -0.196665f, 4.039858f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4207,7 +4581,9 @@ void StaticChildOf_depth_3_r_skip_1(void) {
             0.816034f, -0.411478f, 0.405925f, 0.0f,
             13.308904f, 0.841343f, 4.5018f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4245,7 +4621,9 @@ void StaticChildOf_depth_3_s_skip_1(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4262,7 +4640,9 @@ void StaticChildOf_depth_3_s_skip_1(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             5.5f, 2.0f, 3.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4278,7 +4658,9 @@ void StaticChildOf_depth_3_s_skip_1(void) {
             0.0f, 0.0f, 1.5f, 0.0f,
             17.5f, 1.25f, 5.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4300,7 +4682,9 @@ void StaticChildOf_depth_3_s_skip_1(void) {
             0.0f, 0.0f, 1.75f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4317,7 +4701,9 @@ void StaticChildOf_depth_3_s_skip_1(void) {
             0.0f, 0.0f, 0.875f, 0.0f,
             11.25f, -1.0f, 5.125f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4333,7 +4719,9 @@ void StaticChildOf_depth_3_s_skip_1(void) {
             0.0f, 0.0f, 1.3125f, 0.0f,
             25.25f, -2.5f, 6.875f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4374,7 +4762,9 @@ void StaticChildOf_depth_3_rs_skip_1(void) {
             0.395354f, -0.199667f, 1.950341f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4391,7 +4781,9 @@ void StaticChildOf_depth_3_rs_skip_1(void) {
             0.399904f, -0.099081f, 0.844698f, 0.0f,
             5.832726f, 3.023697f, 2.701545f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4407,7 +4799,9 @@ void StaticChildOf_depth_3_rs_skip_1(void) {
             1.808012f, 0.108634f, -0.19728f, 0.0f,
             16.682215f, 6.787077f, -2.104296f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4430,7 +4824,9 @@ void StaticChildOf_depth_3_rs_skip_1(void) {
             0.166905f, -0.51716f, 1.663487f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4447,7 +4843,9 @@ void StaticChildOf_depth_3_rs_skip_1(void) {
             0.360686f, -0.260455f, 0.722955f, 0.0f,
             11.02146f, 0.405836f, 5.194752f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4463,7 +4861,9 @@ void StaticChildOf_depth_3_rs_skip_1(void) {
             2.224541f, 0.100841f, -0.049929f, 0.0f,
             23.68248f, 6.870867f, 3.248715f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4498,7 +4898,9 @@ void StaticChildOf_depth_3_none_skip_2(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4514,7 +4916,9 @@ void StaticChildOf_depth_3_none_skip_2(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             3.0f, 3.0f, 1.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4531,7 +4935,9 @@ void StaticChildOf_depth_3_none_skip_2(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             7.0f, 2.0f, 3.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4552,7 +4958,9 @@ void StaticChildOf_depth_3_none_skip_2(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4568,7 +4976,9 @@ void StaticChildOf_depth_3_none_skip_2(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             8.0f, 0.0f, 3.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4585,7 +4995,9 @@ void StaticChildOf_depth_3_none_skip_2(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             12.0f, -1.0f, 5.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4623,7 +5035,9 @@ void StaticChildOf_depth_3_r_skip_2(void) {
             0.197677f, -0.099833f, 0.97517f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4639,7 +5053,9 @@ void StaticChildOf_depth_3_r_skip_2(void) {
             0.469936f, -0.212352f, 0.856777f, 0.0f,
             2.811305f, 3.438818f, 1.305592f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4656,7 +5072,9 @@ void StaticChildOf_depth_3_r_skip_2(void) {
             0.808345f, -0.336452f, 0.483093f, 0.0f,
             7.309582f, 4.309808f, 1.388523f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4678,7 +5096,9 @@ void StaticChildOf_depth_3_r_skip_2(void) {
             0.095375f, -0.29552f, 0.950564f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4694,7 +5114,9 @@ void StaticChildOf_depth_3_r_skip_2(void) {
             0.391627f, -0.35077f, 0.85064f, 0.0f,
             7.50671f, 0.395787f, 3.834767f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4711,7 +5133,9 @@ void StaticChildOf_depth_3_r_skip_2(void) {
             0.783889f, -0.3534f, 0.510516f, 0.0f,
             11.816209f, 1.672419f, 4.728318f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4749,7 +5173,9 @@ void StaticChildOf_depth_3_s_skip_2(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4765,7 +5191,9 @@ void StaticChildOf_depth_3_s_skip_2(void) {
             0.0f, 0.0f, 3.0f, 0.0f,
             4.0f, 2.5f, 2.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4782,7 +5210,9 @@ void StaticChildOf_depth_3_s_skip_2(void) {
             0.0f, 0.0f, 4.5f, 0.0f,
             7.0f, 1.5f, 8.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4804,7 +5234,9 @@ void StaticChildOf_depth_3_s_skip_2(void) {
             0.0f, 0.0f, 1.75f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4820,7 +5252,9 @@ void StaticChildOf_depth_3_s_skip_2(void) {
             0.0f, 0.0f, 2.625f, 0.0f,
             9.5f, 0.0f, 4.25f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4837,7 +5271,9 @@ void StaticChildOf_depth_3_s_skip_2(void) {
             0.0f, 0.0f, 3.9375f, 0.0f,
             13.0f, -2.0f, 9.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4878,7 +5314,9 @@ void StaticChildOf_depth_3_rs_skip_2(void) {
             0.395354f, -0.199667f, 1.950341f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4894,7 +5332,9 @@ void StaticChildOf_depth_3_rs_skip_2(void) {
             1.117478f, -0.265622f, 2.667615f, 0.0f,
             4.086477f, 3.157747f, 2.043789f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4911,7 +5351,9 @@ void StaticChildOf_depth_3_rs_skip_2(void) {
             2.095741f, -0.5795f, 2.620385f, 0.0f,
             9.395843f, 3.138277f, 5.004176f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4934,7 +5376,9 @@ void StaticChildOf_depth_3_rs_skip_2(void) {
             0.166905f, -0.51716f, 1.663487f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4950,7 +5394,9 @@ void StaticChildOf_depth_3_rs_skip_2(void) {
             0.937227f, -0.728508f, 2.301813f, 0.0f,
             8.941413f, 0.797454f, 4.604696f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4967,7 +5413,9 @@ void StaticChildOf_depth_3_rs_skip_2(void) {
             2.30292f, -1.3502f, 2.135966f, 0.0f,
             14.879272f, 0.241178f, 7.461272f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5002,7 +5450,9 @@ void StaticChildOf_depth_3_none_skip_3(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5018,7 +5468,9 @@ void StaticChildOf_depth_3_none_skip_3(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             3.0f, 3.0f, 1.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5034,7 +5486,9 @@ void StaticChildOf_depth_3_none_skip_3(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             6.0f, 3.0f, 3.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5056,7 +5510,9 @@ void StaticChildOf_depth_3_none_skip_3(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5072,7 +5528,9 @@ void StaticChildOf_depth_3_none_skip_3(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             8.0f, 0.0f, 3.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5088,7 +5546,9 @@ void StaticChildOf_depth_3_none_skip_3(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             11.0f, 0.0f, 5.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5127,7 +5587,9 @@ void StaticChildOf_depth_3_r_skip_3(void) {
             0.197677f, -0.099833f, 0.97517f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5143,7 +5605,9 @@ void StaticChildOf_depth_3_r_skip_3(void) {
             0.469936f, -0.212352f, 0.856777f, 0.0f,
             2.811305f, 3.438818f, 1.305592f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5159,7 +5623,9 @@ void StaticChildOf_depth_3_r_skip_3(void) {
             0.767561f, -0.287131f, 0.573066f, 0.0f,
             5.893226f, 4.708141f, 1.680528f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5182,7 +5648,9 @@ void StaticChildOf_depth_3_r_skip_3(void) {
             0.095375f, -0.29552f, 0.950564f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5198,7 +5666,9 @@ void StaticChildOf_depth_3_r_skip_3(void) {
             0.391627f, -0.35077f, 0.85064f, 0.0f,
             7.50671f, 0.395787f, 3.834767f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5214,7 +5684,9 @@ void StaticChildOf_depth_3_r_skip_3(void) {
             0.727032f, -0.329842f, 0.602186f, 0.0f,
             10.336314f, 1.851147f, 4.895555f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5253,7 +5725,9 @@ void StaticChildOf_depth_3_s_skip_3(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5269,7 +5743,9 @@ void StaticChildOf_depth_3_s_skip_3(void) {
             0.0f, 0.0f, 3.0f, 0.0f,
             4.0f, 2.5f, 2.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5285,7 +5761,9 @@ void StaticChildOf_depth_3_s_skip_3(void) {
             0.0f, 0.0f, 1.5f, 0.0f,
             6.25f, 2.5f, 7.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5308,7 +5786,9 @@ void StaticChildOf_depth_3_s_skip_3(void) {
             0.0f, 0.0f, 1.75f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5324,7 +5804,9 @@ void StaticChildOf_depth_3_s_skip_3(void) {
             0.0f, 0.0f, 2.625f, 0.0f,
             9.5f, 0.0f, 4.25f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5340,7 +5822,9 @@ void StaticChildOf_depth_3_s_skip_3(void) {
             0.0f, 0.0f, 1.3125f, 0.0f,
             12.125f, 0.0f, 8.1875f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5382,7 +5866,9 @@ void StaticChildOf_depth_3_rs_skip_3(void) {
             0.395354f, -0.199667f, 1.950341f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5398,7 +5884,9 @@ void StaticChildOf_depth_3_rs_skip_3(void) {
             1.117478f, -0.265622f, 2.667615f, 0.0f,
             4.086477f, 3.157747f, 2.043789f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5414,7 +5902,9 @@ void StaticChildOf_depth_3_rs_skip_3(void) {
             0.686382f, -0.174489f, 0.998158f, 0.0f,
             7.615427f, 3.618857f, 5.166699f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5438,7 +5928,9 @@ void StaticChildOf_depth_3_rs_skip_3(void) {
             0.166905f, -0.51716f, 1.663487f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5454,7 +5946,9 @@ void StaticChildOf_depth_3_rs_skip_3(void) {
             0.937227f, -0.728508f, 2.301813f, 0.0f,
             8.941413f, 0.797454f, 4.604696f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5470,7 +5964,9 @@ void StaticChildOf_depth_3_rs_skip_3(void) {
             0.717275f, -0.424165f, 0.833092f, 0.0f,
             12.419958f, 1.203863f, 7.78507f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5505,7 +6001,9 @@ void StaticChildOf_depth_3_none_skip_1_2(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5523,7 +6021,9 @@ void StaticChildOf_depth_3_none_skip_1_2(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             5.0f, 1.0f, 2.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5544,7 +6044,9 @@ void StaticChildOf_depth_3_none_skip_1_2(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5562,7 +6064,9 @@ void StaticChildOf_depth_3_none_skip_1_2(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             10.0f, -2.0f, 4.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5598,7 +6102,9 @@ void StaticChildOf_depth_3_r_skip_1_2(void) {
             0.197677f, -0.099833f, 0.97517f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5616,7 +6122,9 @@ void StaticChildOf_depth_3_r_skip_1_2(void) {
             0.574003f, -0.363677f, 0.733662f, 0.0f,
             5.434654f, 2.025945f, 1.654631f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5638,7 +6146,9 @@ void StaticChildOf_depth_3_r_skip_1_2(void) {
             0.095375f, -0.29552f, 0.950564f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5656,7 +6166,9 @@ void StaticChildOf_depth_3_r_skip_1_2(void) {
             0.527732f, -0.45944f, 0.714432f, 0.0f,
             10.232101f, -0.789117f, 4.244949f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5692,7 +6204,9 @@ void StaticChildOf_depth_3_s_skip_1_2(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5710,7 +6224,9 @@ void StaticChildOf_depth_3_s_skip_1_2(void) {
             0.0f, 0.0f, 3.0f, 0.0f,
             7.0f, 1.5f, 4.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5732,7 +6248,9 @@ void StaticChildOf_depth_3_s_skip_1_2(void) {
             0.0f, 0.0f, 1.75f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5750,7 +6268,9 @@ void StaticChildOf_depth_3_s_skip_1_2(void) {
             0.0f, 0.0f, 2.625f, 0.0f,
             13.0f, -2.0f, 6.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5788,7 +6308,9 @@ void StaticChildOf_depth_3_rs_skip_1_2(void) {
             0.395354f, -0.199667f, 1.950341f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5806,7 +6328,9 @@ void StaticChildOf_depth_3_rs_skip_1_2(void) {
             1.261669f, -0.327806f, 2.372437f, 0.0f,
             7.578976f, 2.889647f, 3.359301f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5829,7 +6353,9 @@ void StaticChildOf_depth_3_rs_skip_1_2(void) {
             0.166905f, -0.51716f, 1.663487f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5847,7 +6373,9 @@ void StaticChildOf_depth_3_rs_skip_1_2(void) {
             1.207331f, -0.829166f, 2.010404f, 0.0f,
             13.101507f, 0.014218f, 5.784808f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5883,7 +6411,9 @@ void StaticChildOf_depth_3_none_skip_0_1_2(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             4.0f, -1.0f, 2.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5907,7 +6437,9 @@ void StaticChildOf_depth_3_none_skip_0_1_2(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             9.0f, -4.0f, 4.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5944,7 +6476,9 @@ void StaticChildOf_depth_3_r_skip_0_1_2(void) {
             0.31583f, -0.389418f, 0.86522f, 0.0f,
             4.0f, -1.0f, 2.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5969,7 +6503,9 @@ void StaticChildOf_depth_3_r_skip_0_1_2(void) {
             0.204191f, -0.564642f, 0.799678f, 0.0f,
             9.0f, -4.0f, 4.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -6006,7 +6542,9 @@ void StaticChildOf_depth_3_s_skip_0_1_2(void) {
             0.0f, 0.0f, 1.5f, 0.0f,
             4.0f, -1.0f, 2.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -6031,7 +6569,9 @@ void StaticChildOf_depth_3_s_skip_0_1_2(void) {
             0.0f, 0.0f, 1.25f, 0.0f,
             9.0f, -4.0f, 4.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -6069,7 +6609,9 @@ void StaticChildOf_depth_3_rs_skip_0_1_2(void) {
             0.473745f, -0.584128f, 1.297829f, 0.0f,
             4.0f, -1.0f, 2.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -6095,7 +6637,9 @@ void StaticChildOf_depth_3_rs_skip_0_1_2(void) {
             0.255239f, -0.705803f, 0.999597f, 0.0f,
             9.0f, -4.0f, 4.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);

@@ -1398,14 +1398,14 @@ void Layout_transform_same_frame(void) {
     test_flt(ecs_get(world, p, Position)->x, 100);
     const WorldTransform *wt = ecs_get(world, b, WorldTransform);
     test_assert(wt != NULL);
-    test_flt(wt->m[3][0], 105);
-    test_flt(wt->m[3][1], 50);
+    test_flt(wt->position[0], 105);
+    test_flt(wt->position[1], 50);
 
     ecs_set(world, a, Rect, {50, 10});
     ecs_progress(world, 0);
 
     wt = ecs_get(world, b, WorldTransform);
-    test_flt(wt->m[3][0], 125);
+    test_flt(wt->position[0], 125);
 
     ecs_fini(world);
 }

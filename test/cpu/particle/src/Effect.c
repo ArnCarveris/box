@@ -102,7 +102,7 @@ static ecs_entity_t play(
     float z,
     float scale)
 {
-    vec3 position = { x, y, z };
+    dvec3 position = { x, y, z };
 
     return box_particle_burst_at(world, template_of(world, name), position, scale);
 }
@@ -518,7 +518,7 @@ void Effect_without_emitter_returns_zero(void) {
     // particle/effect
     box_render_null_t *null;
     ecs_world_t *world = world_new(&null);
-    vec3 origin = {0, 0, 0};
+    dvec3 origin = {0, 0, 0};
 
     test_assert(play(world, "Empty", 0, 0, 0, 1) == 0);
     test_assert(box_particle_burst_at(world, 0, origin, 1) == 0);

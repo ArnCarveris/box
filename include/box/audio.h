@@ -122,7 +122,7 @@ bool box_audio_play_note(
 bool box_audio_play_at(
     ecs_world_t *world,
     ecs_entity_t sound,
-    const vec3 position,
+    const dvec3 position,
     float volume);
 
 /** Gain and pan of a spatial source, as box.audio computes them.
@@ -139,8 +139,8 @@ bool box_audio_play_at(
  */
 float box_audio_spatial_gain(
     const AudioSpatial *spatial,
-    const mat4 listener,
-    const vec3 position,
+    const WorldTransform *listener,
+    const dvec3 position,
     float *pan);
 
 /** Gain, pan and distance filter of a spatial source, as box.audio computes them: the gain and
@@ -155,8 +155,8 @@ float box_audio_spatial_gain(
  */
 float box_audio_spatial_place(
     const AudioSpatial *spatial,
-    const mat4 listener,
-    const vec3 position,
+    const WorldTransform *listener,
+    const dvec3 position,
     float *pan,
     float *cutoff);
 

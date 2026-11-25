@@ -55,7 +55,7 @@ static void LateManualWrite(
 {
     ecs_entity_t *e = it->ctx;
     if (*e) {
-        ecs_set(it->world, *e, WorldTransform, {{{1.0f, 0.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 1.0f, 0.0f}, {10.0f, 0.0f, 0.0f, 1.0f}}});
+        ecs_set(it->world, *e, WorldTransform, {.position = {10.0f, 0.0f, 0.0f}, .basis = {{1.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 1.0f}}});
         *e = 0;
     }
 }
@@ -94,7 +94,7 @@ void Moved_position_set_passes_subtree(void) {
     test_bool(found_child, true);
     test_bool(found_grandchild, true);
     test_bool(found_other, false);
-    test_flt(ecs_get(world, grandchild, WorldTransform)->m[3][0], 4.0f);
+    test_flt(ecs_get(world, grandchild, WorldTransform)->position[0], 4.0f);
 
     ecs_fini(world);
 }
@@ -179,7 +179,7 @@ void Moved_dynamic_entity_not_passed(void) {
 
     test_int(log.calls, 0);
     test_int(log.count, 0);
-    test_flt(box_transform_world(world, child, &buf)->m[3][0], 4.0f);
+    test_flt(box_transform_world(world, child, &buf)->position[0], 4.0f);
 
     ecs_fini(world);
 }
@@ -218,7 +218,7 @@ void Moved_reparent_passes_subtree(void) {
     test_bool(found_b, false);
     test_bool(found_child, true);
     test_bool(found_grandchild, true);
-    test_flt(ecs_get(world, grandchild, WorldTransform)->m[3][0], 7.0f);
+    test_flt(ecs_get(world, grandchild, WorldTransform)->position[0], 7.0f);
 
     ecs_fini(world);
 }
@@ -232,13 +232,13 @@ void Moved_manual_write_before_pre_store(void) {
 
     ecs_entity_t manual = ecs_new(world);
     ecs_add(world, manual, ManualTransform);
-    ecs_set(world, manual, WorldTransform, {{{1.0f, 0.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 0.0f, 1.0f}}});
+    ecs_set(world, manual, WorldTransform, {.position = {0.0f, 0.0f, 0.0f}, .basis = {{1.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 1.0f}}});
     ecs_entity_t child = ecs_new_w_pair(world, EcsChildOf, manual);
     ecs_set(world, child, Position, {1.0f, 0.0f, 0.0f});
     ecs_progress(world, 0);
 
     log = (moved_log_t){0};
-    ecs_set(world, manual, WorldTransform, {{{1.0f, 0.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 1.0f, 0.0f}, {10.0f, 0.0f, 0.0f, 1.0f}}});
+    ecs_set(world, manual, WorldTransform, {.position = {10.0f, 0.0f, 0.0f}, .basis = {{1.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 1.0f}}});
     ecs_progress(world, 0);
 
     test_int(log.calls, 1);
@@ -248,7 +248,7 @@ void Moved_manual_write_before_pre_store(void) {
     }
 
     test_bool(found_child, true);
-    test_flt(ecs_get(world, child, WorldTransform)->m[3][0], 11.0f);
+    test_flt(ecs_get(world, child, WorldTransform)->position[0], 11.0f);
 
     ecs_fini(world);
 }
@@ -262,7 +262,7 @@ void Moved_manual_write_after_pre_store(void) {
 
     ecs_entity_t manual = ecs_new(world);
     ecs_add(world, manual, ManualTransform);
-    ecs_set(world, manual, WorldTransform, {{{1.0f, 0.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 0.0f, 1.0f}}});
+    ecs_set(world, manual, WorldTransform, {.position = {0.0f, 0.0f, 0.0f}, .basis = {{1.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 1.0f}}});
     ecs_entity_t child = ecs_new_w_pair(world, EcsChildOf, manual);
     ecs_set(world, child, Position, {1.0f, 0.0f, 0.0f});
     ecs_progress(world, 0);
@@ -280,7 +280,7 @@ void Moved_manual_write_after_pre_store(void) {
 
     test_uint(writing, 0);
     test_int(log.calls, 0);
-    test_flt(ecs_get(world, child, WorldTransform)->m[3][0], 1.0f);
+    test_flt(ecs_get(world, child, WorldTransform)->position[0], 1.0f);
 
     ecs_progress(world, 0);
 
@@ -291,7 +291,7 @@ void Moved_manual_write_after_pre_store(void) {
     }
 
     test_bool(found_child, true);
-    test_flt(ecs_get(world, child, WorldTransform)->m[3][0], 11.0f);
+    test_flt(ecs_get(world, child, WorldTransform)->position[0], 11.0f);
 
     ecs_fini(world);
 }

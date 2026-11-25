@@ -14,13 +14,13 @@ const ParticleCollision* box_render_particles_collision(
     ParticleCollision *buf)
 {
     const ParticleCollision *result = ecs_get(world, e, ParticleCollision);
-    float y = 0;
+    double y = 0;
     if (result && result->ground && result->terrain && ecs_is_alive(world, result->terrain) &&
-        box_terrain_ground(world, result->terrain, transform->m[3][0], transform->m[3][2], &y,
-            NULL))
+        box_terrain_ground(world, result->terrain, transform->position[0],
+            transform->position[2], &y, NULL))
     {
         *buf = *result;
-        buf->height = y;
+        buf->height = (float)y;
         result = buf;
     }
 
@@ -82,10 +82,10 @@ const WorldTransform* box_render_particles_follow(
         : NULL;
     if (target) {
         *buf = *transform;
-        buf->m[3][0] += target->m[3][0];
-        buf->m[3][2] += target->m[3][2];
+        buf->position[0] += target->position[0];
+        buf->position[2] += target->position[2];
         if (!emitter->ground) {
-            buf->m[3][1] += target->m[3][1];
+            buf->position[1] += target->position[1];
         }
 
         result = buf;

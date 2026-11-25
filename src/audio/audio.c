@@ -1239,7 +1239,7 @@ done:
 bool box_audio_play_at(
     ecs_world_t *world,
     ecs_entity_t sound,
-    const vec3 position,
+    const dvec3 position,
     float volume)
 {
     box_audio_module_t *state = box_audio_module_get(world);
@@ -1500,7 +1500,7 @@ static void box_audio_play_at_function(
     ecs_value_t *result)
 {
     ecs_entity_t sound = *(ecs_entity_t*)argv[0].ptr;
-    const float *position = argv[1].ptr;
+    const double *position = argv[1].ptr;
     float volume = *(float*)argv[2].ptr;
     (void)argc;
     *(bool*)result->ptr = box_audio_play_at(ctx->world, sound, position, volume);
@@ -1646,7 +1646,7 @@ static void box_audio_functions_init(
         .return_type = ecs_id(ecs_bool_t),
         .params = {
             { .name = "sound", .type = ecs_id(ecs_entity_t) },
-            { .name = "position", .type = ecs_id(vec3) },
+            { .name = "position", .type = ecs_id(dvec3) },
             { .name = "volume", .type = ecs_id(ecs_f32_t) }
         },
         .callback = box_audio_play_at_function

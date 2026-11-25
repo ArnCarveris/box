@@ -199,7 +199,10 @@ box_light_scene_t* box_lights_ensure(
         ecs_map_insert(&l->lookup, scene + 1, (ecs_map_val_t)index + 1);
     }
 
-    return ecs_vec_get_t(&l->scenes, box_light_scene_t, index);
+    box_light_scene_t *result = ecs_vec_get_t(&l->scenes, box_light_scene_t, index);
+    box_dvec3_copy(l->origin, result->origin);
+
+    return result;
 }
 
 /** Forget the lights of the previous frame of every scene.
@@ -253,7 +256,7 @@ static void box_lights_axis(
     float *out)
 {
     if (transform) {
-        glm_vec3_copy(ECS_CONST_CAST(float*, transform->m[2]), out);
+        glm_vec3_copy(ECS_CONST_CAST(float*, transform->basis[2]), out);
     } else {
         glm_vec3_copy((vec3){0, 0, 1}, out);
     }
@@ -268,6 +271,7 @@ static void box_lights_axis(
 /** Write a light with a position, a range and no cone.
  *
  * @param transform World transform of the light, NULL for a directional light (no position)
+ * @param origin Render origin the position is relative to
  * @param rgb Color of the light, NULL for white
  * @param intensity Irradiance scale in local units, times the square of the scale
  * @param range Local distance at which the light reaches zero, times the scale
@@ -276,6 +280,7 @@ static void box_lights_axis(
  */
 static void box_lights_point(
     const WorldTransform *transform,
+    const double *origin,
     const Rgb *rgb,
     float intensity,
     float range,
@@ -284,7 +289,7 @@ static void box_lights_point(
 {
     ecs_os_memset_t(out, 0, box_render_light_t);
     if (transform) {
-        glm_vec3_copy(ECS_CONST_CAST(float*, transform->m[3]), out->position);
+        box_dvec3_rel(transform->position, origin, out->position);
     }
 
     out->shadow = BOX_RENDER_SHADOW_NONE;
@@ -481,7 +486,7 @@ void box_lights_point_light(
         goto done;
     }
 
-    box_lights_point(transform, rgb, p->intensity,
+    box_lights_point(transform, s->origin, rgb, p->intensity,
         lt ? glm_max(p->range, BOX_LIGHTS_MIN_RANGE) : p->range, scale, &out);
     box_lights_push(s, e, p->bake, &out);
     if (p->shadows && p->bake != LightBakeModeBaked &&
@@ -515,7 +520,7 @@ void box_lights_spot_light(
         goto done;
     }
 
-    box_lights_point(transform, rgb, sp->intensity,
+    box_lights_point(transform, s->origin, rgb, sp->intensity,
         lt ? glm_max(sp->range, BOX_LIGHTS_MIN_RANGE) : sp->range, scale, &out);
     box_lights_axis(transform, out.direction);
     box_lights_cone(sp->inner_angle, sp->outer_angle, &out);
@@ -576,7 +581,7 @@ static void box_lights_collect(
             if (kind == 0) {
                 const DirectionalLight *d = &ecs_field(&it, DirectionalLight, 0)[i];
                 box_render_light_t out;
-                box_lights_point(NULL, rgb, d->intensity, 0, 1.0f, &out);
+                box_lights_point(NULL, s->origin, rgb, d->intensity, 0, 1.0f, &out);
                 box_lights_axis(transform, out.position);
                 glm_vec3_negate(out.position);
                 *ecs_vec_append_t(NULL, &s->suns, box_light_sun_t) =
@@ -1528,6 +1533,7 @@ static void BoxRenderExtractLights(
     }
 
     ecs_os_memset_t(&l->stats, 0, box_render_lights_stats_t);
+    box_dvec3_copy(p->origin, l->origin);
     l->time += (double)it->delta_time;
     box_lights_reset(l);
     box_lights_collect_bakes(world, l);

@@ -751,7 +751,7 @@ static void box_materials_transitions_end(
     ecs_vec_set_count_t(NULL, &m->transiting, uint32_t, kept);
 }
 
-/** Pack every owner again when the absolute position of the local origin changed since the
+/** Pack every owner again when the render origin changed since the
  * records were packed, for the world space patterns of the records: the WaterCaustics frame and
  * the WindSway base.
  *

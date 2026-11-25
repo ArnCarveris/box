@@ -1424,6 +1424,7 @@ static void BoxRenderExtractDraws(
     }
 
     d->tick ++;
+    box_render_origin(world, d->origin);
     d->stats.processed = 0;
     d->stats.scattered = 0;
     d->stats.scatters = 0;

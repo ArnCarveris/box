@@ -100,7 +100,8 @@ typedef struct box_render_reflect_t {
     const void *lights_state; /**< State of the light extract, looked up once */
     ecs_map_t light_map;    /**< Light entity to its index in a light record, scratch */
     box_task_id_t task;     /**< Report of the captures left, 0 while no scene progresses */
-    bool shifting;          /**< The world origin shifted since the last extract */
+    dvec3 origin;           /**< Render origin of the extract: the probes are kept relative to
+                             *   the origin of the world and sent relative to it */
 } box_render_reflect_t;
 
 /** Find the probes of a scene.
@@ -352,47 +353,22 @@ static bool box_reflect_waiting(
     return !probe->packet && (!probe->captured || probe->queued);
 }
 
-/** Check whether two points differ, or differ by more than the rounding of a shift of the
- * world origin.
- *
- * @param a The first point
- * @param b The second point
- * @param shifting Whether the world origin shifted, which allows the rounding
- * @return Whether the points differ
- */
-static bool box_reflect_point_moved(
-    const float *a,
-    const float *b,
-    bool shifting)
-{
-    bool result = false;
-    int32_t i;
-    for (i = 0; i < 3; i ++) {
-        float tolerance = shifting ? 1e-4f * (1.0f + fabsf(a[i])) : 0.0f;
-        result = result || fabsf(a[i] - b[i]) > tolerance || isnan(a[i]) != isnan(b[i]);
-    }
-
-    return result;
-}
-
 /** Check whether the data of a probe captures something else than before: its boxes or its
  * capture point moved or resized. Blend and priority only change how it is blended.
  *
- * @param a The data before, moved by a shift of the world origin
+ * @param a The data before
  * @param b The data now
- * @param shifting Whether the world origin shifted, so the points may differ by its rounding
  * @return Whether the probe needs a new capture
  */
 static bool box_reflect_moved(
     const box_render_reflection_probe_t *a,
-    const box_render_reflection_probe_t *b,
-    bool shifting)
+    const box_render_reflection_probe_t *b)
 {
-    return box_reflect_point_moved(a->center, b->center, shifting) ||
+    return ecs_os_memcmp(a->center, b->center, ECS_SIZEOF(a->center)) ||
         ecs_os_memcmp(a->axes, b->axes, ECS_SIZEOF(a->axes)) ||
         ecs_os_memcmp(a->extent, b->extent, ECS_SIZEOF(a->extent)) ||
         ecs_os_memcmp(a->projection, b->projection, ECS_SIZEOF(a->projection)) ||
-        box_reflect_point_moved(a->capture, b->capture, shifting);
+        ecs_os_memcmp(a->capture, b->capture, ECS_SIZEOF(a->capture));
 }
 
 /** Check whether a box padded by the half size of another box, then by a radius, reaches the
@@ -507,7 +483,25 @@ static void box_reflect_prune(
     }
 }
 
-/** Fill the GPU data of a probe from the world transform of its entity, ignoring its scale.
+/** Get a point relative to the origin of the world relative to the render origin.
+ *
+ * @param r The state
+ * @param point The point relative to the origin of the world
+ * @param out Receives the point relative to the render origin
+ */
+static void box_reflect_relative(
+    const box_render_reflect_t *r,
+    const float *point,
+    float *out)
+{
+    int32_t i;
+    for (i = 0; i < 3; i ++) {
+        out[i] = (float)((double)point[i] - r->origin[i]);
+    }
+}
+
+/** Fill the data of a probe from the world transform of its entity, ignoring its scale,
+ * relative to the origin of the world.
  *
  * @param out Receives the data, all but the slot
  * @param probe The ReflectionProbe
@@ -520,7 +514,7 @@ static void box_reflect_place(
 {
     mat4 m;
     int32_t i, k;
-    glm_mat4_copy(ECS_CONST_CAST(vec4*, transform->m), m);
+    box_transform_mat4(transform, NULL, m);
 
     ecs_os_memset_t(out, 0, box_render_reflection_probe_t);
     glm_vec3_copy(m[3], out->center);
@@ -748,6 +742,8 @@ static void box_reflect_list(
             &s->list, box_render_reflection_probe_t, i);
         const box_reflect_probe_t *probe = &probes[ranks[i].index];
         *out = probe->data;
+        box_reflect_relative(r, probe->data.center, out->center);
+        box_reflect_relative(r, probe->data.capture, out->capture);
         out->slot = (uint32_t)probe->slot;
         out->ready = probe->captured || probe->packet;
         if (!probe->entity && s->previous >= 0 && !out->ready) {
@@ -866,6 +862,7 @@ static void box_reflect_bakes(
         box_reflect_scene_t *s = ecs_vec_get_t(&r->scenes, box_reflect_scene_t, i);
         s->seen = false;
         s->viewed = false;
+        box_dvec3_copy(r->origin, s->origin);
         s->volume = 0;
         s->volume_buffer = 0;
         ecs_vec_clear(&s->cameras);
@@ -931,7 +928,7 @@ static void box_reflect_bakes(
                 : box_reflect_add_probe(s, 0);
             box_render_reflection_probe_t was = probe->data;
             box_reflect_scene_data(s, &probe->data);
-            if (box_reflect_moved(&was, &probe->data, r->shifting) &&
+            if (box_reflect_moved(&was, &probe->data) &&
                 !(s->follow && box_reflect_hold(s, probe)))
             {
                 box_reflect_queue(probe);
@@ -974,7 +971,7 @@ static void box_reflect_probes(
             WorldTransform buf;
             box_reflect_place(&probe->data, &probes[row],
                 box_transform_world_field(world, &qit, transforms, row, &buf));
-            if (box_reflect_moved(&was, &probe->data, r->shifting)) {
+            if (box_reflect_moved(&was, &probe->data)) {
                 box_reflect_queue(probe);
             }
 
@@ -1007,7 +1004,12 @@ static void box_reflect_views(
         }
 
         if (cameras) {
-            glm_vec3_copy(rv->camera_transform[3], *ecs_vec_append_t(NULL, &s->cameras, vec3));
+            float *camera = *ecs_vec_append_t(NULL, &s->cameras, vec3);
+            int32_t k;
+            for (k = 0; k < 3; k ++) {
+                camera[k] = (float)((double)rv->camera_transform[3][k] + p->origin[k]);
+            }
+
             if (!s->viewed) {
                 s->lights = rv->lights;
                 s->viewed = true;
@@ -1217,15 +1219,18 @@ static void box_reflect_mark_light(
     const box_render_light_t *l)
 {
     box_reflect_scene_t *s = ctx;
-    vec3 zero = {0, 0, 0};
+    vec3 zero = {0, 0, 0}, at = {0, 0, 0};
     int32_t i;
+    for (i = 0; l && i < 3; i ++) {
+        at[i] = (float)((double)l->position[i] + s->origin[i]);
+    }
+
     for (i = 0; i < ecs_vec_count(&s->probes); i ++) {
         box_reflect_probe_t *probe = ecs_vec_get_t(&s->probes, box_reflect_probe_t, i);
         bool reaches = !probe->entity && s->follow
-            ? box_reflect_within(probe->data.capture, l ? l->position : zero, zero,
+            ? box_reflect_within(probe->data.capture, at, zero,
                 l ? s->follow_radius + l->range : 0.0f)
-            : box_reflect_reaches(&probe->data, l ? l->position : zero, zero,
-                l ? l->range : 0.0f);
+            : box_reflect_reaches(&probe->data, at, zero, l ? l->range : 0.0f);
         if (!l || !(l->range > 0) || reaches) {
             box_reflect_queue(probe);
         }
@@ -1389,15 +1394,18 @@ static void box_reflect_schedule(
     batch->volume = s->volume;
     batch->volume_buffer = s->volume_buffer;
     batch->environment = s->env_handle;
-    glm_vec3_copy(s->min, batch->bounds_min);
-    glm_vec3_copy(s->max, batch->bounds_max);
+    for (i = 0; i < 3; i ++) {
+        batch->bounds_min[i] = (float)((double)s->min[i] - r->origin[i]);
+        batch->bounds_max[i] = (float)((double)s->max[i] - r->origin[i]);
+    }
+
     batch->first = ecs_vec_count(&p->probes);
     batch->count = count;
     for (i = 0; i < count; i ++) {
         box_reflect_probe_t *probe = &probes[ranks[i].index];
         box_render_probe_capture_t *out = ecs_vec_append_t(
             NULL, &p->probes, box_render_probe_capture_t);
-        glm_vec3_copy(probe->data.capture, out->position);
+        box_reflect_relative(r, probe->data.capture, out->position);
         out->index = (uint32_t)probe->slot;
         probe->ticket = s->ticket ++;
         probe->packet = packet;
@@ -1545,13 +1553,13 @@ static void BoxRenderExtractReflect(
         r->lights_state = box_render_lights_state(world);
     }
 
+    box_dvec3_copy(p->origin, r->origin);
     box_reflect_bakes(world, r, p);
     if (r->bake) {
         r->bake->reflecting = ecs_vec_count(&r->scenes) != 0;
     }
 
     box_reflect_probes(world, r);
-    r->shifting = false;
     box_reflect_views(world, r, p, true);
     box_reflect_timing(world, r);
     box_reflect_captured(world, r);
@@ -1670,41 +1678,6 @@ static const box_render_reflect_t* box_reflect_state(
     const ecs_system_t *sys = box_reflect_system_ctx(world);
 
     return sys ? sys->ctx : NULL;
-}
-
-void box_render_reflect_shift(
-    ecs_world_t *world,
-    ecs_entity_t scene,
-    const vec3 offset)
-{
-    box_render_reflect_t *r = ECS_CONST_CAST(box_render_reflect_t*, box_reflect_state(world));
-    box_reflect_scene_t *s = r ? box_reflect_find(r, scene) : NULL;
-    int32_t i;
-    if (r) {
-        r->shifting = true;
-    }
-
-    if (!s) {
-        goto done;
-    }
-
-    glm_vec3_add(s->scene_capture, ECS_CONST_CAST(float*, offset), s->scene_capture);
-    glm_vec3_add(s->anchor, ECS_CONST_CAST(float*, offset), s->anchor);
-    glm_vec3_add(s->min, ECS_CONST_CAST(float*, offset), s->min);
-    glm_vec3_add(s->max, ECS_CONST_CAST(float*, offset), s->max);
-    for (i = 0; i < ecs_vec_count(&s->cameras); i ++) {
-        float *camera = *ecs_vec_get_t(&s->cameras, vec3, i);
-        glm_vec3_add(camera, ECS_CONST_CAST(float*, offset), camera);
-    }
-
-    for (i = 0; i < ecs_vec_count(&s->probes); i ++) {
-        box_reflect_probe_t *probe = ecs_vec_get_t(&s->probes, box_reflect_probe_t, i);
-        glm_vec3_add(probe->data.center, ECS_CONST_CAST(float*, offset), probe->data.center);
-        glm_vec3_add(probe->data.capture, ECS_CONST_CAST(float*, offset), probe->data.capture);
-    }
-
-done:
-    return;
 }
 
 const box_render_reflection_probe_t* box_render_reflect_probes(

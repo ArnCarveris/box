@@ -325,8 +325,8 @@ static void clip_project(
 {
     mat4 m, cam, inv, proj, vp;
     vec4 p, clip;
-    glm_mat4_copy(ECS_CONST_CAST(vec4*, ecs_get(world, e, WorldTransform)->m), m);
-    glm_mat4_copy(ECS_CONST_CAST(vec4*, ecs_get(world, camera, WorldTransform)->m), cam);
+    box_transform_mat4(ecs_get(world, e, WorldTransform), NULL, m);
+    box_transform_mat4(ecs_get(world, camera, WorldTransform), NULL, cam);
     glm_mat4_inv(cam, inv);
     box_camera_projection(ecs_get(world, camera, Camera), size, size, proj);
     glm_mat4_mul(proj, inv, vp);

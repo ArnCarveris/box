@@ -428,9 +428,9 @@ void TextureReadback_script_sample(void) {
     const Position *p = ecs_get(world, e, Position);
     test_assert(p != NULL);
     /* The center of texel (3, 2), and the left edge halfway between columns 7 and 0 */
-    test_assert(fabsf(p->x - (float)(3 * 16 + 2) / 255.0f) < 1e-4f);
-    test_assert(fabsf(p->y - (float)(255 - (3 * 16 + 2)) / 255.0f) < 1e-4f);
-    test_assert(fabsf(p->z - (float)(7 * 16 / 2) / 255.0f) < 1e-4f);
+    test_assert(fabs(p->x - (float)(3 * 16 + 2) / 255.0f) < 1e-4f);
+    test_assert(fabs(p->y - (float)(255 - (3 * 16 + 2)) / 255.0f) < 1e-4f);
+    test_assert(fabs(p->z - (float)(7 * 16 / 2) / 255.0f) < 1e-4f);
     ecs_fini(world);
     box_render_null_free(null);
 }

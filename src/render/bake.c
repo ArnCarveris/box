@@ -282,7 +282,9 @@ static bool box_bake_inside(
     mat4 inv;
     vec4 local = { pos[0], pos[1], pos[2], 1.0f };
     if (t) {
-        glm_mat4_inv(ECS_CONST_CAST(vec4*, t->m), inv);
+        mat4 m;
+        box_transform_mat4(t, NULL, m);
+        glm_mat4_inv(m, inv);
         glm_mat4_mulv(inv, local, local);
     }
 
@@ -690,7 +692,12 @@ static void box_bake_views(
             v->viewed = true;
         }
 
-        glm_vec3_copy(rv->camera_transform[3], *ecs_vec_append_t(NULL, &v->cameras, vec3));
+        float *camera = *ecs_vec_append_t(NULL, &v->cameras, vec3);
+        int32_t k;
+        for (k = 0; k < 3; k ++) {
+            camera[k] = (float)((double)rv->camera_transform[3][k] + p->origin[k]);
+        }
+
 
         if (rv->lights.enabled && (rv->features & BOX_RENDER_FEATURE_BAKED)) {
             rv->volume = v->handle;
@@ -1184,13 +1191,17 @@ static void box_bake_pick(
     box_render_packet_t *p,
     int32_t packet)
 {
-    int32_t i, n = ecs_vec_count(&v->queue);
+    int32_t i, k, n = ecs_vec_count(&v->queue);
     uint32_t *queue = ecs_vec_first(&v->queue);
     for (i = n - 1; i >= n - count; i --) {
         box_render_probe_capture_t *out = ecs_vec_append_t(
             NULL, &p->probes, box_render_probe_capture_t);
         out->index = queue[i];
         box_bake_probe_position(v, queue[i], out->position);
+        for (k = 0; k < 3; k ++) {
+            out->position[k] = (float)((double)out->position[k] - p->origin[k]);
+        }
+
         *ecs_vec_append_t(NULL, &v->flight, box_bake_flight_t) = (box_bake_flight_t){
             .probe = queue[i], .pass = v->submitted, .packet = packet
         };
@@ -1275,8 +1286,11 @@ static void box_bake_batch(
     batch->baked_count = v->lights.baked_count;
     batch->baked_directional = v->lights.baked_directional;
     batch->environment = v->env_handle;
-    glm_vec3_copy(v->min, batch->bounds_min);
-    glm_vec3_copy(v->max, batch->bounds_max);
+    for (int32_t k = 0; k < 3; k ++) {
+        batch->bounds_min[k] = (float)((double)v->min[k] - p->origin[k]);
+        batch->bounds_max[k] = (float)((double)v->max[k] - p->origin[k]);
+    }
+
     batch->first = ecs_vec_count(&p->probes);
     batch->count = count;
     box_bake_pick(v, count, p, packet);
@@ -1679,7 +1693,6 @@ static void BoxRenderExtractBake(
 
     if (!ecs_vec_count(&b->volumes) && b->next_handle == 1 && !b->task) {
         box_bake_changes(world, b);
-        b->shifting = false;
         goto done;
     }
 
@@ -1691,7 +1704,6 @@ static void BoxRenderExtractBake(
     }
 
     box_bake_changes(world, b);
-    b->shifting = false;
     for (i = 0; i < ecs_vec_count(&b->volumes); i ++) {
         box_bake_lights(b, ecs_vec_get_t(&b->volumes, box_bake_volume_t, i));
     }
@@ -1773,50 +1785,6 @@ box_render_bake_t* box_bake_state(
     const ecs_system_t *s = system ? ecs_system_get(world, system) : NULL;
 
     return s ? s->ctx : NULL;
-}
-
-/** Add an offset to every point of a vector of vec3.
- *
- * @param points The vector
- * @param offset The offset
- */
-static void box_bake_shift_points(
-    ecs_vec_t *points,
-    const vec3 offset)
-{
-    int32_t i;
-    for (i = 0; i < ecs_vec_count(points); i ++) {
-        float *point = *ecs_vec_get_t(points, vec3, i);
-        glm_vec3_add(point, ECS_CONST_CAST(float*, offset), point);
-    }
-}
-
-void box_render_bake_shift(
-    ecs_world_t *world,
-    ecs_entity_t scene,
-    const vec3 offset)
-{
-    box_render_bake_t *b = box_bake_state(world);
-    box_bake_volume_t *v = b ? box_bake_find(b, scene) : NULL;
-    int32_t i;
-    if (b) {
-        b->shifting = true;
-    }
-
-    if (!v) {
-        goto done;
-    }
-
-    for (i = 0; i < 3; i ++) {
-        v->grid.origin[i] += offset[i];
-    }
-
-    glm_vec3_add(v->min, ECS_CONST_CAST(float*, offset), v->min);
-    glm_vec3_add(v->max, ECS_CONST_CAST(float*, offset), v->max);
-    box_bake_shift_points(&v->cameras, offset);
-    box_bake_shift_points(&v->sorted, offset);
-done:
-    return;
 }
 
 bool box_render_bake_probe(

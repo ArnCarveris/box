@@ -47,6 +47,8 @@ struct CullRun {
     first_block: u32,
     pad0: u32,
     pad1: u32,
+    // The render origin as box_gpu_origin_split packs it (render_origin.wgsl)
+    origin: vec4i,
 };
 
 // CULL_GROUP instances of a batch at most, whose bounds cull_bounds takes.
@@ -373,7 +375,7 @@ struct CullBox {
 };
 
 fn cull_box(job: CullJob, slot: u32) -> CullBox {
-    let m = instance_model(transforms[slot]);
+    let m = instance_model(transforms[slot], run.origin);
     let c0 = m[0].xyz;
     let c1 = m[1].xyz;
     let c2 = m[2].xyz;

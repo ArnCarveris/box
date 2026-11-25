@@ -1,8 +1,8 @@
 /**
  * @file render/grass.c
  * @brief Extract of the Grass entities: their values with the defaults resolved, their colors
- * linear, their ground in the local frame and the Wind of the frame, appended to the packet for
- * the backend, which places and draws their blades in the lit views of their scene
+ * linear, their ground relative to the render origin and the Wind of the frame, appended to the
+ * packet for the backend, which places and draws their blades in the lit views of their scene
  * (gpu_grass.c).
  */
 
@@ -30,7 +30,8 @@ static float box_render_grass_linear(
     return c <= 0.04045f ? c / 12.92f : powf((c + 0.055f) / 1.055f, 2.4f);
 }
 
-/** Fill the ground of a Grass on a terrain: the local y range of its heights.
+/** Fill the ground of a Grass on a terrain: the y range of its heights relative to the render
+ * origin.
  *
  * @param world The world
  * @param terrain The terrain
@@ -43,10 +44,11 @@ static bool box_render_grass_terrain(
     box_render_grass_t *out)
 {
     const Terrain *t = ecs_is_alive(world, terrain) ? ecs_get(world, terrain, Terrain) : NULL;
-    double local[3];
+    double position[3], origin[3];
     float low = BOX_RENDER_GRASS_MIN_HEIGHT, high = BOX_RENDER_GRASS_MAX_HEIGHT;
     if (t) {
-        box_terrain_local(world, terrain, local);
+        box_terrain_position(world, terrain, position);
+        box_render_origin(world, origin);
         if (t->max_height > t->min_height) {
             low = t->min_height;
             high = t->max_height;
@@ -54,8 +56,8 @@ static bool box_render_grass_terrain(
             high = t->max_height;
         }
 
-        out->ground[0] = (float)local[1] + low;
-        out->ground[1] = (float)local[1] + high;
+        out->ground[0] = (float)(position[1] - origin[1]) + low;
+        out->ground[1] = (float)(position[1] - origin[1]) + high;
     }
 
     return t != NULL;
@@ -114,7 +116,7 @@ static void box_render_grass(
         }
     } else {
         const WorldTransform *t = box_transform_world(world, e, &buf);
-        out.plane = t ? t->m[3][1] : 0.0f;
+        out.plane = t ? (float)(t->position[1] - p->origin[1]) : (float)-p->origin[1];
         out.ground[0] = out.plane;
         out.ground[1] = out.plane;
     }

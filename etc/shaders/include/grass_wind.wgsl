@@ -6,8 +6,8 @@
 // in the slow wave along the wind of wind.wgsl.
 //
 // The includer passes its GrassWind, which the CPU fills from the Wind of the frame
-// (box_render_wind_frame) in the local frame of the packet: positions are local, the offset of
-// the gust field and the phase of the sway already take the WorldOrigin into account.
+// (box_render_wind_frame) relative to the render origin of the packet: the offset of the gust
+// field and the phase of the sway already take the origin into account.
 #pragma once
 
 #include "wind_gust.wgsl"

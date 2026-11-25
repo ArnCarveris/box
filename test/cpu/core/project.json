@@ -346,7 +346,7 @@
                     "coarse_kept_until_ready",
                     "drawn_kept_past_budget",
                     "drops_within_budget",
-                    "origin_shift_keeps_tiles",
+                    "far_tiles",
                     "materials_copied",
                     "bounded_extent",
                     "remove_deletes_tiles",
@@ -362,7 +362,6 @@
                     "idle_skips_update",
                     "terrain_change_updates",
                     "material_change_updates",
-                    "origin_shift_updates",
                     "readback_updates"
                 ]
             },

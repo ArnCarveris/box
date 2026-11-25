@@ -61,10 +61,17 @@ static void box_transition_range_add(
 
     layout = box_render_transition_layout(component);
     for (i = 0; i < BOX_TRANSITION_RANGE && i < layout->count &&
-        layout->fields[i].kind == BOX_RENDER_TRANSITION_F32; i ++)
+        layout->fields[i].kind != BOX_RENDER_TRANSITION_U8; i ++)
     {
         float v;
-        ecs_os_memcpy(&v, ECS_OFFSET(value, layout->fields[i].offset), ECS_SIZEOF(float));
+        if (layout->fields[i].kind == BOX_RENDER_TRANSITION_F64) {
+            double d;
+            ecs_os_memcpy(&d, ECS_OFFSET(value, layout->fields[i].offset), ECS_SIZEOF(double));
+            v = (float)d;
+        } else {
+            ecs_os_memcpy(&v, ECS_OFFSET(value, layout->fields[i].offset), ECS_SIZEOF(float));
+        }
+
         slot->lo[i] = reset ? v : glm_min(slot->lo[i], v);
         slot->hi[i] = reset ? v : glm_max(slot->hi[i], v);
     }

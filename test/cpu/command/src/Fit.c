@@ -111,7 +111,9 @@ static void fit_corners(
             ((i & 4) ? mesh->max[2] : mesh->min[2]) * shape->scale[2]
         };
 
-        glm_mat4_mulv3((vec4*)t->m, local, 1.0f, out[i]);
+        mat4 m;
+        box_transform_mat4(t, NULL, m);
+        glm_mat4_mulv3(m, local, 1.0f, out[i]);
     }
 }
 
@@ -183,9 +185,9 @@ static bool fit_inside(
     vec3 right, up, back;
     bool result = true;
     float tan_y = tanf(glm_rad(fov) * 0.5f), tan_x = tan_y * aspect;
-    glm_vec3_normalize_to((float*)m->m[0], right);
-    glm_vec3_normalize_to((float*)m->m[1], up);
-    glm_vec3_normalize_to((float*)m->m[2], back);
+    glm_vec3_normalize_to((float*)m->basis[0], right);
+    glm_vec3_normalize_to((float*)m->basis[1], up);
+    glm_vec3_normalize_to((float*)m->basis[2], back);
     for (int32_t i = 0; result && i < count; i ++) {
         vec3 d;
         glm_vec3_sub(corners[i], (float*)eye, d);
@@ -211,7 +213,9 @@ static void fit_eye(
 {
     const WorldTransform *t = ecs_get(world, e, WorldTransform);
     test_assert(t != NULL);
-    glm_vec3_copy((float*)t->m[3], out);
+    out[0] = (float)t->position[0];
+    out[1] = (float)t->position[1];
+    out[2] = (float)t->position[2];
 }
 
 /** Check that the corners are inside the frustum of a camera and that they are not when the
@@ -310,7 +314,7 @@ void Fit_keeps_direction(void) {
     const WorldTransform *t = ecs_get(world, camera, WorldTransform);
     vec3 eye, forward, to_center;
     fit_eye(world, camera, eye);
-    glm_vec3_negate_to((float*)t->m[2], forward);
+    glm_vec3_negate_to((float*)t->basis[2], forward);
     glm_vec3_normalize(forward);
     glm_vec3_sub(r.center, eye, to_center);
     glm_vec3_normalize(to_center);
@@ -342,7 +346,7 @@ void Fit_named_camera(void) {
     p = ecs_get(world, other, Position);
     test_flt(p->x, 0);
     test_flt(p->y, 0);
-    test_assert(fabsf(p->z - r.distance) < FIT_ROUNDED);
+    test_assert(fabs(p->z - r.distance) < FIT_ROUNDED);
     test_assert(p->z < 80);
 
     ecs_fini(world);
@@ -526,7 +530,7 @@ void Fit_camera_with_parent(void) {
     const WorldTransform *t = ecs_get(world, camera, WorldTransform);
     vec3 eye, forward, expect;
     fit_eye(world, camera, eye);
-    glm_vec3_negate_to((float*)t->m[2], forward);
+    glm_vec3_negate_to((float*)t->basis[2], forward);
     glm_vec3_normalize(forward);
     glm_vec3_copy(r.center, expect);
     glm_vec3_muladds(forward, -r.distance, expect);
@@ -706,7 +710,7 @@ static float fit_depth(
     vec3 eye, back;
     float result = -FLT_MAX;
     fit_eye(world, camera, eye);
-    glm_vec3_normalize_to((float*)t->m[2], back);
+    glm_vec3_normalize_to((float*)t->basis[2], back);
     for (int32_t i = 0; i < count; i ++) {
         vec3 d;
         glm_vec3_sub(corners[i], eye, d);

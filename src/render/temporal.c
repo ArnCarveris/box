@@ -126,6 +126,7 @@ const box_render_temporal_t* box_render_history_update(
     ecs_vec_t *histories,
     uint32_t target,
     const box_render_view_t *v,
+    const double *origin,
     int64_t frame,
     int32_t width,
     int32_t height,
@@ -150,8 +151,11 @@ const box_render_temporal_t* box_render_history_update(
     glm_mat4_mul(ECS_CONST_CAST(vec4*, proj), ECS_CONST_CAST(vec4*, v->view_matrix), view_proj);
     box_render_temporal_t *t = &h->current;
     if (!first && box_render_history_continues(h, v, width, height, proj)) {
-        glm_mat4_copy(h->view_proj, t->prev_view_proj);
+        vec3 moved;
+        box_dvec3_rel(origin, h->origin, moved);
+        glm_translate_to(h->view_proj, moved, t->prev_view_proj);
         glm_vec4_copy(h->camera_position, t->prev_camera);
+        glm_vec3_sub(t->prev_camera, moved, t->prev_camera);
         t->frame_index ++;
         t->valid = true;
         t->prev_frame = h->frame;
@@ -172,6 +176,7 @@ const box_render_temporal_t* box_render_history_update(
     glm_mat4_copy(view_proj, h->view_proj);
     glm_vec3_copy(ECS_CONST_CAST(float*, v->camera_transform[3]), h->camera_position);
     h->camera_position[3] = 1.0f;
+    box_dvec3_copy(origin, h->origin);
 done:
     return &h->current;
 }

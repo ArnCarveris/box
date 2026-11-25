@@ -1,9 +1,12 @@
 // Compose pass: places the slots of a mover page in the world. Each slot holds its transform
 // relative to its mover and the record of its mover; the world transform is the transform of the
-// mover times it. A frame record marked with the frame bit moves with the mover too.
+// mover times it, in the cell of the mover. A frame record marked with the frame bit moves with
+// the mover too.
 
+// InstanceTransform of instance.wgsl: rows, and the cell of a world record (w 1).
 struct InstanceTransform {
     rows: array<vec4f, 3>,
+    cell: vec4i,
 };
 
 const MOVER_INDEX = 0x7FFFFFFFu;
@@ -23,6 +26,7 @@ fn compose(m: InstanceTransform, l: InstanceTransform) -> InstanceTransform {
         out.rows[r] = a.x * l.rows[0] + a.y * l.rows[1] + a.z * l.rows[2] +
             vec4f(0.0, 0.0, 0.0, a.w);
     }
+    out.cell = select(l.cell, m.cell, m.cell.w != 0);
     return out;
 }
 

@@ -61,10 +61,6 @@ view {
 }
 
 $ {
-  WorldOrigin: {enabled: true}
-}
-
-$ {
   ReflectionBake: {
     resolution: 128,
     budget_ms: 1,

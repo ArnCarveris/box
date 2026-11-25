@@ -314,7 +314,8 @@ void SmoothExtrusion_attachment(void) {
     vec3 expected;
     glm_vec3_scale(sample.normal, 0.5f, expected);
     glm_vec3_add(sample.position, expected, expected);
-    test_assert(glm_vec3_distance(expected, ECS_CONST_CAST(float*, m->m[3])) < 0.001f);
+    test_assert(glm_vec3_distance(expected, (vec3){(float)m->position[0],
+        (float)m->position[1], (float)m->position[2]}) < 0.001f);
     float t = 2.5f * 2 * GLM_PI / 64;
     test_assert(sample.normal[0] * cosf(t) + sample.normal[2] * sinf(t) > 0.9999f);
     ecs_fini(world);

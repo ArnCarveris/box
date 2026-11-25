@@ -368,10 +368,10 @@ void TerrainQuery_terrain_position(void) {
     test_assert(fabs(o[0] - 100) < 1e-9);
     test_assert(fabs(o[1] - 2) < 1e-9);
     test_assert(fabs(o[2] + 50) < 1e-9);
-    float y = 0;
+    double y = 0;
     vec3 n;
     test_bool(box_terrain_ground(world, terrain, 105, -48, &y, n), true);
-    test_assert(fabsf(y - (2 + tq_plane(5, 2))) < TQ_EPS);
+    test_assert(fabs(y - (2 + tq_plane(5, 2))) < TQ_EPS);
     test_assert(n[1] > 0.8f && n[1] < 0.9f);
     ecs_fini(world);
 }
@@ -439,9 +439,9 @@ void TerrainQuery_script(void) {
     glm_vec3_normalize(e);
     const Position *p = ecs_get(world, ecs_lookup(world, "probe"), Position);
     test_assert(p != NULL);
-    test_assert(fabsf(p->x - tq_plane(4, -2)) < TQ_EPS);
-    test_assert(fabsf(p->y - e[1]) < TQ_EPS);
-    test_assert(fabsf(p->z - 0.3f) < TQ_EPS);
+    test_assert(fabs(p->x - tq_plane(4, -2)) < TQ_EPS);
+    test_assert(fabs(p->y - e[1]) < TQ_EPS);
+    test_assert(fabs(p->z - 0.3f) < TQ_EPS);
     const Scale *s = ecs_get(world, ecs_lookup(world, "probe"), Scale);
     test_assert(s != NULL);
     test_assert(fabsf(s->x - acosf(e[1])) < TQ_EPS);

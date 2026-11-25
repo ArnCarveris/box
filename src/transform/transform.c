@@ -45,31 +45,104 @@ void box_transform_local(
     const Position *p,
     const Rotation *r,
     const Scale *s,
-    mat4 out)
+    WorldTransform *out)
 {
     if (r) {
-        glm_euler_yxz((vec3){ r->x, r->y, r->z }, out);
+        mat4 m;
+        glm_euler_yxz((vec3){ r->x, r->y, r->z }, m);
+        glm_mat4_pick3(m, out->basis);
     } else {
-        glm_mat4_identity(out);
+        glm_mat3_identity(out->basis);
     }
 
     if (s) {
-        glm_vec4_scale(out[0], s->x, out[0]);
-        glm_vec4_scale(out[1], s->y, out[1]);
-        glm_vec4_scale(out[2], s->z, out[2]);
+        glm_vec3_scale(out->basis[0], s->x, out->basis[0]);
+        glm_vec3_scale(out->basis[1], s->y, out->basis[1]);
+        glm_vec3_scale(out->basis[2], s->z, out->basis[2]);
     }
 
-    out[3][0] = p->x;
-    out[3][1] = p->y;
-    out[3][2] = p->z;
+    out->position[0] = p->x;
+    out->position[1] = p->y;
+    out->position[2] = p->z;
+}
+
+void box_transform_mat4(
+    const WorldTransform *t,
+    const double *origin,
+    mat4 out)
+{
+    int32_t i;
+    for (i = 0; i < 3; i ++) {
+        out[i][0] = t->basis[i][0];
+        out[i][1] = t->basis[i][1];
+        out[i][2] = t->basis[i][2];
+        out[i][3] = 0.0f;
+        out[3][i] = (float)(t->position[i] - (origin ? origin[i] : 0.0));
+    }
+
+    out[3][3] = 1.0f;
+}
+
+void box_transform_from_mat4(
+    const mat4 m,
+    const double *origin,
+    WorldTransform *out)
+{
+    int32_t i;
+    for (i = 0; i < 3; i ++) {
+        out->basis[i][0] = m[i][0];
+        out->basis[i][1] = m[i][1];
+        out->basis[i][2] = m[i][2];
+        out->position[i] = (double)m[3][i] + (origin ? origin[i] : 0.0);
+    }
+}
+
+void box_transform_point(
+    const WorldTransform *t,
+    const vec3 local,
+    dvec3 out)
+{
+    int32_t i;
+    for (i = 0; i < 3; i ++) {
+        out[i] = t->position[i] + (double)(t->basis[0][i] * local[0] + t->basis[1][i] * local[1] +
+            t->basis[2][i] * local[2]);
+    }
+}
+
+void box_transform_mul(
+    const WorldTransform *parent,
+    const WorldTransform *local,
+    WorldTransform *out)
+{
+    mat3 m;
+    dvec3 position;
+    int32_t i;
+    for (i = 0; i < 3; i ++) {
+        position[i] = parent->position[i] +
+            (double)parent->basis[0][i] * local->position[0] +
+            (double)parent->basis[1][i] * local->position[1] +
+            (double)parent->basis[2][i] * local->position[2];
+    }
+
+    glm_mat3_mul(ECS_CONST_CAST(vec3*, parent->basis), ECS_CONST_CAST(vec3*, local->basis), m);
+    glm_mat3_copy(m, out->basis);
+    out->position[0] = position[0];
+    out->position[1] = position[1];
+    out->position[2] = position[2];
+}
+
+bool box_transform_equal(
+    const WorldTransform *a,
+    const WorldTransform *b)
+{
+    return !ecs_os_memcmp(a->position, b->position, ECS_SIZEOF(dvec3)) &&
+        !ecs_os_memcmp(a->basis, b->basis, ECS_SIZEOF(mat3));
 }
 
 float box_transform_world_scale(
     const WorldTransform *transform)
 {
-    mat3 m;
-    glm_mat4_pick3(ECS_CONST_CAST(vec4*, transform->m), m);
-    float result = cbrtf(fabsf(glm_mat3_det(m)));
+    float result = cbrtf(fabsf(glm_mat3_det(ECS_CONST_CAST(vec3*, transform->basis))));
     if (!isfinite(result)) {
         result = 1.0f;
     } else if (fabsf(result - 1.0f) < 1e-5f) {
@@ -88,12 +161,12 @@ void transformSingle(
 {
     ecs_assert(p != NULL, ECS_INTERNAL_ERROR, "missing position");
 
-    mat4 local;
-    vec4 *m = t_parent ? local : t->m;
-    box_transform_local(p, r, s, m);
-
     if (t_parent) {
-        glm_mul((vec4*)t_parent->m, local, t->m);
+        WorldTransform local;
+        box_transform_local(p, r, s, &local);
+        box_transform_mul(t_parent, &local, t);
+    } else {
+        box_transform_local(p, r, s, t);
     }
 }
 
@@ -306,7 +379,7 @@ static const WorldTransform* transformWorldIn(
 
     const WorldTransform *t_anchor = anchor ? ecs_get(world, anchor, WorldTransform) : NULL;
     if (t_anchor) {
-        glm_mul(ECS_CONST_CAST(vec4*, t_anchor->m), rel.m, buf->m);
+        box_transform_mul(t_anchor, &rel, buf);
     } else {
         *buf = rel;
     }

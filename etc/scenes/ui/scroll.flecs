@@ -133,10 +133,10 @@ template HeadlessScrollCore {
         const b = this[layout.Bounds]
         const content = this[Content]
         const tb = e.target[layout.Bounds]
-        const vm = this[WorldTransform].m.v
-        const tm = e.target[WorldTransform].m.v
-        const dx = tm[12] - vm[12]
-        const dy = vm[13] - tm[13]
+        const vm = this[WorldTransform].position
+        const tm = e.target[WorldTransform].position
+        const dx = tm.x - vm.x
+        const dy = vm.y - tm.y
 
         if vertical {
           if dy - tb.height / 2 < -b.height / 2 {

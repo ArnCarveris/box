@@ -1,9 +1,9 @@
 /**
- * @file WorldOriginShading.c
- * @brief Tests for the absolute position of the local origin (WorldOrigin) as the records of the
- * world space patterns pack it: wrapped in double precision to the period of each pattern, 0 at
- * an origin of 0, and continuous across a shift by whole steps. The material records do not
- * hold it: the shaders add the projection of the origin themselves.
+ * @file RenderOriginShading.c
+ * @brief Tests for the render origin, which follows the focus by whole cells, as the records of
+ * the world space patterns pack it: wrapped in double precision to the period of each pattern,
+ * 0 at an origin of 0, and continuous across a move. The material records do not hold it: the
+ * shaders add the projection of the origin themselves.
  */
 
 #include <box.h>
@@ -28,8 +28,8 @@ static double wos_phase_distance(
     return d > 0.5 ? 1.0 - d : d;
 }
 
-void WorldOriginShading_wrap(void) {
-    // render/world_origin_shading
+void RenderOriginShading_wrap(void) {
+    // render/render_origin_shading
     test_flt(box_render_origin_wrap(7, 3), 1);
     test_flt(box_render_origin_wrap(-1, 3), 2);
     test_flt(box_render_origin_wrap(-6, 3), 0);
@@ -39,23 +39,40 @@ void WorldOriginShading_wrap(void) {
     test_assert(box_render_origin_wrap_float(-1e-12, 1.0) >= 0.0f);
 }
 
-void WorldOriginShading_origin_of_world(void) {
-    // render/world_origin_shading
+void RenderOriginShading_origin_follows_focus(void) {
+    // render/render_origin_shading
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
     double origin[3];
     box_render_origin(world, origin);
     test_assert(origin[0] == 0 && origin[1] == 0 && origin[2] == 0);
-    ecs_singleton_set(world, WorldOrigin, {.x = 1e6, .y = -256, .z = 2.5e9, .enabled = false});
+
+    ecs_entity_t focus = ecs_new(world);
+    ecs_set(world, focus, Position, {1000, -1000, 0});
+    ecs_add(world, focus, WorldFocus);
+    ecs_progress(world, 0);
     box_render_origin(world, origin);
-    test_assert(origin[0] == 1e6);
-    test_assert(origin[1] == -256);
-    test_assert(origin[2] == 2.5e9);
+    test_assert(origin[0] == 0 && origin[1] == 0 && origin[2] == 0);
+
+    ecs_set(world, focus, Position, {1e6, -1500, 2.5e9});
+    ecs_progress(world, 0);
+    box_render_origin(world, origin);
+    test_assert(origin[0] == 1000448);
+    test_assert(origin[1] == -1024);
+    test_assert(origin[2] == 2499999744.0);
+
+    /* Within a cell of the origin it stays */
+    ecs_set(world, focus, Position, {1e6 + 1000, -500, 2.5e9 - 1000});
+    ecs_progress(world, 0);
+    box_render_origin(world, origin);
+    test_assert(origin[0] == 1000448);
+    test_assert(origin[1] == -1024);
+    test_assert(origin[2] == 2499999744.0);
     ecs_fini(world);
 }
 
-void WorldOriginShading_mapping_pack(void) {
-    // render/world_origin_shading
+void RenderOriginShading_mapping_pack(void) {
+    // render/render_origin_shading
     float out[4];
 
     /* At an origin of 0 the offset is 0 */
@@ -84,8 +101,8 @@ void WorldOriginShading_mapping_pack(void) {
     test_assert(wos_phase_distance(out[2], -2.5) < 1e-6);
 }
 
-void WorldOriginShading_mapping_record(void) {
-    // render/world_origin_shading
+void RenderOriginShading_mapping_record(void) {
+    // render/render_origin_shading
     /* The shaders add the projection of the origin: the record of a world mapped material is
      * the same at any origin */
     TextureMapping mapping = {.mode = MappingWorld, .size = 3};
@@ -102,8 +119,8 @@ void WorldOriginShading_mapping_record(void) {
     test_int(ecs_os_memcmp(&at_zero, &far, ECS_SIZEOF(box_render_material_t)), 0);
 }
 
-void WorldOriginShading_water_ripple_pack(void) {
-    // render/world_origin_shading
+void RenderOriginShading_water_ripple_pack(void) {
+    // render/render_origin_shading
     TextureMapping mapping = {.mode = MappingWorld, .size = 4};
     Water water = {.depth = 1, .visibility = 1, .ripple_scale = 1.5f};
     box_render_material_t at_zero, far;
@@ -129,10 +146,10 @@ void WorldOriginShading_water_ripple_pack(void) {
     test_flt(far.water_ripple_offset[1], 0);
 }
 
-void WorldOriginShading_mapping_continuous(void) {
-    // render/world_origin_shading
-    /* A point at local p before a shift by 256 is at p - 256 after it: the projection of the
-     * local position plus the offset is the same modulo whole repeats */
+void RenderOriginShading_mapping_continuous(void) {
+    // render/render_origin_shading
+    /* A point at p relative to the origin before a move by 256 is at p - 256 after it: the
+     * projection of the relative position plus the offset is the same modulo whole repeats */
     double origin[3] = {999936, 0, -512};
     float before[4], after[4];
     box_render_origin_mapping(origin, 3, 1, 1, before);
@@ -144,8 +161,8 @@ void WorldOriginShading_mapping_continuous(void) {
     test_assert(wos_phase_distance(p / 3 + before[2], (p - 256) / 3 + after[2]) < 1e-5);
 }
 
-void WorldOriginShading_layer_pack(void) {
-    // render/world_origin_shading
+void RenderOriginShading_layer_pack(void) {
+    // render/render_origin_shading
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
     box_render_texture_layer_t v;
@@ -158,12 +175,15 @@ void WorldOriginShading_layer_pack(void) {
     test_flt(v.origin[2], 0);
     test_flt(v.origin[3], 0);
 
-    ecs_singleton_set(world, WorldOrigin, {.x = 1000, .y = 2, .z = -7, .enabled = false});
+    ecs_entity_t focus = ecs_new(world);
+    ecs_set(world, focus, Position, {3000, 2100, -7000});
+    ecs_add(world, focus, WorldFocus);
+    ecs_progress(world, 0);
     box_draws_layer_pack(world, layer, 0.0, &v);
-    test_assert(wos_phase_distance(v.origin[0], 1000.0 / 3) < 1e-6);
-    test_assert(wos_phase_distance(v.origin[1], 2.0 / 3) < 1e-6);
-    test_assert(wos_phase_distance(v.origin[2], -7.0 / 3) < 1e-6);
-    test_assert(wos_phase_distance(v.origin[3], 1000.0 / 3) < 1e-6);
+    test_assert(wos_phase_distance(v.origin[0], 3072.0 / 3) < 1e-6);
+    test_assert(wos_phase_distance(v.origin[1], 2048.0 / 3) < 1e-6);
+    test_assert(wos_phase_distance(v.origin[2], -7168.0 / 3) < 1e-6);
+    test_assert(wos_phase_distance(v.origin[3], 3072.0 / 3) < 1e-6);
 
     /* A layer on the UVs of the mesh ignores the origin */
     ecs_set(world, layer, TextureMapping, {.mode = MappingUv, .size = 3});
@@ -173,8 +193,8 @@ void WorldOriginShading_layer_pack(void) {
     ecs_fini(world);
 }
 
-void WorldOriginShading_wind_frame(void) {
-    // render/world_origin_shading
+void RenderOriginShading_wind_frame(void) {
+    // render/render_origin_shading
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
     ecs_singleton_set(world, Wind, {.direction = {1, 0}, .speed = 4, .gust = 0.5f,
@@ -195,25 +215,34 @@ void WorldOriginShading_wind_frame(void) {
     test_assert(at_zero.origin_y == 0);
 
     /* The gust field moves back by the origin, wrapped to its period of 32 patches of 5 */
-    ecs_singleton_set(world, WorldOrigin, {.x = 1000, .y = 50, .z = -300, .enabled = false});
+    ecs_entity_t focus = ecs_new(world);
+    ecs_set(world, focus, Position, {3000, 2100, -1100});
+    ecs_add(world, focus, WorldFocus);
+    ecs_progress(world, 0);
+    s = ecs_ensure(world, ecs_id(Wind), WindStatus);
+    s->offset_x = 12.5;
+    s->offset_z = 3;
+    s->sway = 0.25;
+    s->clock = 1234.5;
+    ecs_modified(world, ecs_id(Wind), WindStatus);
     box_render_wind_frame(world, &far);
-    test_flt(far.offset[0], (float)box_render_origin_wrap(12.5 - 1000, 160));
-    test_flt(far.offset[1], (float)box_render_origin_wrap(3 + 300, 160));
+    test_flt(far.offset[0], (float)box_render_origin_wrap(12.5 - 3072, 160));
+    test_flt(far.offset[1], (float)box_render_origin_wrap(3 + 1024, 160));
 
     /* The clock of the flutter and the branches does not move with the origin */
     test_assert(at_zero.clock == 1234.5);
     test_assert(far.clock == at_zero.clock);
     test_assert(far.offset[0] >= 0 && far.offset[0] < 160);
-    test_assert(far.origin_y == 50);
+    test_assert(far.origin_y == 2048);
 
     /* The wave of the sway, along the wind: half a radian per gust patch */
     test_assert(wos_phase_distance(far.sway,
-        0.25 - 0.5 * 1000.0 * 0.2 / (2.0 * GLM_PI)) < 1e-5);
+        0.25 - 0.5 * 3072.0 * 0.2 / (2.0 * GLM_PI)) < 1e-5);
     ecs_fini(world);
 }
 
-void WorldOriginShading_wind_pack_base(void) {
-    // render/world_origin_shading
+void RenderOriginShading_wind_pack_base(void) {
+    // render/render_origin_shading
     WindSway sway = {.bend = 1, .height = 2, .base = 3};
     box_render_wind_t wind = {.direction = {1, 0}, .speed = 2, .frequency = 0.05f,
         .origin_y = 100};

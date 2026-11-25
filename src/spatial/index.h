@@ -33,7 +33,7 @@ extern ECS_COMPONENT_DECLARE(SpatialProxy);
 /** World transform the bounds of an indexed dynamic UI element were computed from, all zero
  * (which no world transform is) until the first update places the element */
 typedef struct SpatialPose {
-    mat4 m; /**< The matrix */
+    WorldTransform t; /**< The world transform */
 } SpatialPose;
 
 /** Component id of SpatialPose */
@@ -270,22 +270,6 @@ int32_t box_spatial_settle(
 void box_spatial_scene_rebuild(
     box_spatial_t *index,
     box_spatial_scene_t *s);
-
-/** Move the items of a scene that a shift of the world origin moved by its offset, with the
- * poses of their movers; the trees translate when every item moved, else are built again.
- *
- * @param index The index
- * @param s The scene
- * @param offset Added to the bounds of the moved items
- * @param shifts Tells which entities moved, NULL for all of them
- * @param ctx Context passed to shifts
- */
-void box_spatial_scene_shift(
-    box_spatial_t *index,
-    box_spatial_scene_t *s,
-    const vec3 offset,
-    box_spatial_shifts_t shifts,
-    void *ctx);
 
 /** Find the mover an entity moves with: the nearest of the entity and its ancestors that owns
  * DynamicTransform, or that has it without inheriting it from DynamicTransformSpread.

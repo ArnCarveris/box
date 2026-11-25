@@ -53,8 +53,7 @@ static void LateManualMove(
 {
     ecs_entity_t *e = it->ctx;
     if (*e) {
-        ecs_set(it->world, *e, WorldTransform, {{
-            {1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {0, 2, 0, 1}}});
+        ecs_set(it->world, *e, WorldTransform, {.position = {0, 2, 0}, .basis = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}}});
         *e = 0;
     }
 }
@@ -771,8 +770,7 @@ void Instancing_manual_parent_move_updates_children(void) {
         .write_to_file = "manual_move.png", .resolution_scale = 1});
     ecs_entity_t parent = ecs_new(world);
     ecs_add(world, parent, ManualTransform);
-    ecs_set(world, parent, WorldTransform, {{
-        {1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {0, -2, 0, 1}}});
+    ecs_set(world, parent, WorldTransform, {.position = {0, -2, 0}, .basis = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}}});
     ecs_entity_t group = ecs_new_w_pair(world, EcsChildOf, parent);
     int32_t i;
     for (i = 0; i < 4; i ++) {
@@ -785,8 +783,7 @@ void Instancing_manual_parent_move_updates_children(void) {
     }
 
     ecs_progress(world, 0);
-    ecs_set(world, parent, WorldTransform, {{
-        {1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {0, 2, 0, 1}}});
+    ecs_set(world, parent, WorldTransform, {.position = {0, 2, 0}, .basis = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}}});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -825,8 +822,7 @@ void Instancing_manual_parent_moved_in_on_store(void) {
         .write_to_file = "manual_late_move.png", .resolution_scale = 1});
     ecs_entity_t parent = ecs_new(world);
     ecs_add(world, parent, ManualTransform);
-    ecs_set(world, parent, WorldTransform, {{
-        {1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {0, -2, 0, 1}}});
+    ecs_set(world, parent, WorldTransform, {.position = {0, -2, 0}, .basis = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}}});
     int32_t i;
     for (i = 0; i < 4; i ++) {
         ecs_entity_t c = ecs_new_w_pair(world, EcsChildOf, parent);

@@ -30,8 +30,8 @@ void DynamicParentRuns_interleaved_parents(void) {
     for (int i = 0; i < 8; i ++) {
         WorldTransform t_buf;
         const WorldTransform *t = box_transform_world(world, children[i], &t_buf);
-        test_flt(t->m[3][0], (i % 3) ? 11.0f : 21.0f);
-        test_flt(t->m[3][1], (float)i);
+        test_flt(t->position[0], (i % 3) ? 11.0f : 21.0f);
+        test_flt(t->position[1], (float)i);
     }
 
     ecs_get_mut(world, a, Position)->x = 30.0f;
@@ -39,7 +39,7 @@ void DynamicParentRuns_interleaved_parents(void) {
     ecs_progress(world, 0);
 
     for (int i = 0; i < 8; i ++) {
-        test_flt(box_transform_world(world, children[i], &buf)->m[3][0],
+        test_flt(box_transform_world(world, children[i], &buf)->position[0],
             (i % 3) ? 31.0f : 41.0f);
     }
 
@@ -68,16 +68,16 @@ void DynamicParentRuns_parent_without_transform(void) {
 
     ecs_progress(world, 0);
 
-    test_flt(box_transform_world(world, under_bare, &buf)->m[3][0], 11.0f);
-    test_flt(box_transform_world(world, under_placed, &buf)->m[3][0], 16.0f);
-    test_flt(box_transform_world(world, under_bare_2, &buf)->m[3][0], 12.0f);
+    test_flt(box_transform_world(world, under_bare, &buf)->position[0], 11.0f);
+    test_flt(box_transform_world(world, under_placed, &buf)->position[0], 16.0f);
+    test_flt(box_transform_world(world, under_bare_2, &buf)->position[0], 12.0f);
 
     ecs_get_mut(world, root, Position)->x = 20.0f;
     ecs_progress(world, 0);
 
-    test_flt(box_transform_world(world, under_bare, &buf)->m[3][0], 21.0f);
-    test_flt(box_transform_world(world, under_placed, &buf)->m[3][0], 26.0f);
-    test_flt(box_transform_world(world, under_bare_2, &buf)->m[3][0], 22.0f);
+    test_flt(box_transform_world(world, under_bare, &buf)->position[0], 21.0f);
+    test_flt(box_transform_world(world, under_placed, &buf)->position[0], 26.0f);
+    test_flt(box_transform_world(world, under_bare_2, &buf)->position[0], 22.0f);
 
     ecs_fini(world);
 }

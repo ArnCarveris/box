@@ -81,13 +81,13 @@ state {
   export const BROOK_START_BANK: f32 = 3.4
 
   // Where the field of ripples is, and whether the player starts by a brook
-  export mut brook_ripple_x: f32 = 0
-  export mut brook_ripple_y: f32 = -1000
-  export mut brook_ripple_z: f32 = 0
+  export mut brook_ripple_x: f64 = 0
+  export mut brook_ripple_y: f64 = -1000
+  export mut brook_ripple_z: f64 = 0
   export mut brook_start: bool = false
   export mut brook_best: f32 = 1000000
-  export mut brook_best_x: f32 = 0
-  export mut brook_best_z: f32 = 0
+  export mut brook_best_x: f64 = 0
+  export mut brook_best_z: f64 = 0
 
   // Meters from the middle of the brook, the bed under it and the height of the land
   fn wild_brook_d(x: f64, z: f64) -> f64 {
@@ -540,17 +540,16 @@ infinite_forest {
 async {
   while true {
     await delay(0.25)
-    const o = WorldOrigin[WorldOrigin]
     const p = player[Position]
-    const x = p.x + o.x
-    const z = p.z + o.z
+    const x = p.x
+    const z = p.z
 
     if box.terrain.known(infinite_forest.brooks, x, z) {
       const near = wild_brook_d(x, z) < BROOK_RIPPLES_NEAR
       state.brook_ripple_x = p.x
       state.brook_ripple_z = p.z
       state.brook_ripple_y = near ?
-        wild_brook_level(wild_brook_k(wild_brook_bed(x, z))) - o.y - 0.01 : GROUND_MIN - 100
+        wild_brook_level(wild_brook_k(wild_brook_bed(x, z))) - 0.01 : GROUND_MIN - 100
     }
   }
 }
@@ -563,9 +562,8 @@ async {
   }
 
   if state.brook_start {
-    const o = WorldOrigin[WorldOrigin]
-    const sx = state.start_x + o.x
-    const sz = state.start_z + o.z
+    const sx = state.start_x
+    const sz = state.start_z
     const r = BROOK_START_REACH
     while !box.terrain.known(infinite_forest.brooks, sx - r, sz - r) ||
       !box.terrain.known(infinite_forest.brooks, sx + r, sz - r) ||
@@ -602,10 +600,9 @@ async {
       !box.terrain.resident(infinite_forest.brooks, cx + 24, cz + 24) ||
       !box.terrain.resident(infinite_forest.land, cx, cz)
     {
-      const oc = WorldOrigin[WorldOrigin]
-      state.start_x = cx - oc.x
-      state.start_y = wild_brook_land(cx, cz) + 30 - oc.y
-      state.start_z = cz - oc.z
+      state.start_x = cx
+      state.start_y = wild_brook_land(cx, cz) + 30
+      state.start_z = cz
       await next_frame()
     }
 
@@ -635,10 +632,9 @@ async {
     const dl = max(sqrt(dx * dx + dz * dz), 0.0001)
     const lx = 0 - gx / gl - 0.6 * dx / dl
     const lz = 0 - gz / gl - 0.6 * dz / dl
-    const ob = WorldOrigin[WorldOrigin]
-    state.start_x = bx - ob.x
-    state.start_z = bz - ob.z
-    state.start_y = box.terrain.height(infinite_forest.land, bx, bz) + EYE + 0.05 - ob.y
+    state.start_x = bx
+    state.start_z = bz
+    state.start_y = box.terrain.height(infinite_forest.land, bx, bz) + EYE + 0.05
     state.start_yaw = atan2(0 - lx, 0 - lz)
     state.start_pitch = -0.2
     state.scripted = false

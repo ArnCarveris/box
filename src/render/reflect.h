@@ -26,6 +26,8 @@ typedef struct box_reflect_probe_t {
 /** The probes of one scene with ReflectionBake */
 typedef struct box_reflect_scene_t {
     ecs_entity_t scene;     /**< Scene root, 0 for the default scene */
+    dvec3 origin;           /**< Render origin of the extract, which the lights are relative to;
+                             *   the points of the scene are relative to the origin of the world */
     ecs_entity_t entity;    /**< Entity with the ReflectionBake of the scene */
     bool seen;              /**< A ReflectionBake of the scene exists in this frame */
     bool placed;            /**< The scene probe was placed at least once */

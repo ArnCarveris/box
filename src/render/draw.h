@@ -303,7 +303,7 @@ typedef struct box_draw_material_t {
                                  *   by 2D shapes */
     const TextureScroll *scroll; /**< Endless UV scrolling of a 3D shape, ignored by 2D shapes */
     double time;                /**< Total render time the scroll offsets are computed at */
-    double origin[3];           /**< Absolute position of the local origin (WorldOrigin) the
+    double origin[3];           /**< Render origin the
                                  *   world space patterns are packed for, 0 without one */
     const Transmission *transmission; /**< Light passing through a 3D shape */
     const ClearCoat *clear_coat; /**< Dielectric layer over a 3D shape, ignored by 2D shapes */
@@ -380,7 +380,7 @@ typedef struct box_draw_transition_material_t {
     TextureScroll scroll;   /**< TextureScroll, which has no transition: the record keeps it */
     bool scrolled;          /**< The material has a TextureScroll */
     double time;            /**< Total render time the scroll offsets are computed at */
-    double origin[3];       /**< Absolute position of the local origin the world space
+    double origin[3];       /**< Render origin the world space
                              *   patterns are packed for */
     Transmission transmission; /**< Transmission */
     ClearCoat clear_coat;   /**< ClearCoat */
@@ -444,7 +444,8 @@ typedef struct box_draw_transition_box_shadow_t {
     BoxShadow shadow;       /**< Target BoxShadow */
     float mesh_scale[2];    /**< ShapeMesh.scale of the shape, x and y, when meshed */
     bool meshed;            /**< The shape has a ShapeMesh */
-    float world[4][4];      /**< Column major: target world matrix of the shape */
+    float world[4][4];      /**< Column major: target world matrix of the shape relative to the
+                             *   render origin */
     float rel[4][4];        /**< Column major: the target chain from the node that moves the
                              *   shape (the parent of the record) down to the shape, read when
                              *   that node has a pose in the packet */
@@ -525,7 +526,8 @@ typedef struct box_draw_frame_pose_t {
     ecs_entity_t frame;     /**< The texture frame */
     int64_t tick;           /**< Extract it was computed in */
     bool valid;             /**< The frame has a world transform that inverts */
-    mat4 inv;               /**< Inverse of its world transform */
+    dvec3 position;         /**< World position of the frame, the origin of inv */
+    mat4 inv;               /**< Inverse of its world transform relative to its position */
     float scale;            /**< Its uniform world scale */
 } box_draw_frame_pose_t;
 
@@ -772,7 +774,7 @@ typedef struct box_draw_materials_t {
     box_draw_water_waves_t *waves; /**< The wave table, NULL until a Water has WaterWaves */
     ecs_map_t caustics;     /**< Owner whose Water has WaterCaustics and a WaterFlow to its
                              *   box_draw_water_caustics_state_t, allocated */
-    double origin[3];       /**< Absolute position of the local origin (WorldOrigin) the
+    double origin[3];       /**< Render origin the
                              *   records were packed for; a change packs every owner again */
     double epoch;           /**< Total render time the words of the records that change with
                              *   the time are packed for; the shader moves them on by the clock
@@ -831,6 +833,7 @@ typedef struct box_render_draws_t {
     uint32_t changes_size;      /**< Bytes of the change buffer, 0 before it is created */
     const box_textures_t *textures; /**< Registry the texture handles resolve from in a send */
     const ecs_world_t *world;   /**< World of the send, whose surfaces render texture entities */
+    dvec3 origin;               /**< Render origin of the extract (box_render_origin) */
     bool order_dirty;           /**< The entities or the hierarchy changed since the order */
     bool runs_dirty;            /**< 2D slots moved since the runs were made */
     ecs_vec_t order;            /**< box_draw_order_t, the entities with 2D slots in order */
@@ -1050,15 +1053,17 @@ bool box_draws_caster(
  *
  * @param world The world, whose mesh cache has the mesh of the batch
  * @param b The batch
+ * @param origin Render origin the bounds of world records are relative to
  * @param lo The minimum of each element of the transform
  * @param hi The maximum of each element of the transform
  * @param surface The surface of the slot, NULL for a batch without surfaces
- * @param out Receives the bounds, with the scene of the batch
+ * @param out Receives the bounds relative to the render origin, with the scene of the batch
  * @return Whether the bounds are known, false when the mesh of the batch is missing or empty
  */
 bool box_draws_shadow_bounds(
     const ecs_world_t *world,
     const box_draw_batch_t *b,
+    const double *origin,
     const box_render_transform_t *lo,
     const box_render_transform_t *hi,
     const box_render_surface_t *surface,
@@ -1652,10 +1657,10 @@ void box_draws_color_unpack(
  * WaterCaustics in the words of the Fresnel, which it ignores (box_draws_water_caustics_pack).
  * Opacity, tints and the 2D shape are not.
  *
- * The shaders wrap the projection of the absolute position of the local origin of a world mapped
+ * The shaders wrap the projection of the render origin of a world mapped
  * Water to BOX_RENDER_WATER_ORIGIN_PERIOD repeats; its ripple offset takes the whole periods that
  * leaves out times the ripple scale as the fragments read it (a half float), so the second normal
- * sample stays continuous across a shift of the origin, for an up facing surface: u along Z, v
+ * sample stays continuous across a move of the origin, for an up facing surface: u along Z, v
  * along -X.
  *
  * @param out The record
@@ -1738,7 +1743,8 @@ void* box_draws_transition_value(
  *
  * @param record The record, its material holding the rendered values
  * @param shadow The BoxShadow its node renders
- * @param world World matrix the shape renders at
+ * @param world World matrix the shape renders at, relative to the render origin
+ * @param origin The render origin of the packet
  * @param transform The box_render_transform_t of the shadow in the packet data, unaligned
  * @param shading The box_render_shading_t of the shadow in the packet data, unaligned
  */
@@ -1746,6 +1752,7 @@ void box_draws_transition_box_shadow(
     const box_draw_transition_box_shadow_t *record,
     const BoxShadow *shadow,
     mat4 world,
+    const double *origin,
     void *transform,
     void *shading);
 
@@ -1821,16 +1828,19 @@ void box_draws_target_local(
     ecs_entity_t e,
     mat4 out);
 
-/** Get the target world matrix of the parent of a node without a parent node: that of its
- * nearest ancestor with a WorldTransform, identity for none.
+/** Get the target world matrix of the parent of a node without a parent node relative to an
+ * origin: that of its nearest ancestor with a WorldTransform, identity for none.
  *
  * @param world The world
  * @param e The entity of the node
+ * @param origin The origin, NULL for the origin of the world
  * @param out Receives the matrix
+ * @return Whether an ancestor has a WorldTransform
  */
-void box_draws_parent_world(
+bool box_draws_parent_world(
     const ecs_world_t *world,
     ecs_entity_t e,
+    const double *origin,
     mat4 out);
 
 /** Get the range of the world matrices of a node: the range of its parent node times its

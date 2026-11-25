@@ -750,15 +750,14 @@ void TransitionAddRemove_scale_remove_child(void) {
     for (i = 0; i < 4; i ++) {
         float s = 2.0f - (float)i / 4.0f;
         box_render_transform_t rendered, expected;
-        WorldTransform wt;
-        mat4 up, local;
+        WorldTransform wt, up, local;
         int32_t r, c;
         tr_frame(world);
         test_assert(!ecs_has(world, parent, Scale));
         test_assert(ecs_has_id(world, child, TransitionTransform));
-        box_transform_local(&(Position){0, 0, 0}, NULL, &(Scale){s, s, s}, up);
-        box_transform_local(&(Position){0, 1, 0}, NULL, NULL, local);
-        glm_mul(up, local, wt.m);
+        box_transform_local(&(Position){0, 0, 0}, NULL, &(Scale){s, s, s}, &up);
+        box_transform_local(&(Position){0, 1, 0}, NULL, NULL, &local);
+        box_transform_mul(&up, &local, &wt);
         box_draws_transform(&expected, &wt, ecs_get(world, child, ShapeMesh));
         test_assert(tr_rendered(world, null, child, &rendered));
         for (r = 0; r < 3; r ++) {

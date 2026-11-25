@@ -251,7 +251,7 @@
                     "quit_records_nothing",
                     "idle_frames_resolve_no_changes",
                     "repeated_change_records_once",
-                    "look_change_in_shift_frame_queues",
+                    "origin_move_queues_nothing",
                     "table_flags_skip_records"
                 ]
             },
@@ -1320,10 +1320,10 @@
                 ]
             },
             {
-                "id": "WorldOriginShading",
+                "id": "RenderOriginShading",
                 "testcases": [
                     "wrap",
-                    "origin_of_world",
+                    "origin_follows_focus",
                     "mapping_pack",
                     "mapping_record",
                     "water_ripple_pack",

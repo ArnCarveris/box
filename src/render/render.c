@@ -371,7 +371,7 @@ static void box_render_extract_view(
     v->features = box_render_view_features(world, v->scene, &view->lighting);
     v->scene_features = box_render_scene_features(world, v->scene);
     if (transform) {
-        ecs_os_memcpy_t(v->camera_transform, transform->m, mat4);
+        box_transform_mat4(transform, p->origin, v->camera_transform);
     } else {
         glm_mat4_identity(v->camera_transform);
     }
@@ -497,6 +497,7 @@ void BoxRenderImport(
     ecs_add_pair(world, TaskPublish, EcsDependsOn, RenderSubmit);
 
     ecs_singleton_set(world, RenderRing, { .ring = box_render_ring_new() });
+    box_render_origin_import(world);
     ecs_singleton_set(world, RenderStatus, {0});
     ecs_atfini(world, box_render_fini, NULL);
 

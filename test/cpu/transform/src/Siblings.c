@@ -38,7 +38,9 @@ void Siblings_static_childof_same_table(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             10.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -54,7 +56,9 @@ void Siblings_static_childof_same_table(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             10.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -70,7 +74,9 @@ void Siblings_static_childof_same_table(void) {
             1.0f, 0.0f, 0.0f, 0.0f,
             8.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -86,7 +92,9 @@ void Siblings_static_childof_same_table(void) {
             0.0f, 0.5f, 0.0f, 0.0f,
             10.0f, 0.0f, 3.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -102,7 +110,9 @@ void Siblings_static_childof_same_table(void) {
             0.0f, 0.0f, 3.0f, 0.0f,
             11.0f, -1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -124,7 +134,9 @@ void Siblings_static_childof_same_table(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 5.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -140,7 +152,9 @@ void Siblings_static_childof_same_table(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             1.0f, 5.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -156,7 +170,9 @@ void Siblings_static_childof_same_table(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             0.0f, 7.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -172,7 +188,9 @@ void Siblings_static_childof_same_table(void) {
             0.5f, 0.0f, 0.0f, 0.0f,
             0.0f, 5.0f, 3.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -188,7 +206,9 @@ void Siblings_static_childof_same_table(void) {
             0.0f, 0.0f, 3.0f, 0.0f,
             -1.0f, 4.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -209,7 +229,9 @@ void Siblings_static_childof_same_table(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 5.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -225,7 +247,9 @@ void Siblings_static_childof_same_table(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             1.0f, 5.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -241,7 +265,9 @@ void Siblings_static_childof_same_table(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             4.0f, 5.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -257,7 +283,9 @@ void Siblings_static_childof_same_table(void) {
             0.5f, 0.0f, 0.0f, 0.0f,
             0.0f, 5.0f, 3.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -273,7 +301,9 @@ void Siblings_static_childof_same_table(void) {
             0.0f, 0.0f, 3.0f, 0.0f,
             -1.0f, 4.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -321,7 +351,9 @@ void Siblings_static_childof_same_table_w_grandchildren(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             5.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -337,7 +369,9 @@ void Siblings_static_childof_same_table_w_grandchildren(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             5.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -353,7 +387,9 @@ void Siblings_static_childof_same_table_w_grandchildren(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             4.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -369,7 +405,9 @@ void Siblings_static_childof_same_table_w_grandchildren(void) {
             0.0f, 0.0f, 0.5f, 0.0f,
             5.0f, 0.0f, 1.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -385,7 +423,9 @@ void Siblings_static_childof_same_table_w_grandchildren(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             5.0f, 3.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -401,7 +441,9 @@ void Siblings_static_childof_same_table_w_grandchildren(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -417,7 +459,9 @@ void Siblings_static_childof_same_table_w_grandchildren(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             4.0f, 0.0f, 1.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -433,7 +477,9 @@ void Siblings_static_childof_same_table_w_grandchildren(void) {
             0.0f, 0.0f, 0.5f, 0.0f,
             4.0f, 1.0f, 1.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -455,7 +501,9 @@ void Siblings_static_childof_same_table_w_grandchildren(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             0.0f, 0.0f, 7.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -471,7 +519,9 @@ void Siblings_static_childof_same_table_w_grandchildren(void) {
             0.0f, -2.0f, 0.0f, 0.0f,
             1.0f, 0.0f, 7.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -487,7 +537,9 @@ void Siblings_static_childof_same_table_w_grandchildren(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             0.0f, 0.0f, 8.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -503,7 +555,9 @@ void Siblings_static_childof_same_table_w_grandchildren(void) {
             0.0f, -0.5f, 0.0f, 0.0f,
             0.0f, -1.0f, 7.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -519,7 +573,9 @@ void Siblings_static_childof_same_table_w_grandchildren(void) {
             0.0f, -2.0f, 0.0f, 0.0f,
             3.0f, 0.0f, 7.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -535,7 +591,9 @@ void Siblings_static_childof_same_table_w_grandchildren(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             0.0f, 0.0f, 11.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -551,7 +609,9 @@ void Siblings_static_childof_same_table_w_grandchildren(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             0.0f, -1.0f, 8.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -567,7 +627,9 @@ void Siblings_static_childof_same_table_w_grandchildren(void) {
             0.0f, -0.5f, 0.0f, 0.0f,
             1.0f, -1.0f, 8.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -589,7 +651,9 @@ void Siblings_static_childof_same_table_w_grandchildren(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             0.0f, 0.0f, 7.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -605,7 +669,9 @@ void Siblings_static_childof_same_table_w_grandchildren(void) {
             0.0f, -2.0f, 0.0f, 0.0f,
             1.0f, 0.0f, 7.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -621,7 +687,9 @@ void Siblings_static_childof_same_table_w_grandchildren(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             3.0f, 0.0f, 7.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -637,7 +705,9 @@ void Siblings_static_childof_same_table_w_grandchildren(void) {
             0.0f, -0.5f, 0.0f, 0.0f,
             0.0f, -1.0f, 7.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -653,7 +723,9 @@ void Siblings_static_childof_same_table_w_grandchildren(void) {
             0.0f, -2.0f, 0.0f, 0.0f,
             3.0f, 0.0f, 7.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -669,7 +741,9 @@ void Siblings_static_childof_same_table_w_grandchildren(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             3.0f, 0.0f, 8.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -685,7 +759,9 @@ void Siblings_static_childof_same_table_w_grandchildren(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             3.0f, -1.0f, 7.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -701,7 +777,9 @@ void Siblings_static_childof_same_table_w_grandchildren(void) {
             0.0f, -0.5f, 0.0f, 0.0f,
             1.0f, -1.0f, 8.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -748,7 +826,9 @@ void Siblings_static_parent_same_table(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             10.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -764,7 +844,9 @@ void Siblings_static_parent_same_table(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             10.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -780,7 +862,9 @@ void Siblings_static_parent_same_table(void) {
             1.0f, 0.0f, 0.0f, 0.0f,
             8.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -796,7 +880,9 @@ void Siblings_static_parent_same_table(void) {
             0.0f, 0.5f, 0.0f, 0.0f,
             10.0f, 0.0f, 3.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -812,7 +898,9 @@ void Siblings_static_parent_same_table(void) {
             0.0f, 0.0f, 3.0f, 0.0f,
             11.0f, -1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -834,7 +922,9 @@ void Siblings_static_parent_same_table(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 5.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -850,7 +940,9 @@ void Siblings_static_parent_same_table(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             1.0f, 5.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -866,7 +958,9 @@ void Siblings_static_parent_same_table(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             0.0f, 7.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -882,7 +976,9 @@ void Siblings_static_parent_same_table(void) {
             0.5f, 0.0f, 0.0f, 0.0f,
             0.0f, 5.0f, 3.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -898,7 +994,9 @@ void Siblings_static_parent_same_table(void) {
             0.0f, 0.0f, 3.0f, 0.0f,
             -1.0f, 4.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -919,7 +1017,9 @@ void Siblings_static_parent_same_table(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 5.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -935,7 +1035,9 @@ void Siblings_static_parent_same_table(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             1.0f, 5.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -951,7 +1053,9 @@ void Siblings_static_parent_same_table(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             4.0f, 5.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -967,7 +1071,9 @@ void Siblings_static_parent_same_table(void) {
             0.5f, 0.0f, 0.0f, 0.0f,
             0.0f, 5.0f, 3.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -983,7 +1089,9 @@ void Siblings_static_parent_same_table(void) {
             0.0f, 0.0f, 3.0f, 0.0f,
             -1.0f, 4.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1031,7 +1139,9 @@ void Siblings_static_parent_same_table_w_grandchildren(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             5.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1047,7 +1157,9 @@ void Siblings_static_parent_same_table_w_grandchildren(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             5.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1063,7 +1175,9 @@ void Siblings_static_parent_same_table_w_grandchildren(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             4.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1079,7 +1193,9 @@ void Siblings_static_parent_same_table_w_grandchildren(void) {
             0.0f, 0.0f, 0.5f, 0.0f,
             5.0f, 0.0f, 1.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1095,7 +1211,9 @@ void Siblings_static_parent_same_table_w_grandchildren(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             5.0f, 3.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1111,7 +1229,9 @@ void Siblings_static_parent_same_table_w_grandchildren(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1127,7 +1247,9 @@ void Siblings_static_parent_same_table_w_grandchildren(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             4.0f, 0.0f, 1.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1143,7 +1265,9 @@ void Siblings_static_parent_same_table_w_grandchildren(void) {
             0.0f, 0.0f, 0.5f, 0.0f,
             4.0f, 1.0f, 1.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1165,7 +1289,9 @@ void Siblings_static_parent_same_table_w_grandchildren(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             0.0f, 0.0f, 7.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1181,7 +1307,9 @@ void Siblings_static_parent_same_table_w_grandchildren(void) {
             0.0f, -2.0f, 0.0f, 0.0f,
             1.0f, 0.0f, 7.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1197,7 +1325,9 @@ void Siblings_static_parent_same_table_w_grandchildren(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             0.0f, 0.0f, 8.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1213,7 +1343,9 @@ void Siblings_static_parent_same_table_w_grandchildren(void) {
             0.0f, -0.5f, 0.0f, 0.0f,
             0.0f, -1.0f, 7.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1229,7 +1361,9 @@ void Siblings_static_parent_same_table_w_grandchildren(void) {
             0.0f, -2.0f, 0.0f, 0.0f,
             3.0f, 0.0f, 7.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1245,7 +1379,9 @@ void Siblings_static_parent_same_table_w_grandchildren(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             0.0f, 0.0f, 11.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1261,7 +1397,9 @@ void Siblings_static_parent_same_table_w_grandchildren(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             0.0f, -1.0f, 8.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1277,7 +1415,9 @@ void Siblings_static_parent_same_table_w_grandchildren(void) {
             0.0f, -0.5f, 0.0f, 0.0f,
             1.0f, -1.0f, 8.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1299,7 +1439,9 @@ void Siblings_static_parent_same_table_w_grandchildren(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             0.0f, 0.0f, 7.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1315,7 +1457,9 @@ void Siblings_static_parent_same_table_w_grandchildren(void) {
             0.0f, -2.0f, 0.0f, 0.0f,
             1.0f, 0.0f, 7.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1331,7 +1475,9 @@ void Siblings_static_parent_same_table_w_grandchildren(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             3.0f, 0.0f, 7.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1347,7 +1493,9 @@ void Siblings_static_parent_same_table_w_grandchildren(void) {
             0.0f, -0.5f, 0.0f, 0.0f,
             0.0f, -1.0f, 7.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1363,7 +1511,9 @@ void Siblings_static_parent_same_table_w_grandchildren(void) {
             0.0f, -2.0f, 0.0f, 0.0f,
             3.0f, 0.0f, 7.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1379,7 +1529,9 @@ void Siblings_static_parent_same_table_w_grandchildren(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             3.0f, 0.0f, 8.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1395,7 +1547,9 @@ void Siblings_static_parent_same_table_w_grandchildren(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             3.0f, -1.0f, 7.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1411,7 +1565,9 @@ void Siblings_static_parent_same_table_w_grandchildren(void) {
             0.0f, -0.5f, 0.0f, 0.0f,
             1.0f, -1.0f, 8.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1456,7 +1612,9 @@ void Siblings_static_parent_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             10.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1472,7 +1630,9 @@ void Siblings_static_parent_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 10.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1488,7 +1648,9 @@ void Siblings_static_parent_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             11.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1504,7 +1666,9 @@ void Siblings_static_parent_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 12.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1520,7 +1684,9 @@ void Siblings_static_parent_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             10.0f, 3.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1536,7 +1702,9 @@ void Siblings_static_parent_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -4.0f, 10.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1552,7 +1720,9 @@ void Siblings_static_parent_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             10.0f, 0.0f, 5.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1568,7 +1738,9 @@ void Siblings_static_parent_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 10.0f, 6.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1590,7 +1762,9 @@ void Siblings_static_parent_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             10.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1606,7 +1780,9 @@ void Siblings_static_parent_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 20.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1622,7 +1798,9 @@ void Siblings_static_parent_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             11.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1638,7 +1816,9 @@ void Siblings_static_parent_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 18.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1654,7 +1834,9 @@ void Siblings_static_parent_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             10.0f, 3.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1670,7 +1852,9 @@ void Siblings_static_parent_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             4.0f, 20.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1686,7 +1870,9 @@ void Siblings_static_parent_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             10.0f, 0.0f, 5.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1702,7 +1888,9 @@ void Siblings_static_parent_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 20.0f, 6.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1723,7 +1911,9 @@ void Siblings_static_parent_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -10.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1739,7 +1929,9 @@ void Siblings_static_parent_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 20.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1755,7 +1947,9 @@ void Siblings_static_parent_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -9.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1771,7 +1965,9 @@ void Siblings_static_parent_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 18.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1787,7 +1983,9 @@ void Siblings_static_parent_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -10.0f, 3.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1803,7 +2001,9 @@ void Siblings_static_parent_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             4.0f, 20.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1819,7 +2019,9 @@ void Siblings_static_parent_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -10.0f, 0.0f, 5.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1835,7 +2037,9 @@ void Siblings_static_parent_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 20.0f, 6.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1856,7 +2060,9 @@ void Siblings_static_parent_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -10.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1872,7 +2078,9 @@ void Siblings_static_parent_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 20.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1888,7 +2096,9 @@ void Siblings_static_parent_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -9.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1904,7 +2114,9 @@ void Siblings_static_parent_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 18.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1920,7 +2132,9 @@ void Siblings_static_parent_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -10.0f, 3.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1936,7 +2150,9 @@ void Siblings_static_parent_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 19.0f, 1.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1952,7 +2168,9 @@ void Siblings_static_parent_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -10.0f, 0.0f, 5.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -1968,7 +2186,9 @@ void Siblings_static_parent_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 20.0f, 6.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2013,7 +2233,9 @@ void Siblings_static_childof_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             10.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2029,7 +2251,9 @@ void Siblings_static_childof_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 10.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2045,7 +2269,9 @@ void Siblings_static_childof_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             11.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2061,7 +2287,9 @@ void Siblings_static_childof_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 12.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2077,7 +2305,9 @@ void Siblings_static_childof_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             10.0f, 3.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2093,7 +2323,9 @@ void Siblings_static_childof_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -4.0f, 10.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2109,7 +2341,9 @@ void Siblings_static_childof_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             10.0f, 0.0f, 5.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2125,7 +2359,9 @@ void Siblings_static_childof_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 10.0f, 6.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2147,7 +2383,9 @@ void Siblings_static_childof_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             10.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2163,7 +2401,9 @@ void Siblings_static_childof_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 20.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2179,7 +2419,9 @@ void Siblings_static_childof_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             11.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2195,7 +2437,9 @@ void Siblings_static_childof_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 18.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2211,7 +2455,9 @@ void Siblings_static_childof_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             10.0f, 3.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2227,7 +2473,9 @@ void Siblings_static_childof_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             4.0f, 20.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2243,7 +2491,9 @@ void Siblings_static_childof_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             10.0f, 0.0f, 5.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2259,7 +2509,9 @@ void Siblings_static_childof_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 20.0f, 6.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2280,7 +2532,9 @@ void Siblings_static_childof_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -10.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2296,7 +2550,9 @@ void Siblings_static_childof_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 20.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2312,7 +2568,9 @@ void Siblings_static_childof_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -9.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2328,7 +2586,9 @@ void Siblings_static_childof_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 18.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2344,7 +2604,9 @@ void Siblings_static_childof_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -10.0f, 3.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2360,7 +2622,9 @@ void Siblings_static_childof_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             4.0f, 20.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2376,7 +2640,9 @@ void Siblings_static_childof_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -10.0f, 0.0f, 5.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2392,7 +2658,9 @@ void Siblings_static_childof_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 20.0f, 6.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2413,7 +2681,9 @@ void Siblings_static_childof_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -10.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2429,7 +2699,9 @@ void Siblings_static_childof_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 20.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2445,7 +2717,9 @@ void Siblings_static_childof_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -9.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2461,7 +2735,9 @@ void Siblings_static_childof_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 18.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2477,7 +2753,9 @@ void Siblings_static_childof_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -10.0f, 3.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2493,7 +2771,9 @@ void Siblings_static_childof_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 19.0f, 1.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2509,7 +2789,9 @@ void Siblings_static_childof_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -10.0f, 0.0f, 5.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2525,7 +2807,9 @@ void Siblings_static_childof_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 20.0f, 6.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2571,7 +2855,9 @@ void Siblings_static_childof_mixed_transformable(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             3.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2587,7 +2873,9 @@ void Siblings_static_childof_mixed_transformable(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             3.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2604,7 +2892,9 @@ void Siblings_static_childof_mixed_transformable(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             2.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2621,7 +2911,9 @@ void Siblings_static_childof_mixed_transformable(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             3.0f, 0.0f, 1.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2637,7 +2929,9 @@ void Siblings_static_childof_mixed_transformable(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             2.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2653,7 +2947,9 @@ void Siblings_static_childof_mixed_transformable(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             2.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2669,7 +2965,9 @@ void Siblings_static_childof_mixed_transformable(void) {
             1.0f, 0.0f, 0.0f, 0.0f,
             3.0f, 2.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2691,7 +2989,9 @@ void Siblings_static_childof_mixed_transformable(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 0.0f, 4.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2707,7 +3007,9 @@ void Siblings_static_childof_mixed_transformable(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 0.0f, 4.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2724,7 +3026,9 @@ void Siblings_static_childof_mixed_transformable(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 1.0f, 4.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2741,7 +3045,9 @@ void Siblings_static_childof_mixed_transformable(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 0.0f, 5.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2757,7 +3063,9 @@ void Siblings_static_childof_mixed_transformable(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 1.0f, 4.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2773,7 +3081,9 @@ void Siblings_static_childof_mixed_transformable(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 1.0f, 4.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2789,7 +3099,9 @@ void Siblings_static_childof_mixed_transformable(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             2.0f, 0.0f, 4.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2811,7 +3123,9 @@ void Siblings_static_childof_mixed_transformable(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 0.0f, 4.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2827,7 +3141,9 @@ void Siblings_static_childof_mixed_transformable(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 0.0f, 4.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2844,7 +3160,9 @@ void Siblings_static_childof_mixed_transformable(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             0.0f, 2.0f, 4.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2861,7 +3179,9 @@ void Siblings_static_childof_mixed_transformable(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 0.0f, 5.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2877,7 +3197,9 @@ void Siblings_static_childof_mixed_transformable(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 1.0f, 4.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2893,7 +3215,9 @@ void Siblings_static_childof_mixed_transformable(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             2.0f, 2.0f, 4.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2909,7 +3233,9 @@ void Siblings_static_childof_mixed_transformable(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             2.0f, 0.0f, 4.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2955,7 +3281,9 @@ void Siblings_static_parent_mixed_transformable(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             3.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2971,7 +3299,9 @@ void Siblings_static_parent_mixed_transformable(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             3.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -2988,7 +3318,9 @@ void Siblings_static_parent_mixed_transformable(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             2.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3005,7 +3337,9 @@ void Siblings_static_parent_mixed_transformable(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             3.0f, 0.0f, 1.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3021,7 +3355,9 @@ void Siblings_static_parent_mixed_transformable(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             2.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3037,7 +3373,9 @@ void Siblings_static_parent_mixed_transformable(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             2.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3053,7 +3391,9 @@ void Siblings_static_parent_mixed_transformable(void) {
             1.0f, 0.0f, 0.0f, 0.0f,
             3.0f, 2.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3075,7 +3415,9 @@ void Siblings_static_parent_mixed_transformable(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 0.0f, 4.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3091,7 +3433,9 @@ void Siblings_static_parent_mixed_transformable(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 0.0f, 4.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3108,7 +3452,9 @@ void Siblings_static_parent_mixed_transformable(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 1.0f, 4.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3125,7 +3471,9 @@ void Siblings_static_parent_mixed_transformable(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 0.0f, 5.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3141,7 +3489,9 @@ void Siblings_static_parent_mixed_transformable(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 1.0f, 4.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3157,7 +3507,9 @@ void Siblings_static_parent_mixed_transformable(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 1.0f, 4.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3173,7 +3525,9 @@ void Siblings_static_parent_mixed_transformable(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             2.0f, 0.0f, 4.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3195,7 +3549,9 @@ void Siblings_static_parent_mixed_transformable(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 0.0f, 4.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3211,7 +3567,9 @@ void Siblings_static_parent_mixed_transformable(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 0.0f, 4.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3228,7 +3586,9 @@ void Siblings_static_parent_mixed_transformable(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             0.0f, 2.0f, 4.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3245,7 +3605,9 @@ void Siblings_static_parent_mixed_transformable(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 0.0f, 5.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3261,7 +3623,9 @@ void Siblings_static_parent_mixed_transformable(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 1.0f, 4.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3277,7 +3641,9 @@ void Siblings_static_parent_mixed_transformable(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             2.0f, 2.0f, 4.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3293,7 +3659,9 @@ void Siblings_static_parent_mixed_transformable(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             2.0f, 0.0f, 4.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3345,7 +3713,9 @@ void Siblings_dynamic_childof_same_table(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             10.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3361,7 +3731,9 @@ void Siblings_dynamic_childof_same_table(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             10.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3377,7 +3749,9 @@ void Siblings_dynamic_childof_same_table(void) {
             1.0f, 0.0f, 0.0f, 0.0f,
             8.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3393,7 +3767,9 @@ void Siblings_dynamic_childof_same_table(void) {
             0.0f, 0.5f, 0.0f, 0.0f,
             10.0f, 0.0f, 3.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3409,7 +3785,9 @@ void Siblings_dynamic_childof_same_table(void) {
             0.0f, 0.0f, 3.0f, 0.0f,
             11.0f, -1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3431,7 +3809,9 @@ void Siblings_dynamic_childof_same_table(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 5.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3447,7 +3827,9 @@ void Siblings_dynamic_childof_same_table(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             1.0f, 5.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3463,7 +3845,9 @@ void Siblings_dynamic_childof_same_table(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             0.0f, 7.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3479,7 +3863,9 @@ void Siblings_dynamic_childof_same_table(void) {
             0.5f, 0.0f, 0.0f, 0.0f,
             0.0f, 5.0f, 3.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3495,7 +3881,9 @@ void Siblings_dynamic_childof_same_table(void) {
             0.0f, 0.0f, 3.0f, 0.0f,
             -1.0f, 4.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3516,7 +3904,9 @@ void Siblings_dynamic_childof_same_table(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 5.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3532,7 +3922,9 @@ void Siblings_dynamic_childof_same_table(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             1.0f, 5.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3548,7 +3940,9 @@ void Siblings_dynamic_childof_same_table(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             4.0f, 5.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3564,7 +3958,9 @@ void Siblings_dynamic_childof_same_table(void) {
             0.5f, 0.0f, 0.0f, 0.0f,
             0.0f, 5.0f, 3.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3580,7 +3976,9 @@ void Siblings_dynamic_childof_same_table(void) {
             0.0f, 0.0f, 3.0f, 0.0f,
             -1.0f, 4.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3636,7 +4034,9 @@ void Siblings_dynamic_childof_same_table_w_grandchildren(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             5.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3652,7 +4052,9 @@ void Siblings_dynamic_childof_same_table_w_grandchildren(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             5.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3668,7 +4070,9 @@ void Siblings_dynamic_childof_same_table_w_grandchildren(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             4.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3684,7 +4088,9 @@ void Siblings_dynamic_childof_same_table_w_grandchildren(void) {
             0.0f, 0.0f, 0.5f, 0.0f,
             5.0f, 0.0f, 1.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3700,7 +4106,9 @@ void Siblings_dynamic_childof_same_table_w_grandchildren(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             5.0f, 3.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3716,7 +4124,9 @@ void Siblings_dynamic_childof_same_table_w_grandchildren(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3732,7 +4142,9 @@ void Siblings_dynamic_childof_same_table_w_grandchildren(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             4.0f, 0.0f, 1.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3748,7 +4160,9 @@ void Siblings_dynamic_childof_same_table_w_grandchildren(void) {
             0.0f, 0.0f, 0.5f, 0.0f,
             4.0f, 1.0f, 1.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3770,7 +4184,9 @@ void Siblings_dynamic_childof_same_table_w_grandchildren(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             0.0f, 0.0f, 7.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3786,7 +4202,9 @@ void Siblings_dynamic_childof_same_table_w_grandchildren(void) {
             0.0f, -2.0f, 0.0f, 0.0f,
             1.0f, 0.0f, 7.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3802,7 +4220,9 @@ void Siblings_dynamic_childof_same_table_w_grandchildren(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             0.0f, 0.0f, 8.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3818,7 +4238,9 @@ void Siblings_dynamic_childof_same_table_w_grandchildren(void) {
             0.0f, -0.5f, 0.0f, 0.0f,
             0.0f, -1.0f, 7.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3834,7 +4256,9 @@ void Siblings_dynamic_childof_same_table_w_grandchildren(void) {
             0.0f, -2.0f, 0.0f, 0.0f,
             3.0f, 0.0f, 7.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3850,7 +4274,9 @@ void Siblings_dynamic_childof_same_table_w_grandchildren(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             0.0f, 0.0f, 11.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3866,7 +4292,9 @@ void Siblings_dynamic_childof_same_table_w_grandchildren(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             0.0f, -1.0f, 8.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3882,7 +4310,9 @@ void Siblings_dynamic_childof_same_table_w_grandchildren(void) {
             0.0f, -0.5f, 0.0f, 0.0f,
             1.0f, -1.0f, 8.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3904,7 +4334,9 @@ void Siblings_dynamic_childof_same_table_w_grandchildren(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             0.0f, 0.0f, 7.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3920,7 +4352,9 @@ void Siblings_dynamic_childof_same_table_w_grandchildren(void) {
             0.0f, -2.0f, 0.0f, 0.0f,
             1.0f, 0.0f, 7.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3936,7 +4370,9 @@ void Siblings_dynamic_childof_same_table_w_grandchildren(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             3.0f, 0.0f, 7.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3952,7 +4388,9 @@ void Siblings_dynamic_childof_same_table_w_grandchildren(void) {
             0.0f, -0.5f, 0.0f, 0.0f,
             0.0f, -1.0f, 7.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3968,7 +4406,9 @@ void Siblings_dynamic_childof_same_table_w_grandchildren(void) {
             0.0f, -2.0f, 0.0f, 0.0f,
             3.0f, 0.0f, 7.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -3984,7 +4424,9 @@ void Siblings_dynamic_childof_same_table_w_grandchildren(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             3.0f, 0.0f, 8.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4000,7 +4442,9 @@ void Siblings_dynamic_childof_same_table_w_grandchildren(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             3.0f, -1.0f, 7.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4016,7 +4460,9 @@ void Siblings_dynamic_childof_same_table_w_grandchildren(void) {
             0.0f, -0.5f, 0.0f, 0.0f,
             1.0f, -1.0f, 8.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4068,7 +4514,9 @@ void Siblings_dynamic_parent_same_table(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             10.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4084,7 +4532,9 @@ void Siblings_dynamic_parent_same_table(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             10.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4100,7 +4550,9 @@ void Siblings_dynamic_parent_same_table(void) {
             1.0f, 0.0f, 0.0f, 0.0f,
             8.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4116,7 +4568,9 @@ void Siblings_dynamic_parent_same_table(void) {
             0.0f, 0.5f, 0.0f, 0.0f,
             10.0f, 0.0f, 3.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4132,7 +4586,9 @@ void Siblings_dynamic_parent_same_table(void) {
             0.0f, 0.0f, 3.0f, 0.0f,
             11.0f, -1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4154,7 +4610,9 @@ void Siblings_dynamic_parent_same_table(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 5.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4170,7 +4628,9 @@ void Siblings_dynamic_parent_same_table(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             1.0f, 5.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4186,7 +4646,9 @@ void Siblings_dynamic_parent_same_table(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             0.0f, 7.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4202,7 +4664,9 @@ void Siblings_dynamic_parent_same_table(void) {
             0.5f, 0.0f, 0.0f, 0.0f,
             0.0f, 5.0f, 3.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4218,7 +4682,9 @@ void Siblings_dynamic_parent_same_table(void) {
             0.0f, 0.0f, 3.0f, 0.0f,
             -1.0f, 4.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4239,7 +4705,9 @@ void Siblings_dynamic_parent_same_table(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 5.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4255,7 +4723,9 @@ void Siblings_dynamic_parent_same_table(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             1.0f, 5.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4271,7 +4741,9 @@ void Siblings_dynamic_parent_same_table(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             4.0f, 5.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4287,7 +4759,9 @@ void Siblings_dynamic_parent_same_table(void) {
             0.5f, 0.0f, 0.0f, 0.0f,
             0.0f, 5.0f, 3.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4303,7 +4777,9 @@ void Siblings_dynamic_parent_same_table(void) {
             0.0f, 0.0f, 3.0f, 0.0f,
             -1.0f, 4.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4359,7 +4835,9 @@ void Siblings_dynamic_parent_same_table_w_grandchildren(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             5.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4375,7 +4853,9 @@ void Siblings_dynamic_parent_same_table_w_grandchildren(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             5.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4391,7 +4871,9 @@ void Siblings_dynamic_parent_same_table_w_grandchildren(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             4.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4407,7 +4889,9 @@ void Siblings_dynamic_parent_same_table_w_grandchildren(void) {
             0.0f, 0.0f, 0.5f, 0.0f,
             5.0f, 0.0f, 1.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4423,7 +4907,9 @@ void Siblings_dynamic_parent_same_table_w_grandchildren(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             5.0f, 3.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4439,7 +4925,9 @@ void Siblings_dynamic_parent_same_table_w_grandchildren(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4455,7 +4943,9 @@ void Siblings_dynamic_parent_same_table_w_grandchildren(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             4.0f, 0.0f, 1.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4471,7 +4961,9 @@ void Siblings_dynamic_parent_same_table_w_grandchildren(void) {
             0.0f, 0.0f, 0.5f, 0.0f,
             4.0f, 1.0f, 1.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4493,7 +4985,9 @@ void Siblings_dynamic_parent_same_table_w_grandchildren(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             0.0f, 0.0f, 7.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4509,7 +5003,9 @@ void Siblings_dynamic_parent_same_table_w_grandchildren(void) {
             0.0f, -2.0f, 0.0f, 0.0f,
             1.0f, 0.0f, 7.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4525,7 +5021,9 @@ void Siblings_dynamic_parent_same_table_w_grandchildren(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             0.0f, 0.0f, 8.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4541,7 +5039,9 @@ void Siblings_dynamic_parent_same_table_w_grandchildren(void) {
             0.0f, -0.5f, 0.0f, 0.0f,
             0.0f, -1.0f, 7.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4557,7 +5057,9 @@ void Siblings_dynamic_parent_same_table_w_grandchildren(void) {
             0.0f, -2.0f, 0.0f, 0.0f,
             3.0f, 0.0f, 7.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4573,7 +5075,9 @@ void Siblings_dynamic_parent_same_table_w_grandchildren(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             0.0f, 0.0f, 11.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4589,7 +5093,9 @@ void Siblings_dynamic_parent_same_table_w_grandchildren(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             0.0f, -1.0f, 8.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4605,7 +5111,9 @@ void Siblings_dynamic_parent_same_table_w_grandchildren(void) {
             0.0f, -0.5f, 0.0f, 0.0f,
             1.0f, -1.0f, 8.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4627,7 +5135,9 @@ void Siblings_dynamic_parent_same_table_w_grandchildren(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             0.0f, 0.0f, 7.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4643,7 +5153,9 @@ void Siblings_dynamic_parent_same_table_w_grandchildren(void) {
             0.0f, -2.0f, 0.0f, 0.0f,
             1.0f, 0.0f, 7.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4659,7 +5171,9 @@ void Siblings_dynamic_parent_same_table_w_grandchildren(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             3.0f, 0.0f, 7.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4675,7 +5189,9 @@ void Siblings_dynamic_parent_same_table_w_grandchildren(void) {
             0.0f, -0.5f, 0.0f, 0.0f,
             0.0f, -1.0f, 7.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4691,7 +5207,9 @@ void Siblings_dynamic_parent_same_table_w_grandchildren(void) {
             0.0f, -2.0f, 0.0f, 0.0f,
             3.0f, 0.0f, 7.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4707,7 +5225,9 @@ void Siblings_dynamic_parent_same_table_w_grandchildren(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             3.0f, 0.0f, 8.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4723,7 +5243,9 @@ void Siblings_dynamic_parent_same_table_w_grandchildren(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             3.0f, -1.0f, 7.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4739,7 +5261,9 @@ void Siblings_dynamic_parent_same_table_w_grandchildren(void) {
             0.0f, -0.5f, 0.0f, 0.0f,
             1.0f, -1.0f, 8.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4792,7 +5316,9 @@ void Siblings_dynamic_parent_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             10.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4808,7 +5334,9 @@ void Siblings_dynamic_parent_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 10.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4824,7 +5352,9 @@ void Siblings_dynamic_parent_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             11.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4840,7 +5370,9 @@ void Siblings_dynamic_parent_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 12.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4856,7 +5388,9 @@ void Siblings_dynamic_parent_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             10.0f, 3.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4872,7 +5406,9 @@ void Siblings_dynamic_parent_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -4.0f, 10.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4888,7 +5424,9 @@ void Siblings_dynamic_parent_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             10.0f, 0.0f, 5.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4904,7 +5442,9 @@ void Siblings_dynamic_parent_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 10.0f, 6.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4926,7 +5466,9 @@ void Siblings_dynamic_parent_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             10.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4942,7 +5484,9 @@ void Siblings_dynamic_parent_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 20.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4958,7 +5502,9 @@ void Siblings_dynamic_parent_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             11.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4974,7 +5520,9 @@ void Siblings_dynamic_parent_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 18.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -4990,7 +5538,9 @@ void Siblings_dynamic_parent_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             10.0f, 3.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5006,7 +5556,9 @@ void Siblings_dynamic_parent_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             4.0f, 20.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5022,7 +5574,9 @@ void Siblings_dynamic_parent_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             10.0f, 0.0f, 5.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5038,7 +5592,9 @@ void Siblings_dynamic_parent_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 20.0f, 6.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5059,7 +5615,9 @@ void Siblings_dynamic_parent_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -10.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5075,7 +5633,9 @@ void Siblings_dynamic_parent_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 20.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5091,7 +5651,9 @@ void Siblings_dynamic_parent_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -9.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5107,7 +5669,9 @@ void Siblings_dynamic_parent_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 18.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5123,7 +5687,9 @@ void Siblings_dynamic_parent_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -10.0f, 3.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5139,7 +5705,9 @@ void Siblings_dynamic_parent_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             4.0f, 20.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5155,7 +5723,9 @@ void Siblings_dynamic_parent_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -10.0f, 0.0f, 5.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5171,7 +5741,9 @@ void Siblings_dynamic_parent_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 20.0f, 6.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5192,7 +5764,9 @@ void Siblings_dynamic_parent_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -10.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5208,7 +5782,9 @@ void Siblings_dynamic_parent_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 20.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5224,7 +5800,9 @@ void Siblings_dynamic_parent_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -9.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5240,7 +5818,9 @@ void Siblings_dynamic_parent_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 18.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5256,7 +5836,9 @@ void Siblings_dynamic_parent_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -10.0f, 3.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5272,7 +5854,9 @@ void Siblings_dynamic_parent_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 19.0f, 1.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5288,7 +5872,9 @@ void Siblings_dynamic_parent_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -10.0f, 0.0f, 5.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5304,7 +5890,9 @@ void Siblings_dynamic_parent_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 20.0f, 6.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5357,7 +5945,9 @@ void Siblings_dynamic_childof_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             10.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5373,7 +5963,9 @@ void Siblings_dynamic_childof_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 10.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5389,7 +5981,9 @@ void Siblings_dynamic_childof_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             11.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5405,7 +5999,9 @@ void Siblings_dynamic_childof_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 12.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5421,7 +6017,9 @@ void Siblings_dynamic_childof_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             10.0f, 3.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5437,7 +6035,9 @@ void Siblings_dynamic_childof_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -4.0f, 10.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5453,7 +6053,9 @@ void Siblings_dynamic_childof_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             10.0f, 0.0f, 5.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5469,7 +6071,9 @@ void Siblings_dynamic_childof_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 10.0f, 6.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5491,7 +6095,9 @@ void Siblings_dynamic_childof_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             10.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5507,7 +6113,9 @@ void Siblings_dynamic_childof_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 20.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5523,7 +6131,9 @@ void Siblings_dynamic_childof_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             11.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5539,7 +6149,9 @@ void Siblings_dynamic_childof_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 18.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5555,7 +6167,9 @@ void Siblings_dynamic_childof_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             10.0f, 3.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5571,7 +6185,9 @@ void Siblings_dynamic_childof_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             4.0f, 20.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5587,7 +6203,9 @@ void Siblings_dynamic_childof_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             10.0f, 0.0f, 5.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5603,7 +6221,9 @@ void Siblings_dynamic_childof_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 20.0f, 6.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5624,7 +6244,9 @@ void Siblings_dynamic_childof_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -10.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5640,7 +6262,9 @@ void Siblings_dynamic_childof_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 20.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5656,7 +6280,9 @@ void Siblings_dynamic_childof_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -9.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5672,7 +6298,9 @@ void Siblings_dynamic_childof_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 18.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5688,7 +6316,9 @@ void Siblings_dynamic_childof_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -10.0f, 3.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5704,7 +6334,9 @@ void Siblings_dynamic_childof_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             4.0f, 20.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5720,7 +6352,9 @@ void Siblings_dynamic_childof_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -10.0f, 0.0f, 5.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5736,7 +6370,9 @@ void Siblings_dynamic_childof_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 20.0f, 6.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5757,7 +6393,9 @@ void Siblings_dynamic_childof_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -10.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5773,7 +6411,9 @@ void Siblings_dynamic_childof_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 20.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5789,7 +6429,9 @@ void Siblings_dynamic_childof_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -9.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5805,7 +6447,9 @@ void Siblings_dynamic_childof_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 18.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5821,7 +6465,9 @@ void Siblings_dynamic_childof_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -10.0f, 3.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5837,7 +6483,9 @@ void Siblings_dynamic_childof_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 19.0f, 1.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5853,7 +6501,9 @@ void Siblings_dynamic_childof_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             -10.0f, 0.0f, 5.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5869,7 +6519,9 @@ void Siblings_dynamic_childof_interleaved_tables(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 20.0f, 6.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5924,7 +6576,9 @@ void Siblings_dynamic_childof_mixed_transformable(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             3.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5940,7 +6594,9 @@ void Siblings_dynamic_childof_mixed_transformable(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             3.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5957,7 +6613,9 @@ void Siblings_dynamic_childof_mixed_transformable(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             2.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5974,7 +6632,9 @@ void Siblings_dynamic_childof_mixed_transformable(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             3.0f, 0.0f, 1.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -5990,7 +6650,9 @@ void Siblings_dynamic_childof_mixed_transformable(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             2.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -6006,7 +6668,9 @@ void Siblings_dynamic_childof_mixed_transformable(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             2.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -6022,7 +6686,9 @@ void Siblings_dynamic_childof_mixed_transformable(void) {
             1.0f, 0.0f, 0.0f, 0.0f,
             3.0f, 2.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -6044,7 +6710,9 @@ void Siblings_dynamic_childof_mixed_transformable(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 0.0f, 4.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -6060,7 +6728,9 @@ void Siblings_dynamic_childof_mixed_transformable(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 0.0f, 4.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -6077,7 +6747,9 @@ void Siblings_dynamic_childof_mixed_transformable(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 1.0f, 4.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -6094,7 +6766,9 @@ void Siblings_dynamic_childof_mixed_transformable(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 0.0f, 5.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -6110,7 +6784,9 @@ void Siblings_dynamic_childof_mixed_transformable(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 1.0f, 4.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -6126,7 +6802,9 @@ void Siblings_dynamic_childof_mixed_transformable(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 1.0f, 4.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -6142,7 +6820,9 @@ void Siblings_dynamic_childof_mixed_transformable(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             2.0f, 0.0f, 4.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -6164,7 +6844,9 @@ void Siblings_dynamic_childof_mixed_transformable(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 0.0f, 4.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -6180,7 +6862,9 @@ void Siblings_dynamic_childof_mixed_transformable(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 0.0f, 4.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -6197,7 +6881,9 @@ void Siblings_dynamic_childof_mixed_transformable(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             0.0f, 2.0f, 4.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -6214,7 +6900,9 @@ void Siblings_dynamic_childof_mixed_transformable(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 0.0f, 5.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -6230,7 +6918,9 @@ void Siblings_dynamic_childof_mixed_transformable(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 1.0f, 4.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -6246,7 +6936,9 @@ void Siblings_dynamic_childof_mixed_transformable(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             2.0f, 2.0f, 4.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -6262,7 +6954,9 @@ void Siblings_dynamic_childof_mixed_transformable(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             2.0f, 0.0f, 4.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -6317,7 +7011,9 @@ void Siblings_dynamic_parent_mixed_transformable(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             3.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -6333,7 +7029,9 @@ void Siblings_dynamic_parent_mixed_transformable(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             3.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -6350,7 +7048,9 @@ void Siblings_dynamic_parent_mixed_transformable(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             2.0f, 0.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -6367,7 +7067,9 @@ void Siblings_dynamic_parent_mixed_transformable(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             3.0f, 0.0f, 1.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -6383,7 +7085,9 @@ void Siblings_dynamic_parent_mixed_transformable(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             2.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -6399,7 +7103,9 @@ void Siblings_dynamic_parent_mixed_transformable(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             2.0f, 1.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -6415,7 +7121,9 @@ void Siblings_dynamic_parent_mixed_transformable(void) {
             1.0f, 0.0f, 0.0f, 0.0f,
             3.0f, 2.0f, 0.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -6437,7 +7145,9 @@ void Siblings_dynamic_parent_mixed_transformable(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 0.0f, 4.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -6453,7 +7163,9 @@ void Siblings_dynamic_parent_mixed_transformable(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 0.0f, 4.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -6470,7 +7182,9 @@ void Siblings_dynamic_parent_mixed_transformable(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 1.0f, 4.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -6487,7 +7201,9 @@ void Siblings_dynamic_parent_mixed_transformable(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 0.0f, 5.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -6503,7 +7219,9 @@ void Siblings_dynamic_parent_mixed_transformable(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 1.0f, 4.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -6519,7 +7237,9 @@ void Siblings_dynamic_parent_mixed_transformable(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 1.0f, 4.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -6535,7 +7255,9 @@ void Siblings_dynamic_parent_mixed_transformable(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             2.0f, 0.0f, 4.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -6557,7 +7279,9 @@ void Siblings_dynamic_parent_mixed_transformable(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 0.0f, 4.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -6573,7 +7297,9 @@ void Siblings_dynamic_parent_mixed_transformable(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 0.0f, 4.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -6590,7 +7316,9 @@ void Siblings_dynamic_parent_mixed_transformable(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             0.0f, 2.0f, 4.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -6607,7 +7335,9 @@ void Siblings_dynamic_parent_mixed_transformable(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 0.0f, 5.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -6623,7 +7353,9 @@ void Siblings_dynamic_parent_mixed_transformable(void) {
             0.0f, 0.0f, 1.0f, 0.0f,
             1.0f, 1.0f, 4.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -6639,7 +7371,9 @@ void Siblings_dynamic_parent_mixed_transformable(void) {
             0.0f, 0.0f, 2.0f, 0.0f,
             2.0f, 2.0f, 4.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);
@@ -6655,7 +7389,9 @@ void Siblings_dynamic_parent_mixed_transformable(void) {
             0.0f, -1.0f, 0.0f, 0.0f,
             2.0f, 0.0f, 4.0f, 1.0f
         };
-        const float *m = &t->m[0][0];
+        mat4 matrix;
+        box_transform_mat4(t, NULL, matrix);
+        const float *m = &matrix[0][0];
         for (int i = 0; i < 16; i ++) {
             if (fabsf(m[i] - expect[i]) > 1e-3f) {
                 test_flt(m[i], expect[i]);

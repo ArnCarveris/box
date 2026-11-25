@@ -167,14 +167,14 @@ void TerrainWalk_walks_up_slope(void) {
     float h = tw_slope(p->x, p->z);
     test_assert(p->z < -6.0f);
     test_assert(h > 2.0f);
-    test_assert(fabsf(p->y - 1.7f - h) < 0.1f);
+    test_assert(fabs(p->y - 1.7f - h) < 0.1f);
     test_bool(ecs_get(world, fp, FirstPersonController)->grounded, true);
 
     box_input_key(world, KeyW, false);
     tw_run(world, terrain, 5);
     float y = ecs_get(world, fp, Position)->y;
     tw_run(world, terrain, 5);
-    test_assert(fabsf(ecs_get(world, fp, Position)->y - y) < 0.01f);
+    test_assert(fabs(ecs_get(world, fp, Position)->y - y) < 0.01f);
 
     ecs_fini(world);
 }
@@ -218,7 +218,7 @@ void TerrainWalk_climbs_cliff(void) {
     tw_run(world, terrain, 5);
     const Position *p = ecs_get(world, fp, Position);
     test_assert(p->z < -6.0f);
-    test_assert(fabsf(p->y - 7.7f) < 0.1f);
+    test_assert(fabs(p->y - 7.7f) < 0.1f);
     const FirstPersonController *c = ecs_get(world, fp, FirstPersonController);
     test_bool(c->grounded, true);
     test_int(c->climbed, 0);

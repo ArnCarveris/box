@@ -143,7 +143,7 @@ static void box_cmd_fit_axes(
     vec3 world_up = { 0, 1, 0 };
     glm_vec3_copy((vec3){ 0, 0, -1 }, forward);
     if (transform) {
-        glm_vec3_negate_to((float*)transform->m[2], forward);
+        glm_vec3_negate_to((float*)transform->basis[2], forward);
         if (glm_vec3_norm(forward) < FLT_EPSILON) {
             glm_vec3_copy((vec3){ 0, 0, -1 }, forward);
         }
@@ -178,8 +178,9 @@ static void box_cmd_fit_place(
     vec3 local;
     glm_vec3_copy((float*)eye, local);
     if (pt) {
-        mat4 inv;
-        glm_mat4_inv((vec4*)pt->m, inv);
+        mat4 m, inv;
+        box_transform_mat4(pt, NULL, m);
+        glm_mat4_inv(m, inv);
         glm_mat4_mulv3(inv, (float*)eye, 1.0f, local);
     }
 

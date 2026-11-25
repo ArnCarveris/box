@@ -133,6 +133,7 @@ typedef struct box_gpu_bake_run_uniforms_t {
     uint32_t first;                 /**< Job of the first batch */
     uint32_t first_block;           /**< Block of the first batch */
     uint32_t pad[2];                /**< Pads the run to the size of CullRun */
+    int32_t origin[4];              /**< The render origin, as box_gpu_origin_split packs it */
 } box_gpu_bake_run_uniforms_t;
 
 /** A batch the faces of the captures draw, with what its draws bind */

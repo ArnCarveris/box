@@ -491,8 +491,8 @@ typedef struct box_render_wind_t {
     float sway;             /**< Phase of the sway, 0..1 */
     double time;            /**< Seconds the wind was advanced */
     double clock;           /**< WindStatus.clock, the clock of the flutter and branches */
-    double origin_y;        /**< Absolute Y of the local origin, which the WindSway.base of a
-                             *   record is made local by */
+    double origin_y;        /**< Y of the render origin, which the WindSway.base of a record
+                             *   is made relative to */
 } box_render_wind_t;
 
 /** Axis the phase of the flutter of a vertex runs along, WIND_FLUTTER_AXIS of wind.wgsl */
@@ -572,7 +572,7 @@ void box_render_wind_advance(
 /** Get the Wind of a world as the WindSway records pack it: the singleton Wind, resolved, with
  * the state of its WindStatus; a calm wind without one.
  *
- * The gust offset moves back by the absolute position of the local origin (WorldOrigin), the
+ * The gust offset moves back by the render origin, the
  * sway phase by the wave across it along the wind, and the flutter offset is the origin along
  * the flutter axis, all wrapped in double precision, so the patterns hold across a shift.
  *
@@ -644,11 +644,17 @@ void box_render_fog_offset(
     double time,
     float *out);
 
-/** Get the absolute world position of the local origin, the WorldOrigin singleton; 0 without
- * one or when it is not finite.
+/** Size of a cell of the grid the render origin and the instances are placed on, in meters */
+#define BOX_RENDER_ORIGIN_CELL (1024.0)
+
+/** Get the origin the renderer draws relative to in this frame (render/origin.c): a multiple
+ * of BOX_RENDER_ORIGIN_CELL near the first focus of the world (box_world_focus), which moves to
+ * the cell nearest to the focus when the focus is more than a cell away along an axis. The
+ * first call of a frame updates it; 0 until a focus leaves the first cell.
  *
- * The world space patterns of the shaders sample the local position plus this origin, which
- * the CPU splits per use in double precision and wraps to the period of each pattern.
+ * The GPU data of a frame is relative to it. The world space patterns of the shaders sample
+ * the relative position plus this origin, which the CPU splits per use in double precision and
+ * wraps to the period of each pattern.
  *
  * @param world The world
  * @param out Receives X, Y and Z
@@ -656,6 +662,80 @@ void box_render_fog_offset(
 void box_render_origin(
     const ecs_world_t *world,
     double out[3]);
+
+/** Place a world record at a world position: its cell, the corner of the cell nearest to the
+ * position, and its translation relative to that corner, marking it a world record. The rows of
+ * the axes are kept.
+ *
+ * @param out The record
+ * @param position World position of the record
+ */
+void box_render_transform_place(
+    box_render_transform_t *out,
+    const dvec3 position);
+
+/** Write the world record of a world transform with an instance scale.
+ *
+ * @param out The record
+ * @param t The world transform
+ * @param scale Scale of the axes, NULL for none
+ */
+void box_render_transform_world(
+    box_render_transform_t *out,
+    const WorldTransform *t,
+    const vec3 scale);
+
+/** Get the world position of the translation of a record: its cell plus its translation for a
+ * world record, its translation for another one.
+ *
+ * @param t The record
+ * @param out Receives the position
+ */
+void box_render_transform_position(
+    const box_render_transform_t *t,
+    dvec3 out);
+
+/** Get the translation of a record relative to an origin: that of a world record minus the
+ * origin, subtracted in f64, that of another record as it is.
+ *
+ * @param t The record
+ * @param origin The origin, NULL for the origin of the world
+ * @param out Receives the translation
+ */
+void box_render_transform_offset(
+    const box_render_transform_t *t,
+    const double *origin,
+    vec3 out);
+
+/** Get the matrix of a record relative to an origin: the translation of a world record minus
+ * the origin, the matrix of another record as it is.
+ *
+ * @param t The record
+ * @param origin The origin, NULL for the origin of the world
+ * @param out Receives the matrix
+ */
+void box_render_transform_mat4(
+    const box_render_transform_t *t,
+    const double *origin,
+    mat4 out);
+
+/** Write the world record of a matrix relative to an origin.
+ *
+ * @param out The record
+ * @param m The matrix, its last row 0 0 0 1
+ * @param origin The origin the matrix is relative to, NULL for the origin of the world
+ */
+void box_render_transform_from_mat4(
+    box_render_transform_t *out,
+    const mat4 m,
+    const double *origin);
+
+/** Register the singleton of the render origin.
+ *
+ * @param world The world
+ */
+void box_render_origin_import(
+    ecs_world_t *world);
 
 /** Wrap a value to [0, period) in double precision, 0 when it or the period is not finite or
  * the period not above 0.
@@ -684,7 +764,7 @@ float box_render_origin_wrap_float(
  * The origin over the size times the TextureTransform scale, as mapping_object of material.wgsl
  * makes it, (x * su, y * sv, z * su, x * sv), each wrapped to [0, 1). 0 at an origin of 0.
  *
- * @param origin The absolute position of the local origin
+ * @param origin The render origin
  * @param size TextureMapping.size, 1 when it is not above 0 and finite
  * @param scale_u TextureTransform.scale_x
  * @param scale_v TextureTransform.scale_y
@@ -701,7 +781,7 @@ void box_render_origin_mapping(
  * pattern that repeats over that many repeats of the texture: the four components in eight
  * bits each, the first in the lowest.
  *
- * @param origin The absolute position of the local origin
+ * @param origin The render origin
  * @param size TextureMapping.size, 1 when it is not above 0 and finite
  * @param scale_u TextureTransform.scale_x
  * @param scale_v TextureTransform.scale_y
@@ -715,7 +795,7 @@ uint32_t box_render_origin_repeats(
     float scale_v,
     int32_t period);
 
-/** Repeats the projection of the absolute position of the local origin of a Water record wraps
+/** Repeats the projection of the render origin of a Water record wraps
  * to in the shaders (WATER_ORIGIN_PERIOD of material.wgsl): its foam samples scale the UVs by
  * Water.foam_scale and by a second, rotated scale of 1.63 (0.8, 0.6), which stay whole repeats
  * over this many for foam scales of a few binary decimals */
@@ -1613,14 +1693,6 @@ uint32_t box_render_shadow_rendered(
     const ecs_world_t *world,
     ecs_entity_t view);
 
-/** Render every shadow cascade of every view in the next extract, as when the views are new:
- * after a shift of the world origin the cascades kept from earlier frames show the old place.
- *
- * @param world The world
- */
-void box_render_shadows_reset(
-    ecs_world_t *world);
-
 /** Resolve shadow settings: every field is clamped to its valid range and an even
  * filter_size rounds up to the next odd one, other values apply as set.
  *
@@ -2049,19 +2121,6 @@ typedef struct box_render_reflection_probe_t {
  */
 void box_render_reflect_init(
     ecs_world_t *world);
-
-/** Move the reflection probes of a scene, its scene probe and its static bounds by the offset
- * of a shift of the world origin, and take the moves of the probes in this frame by the offset
- * alone as no change, so a shift captures nothing again.
- *
- * @param world The world
- * @param scene The scene, 0 for the default scene
- * @param offset Added to the world positions
- */
-void box_render_reflect_shift(
-    ecs_world_t *world,
-    ecs_entity_t scene,
-    const vec3 offset);
 
 /** Get the resident reflection probes of a scene.
  *
@@ -2930,7 +2989,8 @@ bool box_render_load(
 /** Kind of a field of a transitionable component */
 typedef enum box_render_transition_kind_t {
     BOX_RENDER_TRANSITION_F32 = 0,  /**< float, interpolated linearly */
-    BOX_RENDER_TRANSITION_U8        /**< uint8_t, interpolated in float and rounded */
+    BOX_RENDER_TRANSITION_U8,       /**< uint8_t, interpolated in float and rounded */
+    BOX_RENDER_TRANSITION_F64       /**< double, interpolated linearly in double */
 } box_render_transition_kind_t;
 
 /** A field of a transitionable component */

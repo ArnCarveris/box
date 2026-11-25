@@ -153,8 +153,8 @@ static void widgets_offset(
     const WorldTransform *a = ecs_get(world, e, WorldTransform);
     const WorldTransform *b = ecs_get(world, from, WorldTransform);
     test_assert(a != NULL && b != NULL);
-    out[0] = a->m[3][0] - b->m[3][0];
-    out[1] = a->m[3][1] - b->m[3][1];
+    out[0] = a->position[0] - b->position[0];
+    out[1] = a->position[1] - b->position[1];
 }
 
 /** A scroll view of 200 by 100 points with six blocks of 40 points in a column, which do not fit,

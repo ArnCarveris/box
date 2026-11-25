@@ -24,7 +24,60 @@ extern "C" {
 extern ECS_COMPONENT_DECLARE(vec2);
 extern ECS_COMPONENT_DECLARE(vec3);
 extern ECS_COMPONENT_DECLARE(vec4);
+extern ECS_COMPONENT_DECLARE(mat3);
 extern ECS_COMPONENT_DECLARE(mat4);
+
+/** A point or vector in f64, for positions that keep their precision anywhere in a large
+ * world */
+typedef double dvec3[3];
+
+extern ECS_COMPONENT_DECLARE(dvec3);
+
+/** Copy a dvec3.
+ *
+ * @param v The vector
+ * @param out Receives the copy
+ */
+static inline void box_dvec3_copy(
+    const dvec3 v,
+    dvec3 out)
+{
+    out[0] = v[0];
+    out[1] = v[1];
+    out[2] = v[2];
+}
+
+/** Get a point relative to an origin in f32: a - origin, subtracted in f64.
+ *
+ * @param a The point
+ * @param origin The origin
+ * @param out Receives the relative point
+ */
+static inline void box_dvec3_rel(
+    const dvec3 a,
+    const dvec3 origin,
+    vec3 out)
+{
+    out[0] = (float)(a[0] - origin[0]);
+    out[1] = (float)(a[1] - origin[1]);
+    out[2] = (float)(a[2] - origin[2]);
+}
+
+/** Add an f32 offset to a point: a + offset, in f64.
+ *
+ * @param a The point
+ * @param offset The offset
+ * @param out Receives the point
+ */
+static inline void box_dvec3_add(
+    const dvec3 a,
+    const vec3 offset,
+    dvec3 out)
+{
+    out[0] = a[0] + (double)offset[0];
+    out[1] = a[1] + (double)offset[1];
+    out[2] = a[2] + (double)offset[2];
+}
 
 /** Display encoded color with 8 bit channels */
 ECS_STRUCT(rgb, {

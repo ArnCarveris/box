@@ -316,21 +316,21 @@ static ecs_entity_t box_spatial_mover_frame(
  * @param world The world
  * @param m The mover
  * @param buf Receives the transform when the frame keeps none (box_transform_world)
- * @return The 16 floats of the transform, the identity when the frame has none
+ * @return The transform, the identity when the frame has none
  */
-static const float* box_spatial_mover_pose(
+static const WorldTransform* box_spatial_mover_pose(
     const ecs_world_t *world,
     box_spatial_mover_t *m,
     WorldTransform *buf)
 {
-    static const mat4 identity = GLM_MAT4_IDENTITY_INIT;
+    static const WorldTransform identity = { .basis = GLM_MAT3_IDENTITY_INIT };
     const WorldTransform *t = m->frame ?
         ecs_ref_get(ecs_get_world(world), &m->pose_ref, WorldTransform) : NULL;
     if (t && box_transform_spread(world, ecs_get_table(world, m->frame))) {
         t = box_transform_world(world, m->frame, buf);
     }
 
-    return t ? &t->m[0][0] : &identity[0][0];
+    return t ? t : &identity;
 }
 
 /** Compute the transform of a shape in the frame of its mover from the local transforms between
@@ -338,37 +338,41 @@ static const float* box_spatial_mover_pose(
  *
  * @param world The world
  * @param frame The frame of the mover
- * @param inv The inverse of the world transform of the frame
+ * @param pose The world transform of the frame
+ * @param inv The inverse of the world transform of the frame relative to its position
  * @param e The shape
  * @param out Receives the transform
  */
 static void box_spatial_member_frame(
     const ecs_world_t *world,
     ecs_entity_t frame,
+    const WorldTransform *pose,
     const mat4 inv,
     ecs_entity_t e,
     mat4 out)
 {
-    mat4 acc = GLM_MAT4_IDENTITY_INIT;
+    WorldTransform acc = { .basis = GLM_MAT3_IDENTITY_INIT };
     ecs_entity_t a = e;
     bool manual = false;
     for (; a && a != frame && !manual; a = ecs_get_parent(world, a)) {
         const Position *p = ecs_get(world, a, Position);
         manual = ecs_has_id(world, a, ManualTransform);
         if (p && !manual) {
-            mat4 local, tmp;
-            box_transform_local(p, ecs_get(world, a, Rotation), ecs_get(world, a, Scale), local);
-            glm_mat4_mul(local, acc, tmp);
-            glm_mat4_copy(tmp, acc);
+            WorldTransform local;
+            box_transform_local(p, ecs_get(world, a, Rotation), ecs_get(world, a, Scale),
+                &local);
+            box_transform_mul(&local, &acc, &acc);
         }
     }
 
     WorldTransform t_buf;
     const WorldTransform *t = box_transform_world(world, e, &t_buf);
     if ((manual || a != frame) && t) {
-        glm_mat4_mul(ECS_CONST_CAST(vec4*, inv), ECS_CONST_CAST(vec4*, t->m), out);
+        mat4 world_rel;
+        box_transform_mat4(t, pose->position, world_rel);
+        glm_mat4_mul(ECS_CONST_CAST(vec4*, inv), world_rel, out);
     } else {
-        glm_mat4_copy(acc, out);
+        box_transform_mat4(&acc, NULL, out);
     }
 }
 
@@ -518,15 +522,18 @@ static void box_spatial_mover_refit(
     }
 
     WorldTransform buf;
-    ecs_os_memcpy(m->pose, box_spatial_mover_pose(world, m, &buf), sizeof(mat4));
-    glm_mat4_inv(m->pose, inv);
+    const WorldTransform *pose = box_spatial_mover_pose(world, m, &buf);
+    mat4 pose_rel;
+    box_transform_mat4(pose, NULL, m->pose);
+    box_transform_mat4(pose, pose->position, pose_rel);
+    glm_mat4_inv(pose_rel, inv);
     glm_vec3_fill(m->min, FLT_MAX);
     glm_vec3_fill(m->max, -FLT_MAX);
     box_spatial_member_t *members = ecs_vec_first(&m->members);
     for (i = 0; i < m->live; i ++) {
         mat4 rel;
         vec3 min, max;
-        box_spatial_member_frame(world, m->frame, inv, members[i].entity, rel);
+        box_spatial_member_frame(world, m->frame, pose, inv, members[i].entity, rel);
         box_spatial_bounds_of(members[i].shape_min, members[i].shape_max, &rel[0][0],
             min, max);
         box_spatial_member_fit(m, i, min, max, &changed);
@@ -561,9 +568,14 @@ int32_t box_spatial_movers_place(
     for (i = 0; i < count; i ++) {
         box_spatial_mover_t *m = box_spatial_mover(index, i);
         WorldTransform buf;
-        const float *pose = m->entity && m->item >= 0 ?
+        const WorldTransform *t = m->entity && m->item >= 0 ?
             box_spatial_mover_pose(world, m, &buf) : NULL;
-        if (pose && ecs_os_memcmp(m->pose, pose, sizeof(mat4))) {
+        mat4 pose;
+        if (t) {
+            box_transform_mat4(t, NULL, pose);
+        }
+
+        if (t && ecs_os_memcmp(m->pose, pose, sizeof(mat4))) {
             ecs_os_memcpy(m->pose, pose, sizeof(mat4));
             index->stats.moved += box_spatial_mover_leaf(index, m, i, m->scene);
             result ++;
@@ -612,9 +624,12 @@ void box_spatial_member_bounds(
     vec3 min,
     vec3 max)
 {
-    static const mat4 identity = GLM_MAT4_IDENTITY_INIT;
+    mat4 pose = GLM_MAT4_IDENTITY_INIT;
     WorldTransform t_buf;
     const WorldTransform *t = box_transform_world(world, m->entity, &t_buf);
-    box_spatial_bounds_of(m->shape_min, m->shape_max, t ? &t->m[0][0] : &identity[0][0],
-        min, max);
+    if (t) {
+        box_transform_mat4(t, NULL, pose);
+    }
+
+    box_spatial_bounds_of(m->shape_min, m->shape_max, &pose[0][0], min, max);
 }

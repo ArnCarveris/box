@@ -161,7 +161,7 @@ void Transition_shape_mid_transition(void) {
 
     stbi_image_free(trans_capture(world, "transition_shape_2.png"));
     px = trans_capture(world, "transition_shape_3.png");
-    test_flt(ecs_get(world, e, WorldTransform)->m[3][0], 2);
+    test_flt(ecs_get(world, e, WorldTransform)->position[0], 2);
     test_assert(trans_channel(px, 32, 32, 1) < TRANS_DARK);
     test_assert(trans_channel(px, 32, 32, 0) > TRANS_LIT);
     test_assert(trans_channel(px, 11, 32, 1) > TRANS_LIT);

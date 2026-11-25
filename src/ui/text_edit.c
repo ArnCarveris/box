@@ -622,9 +622,10 @@ static bool box_ui_edit_local(
     WorldTransform t_buf;
     const WorldTransform *t = box_transform_world(world, s->content, &t_buf);
     if (t) {
-        mat4 inv;
+        mat4 m, inv;
         vec3 local;
-        glm_mat4_inv(ECS_CONST_CAST(vec4*, t->m), inv);
+        box_transform_mat4(t, NULL, m);
+        glm_mat4_inv(m, inv);
         glm_mat4_mulv3(inv, ECS_CONST_CAST(float*, point), 1.0f, local);
         *x = local[0];
     }

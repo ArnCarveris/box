@@ -13,9 +13,9 @@ state {
   export const SEARCH_STEP: f32 = 25
   export const FLANK: f32 = 40
 
-  export mut start_x: f32 = START_X
-  export mut start_y: f32 = 60
-  export mut start_z: f32 = START_Z
+  export mut start_x: f64 = START_X
+  export mut start_y: f64 = 60
+  export mut start_z: f64 = START_Z
   export mut start_yaw: f32 = 0
   export mut start_pitch: f32 = -0.06
   export mut started: bool = false

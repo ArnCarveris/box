@@ -202,7 +202,7 @@ void TerrainQuery_walk_slope_stop_at_cliff(void) {
     const Position *p = ecs_get(world, walker, Position);
     float d = 32 - p->z;
     test_assert(d > 6.0f && d < 10.0f);
-    test_assert(fabsf(p->y - 1.7f - tq_cone(p->x, p->z)) < 0.15f);
+    test_assert(fabs(p->y - 1.7f - tq_cone(p->x, p->z)) < 0.15f);
     test_bool(ecs_get(world, walker, FirstPersonController)->grounded, true);
 
     /* The cliff at 16 m from the center is steeper than the walker stands on */

@@ -199,7 +199,7 @@ fn impostor_lod(a: vec2f, res: f32) -> f32 {
     return max(log2(max(footprint, 1e-6)), 0.0);
 }
 
-// Model matrix of a card from its rows.
+// Model matrix of a card from its rows relative to the render origin.
 fn impostor_model(r0: vec4f, r1: vec4f, r2: vec4f) -> mat4x4f {
-    return instance_model(InstanceTransform(array<vec4f, 3>(r0, r1, r2)));
+    return rows_model(array<vec4f, 3>(r0, r1, r2));
 }

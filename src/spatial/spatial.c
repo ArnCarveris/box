@@ -385,7 +385,39 @@ static bool box_spatial_local(
     return result;
 }
 
-/** Compute the world bounds of local bounds placed by a transform.
+/** Round an f64 coordinate to the f32 at or below it, so bounds stay conservative.
+ *
+ * @param v The coordinate
+ * @return The f32 coordinate
+ */
+static float box_spatial_round_down(
+    double v)
+{
+    float result = (float)v;
+    if ((double)result > v) {
+        result = nextafterf(result, -INFINITY);
+    }
+
+    return result;
+}
+
+/** Round an f64 coordinate to the f32 at or above it, so bounds stay conservative.
+ *
+ * @param v The coordinate
+ * @return The f32 coordinate
+ */
+static float box_spatial_round_up(
+    double v)
+{
+    float result = (float)v;
+    if ((double)result < v) {
+        result = nextafterf(result, INFINITY);
+    }
+
+    return result;
+}
+
+/** Compute the world bounds of local bounds placed by a transform, rounded outwards to f32.
  *
  * @param l_min Minimum corner of the local bounds
  * @param l_max Maximum corner of the local bounds
@@ -409,11 +441,12 @@ static void box_spatial_world_bounds(
     }
 
     for (i = 0; i < 3; i ++) {
-        float wc = m->m[3][i] + m->m[0][i] * c[0] + m->m[1][i] * c[1] + m->m[2][i] * c[2];
-        float we = fabsf(m->m[0][i]) * e[0] + fabsf(m->m[1][i]) * e[1] +
-            fabsf(m->m[2][i]) * e[2];
-        min[i] = wc - we;
-        max[i] = wc + we;
+        double wc = m->position[i] + (double)(m->basis[0][i] * c[0] +
+            m->basis[1][i] * c[1] + m->basis[2][i] * c[2]);
+        double we = (double)(fabsf(m->basis[0][i]) * e[0] + fabsf(m->basis[1][i]) * e[1] +
+            fabsf(m->basis[2][i]) * e[2]);
+        min[i] = box_spatial_round_down(wc - we);
+        max[i] = box_spatial_round_up(wc + we);
     }
 }
 
@@ -433,9 +466,11 @@ static uint32_t box_spatial_signature(
     float values[22];
     uint64_t h = 0x9E3779B97F4A7C15ull;
     int32_t i;
-    ecs_os_memcpy(values, t->m, sizeof(mat4));
-    glm_vec3_copy(ECS_CONST_CAST(float*, l_min), &values[16]);
-    glm_vec3_copy(ECS_CONST_CAST(float*, l_max), &values[19]);
+    ecs_os_memcpy(values, t->position, sizeof(dvec3));
+    ecs_os_memcpy(&values[6], t->basis, sizeof(mat3));
+    glm_vec3_copy(ECS_CONST_CAST(float*, l_min), &values[15]);
+    glm_vec3_copy(ECS_CONST_CAST(float*, l_max), &values[18]);
+    values[21] = 0.0f;
     for (i = 0; i < 22; i += 2) {
         uint64_t w;
         ecs_os_memcpy(&w, &values[i], sizeof(uint64_t));
@@ -464,7 +499,7 @@ static void box_spatial_pose(
 {
     if (dynamic) {
         SpatialPose pose;
-        ecs_os_memcpy(pose.m, t->m, sizeof(mat4));
+        pose.t = *t;
         ecs_set_ptr(world, e, SpatialPose, &pose);
     } else if (ecs_has(world, e, SpatialPose)) {
         ecs_remove(world, e, SpatialPose);
@@ -635,11 +670,11 @@ static void box_spatial_dynamic(
             bool ui = false;
             WorldTransform buf;
             const WorldTransform *m = box_transform_world_field(world, &it, t, i, &buf);
-            if (p[i].item < 0 || p[i].dirty || !ecs_os_memcmp(pose[i].m, m->m, sizeof(mat4))) {
+            if (p[i].item < 0 || p[i].dirty || box_transform_equal(&pose[i].t, m)) {
                 continue;
             }
 
-            ecs_os_memcpy(pose[i].m, m->m, sizeof(mat4));
+            pose[i].t = *m;
             index->stats.rebound ++;
             if (!s || scene != p[i].scene) {
                 scene = p[i].scene;
@@ -785,20 +820,6 @@ void box_spatial_rebuild(
 
 done:
     return;
-}
-
-void box_spatial_shift(
-    ecs_world_t *world,
-    ecs_entity_t scene,
-    const vec3 offset,
-    box_spatial_shifts_t shifts,
-    void *ctx)
-{
-    box_spatial_t *index = box_spatial_get(world);
-    box_spatial_scene_t *s = index ? box_spatial_scene(index, scene) : NULL;
-    if (s) {
-        box_spatial_scene_shift(index, s, offset, shifts, ctx);
-    }
 }
 
 uint64_t box_spatial_static_revision(

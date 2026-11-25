@@ -828,9 +828,9 @@ static void float_clip_center(
 {
     const WorldTransform *t = ecs_get(world, ecs_lookup(world, path), WorldTransform);
     test_assert(t != NULL);
-    out[0] = t->m[3][0];
-    out[1] = t->m[3][1];
-    out[2] = t->m[3][2];
+    out[0] = t->position[0];
+    out[1] = t->position[1];
+    out[2] = t->position[2];
 }
 
 void LayoutFloat_clip_overlay_clipped(void) {

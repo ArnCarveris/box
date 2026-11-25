@@ -80,12 +80,13 @@ static void design_check_fit(ecs_world_t *world, vec3 min, vec3 max)
         test_assert(transform != NULL);
         test_bool(camera->ortho, i < 6);
         glm_vec3_normalize(directions[i]);
-        test_assert(glm_vec3_dot((float*)transform->m[2], directions[i]) > 0.999f);
+        test_assert(glm_vec3_dot((float*)transform->basis[2], directions[i]) > 0.999f);
         test_assert(camera->near_ > 0);
         test_assert(camera->far_ > camera->near_);
         mat4 projection, view, vp;
         box_camera_projection(camera, 400, 600, projection);
-        glm_mat4_inv((vec4*)transform->m, view);
+        box_transform_mat4(transform, NULL, view);
+        glm_mat4_inv(view, view);
         glm_mat4_mul(projection, view, vp);
         float edge = 0;
         for (int c = 0; c < 8; c ++) {
@@ -159,7 +160,7 @@ void Design_fitted_views(void)
                 const WorldTransform *light = ecs_get(world, views[i].lighting.scene, WorldTransform);
                 const WorldTransform *camera = ecs_get(world, views[i].camera, WorldTransform);
                 test_assert(light != NULL);
-                test_assert(-glm_vec3_dot((float*)light->m[2], (float*)camera->m[2]) > 0.8f);
+                test_assert(-glm_vec3_dot((float*)light->basis[2], (float*)camera->basis[2]) > 0.8f);
                 test_bool(views[i].lighting.baked, false);
                 test_bool(views[i].lighting.reflections, false);
                 test_bool(views[i].lighting.atmosphere, false);
@@ -350,7 +351,8 @@ void Design_tight_perspective(void)
             const WorldTransform *transform = ecs_get(world, entity, WorldTransform);
             mat4 projection, view, vp;
             box_camera_projection(camera, 1, 1, projection);
-            glm_mat4_inv((vec4*)transform->m, view);
+            box_transform_mat4(transform, NULL, view);
+            glm_mat4_inv(view, view);
             glm_mat4_mul(projection, view, vp);
             float min[2] = {1, 1}, max[2] = {-1, -1};
             for (int shape = 0; shape < 3; shape ++) {

@@ -5,7 +5,7 @@
  * displaces by them, made and dropped within a budget per frame.
  *
  * The tiles are children of a container without a transform in the scene of the terrain, roots
- * that a shift of the WorldOrigin moves, placed in double precision from the terrain position.
+ * placed in double precision from the terrain position.
  * A tile is disabled while it does not draw: its heights are pending, or another tile covers it.
  *
  * With Terrain.masks a tile also has the TextureGraph of the masks over the window of its heights
@@ -1088,7 +1088,7 @@ done:
     return;
 }
 
-void box_terrain_local(
+void box_terrain_position(
     const ecs_world_t *world,
     ecs_entity_t e,
     double out[3])
@@ -1101,14 +1101,7 @@ void box_terrain_local(
         out[1] = p->y;
         out[2] = p->z;
     } else if (t) {
-        out[0] = t->m[3][0];
-        out[1] = t->m[3][1];
-        out[2] = t->m[3][2];
-    } else if (ecs_id(WorldOrigin)) {
-        const WorldOrigin *o = ecs_singleton_get(world, WorldOrigin);
-        out[0] = o ? -o->x : 0.0;
-        out[1] = o ? -o->y : 0.0;
-        out[2] = o ? -o->z : 0.0;
+        box_dvec3_copy(t->position, out);
     }
 }
 
@@ -1125,10 +1118,10 @@ int32_t box_terrain_foci(
     count = count < BOX_TERRAIN_FOCI ? count : BOX_TERRAIN_FOCI;
     for (i = 0; i < count; i ++) {
         if (foci[i].scene == scene) {
-            out[result][0] = (double)foci[i].position[0] - local[0];
-            out[result][1] = (double)foci[i].position[2] - local[2];
+            out[result][0] = foci[i].position[0] - local[0];
+            out[result][1] = foci[i].position[2] - local[2];
             if (heights) {
-                heights[result] = (double)foci[i].position[1] - local[1];
+                heights[result] = foci[i].position[1] - local[1];
             }
 
             result ++;
@@ -1136,10 +1129,10 @@ int32_t box_terrain_foci(
     }
 
     for (i = 0; i < count && !result; i ++) {
-        out[i][0] = (double)foci[i].position[0] - local[0];
-        out[i][1] = (double)foci[i].position[2] - local[2];
+        out[i][0] = foci[i].position[0] - local[0];
+        out[i][1] = foci[i].position[2] - local[2];
         if (heights) {
-            heights[i] = (double)foci[i].position[1] - local[1];
+            heights[i] = foci[i].position[1] - local[1];
         }
     }
 
@@ -1471,7 +1464,7 @@ static void box_terrain_update(
     bool reset = !tiles->made ||
         ecs_os_memcmp(&tiles->settings, &s, ECS_SIZEOF(box_terrain_settings_t)) ||
         radius != tiles->radius || value->query_only != tiles->query_only;
-    box_terrain_local(world, e, local);
+    box_terrain_position(world, e, local);
     count = box_terrain_foci(world, e, local, foci, heights);
     ecs_os_memset_n(seen, 0, double, 3 * BOX_TERRAIN_FOCI);
     for (i = 0; i < count; i ++) {
@@ -1632,7 +1625,7 @@ done:
     return;
 }
 
-/** Update the tiles of every terrain, in EcsPostUpdate before the world origin shifts. The system
+/** Update the tiles of every terrain, in EcsPostUpdate. The system
  * is immediate to create the tile entities and textures, and updates the terrains after the
  * iteration as it sets their status.
  *

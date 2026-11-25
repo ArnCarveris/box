@@ -30,7 +30,8 @@ ecs_entity_t ore_burst(
     float scale)
 {
     ecs_world_t *w = ore_particles_world(world);
-    ecs_entity_t result = effect ? box_particle_burst_at(w, effect, position, scale) : 0;
+    dvec3 at = { position[0], position[1], position[2] };
+    ecs_entity_t result = effect ? box_particle_burst_at(w, effect, at, scale) : 0;
     if (result && ecs_has(w, result, Rotation)) {
         ecs_set(w, result, Rotation, {0, 0, 0});
     }
@@ -45,7 +46,8 @@ ecs_entity_t ore_burst_aimed(
     float aim)
 {
     ecs_world_t *w = ore_particles_world(world);
-    ecs_entity_t result = box_particle_burst_at(w, effect, position, 1.0f);
+    dvec3 at = { position[0], position[1], position[2] };
+    ecs_entity_t result = box_particle_burst_at(w, effect, at, 1.0f);
     if (result) {
         ecs_set(w, result, Rotation, {0, aim, 0});
     }

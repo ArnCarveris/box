@@ -3,8 +3,8 @@
 // casters and the wireframe. The includer declares the material table (material.wgsl).
 //
 // The patterns over the world (the gust field, the wave of the sway and the base) come from the
-// CPU packed for the absolute position of the local origin (WorldOrigin), the phase of the
-// flutter adds that of the origin, so plants sway the same across a shift of the origin.
+// CPU packed for the render origin, the phase of the
+// flutter adds that of the origin, so plants sway the same across a move of the origin.
 //
 // The main bend is the response of a plant to the gust where it stands, a function of the world
 // position of a vertex only, so every shape of a plant with the same bend, height and base moves
@@ -100,7 +100,7 @@ fn wind_vertex_data(data0: vec4f, data2: vec4f, data3: vec4f) {
 }
 
 // Axis the phase of the flutter of a vertex runs along (BOX_RENDER_WIND_FLUTTER_AXIS); its
-// dot product with the absolute position of the local origin is wrapped to 20 pi
+// dot product with the render origin is wrapped to 20 pi
 // (WIND_FLUTTER_PERIOD, BOX_RENDER_WIND_FLUTTER_PERIOD), the period of the three sines of the
 // flutter in it.
 const WIND_FLUTTER_AXIS: vec3f = vec3f(3.1, 1.7, 2.3);
@@ -212,8 +212,8 @@ fn wind_sways(m: Material) -> bool {
 
 // The move of a vertex at a world position of a shape placed by model, whose origin is its
 // translation, by the WindSway and the wind of its material; wind_sways(m) is true. absolute is
-// the absolute position of the local origin, which the phase of the flutter takes.
-fn wind_move(world: vec3f, model: mat4x4f, m: Material, absolute: WorldOrigin) -> WindMove {
+// the render origin, which the phase of the flutter takes.
+fn wind_move(world: vec3f, model: mat4x4f, m: Material, absolute: RenderOrigin) -> WindMove {
     let origin = model[3].xyz;
     let pivots = wind_pivots(m);
     let dir = m.wind_direction;

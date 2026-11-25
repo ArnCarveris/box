@@ -23,7 +23,7 @@
  * supports; a batch whose segment does not fit any more uploads all its instances instead */
 #define BOX_DRAWS_MAX_CHANGES ((uint64_t)128 << 20)
 
-_Static_assert(sizeof(box_render_transform_t) == 48, "InstanceTransform of instance.wgsl");
+_Static_assert(sizeof(box_render_transform_t) == 64, "InstanceTransform of instance.wgsl");
 _Static_assert(sizeof(box_render_shading_t) == 64, "Shape2DShading of shape2d.wgsl");
 _Static_assert(sizeof(box_render_mesh_shading_t) == 16, "MeshShading of instance.wgsl");
 _Static_assert(BOX_DRAWS_PAGE_BYTES / sizeof(box_render_transform_t) <= (1u << 22),
@@ -540,56 +540,6 @@ bool box_draws_caster(
         b->key.blend == Opaque && !b->key.atlas;
 }
 
-bool box_draws_shadow_bounds(
-    const ecs_world_t *world,
-    const box_draw_batch_t *b,
-    const box_render_transform_t *lo,
-    const box_render_transform_t *hi,
-    const box_render_surface_t *surface,
-    box_render_shadow_region_t *out)
-{
-    const box_mesh_cache_t *cache = NULL;
-    const box_mesh_t *mesh = NULL;
-    vec3 min, max;
-    int32_t r, k;
-    bool result = false;
-    if (surface && surface->p[0][0] != 0.0f) {
-        for (r = 0; r < 3; r ++) {
-            min[r] = surface->p[22][r] - surface->p[23][r];
-            max[r] = surface->p[22][r] + surface->p[23][r];
-        }
-    } else {
-        cache = box_mesh_cache_of(world);
-        mesh = cache ? box_mesh_cache_get(cache, b->key.mesh) : NULL;
-        if (!mesh || !mesh->vertex_count) {
-            goto done;
-        }
-
-        glm_vec3_copy(ECS_CONST_CAST(float*, mesh->min), min);
-        glm_vec3_copy(ECS_CONST_CAST(float*, mesh->max), max);
-    }
-
-    out->scene = b->key.scene;
-    for (r = 0; r < 3; r ++) {
-        const float *row_lo = lo->rows[r];
-        const float *row_hi = hi->rows[r];
-        float world_lo = 0.0f, world_hi = 0.0f;
-        for (k = 0; k < 3; k ++) {
-            float p0 = row_lo[k] * min[k], p1 = row_lo[k] * max[k];
-            float p2 = row_hi[k] * min[k], p3 = row_hi[k] * max[k];
-            world_lo += glm_min(glm_min(p0, p1), glm_min(p2, p3));
-            world_hi += glm_max(glm_max(p0, p1), glm_max(p2, p3));
-        }
-
-        out->min[r] = world_lo + row_lo[3];
-        out->max[r] = world_hi + row_hi[3];
-    }
-
-    result = true;
-done:
-    return result;
-}
-
 void box_draws_shadow_region(
     const ecs_world_t *world,
     box_render_draws_t *d,
@@ -599,7 +549,7 @@ void box_draws_shadow_region(
 {
     box_render_shadow_region_t region;
     if (d->shadow_record && box_draws_caster(b) &&
-        box_draws_shadow_bounds(world, b, transform, transform, surface, &region))
+        box_draws_shadow_bounds(world, b, d->origin, transform, transform, surface, &region))
     {
         *ecs_vec_append_t(NULL, &d->shadow_regions, box_render_shadow_region_t) = region;
     }
@@ -1168,8 +1118,12 @@ static void box_draws_batch_page(
 
     out->bounds = b->world_valid && !b->world_dirty;
     if (out->bounds) {
-        glm_vec3_copy(ECS_CONST_CAST(float*, b->world_min), out->min);
-        glm_vec3_copy(ECS_CONST_CAST(float*, b->world_max), out->max);
+        int32_t r;
+        for (r = 0; r < 3; r ++) {
+            out->min[r] = nextafterf((float)((double)b->world_min[r] - d->origin[r]), -INFINITY);
+            out->max[r] = nextafterf((float)((double)b->world_max[r] - d->origin[r]), INFINITY);
+        }
+
         out->radius = b->world_radius;
     }
 }
@@ -1392,7 +1346,9 @@ static void box_draws_collect(
             box_render_transform_t tmp;
             const box_render_transform_t *w = b->key.mover
                 ? box_draws_slot_world(d, b, s, &tmp) : &t[s];
-            float x = w->rows[0][3], y = w->rows[1][3], z = w->rows[2][3];
+            vec3 offset;
+            box_render_transform_offset(w, d->origin, offset);
+            float x = offset[0], y = offset[1], z = offset[2];
             out[s].depth = m[0][2] * x + m[1][2] * y + m[2][2] * z + m[3][2];
             out[s].atmosphere = planet && box_draws_layer(&layer, w);
             out[s].batch = index;

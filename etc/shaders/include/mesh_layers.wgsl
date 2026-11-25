@@ -11,8 +11,8 @@
 // material the roughness and metallic constants, the world size of one repeat and the
 // triplanar blend, transform the scale and offset of the UVs, modes the LAYER_* blend of the
 // albedo, roughness, metallic and occlusion, flags.x the LAYER_HAS_* and LAYER_UV flags,
-// origin the offset of the world projection for the absolute position of the local origin
-// (WorldOrigin), the origin projected as mapping_object projects a position (x * su, y * sv,
+// origin the offset of the world projection for the render origin
+// (RenderOrigin), the origin projected as mapping_object projects a position (x * su, y * sv,
 // z * su, x * sv) and wrapped to whole repeats on the CPU, 0 at an origin of 0.
 struct TextureLayer {
     color: vec4f,

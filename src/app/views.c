@@ -194,8 +194,8 @@ static void box_design_pose(
     ecs_entity_t entity,
     mat4 matrix)
 {
-    WorldTransform transform;
-    glm_mat4_copy(matrix, transform.m);
+    WorldTransform transform = {0};
+    box_transform_from_mat4(matrix, NULL, &transform);
     ecs_set_ptr(world, entity, WorldTransform, &transform);
 }
 

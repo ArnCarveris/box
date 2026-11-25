@@ -239,9 +239,9 @@ static void test_points_from(
     const WorldTransform *wt = ecs_get(world, light, WorldTransform);
     test_assert(wt != NULL);
     float alt = glm_rad(altitude), yaw = glm_rad(north - azimuth);
-    test_near(-wt->m[2][0], cosf(alt) * sinf(yaw), 1e-4f);
-    test_near(-wt->m[2][1], sinf(alt), 1e-4f);
-    test_near(-wt->m[2][2], cosf(alt) * cosf(yaw), 1e-4f);
+    test_near(-wt->basis[2][0], cosf(alt) * sinf(yaw), 1e-4f);
+    test_near(-wt->basis[2][1], sinf(alt), 1e-4f);
+    test_near(-wt->basis[2][2], cosf(alt) * cosf(yaw), 1e-4f);
 }
 
 /** Count the Rotation OnSet events.
@@ -563,7 +563,7 @@ void TimeOfDay_sun_rotation_follows_status(void) {
     test_assert(s->sun_altitude > 20);
     test_assert(s->sun_azimuth > 90 && s->sun_azimuth < 180);
     test_points_from(world, sun, 0, s->sun_altitude, s->sun_azimuth);
-    test_assert(ecs_get(world, sun, WorldTransform)->m[2][0] > 0);
+    test_assert(ecs_get(world, sun, WorldTransform)->basis[2][0] > 0);
 
     t.north = 90;
     t.time_scale = 0;
@@ -572,7 +572,7 @@ void TimeOfDay_sun_rotation_follows_status(void) {
     s = ecs_get(world, scene, TimeOfDayStatus);
     test_flt(s->hour, 9);
     test_points_from(world, sun, 90, s->sun_altitude, s->sun_azimuth);
-    test_assert(ecs_get(world, sun, WorldTransform)->m[2][2] < 0);
+    test_assert(ecs_get(world, sun, WorldTransform)->basis[2][2] < 0);
 
     ecs_fini(world);
     box_render_null_free(null);

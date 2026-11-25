@@ -8,7 +8,7 @@
 //   @group(2) @binding(4) var<storage, read> materials: array<Material>;
 #pragma once
 
-#include "world_origin.wgsl"
+#include "render_origin.wgsl"
 
 struct Material {
     // Display encoded base color (Rgb), r | g << 8 | b << 16
@@ -349,12 +349,12 @@ fn mapping_object(m: Material, position: vec3f, scale: vec3f) -> vec4f {
 // scales of a few binary decimals.
 const WATER_ORIGIN_PERIOD: f32 = 5000.0;
 
-// The projection of the absolute position of the local origin for a MappingWorld material, and a
+// The projection of the render origin for a MappingWorld material, and a
 // MappingFrame one without a frame: the origin as mapping_object projects it, each component
 // wrapped to whole repeats of the texture (origin_phase), 0 at an origin of 0. Of a Water record
 // wrapped to WATER_ORIGIN_PERIOD repeats instead: the whole repeats come from the phase over the
 // period, which is precise to far less than a repeat, rounded, and the precise phase is added.
-fn mapping_origin(m: Material, o: WorldOrigin) -> vec4f {
+fn mapping_origin(m: Material, o: RenderOrigin) -> vec4f {
     let a = m.uv.x / m.mapping_size;
     let b = m.uv.y / m.mapping_size;
     var p = vec4f(origin_phase(o, vec3f(a, b, a)), origin_phase(o, vec3f(b)).x);
@@ -366,10 +366,10 @@ fn mapping_origin(m: Material, o: WorldOrigin) -> vec4f {
     return p;
 }
 
-// What a vertex of a MappingWorld material passes on: mapping_object of its local world position
-// plus mapping_origin, so the texture stays where it is in the world across a shift of the
-// origin and precise far from it.
-fn mapping_world(m: Material, position: vec3f, o: WorldOrigin) -> vec4f {
+// What a vertex of a MappingWorld material passes on: mapping_object of its position relative to
+// the render origin plus mapping_origin, so the texture stays where it is in the world across a
+// move of the origin and precise far from the origin of the world.
+fn mapping_world(m: Material, position: vec3f, o: RenderOrigin) -> vec4f {
     return mapping_object(m, position, vec3f(1.0)) + mapping_origin(m, o);
 }
 

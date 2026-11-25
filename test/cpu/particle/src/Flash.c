@@ -87,7 +87,7 @@ static ecs_entity_t play(
     const char *name,
     float x)
 {
-    vec3 position = { x, 0, 0 };
+    dvec3 position = { x, 0, 0 };
     ecs_entity_t t = ecs_lookup(world, name);
     test_assert(t != 0);
     ecs_entity_t result = box_particle_burst_at(world, t, position, 1);

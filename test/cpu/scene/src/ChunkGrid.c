@@ -568,39 +568,6 @@ void ChunkGrid_grid_3d(void) {
     ecs_fini(world);
 }
 
-void ChunkGrid_origin_shift_no_reload(void) {
-    // scenes/chunk_grid
-    ecs_world_t *world = chunk_world();
-    ecs_singleton_set(world, WorldOrigin, { .threshold = 100, .step = 50, .enabled = true });
-    ecs_entity_t grid = chunk_grid(world, "Chunk", 30, 0, 0, 0);
-    ecs_entity_t focus = chunk_focus(world, 95, 0, 5);
-    ecs_progress(world, 0);
-    ecs_entity_t c9 = chunk_cell(world, grid, 9, 0, NULL);
-    ecs_entity_t c10 = chunk_cell(world, grid, 10, 0, NULL);
-    test_assert(c9 != 0 && c10 != 0);
-    test_flt(ecs_get(world, c10, WorldTransform)->m[3][0], 100);
-
-    chunk_move(world, focus, 105, 5);
-    ecs_progress(world, 0);
-    test_int(ecs_singleton_get(world, WorldOriginStatus)->shifts, 1);
-    test_assert(ecs_singleton_get(world, WorldOrigin)->x == 100);
-    test_flt(ecs_get(world, focus, Position)->x, 5);
-    test_assert(chunk_cell(world, grid, 9, 0, NULL) == c9);
-    test_assert(chunk_cell(world, grid, 10, 0, NULL) == c10);
-    test_int((int32_t)chunk_prop(world, c10, "Chunk", "cell_x"), 10);
-    test_flt(ecs_get(world, c9, WorldTransform)->m[3][0], -10);
-    test_flt(ecs_get(world, c10, WorldTransform)->m[3][0], 0);
-
-    ecs_entity_t c13 = chunk_cell(world, grid, 13, 0, NULL);
-    test_assert(c13 != 0);
-    test_int((int32_t)chunk_prop(world, c13, "Chunk", "cell_x"), 13);
-    test_flt(ecs_get(world, c13, WorldTransform)->m[3][0], 30);
-    test_assert(chunk_cell(world, grid, 6, 0, NULL) == 0);
-    test_int(ecs_get(world, grid, ChunkGridStatus)->cells, chunk_children(world, grid));
-
-    ecs_fini(world);
-}
-
 void ChunkGrid_delete_grid(void) {
     // scenes/chunk_grid
     ecs_world_t *world = chunk_world();
@@ -756,7 +723,6 @@ void ChunkGrid_script(void) {
 void ChunkGrid_endless_walk(void) {
     // scenes/chunk_grid
     ecs_world_t *world = chunk_world();
-    ecs_singleton_set(world, WorldOrigin, { .threshold = 200, .step = 100, .enabled = true });
     ecs_entity_t grid = chunk_grid(world, "Chunk", 15, 30, 2, 8);
     ecs_entity_t focus = chunk_focus(world, 5, 0, 5);
     int32_t i;
@@ -773,8 +739,7 @@ void ChunkGrid_endless_walk(void) {
         ecs_progress(world, 0);
     }
 
-    const WorldOrigin *o = ecs_singleton_get(world, WorldOrigin);
-    double x = o->x + (double)ecs_get(world, focus, Position)->x;
+    double x = ecs_get(world, focus, Position)->x;
     test_assert(fabs(x - 10005) < 0.01);
     int32_t cx = (int32_t)floor(x / 10);
     int32_t level;
@@ -782,7 +747,7 @@ void ChunkGrid_endless_walk(void) {
     test_assert(cell != 0);
     test_int(level, 0);
     test_int((int32_t)chunk_prop(world, cell, "Chunk", "cell_x"), cx);
-    test_flt(ecs_get(world, cell, WorldTransform)->m[3][0], (float)(cx * 10.0 - o->x));
+    test_assert(ecs_get(world, cell, WorldTransform)->position[0] == cx * 10.0);
     test_int(chunk_children(world, grid), ecs_get(world, grid, ChunkGridStatus)->cells);
 
     ecs_fini(world);
@@ -876,7 +841,7 @@ void ChunkGrid_ground(void) {
             test_assert(rock != 0);
             const Position *p = ecs_get(world, rock, Position);
             test_assert(p != NULL);
-            test_assert(fabsf(p->y - chunk_ground_height(cx * 10 + 5, cz * 10 + 5)) < 1e-3f);
+            test_assert(fabs(p->y - chunk_ground_height(cx * 10 + 5, cz * 10 + 5)) < 1e-3f);
         }
     }
 

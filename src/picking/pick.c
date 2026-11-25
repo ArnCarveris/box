@@ -71,7 +71,7 @@ static void box_pick_transform(
     WorldTransform t_buf;
     const WorldTransform *t = box_transform_world(world, e, &t_buf);
     if (t) {
-        glm_mat4_copy(ECS_CONST_CAST(vec4*, t->m), out);
+        box_transform_mat4(t, NULL, out);
     } else {
         glm_mat4_identity(out);
     }
@@ -1181,7 +1181,7 @@ static void box_pick_mapping_uv(
         float frame_scale = 1.0f;
         if (frame) {
             WorldTransform ft;
-            glm_mat4_copy(frame, ft.m);
+            box_transform_from_mat4(frame, NULL, &ft);
             frame_scale = box_transform_world_scale(&ft);
             frame_scale = frame_scale > 1e-20f ? frame_scale : 1.0f;
         }

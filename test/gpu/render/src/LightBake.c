@@ -323,7 +323,7 @@ void LightBake_projected_anchor_not_baked(void) {
         ecs_progress(world, 0);
         status = ecs_get(world, scene, LightBakeStatus);
         test_assert(status->converged);
-        test_assert(fabsf(ecs_get(world, anchor, WorldTransform)->m[3][0]) < 1.0f);
+        test_assert(fabs(ecs_get(world, anchor, WorldTransform)->position[0]) < 1.0f);
     }
 
     ecs_entity_t plain = ecs_new_w_pair(world, EcsChildOf, scene);

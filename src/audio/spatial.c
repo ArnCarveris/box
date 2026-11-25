@@ -57,8 +57,8 @@ done:
 
 float box_audio_spatial_gain(
     const AudioSpatial *spatial,
-    const mat4 listener,
-    const vec3 position,
+    const WorldTransform *listener,
+    const dvec3 position,
     float *pan)
 {
     return box_audio_spatial_place(spatial, listener, position, pan, NULL);
@@ -66,8 +66,8 @@ float box_audio_spatial_gain(
 
 float box_audio_spatial_place(
     const AudioSpatial *spatial,
-    const mat4 listener,
-    const vec3 position,
+    const WorldTransform *listener,
+    const dvec3 position,
     float *pan,
     float *cutoff)
 {
@@ -75,11 +75,11 @@ float box_audio_spatial_place(
         (AudioSpatial){ .min_distance = 1.0f, .max_distance = 50.0f, .rolloff = 1.0f };
     float min = s.min_distance > BOX_AUDIO_SPATIAL_MIN ? s.min_distance : BOX_AUDIO_SPATIAL_MIN;
     float rolloff = s.rolloff > 0 ? s.rolloff : 0;
-    float dx = position[0] - listener[3][0];
-    float dy = position[1] - listener[3][1];
-    float dz = position[2] - listener[3][2];
+    float dx = (float)(position[0] - listener->position[0]);
+    float dy = (float)(position[1] - listener->position[1]);
+    float dz = (float)(position[2] - listener->position[2]);
     float d = sqrtf(dx * dx + dy * dy + dz * dz);
-    float rx = listener[0][0], ry = listener[0][1], rz = listener[0][2];
+    float rx = listener->basis[0][0], ry = listener->basis[0][1], rz = listener->basis[0][2];
     float rl = sqrtf(rx * rx + ry * ry + rz * rz);
     float lateral = rl > 0 ? (dx * rx + dy * ry + dz * rz) / rl : dx;
     float reach = d > min ? d : min;
@@ -122,8 +122,8 @@ void box_audio_listener_find(
     const WorldTransform *best = NULL;
     int32_t best_order = 0, count = 0, i;
     *listener = (box_audio_listener_t){0};
-    for (i = 0; i < 4; i ++) {
-        listener->m[i][i] = 1.0f;
+    for (i = 0; i < 3; i ++) {
+        listener->t.basis[i][i] = 1.0f;
     }
 
     while (ecs_query_next(&it)) {
@@ -148,7 +148,7 @@ void box_audio_listener_find(
 
     if (best) {
         best = box_transform_world(world, listener->entity, &best_buf);
-        ecs_os_memcpy(listener->m, best->m, ECS_SIZEOF(mat4));
+        listener->t = *best;
         goto done;
     }
 
@@ -172,7 +172,7 @@ void box_audio_listener_find(
     }
 
     if (best) {
-        ecs_os_memcpy(listener->m, best->m, ECS_SIZEOF(mat4));
+        listener->t = *best;
         listener->entity = ecs_get(world, listener->entity, View)->camera;
     }
 

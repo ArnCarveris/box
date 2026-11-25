@@ -133,7 +133,7 @@ void box_terrain_counters(
  *
  * It changes when a terrain got or lost query tiles, when its settings, scene or position
  * changed (seen by the system of the query tiles in EcsPostUpdate), when a CPU copy of a
- * texture arrived, changed or was freed and when the world origin shifted.
+ * texture arrived, changed or was freed.
  *
  * @param world The world
  * @return The counter
@@ -245,15 +245,14 @@ uint32_t box_terrain_row_bytes(
 /** Foci a terrain follows at most */
 #define BOX_TERRAIN_FOCI (8)
 
-/** Get the local position of a terrain: the Position of a root, else the translation of its
- * world transform; a terrain without a transform is at the absolute origin of the world, so it
- * stays in place when the origin shifts.
+/** Get the world position of a terrain: the Position of a root, else the translation of its
+ * world transform, the origin of the world without a transform.
  *
  * @param world The world
  * @param e The terrain
  * @param out Receives the position
  */
-void box_terrain_local(
+void box_terrain_position(
     const ecs_world_t *world,
     ecs_entity_t e,
     double out[3]);

@@ -188,7 +188,7 @@ static void YeonLanternMove(
 
         float dx = p[i].x - kp->x, dy = p[i].y - kp->y;
         if (dx * dx + dy * dy < reach * reach) {
-            box_particle_burst_at(it->world, g->sparkle, (vec3){ p[i].x, p[i].y, p[i].z }, 0.0f);
+            box_particle_burst_at(it->world, g->sparkle, (dvec3){ p[i].x, p[i].y, p[i].z }, 0.0f);
             ecs_delete(it->stage, it->entities[i]);
             g->lanterns ++;
             if (!(g->lanterns % speed_up_every)) {
@@ -315,7 +315,7 @@ static void yeon_hit(
 {
     const Position *p = ecs_get(world, g->player, Position);
     YeonLives *lives = ecs_get_mut(world, g->player, YeonLives);
-    box_particle_burst_at(world, g->cut, (vec3){ p->x, p->y, p->z }, 0.0f);
+    box_particle_burst_at(world, g->cut, (dvec3){ p->x, p->y, p->z }, 0.0f);
     lives->lives_left --;
     ecs_modified(world, g->player, YeonLives);
     if (lives->lives_left <= 0) {

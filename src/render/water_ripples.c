@@ -9,8 +9,8 @@
  * WaterFlow over the window give the rectangles the backend takes the velocity of each cell from.
  *
  * A RippleSource pushes the water and lays down foam by its speed relative to the local flow at
- * its position (box_render_ripples_flow_at), from the change of its absolute world position.
- * Frames, windows and sources are absolute (origin plus local), so a shift moves no water.
+ * its position (box_render_ripples_flow_at), from the change of its world position. Frames,
+ * windows and sources are world positions; the records are relative to the render origin.
  */
 
 #include "render.h"
@@ -93,7 +93,7 @@ typedef struct box_render_ripples_state_t {
     ecs_vec_t scenes;       /**< ecs_entity_t, scratch: the scenes that have a field this frame */
     ecs_vec_t keep;         /**< box_material_ripple_t, scratch: the disturbances that wait */
     ecs_vec_t candidates;   /**< box_ripple_candidate_t, scratch: the flowing Water of a field */
-    double origin[3];       /**< Absolute position of the local origin of this frame */
+    double origin[3];       /**< Render origin of this frame */
     int64_t frame;          /**< Frames extracted */
     bool warned;            /**< A scene with more than one field was reported */
 } box_render_ripples_state_t;
@@ -321,7 +321,7 @@ static void box_ripples_sources(
             ecs_os_memset_t(e, 0, box_ripple_entry_t);
             e->scene = box_render_scene_field(&it, 2, i);
             for (k = 0; k < 3; k ++) {
-                e->to[k] = (double)t->m[3][k] + l->origin[k];
+                e->to[k] = t->position[k];
                 e->from[k] = known ? m->position[k] : e->to[k];
                 m->velocity[k] = known && delta > 0.0
                     ? (float)((e->to[k] - e->from[k]) / delta) : 0.0f;
@@ -330,7 +330,7 @@ static void box_ripples_sources(
             }
 
             m->seen = l->frame;
-            float ax = t->m[0][0], az = t->m[0][2];
+            float ax = t->basis[0][0], az = t->basis[0][2];
             float len = sqrtf(ax * ax + az * az);
             if (!(len > 1e-6f) || !isfinite(len)) {
                 ax = 1.0f;
@@ -342,8 +342,8 @@ static void box_ripples_sources(
 
             e->axis[0] = ax;
             e->axis[1] = az;
-            float sx = glm_vec3_norm(ECS_CONST_CAST(float*, t->m[0]));
-            float sz = glm_vec3_norm(ECS_CONST_CAST(float*, t->m[2]));
+            float sx = glm_vec3_norm(ECS_CONST_CAST(float*, t->basis[0]));
+            float sz = glm_vec3_norm(ECS_CONST_CAST(float*, t->basis[2]));
             e->extents[0] = isfinite(src->extents[0]) && isfinite(sx)
                 ? fabsf(src->extents[0]) * sx : 0.0f;
             e->extents[1] = isfinite(src->extents[1]) && isfinite(sz)
@@ -404,8 +404,8 @@ static bool box_ripples_flow_rect(
     const box_mesh_t *mesh = shape->mesh ? box_mesh_cache_get(cache, shape->mesh) : NULL;
     bool result = false;
     float half[3][2], best = 0.0f;
-    mat4 identity = GLM_MAT4_IDENTITY_INIT;
-    const vec4 *m = t ? t->m : identity;
+    mat3 identity = GLM_MAT3_IDENTITY_INIT;
+    const vec3 *m = t ? t->basis : identity;
     int32_t k, primary = -1;
     if (!mesh || !mesh->vertex_count) {
         goto done;
@@ -413,7 +413,11 @@ static bool box_ripples_flow_rect(
 
     const float *lo = shape->surface.p[0][0] ? shape->min : mesh->min;
     const float *hi = shape->surface.p[0][0] ? shape->max : mesh->max;
-    double center[3] = { m[3][0], m[3][1], m[3][2] };
+    double center[3] = { 0, 0, 0 };
+    if (t) {
+        box_dvec3_copy(t->position, center);
+    }
+
     for (k = 0; k < 3; k ++) {
         float local = (lo[k] + hi[k]) * 0.5f * shape->scale[k];
         float size = fabsf((hi[k] - lo[k]) * 0.5f * shape->scale[k]);
@@ -523,8 +527,8 @@ static void box_ripples_push_flows(
     const box_mesh_cache_t *cache = box_mesh_cache_of(world);
     double cell = f->cell, half = (double)f->resolution * cell * 0.5;
     double corner[2] = {
-        (double)f->origin[0] * cell + f->frame[0] - l->origin[0],
-        (double)f->origin[1] * cell + f->frame[1] - l->origin[2]
+        (double)f->origin[0] * cell + f->frame[0],
+        (double)f->origin[1] * cell + f->frame[1]
     };
     int32_t i, count;
     ecs_vec_clear(&l->candidates);
@@ -685,10 +689,10 @@ static void box_ripples_push_impulses(
 
         taken[i] = true;
         ecs_os_memset_t(&s, 0, box_render_ripple_source_t);
-        s.to[0] = s.from[0] = (float)(((double)r->position[0] + l->origin[0] - f->frame[0]) /
-            cell - (double)f->origin[0]);
-        s.to[1] = s.from[1] = (float)(((double)r->position[2] + l->origin[2] - f->frame[1]) /
-            cell - (double)f->origin[1]);
+        s.to[0] = s.from[0] = (float)((r->position[0] - f->frame[0]) / cell -
+            (double)f->origin[0]);
+        s.to[1] = s.from[1] = (float)((r->position[2] - f->frame[1]) / cell -
+            (double)f->origin[1]);
         s.extents[0] = s.extents[1] = (float)((double)r->radius / cell);
         s.axis[0] = 1.0f;
         s.amount = -r->strength;
@@ -797,8 +801,8 @@ static void box_ripples_field(
         center = ft ? ft : center;
     }
 
-    double cx = (center ? (double)center->m[3][0] : 0.0) + l->origin[0];
-    double cz = (center ? (double)center->m[3][2] : 0.0) + l->origin[2];
+    double cx = center ? center->position[0] : 0.0;
+    double cz = center ? center->position[2] : 0.0;
     int64_t origin[2];
     box_render_ripples_window(cx - f->frame[0], cz - f->frame[1], cell, resolution, origin);
 
@@ -822,7 +826,7 @@ static void box_ripples_field(
     box_render_ripples_wave(ripples, cell, &rec->courant2, &rec->keep);
     rec->corner[0] = (float)((double)origin[0] * cell + f->frame[0] - l->origin[0]);
     rec->corner[1] = (float)((double)origin[1] * cell + f->frame[1] - l->origin[2]);
-    rec->height = t ? t->m[3][1] : 0.0f;
+    rec->height = (float)((t ? t->position[1] : 0.0) - l->origin[1]);
     rec->strength = isfinite(ripples->strength) ? ripples->strength : 0.0f;
     box_render_ripples_foam(ripples, cell, &rec->foam_spread, &rec->foam_keep, &rec->crest);
     rec->source_first = ecs_vec_count(&p->ripple_sources);

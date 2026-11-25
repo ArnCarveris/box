@@ -25,8 +25,8 @@ void Movement_linear(void) {
     test_flt(p->x, 11);
     test_flt(p->y, -18);
     test_flt(p->z, 43);
-    test_flt(ecs_get(world, e, WorldTransform)->m[3][0], 11);
-    test_flt(ecs_get(world, e, WorldTransform)->m[3][1], -18);
+    test_flt(ecs_get(world, e, WorldTransform)->position[0], 11);
+    test_flt(ecs_get(world, e, WorldTransform)->position[1], -18);
 
     ecs_fini(world);
 }
@@ -127,8 +127,8 @@ void Movement_child_follows_parent(void) {
 
     test_flt(ecs_get(world, child, Position)->x, 1);
     WorldTransform t_buf;
-    test_flt(ecs_get(world, parent, WorldTransform)->m[3][0], 4);
-    test_flt(box_transform_world(world, child, &t_buf)->m[3][0], 5);
+    test_flt(ecs_get(world, parent, WorldTransform)->position[0], 4);
+    test_flt(box_transform_world(world, child, &t_buf)->position[0], 5);
 
     ecs_fini(world);
 }
@@ -151,8 +151,8 @@ void Movement_moving_child(void) {
         ecs_progress(world, 1.0f);
     }
 
-    test_flt(ecs_get(world, child, WorldTransform)->m[3][0], 12);
-    test_flt(ecs_get(world, child, WorldTransform)->m[3][1], 6);
+    test_flt(ecs_get(world, child, WorldTransform)->position[0], 12);
+    test_flt(ecs_get(world, child, WorldTransform)->position[1], 6);
 
     ecs_fini(world);
 }
@@ -246,8 +246,8 @@ void Movement_velocity_only_moves(void) {
     test_flt(p->x, 1);
     test_flt(p->y, -0.5f);
     test_flt(p->z, 2);
-    test_flt(ecs_get(world, e, WorldTransform)->m[3][0], 1);
-    test_flt(ecs_get(world, e, WorldTransform)->m[3][2], 2);
+    test_flt(ecs_get(world, e, WorldTransform)->position[0], 1);
+    test_flt(ecs_get(world, e, WorldTransform)->position[2], 2);
 
     ecs_fini(world);
 }
@@ -303,7 +303,7 @@ void Movement_velocity_from_script(void) {
     ecs_progress(world, 1.0f);
 
     test_flt(ecs_get(world, mover, Position)->x, 2);
-    test_flt(ecs_get(world, mover, WorldTransform)->m[3][0], 2);
+    test_flt(ecs_get(world, mover, WorldTransform)->position[0], 2);
     test_flt(ecs_get(world, placed, Position)->x, 5);
 
     ecs_fini(world);
@@ -460,7 +460,7 @@ void Movement_path_follow_line(void) {
     test_flt(p->y, 0);
     test_flt(p->z, 0);
     test_flt(ecs_get(world, e, PathFollow)->distance, 4);
-    test_flt(ecs_get(world, e, WorldTransform)->m[3][0], 4);
+    test_flt(ecs_get(world, e, WorldTransform)->position[0], 4);
 
     ecs_fini(world);
 }
@@ -645,20 +645,20 @@ void Movement_path_follow_orient(void) {
     ecs_progress(world, 1.0f);
 
     const WorldTransform *m = ecs_get(world, diagonal, WorldTransform);
-    test_assert(fabsf(-m->m[2][0] - 0.6f) < 1e-4f);
-    test_assert(fabsf(-m->m[2][1] - 0.8f) < 1e-4f);
-    test_assert(fabsf(m->m[2][2]) < 1e-4f);
+    test_assert(fabsf(-m->basis[2][0] - 0.6f) < 1e-4f);
+    test_assert(fabsf(-m->basis[2][1] - 0.8f) < 1e-4f);
+    test_assert(fabsf(m->basis[2][2]) < 1e-4f);
     /* +Y stays up */
-    test_assert(m->m[1][1] > 0);
+    test_assert(m->basis[1][1] > 0);
 
     /* Along Y the up of the entity is +X */
     m = ecs_get(world, up, WorldTransform);
-    test_assert(fabsf(-m->m[2][1] - 1) < 1e-4f);
-    test_assert(fabsf(m->m[1][0] - 1) < 1e-4f);
+    test_assert(fabsf(-m->basis[2][1] - 1) < 1e-4f);
+    test_assert(fabsf(m->basis[1][0] - 1) < 1e-4f);
 
     /* Moving backwards faces the direction of travel */
     m = ecs_get(world, back, WorldTransform);
-    test_assert(fabsf(-m->m[2][0] + 1) < 1e-4f);
+    test_assert(fabsf(-m->basis[2][0] + 1) < 1e-4f);
 
     ecs_fini(world);
 }

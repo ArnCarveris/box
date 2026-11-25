@@ -147,14 +147,14 @@ void box_draws_water_waves_pack(
     }
 }
 
-/** Pack the waves of a set for the absolute position of the local origin: the phase of each
+/** Pack the waves of a set for the render origin: the phase of each
  * wave moves back by k times the origin along it, so the waves at a local position are those at
  * its absolute position.
  *
  * @param out The set
  * @param waves The WaterWaves
  * @param phases The phases of its waves
- * @param origin Absolute position of the local origin
+ * @param origin Render origin
  */
 static void box_water_waves_pack_at(
     box_render_water_waves_t *out,

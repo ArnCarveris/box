@@ -5,7 +5,7 @@
 // meters to tens of meters. Self contained, so any shader can include it.
 //
 // The position is absolute: a shader with local positions adds the world origin first (for
-// example whole + rest of world_origin.wgsl). In f32 the patterns stay smooth to about 100 km
+// example whole + rest of render_origin.wgsl). In f32 the patterns stay smooth to about 100 km
 // from the absolute origin.
 #pragma once
 

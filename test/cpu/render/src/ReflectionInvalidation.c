@@ -1128,7 +1128,7 @@ void ReflectionInvalidation_repeated_change_records_once(void) {
     ecs_fini(world);
 }
 
-void ReflectionInvalidation_look_change_in_shift_frame_queues(void) {
+void ReflectionInvalidation_origin_move_queues_nothing(void) {
     // reflection_probes/invalidation
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
@@ -1137,18 +1137,25 @@ void ReflectionInvalidation_look_change_in_shift_frame_queues(void) {
     ecs_entity_t a = probe_new(world, scene, -10, 2);
     ecs_entity_t shape = shape_new(world, scene, -10, 2);
     shape_new(world, scene, 0, 30);
+    ecs_entity_t focus = ecs_new(world);
+    ecs_set(world, focus, Position, {0, 0, 0});
+    ecs_add(world, focus, WorldFocus);
     ecs_progress(world, 0);
     settle(world, scene);
 
     box_render_bake_t *b = box_bake_state(world);
     test_assert(b != NULL);
-    box_world_origin_shift(world, scene, (double[3]){ 256, 0, -512 });
+    ecs_set(world, focus, Position, {3072, 0, -2048});
     ecs_progress(world, 0);
+    double origin[3];
+    box_render_origin(world, origin);
+    test_assert(origin[0] == 3072 && origin[2] == -2048);
     test_int(ecs_vec_count(&b->regions), 0);
+    test_bool(is_queued(world, scene, a), false);
     settle(world, scene);
 
     ecs_set(world, shape, Rgb, {255, 0, 0});
-    box_world_origin_shift(world, scene, (double[3]){ 256, 0, 0 });
+    ecs_set(world, focus, Position, {4096, 0, 0});
     ecs_progress(world, 0);
     test_int(ecs_vec_count(&b->regions), 2);
     test_bool(is_queued(world, scene, a), true);

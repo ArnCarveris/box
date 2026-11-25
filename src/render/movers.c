@@ -107,12 +107,7 @@ static void box_draws_mover_rows(
     box_render_transform_t *out,
     const WorldTransform *t)
 {
-    int32_t r, c;
-    for (r = 0; r < 3; r ++) {
-        for (c = 0; c < 4; c ++) {
-            out->rows[r][c] = t->m[c][r];
-        }
-    }
+    box_render_transform_world(out, t, NULL);
 }
 
 uint32_t box_draws_mover_ref(
@@ -268,6 +263,8 @@ void box_draws_compose(
     const box_render_transform_t *pose,
     const box_render_transform_t *local)
 {
+    const box_render_transform_t *placed = pose->cell[3] ? pose : local;
+    box_render_transform_t result;
     int32_t r, c, k;
     for (r = 0; r < 3; r ++) {
         for (c = 0; c < 4; c ++) {
@@ -276,9 +273,12 @@ void box_draws_compose(
                 sum += pose->rows[r][k] * local->rows[k][c];
             }
 
-            out->rows[r][c] = sum;
+            result.rows[r][c] = sum;
         }
     }
+
+    ecs_os_memcpy(result.cell, placed->cell, ECS_SIZEOF(result.cell));
+    *out = result;
 }
 
 void box_draws_relative(
@@ -287,18 +287,20 @@ void box_draws_relative(
     const box_render_transform_t *model)
 {
     double a[3][3], inv[3][3], t[3], det;
+    dvec3 position;
     int32_t r, c, k;
     if (!mover) {
         *out = *model;
         goto done;
     }
 
+    box_render_transform_position(model, position);
     for (r = 0; r < 3; r ++) {
         for (c = 0; c < 3; c ++) {
-            a[r][c] = mover->m[c][r];
+            a[r][c] = mover->basis[c][r];
         }
 
-        t[r] = mover->m[3][r];
+        t[r] = mover->position[r];
     }
 
     inv[0][0] = a[1][1] * a[2][2] - a[1][2] * a[2][1];
@@ -326,12 +328,16 @@ void box_draws_relative(
         for (c = 0; c < 4; c ++) {
             double sum = 0.0;
             for (k = 0; k < 3; k ++) {
-                sum += inv[r][k] * ((double)model->rows[k][c] - (c == 3 ? t[k] : 0.0));
+                sum += inv[r][k] * (c == 3 ? position[k] - t[k] : (double)model->rows[k][c]);
             }
 
             out->rows[r][c] = (float)sum;
         }
+
+        out->cell[r] = 0;
     }
+
+    out->cell[3] = 0;
 
 done:
     return;
@@ -412,16 +418,19 @@ static uint64_t box_draws_local_hash(
     const ecs_world_t *world,
     ecs_entity_t e)
 {
-    const void *parts[4] = {
+    const WorldTransform *manual = ecs_has_id(world, e, ManualTransform)
+        ? ecs_get(world, e, WorldTransform) : NULL;
+    const void *parts[5] = {
         ecs_get(world, e, Position), ecs_get(world, e, Rotation), ecs_get(world, e, Scale),
-        ecs_has_id(world, e, ManualTransform) ? ecs_get(world, e, WorldTransform) : NULL
+        manual ? (const void*)manual->position : NULL, manual ? (const void*)manual->basis : NULL
     };
-    const ecs_size_t sizes[4] = {
-        ECS_SIZEOF(Position), ECS_SIZEOF(Rotation), ECS_SIZEOF(Scale), ECS_SIZEOF(WorldTransform)
+    const ecs_size_t sizes[5] = {
+        ECS_SIZEOF(Position), ECS_SIZEOF(Rotation), ECS_SIZEOF(Scale), ECS_SIZEOF(dvec3),
+        ECS_SIZEOF(mat3)
     };
     uint64_t result = 0xCBF29CE484222325ull;
     int32_t i, b;
-    for (i = 0; i < 4; i ++) {
+    for (i = 0; i < 5; i ++) {
         const uint8_t *bytes = parts[i];
         result = (result ^ (uint64_t)(i + 1)) * 0x100000001B3ull;
         for (b = 0; bytes && b < sizes[i]; b ++) {

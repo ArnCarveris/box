@@ -54,8 +54,7 @@ static void LateManualMove(
 {
     ecs_entity_t *e = it->ctx;
     if (*e) {
-        ecs_set(it->world, *e, WorldTransform, {{
-            {1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {5, 0, 0, 1}}});
+        ecs_set(it->world, *e, WorldTransform, {.position = {5, 0, 0}, .basis = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}}});
         *e = 0;
     }
 }
@@ -1505,8 +1504,7 @@ void Spatial_manual_parent_moved_in_pre_store(void) {
     ECS_IMPORT(world, Box);
     ecs_entity_t parent = ecs_new(world);
     ecs_add(world, parent, ManualTransform);
-    ecs_set(world, parent, WorldTransform, {{
-        {1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, 1}}});
+    ecs_set(world, parent, WorldTransform, {.position = {0, 0, 0}, .basis = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}}});
     ecs_entity_t child = ecs_new_w_pair(world, EcsChildOf, parent);
     ecs_set(world, child, Position, {0, 2, 0});
     ecs_set(world, child, Box, {1, 1, 1});
@@ -1608,10 +1606,10 @@ void Spatial_dynamic_random_moves_vs_brute_force(void) {
             const Box *b = ecs_get(world, shapes[i], Box);
             vec3 got_min, got_max;
             for (a = 0; a < 3; a ++) {
-                float e = (fabsf(t->m[0][a]) * b->x + fabsf(t->m[1][a]) * b->y +
-                    fabsf(t->m[2][a]) * b->z) * 0.5f;
-                min[i][a] = t->m[3][a] - e;
-                max[i][a] = t->m[3][a] + e;
+                float e = (fabsf(t->basis[0][a]) * b->x + fabsf(t->basis[1][a]) * b->y +
+                    fabsf(t->basis[2][a]) * b->z) * 0.5f;
+                min[i][a] = (float)t->position[a] - e;
+                max[i][a] = (float)t->position[a] + e;
             }
 
             test_assert(box_spatial_bounds(world, shapes[i], NULL, got_min, got_max));
@@ -1899,10 +1897,10 @@ void Spatial_dynamic_moved_without_queries(void) {
             const WorldTransform *t = ecs_get(world, shapes[i], WorldTransform);
             vec3 got_min, got_max;
             for (a = 0; a < 3; a ++) {
-                float e = (fabsf(t->m[0][a]) * 1.0f + fabsf(t->m[1][a]) * 2.0f +
-                    fabsf(t->m[2][a]) * 0.5f) * 0.5f;
-                min[i][a] = t->m[3][a] - e;
-                max[i][a] = t->m[3][a] + e;
+                float e = (fabsf(t->basis[0][a]) * 1.0f + fabsf(t->basis[1][a]) * 2.0f +
+                    fabsf(t->basis[2][a]) * 0.5f) * 0.5f;
+                min[i][a] = (float)t->position[a] - e;
+                max[i][a] = (float)t->position[a] + e;
             }
 
             test_assert(box_spatial_bounds(world, shapes[i], NULL, got_min, got_max));
@@ -2236,7 +2234,7 @@ void Spatial_mover_moves_one_leaf(void) {
     const WorldTransform *t = box_transform_world(world, e, &t_buf);
     box_spatial_hit_t hit = {0};
     box_spatial_ray_t ray = {
-        .origin = {t->m[3][0], 10, t->m[3][2]}, .dir = {0, -1, 0}, .shapes = true };
+        .origin = {t->position[0], 10, t->position[2]}, .dir = {0, -1, 0}, .shapes = true };
     test_assert(box_spatial_ray(world, &ray, &hit));
     test_uint(hit.entity, e);
 
@@ -2401,7 +2399,7 @@ void Spatial_mover_nested(void) {
     WorldTransform t_buf;
     const WorldTransform *t = box_transform_world(world, cab, &t_buf);
     box_spatial_hit_t hit = {0};
-    box_spatial_ray_t ray = { .origin = {t->m[3][0], t->m[3][1] + 10, t->m[3][2]},
+    box_spatial_ray_t ray = { .origin = {t->position[0], t->position[1] + 10, t->position[2]},
         .dir = {0, -1, 0} };
     test_assert(box_spatial_ray(world, &ray, &hit));
     test_uint(hit.entity, car);
@@ -2900,7 +2898,7 @@ void Spatial_mover_tree_members_change(void) {
 
     const WorldTransform *t = ecs_get(world, shapes[10], WorldTransform);
     box_spatial_hit_t hit = {0};
-    box_spatial_ray_t ray = { .origin = {t->m[3][0], t->m[3][1] + 50, t->m[3][2]},
+    box_spatial_ray_t ray = { .origin = {t->position[0], t->position[1] + 50, t->position[2]},
         .dir = {0, -1, 0}, .shapes = true };
     test_assert(!box_spatial_ray(world, &ray, &hit) || hit.entity != shapes[10]);
 
@@ -3008,7 +3006,7 @@ void Spatial_mover_tree_nested(void) {
     WorldTransform t_buf;
     const WorldTransform *t = box_transform_world(world, inner[4], &t_buf);
     box_spatial_hit_t hit = {0};
-    box_spatial_ray_t ray = { .origin = {t->m[3][0], t->m[3][1] + 50, t->m[3][2]},
+    box_spatial_ray_t ray = { .origin = {t->position[0], t->position[1] + 50, t->position[2]},
         .dir = {0, -1, 0}, .shapes = true, .filter = count_filter };
     int32_t calls = 0;
     ray.ctx = &calls;
@@ -3208,11 +3206,6 @@ void Spatial_static_revision_follows_changes(void) {
     r = box_spatial_static_revision(world, 0);
     ecs_progress(world, 0);
     test_assert(box_spatial_static_revision(world, 0) == r);
-
-    /* A shift of the world origin */
-    box_spatial_shift(world, 0, (vec3){-16, 0, 0}, NULL, NULL);
-    test_assert(box_spatial_static_revision(world, 0) != r);
-    r = box_spatial_static_revision(world, 0);
 
     /* Removed, at once */
     ecs_delete(world, b);

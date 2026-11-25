@@ -956,6 +956,7 @@ static uint32_t box_transition_matrix(
  * @param p The packet
  * @param item The item of the node
  * @param rel The target chain from the parent node, or the world matrix of the parent
+ * @param offset Subtracted from the position, the render origin for a root, NULL for none
  * @param up The range of the parent node, NULL without a parent node
  * @param range Receives the range of the node, NULL to skip it
  */
@@ -965,6 +966,7 @@ static void box_transition_send_pose(
     box_render_packet_t *p,
     const box_transition_item_t *item,
     vec4 *rel,
+    const double *offset,
     const box_draw_transition_range_t *up,
     box_draw_transition_range_t *range)
 {
@@ -973,15 +975,21 @@ static void box_transition_send_pose(
     const Rotation *rotation = ecs_get(world, item->entity, Rotation);
     const Scale *scale = ecs_get(world, item->entity, Scale);
     const box_transition_node_t *node = box_transitions_node_state(s, item->node);
-    float *targets[3] = { pose.position, pose.rotation, pose.scale };
+    vec3 local_position = { 0, 0, 0 };
+    float *targets[3] = { local_position, pose.rotation, pose.scale };
     vec3 lo[3], hi[3];
-    uint32_t offset = 0;
+    uint32_t data = 0;
     int32_t c;
     ecs_os_memcpy(pose.rel, rel, ECS_SIZEOF(mat4));
+    if (offset) {
+        box_dvec3_copy(offset, pose.offset);
+    }
+
     if (position) {
         pose.position[0] = position->x;
         pose.position[1] = position->y;
         pose.position[2] = position->z;
+        box_dvec3_rel(pose.position, pose.offset, local_position);
     }
 
     if (rotation) {
@@ -993,18 +1001,25 @@ static void box_transition_send_pose(
     pose.scale[0] = scale ? scale->x : 1.0f;
     pose.scale[1] = scale ? scale->y : 1.0f;
     pose.scale[2] = scale ? scale->z : 1.0f;
-    void *dst = box_render_packet_reserve(p, (uint32_t)sizeof(pose), &offset);
+    void *dst = box_render_packet_reserve(p, (uint32_t)sizeof(pose), &data);
     ecs_os_memcpy(dst, &pose, ECS_SIZEOF(pose));
 
     box_render_transition_record_t *r = box_render_packet_transition(
         p, BOX_RENDER_TRANSITION_POSE, item->node);
     r->parent = item->parent;
-    r->data = offset;
+    r->data = data;
     for (c = 0; range && c < 3; c ++) {
         bool runs = node && box_render_transitions_active(
             s, item->node, (box_render_transition_component_t)c, p->time);
         glm_vec3_copy(runs ? ECS_CONST_CAST(float*, node->slots[c].lo) : targets[c], lo[c]);
         glm_vec3_copy(runs ? ECS_CONST_CAST(float*, node->slots[c].hi) : targets[c], hi[c]);
+        if (runs && c == BOX_RENDER_TRANSITION_POSITION) {
+            int32_t k;
+            for (k = 0; k < 3; k ++) {
+                lo[c][k] = (float)((double)lo[c][k] - pose.offset[k]);
+                hi[c][k] = (float)((double)hi[c][k] - pose.offset[k]);
+            }
+        }
     }
 
     if (range) {
@@ -1644,10 +1659,11 @@ static void box_transition_send_poses(
         if (item->is_node) {
             mat4 parent;
             if (item->parent) {
-                box_transition_send_pose(world, s, p, item, up, up_range, range);
+                box_transition_send_pose(world, s, p, item, up, NULL, up_range, range);
+            } else if (box_draws_parent_world(world, item->entity, p->origin, parent)) {
+                box_transition_send_pose(world, s, p, item, parent, NULL, NULL, range);
             } else {
-                box_draws_parent_world(world, item->entity, parent);
-                box_transition_send_pose(world, s, p, item, parent, NULL, range);
+                box_transition_send_pose(world, s, p, item, parent, p->origin, NULL, range);
             }
 
             glm_mat4_identity(rel);

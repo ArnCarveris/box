@@ -729,7 +729,7 @@ static box_audio_place_t box_audio_place(
     box_audio_place_t result = { .gain = 1.0f };
     state->stats.spatial_updates ++;
     if (wt && state->listener.entity) {
-        result.gain = box_audio_spatial_place(spatial, (vec4*)state->listener.m, wt->m[3],
+        result.gain = box_audio_spatial_place(spatial, &state->listener.t, wt->position,
             &result.pan, &result.cutoff);
     }
 
@@ -818,7 +818,7 @@ static void box_audio_spatial_oneshots(
 
         state->stats.spatial_updates ++;
         if (state->listener.entity) {
-            gain = box_audio_spatial_place(&shot->distances, (vec4*)state->listener.m,
+            gain = box_audio_spatial_place(&shot->distances, &state->listener.t,
                 shot->position, &pan, &cutoff);
         }
 
@@ -868,7 +868,7 @@ uint32_t box_audio_play_send(
             ecs_get(world, play->sound, AudioSpatial);
         state->stats.spatial_updates ++;
         if (state->listener.entity) {
-            gain = box_audio_spatial_place(spatial, (vec4*)state->listener.m,
+            gain = box_audio_spatial_place(spatial, &state->listener.t,
                 play->position, &pan, &cutoff);
         }
 
@@ -1233,7 +1233,7 @@ static void BoxAudioSync(
 
     box_audio_listener_find(world, state, &listener);
     if (listener.entity != state->listener.entity ||
-        ecs_os_memcmp(listener.m, state->listener.m, ECS_SIZEOF(mat4)))
+        !box_transform_equal(&listener.t, &state->listener.t))
     {
         state->listener = listener;
         state->spatial_dirty = true;

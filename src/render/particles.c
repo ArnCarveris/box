@@ -102,9 +102,9 @@ typedef struct box_particle_pool_t {
     uint32_t table_mesh;    /**< Mesh handle the table was sampled from */
     vec3 table_scale;       /**< Shape scale the table was sampled with */
     uint32_t table_seed;    /**< Seed the table was sampled with */
-    vec3 last_position;     /**< World position of the emitter in the last frame */
-    vec3 shift;             /**< World offset of the shifts of the world origin that its
-                             *   particles did not get yet */
+    dvec3 last_position;    /**< World position of the emitter in the last frame */
+    dvec3 origin;           /**< Render origin its world space particles are relative to on
+                             *   the GPU, which they move by when it moves */
     bool has_last;          /**< last_position holds a position */
     bool linger;            /**< ParticleEmitter.linger of the last frame the emitter was seen */
     bool local;             /**< ParticleEmitter.local its particles were spawned with */
@@ -1006,6 +1006,7 @@ static void box_particles_block_forces(
  *
  * @param emitter The emitter values
  * @param transform World transform of the emitter
+ * @param origin Render origin of the frame
  * @param collision Its ground collision, NULL for none
  * @param inherit World velocity its spawns get
  * @param delta Seconds of the frame
@@ -1016,6 +1017,7 @@ static void box_particles_block_forces(
 static void box_particles_block(
     const ParticleEmitter *emitter,
     const WorldTransform *transform,
+    const double *origin,
     const ParticleCollision *collision,
     const vec3 inherit,
     float delta,
@@ -1023,8 +1025,10 @@ static void box_particles_block(
     box_render_particle_block_t *out)
 {
     float spread = glm_clamp(emitter->spread, 0.0f, 180.0f);
+    mat4 model;
     ecs_os_memset_t(out, 0, box_render_particle_block_t);
-    ecs_os_memcpy_t(out->model, transform->m, mat4);
+    box_transform_mat4(transform, origin, model);
+    ecs_os_memcpy_t(out->model, model, mat4);
 
     glm_vec3_copy(ECS_CONST_CAST(float*, emitter->direction), out->direction);
     if (glm_vec3_norm2(out->direction) > 0) {
@@ -1059,7 +1063,7 @@ static void box_particles_block(
     out->variance[2] = (float)emitter->color_variance.b / 255.0f;
     glm_vec3_copy(ECS_CONST_CAST(float*, inherit), out->inherit);
     if (collision && collision->ground) {
-        out->ground[0] = collision->height;
+        out->ground[0] = (float)((double)collision->height - origin[1]);
         out->ground[1] = glm_clamp(collision->bounce, 0.0f, 1.0f);
         out->ground[2] = glm_clamp(collision->friction, 0.0f, 1.0f);
         out->collide = collision->die ? BOX_PARTICLE_GROUND_DIE : BOX_PARTICLE_GROUND_BOUNCE;
@@ -1079,16 +1083,15 @@ static void box_particles_velocity(
     float delta,
     vec3 out)
 {
-    vec3 position;
-    glm_vec3_copy(ECS_CONST_CAST(float*, transform->m[3]), position);
-
+    int32_t i;
     glm_vec3_zero(out);
     if (pool->has_last && delta > 0) {
-        glm_vec3_sub(position, pool->last_position, out);
-        glm_vec3_scale(out, 1.0f / delta, out);
+        for (i = 0; i < 3; i ++) {
+            out[i] = (float)((transform->position[i] - pool->last_position[i]) / (double)delta);
+        }
     }
 
-    glm_vec3_copy(position, pool->last_position);
+    box_dvec3_copy(transform->position, pool->last_position);
     pool->has_last = true;
 }
 
@@ -1099,18 +1102,28 @@ _Static_assert(offsetof(box_render_particle_block_t, sampled) ==
     offsetof(box_render_particle_block_t, motion_force) + 4 * sizeof(float),
     "the motion ends the curves and motion of a block");
 
-/** Write the shift of the world origin of a pool into the w lanes of its block.
+/** Write the move of the render origin since the last frame of a pool into the w lanes of its
+ * block, which its world space particles move by before they move, and take the render origin
+ * of this frame as theirs.
  *
+ * @param pool The pool
+ * @param origin Render origin of the frame
  * @param out The block
- * @param shift World offset added to the live particles before they move
  */
 static void box_particles_block_shift(
-    box_render_particle_block_t *out,
-    const vec3 shift)
+    box_particle_pool_t *pool,
+    const double *origin,
+    box_render_particle_block_t *out)
 {
+    vec3 shift = { 0, 0, 0 };
+    if (!pool->local) {
+        box_dvec3_rel(pool->origin, origin, shift);
+    }
+
     out->color[3] = shift[0];
     out->variance[3] = shift[1];
     out->ground[3] = shift[2];
+    box_dvec3_copy(origin, pool->origin);
 }
 
 /** The curves and motion of the block of an emitter without ParticleCurves and ParticleMotion,
@@ -1363,6 +1376,8 @@ static void box_particles_emitter(
 {
     bool card = look && look->shape == ParticleCard;
     int32_t limit = card ? BOX_PARTICLE_MAX / 2 : BOX_PARTICLE_MAX;
+    double origin[3];
+    box_render_origin(world, origin);
     int32_t max = emitter->max > limit ? limit : emitter->max;
     box_particle_pool_t *pool = ecs_map_get_deref(&s->by_entity, box_particle_pool_t, e);
     uint32_t life_min = box_particle_us(emitter->lifetime.min);
@@ -1460,7 +1475,7 @@ static void box_particles_emitter(
     stats->spawned += (int32_t)count;
     stats->particles += pool->live;
     if (!pool->used) {
-        glm_vec3_zero(pool->shift);
+        box_dvec3_copy(origin, pool->origin);
         goto done;
     }
 
@@ -1490,7 +1505,7 @@ static void box_particles_emitter(
     vec3 acceleration;
     glm_vec3_scale(ECS_CONST_CAST(float*, emitter->acceleration), scale, acceleration);
     ParticleCollision ground;
-    box_particles_block(emitter, transform,
+    box_particles_block(emitter, transform, origin,
         box_render_particles_collision(world, e, transform, &ground), velocity,
         age_us ? p->delta : 0.0f, scale, &entry->block);
     if (timeline) {
@@ -1525,8 +1540,11 @@ static void box_particles_emitter(
     entry->block.life_min = life_min;
     entry->block.life_span = life_max > life_min ? life_max - life_min : 0;
     entry->block.cards = pool->card ? pool->capacity : 0u;
-    box_particles_block_shift(&entry->block, pool->shift);
-    glm_vec3_zero(pool->shift);
+    if (pool->fresh) {
+        box_dvec3_copy(origin, pool->origin);
+    }
+
+    box_particles_block_shift(pool, origin, &entry->block);
     pool->fresh = false;
     if (emitter->linger) {
         pool->entry = *entry;
@@ -1570,6 +1588,7 @@ static bool box_particles_linger(
 {
     ParticleForces forces;
     uint32_t delta_us = box_particle_us(p->delta), slots = 0;
+    double origin[3];
     bool result = false;
     pool->clock += delta_us;
     box_particles_retire(pool);
@@ -1581,8 +1600,8 @@ static bool box_particles_linger(
     box_render_particle_pool_t *entry = ecs_vec_append_t(
         NULL, &p->particles, box_render_particle_pool_t);
     *entry = pool->entry;
-    box_particles_block_shift(&entry->block, pool->shift);
-    glm_vec3_zero(pool->shift);
+    box_render_origin(world, origin);
+    box_particles_block_shift(pool, origin, &entry->block);
     entry->clear = false;
     entry->slots = slots;
     entry->block.acceleration[3] = delta_us ? p->delta : 0.0f;
@@ -1872,31 +1891,6 @@ box_render_particles_t* box_render_particles_get(
     box_render_particles_t *result = box_particles_state(world);
 
     return result && result->emitters ? result : NULL;
-}
-
-void box_render_particles_shift(
-    box_render_particles_t *s,
-    ecs_entity_t scene,
-    const vec3 offset,
-    box_render_particles_shifts_t shifts,
-    void *ctx)
-{
-    int32_t i, count = s ? ecs_vec_count(&s->pools) : 0;
-    for (i = 0; i < count; i ++) {
-        box_particle_pool_t *pool = *ecs_vec_get_t(&s->pools, box_particle_pool_t*, i);
-        if (pool->scene != scene) {
-            continue;
-        }
-
-        if (!pool->lingering && shifts && !shifts(ctx, pool->entity)) {
-            continue;
-        }
-
-        glm_vec3_add(pool->last_position, ECS_CONST_CAST(float*, offset), pool->last_position);
-        if (!pool->local) {
-            glm_vec3_add(pool->shift, ECS_CONST_CAST(float*, offset), pool->shift);
-        }
-    }
 }
 
 int32_t box_render_particles_live(

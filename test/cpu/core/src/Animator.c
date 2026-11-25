@@ -1064,13 +1064,13 @@ void Animator_transform_follows(void) {
     animator_play(world, e, clip, AnimationLoop, 1);
 
     ecs_progress(world, 0.5f);
-    test_flt(ecs_get(world, e, WorldTransform)->m[3][0], 1);
-    test_flt(ecs_get(world, arm, WorldTransform)->m[3][0], 1);
-    test_flt(ecs_get(world, arm, WorldTransform)->m[3][1], 1);
+    test_flt(ecs_get(world, e, WorldTransform)->position[0], 1);
+    test_flt(ecs_get(world, arm, WorldTransform)->position[0], 1);
+    test_flt(ecs_get(world, arm, WorldTransform)->position[1], 1);
 
     ecs_progress(world, 0.5f);
-    test_flt(ecs_get(world, e, WorldTransform)->m[3][0], 2);
-    test_flt(ecs_get(world, arm, WorldTransform)->m[3][1], 2);
+    test_flt(ecs_get(world, e, WorldTransform)->position[0], 2);
+    test_flt(ecs_get(world, arm, WorldTransform)->position[1], 2);
 
     ecs_fini(world);
 }

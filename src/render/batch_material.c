@@ -624,7 +624,7 @@ done:
  * @param caustics The component, NULL for none
  * @param flow The WaterFlow of the Water its frame moves with, NULL for none
  * @param frame Offset of its water frame in cells, wrapped
- * @param origin Absolute position of the local origin, which the frame moves back by
+ * @param origin Render origin, which the frame moves back by
  * @param time Total render time the phase is computed at
  */
 static void box_draws_water_caustics_pack(
@@ -1033,14 +1033,7 @@ void box_draws_transform(
     const WorldTransform *transform,
     const ShapeMesh *shape)
 {
-    int32_t r, c;
-    for (r = 0; r < 3; r ++) {
-        for (c = 0; c < 3; c ++) {
-            out->rows[r][c] = transform->m[c][r] * shape->scale[c];
-        }
-
-        out->rows[r][3] = transform->m[3][r];
-    }
+    box_render_transform_world(out, transform, shape->scale);
 }
 
 box_render_transform_t* box_draws_slot_frame(
@@ -1069,36 +1062,43 @@ done:
     return result;
 }
 
+/** Write a record relative to a texture frame from its matrix: not a world record.
+ *
+ * @param out The record
+ * @param m The matrix relative to the frame
+ */
+static void box_draws_frame_relative(
+    box_render_transform_t *out,
+    const mat4 m)
+{
+    int32_t r, c;
+    for (r = 0; r < 3; r ++) {
+        for (c = 0; c < 4; c ++) {
+            out->rows[r][c] = m[c][r];
+        }
+
+        out->cell[r] = 0;
+    }
+
+    out->cell[3] = 0;
+}
+
 void box_draws_frame(
     box_render_transform_t *out,
     const box_render_transform_t *model,
     const WorldTransform *frame)
 {
-    mat4 inv;
-    mat3 axes;
-    int32_t r, c, k;
-    if (!frame) {
+    mat4 inv, f, m, rel;
+    if (!frame || !(fabsf(glm_mat3_det(ECS_CONST_CAST(vec3*, frame->basis))) > 1e-30f)) {
         *out = *model;
         goto done;
     }
 
-    glm_mat4_pick3(ECS_CONST_CAST(vec4*, frame->m), axes);
-    if (!(fabsf(glm_mat3_det(axes)) > 1e-30f)) {
-        *out = *model;
-        goto done;
-    }
-
-    glm_mat4_inv(ECS_CONST_CAST(vec4*, frame->m), inv);
-    for (k = 0; k < 3; k ++) {
-        for (c = 0; c < 4; c ++) {
-            float sum = c == 3 ? inv[3][k] : 0.0f;
-            for (r = 0; r < 3; r ++) {
-                sum += inv[r][k] * model->rows[r][c];
-            }
-
-            out->rows[k][c] = sum;
-        }
-    }
+    box_transform_mat4(frame, frame->position, f);
+    glm_mat4_inv(f, inv);
+    box_render_transform_mat4(model, frame->position, m);
+    glm_mat4_mul(inv, m, rel);
+    box_draws_frame_relative(out, rel);
 
 done:
     return;
@@ -1138,7 +1138,6 @@ const box_draw_frame_pose_t* box_draws_frame_pose(
 {
     ecs_map_val_t *v = ecs_map_get(&d->frame_poses, frame);
     box_draw_frame_pose_t *result;
-    mat3 axes;
     if (v) {
         result = ecs_vec_get_t(&d->frame_cache, box_draw_frame_pose_t, (int32_t)*v - 1);
     } else {
@@ -1164,9 +1163,11 @@ const box_draw_frame_pose_t* box_draws_frame_pose(
     }
 
     result->scale = box_transform_world_scale(t);
-    glm_mat4_pick3(ECS_CONST_CAST(vec4*, t->m), axes);
-    if (fabsf(glm_mat3_det(axes)) > 1e-30f) {
-        glm_mat4_inv(ECS_CONST_CAST(vec4*, t->m), result->inv);
+    if (fabsf(glm_mat3_det(ECS_CONST_CAST(vec3*, t->basis))) > 1e-30f) {
+        mat4 m;
+        box_transform_mat4(t, t->position, m);
+        glm_mat4_inv(m, result->inv);
+        box_dvec3_copy(t->position, result->position);
         result->valid = true;
     }
 
@@ -1183,7 +1184,7 @@ void box_draws_frame_record(
 {
     const box_draw_frame_pose_t *pose = src->frame
         ? box_draws_frame_pose(world, d, src->frame) : NULL;
-    int32_t r, c, k;
+    int32_t r, c;
     if (src->mode == MappingObject) {
         float scale = pose ? pose->scale : 1.0f;
         float inv = scale > 1e-20f ? 1.0f / scale : 1.0f;
@@ -1202,16 +1203,10 @@ void box_draws_frame_record(
         goto done;
     }
 
-    for (k = 0; k < 3; k ++) {
-        for (c = 0; c < 4; c ++) {
-            float sum = c == 3 ? pose->inv[3][k] : 0.0f;
-            for (r = 0; r < 3; r ++) {
-                sum += pose->inv[r][k] * model->rows[r][c];
-            }
-
-            out->rows[k][c] = sum;
-        }
-    }
+    mat4 m, rel;
+    box_render_transform_mat4(model, pose->position, m);
+    glm_mat4_mul(ECS_CONST_CAST(vec4*, pose->inv), m, rel);
+    box_draws_frame_relative(out, rel);
 
 done:
     return;

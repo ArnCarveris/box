@@ -467,7 +467,7 @@ void FogVolume_rotated_record(void) {
     int32_t k, c;
     for (k = 0; k < 3; k ++) {
         vec3 axis;
-        glm_vec3_normalize_to(ECS_CONST_CAST(float*, wt->m[k]), axis);
+        glm_vec3_normalize_to(ECS_CONST_CAST(float*, wt->basis[k]), axis);
         for (c = 0; c < 3; c ++) {
             test_assert(fabsf(r->axes[k][c] - axis[c]) < 1e-5f);
         }

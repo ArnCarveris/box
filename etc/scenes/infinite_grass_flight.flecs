@@ -150,10 +150,9 @@ async {
     await next_frame()
   }
 
-  const o0 = WorldOrigin[WorldOrigin]
-  state.course_x = state.start_x + o0.x
-  state.course_y = state.start_y + o0.y
-  state.course_z = state.start_z + o0.z
+  state.course_x = state.start_x
+  state.course_y = state.start_y
+  state.course_z = state.start_z
   state.course_yaw = state.start_yaw
   state.course_leg_yaw = state.start_yaw
   state.course_leg_end = course_leg_length(0)
@@ -188,10 +187,9 @@ async {
       const ground = course_ground(state.course_x, state.course_z, state.course_y)
       const above = state.course_y - ground
       const mean = frames > 0 ? sum_ms / frames : 0
-      const shifts = WorldOriginStatus[WorldOriginStatus].shifts
       state.course_log = state.course_log +
         "{km:.1} km  frame {frame}  {mode} {above:.0} m  mean {mean:.2} ms  " +
-        "worst {worst:.1} ms  slow {slow}  hitch {hitches}  shifts {shifts}\n"
+        "worst {worst:.1} ms  slow {slow}  hitch {hitches}\n"
       next_mark = next_mark + COURSE_MARK
       worst = 0
       sum_ms = 0
@@ -305,11 +303,10 @@ async {
     state.course_pitch = state.course_pitch + (target_pitch - state.course_pitch) * min(1, dt)
     last_y = state.course_y
 
-    // The pose of the player in the frame of the origin
-    const o = WorldOrigin[WorldOrigin]
-    state.start_x = state.course_x - o.x
-    state.start_y = state.course_y - o.y
-    state.start_z = state.course_z - o.z
+    // The pose of the player
+    state.start_x = state.course_x
+    state.start_y = state.course_y
+    state.start_z = state.course_z
     state.start_yaw = state.course_yaw
     state.start_pitch = state.course_pitch
 

@@ -55,7 +55,7 @@ static void tr_rendered_bounds(
     int32_t slot = ecs_get(world, e, DrawSlot)->slot;
     test_assert(tr_rendered(world, null, e, &t));
     test_assert(box_draws_caster(b));
-    test_assert(box_draws_shadow_bounds(world, b, &t, &t, box_draws_slot_surface(b, slot), out));
+    test_assert(box_draws_shadow_bounds(world, b, NULL, &t, &t, box_draws_slot_surface(b, slot), out));
 }
 
 /** Check that the regions recorded since they were cleared are each within an x range, which
@@ -577,7 +577,7 @@ void TransitionShadow_bounds_corners(void) {
     // engine_core/transition
     box_render_null_t *null;
     box_render_shadow_region_t got, expected;
-    box_render_transform_t lo, hi;
+    box_render_transform_t lo = {0}, hi = {0};
     ecs_world_t *world = tr_scene(&null);
     ecs_entity_t e = tr_shape(world, 0, 1);
     tr_frame(world);
@@ -595,7 +595,7 @@ void TransitionShadow_bounds_corners(void) {
             }
         }
 
-        test_assert(box_draws_shadow_bounds(world, b, &lo, &hi, NULL, &got));
+        test_assert(box_draws_shadow_bounds(world, b, NULL, &lo, &hi, NULL, &got));
         glm_vec3_fill(expected.min, FLT_MAX);
         glm_vec3_fill(expected.max, -FLT_MAX);
         for (c = 0; c < 8; c ++) {

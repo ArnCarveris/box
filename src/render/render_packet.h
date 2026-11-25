@@ -1126,9 +1126,9 @@ typedef struct box_render_view_t {
                                  *   copied by a capture of the camera of the view */
     int32_t debug_pose_first;   /**< Index of the first pose of the view in the debug poses of
                                  *   the packet */
-    int32_t debug_pose_count;   /**< Poses the boxes of the view index, the identity first and
-                                 *   then one per mover tree (BvhDebug.mover_trees), 0 without
-                                 *   boxes */
+    int32_t debug_pose_count;   /**< Poses the boxes of the view index, relative to the render
+                                 *   origin: the world first and then one per mover tree
+                                 *   (BvhDebug.mover_trees), 0 without boxes */
     LodSettings lod;            /**< View.lod resolved by box_render_lod_settings, all zero
                                  *   (every shape at full detail) without a view */
     uint32_t features;          /**< BOX_RENDER_FEATURE_* features: those of its scene, without
@@ -1302,7 +1302,9 @@ typedef enum box_render_volume_op_t {
  * every probe of both buffers with sh and writes the mask; an update does what its op says.
  */
 typedef struct box_render_volume_desc_t {
-    float origin[3];        /**< World position of the first probe */
+    double origin[3];       /**< World position of the first probe, relative to the origin of
+                             *   the world: the backend writes it relative to the render origin
+                             *   of each packet */
     float spacing;          /**< World units between neighbouring probes */
     uint32_t size[3];       /**< Probes per axis, at least 1 */
     uint32_t probes;        /**< Probes of the grid, the product of size */
@@ -1615,9 +1617,16 @@ typedef struct box_render_buffer_desc_t {
  *
  * The three rows of the affine model matrix, the world transform with the instance scale:
  * row r is (m[0][r], m[1][r], m[2][r], m[3][r]). The shaders derive the normal matrix from it.
+ *
+ * A world record (cell[3] 1) has its translation relative to the corner of a cell of the grid of
+ * BOX_RENDER_ORIGIN_CELL, so it stays precise anywhere in a large world and does not depend on
+ * the render origin: the shaders add cell * BOX_RENDER_ORIGIN_CELL minus the origin of the pass
+ * (instance_model of instance.wgsl). Other records (cell[3] 0), such as transforms relative to
+ * a mover or a texture frame, are used as they are.
  */
 typedef struct box_render_transform_t {
     vec4 rows[3];           /**< Rows of the model matrix, the fourth row is (0, 0, 0, 1) */
+    int32_t cell[4];        /**< Cell of a world record in xyz, w 1 for a world record */
 } box_render_transform_t;
 
 /** Shading constants of a 2D shape or glyph, the shading stream of a 2D instance page, which
@@ -1814,7 +1823,7 @@ typedef struct box_render_material_t {
     float wind_sway;        /**< Phase of the sway of the Wind, 0..1, 0 without a WindSway */
     float wind_bend;        /**< WindSway.bend, 0 without one or when not finite */
     float wind_height;      /**< WindSway.height, at least BOX_RENDER_WIND_MIN, 0 without one */
-    float wind_base;        /**< WindSway.base relative to the local origin, or as it is
+    float wind_base;        /**< WindSway.base relative to the render origin, or as it is
                              *   with BOX_RENDER_WIND_LOCAL; 0 without one or when not finite */
     float wind_flutter;     /**< WindSway.flutter, 0 without one, when negative or not finite */
     float wind_reach;       /**< WindSway.flutter_reach, at least BOX_RENDER_WIND_MIN, 0
@@ -1925,7 +1934,7 @@ typedef struct box_render_material_clock_t {
 #define BOX_RENDER_WIND_FOLIAGE (1u << 11)
 
 /** Flag of a WindSway record with a local base (WindSway.local_base): wind_base is a height
- * above the origin of the shape rather than a world Y relative to the local origin */
+ * above the origin of the shape rather than a world Y relative to the render origin */
 #define BOX_RENDER_WIND_LOCAL (1u << 12)
 
 /** Smallest Distortion.scale of a record */
@@ -2090,7 +2099,7 @@ typedef struct box_render_water_ripples_t {
     float courant2;         /**< (c dt / dx)^2 of the clamped wave speed */
     float keep;             /**< Factor of the vertical velocity a step keeps, from damping */
     float corner[2];        /**< World XZ of the corner of the window at the end of the frame */
-    float height;           /**< World Y of the Water entity */
+    float height;           /**< Y of the Water entity relative to the render origin */
     float strength;         /**< WaterRipples.strength, 0 when not finite */
     float foam_spread;      /**< Share of the difference to its neighbours the foam of a cell
                              *   takes per step, from WaterRipples.foam_spread */
@@ -2160,7 +2169,7 @@ typedef struct box_render_water_spectrum_t {
     float detail;           /**< WaterSpectrum.detail, 0 when negative or not finite */
     float time;             /**< Render time wrapped to 0..BOX_RENDER_SPECTRUM_PERIOD */
     float offset[2];        /**< World XZ the fragments add to their local world XZ to sample
-                             *   the tiles: the absolute position of the local origin minus the
+                             *   the tiles: the render origin minus the
                              *   water frame, wrapped to 0..sizes[0] */
     float height_scale;     /**< One over twice the standard deviation of the height of the
                              *   spectrum, which brings its heights to about -1..1; 0 for flat
@@ -2342,13 +2351,13 @@ typedef struct box_render_terrain_sample_t {
 
 /** A Grass whose blades the GPU backend places around the camera of each lit view of its scene
  * and draws (gpu_grass.c), with its defaults resolved (box_grass_resolve) and its colors
- * linear. Positions and heights are in the local frame of the packet. */
+ * linear. Positions and heights are relative to the render origin of the packet. */
 typedef struct box_render_grass_t {
     ecs_entity_t grass;     /**< The Grass entity, the key of its buffers in the backend */
     ecs_entity_t terrain;   /**< Terrain with TerrainSampled it grows on, 0 for the plane */
     ecs_entity_t scene;     /**< Scene of the Grass entity, 0 for the default scene */
-    float plane;            /**< Local y of the plane of a Grass without a terrain */
-    float ground[2];        /**< Lowest and highest local y of the ground the blades stand on */
+    float plane;            /**< Y of the plane of a Grass without a terrain */
+    float ground[2];        /**< Lowest and highest y of the ground the blades stand on */
     int32_t mask;           /**< Mask channel that weighs the density, -1 for none */
     float density;          /**< Blades per square meter */
     float height[2];        /**< Shortest and tallest blade */
@@ -2505,8 +2514,8 @@ typedef struct box_render_texture_layer_t {
                              *   and of its altitude_fade (0 for none, negative to cover
                              *   below the altitude), then the whole repeats of the origin
                              *   modulo BOX_RENDER_LAYER_PERIOD (box_render_origin_repeats) */
-    float origin[4];        /**< Wrapped offset of the world projection for the absolute
-                             *   position of the local origin (box_render_origin_mapping); 0 with
+    float origin[4];        /**< Wrapped offset of the world projection for the render
+                             *   origin (box_render_origin_mapping); 0 with
                              *   BOX_RENDER_LAYER_UV */
 } box_render_texture_layer_t;
 
@@ -2746,13 +2755,16 @@ typedef struct box_render_transition_fade_t {
  * pose its own components fall back to when they do not transition.
  *
  * The rendered world matrix of the node is W_r(parent) * rel * L_r, or rel * L_r without a
- * parent node, where L_r is the local matrix (box_transform_local) of the rendered position,
- * rotation and scale. */
+ * parent node, where L_r is the local matrix (box_transform_local) of the rendered position
+ * minus offset, rotation and scale. The world matrices are relative to the render origin of the
+ * packet: a root has the render origin as offset, which the position loses in f64. */
 typedef struct box_render_transition_pose_t {
     float rel[4][4];        /**< Column major: the target locals from the parent node down to
                              *   the parent of the node, or without a parent node the target
-                             *   world matrix of its parent (identity for a root) */
-    float position[3];      /**< Target Position */
+                             *   world matrix of its parent relative to the render origin
+                             *   (identity for a root) */
+    double offset[3];       /**< Subtracted from the position, the render origin for a root */
+    double position[3];     /**< Target Position */
     float rotation[3];      /**< Target Rotation, 0 without one */
     float scale[3];         /**< Target Scale, 1 without one */
 } box_render_transition_pose_t;
@@ -2800,7 +2812,7 @@ typedef struct box_render_transition_record_t {
 typedef struct box_render_packet_t {
     int64_t frame;          /**< Frame the packet was extracted in */
     double time;            /**< World time at the end of the frame, in seconds */
-    double origin[3];       /**< Absolute position of the local origin (WorldOrigin) of the
+    double origin[3];       /**< Render origin of the
                              *   frame, which the world space patterns of the shaders add */
     float delta;            /**< Seconds the frame advanced the world */
     float fps;              /**< Frame rate cap of the frame, box_app_fps, 0 uncapped */

@@ -405,35 +405,24 @@ void Terrain_drops_within_budget(void) {
     ecs_fini(world);
 }
 
-void Terrain_origin_shift_keeps_tiles(void) {
+void Terrain_far_tiles(void) {
     ecs_entity_t terrain, focus;
     ecs_world_t *world = tt_world(&terrain, &focus, 1000);
-    ecs_singleton_add(world, WorldOrigin);
-    WorldOrigin *o = ecs_singleton_get_mut(world, WorldOrigin);
-    o->enabled = false;
-    ecs_singleton_modified(world, WorldOrigin);
+    const Position *f = ecs_get(world, focus, Position);
+    ecs_set(world, focus, Position, {f->x + 4194304.0, f->y, f->z - 2097152.0});
     ecs_progress(world, 0);
     tt_ready(world, terrain);
     ecs_progress(world, 0);
     int32_t count, i;
     box_terrain_tile_t *const *tiles = box_terrain_tiles(world, terrain, &count);
-    int32_t before = count;
-    int32_t created = ecs_get(world, terrain, TerrainStatus)->created;
-
-    box_world_origin_shift(world, 0, (double[3]){ 512, 0, -256 });
-    ecs_progress(world, 0);
-    ecs_progress(world, 0);
-    tiles = box_terrain_tiles(world, terrain, &count);
-    test_int(count, before);
-    test_int(ecs_get(world, terrain, TerrainStatus)->created, created);
+    test_assert(count > 0);
     for (i = 0; i < count; i ++) {
         const box_terrain_tile_t *t = tiles[i];
         double size = TT_TILE * (double)(1 << t->level);
         const Position *p = ecs_get(world, t->entity, Position);
-        double abs[3];
-        box_world_to_absolute(world, (vec3){ p->x, p->y, p->z }, abs);
-        test_flt(abs[0], (t->ix + 0.5) * size);
-        test_flt(abs[2], (t->iz + 0.5) * size);
+        test_assert(p->x == (t->ix + 0.5) * size);
+        test_assert(p->z == (t->iz + 0.5) * size);
+        test_assert(p->x > 4194304.0 - 4096 && p->z < -2097152.0 + 4096);
         test_bool(t->drawn, true);
     }
 
@@ -907,43 +896,6 @@ void Terrain_material_change_updates(void) {
 
     box_terrain_counters(world, terrain, &u, &s);
     test_int(u, updates);
-    ecs_fini(world);
-}
-
-void Terrain_origin_shift_updates(void) {
-    ecs_entity_t terrain, focus;
-    ecs_world_t *world = tt_world(&terrain, &focus, 1000);
-    int32_t i, updates, selects, u, s;
-    ecs_singleton_add(world, WorldOrigin);
-    WorldOrigin *o = ecs_singleton_get_mut(world, WorldOrigin);
-    o->enabled = false;
-    ecs_singleton_modified(world, WorldOrigin);
-    ecs_progress(world, 0);
-    tt_ready(world, terrain);
-    for (i = 0; i < 4; i ++) {
-        ecs_progress(world, 0);
-    }
-
-    box_terrain_counters(world, terrain, &updates, &selects);
-    uint64_t revision = box_terrain_revision(world);
-    box_world_origin_shift(world, 0, (double[3]){ 512, 0, -256 });
-    test_assert(box_terrain_revision(world) != revision);
-    ecs_progress(world, 0);
-    box_terrain_counters(world, terrain, &u, &s);
-    test_assert(u > updates);
-    for (i = 0; i < 3; i ++) {
-        ecs_progress(world, 0);
-    }
-
-    box_terrain_counters(world, terrain, &updates, &selects);
-    revision = box_terrain_revision(world);
-    for (i = 0; i < 4; i ++) {
-        ecs_progress(world, 0);
-    }
-
-    box_terrain_counters(world, terrain, &u, &s);
-    test_int(u, updates);
-    test_assert(box_terrain_revision(world) == revision);
     ecs_fini(world);
 }
 

@@ -412,7 +412,7 @@ fn vertex_base(v: VertexIn, shading: MeshShading, material: Material) -> VertexS
 fn frame_model(slot: u32, model: mat4x4f) -> mat4x4f {
     var result = model;
     if (slot < arrayLength(&frames)) {
-        result = instance_frame(frames[slot], model);
+        result = instance_frame(frames[slot], model, view.origin);
     }
     return result;
 }
@@ -433,7 +433,7 @@ fn frame_placed(slot: u32) -> bool {
 fn object_scale(slot: u32, model: mat4x4f, scale: vec3f) -> vec3f {
     var result = scale;
     if (slot < arrayLength(&frames)) {
-        let relative = instance_frame(frames[slot], model);
+        let relative = instance_frame(frames[slot], model, view.origin);
         result = vec3f(length(relative[0].xyz), length(relative[1].xyz),
             length(relative[2].xyz));
     }
@@ -447,7 +447,7 @@ fn vertex_mapping(o: ptr<function, VertexShading>, v: VertexIn, material: Materi
     (*o).uv = mapping_offset(material);
     if (material_world(material)) {
         (*o).object = mapping_world(material, p.world.xyz,
-            world_origin(view.origin));
+            render_origin(view.origin));
         (*o).object_normal = normal;
     } else if (material_frame(material)) {
         let relative = frame_model(slot_of(v.slot), p.model);
@@ -455,7 +455,7 @@ fn vertex_mapping(o: ptr<function, VertexShading>, v: VertexIn, material: Materi
         (*o).object = f.object;
         if (!frame_placed(slot_of(v.slot))) {
             (*o).object += mapping_origin(material,
-                world_origin(view.origin));
+                render_origin(view.origin));
         }
         (*o).object_normal = f.normal;
         if (blend > 0.0) {

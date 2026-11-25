@@ -102,8 +102,8 @@ static box_render_temporal_t history_advance(
     test_assert(v != NULL);
     box_camera_projection(&v->camera_data, (float)width, (float)height, proj);
 
-    return *box_render_history_update(histories, HISTORY_TARGET, v, null->last.frame, width,
-        height, proj);
+    return *box_render_history_update(histories, HISTORY_TARGET, v, null->last.origin,
+        null->last.frame, width, height, proj);
 }
 
 /** Run a frame into the null backend and advance the history of a view of 64x64 pixels.

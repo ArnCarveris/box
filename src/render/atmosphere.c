@@ -82,7 +82,8 @@ typedef struct box_atmos_planet_t {
     int32_t version;        /**< lut_version of the last build */
     box_render_atmosphere_desc_t key; /**< Medium of the last build */
     PlanetAtmosphere value; /**< Values of the PlanetAtmosphere in this frame */
-    float center[3];        /**< World position of the entity in this frame */
+    float center[3];        /**< Position of the entity in this frame relative to the render
+                             *   origin */
     float scale;            /**< Uniform world scale of the entity in this frame */
 } box_atmos_planet_t;
 
@@ -512,7 +513,9 @@ static void box_atmos_collect_planets(
                 const WorldTransform *t = box_transform_world_field(
                     world, &it, transforms, i, &buf);
                 if (t) {
-                    glm_vec3_copy(ECS_CONST_CAST(float*, t->m[3]), l->center);
+                    double origin[3];
+                    box_render_origin(world, origin);
+                    box_dvec3_rel(t->position, origin, l->center);
                     l->scale = box_transform_world_scale(t);
                 } else {
                     glm_vec3_zero(l->center);

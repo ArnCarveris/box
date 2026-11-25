@@ -128,7 +128,7 @@ void SpatialIgnore_moving_wave_not_refit(void) {
     }
 
     const WorldTransform *after = box_transform_world(world, part, &t_buf);
-    test_assert(ecs_os_memcmp(before.m, after->m, sizeof(mat4)) != 0);
+    test_assert(!box_transform_equal(&before, after));
     test_assert(!ecs_has(world, part, SpatialPose));
 
     ecs_fini(world);

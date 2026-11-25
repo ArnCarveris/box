@@ -312,8 +312,8 @@ void gallery_point(
     test_assert(t != NULL);
     test_assert(b != NULL);
     test_assert(s != NULL);
-    float x = (float)s->point_width * 0.5f + t->m[3][0] + fx * b->width * 0.5f;
-    float y = (float)s->point_height * 0.5f - t->m[3][1] + fy * b->height * 0.5f;
+    float x = (float)s->point_width * 0.5f + t->position[0] + fx * b->width * 0.5f;
+    float y = (float)s->point_height * 0.5f - t->position[1] + fy * b->height * 0.5f;
     ecs_os_snprintf(out, (ecs_size_t)size, "[%.1f, %.1f]", (double)x, (double)y);
 }
 
@@ -329,8 +329,8 @@ void gallery_rect(
     const LayoutBounds *b = ecs_get(world, e, LayoutBounds);
     const SurfaceStatus *ss = ecs_get(world, window, SurfaceStatus);
     test_assert(t != NULL && b != NULL && ss != NULL);
-    float x = (float)ss->point_width * 0.5f + t->m[3][0];
-    float y = (float)ss->point_height * 0.5f - t->m[3][1];
+    float x = (float)ss->point_width * 0.5f + t->position[0];
+    float y = (float)ss->point_height * 0.5f - t->position[1];
     r[0] = x - b->width * 0.5f;
     r[1] = y - b->height * 0.5f;
     r[2] = x + b->width * 0.5f;

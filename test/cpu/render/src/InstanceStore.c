@@ -1301,10 +1301,10 @@ void InstanceStore_store_chunk_from_largest_stride(void) {
     uint32_t shape2d = (uint32_t)(sizeof(box_render_transform_t) >
         sizeof(box_render_shading_t) ? sizeof(box_render_transform_t) :
         sizeof(box_render_shading_t));
-    test_uint(mesh, 48);
+    test_uint(mesh, 64);
     test_uint(shape2d, 64);
     test_uint(d->stores[BOX_DRAWS_STORE_MESH].chunk, page / mesh);
-    test_uint(d->stores[BOX_DRAWS_STORE_MESH].chunk, 2796202);
+    test_uint(d->stores[BOX_DRAWS_STORE_MESH].chunk, 2097152);
     test_uint(d->stores[BOX_DRAWS_STORE_2D].chunk, page / shape2d);
     test_uint(d->stores[BOX_DRAWS_STORE_2D].chunk, 2097152);
     test_uint(d->stores[BOX_DRAWS_STORE_SURFACE].chunk, page / SURFACE);
@@ -1322,8 +1322,8 @@ void InstanceStore_store_chunk_from_largest_stride(void) {
     /* The test sizes lower every store, capped by its own chunk */
     box_render_draws_chunk(world, 3000000);
     box_render_draws_page(world, 3000000);
-    test_uint(d->stores[BOX_DRAWS_STORE_MESH].chunk, 2796202);
-    test_uint(d->stores[BOX_DRAWS_STORE_MESH].slots, 2796202);
+    test_uint(d->stores[BOX_DRAWS_STORE_MESH].chunk, 2097152);
+    test_uint(d->stores[BOX_DRAWS_STORE_MESH].slots, 2097152);
     test_uint(d->stores[BOX_DRAWS_STORE_SURFACE].chunk, 349525);
     test_uint(d->stores[BOX_DRAWS_STORE_SURFACE].slots, 349525);
     box_render_draws_chunk(world, 2);
@@ -1467,7 +1467,7 @@ void InstanceStore_plain_batch_not_split_at_surface_chunk(void) {
     test_uint(box_draws_key_limit(d, &b->key), BOX_DRAWS_CHUNK);
     box_draw_key_t key = b->key;
     key.surface = false;
-    test_uint(box_draws_key_limit(d, &key), 2796202);
+    test_uint(box_draws_key_limit(d, &key), 2097152);
 
     ecs_fini(world);
     box_render_null_free(null);

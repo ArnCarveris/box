@@ -143,10 +143,13 @@ static void box_pick_local(
     evt->local_x = evt->screen_x;
     evt->local_y = evt->screen_y;
     if (t) {
-        mat4 inv;
-        vec3 local;
-        glm_mat4_inv(ECS_CONST_CAST(vec4*, t->m), inv);
-        glm_mat4_mulv3(inv, ECS_CONST_CAST(float*, pick->point), 1.0f, local);
+        mat4 m, inv;
+        vec3 local, point;
+        box_transform_mat4(t, t->position, m);
+        glm_mat4_inv(m, inv);
+        box_dvec3_rel((double[3]){ pick->point[0], pick->point[1], pick->point[2] },
+            t->position, point);
+        glm_mat4_mulv3(inv, point, 1.0f, local);
         evt->local_x = local[0];
         evt->local_y = local[1];
     }

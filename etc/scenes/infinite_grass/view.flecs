@@ -69,7 +69,3 @@ view {
     ]
   }
 }
-
-$ {
-  WorldOrigin: {enabled: true}
-}

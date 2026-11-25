@@ -84,9 +84,9 @@ ECS_STRUCT(TileTerrain, {
  * Each tile is a TextureGraph of the node on DomainWorld (GraphFloat) over its rectangle with a
  * border of two texels, its first channel the height in meters. Every tile shares the node
  * entities of the graph, so editing a node updates the whole terrain. The rectangles are in the
- * frame of the terrain entity: a terrain without a transform is at the absolute origin, a
- * function of the absolute position fixed in the world across shifts of the WorldOrigin; the
- * Position of the terrain offsets it (only its translation applies). Height fields cannot
+ * frame of the terrain entity: a terrain without a transform is at the origin of the world, a
+ * function of the world position; the Position of the terrain offsets it (only its translation
+ * applies). Height fields cannot
  * overhang: cliffs are steep slopes, best textured triplanar.
  *
  * The tiles form a quadtree: a tile of level L has an edge of tile_size * 2^L meters, and splits
@@ -117,8 +117,8 @@ ECS_STRUCT(TileTerrain, {
  * tile fades to as its grid morphs, so tiles of adjacent levels meet without a seam in the
  * material. The tiles of a coarser level read the node through a TexBlur of about a texel of
  * their level, so distant slopes do not shimmer. The layers are mapped by the TextureMapping of
- * the terrain, MappingWorld of a size of 1 without one, continuous across tiles and shifts of
- * the WorldOrigin, with the height based contrast of the TextureBlend; a triplanar blend keeps
+ * the terrain, MappingWorld of a size of 1 without one, continuous across tiles, with the
+ * height based contrast of the TextureBlend; a triplanar blend keeps
  * steep rock from stretching and TextureLayers apply on top. The tiles still draw in one batch.
  * A terrain without masks, or without a TextureBlend, draws as before.
  *
@@ -219,8 +219,8 @@ ECS_STRUCT(TerrainQueryStatus, {
  * level of detail the terrain draws with.
  *
  * Queries take x and z in the frame of the terrain, the coordinates its height graph is
- * evaluated at: for a terrain without a transform the absolute position in the world (as
- * box.world.absolute_x gives it), else relative to its Position. Heights are in that frame too.
+ * evaluated at: for a terrain without a transform the position in the world, else relative to
+ * its Position. Heights are in that frame too.
  * The finest resident level answers; where no level is resident a query returns false and
  * leaves out zero rather than guessing.
  *
@@ -349,8 +349,8 @@ void box_terrain_request(
     double x1,
     double z1);
 
-/** Get the local world position of the origin of the frame of a Terrain: a point (x, h, z) of
- * the terrain is at origin + (x, h, z) in the local frame of the world (box/world.h).
+/** Get the world position of the origin of the frame of a Terrain: a point (x, h, z) of the
+ * terrain is at origin + (x, h, z) in the world.
  *
  * @param world The world
  * @param terrain The terrain entity
@@ -361,23 +361,23 @@ void box_terrain_origin(
     ecs_entity_t terrain,
     double out[3]);
 
-/** Get the ground of a Terrain below a point of the local frame of the world, as the
- * controllers and particles collide with it.
+/** Get the ground of a Terrain below a world point, as the controllers and particles collide
+ * with it.
  *
  * @param world The world
  * @param terrain The terrain entity
- * @param x Local world x
- * @param z Local world z
- * @param y Receives the local world y of the surface, may be NULL
+ * @param x World x
+ * @param z World z
+ * @param y Receives the world y of the surface, may be NULL
  * @param normal Receives the unit normal, may be NULL
  * @return Whether the terrain is resident there
  */
 bool box_terrain_ground(
     const ecs_world_t *world,
     ecs_entity_t terrain,
-    float x,
-    float z,
-    float *y,
+    double x,
+    double z,
+    double *y,
     vec3 normal);
 
 /** Find where a ray first hits the surface of a Terrain of a scene, marching through its
@@ -386,7 +386,7 @@ bool box_terrain_ground(
  *
  * @param world The world
  * @param scene The scene, 0 for the default scene
- * @param origin Origin of the ray in the local frame of the world
+ * @param origin Origin of the ray in the world
  * @param dir Direction of the ray, need not be normalized
  * @param max_distance Longest distance along the unit direction that counts, 0 for no limit
  * @param terrain Receives the terrain entity hit, may be NULL

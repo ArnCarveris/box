@@ -625,7 +625,7 @@ void Radial_rotated_scaled_effect(void) {
     ecs_world_t *world = world_new(&null);
     test_assert(ecs_script_run(world, "templates", TEMPLATES, NULL) == 0);
 
-    vec3 at = {5, 0, 0};
+    dvec3 at = {5, 0, 0};
     ecs_entity_t root = box_particle_burst_at(world, ecs_lookup(world, "Ring"), at, 2);
     test_assert(root != 0);
     ecs_entity_t layer = ecs_lookup_child(world, root, "ring");

@@ -306,7 +306,7 @@ void Tooltip_not_clipped_in_scroll(void) {
     test_assert(ss != NULL && wt != NULL);
     float x = (tip[0] + tip[2]) * 0.5f, below = (notes[3] + tip[3]) * 0.5f;
     float point[3] = {
-        x - (float)ss->point_width * 0.5f, (float)ss->point_height * 0.5f - below, wt->m[3][2]
+        x - (float)ss->point_width * 0.5f, (float)ss->point_height * 0.5f - below, wt->position[2]
     };
     test_bool(box_render_clip_contains(world, e, point), true);
 

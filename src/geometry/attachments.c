@@ -42,7 +42,7 @@ static bool box_attachment_transform(
             goto error;
         }
 
-        glm_mat4_copy(ECS_CONST_CAST(vec4*, t->m), m);
+        box_transform_mat4(t, NULL, m);
         goto done;
     }
 
@@ -127,23 +127,26 @@ static bool box_attachment_update(
     glm_vec3_cross(frame[2], frame[0], frame[1]);
     glm_vec3_copy(point, frame[3]);
     glm_euler_yxz(attachment.rotation, rotation);
-    WorldTransform result;
-    glm_mat4_mul(frame, rotation, result.m);
+    mat4 pose;
+    glm_mat4_mul(frame, rotation, pose);
     const Scale *scale = ecs_get(world, e, Scale);
     if (scale) {
-        glm_scale(result.m, (vec3){scale->x, scale->y, scale->z});
+        glm_scale(pose, (vec3){scale->x, scale->y, scale->z});
     }
 
+    WorldTransform result = {0};
+    box_transform_from_mat4(pose, NULL, &result);
     const WorldTransform *old = ecs_get(world, e, WorldTransform);
     bool changed = !old;
-    for (int i = 0; old && i < 4; i ++) {
-        for (int j = 0; j < 4; j ++) {
-            changed |= fabsf(old->m[i][j] - result.m[i][j]) > 0.000001f;
+    for (int i = 0; old && i < 3; i ++) {
+        changed |= fabs(old->position[i] - result.position[i]) > 0.000001;
+        for (int j = 0; j < 3; j ++) {
+            changed |= fabsf(old->basis[i][j] - result.basis[i][j]) > 0.000001f;
         }
     }
 
     if (output) {
-        glm_mat4_copy(result.m, output);
+        glm_mat4_copy(pose, output);
     }
 
     if (changed) {

@@ -112,6 +112,7 @@ typedef struct box_light_tod_t {
 /** The lights of one scene */
 typedef struct box_light_scene_t {
     ecs_entity_t scene;     /**< Scene root, 0 for the default scene */
+    dvec3 origin;           /**< Render origin of the frame the light positions are relative to */
     bool has_lights;        /**< The scene has a light entity, even one that lights nothing */
     bool has_ambient;       /**< The scene has an AmbientLight */
     bool baking;            /**< The scene has LightBake, so bake modes apply */
@@ -142,6 +143,7 @@ typedef struct box_light_cull_view_t {
 
 /** Main thread state of the light extract */
 typedef struct box_render_lights_t {
+    dvec3 origin;           /**< Render origin of the frame (box_render_origin) */
     ecs_query_t *directional;   /**< Entities with DirectionalLight */
     ecs_query_t *point;         /**< Entities with PointLight */
     ecs_query_t *spot;          /**< Entities with SpotLight */

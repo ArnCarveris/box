@@ -668,7 +668,7 @@ bool box_cmd_render_corners(
     }
 
     if (transform) {
-        ecs_os_memcpy_t(m, transform->m, mat4);
+        box_transform_mat4(transform, NULL, m);
     } else {
         glm_mat4_identity(m);
     }
@@ -743,9 +743,9 @@ static void box_cmd_render_request(
         const WorldTransform *t = box_transform_world(world, job->subject, &t_buf);
         glm_vec3_zero(min);
         if (t) {
-            min[0] = t->m[3][0];
-            min[1] = t->m[3][1];
-            min[2] = t->m[3][2];
+            min[0] = (float)t->position[0];
+            min[1] = (float)t->position[1];
+            min[2] = (float)t->position[2];
         }
 
         glm_vec3_copy(min, max);

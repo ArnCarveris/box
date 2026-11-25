@@ -273,6 +273,36 @@ done:
     return;
 }
 
+/** Write the uniforms of the grid of a volume, its first probe relative to the render origin.
+ *
+ * @param gpu The backend
+ * @param v The volume
+ */
+static void box_gpu_volume_grid(
+    box_gpu_t *gpu,
+    box_gpu_volume_t *v)
+{
+    box_gpu_volume_uniforms_t u = {
+        .origin = {
+            (float)(v->origin[0] - gpu->origin[0]),
+            (float)(v->origin[1] - gpu->origin[1]),
+            (float)(v->origin[2] - gpu->origin[2]),
+            v->spacing
+        },
+        .size = { v->size[0], v->size[1], v->size[2], 1 }
+    };
+    wgpuQueueWriteBuffer(gpu->queue, v->grid, 0, &u, sizeof(u));
+}
+
+void box_gpu_volumes_origin(
+    box_gpu_t *gpu)
+{
+    ecs_map_iter_t it = ecs_map_iter(&gpu->volumes);
+    while (ecs_map_next(&it)) {
+        box_gpu_volume_grid(gpu, ecs_map_ptr(&it));
+    }
+}
+
 /** Write the grid of a volume, fill every probe of both buffers with one SH, open its
  * visibility maps and write its validity mask.
  *
@@ -285,10 +315,7 @@ static void box_gpu_volume_write(
     box_gpu_volume_t *v,
     const box_render_volume_desc_t *desc)
 {
-    box_gpu_volume_uniforms_t u = {
-        .origin = { desc->origin[0], desc->origin[1], desc->origin[2], desc->spacing },
-        .size = { desc->size[0], desc->size[1], desc->size[2], 1 }
-    };
+    int32_t k;
     size_t size = (size_t)v->count * BOX_GPU_VOLUME_PROBE_SIZE;
     size_t texels = (size_t)v->count * BOX_GPU_VISIBILITY_TEXELS;
     uint8_t *probes = ecs_os_malloc((ecs_size_t)size);
@@ -305,8 +332,12 @@ static void box_gpu_volume_write(
     }
 
     v->spacing = desc->spacing;
+    for (k = 0; k < 3; k ++) {
+        v->origin[k] = desc->origin[k];
+        v->size[k] = desc->size[k];
+    }
 
-    wgpuQueueWriteBuffer(gpu->queue, v->grid, 0, &u, sizeof(u));
+    box_gpu_volume_grid(gpu, v);
     wgpuQueueWriteBuffer(gpu->queue, v->probes[0], 0, probes, size);
     wgpuQueueWriteBuffer(gpu->queue, v->probes[1], 0, probes, size);
     wgpuQueueWriteBuffer(gpu->queue, v->visibility, 0, open, texels * sizeof(uint32_t));

@@ -218,9 +218,9 @@ void FirstPerson_walk_diagonal(void) {
     box_input_key(world, KeyD, true);
     ecs_progress(world, 0.5f);
     const Position *p = ecs_get(world, fp, Position);
-    test_assert(fabsf(p->x - 2.0f / sqrtf(2.0f)) < 0.0001f);
+    test_assert(fabs(p->x - 2.0f / sqrtf(2.0f)) < 0.0001f);
     test_flt(p->y, 1.7f);
-    test_assert(fabsf(p->z + 2.0f / sqrtf(2.0f)) < 0.0001f);
+    test_assert(fabs(p->z + 2.0f / sqrtf(2.0f)) < 0.0001f);
 
     ecs_fini(world);
 }
@@ -237,13 +237,13 @@ void FirstPerson_walk_follows_yaw(void) {
     box_input_key_press(world, KeyW, 1);
     ecs_progress(world, 0.5f);
     const Position *p = ecs_get(world, fp, Position);
-    test_assert(fabsf(p->x + 2) < 0.0001f);
-    test_assert(fabsf(p->z) < 0.0001f);
+    test_assert(fabs(p->x + 2) < 0.0001f);
+    test_assert(fabs(p->z) < 0.0001f);
 
     box_input_key_press(world, KeyD, 1);
     ecs_progress(world, 0.5f);
     p = ecs_get(world, fp, Position);
-    test_assert(fabsf(p->x + 2) < 0.0001f);
+    test_assert(fabs(p->x + 2) < 0.0001f);
     test_assert(fabsf(p->z + 2) < 0.0001f);
 
     ecs_fini(world);
@@ -323,7 +323,7 @@ void FirstPerson_acceleration(void) {
     const FirstPersonController *c = ecs_get(world, fp, FirstPersonController);
     test_assert(fabsf(c->velocity[0] - v) < 0.0001f);
     test_flt(c->velocity[1], 0);
-    test_assert(fabsf(ecs_get(world, fp, Position)->x - v * 0.5f) < 0.0001f);
+    test_assert(fabs(ecs_get(world, fp, Position)->x - v * 0.5f) < 0.0001f);
 
     box_input_key(world, KeyD, false);
     ecs_progress(world, 0.5f);
@@ -332,7 +332,7 @@ void FirstPerson_acceleration(void) {
     x += v * 0.5f;
     c = ecs_get(world, fp, FirstPersonController);
     test_assert(fabsf(c->velocity[0] - v) < 0.0001f);
-    test_assert(fabsf(ecs_get(world, fp, Position)->x - x) < 0.0001f);
+    test_assert(fabs(ecs_get(world, fp, Position)->x - x) < 0.0001f);
     test_flt(ecs_get(world, fp, Position)->y, 1.7f);
 
     ecs_fini(world);
@@ -464,12 +464,12 @@ void FirstPerson_jump_while_walking(void) {
     ecs_progress(world, 0.1f);
     const Position *p = ecs_get(world, fp, Position);
     test_assert(p->y > 1.7f);
-    test_assert(fabsf(p->z + 0.4f) < 0.0001f);
+    test_assert(fabs(p->z + 0.4f) < 0.0001f);
 
     ecs_progress(world, 0.1f);
     p = ecs_get(world, fp, Position);
     test_assert(p->y > 1.7f);
-    test_assert(fabsf(p->z + 0.8f) < 0.0001f);
+    test_assert(fabs(p->z + 0.8f) < 0.0001f);
 
     ecs_fini(world);
 }
@@ -488,7 +488,7 @@ void FirstPerson_jump_needs_ground(void) {
     const FirstPersonController *c = ecs_get(world, fp, FirstPersonController);
     test_bool(c->grounded, false);
     test_assert(fabsf(c->velocity[1] + 1.8f) < 0.0001f);
-    test_assert(fabsf(ecs_get(world, fp, Position)->y - 9.82f) < 0.0001f);
+    test_assert(fabs(ecs_get(world, fp, Position)->y - 9.82f) < 0.0001f);
 
     ecs_fini(world);
 }
@@ -528,7 +528,7 @@ void FirstPerson_fall(void) {
     const FirstPersonController *c = ecs_get(world, fp, FirstPersonController);
     test_bool(c->grounded, false);
     test_assert(fabsf(c->velocity[1] + 1) < 0.0001f);
-    test_assert(fabsf(ecs_get(world, fp, Position)->y - 9.9f) < 0.0001f);
+    test_assert(fabs(ecs_get(world, fp, Position)->y - 9.9f) < 0.0001f);
 
     for (int32_t i = 0; i < 20; i ++) {
         ecs_progress(world, 0.1f);
@@ -797,7 +797,7 @@ void FirstPerson_fly_moves_like_camera(void) {
     box_input_key_press(world, KeyW, 1);
     ecs_progress(world, 0.5f);
     const Position *p = ecs_get(world, fp, Position);
-    test_assert(fabsf(p->y - 5) < 0.0001f);
+    test_assert(fabs(p->y - 5) < 0.0001f);
     test_flt(p->z, -5);
 
     box_input_key(world, KeyShiftLeft, true);
@@ -931,7 +931,7 @@ void FirstPerson_custom_actions(void) {
 
     box_input_key_press(world, KeyUp, 1);
     ecs_progress(world, 0.1f);
-    test_assert(fabsf(ecs_get(world, fp, Position)->z + 0.4f) < 0.0001f);
+    test_assert(fabs(ecs_get(world, fp, Position)->z + 0.4f) < 0.0001f);
 
     box_input_key_press(world, KeyEnter, 1);
     ecs_progress(world, 0.1f);
@@ -973,9 +973,9 @@ void FirstPerson_world_transform(void) {
     box_input_key_press(world, KeyD, 1);
     ecs_progress(world, 0.5f);
     const WorldTransform *t = ecs_get(world, fp, WorldTransform);
-    test_flt(t->m[3][0], 2);
-    test_flt(t->m[3][1], 1.7f);
-    test_flt(t->m[3][2], 0);
+    test_flt(t->position[0], 2);
+    test_flt(t->position[1], 1.7f);
+    test_flt(t->position[2], 0);
 
     ecs_fini(world);
 }
@@ -1063,7 +1063,7 @@ void FirstPerson_command_action(void) {
     test_bool(error, false);
     ecs_progress(world, 0.5f);
     ecs_progress(world, 0.5f);
-    test_assert(fabsf(ecs_get(world, fp, Position)->y - 11.7f) < 0.0001f);
+    test_assert(fabs(ecs_get(world, fp, Position)->y - 11.7f) < 0.0001f);
 
     ecs_os_free(box_command_run(world, s,
         "action_down box.controllers.first_person.Crouch", &error));
@@ -1113,8 +1113,8 @@ void FirstPerson_arrows_turn(void) {
 
     test_assert(ecs_get(world, fp, Rotation)->y > yaw);
     test_assert(ecs_get(world, fp, Rotation)->x < -0.1f);
-    test_assert(fabsf(ecs_get(world, fp, Position)->x) < 0.0001f);
-    test_assert(fabsf(ecs_get(world, fp, Position)->z) < 0.0001f);
+    test_assert(fabs(ecs_get(world, fp, Position)->x) < 0.0001f);
+    test_assert(fabs(ecs_get(world, fp, Position)->z) < 0.0001f);
 
     ecs_fini(world);
 }
@@ -1146,13 +1146,13 @@ void FirstPerson_look_level_horizon(void) {
     test_flt(r->z, 0);
 
     const WorldTransform *t = ecs_get(world, fp, WorldTransform);
-    test_assert(fabsf(t->m[0][1]) < 0.0001f);
-    test_assert(fabsf(t->m[0][0] - cosf(0.6f)) < 0.0001f);
-    test_assert(fabsf(t->m[0][2] + sinf(0.6f)) < 0.0001f);
-    test_assert(t->m[1][1] > 0.9f);
-    test_assert(fabsf(t->m[2][0] - cosf(0.3f) * sinf(0.6f)) < 0.0001f);
-    test_assert(fabsf(t->m[2][1] - sinf(0.3f)) < 0.0001f);
-    test_assert(fabsf(t->m[2][2] - cosf(0.3f) * cosf(0.6f)) < 0.0001f);
+    test_assert(fabsf(t->basis[0][1]) < 0.0001f);
+    test_assert(fabsf(t->basis[0][0] - cosf(0.6f)) < 0.0001f);
+    test_assert(fabsf(t->basis[0][2] + sinf(0.6f)) < 0.0001f);
+    test_assert(t->basis[1][1] > 0.9f);
+    test_assert(fabsf(t->basis[2][0] - cosf(0.3f) * sinf(0.6f)) < 0.0001f);
+    test_assert(fabsf(t->basis[2][1] - sinf(0.3f)) < 0.0001f);
+    test_assert(fabsf(t->basis[2][2] - cosf(0.3f) * cosf(0.6f)) < 0.0001f);
 
     ecs_fini(world);
 }
@@ -1170,7 +1170,7 @@ void FirstPerson_stall_clamped(void) {
     ecs_progress(world, 5.0f);
     const Position *p = ecs_get(world, fp, Position);
     test_flt(p->z, -2);
-    test_assert(fabsf(p->y - (11.7f - 18 * 0.25f)) < 0.001f);
+    test_assert(fabs(p->y - (11.7f - 18 * 0.25f)) < 0.001f);
     test_assert(fabsf(ecs_get(world, fp, FirstPersonController)->velocity[1] + 9) < 0.001f);
 
     ecs_fini(world);

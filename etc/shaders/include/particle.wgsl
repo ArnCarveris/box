@@ -38,7 +38,7 @@ struct Emitter {
     // xyz: world acceleration plus gravity, w: seconds of the frame
     acceleration: vec4f,
     // rgb: display encoded color, w: X of the world offset added to the live particles before
-    // they move, the shift of the world origin of the frame for a world space pool
+    // they move, the move of the render origin since their last frame for a world space pool
     color: vec4f,
     // xy: speed range, zw: size range
     speed_size: vec4f,

@@ -404,7 +404,7 @@ static bool box_material_disturb(
     ecs_world_t *world,
     const char *what,
     ecs_entity_t water,
-    const float *position,
+    const double *position,
     float radius,
     float strength,
     float foam)
@@ -458,7 +458,7 @@ done:
 bool box_material_ripple_at(
     ecs_world_t *world,
     ecs_entity_t water,
-    const float *position,
+    const double *position,
     float radius,
     float strength)
 {
@@ -468,7 +468,7 @@ bool box_material_ripple_at(
 bool box_material_foam_at(
     ecs_world_t *world,
     ecs_entity_t water,
-    const float *position,
+    const double *position,
     float radius,
     float amount)
 {
@@ -489,7 +489,7 @@ static void box_material_ripple_at_function(
     ecs_value_t *result)
 {
     ecs_entity_t water = *(ecs_entity_t*)argv[0].ptr;
-    const float *position = argv[1].ptr;
+    const double *position = argv[1].ptr;
     float radius = *(float*)argv[2].ptr;
     float strength = *(float*)argv[3].ptr;
     (void)argc;
@@ -511,7 +511,7 @@ static void box_material_foam_at_function(
     ecs_value_t *result)
 {
     ecs_entity_t water = *(ecs_entity_t*)argv[0].ptr;
-    const float *position = argv[1].ptr;
+    const double *position = argv[1].ptr;
     float radius = *(float*)argv[2].ptr;
     float amount = *(float*)argv[3].ptr;
     (void)argc;
@@ -936,7 +936,7 @@ void BoxMaterialImport(
         .return_type = ecs_id(ecs_bool_t),
         .params = {
             { .name = "water", .type = ecs_id(ecs_entity_t) },
-            { .name = "position", .type = ecs_id(vec3) },
+            { .name = "position", .type = ecs_id(dvec3) },
             { .name = "radius", .type = ecs_id(ecs_f32_t) },
             { .name = "strength", .type = ecs_id(ecs_f32_t) }
         },
@@ -949,7 +949,7 @@ void BoxMaterialImport(
         .return_type = ecs_id(ecs_bool_t),
         .params = {
             { .name = "water", .type = ecs_id(ecs_entity_t) },
-            { .name = "position", .type = ecs_id(vec3) },
+            { .name = "position", .type = ecs_id(dvec3) },
             { .name = "radius", .type = ecs_id(ecs_f32_t) },
             { .name = "amount", .type = ecs_id(ecs_f32_t) }
         },

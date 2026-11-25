@@ -151,7 +151,7 @@ fn integrate(@builtin(workgroup_id) group: vec3u, @builtin(local_invocation_id) 
             alive = particle_collide_local(&p, emitter.model, inverse, ground, emitter.collide);
         } else {
             if ((emitter.sampled.x & SAMPLED_COLLIDE_TERRAIN) != 0u) {
-                let surface = terrain_sample_local(world_origin(emitter.origin), p.position.xz);
+                let surface = terrain_sample_local(render_origin(emitter.origin), p.position.xz);
                 if (surface.found) {
                     ground.x = surface.y;
                 }
@@ -218,7 +218,7 @@ fn spawn(@builtin(workgroup_id) group: vec3u, @builtin(local_invocation_id) lane
         p.position = local;
         p.velocity = particle_inverse(emitter.model) * p.velocity;
     } else if ((emitter.sampled.x & SAMPLED_SPAWN_GROUND) != 0u) {
-        let surface = terrain_sample_local(world_origin(emitter.origin), p.position.xz);
+        let surface = terrain_sample_local(render_origin(emitter.origin), p.position.xz);
         p.position.y += surface.y;
         if (!surface.found) {
             p.remaining = 0u;

@@ -814,7 +814,7 @@ void CurveKeys_effect_instance(void) {
         "}\n", NULL), 0);
     ecs_entity_t effect = ecs_lookup(world, "Puff");
     test_assert(effect != 0);
-    vec3 at = {0, 0, 0}, other = {5, 0, 0};
+    dvec3 at = {0, 0, 0}, other = {5, 0, 0};
     ecs_entity_t first = box_particle_burst_at(world, effect, at, 1);
     ecs_entity_t second = box_particle_burst_at(world, effect, other, 1);
     test_assert(first != 0 && second != 0);

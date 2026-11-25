@@ -137,8 +137,8 @@ void Projection_perspective(void) {
     float focal = 1.0f / tanf(glm_rad(30.0f));
     float aspect = 1280.0f / 720.0f;
     const Position *p = ecs_get(world, label, Position);
-    test_assert(fabsf(p->x - focal / aspect * 0.2f * 640.0f) < 0.01f);
-    test_assert(fabsf(p->y - focal * 0.1f * 360.0f) < 0.01f);
+    test_assert(fabs(p->x - focal / aspect * 0.2f * 640.0f) < 0.01f);
+    test_assert(fabs(p->y - focal * 0.1f * 360.0f) < 0.01f);
     test_assert(p->z == 3);
     test_assert(!ecs_has(world, label, ProjectedHidden));
 
@@ -166,8 +166,8 @@ void Projection_offset(void) {
     float focal = 1.0f / tanf(glm_rad(30.0f));
     float aspect = 1280.0f / 720.0f;
     const Position *p = ecs_get(world, label, Position);
-    test_assert(fabsf(p->x - focal / aspect * 0.2f * 640.0f) < 0.01f);
-    test_assert(fabsf(p->y - focal * 0.1f * 360.0f) < 0.01f);
+    test_assert(fabs(p->x - focal / aspect * 0.2f * 640.0f) < 0.01f);
+    test_assert(fabs(p->y - focal * 0.1f * 360.0f) < 0.01f);
 
     ecs_fini(world);
 }
@@ -189,8 +189,8 @@ void Projection_orthographic(void) {
     ecs_progress(world, 0);
 
     const Position *p = ecs_get(world, label, Position);
-    test_assert(fabsf(p->x - 144.0f) < 0.01f);
-    test_assert(fabsf(p->y - 72.0f) < 0.01f);
+    test_assert(fabs(p->x - 144.0f) < 0.01f);
+    test_assert(fabs(p->y - 72.0f) < 0.01f);
 
     ecs_fini(world);
 }
@@ -218,12 +218,12 @@ void Projection_surface_size(void) {
     ecs_progress(world, 0);
 
     const Position *p = ecs_get(world, label, Position);
-    test_assert(fabsf(p->x - 50.0f) < 0.01f);
-    test_assert(fabsf(p->y + 20.0f) < 0.01f);
+    test_assert(fabs(p->x - 50.0f) < 0.01f);
+    test_assert(fabs(p->y + 20.0f) < 0.01f);
 
     ecs_set(world, target, Position, {150, 0, 0});
     ecs_progress(world, 0);
-    test_assert(fabsf(ecs_get(world, label, Position)->x - 150.0f) < 0.01f);
+    test_assert(fabs(ecs_get(world, label, Position)->x - 150.0f) < 0.01f);
     test_assert(!ecs_has(world, label, ProjectedHidden));
 
     ecs_set(world, target, Position, {250, 0, 0});
@@ -262,8 +262,8 @@ void Projection_surface_points(void) {
     test_int(status->width, 800);
     test_int(status->point_width, 400);
     const Position *p = ecs_get(world, label, Position);
-    test_assert(fabsf(p->x - 150.0f) < 0.01f);
-    test_assert(fabsf(p->y + 20.0f) < 0.01f);
+    test_assert(fabs(p->x - 150.0f) < 0.01f);
+    test_assert(fabs(p->y + 20.0f) < 0.01f);
     test_assert(!ecs_has(world, label, ProjectedHidden));
 
     ecs_set(world, target, Position, {250, 0, 0});
@@ -300,12 +300,12 @@ void Projection_anchor_in_ui_scene(void) {
     ecs_progress(world, 0);
 
     const Position *p = ecs_get(world, label, Position);
-    test_assert(fabsf(p->x + 144.0f) < 0.01f);
-    test_assert(fabsf(p->y + 72.0f) < 0.01f);
+    test_assert(fabs(p->x + 144.0f) < 0.01f);
+    test_assert(fabs(p->y + 72.0f) < 0.01f);
     const WorldTransform *t = ecs_get(world, label, WorldTransform);
-    test_assert(fabsf(t->m[3][0] + 144.0f) < 0.01f);
-    test_assert(fabsf(t->m[3][1] + 72.0f) < 0.01f);
-    test_assert(fabsf(t->m[3][2] - 1.0f) < 0.01f);
+    test_assert(fabs(t->position[0] + 144.0f) < 0.01f);
+    test_assert(fabs(t->position[1] + 72.0f) < 0.01f);
+    test_assert(fabs(t->position[2] - 1.0f) < 0.01f);
     const Position *tp = ecs_get(world, target, Position);
     test_assert(tp->x == -2 && tp->y == -1 && tp->z == 0);
 
@@ -329,24 +329,24 @@ void Projection_follows_target_same_frame(void) {
     ecs_progress(world, 0);
 
     const WorldTransform *t = ecs_get(world, label, WorldTransform);
-    test_assert(fabsf(t->m[3][0]) < 0.01f);
-    test_assert(fabsf(t->m[3][1]) < 0.01f);
+    test_assert(fabs(t->position[0]) < 0.01f);
+    test_assert(fabs(t->position[1]) < 0.01f);
 
     ecs_set(world, target, Position, {2, 1, 0});
     ecs_progress(world, 0);
     const Position *p = ecs_get(world, label, Position);
-    test_assert(fabsf(p->x - 144.0f) < 0.01f);
-    test_assert(fabsf(p->y - 72.0f) < 0.01f);
+    test_assert(fabs(p->x - 144.0f) < 0.01f);
+    test_assert(fabs(p->y - 72.0f) < 0.01f);
     t = ecs_get(world, label, WorldTransform);
-    test_assert(fabsf(t->m[3][0] - 144.0f) < 0.01f);
-    test_assert(fabsf(t->m[3][1] - 72.0f) < 0.01f);
+    test_assert(fabs(t->position[0] - 144.0f) < 0.01f);
+    test_assert(fabs(t->position[1] - 72.0f) < 0.01f);
 
     ecs_add(world, target, DynamicTransform);
     ecs_set(world, target, Position, {-2, 1, 0});
     ecs_progress(world, 0);
     t = ecs_get(world, label, WorldTransform);
-    test_assert(fabsf(t->m[3][0] + 144.0f) < 0.01f);
-    test_assert(fabsf(t->m[3][1] - 72.0f) < 0.01f);
+    test_assert(fabs(t->position[0] + 144.0f) < 0.01f);
+    test_assert(fabs(t->position[1] - 72.0f) < 0.01f);
 
     ecs_fini(world);
 }
@@ -368,19 +368,19 @@ void Projection_follows_camera(void) {
     ecs_entity_t label = ecs_new(world);
     ecs_set(world, label, ProjectedAnchor, {.target = target, .view = view});
     ecs_progress(world, 0);
-    test_assert(fabsf(ecs_get(world, label, Position)->x) < 0.01f);
+    test_assert(fabs(ecs_get(world, label, Position)->x) < 0.01f);
 
     ecs_set(world, rig, Position, {-2, -1, 0});
     ecs_progress(world, 0);
     const Position *p = ecs_get(world, label, Position);
-    test_assert(fabsf(p->x - 144.0f) < 0.01f);
-    test_assert(fabsf(p->y - 72.0f) < 0.01f);
+    test_assert(fabs(p->x - 144.0f) < 0.01f);
+    test_assert(fabs(p->y - 72.0f) < 0.01f);
 
     ecs_set(world, rig, Rotation, {0, (float)GLM_PI, 0});
     ecs_progress(world, 0);
     p = ecs_get(world, label, Position);
-    test_assert(fabsf(p->x + 144.0f) < 0.01f);
-    test_assert(fabsf(p->y - 72.0f) < 0.01f);
+    test_assert(fabs(p->x + 144.0f) < 0.01f);
+    test_assert(fabs(p->y - 72.0f) < 0.01f);
 
     ecs_fini(world);
 }
@@ -411,11 +411,11 @@ void Projection_subtree_same_frame(void) {
     ecs_set(world, target, Position, {2, 1, 0});
     ecs_progress(world, 0);
     const WorldTransform *t = ecs_get(world, text, WorldTransform);
-    test_assert(fabsf(t->m[3][0] - 154.0f) < 0.01f);
-    test_assert(fabsf(t->m[3][1] - 72.0f) < 0.01f);
+    test_assert(fabs(t->position[0] - 154.0f) < 0.01f);
+    test_assert(fabs(t->position[1] - 72.0f) < 0.01f);
     t = ecs_get(world, mark, WorldTransform);
-    test_assert(fabsf(t->m[3][0] - 154.0f) < 0.01f);
-    test_assert(fabsf(t->m[3][1] - 78.0f) < 0.01f);
+    test_assert(fabs(t->position[0] - 154.0f) < 0.01f);
+    test_assert(fabs(t->position[1] - 78.0f) < 0.01f);
 
     ecs_fini(world);
 }
@@ -442,11 +442,11 @@ void Projection_dynamic_anchor(void) {
     ecs_set(world, target, Position, {2, 1, 0});
     ecs_progress(world, 0);
     const WorldTransform *t = ecs_get(world, label, WorldTransform);
-    test_assert(fabsf(t->m[3][0] - 144.0f) < 0.01f);
-    test_assert(fabsf(t->m[3][1] - 72.0f) < 0.01f);
+    test_assert(fabs(t->position[0] - 144.0f) < 0.01f);
+    test_assert(fabs(t->position[1] - 72.0f) < 0.01f);
     t = ecs_get(world, text, WorldTransform);
-    test_assert(fabsf(t->m[3][0] - 149.0f) < 0.01f);
-    test_assert(fabsf(t->m[3][1] - 72.0f) < 0.01f);
+    test_assert(fabs(t->position[0] - 149.0f) < 0.01f);
+    test_assert(fabs(t->position[1] - 72.0f) < 0.01f);
 
     ecs_fini(world);
 }
@@ -474,19 +474,19 @@ void Projection_behind_camera_hidden(void) {
     ecs_progress(world, 0);
     test_assert(ecs_has(world, label, ProjectedHidden));
     const Position *p = ecs_get(world, label, Position);
-    test_assert(fabsf(p->x) < 0.01f && fabsf(p->y) < 0.01f);
+    test_assert(fabs(p->x) < 0.01f && fabs(p->y) < 0.01f);
     const WorldTransform *t = ecs_get(world, label, WorldTransform);
-    test_assert(glm_vec3_norm(ECS_CONST_CAST(float*, t->m[0])) < 1e-6f);
-    test_assert(glm_vec3_norm(ECS_CONST_CAST(float*, t->m[1])) < 1e-6f);
-    test_assert(glm_vec3_norm(ECS_CONST_CAST(float*, t->m[2])) < 1e-6f);
+    test_assert(glm_vec3_norm(ECS_CONST_CAST(float*, t->basis[0])) < 1e-6f);
+    test_assert(glm_vec3_norm(ECS_CONST_CAST(float*, t->basis[1])) < 1e-6f);
+    test_assert(glm_vec3_norm(ECS_CONST_CAST(float*, t->basis[2])) < 1e-6f);
     t = ecs_get(world, text, WorldTransform);
-    test_assert(glm_vec3_norm(ECS_CONST_CAST(float*, t->m[0])) < 1e-6f);
-    test_assert(fabsf(t->m[3][0]) < 0.01f);
+    test_assert(glm_vec3_norm(ECS_CONST_CAST(float*, t->basis[0])) < 1e-6f);
+    test_assert(fabs(t->position[0]) < 0.01f);
 
     ecs_progress(world, 0);
     test_assert(ecs_has(world, label, ProjectedHidden));
     t = ecs_get(world, text, WorldTransform);
-    test_assert(glm_vec3_norm(ECS_CONST_CAST(float*, t->m[0])) < 1e-6f);
+    test_assert(glm_vec3_norm(ECS_CONST_CAST(float*, t->basis[0])) < 1e-6f);
 
     ecs_fini(world);
 }
@@ -546,13 +546,13 @@ void Projection_shown_again(void) {
     ecs_progress(world, 0);
     test_assert(!ecs_has(world, label, ProjectedHidden));
     const WorldTransform *t = ecs_get(world, label, WorldTransform);
-    test_assert(fabsf(t->m[0][0] - 2.0f) < 1e-6f);
-    test_assert(fabsf(t->m[1][1] - 2.0f) < 1e-6f);
-    test_assert(fabsf(t->m[3][0] - 144.0f) < 0.01f);
+    test_assert(fabsf(t->basis[0][0] - 2.0f) < 1e-6f);
+    test_assert(fabsf(t->basis[1][1] - 2.0f) < 1e-6f);
+    test_assert(fabs(t->position[0] - 144.0f) < 0.01f);
     t = ecs_get(world, text, WorldTransform);
-    test_assert(fabsf(t->m[0][0] - 2.0f) < 1e-6f);
-    test_assert(fabsf(t->m[3][0] - 154.0f) < 0.01f);
-    test_assert(fabsf(t->m[3][1] - 72.0f) < 0.01f);
+    test_assert(fabsf(t->basis[0][0] - 2.0f) < 1e-6f);
+    test_assert(fabs(t->position[0] - 154.0f) < 0.01f);
+    test_assert(fabs(t->position[1] - 72.0f) < 0.01f);
 
     ecs_fini(world);
 }
@@ -607,7 +607,7 @@ void Projection_deleted_target_hidden(void) {
     test_assert(ecs_is_alive(world, label));
     test_assert(ecs_has(world, label, ProjectedHidden));
     const Position *p = ecs_get(world, label, Position);
-    test_assert(fabsf(p->x - 144.0f) < 0.01f);
+    test_assert(fabs(p->x - 144.0f) < 0.01f);
 
     ecs_fini(world);
 }
@@ -643,8 +643,8 @@ void Projection_from_script(void) {
     test_assert(label != 0);
     const Position *p = ecs_get(world, label, Position);
     test_assert(p != NULL);
-    test_assert(fabsf(p->x - 144.0f) < 0.01f);
-    test_assert(fabsf(p->y - 72.0f) < 0.01f);
+    test_assert(fabs(p->x - 144.0f) < 0.01f);
+    test_assert(fabs(p->y - 72.0f) < 0.01f);
 
     ecs_fini(world);
 }
@@ -757,10 +757,10 @@ void Projection_transformed_once_per_frame(void) {
         ecs_set(world, target, Position, {0.5f * (float)frame, 0, 0});
         ecs_progress(world, 0);
         const WorldTransform *t = ecs_get(world, label, WorldTransform);
-        test_assert(fabsf(t->m[3][0] - 36.0f * (float)frame) < 0.01f);
+        test_assert(fabs(t->position[0] - 36.0f * (float)frame) < 0.01f);
         t = ecs_get(world, child, WorldTransform);
-        test_assert(fabsf(t->m[3][0] - 36.0f * (float)frame) < 0.01f);
-        test_assert(fabsf(t->m[3][1] - 10.0f) < 0.01f);
+        test_assert(fabs(t->position[0] - 36.0f * (float)frame) < 0.01f);
+        test_assert(fabs(t->position[1] - 10.0f) < 0.01f);
     }
 
     test_int(set.count, 5);
@@ -773,7 +773,7 @@ void Projection_transformed_once_per_frame(void) {
     test_int(set.count, 5);
     test_int(child_set.count, 5);
     test_int(moved.count, 0);
-    test_flt(ecs_get(world, label, WorldTransform)->m[3][0], 180.0f);
+    test_flt(ecs_get(world, label, WorldTransform)->position[0], 180.0f);
 
     ecs_fini(world);
 }
@@ -811,12 +811,12 @@ void Projection_box_perspective(void) {
     test_assert(fabsf(b->bottom + focal * 0.5f / 9.5f * 360.0f) < 0.05f);
 
     const Position *p = ecs_get(world, bar, Position);
-    test_assert(fabsf(p->x - (expect[0] + expect[1]) * 0.5f) < 0.05f);
-    test_assert(fabsf(p->y - (expect[2] + 6.0f)) < 0.05f);
+    test_assert(fabs(p->x - (expect[0] + expect[1]) * 0.5f) < 0.05f);
+    test_assert(fabs(p->y - (expect[2] + 6.0f)) < 0.05f);
     test_assert(p->z == 2);
     const WorldTransform *t = ecs_get(world, bar, WorldTransform);
-    test_assert(fabsf(t->m[3][0] - p->x) < 0.01f);
-    test_assert(fabsf(t->m[3][1] - p->y) < 0.01f);
+    test_assert(fabs(t->position[0] - p->x) < 0.01f);
+    test_assert(fabs(t->position[1] - p->y) < 0.01f);
 
     ecs_fini(world);
 }
@@ -842,7 +842,7 @@ void Projection_box_camera_moves(void) {
     float far[4], near[4], side[4];
     projection_box_expected(world, camera, (vec3){0, 0, 0}, min, max, far);
     test_assert(projection_bounds_match(world, bar, far));
-    test_assert(fabsf(ecs_get(world, bar, Position)->x) < 0.05f);
+    test_assert(fabs(ecs_get(world, bar, Position)->x) < 0.05f);
 
     ecs_set(world, camera, Position, {0, 0, 5});
     ecs_progress(world, 0);
@@ -858,7 +858,7 @@ void Projection_box_camera_moves(void) {
     test_assert(side[1] < near[1] - 100.0f);
     test_assert(side[0] < near[0] - 100.0f);
     const Position *p = ecs_get(world, bar, Position);
-    test_assert(fabsf(p->x - (side[0] + side[1]) * 0.5f) < 0.05f);
+    test_assert(fabs(p->x - (side[0] + side[1]) * 0.5f) < 0.05f);
     test_assert(p->x < -100.0f);
 
     ecs_fini(world);
@@ -912,14 +912,14 @@ void Projection_box_fit_width(void) {
     test_assert(fabsf(ecs_get(world, bar, Rect)->width - 144.0f) < 0.01f);
     test_assert(fabsf(ecs_get(world, bar, LayoutBounds)->width - 144.0f) < 0.01f);
     const Position *p = ecs_get(world, bar, Position);
-    test_assert(fabsf(p->x) < 0.01f);
-    test_assert(fabsf(p->y - 154.0f) < 0.01f);
+    test_assert(fabs(p->x) < 0.01f);
+    test_assert(fabs(p->y - 154.0f) < 0.01f);
     test_assert(fabsf(ecs_get(world, fill, Rect)->width - 36.0f) < 0.01f);
     test_assert(fabsf(ecs_get(world, rest, Rect)->width - 108.0f) < 0.01f);
     test_assert(fabsf(ecs_get(world, fill, Rect)->height - 8.0f) < 0.01f);
     const WorldTransform *t = ecs_get(world, fill, WorldTransform);
-    test_assert(fabsf(t->m[3][0] + 54.0f) < 0.01f);
-    test_assert(fabsf(t->m[3][1] - 154.0f) < 0.01f);
+    test_assert(fabs(t->position[0] + 54.0f) < 0.01f);
+    test_assert(fabs(t->position[1] - 154.0f) < 0.01f);
 
     projection_count_t fill_set = { .entity = fill };
     ecs_observer(world, {
@@ -936,19 +936,19 @@ void Projection_box_fit_width(void) {
     test_assert(fabsf(ecs_get(world, fill, Rect)->width - 72.0f) < 0.01f);
     test_assert(fabsf(ecs_get(world, rest, Rect)->width - 216.0f) < 0.01f);
     t = ecs_get(world, bar, WorldTransform);
-    test_assert(fabsf(t->m[3][1] - 298.0f) < 0.01f);
+    test_assert(fabs(t->position[1] - 298.0f) < 0.01f);
     t = ecs_get(world, fill, WorldTransform);
-    test_assert(fabsf(t->m[3][0] + 108.0f) < 0.01f);
-    test_assert(fabsf(t->m[3][1] - 298.0f) < 0.01f);
+    test_assert(fabs(t->position[0] + 108.0f) < 0.01f);
+    test_assert(fabs(t->position[1] - 298.0f) < 0.01f);
     t = ecs_get(world, rest, WorldTransform);
-    test_assert(fabsf(t->m[3][0] - 36.0f) < 0.01f);
+    test_assert(fabs(t->position[0] - 36.0f) < 0.01f);
 
     ecs_progress(world, 0);
     test_int(fill_set.count, 1);
     test_assert(fabsf(ecs_get(world, fill, Rect)->width - 72.0f) < 0.01f);
     t = ecs_get(world, fill, WorldTransform);
-    test_assert(fabsf(t->m[3][0] + 108.0f) < 0.01f);
-    test_assert(fabsf(t->m[3][1] - 298.0f) < 0.01f);
+    test_assert(fabs(t->position[0] + 108.0f) < 0.01f);
+    test_assert(fabs(t->position[1] - 298.0f) < 0.01f);
 
     ecs_fini(world);
 }
@@ -978,8 +978,8 @@ void Projection_box_fit_height(void) {
     test_assert(fabsf(r->width - 72.0f) < 0.01f);
     test_assert(fabsf(r->height - 72.0f) < 0.01f);
     const Position *p = ecs_get(world, frame, Position);
-    test_assert(fabsf(p->x - 72.0f) < 0.01f);
-    test_assert(fabsf(p->y - 36.0f) < 0.01f);
+    test_assert(fabs(p->x - 72.0f) < 0.01f);
+    test_assert(fabs(p->y - 36.0f) < 0.01f);
 
     ecs_fini(world);
 }
@@ -1010,7 +1010,7 @@ void Projection_box_behind_camera(void) {
     test_assert(b->left == before.left && b->right == before.right);
     test_assert(b->top == before.top && b->bottom == before.bottom);
     const WorldTransform *t = ecs_get(world, bar, WorldTransform);
-    test_assert(glm_vec3_norm(ECS_CONST_CAST(float*, t->m[0])) < 1e-6f);
+    test_assert(glm_vec3_norm(ECS_CONST_CAST(float*, t->basis[0])) < 1e-6f);
 
     ecs_set(world, target, Position, {0, 0, 10});
     ecs_set(world, bar, ProjectedBox, {.min = {-1, -1, -1}, .max = {1, 1, 1}});
@@ -1032,7 +1032,7 @@ void Projection_box_behind_camera(void) {
     ecs_progress(world, 0);
     test_assert(!ecs_has(world, bar, ProjectedHidden));
     t = ecs_get(world, bar, WorldTransform);
-    test_assert(fabsf(t->m[0][0] - 1.0f) < 1e-6f);
+    test_assert(fabsf(t->basis[0][0] - 1.0f) < 1e-6f);
 
     ecs_fini(world);
 }
@@ -1141,17 +1141,17 @@ void Projection_box_removed(void) {
     test_assert(!ecs_has(world, bar, LayoutItem));
     test_assert(ecs_get(world, bar, Rect)->width == 10);
     const Position *p = ecs_get(world, bar, Position);
-    test_assert(fabsf(p->x - 144.0f) < 0.01f);
-    test_assert(fabsf(p->y - 148.0f) < 0.01f);
+    test_assert(fabs(p->x - 144.0f) < 0.01f);
+    test_assert(fabs(p->y - 148.0f) < 0.01f);
     p = ecs_get(world, point, Position);
-    test_assert(fabsf(p->x - 144.0f) < 0.01f);
-    test_assert(fabsf(p->y - 72.0f) < 0.01f);
+    test_assert(fabs(p->x - 144.0f) < 0.01f);
+    test_assert(fabs(p->y - 72.0f) < 0.01f);
 
     ecs_remove(world, bar, ProjectedBox);
     ecs_progress(world, 0);
     p = ecs_get(world, bar, Position);
-    test_assert(fabsf(p->x - 144.0f) < 0.01f);
-    test_assert(fabsf(p->y - 72.0f) < 0.01f);
+    test_assert(fabs(p->x - 144.0f) < 0.01f);
+    test_assert(fabs(p->y - 72.0f) < 0.01f);
 
     ecs_fini(world);
 }
@@ -1201,14 +1201,14 @@ void Projection_box_from_script(void) {
     test_assert(bar != 0 && fill != 0);
     test_assert(!ecs_has(world, bar, ProjectedHidden));
     const Position *p = ecs_get(world, bar, Position);
-    test_assert(fabsf(p->x) < 0.01f);
-    test_assert(fabsf(p->y - 152.0f) < 0.01f);
+    test_assert(fabs(p->x) < 0.01f);
+    test_assert(fabs(p->y - 152.0f) < 0.01f);
     test_assert(fabsf(ecs_get(world, bar, Rect)->width - 144.0f) < 0.01f);
     test_assert(fabsf(ecs_get(world, fill, Rect)->width - 72.0f) < 0.01f);
     test_assert(fabsf(ecs_get(world, fill, Rect)->height - 4.0f) < 0.01f);
     const WorldTransform *t = ecs_get(world, fill, WorldTransform);
-    test_assert(fabsf(t->m[3][0] + 36.0f) < 0.01f);
-    test_assert(fabsf(t->m[3][1] - 152.0f) < 0.01f);
+    test_assert(fabs(t->position[0] + 36.0f) < 0.01f);
+    test_assert(fabs(t->position[1] - 152.0f) < 0.01f);
 
     ecs_fini(world);
 }

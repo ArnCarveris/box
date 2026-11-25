@@ -404,7 +404,9 @@ void Local_turns_with_parent(void) {
     *before = *r;
     ecs_set(world, parent, Rotation, {0, 1.5707964f, 0});
     frame_replay(world, null, e, r);
-    memcpy(m, ecs_get(world, parent, WorldTransform)->m, sizeof(m));
+    mat4 parent_m;
+    box_transform_mat4(ecs_get(world, parent, WorldTransform), NULL, parent_m);
+    memcpy(m, parent_m, sizeof(m));
     test_assert(fabsf(m[0][0]) < 1e-5f);
     test_assert(check_carried(before, r, m, 1e-4f) >= 29);
 

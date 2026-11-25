@@ -236,8 +236,8 @@ void WaterRipples_function_checks_arguments(void) {
     ecs_add(world, plain, Water);
     ecs_entity_t dry = ecs_new(world);
     ecs_add(world, dry, WaterRipples);
-    float at[3] = {0, 0, 0};
-    float nan_at[3] = {NAN, 0, 0};
+    double at[3] = {0, 0, 0};
+    double nan_at[3] = {NAN, 0, 0};
 
     int level = ecs_log_set_level(-4);
     test_bool(box_material_ripple_at(world, 0, at, 1, 0.1f), false);
@@ -494,7 +494,7 @@ void WaterRipples_ripple_at_next_step(void) {
     ecs_entity_t pond = pond_new(world);
     frame_dt(world, 1.0f / 60);
 
-    float at[3] = {2, 0, -1};
+    double at[3] = {2, 0, -1};
     test_bool(box_material_ripple_at(world, pond, at, 0.5f, 0.1f), true);
 
     /* A frame too short for a step keeps it */
@@ -616,8 +616,8 @@ void WaterRipples_foam_function_checks_arguments(void) {
     ecs_add(world, pond, WaterRipples);
     ecs_entity_t plain = ecs_new(world);
     ecs_add(world, plain, Water);
-    float at[3] = {0, 0, 0};
-    float nan_at[3] = {0, NAN, 0};
+    double at[3] = {0, 0, 0};
+    double nan_at[3] = {0, NAN, 0};
 
     int level = ecs_log_set_level(-4);
     test_bool(box_material_foam_at(world, 0, at, 1, 0.5f), false);
@@ -768,7 +768,7 @@ void WaterRipples_foam_at_next_step(void) {
     ecs_entity_t pond = pond_new(world);
     frame_dt(world, 1.0f / 60);
 
-    float at[3] = {-3, 0, 1};
+    double at[3] = {-3, 0, 1};
     test_bool(box_material_foam_at(world, pond, at, 0.75f, 0.6f), true);
     frame_dt(world, 1.0f / 60);
     const box_render_water_ripples_t *rec = field_of(null, pond);

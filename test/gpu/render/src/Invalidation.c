@@ -747,8 +747,7 @@ void Invalidation_deleting_uncaptured_shapes_rebakes_nothing(void) {
     ecs_entity_t manual = ecs_new_w_pair(world, EcsChildOf, scene);
     ecs_add(world, manual, ManualTransform);
     ecs_set(world, manual, Box, {1, 1, 1});
-    WorldTransform placed;
-    glm_translate_make(placed.m, (vec3){4, 0.5f, 0});
+    WorldTransform placed = { .position = {4, 0.5, 0}, .basis = GLM_MAT3_IDENTITY_INIT };
     ecs_set_ptr(world, manual, WorldTransform, &placed);
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Surface, {.width = 32, .height = 24, .resolution_scale = 1});

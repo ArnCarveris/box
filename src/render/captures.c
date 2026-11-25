@@ -174,7 +174,9 @@ static int box_render_capture_camera(
         v->cull.min_dimension = BOX_RENDER_CULL_MIN_DIMENSION;
         v->features = box_render_view_features(world, v->scene, NULL);
         v->scene_features = box_render_scene_features(world, v->scene);
-        ecs_os_memcpy_t(v->camera_transform, d->transform, mat4);
+        WorldTransform t;
+        box_transform_from_mat4(d->transform, NULL, &t);
+        box_transform_mat4(&t, p->origin, v->camera_transform);
         result = 0;
         goto done;
     }
@@ -210,7 +212,7 @@ static int box_render_capture_camera(
     }
 
     if (transform) {
-        ecs_os_memcpy_t(v->camera_transform, transform->m, mat4);
+        box_transform_mat4(transform, p->origin, v->camera_transform);
     } else {
         glm_mat4_identity(v->camera_transform);
     }

@@ -254,17 +254,17 @@ void Parametric_attachments(void) {
     ecs_progress(world, 0);
     const WorldTransform *m = ecs_get(world, attachment, WorldTransform);
     test_not_null(m);
-    test_assert(fabsf(m->m[3][0] - 3.5f) < 0.001f);
-    test_flt(m->m[3][1], 1.5f);
+    test_assert(fabs(m->position[0] - 3.5f) < 0.001f);
+    test_flt(m->position[1], 1.5f);
     sweep.scale[0] = sweep.scale[1] = 2;
     ecs_set_ptr(world, target, Sweep, &sweep);
     ecs_progress(world, 0);
     m = ecs_get(world, attachment, WorldTransform);
-    test_assert(fabsf(m->m[3][0] - 2.5f) < 0.001f);
+    test_assert(fabs(m->position[0] - 2.5f) < 0.001f);
     ecs_set(world, target, Position, {7, 0, 0});
     ecs_progress(world, 0);
     m = ecs_get(world, attachment, WorldTransform);
-    test_assert(fabsf(m->m[3][0] - 4.5f) < 0.001f);
+    test_assert(fabs(m->position[0] - 4.5f) < 0.001f);
     ecs_remove(world, attachment, SurfaceAttachment);
     test_bool(ecs_has_id(world, attachment, ManualTransform), false);
     ecs_fini(world);
@@ -390,9 +390,11 @@ void Parametric_attachment_chain(void) {
         const WorldTransform *mb = ecs_get(world, b, WorldTransform);
         box_surface_sample_t sample;
         box_surface_evaluate(world, b, SurfaceOuter, 0, 0.5f, &sample);
-        vec3 expected;
-        glm_mat4_mulv3(ECS_CONST_CAST(vec4*, mb->m), sample.position, 1, expected);
-        test_assert(glm_vec3_distance(expected, ECS_CONST_CAST(float*, ma->m[3])) < 0.0001f);
+        dvec3 expected;
+        box_transform_point(mb, sample.position, expected);
+        test_assert(fabs(expected[0] - ma->position[0]) < 0.0001);
+        test_assert(fabs(expected[1] - ma->position[1]) < 0.0001);
+        test_assert(fabs(expected[2] - ma->position[2]) < 0.0001);
     }
     ecs_fini(world);
 }

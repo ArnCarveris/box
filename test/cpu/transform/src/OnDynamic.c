@@ -116,7 +116,7 @@ void OnDynamic_prefab_instance(void) {
     ecs_progress(world, 0);
     ecs_set(world, instance, Position, {2, 0, 0});
     ecs_progress(world, 0);
-    test_flt(ecs_get(world, instance, WorldTransform)->m[3][0], 2.0f);
+    test_flt(ecs_get(world, instance, WorldTransform)->position[0], 2.0f);
 
     ecs_remove_pair(world, instance, EcsIsA, prefab);
     test_int(log.remove_count, 1);

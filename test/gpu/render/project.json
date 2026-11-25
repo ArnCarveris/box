@@ -1383,8 +1383,7 @@
                     "captures_at_focus",
                     "recaptures_after_distance",
                     "blends_previous_capture",
-                    "far_shapes_do_not_queue",
-                    "origin_shift_does_not_recapture"
+                    "far_shapes_do_not_queue"
                 ]
             },
             {
@@ -2129,7 +2128,7 @@
                 "id": "Terrain",
                 "testcases": [
                     "levels_no_cracks",
-                    "origin_shift_same_image",
+                    "far_same_image",
                     "extract_reuses_heights"
                 ]
             },
@@ -2148,7 +2147,7 @@
                     "plane_places_blades",
                     "thins_with_distance",
                     "stays_put_as_camera_moves",
-                    "stays_put_across_origin_shift",
+                    "stays_put_across_origin_move",
                     "follows_terrain_height",
                     "mask_weighs_density",
                     "stats_show_counts_and_time",
@@ -2174,7 +2173,7 @@
                 "testcases": [
                     "matches_queries",
                     "tile_edges",
-                    "after_origin_shift",
+                    "far_from_origin",
                     "coarse_levels_further_out",
                     "beyond_windows_not_found",
                     "untagged_has_no_bindings",
@@ -2192,21 +2191,23 @@
                 ]
             },
             {
-                "id": "WorldOrigin",
+                "id": "RenderOrigin",
                 "testcases": [
-                    "shift_same_image",
-                    "rebase_same_image",
+                    "follows_camera",
+                    "origin_same_image",
+                    "move_same_image",
+                    "far_same_image",
                     "particles_same_image"
                 ]
             },
             {
-                "id": "WorldOriginShading",
+                "id": "RenderOriginShading",
                 "testcases": [
-                    "mapping_world_shift",
-                    "triplanar_shift",
-                    "mapping_frame_shift",
-                    "texture_layer_shift",
-                    "wind_sway_shift",
+                    "mapping_world_move",
+                    "triplanar_move",
+                    "mapping_frame_move",
+                    "texture_layer_move",
+                    "wind_sway_move",
                     "far_origin_not_blocky"
                 ]
             }

@@ -1252,6 +1252,7 @@ void box_gpu_cull_add(
     int32_t count = cascades ? cascades + c->copies : 0;
     uint32_t renders = box_gpu_shadow_renders(gpu, slot);
     ecs_os_memset_t(&base, 0, box_gpu_cull_uniforms_t);
+    box_gpu_origin_split(gpu->origin, base.origin);
     ecs_os_memset_t(&view, 0, box_gpu_cull_desc_t);
     view.view = v->view;
     view.slot = slot;
@@ -1336,6 +1337,7 @@ void box_gpu_cull_reflect_add(
     box_gpu_cull_desc_t f;
     int32_t j;
     ecs_os_memset_t(&base, 0, box_gpu_cull_uniforms_t);
+    box_gpu_origin_split(gpu->origin, base.origin);
     ecs_os_memset_t(&f, 0, box_gpu_cull_desc_t);
     f.view = v->view;
     f.slot = slot;
@@ -1379,6 +1381,7 @@ void box_gpu_cull_casters_add(
     uint32_t bounds = box_gpu_cull_scene_bounds(packet, scene) ? BOX_GPU_CULL_BOUNDS : 0;
     int32_t i, o;
     ecs_os_memset_t(&base, 0, box_gpu_cull_uniforms_t);
+    box_gpu_origin_split(gpu->origin, base.origin);
     ecs_vec_clear(&c->frustums);
     for (i = 0; i < count; i ++) {
         bool octahedral = tiles[i].projection == BOX_RENDER_SHADOW_OCTAHEDRAL;
@@ -1461,6 +1464,7 @@ void box_gpu_cull_capture_add(
     box_gpu_cull_desc_t f;
     int32_t i;
     ecs_os_memset_t(&base, 0, box_gpu_cull_uniforms_t);
+    box_gpu_origin_split(gpu->origin, base.origin);
     ecs_os_memset_t(&f, 0, box_gpu_cull_desc_t);
     f.slot = slot;
     f.cascade = cascade;

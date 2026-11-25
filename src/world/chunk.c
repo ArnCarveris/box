@@ -516,7 +516,6 @@ static bool box_chunk_ground_ready(
     const ChunkGrid *config,
     const box_chunk_work_t *work)
 {
-    const WorldOrigin *o = ecs_id(WorldOrigin) ? ecs_singleton_get(world, WorldOrigin) : NULL;
     double frame[3], r[4];
     bool result = true;
     if (!config->ground || !ecs_id(Terrain) || !ecs_is_alive(world, config->ground) ||
@@ -526,8 +525,8 @@ static bool box_chunk_ground_ready(
     }
 
     box_terrain_origin(world, config->ground, frame);
-    r[0] = (double)work->c[0] * (double)config->cell_size[0] - (o ? o->x : 0.0) - frame[0];
-    r[1] = (double)work->c[2] * (double)config->cell_size[2] - (o ? o->z : 0.0) - frame[2];
+    r[0] = (double)work->c[0] * (double)config->cell_size[0] - frame[0];
+    r[1] = (double)work->c[2] * (double)config->cell_size[2] - frame[2];
     r[2] = r[0] + (double)config->cell_size[0];
     r[3] = r[1] + (double)config->cell_size[2];
     result = box_terrain_resident(world, config->ground, r[0], r[1], r[2], r[3]);
@@ -946,11 +945,9 @@ static void box_chunk_apply(
 {
     int32_t count = ecs_vec_count(&state->work), i, done = 0;
     box_chunk_work_t *work = ecs_vec_first_t(&state->work, box_chunk_work_t);
-    double anchor[3] = {0, 0, 0};
-    vec3 local = {0, 0, 0};
+    dvec3 anchor = {0, 0, 0};
     ecs_time_t t, op;
-    box_world_position(world, grid, local);
-    box_world_to_absolute(world, local, anchor);
+    box_world_position(world, grid, anchor);
     if (count > 1) {
         qsort(work, (size_t)count, sizeof(box_chunk_work_t), box_chunk_work_compare);
     }
@@ -1134,7 +1131,7 @@ static void box_chunk_stream_foci(
         box_chunk_focus_t *f = ecs_vec_append_t(NULL, out, box_chunk_focus_t);
         f->entity = foci[i].entity;
         f->scene = foci[i].scene;
-        box_world_to_absolute(world, foci[i].position, f->p);
+        box_dvec3_copy(foci[i].position, f->p);
     }
 
     if (foci != local) {

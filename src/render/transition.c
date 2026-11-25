@@ -16,6 +16,10 @@
 #define BOX_TRANSITION_FLOAT(T, m) \
     { (uint16_t)offsetof(T, m), BOX_RENDER_TRANSITION_F32 }
 
+/** A double field of a component */
+#define BOX_TRANSITION_DOUBLE(T, m) \
+    { (uint16_t)offsetof(T, m), BOX_RENDER_TRANSITION_F64 }
+
 /** A uint8_t field of a component */
 #define BOX_TRANSITION_U8(T, m) \
     { (uint16_t)offsetof(T, m), BOX_RENDER_TRANSITION_U8 }
@@ -62,9 +66,9 @@ static const box_render_transition_layout_t box_transition_layouts[
     BOX_RENDER_TRANSITION_COMPONENTS] =
 {
     [BOX_RENDER_TRANSITION_POSITION] = { ECS_SIZEOF(Position), 3, {
-        BOX_TRANSITION_FLOAT(Position, x),
-        BOX_TRANSITION_FLOAT(Position, y),
-        BOX_TRANSITION_FLOAT(Position, z) } },
+        BOX_TRANSITION_DOUBLE(Position, x),
+        BOX_TRANSITION_DOUBLE(Position, y),
+        BOX_TRANSITION_DOUBLE(Position, z) } },
     [BOX_RENDER_TRANSITION_ROTATION] = { ECS_SIZEOF(Rotation), 3, {
         BOX_TRANSITION_FLOAT(Rotation, x),
         BOX_TRANSITION_FLOAT(Rotation, y),
@@ -180,7 +184,14 @@ const box_render_transition_layout_t* box_render_transition_layout(
 static int32_t box_transition_field_size(
     const box_render_transition_field_t *field)
 {
-    return field->kind == BOX_RENDER_TRANSITION_F32 ? ECS_SIZEOF(float) : ECS_SIZEOF(uint8_t);
+    int32_t result = ECS_SIZEOF(uint8_t);
+    if (field->kind == BOX_RENDER_TRANSITION_F32) {
+        result = ECS_SIZEOF(float);
+    } else if (field->kind == BOX_RENDER_TRANSITION_F64) {
+        result = ECS_SIZEOF(double);
+    }
+
+    return result;
 }
 
 void box_render_transition_pack(
@@ -218,9 +229,8 @@ bool box_render_transition_equal(
     int32_t i;
     for (i = 0; i < layout->count && result; i ++) {
         const box_render_transition_field_t *field = &layout->fields[i];
-        const uint8_t *fa = ECS_OFFSET(a, field->offset), *fb = ECS_OFFSET(b, field->offset);
-        result = fa[0] == fb[0] && (field->kind != BOX_RENDER_TRANSITION_F32 ||
-            (fa[1] == fb[1] && fa[2] == fb[2] && fa[3] == fb[3]));
+        result = !ecs_os_memcmp(ECS_OFFSET(a, field->offset), ECS_OFFSET(b, field->offset),
+            box_transition_field_size(field));
     }
 
     return result;
@@ -253,6 +263,12 @@ void box_render_transition_mix(
             ecs_os_memcpy(&b, ECS_OFFSET(to, field->offset), ECS_SIZEOF(float));
             float v = a + (b - a) * t;
             ecs_os_memcpy(ECS_OFFSET(out, field->offset), &v, ECS_SIZEOF(float));
+        } else if (field->kind == BOX_RENDER_TRANSITION_F64) {
+            double a, b;
+            ecs_os_memcpy(&a, ECS_OFFSET(from, field->offset), ECS_SIZEOF(double));
+            ecs_os_memcpy(&b, ECS_OFFSET(to, field->offset), ECS_SIZEOF(double));
+            double v = a + (b - a) * (double)t;
+            ecs_os_memcpy(ECS_OFFSET(out, field->offset), &v, ECS_SIZEOF(double));
         } else {
             float a = (float)*(const uint8_t*)ECS_OFFSET(from, field->offset);
             float b = (float)*(const uint8_t*)ECS_OFFSET(to, field->offset);
@@ -674,6 +690,7 @@ static void box_transition_pose(
     Position position;
     Rotation rotation;
     Scale scale;
+    WorldTransform local_t;
     mat4 rel, local, chain;
     if (!node || !node->alive || !src) {
         goto done;
@@ -684,10 +701,20 @@ static void box_transition_pose(
     }
 
     ecs_os_memcpy(&pose, src, ECS_SIZEOF(pose));
-    box_transition_pose_value(node, BOX_RENDER_TRANSITION_POSITION, pose.position, &position.x);
+    const box_render_transition_value_t *pv = &node->values[BOX_RENDER_TRANSITION_POSITION];
+    if (pv->active) {
+        ecs_os_memcpy(&position, pv->current, ECS_SIZEOF(Position));
+    } else {
+        ecs_os_memcpy(&position, pose.position, ECS_SIZEOF(Position));
+    }
+
+    position.x -= pose.offset[0];
+    position.y -= pose.offset[1];
+    position.z -= pose.offset[2];
     box_transition_pose_value(node, BOX_RENDER_TRANSITION_ROTATION, pose.rotation, &rotation.x);
     box_transition_pose_value(node, BOX_RENDER_TRANSITION_SCALE, pose.scale, &scale.x);
-    box_transform_local(&position, &rotation, &scale, local);
+    box_transform_local(&position, &rotation, &scale, &local_t);
+    box_transform_mat4(&local_t, NULL, local);
     ecs_os_memcpy(rel, pose.rel, ECS_SIZEOF(mat4));
     if (parent) {
         glm_mul(ECS_CONST_CAST(vec4*, parent->world), rel, chain);
@@ -718,18 +745,13 @@ static void box_transition_slot(
     void *dst = box_transition_data(p, r->offset, ECS_SIZEOF(box_render_transform_t));
     box_render_transform_t out;
     mat4 rel, m;
-    int32_t row, col;
     if (!node || !node->alive || node->posed != p->frame || !src || !dst) {
         goto done;
     }
 
     ecs_os_memcpy(rel, src, ECS_SIZEOF(mat4));
     glm_mul(ECS_CONST_CAST(vec4*, node->world), rel, m);
-    for (row = 0; row < 3; row ++) {
-        for (col = 0; col < 4; col ++) {
-            out.rows[row][col] = m[col][row];
-        }
-    }
+    box_render_transform_from_mat4(&out, m, p->origin);
 
     ecs_os_memcpy(dst, &out, ECS_SIZEOF(box_render_transform_t));
 done:
@@ -1007,7 +1029,7 @@ static void box_transition_box_shadow(
     }
 
     box_transition_material_rendered(t, &record.material);
-    box_draws_transition_box_shadow(&record, &shadow, world, transform, shading);
+    box_draws_transition_box_shadow(&record, &shadow, world, p->origin, transform, shading);
 done:
     return;
 }

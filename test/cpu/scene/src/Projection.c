@@ -42,15 +42,15 @@ void Projection_offscreen_surface_resize(void) {
 
     float focal = 1.0f / tanf(glm_rad(30.0f));
     const Position *p = ecs_get(world, label, Position);
-    test_assert(fabsf(p->x - focal / (320.0f / 200.0f) * 0.2f * 160.0f) < 0.01f);
-    test_assert(fabsf(p->y - focal * 0.1f * 100.0f) < 0.01f);
+    test_assert(fabs(p->x - focal / (320.0f / 200.0f) * 0.2f * 160.0f) < 0.01f);
+    test_assert(fabs(p->y - focal * 0.1f * 100.0f) < 0.01f);
 
     ecs_set(world, s, Surface, {.width = 640, .height = 480, .texture = tex});
     ecs_progress(world, 0);
 
     p = ecs_get(world, label, Position);
-    test_assert(fabsf(p->x - focal / (640.0f / 480.0f) * 0.2f * 320.0f) < 0.01f);
-    test_assert(fabsf(p->y - focal * 0.1f * 240.0f) < 0.01f);
+    test_assert(fabs(p->x - focal / (640.0f / 480.0f) * 0.2f * 320.0f) < 0.01f);
+    test_assert(fabs(p->y - focal * 0.1f * 240.0f) < 0.01f);
 
     ecs_fini(world);
     box_render_null_free(null);

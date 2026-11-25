@@ -444,10 +444,10 @@ static inline void box_gpu_api_copy_buffer(
 
 /** Bytes of the uniforms of one cascade, tile or octant of the shadow pass, Cascade of
  * etc/shaders/shadow.wgsl: the matrix, the light of a point light tile and its octant, its near
- * and far plane, then the absolute position of the local origin (BOX_GPU_SHADOW_ORIGIN) */
+ * and far plane, then the render origin (BOX_GPU_SHADOW_ORIGIN) */
 #define BOX_GPU_SHADOW_UNIFORM_SIZE (sizeof(mat4) + 3 * sizeof(vec4))
 
-/** Byte offset of the absolute position of the local origin in the uniforms of a cascade, tile
+/** Byte offset of the render origin in the uniforms of a cascade, tile
  * or octant, as box_gpu_origin_split packs it */
 #define BOX_GPU_SHADOW_ORIGIN (sizeof(mat4) + 2 * sizeof(vec4))
 
@@ -1139,6 +1139,8 @@ typedef struct box_gpu_cull_uniforms_t {
                                      *   instance by its range */
     float lod[4];                   /**< LodSettings.fade, then the distance at which level i
                                      *   starts for levels 1 to 3, LodSettings.distances */
+    int32_t origin[4];              /**< The render origin, which the world positions are
+                                     *   relative to, as box_gpu_origin_split packs it */
 } box_gpu_cull_uniforms_t;
 
 /** The frustums one pass of the cull shader tests together: a view of a target and the
@@ -1422,7 +1424,7 @@ typedef struct box_gpu_view_uniforms_t {
                                      *   detail, height scale */
     vec4 spectrum_b;                /**< 1 / world units of the tile of each cascade, unused */
     uint32_t spectrum_c[4];         /**< Cascades, 0 without a spectrum, three unused */
-    int32_t origin[4];              /**< Absolute position of the local origin (WorldOrigin)
+    int32_t origin[4];              /**< Render origin
                                      *   as box_gpu_origin_split packs it */
     mat4 prev_view_proj;            /**< view_proj of the previous frame the view rendered,
                                      *   view_proj without a valid history (temporal.c) */
@@ -1466,7 +1468,8 @@ typedef struct box_gpu_cascade_store_t {
     int32_t resolution;             /**< Edge of a layer in texels */
     int32_t cascades;               /**< Layers */
     box_render_cascade_t fits[BOX_RENDER_SHADOW_CASCADES]; /**< Cascade each layer rendered
-                                     *   with, or renders with in the packet */
+                                     *   with, or renders with in the packet, relative to the
+                                     *   render origin of the backend */
     uint32_t valid;                 /**< Mask of the layers that hold the render of their fit */
     uint32_t casters_valid;         /**< Mask of the layers whose casters the copy holds */
     mat4 proj;                      /**< Projection of the view the fits were made with */
@@ -1575,6 +1578,9 @@ typedef struct box_gpu_volume_t {
     WGPUBuffer visibility;          /**< BOX_GPU_VISIBILITY_TEXELS packed halves per probe */
     uint32_t count;                 /**< Probes of the volume */
     float spacing;                  /**< World units between neighbouring probes */
+    double origin[3];               /**< World position of the first probe, relative to the
+                                     *   origin of the world */
+    uint32_t size[3];               /**< Probes per axis */
     WGPUBindGroup group[2];         /**< Binds the grid, a probe buffer, the mask and the
                                      *   visibility as group 3 */
 } box_gpu_volume_t;
@@ -1624,10 +1630,11 @@ typedef struct box_gpu_terrain_sample_params_t {
     uint32_t layout[4];             /**< Floats of a row of the heights of a slot, floats of a
                                      *   slot, texels along an edge of the masks of a tile (0
                                      *   without masks), cells across the mask atlas */
-    int32_t origin_whole[4];        /**< Absolute x and z of the frame of the terrain, whole
+    int32_t origin_whole[4];        /**< World x and z of the frame of the terrain, whole
                                      *   meters, then 1 when the terrain is bounded */
     float origin[4];                /**< The rest of x and z, the extent of a bounded terrain and
-                                     *   the local y of the frame of the terrain */
+                                     *   the y of the frame of the terrain relative to the render
+                                     *   origin */
     float foci[4][4];               /**< Two foci per vec4, x and z relative to the corner of the
                                      *   window of level 0 */
     box_gpu_terrain_sample_level_t levels[BOX_RENDER_TERRAIN_LEVELS]; /**< The levels */
@@ -1812,8 +1819,8 @@ typedef struct box_gpu_t {
     int32_t shadow_capacity;        /**< Views the cascade buffer holds */
     ecs_vec_t shadow_data;          /**< Bytes of the cascade matrices of a target */
     box_gpu_written_t shadow_written; /**< Cascade matrices last written to shadow_buffer */
-    double origin[3];               /**< Absolute position of the local origin of the packet
-                                     *   the views are written for, which the cascades take */
+    double origin[3];               /**< Render origin of the packet being rendered, which the
+                                     *   world data on the GPU is relative to */
     WGPUTexture capture_shadow;     /**< Shadow map of the probe captures, one cascade */
     WGPUTextureView capture_shadow_view; /**< Array view the captures sample */
     WGPUTextureView capture_shadow_layer; /**< View the casters render into */

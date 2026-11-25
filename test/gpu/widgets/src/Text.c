@@ -430,9 +430,9 @@ void Text_capture_selection(void) {
         WorldTransform);
     const LayoutBounds *b = ecs_get(world, ecs_lookup(world, TEXT ".name.field"), LayoutBounds);
     float scale = (float)w / (float)ss->point_width;
-    int32_t x0 = (int32_t)(((float)ss->point_width * 0.5f + t->m[3][0] - b->width * 0.5f) * scale);
-    int32_t x1 = (int32_t)(((float)ss->point_width * 0.5f + t->m[3][0] + b->width * 0.5f) * scale);
-    int32_t y = (int32_t)(((float)ss->point_height * 0.5f - t->m[3][1] - 6) * scale);
+    int32_t x0 = (int32_t)(((float)ss->point_width * 0.5f + t->position[0] - b->width * 0.5f) * scale);
+    int32_t x1 = (int32_t)(((float)ss->point_width * 0.5f + t->position[0] + b->width * 0.5f) * scale);
+    int32_t y = (int32_t)(((float)ss->point_height * 0.5f - t->position[1] - 6) * scale);
     for (i = x0; i < x1; i ++) {
         const unsigned char *c = &px[(y * w + i) * 4];
         selected += abs(c[0] - 60) < 12 && abs(c[1] - 104) < 12 && abs(c[2] - 84) < 12;
@@ -445,8 +445,8 @@ void Text_capture_selection(void) {
     test_assert(ct != NULL);
     test_assert(cr != NULL);
     test_assert(cr->width > 0);
-    int32_t cx = (int32_t)(((float)ss->point_width * 0.5f + ct->m[3][0]) * scale);
-    int32_t cy = (int32_t)(((float)ss->point_height * 0.5f - ct->m[3][1]) * scale);
+    int32_t cx = (int32_t)(((float)ss->point_width * 0.5f + ct->position[0]) * scale);
+    int32_t cy = (int32_t)(((float)ss->point_height * 0.5f - ct->position[1]) * scale);
     int32_t half = (int32_t)(cr->height * 0.5f * scale) - 1, r;
     for (r = cy - half; r <= cy + half; r ++) {
         int32_t best = 0, d;

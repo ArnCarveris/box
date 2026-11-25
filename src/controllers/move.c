@@ -75,6 +75,8 @@ typedef struct box_move_shape_t {
 typedef struct box_move_t {
     ecs_world_t *world;                /**< The world */
     const box_controller_body_t *body; /**< The body */
+    dvec3 origin;                      /**< World position the positions of the move are
+                                        *   relative to, the feet where it started */
     ecs_vec_t shapes;                  /**< box_move_shape_t of the region */
     vec3 region_min;                   /**< Minimum corner of the box the shapes were read for */
     vec3 region_max;                   /**< Maximum corner of the box the shapes were read for */
@@ -96,6 +98,8 @@ typedef struct box_move_t {
 typedef struct box_move_ray_t {
     const ecs_world_t *world;          /**< The world */
     const box_controller_body_t *body; /**< The body */
+    dvec3 feet;                        /**< World position of the feet, the origin of the ray
+                                        *   is relative to it */
     vec3 origin;                       /**< Origin of the ray */
 } box_move_ray_t;
 
@@ -202,12 +206,20 @@ static bool box_move_gather(
     ecs_vec_t hits, found;
     int32_t i, j, k, count;
     bool result = false;
+    vec3 world_min, world_max;
     ecs_vec_init_t(NULL, &hits, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &found, ecs_entity_t, 0);
-    count = box_spatial_overlap_box(m->world, m->body->scene, min, max, &hits);
+    for (i = 0; i < 3; i ++) {
+        world_min[i] = (float)(m->origin[i] + (double)min[i]);
+        world_max[i] = (float)(m->origin[i] + (double)max[i]);
+        world_min[i] = nextafterf(world_min[i], -INFINITY);
+        world_max[i] = nextafterf(world_max[i], INFINITY);
+    }
+
+    count = box_spatial_overlap_box(m->world, m->body->scene, world_min, world_max, &hits);
     for (i = 0; i < count; i ++) {
-        box_spatial_expand_box(m->world, *ecs_vec_get_t(&hits, ecs_entity_t, i), min, max,
-            &found);
+        box_spatial_expand_box(m->world, *ecs_vec_get_t(&hits, ecs_entity_t, i), world_min,
+            world_max, &found);
     }
 
     count = ecs_vec_count(&found);
@@ -225,7 +237,7 @@ static bool box_move_gather(
         ecs_entity_t e = *ecs_vec_get_t(&found, ecs_entity_t, i);
         box_move_shape_t s;
         if (box_move_own(m->world, m->body, e) ||
-            !box_collider_resolve(m->world, e, &s.collider))
+            !box_collider_resolve(m->world, e, m->origin, &s.collider))
         {
             continue;
         }
@@ -340,13 +352,15 @@ static float box_move_covered(
  * @param world The world
  * @param m The move, initialized
  * @param body The body
- * @param start The feet before the move
+ * @param origin World position the positions of the move are relative to
+ * @param start The feet before the move, relative to the origin
  * @param motion The motion of the move
  */
 static void box_move_init(
     ecs_world_t *world,
     box_move_t *m,
     const box_controller_body_t *body,
+    const dvec3 origin,
     const vec3 start,
     const vec3 motion)
 {
@@ -356,6 +370,7 @@ static void box_move_init(
     ecs_os_memset_t(m, 0, box_move_t);
     m->world = world;
     m->body = body;
+    box_dvec3_copy(origin, m->origin);
     m->ahead = chunk * BOX_MOVE_AHEAD;
     m->terrain_count = box_terrain_scene(world, body->scene, m->terrains, BOX_MOVE_TERRAINS);
     ecs_vec_init_t(NULL, &m->shapes, box_move_shape_t, 0);
@@ -473,6 +488,34 @@ static bool box_move_steep(
         (n[0] != 0 || n[2] != 0);
 }
 
+/** Get the ground of a terrain below a point of a move, relative to the origin of the move.
+ *
+ * @param m The move
+ * @param terrain The terrain entity
+ * @param x X relative to the origin of the move
+ * @param z Z relative to the origin of the move
+ * @param y Receives Y of the surface relative to the origin of the move, may be NULL
+ * @param normal Receives the unit normal, may be NULL
+ * @return Whether the terrain is resident there
+ */
+static bool box_move_terrain_ground(
+    const box_move_t *m,
+    ecs_entity_t terrain,
+    float x,
+    float z,
+    float *y,
+    vec3 normal)
+{
+    double world_y = 0.0;
+    bool result = box_terrain_ground(m->world, terrain, m->origin[0] + (double)x,
+        m->origin[2] + (double)z, &world_y, normal);
+    if (y) {
+        *y = (float)(world_y - m->origin[1]);
+    }
+
+    return result;
+}
+
 /** Find the signed distance between the lower cap of the capsule and the surface of a terrain.
  *
  * The nearest of a grid of points of the surface around the cap, a radius to each side, moves
@@ -500,7 +543,7 @@ static float box_move_terrain_separation(
     float r = m->body->radius, y = 0, best = FLT_MAX, result = FLT_MAX;
     vec3 n, p = { 0, 0, 0 }, pn = { 0, 1, 0 }, d;
     int32_t i, j;
-    if (!box_terrain_ground(m->world, terrain, a[0], a[2], &y, n)) {
+    if (!box_move_terrain_ground(m, terrain, a[0], a[2], &y, n)) {
         goto done;
     }
 
@@ -517,7 +560,7 @@ static float box_move_terrain_separation(
             float fz = (float)j / (float)(BOX_MOVE_TERRAIN_GRID - 1) * 2.0f - 1.0f;
             vec3 s = { a[0] + r * fx, 0, a[2] + r * fz };
             float len;
-            if (!box_terrain_ground(m->world, terrain, s[0], s[2], &s[1], NULL)) {
+            if (!box_move_terrain_ground(m, terrain, s[0], s[2], &s[1], NULL)) {
                 continue;
             }
 
@@ -531,7 +574,7 @@ static float box_move_terrain_separation(
     }
 
     if (best < FLT_MAX) {
-        box_terrain_ground(m->world, terrain, p[0], p[2], NULL, pn);
+        box_move_terrain_ground(m, terrain, p[0], p[2], NULL, pn);
     }
 
     for (i = 0; i < BOX_MOVE_TERRAIN_REFINE && best < FLT_MAX; i ++) {
@@ -540,7 +583,7 @@ static float box_move_terrain_separation(
         glm_vec3_sub(ECS_CONST_CAST(float*, a), p, d);
         glm_vec3_copy(ECS_CONST_CAST(float*, a), s);
         glm_vec3_muladds(pn, -glm_vec3_dot(d, pn), s);
-        if (!box_terrain_ground(m->world, terrain, s[0], s[2], &s[1], sn)) {
+        if (!box_move_terrain_ground(m, terrain, s[0], s[2], &s[1], sn)) {
             break;
         }
 
@@ -1003,7 +1046,8 @@ bool box_controller_move(
     float dt,
     box_controller_hit_t *hit)
 {
-    vec3 start = { feet->x, feet->y, feet->z };
+    dvec3 origin = { feet->x, feet->y, feet->z };
+    vec3 start = { 0, 0, 0 };
     vec3 motion, pos;
     box_move_t m;
     bool result = false;
@@ -1022,7 +1066,7 @@ bool box_controller_move(
         goto done;
     }
 
-    box_move_init(world, &m, body, start, motion);
+    box_move_init(world, &m, body, origin, start, motion);
     if (ecs_vec_count(&m.shapes) || m.terrain_count || glm_vec3_norm(motion) > body->radius *
         BOX_MOVE_FRACTION * BOX_MOVE_CHUNK)
     {
@@ -1047,10 +1091,14 @@ bool box_controller_move(
     box_move_fini(&m);
 
 done:
-    result = pos[0] != feet->x || pos[1] != feet->y || pos[2] != feet->z;
-    feet->x = pos[0];
-    feet->y = pos[1];
-    feet->z = pos[2];
+    if (glm_vec3_norm(pos) < BOX_MOVE_EPS) {
+        glm_vec3_zero(pos);
+    }
+
+    result = pos[0] != 0 || pos[1] != 0 || pos[2] != 0;
+    feet->x = origin[0] + (double)pos[0];
+    feet->y = origin[1] + (double)pos[1];
+    feet->z = origin[2] + (double)pos[2];
 
     return result;
 }
@@ -1168,14 +1216,15 @@ bool box_controller_fits(
     const box_controller_body_t *body,
     const Position *feet)
 {
-    vec3 pos = { feet->x, feet->y, feet->z };
+    dvec3 origin = { feet->x, feet->y, feet->z };
+    vec3 pos = { 0, 0, 0 };
     vec3 still = { 0, 0, 0 };
     box_collider_contact_t contact;
     box_move_t m;
     vec3 steep;
     bool result = true;
     if (body->radius > 0) {
-        box_move_init(world, &m, body, pos, still);
+        box_move_init(world, &m, body, origin, pos, still);
         result = box_move_deepest(&m, pos, &contact, steep) <= BOX_MOVE_FIT;
         box_move_fini(&m);
     }
@@ -1199,7 +1248,7 @@ static bool box_move_ground_filter(
     box_collider_t c;
     vec3 down = { 0, -1, 0 };
 
-    return !box_move_own(r->world, r->body, e) && box_collider_resolve(r->world, e, &c) &&
+    return !box_move_own(r->world, r->body, e) && box_collider_resolve(r->world, e, r->feet, &c) &&
         box_collider_ray(&c, r->origin, down, FLT_MAX, distance, NULL);
 }
 
@@ -1212,11 +1261,12 @@ bool box_controller_ground_below(
     box_move_ray_t ctx = {
         .world = world,
         .body = body,
-        .origin = { feet->x, feet->y + body->radius, feet->z }
+        .feet = { feet->x, feet->y, feet->z },
+        .origin = { 0, body->radius, 0 }
     };
     box_spatial_ray_t ray = {
         .scene = body->scene,
-        .origin = { ctx.origin[0], ctx.origin[1], ctx.origin[2] },
+        .origin = { (float)feet->x, (float)(feet->y + body->radius), (float)feet->z },
         .dir = { 0, -1, 0 },
         .filter = box_move_ground_filter,
         .ctx = &ctx,
@@ -1229,9 +1279,9 @@ bool box_controller_ground_below(
         : 0;
     bool result = false;
     for (i = 0; i < count && !result; i ++) {
-        float y = 0;
+        double y = 0;
         result = box_terrain_ground(world, terrains[i], feet->x, feet->z, &y, NULL) &&
-            y <= ctx.origin[1];
+            y <= feet->y + body->radius;
     }
 
     return result || (body->radius > 0 && box_spatial_ray(world, &ray, &hit));

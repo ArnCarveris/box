@@ -1049,13 +1049,14 @@ static void tr_pose(
     const Scale *s,
     box_render_transform_t *out)
 {
-    WorldTransform wt;
-    mat4 local;
-    box_transform_local(p, r, s, local);
+    WorldTransform wt, local;
+    box_transform_local(p, r, s, &local);
     if (parent) {
-        glm_mul(parent, local, wt.m);
+        WorldTransform up;
+        box_transform_from_mat4(parent, NULL, &up);
+        box_transform_mul(&up, &local, &wt);
     } else {
-        glm_mat4_copy(local, wt.m);
+        wt = local;
     }
 
     box_draws_transform(out, &wt, ecs_get(world, e, ShapeMesh));
@@ -1070,12 +1071,18 @@ static void tr_test_transform(
     const box_render_transform_t *a,
     const box_render_transform_t *b)
 {
+    dvec3 pa, pb;
     int32_t r, c;
+    box_render_transform_position(a, pa);
+    box_render_transform_position(b, pb);
     for (r = 0; r < 3; r ++) {
-        for (c = 0; c < 4; c ++) {
+        for (c = 0; c < 3; c ++) {
             test_assert(isfinite(a->rows[r][c]));
             test_assert(fabsf(a->rows[r][c] - b->rows[r][c]) < 1e-4f);
         }
+
+        test_assert(isfinite(pa[r]));
+        test_assert(fabs(pa[r] - pb[r]) < 1e-4);
     }
 }
 
@@ -1117,7 +1124,9 @@ static void tr_at(
     float z,
     mat4 out)
 {
-    box_transform_local(&(Position){x, y, z}, NULL, NULL, out);
+    WorldTransform t;
+    box_transform_local(&(Position){x, y, z}, NULL, NULL, &t);
+    box_transform_mat4(&t, NULL, out);
 }
 
 void Transition_transform_position(void) {
@@ -1308,7 +1317,7 @@ static void tr_child_follows(
     tr_frame(world);
     tr_test_static(world, null, parent);
     tr_test_static(world, null, child);
-    test_flt(ecs_get(world, child, WorldTransform)->m[3][0], 4);
+    test_flt(ecs_get(world, child, WorldTransform)->position[0], 4);
     tr_fini(world, null);
 }
 
@@ -1359,7 +1368,7 @@ void Transition_transform_child_surface(void) {
     tr_frame(world);
     tr_test_static(world, null, parent);
     tr_test_static(world, null, child);
-    test_flt(ecs_get(world, child, WorldTransform)->m[3][0], 4);
+    test_flt(ecs_get(world, child, WorldTransform)->position[0], 4);
     tr_fini(world, null);
 }
 
@@ -1383,8 +1392,10 @@ void Transition_transform_parent_of_node(void) {
     tr_frame(world);
 
     mat4 r;
+    WorldTransform rt;
     box_transform_local(&(Position){1, 2, 0}, &(Rotation){0, (float)GLM_PI_2, 0},
-        &(Scale){2, 2, 2}, r);
+        &(Scale){2, 2, 2}, &rt);
+    box_transform_mat4(&rt, NULL, r);
     ecs_set(world, node, Position, {4, 0, 0});
     int32_t i;
     for (i = 0; i < 4; i ++) {
@@ -1439,8 +1450,8 @@ void Transition_transform_reparent_into(void) {
     tr_frame(world);
     tr_test_static(world, null, parent);
     tr_test_static(world, null, other);
-    test_flt(ecs_get(world, other, WorldTransform)->m[3][0], 4);
-    test_flt(ecs_get(world, other, WorldTransform)->m[3][1], 1);
+    test_flt(ecs_get(world, other, WorldTransform)->position[0], 4);
+    test_flt(ecs_get(world, other, WorldTransform)->position[1], 1);
     tr_frame(world);
     tr_test_static(world, null, other);
     tr_fini(world, null);
@@ -1481,8 +1492,8 @@ void Transition_transform_reparent_out(void) {
     tr_frame(world);
     tr_test_static(world, null, parent);
     tr_test_static(world, null, child);
-    test_flt(ecs_get(world, child, WorldTransform)->m[3][0], 0);
-    test_flt(ecs_get(world, child, WorldTransform)->m[3][1], 1);
+    test_flt(ecs_get(world, child, WorldTransform)->position[0], 0);
+    test_flt(ecs_get(world, child, WorldTransform)->position[1], 1);
     tr_frame(world);
     tr_test_static(world, null, child);
     tr_fini(world, null);
@@ -1537,8 +1548,10 @@ void Transition_transform_scale_zero(void) {
     for (i = 0; i < 4; i ++) {
         float s = 1.0f - (float)i / 4.0f;
         mat4 m;
+        WorldTransform t;
         tr_frame(world);
-        box_transform_local(&(Position){0, 0, 0}, NULL, &(Scale){s, s, s}, m);
+        box_transform_local(&(Position){0, 0, 0}, NULL, &(Scale){s, s, s}, &t);
+        box_transform_mat4(&t, NULL, m);
         tr_test_pose(world, null, child, m, &(Position){0, 1, 0}, NULL, NULL);
     }
 
@@ -1549,8 +1562,10 @@ void Transition_transform_scale_zero(void) {
     for (i = 0; i < 4; i ++) {
         float s = (float)i / 4.0f;
         mat4 m;
+        WorldTransform t;
         tr_frame(world);
-        box_transform_local(&(Position){0, 0, 0}, NULL, &(Scale){s, s, s}, m);
+        box_transform_local(&(Position){0, 0, 0}, NULL, &(Scale){s, s, s}, &t);
+        box_transform_mat4(&t, NULL, m);
         tr_test_pose(world, null, child, m, &(Position){0, 1, 0}, NULL, NULL);
     }
 
@@ -1745,9 +1760,9 @@ void Transition_transform_targets_on_game_thread(void) {
     for (i = 0; i < 4; i ++) {
         vec3 min, max;
         tr_frame(world);
-        test_flt(ecs_get(world, e, WorldTransform)->m[3][0], 4);
-        test_flt(ecs_get(world, child, WorldTransform)->m[3][0], 4);
-        test_flt(ecs_get(world, child, WorldTransform)->m[3][1], 3);
+        test_flt(ecs_get(world, e, WorldTransform)->position[0], 4);
+        test_flt(ecs_get(world, child, WorldTransform)->position[0], 4);
+        test_flt(ecs_get(world, child, WorldTransform)->position[1], 3);
         test_assert(box_spatial_bounds(world, e, NULL, min, max));
         test_flt((min[0] + max[0]) * 0.5f, 4);
         test_assert(box_spatial_bounds(world, child, NULL, min, max));
@@ -1789,11 +1804,13 @@ static void tr_test_glyphs(
     mat4 m;
     test_assert(count > 0);
     test_int(ecs_vec_count(&tg->glyphs), count);
-    box_transform_local(p, NULL, NULL, m);
+    WorldTransform t;
+    box_transform_local(p, NULL, NULL, &t);
+    box_transform_mat4(&t, NULL, m);
     for (i = 0; i < count; i ++) {
         const box_draw_glyph_slot_t *at = ecs_vec_get_t(&ts->slots, box_draw_glyph_slot_t, i);
         const box_text_glyph_t *g = ecs_vec_get_t(&tg->glyphs, box_text_glyph_t, i);
-        box_render_transform_t rendered, expected;
+        box_render_transform_t rendered, expected = {0};
         test_bool(tr_transform_slot(world, null, box_draws_batch(d, at->batch), at->slot,
             &rendered), moving);
         for (r = 0; r < 3; r ++) {

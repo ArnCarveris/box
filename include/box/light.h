@@ -234,8 +234,7 @@ extern ECS_TAG_DECLARE(NoBake);
  * captures nothing and sets ReflectionBakeStatus.error.
  *
  * With follow_focus the scene probe follows the first WorldFocus of the scene (box_world_focus)
- * for streamed worlds; without one it stays over the static bounds. A shift of the world origin
- * moves it without a capture.
+ * for streamed worlds; without one it stays over the static bounds.
  */
 ECS_STRUCT(ReflectionBake, {
     int32_t resolution;   /**< Face edge of a probe cubemap in texels, 8 to 512, default 128 */

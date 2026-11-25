@@ -304,8 +304,10 @@ void box_draws_send_nearest(
         ecs_vec_clear(&d->sorted);
         box_draw_sorted_t *sorted = ecs_vec_grow_t(NULL, &d->sorted, box_draw_sorted_t, count);
         for (i = 0; i < count; i ++) {
-            float dx = fabsf(cx - t[i].rows[0][3]) - 0.5f * fabsf(t[i].rows[0][0]);
-            float dz = fabsf(cz - t[i].rows[2][3]) - 0.5f * fabsf(t[i].rows[2][2]);
+            vec3 offset;
+            box_render_transform_offset(&t[i], d->origin, offset);
+            float dx = fabsf(cx - offset[0]) - 0.5f * fabsf(t[i].rows[0][0]);
+            float dz = fabsf(cz - offset[2]) - 0.5f * fabsf(t[i].rows[2][2]);
             dx = dx > 0.0f ? dx : 0.0f;
             dz = dz > 0.0f ? dz : 0.0f;
             sorted[i] = (box_draw_sorted_t){ .depth = dx * dx + dz * dz, .slot = i };
@@ -430,7 +432,6 @@ static void box_render_terrain_sample(
     box_render_packet_t *p = box_render_packet(world);
     box_render_terrain_cache_t *c = ecs_map_get_deref(&state->samples,
         box_render_terrain_cache_t, e);
-    double local[3];
     int32_t updates, selects;
     if (!c) {
         c = ecs_os_calloc_t(box_render_terrain_cache_t);
@@ -447,11 +448,7 @@ static void box_render_terrain_sample(
     }
 
     c->frame = ecs_get_world_info(world)->frame_count_total;
-    box_terrain_local(world, e, local);
-    const WorldOrigin *o = ecs_id(WorldOrigin) ? ecs_singleton_get(world, WorldOrigin) : NULL;
-    c->sample.origin[0] = local[0] + (o ? o->x : 0.0);
-    c->sample.origin[1] = local[1] + (o ? o->y : 0.0);
-    c->sample.origin[2] = local[2] + (o ? o->z : 0.0);
+    box_terrain_position(world, e, c->sample.origin);
     box_render_terrain_sample_t *s = ecs_vec_append_t(NULL, &p->terrain_samples,
         box_render_terrain_sample_t);
     *s = c->sample;

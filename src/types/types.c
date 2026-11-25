@@ -14,7 +14,9 @@
 ECS_COMPONENT_DECLARE(vec2);
 ECS_COMPONENT_DECLARE(vec3);
 ECS_COMPONENT_DECLARE(vec4);
+ECS_COMPONENT_DECLARE(mat3);
 ECS_COMPONENT_DECLARE(mat4);
+ECS_COMPONENT_DECLARE(dvec3);
 
 void BoxTypesImport(
     ecs_world_t *world)
@@ -24,7 +26,9 @@ void BoxTypesImport(
     ECS_COMPONENT_DEFINE(world, vec2);
     ECS_COMPONENT_DEFINE(world, vec3);
     ECS_COMPONENT_DEFINE(world, vec4);
+    ECS_COMPONENT_DEFINE(world, mat3);
     ECS_COMPONENT_DEFINE(world, mat4);
+    ECS_COMPONENT_DEFINE(world, dvec3);
 
     ecs_struct(world, {
         .entity = ecs_id(vec2),
@@ -50,6 +54,22 @@ void BoxTypesImport(
             { .name = "y", .type = ecs_id(ecs_f32_t) },
             { .name = "z", .type = ecs_id(ecs_f32_t) },
             { .name = "w", .type = ecs_id(ecs_f32_t) }
+        }
+    });
+
+    ecs_struct(world, {
+        .entity = ecs_id(dvec3),
+        .members = {
+            { .name = "x", .type = ecs_id(ecs_f64_t) },
+            { .name = "y", .type = ecs_id(ecs_f64_t) },
+            { .name = "z", .type = ecs_id(ecs_f64_t) }
+        }
+    });
+
+    ecs_struct(world, {
+        .entity = ecs_id(mat3),
+        .members = {
+            { .name = "v", .type = ecs_id(ecs_f32_t), .count = 9 }
         }
     });
 

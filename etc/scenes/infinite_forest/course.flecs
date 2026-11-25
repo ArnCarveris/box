@@ -20,16 +20,15 @@ using state
 // COURSE_FLY_CLEARANCE meters over the highest ground ahead. Every frame moves the player by
 // COURSE_FRAME seconds of the world, as a frame at 60 FPS would, however long the frame took:
 // the streaming has as much to do per frame as on a real walk, while the frames may run faster
-// than real time. The path is kept in absolute meters and written to the player in the frame of
-// the WorldOrigin, so the origin shifts as the player goes on.
+// than real time. The path is kept in world meters and written to the player.
 //
 // The course panel (top right, H hides it with the forest panel) shows where the player is and,
-// every COURSE_MARK meters, a row of the streaming and the frames since the mark before: origin
-// shifts, terrain tiles and their GPU memory, loaded cells of the stands, undergrowth and
+// every COURSE_MARK meters, a row of the streaming and the frames since the mark before: terrain
+// tiles and their GPU memory, loaded cells of the stands, undergrowth and
 // landmarks and the cells loaded per second, instances of the view, texture graphs and their
 // pool, the worst frame and the frames over 16.7 and 33.3 ms. Every frame over 16.7 ms is
-// counted under what the frame before it did: an origin shift, cells of the grids loaded or
-// unloaded, terrain tiles made or dropped, texture graphs made or dropped, or none of those;
+// counted under what the frame before it did: cells of the grids loaded or unloaded, terrain
+// tiles made or dropped, texture graphs made or dropped, or none of those;
 // course_hitches lists the worst frame over 33.3 ms of every COURSE_MARK meters with what it did.
 state {
   // Length of the course in meters, the distance between two rows of the panel, and the
@@ -170,9 +169,8 @@ async {
     await next_frame()
   }
 
-  const o0 = WorldOrigin[WorldOrigin]
-  state.course_x = state.start_x + o0.x
-  state.course_z = state.start_z + o0.z
+  state.course_x = state.start_x
+  state.course_z = state.start_z
   state.course_yaw = state.start_yaw
   state.course_leg_yaw = state.start_yaw
   state.course_leg_end = course_leg_length(0)
@@ -203,10 +201,9 @@ async {
   if state.course_seek > 0 {
     state.course_now = "Waiting for the ground at {state.course_seek:.0} m"
     while !box.terrain.resident(infinite_forest.land, state.course_x, state.course_z) {
-      const o = WorldOrigin[WorldOrigin]
-      state.start_x = state.course_x - o.x
-      state.start_y = GROUND_MAX - o.y
-      state.start_z = state.course_z - o.z
+      state.start_x = state.course_x
+      state.start_y = GROUND_MAX
+      state.start_z = state.course_z
       state.start_yaw = state.course_yaw
       await next_frame()
     }
@@ -230,11 +227,9 @@ async {
   mut last_y: f64 = state.course_y
 
   // What the frame before did, and the slow frames counted by it
-  mut last_shifts: i32 = WorldOriginStatus[WorldOriginStatus].shifts
   mut last_made: i32 = infinite_forest.land[TerrainStatus].created
   mut last_dropped: i32 = infinite_forest.land[TerrainStatus].dropped
   mut last_graphs: i32 = course_graphs()
-  mut slow_shift: i32 = 0
   mut slow_cells: i32 = 0
   mut slow_tiles: i32 = 0
   mut slow_graphs: i32 = 0
@@ -245,7 +240,6 @@ async {
     // Every mark, a row of the streaming and the frames since the mark before
     if state.course_distance >= next_mark {
       const km = next_mark / 1000
-      const shifts = WorldOriginStatus[WorldOriginStatus].shifts
       const land = infinite_forest.land[TerrainStatus]
       const tiles_mb = course_mb(land.gpu_bytes)
       const query_mb = course_mb(infinite_forest.land[TerrainQueryStatus].cpu_bytes)
@@ -264,7 +258,7 @@ async {
 
       const tiles = land.count
       state.course_log = state.course_log +
-        "{km:.1} km  shifts {shifts}  tiles {tiles} {tiles_mb:.0}+{query_mb:.0} MB  " +
+        "{km:.1} km  tiles {tiles} {tiles_mb:.0}+{query_mb:.0} MB  " +
         "cells {cells:.0} {rate:.1}/s  inst {shown}  graphs {graphs} {pool_mb:.0} MB  " +
         "worst {worst:.1} ms  slow {slow}  hitch {hitches}\n"
       state.course_hitches = state.course_hitches + hitch_line
@@ -286,16 +280,13 @@ async {
     // The interval of the frame before and what it did
     const dt = COURSE_FRAME
     const frame_ms = box.app.FrameTiming[box.app.FrameTiming].interval_ms
-    const shifts_now = WorldOriginStatus[WorldOriginStatus].shifts
     const land_now = infinite_forest.land[TerrainStatus]
     const graphs_now = course_graphs()
     const made = course_created()
     const changed = course_changed()
-    const shifted = shifts_now - last_shifts
     const tiles_made = land_now.created - last_made
     const tiles_dropped = land_now.dropped - last_dropped
     const graphs_delta = graphs_now - last_graphs
-    last_shifts = shifts_now
     last_made = land_now.created
     last_dropped = land_now.dropped
     last_graphs = graphs_now
@@ -310,9 +301,7 @@ async {
     if frame_ms > COURSE_SLOW_MS {
       slow = slow + 1
       all_slow = all_slow + 1
-      if shifted > 0 {
-        slow_shift = slow_shift + 1
-      } else if made + changed > 0 {
+      if made + changed > 0 {
         slow_cells = slow_cells + 1
       } else if tiles_made + tiles_dropped > 0 {
         slow_tiles = slow_tiles + 1
@@ -322,9 +311,8 @@ async {
         slow_none = slow_none + 1
       }
 
-      state.course_causes = "over 16.7 ms: {all_slow}: origin shift {slow_shift}, " +
-        "cells {slow_cells}, terrain tiles {slow_tiles}, texture graphs {slow_graphs}, " +
-        "none of those {slow_none}"
+      state.course_causes = "over 16.7 ms: {all_slow}: cells {slow_cells}, " +
+        "terrain tiles {slow_tiles}, texture graphs {slow_graphs}, none of those {slow_none}"
     }
 
     if frame_ms > COURSE_HITCH_MS {
@@ -333,7 +321,7 @@ async {
       if section_worst {
         const km = state.course_distance / 1000
         const grid_ms = course_grid_ms()
-        hitch_line = "{km:.3} km {frame_ms:.1} ms: shifts {shifted}, cells +{made:.0} " +
+        hitch_line = "{km:.3} km {frame_ms:.1} ms: cells +{made:.0} " +
           "~{changed:.0} in {grid_ms:.1} ms, tiles +{tiles_made} -{tiles_dropped}, " +
           "graphs {graphs_delta}\n"
       }
@@ -411,28 +399,23 @@ async {
 
     last_y = state.course_y
 
-    // The pose of the player in the frame of the origin
-    const o = WorldOrigin[WorldOrigin]
-    state.start_x = state.course_x - o.x
-    state.start_y = state.course_y - o.y
-    state.start_z = state.course_z - o.z
+    // The pose of the player
+    state.start_x = state.course_x
+    state.start_y = state.course_y
+    state.start_z = state.course_z
     state.start_yaw = state.course_yaw
     state.start_pitch = pitch
 
     if state.course_distance >= next_line {
       const km = state.course_distance / 1000
       const t = state.course_seconds
-      const shifts = WorldOriginStatus[WorldOriginStatus].shifts
       const mode = state.course_flight ? "Flight" : "Walk"
       const leg = state.course_leg + 1
       const ax = state.course_x
       const ay = state.course_y
       const az = state.course_z
-      const ox = o.x
-      const oy = o.y
-      const oz = o.z
-      state.course_now = "{mode} {km:.2} km of {COURSE_KM:.0} in {t:.0} s, leg {leg}, " +
-        "origin shifts {shifts}\nat {ax:.0} {ay:.0} {az:.0}, origin {ox:.0} {oy:.0} {oz:.0}\n" +
+      state.course_now = "{mode} {km:.2} km of {COURSE_KM:.0} in {t:.0} s, leg {leg}\n" +
+        "at {ax:.0} {ay:.0} {az:.0}\n" +
         "worst frame {all_worst:.1} ms at {all_worst_km:.2} km, over 16.7 ms {all_slow}, " +
         "over 33.3 ms {all_hitches}"
       next_line = next_line + 25
@@ -440,11 +423,10 @@ async {
   }
 
   const t = state.course_seconds
-  const shifts = WorldOriginStatus[WorldOriginStatus].shifts
   const mode = state.course_flight ? "Flight" : "Walk"
-  state.course_now = "{mode} done: {COURSE_KM:.0} km in {t:.0} s, origin shifts " +
-    "{shifts}\nworst frame {all_worst:.1} ms at {all_worst_km:.2} km, over 16.7 ms " +
-    "{all_slow}, over 33.3 ms {all_hitches}"
+  state.course_now = "{mode} done: {COURSE_KM:.0} km in {t:.0} s\n" +
+    "worst frame {all_worst:.1} ms at {all_worst_km:.2} km, over 16.7 ms {all_slow}, " +
+    "over 33.3 ms {all_hitches}"
   state.course_done = true
 }
 

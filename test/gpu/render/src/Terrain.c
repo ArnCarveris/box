@@ -189,19 +189,19 @@ void Terrain_levels_no_cracks(void) {
     ecs_fini(world);
 }
 
-void Terrain_origin_shift_same_image(void) {
+void Terrain_far_same_image(void) {
     // terrain/terrain_tiles
     ecs_world_t *a = terrain_world("test/assets/terrain/bounded.flecs");
     ecs_world_t *b = terrain_world("test/assets/terrain/bounded.flecs");
-    ecs_singleton_add(b, WorldOrigin);
-    WorldOrigin *o = ecs_singleton_get_mut(b, WorldOrigin);
-    o->enabled = false;
-    ecs_singleton_modified(b, WorldOrigin);
     ecs_entity_t ta = ecs_lookup(a, "terrain_bounded.hills");
     ecs_entity_t tb = ecs_lookup(b, "terrain_bounded.hills");
+    ecs_entity_t camera = ecs_lookup(b, "terrain_bounded.camera");
+    const double offset[3] = { 2097152 + 2816, 0, -1048576 - 1280 };
+    test_assert(camera != 0);
+    const Position *p = ecs_get(b, camera, Position);
+    ecs_set(b, camera, Position, {p->x + offset[0], p->y, p->z + offset[2]});
+    ecs_set(b, tb, Position, {offset[0], offset[1], offset[2]});
     terrain_settle(a, ta);
-    terrain_settle(b, tb);
-    box_world_origin_shift(b, 0, (double[3]){ 2816, 0, -1280 });
     terrain_settle(b, tb);
     unsigned char *pa = terrain_frame(a, "terrain_a.png");
     unsigned char *pb = terrain_frame(b, "terrain_b.png");

@@ -414,8 +414,8 @@ static void edit_point(
     test_assert(t != NULL);
     test_assert(p != NULL);
     test_assert(box_text_caret(world, parts.text, offset, &c));
-    float x = 640 + t->m[3][0] + p->x + c.x + dx;
-    float y = 360 - t->m[3][1];
+    float x = 640 + t->position[0] + p->x + c.x + dx;
+    float y = 360 - t->position[1];
     ecs_os_snprintf(out, (ecs_size_t)size, "[%.2f, %.2f]", (double)x, (double)y);
 }
 
@@ -466,8 +466,8 @@ static void edit_focus(
     ecs_entity_t e = edit_field(world);
     const WorldTransform *t = ecs_get(world, e, WorldTransform);
     edit_run(world, s, "mouse_click left [%.2f, %.2f]",
-        (double)(640 + t->m[3][0] + ecs_get(world, e, LayoutBounds)->width * 0.5f - 2),
-        (double)(360 - t->m[3][1]));
+        (double)(640 + t->position[0] + ecs_get(world, e, LayoutBounds)->width * 0.5f - 2),
+        (double)(360 - t->position[1]));
     test_uint(ecs_singleton_get(world, FocusStatus)->focused, edit_field(world));
     edit_wait(world);
 }
@@ -942,7 +942,7 @@ void TextEdit_drag_scrolls(void) {
     ecs_entity_t s = ecs_shell_session_init(world, NULL);
     char from[64];
     const WorldTransform *t = ecs_get(world, edit_field(world), WorldTransform);
-    float x = 640 + t->m[3][0], y = 360 - t->m[3][1];
+    float x = 640 + t->position[0], y = 360 - t->position[1];
     int32_t i, last = 0;
     edit_point(world, 1, 0, from, sizeof(from));
     edit_run(world, s, "mouse_move %s", from);
@@ -1136,7 +1136,7 @@ void TextEdit_password(void) {
     float x = edit_caret_x(world, 15) - edit_caret_x(world, 0);
     const Position *caret = ecs_get(world, parts.caret, Position);
     const Position *text = ecs_get(world, parts.text, Position);
-    test_flt(caret->x, text->x + edit_caret_x(world, 0) + x);
+    test_flt(caret->x, (float)text->x + edit_caret_x(world, 0) + x);
 
     edit_run(world, s, "clipboard_set keep");
     edit_chord(world, s, EDIT_CMD, "A");

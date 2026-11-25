@@ -201,6 +201,11 @@ static bool box_bake_shape_bounds(
 
     const float *local_min = shape->surface.p[0][0] ? shape->min : mesh->min;
     const float *local_max = shape->surface.p[0][0] ? shape->max : mesh->max;
+    mat4 m;
+    if (t) {
+        box_transform_mat4(t, NULL, m);
+    }
+
     glm_vec3_fill(min, FLT_MAX);
     glm_vec3_fill(max, -FLT_MAX);
     for (c = 0; c < 8; c ++) {
@@ -211,7 +216,7 @@ static bool box_bake_shape_bounds(
             1.0f
         };
         if (t) {
-            glm_mat4_mulv(ECS_CONST_CAST(vec4*, t->m), corner, corner);
+            glm_mat4_mulv(m, corner, corner);
         }
 
         for (i = 0; i < 3; i ++) {
@@ -245,26 +250,22 @@ static bool box_bake_recording(
  * @param e The shape
  * @param removed Whether the shape is being removed, so the index may have lost it already
  * @param geometry Whether the change can move, add or remove surfaces
- * @param shifted Whether the change is a move in a frame with a shift of the world origin
  */
 static void box_bake_record(
     const ecs_world_t *world,
     box_render_bake_t *b,
     ecs_entity_t e,
     bool removed,
-    bool geometry,
-    bool shifted)
+    bool geometry)
 {
     box_bake_change_t *c = ecs_vec_count(&b->changes) ?
         ecs_vec_last_t(&b->changes, box_bake_change_t) : NULL;
     if (c && c->entity == e) {
         c->geometry = c->geometry || geometry;
-        c->shifted = c->shifted && shifted;
     } else {
         c = ecs_vec_append_t(NULL, &b->changes, box_bake_change_t);
         c->entity = e;
         c->geometry = geometry;
-        c->shifted = shifted;
         c->old = box_spatial_bounds(world, e, &c->scene, c->min, c->max);
     }
 
@@ -351,7 +352,7 @@ static void BakeOnChange(
         ecs_entity_t e = it->entities[i];
         if (!box_projection_anchored(it->world, e)) {
             box_bake_record(it->world, b, e, it->event == EcsOnRemove,
-                flag || deleted || id == ecs_id(ShapeMesh), false);
+                flag || deleted || id == ecs_id(ShapeMesh));
         }
     }
 
@@ -384,7 +385,7 @@ static void box_bake_record_blends(
             }
 
             if (used && box_bake_captured_but(world, it.table, it.entities[i], 0)) {
-                box_bake_record(world, b, it.entities[i], false, false, false);
+                box_bake_record(world, b, it.entities[i], false, false);
             }
         }
     }
@@ -429,7 +430,7 @@ static void box_bake_record_tree(
     if (ecs_has(world, e, ShapeMesh) &&
         box_bake_captured_but(world, ecs_get_table(world, e), e, 0))
     {
-        box_bake_record(world, b, e, false, false, false);
+        box_bake_record(world, b, e, false, false);
     }
 
     ecs_iter_t it = ecs_children(world, e);
@@ -476,7 +477,7 @@ static void box_bake_on_moved(
     int32_t i;
     for (i = 0; box_bake_recording(b) && i < count; i ++) {
         if (ecs_has(world, entities[i], ShapeMesh) && !ecs_has_id(world, entities[i], NoBake)) {
-            box_bake_record(world, b, entities[i], false, true, b->shifting);
+            box_bake_record(world, b, entities[i], false, true);
         }
     }
 }
@@ -544,32 +545,6 @@ static void box_bake_add_region(
     glm_vec3_copy(ECS_CONST_CAST(float*, max), r->max);
 }
 
-/** Check whether the bounds of a shape before and after a move in a frame with a shift of the
- * world origin are the same but for the rounding of the shift.
- *
- * @param a_min Minimum corner of the bounds before
- * @param a_max Maximum corner of the bounds before
- * @param b_min Minimum corner of the bounds after
- * @param b_max Maximum corner of the bounds after
- * @return Whether every corner is within the rounding of its magnitude
- */
-static bool box_bake_same_bounds(
-    const vec3 a_min,
-    const vec3 a_max,
-    const vec3 b_min,
-    const vec3 b_max)
-{
-    bool result = true;
-    int32_t i;
-    for (i = 0; i < 3; i ++) {
-        float tolerance = 1e-4f * (1.0f + fabsf(a_min[i]) + fabsf(a_max[i]));
-        result = result && fabsf(a_min[i] - b_min[i]) <= tolerance &&
-            fabsf(a_max[i] - b_max[i]) <= tolerance;
-    }
-
-    return result;
-}
-
 void box_bake_changes(
     ecs_world_t *world,
     box_render_bake_t *b)
@@ -590,12 +565,6 @@ void box_bake_changes(
             !box_projection_anchored(world, e) &&
             !box_transform_dynamic(world, ecs_get_table(world, e)) &&
             box_spatial_bounds(world, e, &scene, min, max);
-        if (c->shifted && c->old && now && scene == c->scene &&
-            box_bake_same_bounds(c->min, c->max, min, max))
-        {
-            continue;
-        }
-
         if (c->old) {
             box_bake_add_region(b, c->scene, c->min, c->max, c->geometry);
         }

@@ -204,16 +204,19 @@ void box_draws_target_local(
 {
     const Position *position = ecs_get(world, e, Position);
     if (position) {
+        WorldTransform local;
         box_transform_local(position, ecs_get(world, e, Rotation), ecs_get(world, e, Scale),
-            out);
+            &local);
+        box_transform_mat4(&local, NULL, out);
     } else {
         glm_mat4_identity(out);
     }
 }
 
-void box_draws_parent_world(
+bool box_draws_parent_world(
     const ecs_world_t *world,
     ecs_entity_t e,
+    const double *origin,
     mat4 out)
 {
     WorldTransform buf;
@@ -225,10 +228,12 @@ void box_draws_parent_world(
     }
 
     if (parent) {
-        ecs_os_memcpy(out, parent->m, ECS_SIZEOF(mat4));
+        box_transform_mat4(parent, origin, out);
     } else {
         glm_mat4_identity(out);
     }
+
+    return parent != NULL;
 }
 
 void box_draws_range_pose(
@@ -294,7 +299,7 @@ void box_draws_range_region(
     mat4 rel,
     box_render_shadow_region_t *out)
 {
-    box_render_transform_t lo, hi;
+    box_render_transform_t lo = {0}, hi = {0};
     int32_t row, col, k;
     for (row = 0; row < 3; row ++) {
         for (col = 0; col < 4; col ++) {
@@ -312,7 +317,9 @@ void box_draws_range_region(
         }
     }
 
-    if (!box_draws_shadow_bounds(world, b, &lo, &hi, box_draws_slot_surface(b, slot), out)) {
+    if (!box_draws_shadow_bounds(world, b, NULL, &lo, &hi, box_draws_slot_surface(b, slot),
+        out))
+    {
         out->scene = b->key.scene;
         glm_vec3_fill(out->min, -FLT_MAX);
         glm_vec3_fill(out->max, FLT_MAX);

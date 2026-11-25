@@ -56,8 +56,8 @@ void box_render_cookie_resolve(
     glm_vec3_copy((vec3){1, 0, 0}, out->axis_x);
     glm_vec3_copy((vec3){0, 1, 0}, out->axis_y);
     if (transform) {
-        glm_vec3_copy(ECS_CONST_CAST(float*, transform->m[0]), out->axis_x);
-        glm_vec3_copy(ECS_CONST_CAST(float*, transform->m[1]), out->axis_y);
+        glm_vec3_copy(ECS_CONST_CAST(float*, transform->basis[0]), out->axis_x);
+        glm_vec3_copy(ECS_CONST_CAST(float*, transform->basis[1]), out->axis_y);
         glm_vec3_normalize(out->axis_x);
         glm_vec3_normalize(out->axis_y);
     }

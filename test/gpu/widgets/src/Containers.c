@@ -152,8 +152,8 @@ static void containers_rect(
     const LayoutBounds *b = ecs_get(world, e, LayoutBounds);
     const SurfaceStatus *ss = ecs_get(world, window, SurfaceStatus);
     test_assert(t != NULL && b != NULL && ss != NULL);
-    float x = (float)ss->point_width * 0.5f + t->m[3][0];
-    float y = (float)ss->point_height * 0.5f - t->m[3][1];
+    float x = (float)ss->point_width * 0.5f + t->position[0];
+    float y = (float)ss->point_height * 0.5f - t->position[1];
     r[0] = x - b->width * 0.5f;
     r[1] = y - b->height * 0.5f;
     r[2] = x + b->width * 0.5f;
@@ -344,8 +344,8 @@ static void containers_shape(
     const Rect *rect = ecs_get(world, e, Rect);
     const SurfaceStatus *ss = ecs_get(world, window, SurfaceStatus);
     test_assert(t != NULL && rect != NULL && ss != NULL);
-    float x = (float)ss->point_width * 0.5f + t->m[3][0];
-    float y = (float)ss->point_height * 0.5f - t->m[3][1];
+    float x = (float)ss->point_width * 0.5f + t->position[0];
+    float y = (float)ss->point_height * 0.5f - t->position[1];
     r[0] = x - rect->width * 0.5f;
     r[1] = y - rect->height * 0.5f;
     r[2] = x + rect->width * 0.5f;
@@ -374,7 +374,7 @@ static bool containers_clip_keeps(
     const SurfaceStatus *ss = ecs_get(world, window, SurfaceStatus);
     test_assert(t != NULL && ss != NULL);
     float point[3] = {
-        x - (float)ss->point_width * 0.5f, (float)ss->point_height * 0.5f - y, t->m[3][2]
+        x - (float)ss->point_width * 0.5f, (float)ss->point_height * 0.5f - y, t->position[2]
     };
 
     return box_render_clip_contains(world, e, point);

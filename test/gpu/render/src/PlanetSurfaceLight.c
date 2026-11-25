@@ -221,7 +221,7 @@ static void ps_sun_direction(
     ecs_entity_t sun = ecs_lookup(world, "sun");
     const WorldTransform *t = ecs_get(world, sun, WorldTransform);
     test_assert(t != NULL);
-    glm_vec3_negate_to(ECS_CONST_CAST(float*, t->m[2]), out);
+    glm_vec3_negate_to(ECS_CONST_CAST(float*, t->basis[2]), out);
     glm_vec3_normalize(out);
 }
 

@@ -341,6 +341,7 @@ void box_draws_transition_box_shadow(
     const box_draw_transition_box_shadow_t *record,
     const BoxShadow *shadow,
     mat4 world,
+    const double *origin,
     void *transform,
     void *shading)
 {
@@ -354,7 +355,7 @@ void box_draws_transition_box_shadow(
             &patched.material.shape2d, record->material.shadow_blend, 1.0f);
     }
 
-    box_draws_box_shadow_patch(&m, &patched, shadow, world, transform, shading);
+    box_draws_box_shadow_patch(&m, &patched, shadow, world, origin, transform, shading);
 }
 
 void box_draws_transition_fade_own(

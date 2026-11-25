@@ -1253,7 +1253,10 @@ typedef struct box_render_history_t {
     int32_t height;             /**< Render height of that frame */
     mat4 proj;                  /**< Projection of that frame */
     mat4 view_proj;             /**< View projection of that frame */
-    vec4 camera_position;       /**< World position of the camera in that frame, w 1 */
+    vec4 camera_position;       /**< Position of the camera in that frame relative to its render
+                                 *   origin, w 1 */
+    dvec3 origin;               /**< Render origin of that frame, which view_proj and
+                                 *   camera_position are relative to */
     box_render_temporal_t current; /**< What the view rendered that frame with */
 } box_render_history_t;
 
@@ -1261,11 +1264,13 @@ typedef struct box_render_history_t {
  *
  * The history restarts, invalid and at frame index 0, on the first frame of the view in the
  * target, and when the render size, the camera entity or the projection changed or the view has
- * history_reset. A second call in the same frame returns what the first one did.
+ * history_reset. A second call in the same frame returns what the first one did. A move of the
+ * render origin keeps the history: the previous frame is moved into the new render space.
  *
  * @param histories box_render_history_t of the backend
  * @param target Handle of the target
  * @param v The view
+ * @param origin Render origin of the packet
  * @param frame Packet frame
  * @param width Render width
  * @param height Render height
@@ -1276,6 +1281,7 @@ const box_render_temporal_t* box_render_history_update(
     ecs_vec_t *histories,
     uint32_t target,
     const box_render_view_t *v,
+    const double *origin,
     int64_t frame,
     int32_t width,
     int32_t height,

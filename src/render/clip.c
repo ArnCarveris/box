@@ -146,7 +146,9 @@ static void box_draws_clip_record(
     int32_t k;
     ecs_os_zeromem(out);
     if (t) {
-        glm_mat4_copy(ECS_CONST_CAST(vec4*, t->m), m);
+        double origin[3];
+        box_render_origin(world, origin);
+        box_transform_mat4(t, origin, m);
     } else {
         glm_mat4_identity(m);
     }
@@ -295,12 +297,19 @@ static bool box_draws_clip_hides(
     ecs_entity_t top = e, cur = box_draws_clip_up(world, e);
     int32_t i, depth = 0, clips = 0;
     bool result = false;
+    double origin[3];
+    mat4 m;
+    box_render_origin(world, origin);
+    if (t) {
+        box_transform_mat4(t, origin, m);
+    }
+
     box_draws_clip_extent(world, e, center, half);
     for (i = 0; i < 4; i ++) {
         vec3 local = { center[0] + ((i & 1) ? half[0] : -half[0]),
             center[1] + ((i & 2) ? half[1] : -half[1]), 0 };
         if (t) {
-            glm_mat4_mulv3(ECS_CONST_CAST(vec4*, t->m), local, 1.0f, corners[i]);
+            glm_mat4_mulv3(m, local, 1.0f, corners[i]);
         } else {
             glm_vec3_copy(local, corners[i]);
         }

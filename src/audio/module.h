@@ -321,7 +321,7 @@ typedef struct box_audio_oneshot_t {
     uint32_t sound;         /**< Sound id it plays, so a deleted sound fades it */
     uint8_t bus;            /**< Bus index */
     bool spatial;           /**< A play of box_audio_play_at */
-    float position[3];      /**< World position of a spatial play */
+    double position[3];     /**< World position of a spatial play */
     AudioSpatial distances; /**< Distances of a spatial play */
     float volume;           /**< Volume of the play, before the distance */
     float sent_volume;      /**< Volume sent */
@@ -339,7 +339,7 @@ typedef struct box_audio_play_t {
     ecs_entity_t sound;     /**< The sound */
     float volume;           /**< The volume */
     bool spatial;           /**< A play of box_audio_play_at */
-    float position[3];      /**< World position of a spatial play */
+    double position[3];     /**< World position of a spatial play */
     AudioQuantize quantize; /**< Grid of a play of box_audio_play_quantized */
     float pitch;            /**< Pitch ratio, 0 for 1 */
     bool routed;            /**< The play has a bus of its own: output instead of the
@@ -368,7 +368,7 @@ typedef struct box_audio_place_t {
 /** The listener the spatial sources are heard from */
 typedef struct box_audio_listener_t {
     ecs_entity_t entity;    /**< Entity that listens, 0 for none */
-    mat4 m;                 /**< Its world transform, identity without a listener */
+    WorldTransform t;       /**< Its world transform, identity without a listener */
 } box_audio_listener_t;
 
 /** Counters of the module, for the tests */

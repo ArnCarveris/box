@@ -8,8 +8,7 @@ using state
 using assets
 
 // The ground of the infinite forest: an endless Terrain whose heights and masks are texture graphs over
-// the absolute world (DomainWorld), so it never repeats and stays the same across shifts of the
-// WorldOrigin.
+// the world (DomainWorld), so it never repeats.
 //
 // Heights in meters, from the largest features to the smallest:
 // - the regional relief: low frequency noise, the uplands and lowlands kilometers apart

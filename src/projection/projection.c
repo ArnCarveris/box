@@ -26,7 +26,9 @@ typedef struct box_projection_state_t {
 /** Camera of a view, ready to project points for one frame */
 typedef struct box_projection_lens_t {
     ecs_entity_t view; /**< View the lens was made for */
-    mat4 view_proj;    /**< Projection times the inverse of the camera transform */
+    dvec3 eye;         /**< World position of the camera, the origin of view_proj */
+    mat4 view_proj;    /**< Projection times the inverse of the camera transform relative to
+                        *   the eye */
     float width;       /**< Width of the surface of the view in points */
     float height;      /**< Height of the surface of the view in points */
     bool valid;        /**< The view exists and its camera has a Camera */
@@ -56,8 +58,10 @@ static void box_projection_lens(
         const WorldTransform *t = box_transform_world(world, camera, &t_buf);
         mat4 transform, inverse, proj;
         if (t) {
-            glm_mat4_copy(ECS_CONST_CAST(vec4*, t->m), transform);
+            box_dvec3_copy(t->position, lens->eye);
+            box_transform_mat4(t, t->position, transform);
         } else {
+            lens->eye[0] = lens->eye[1] = lens->eye[2] = 0.0;
             glm_mat4_identity(transform);
         }
 
@@ -93,9 +97,9 @@ static bool box_projection_point(
     }
 
     vec4 point = {
-        t->m[3][0] + anchor->offset[0],
-        t->m[3][1] + anchor->offset[1],
-        t->m[3][2] + anchor->offset[2],
+        (float)(t->position[0] - lens->eye[0]) + anchor->offset[0],
+        (float)(t->position[1] - lens->eye[1]) + anchor->offset[1],
+        (float)(t->position[2] - lens->eye[2]) + anchor->offset[2],
         1.0f
     };
     vec4 clip;
@@ -173,9 +177,12 @@ static bool box_projection_box(
 
     for (i = 0; i < 8; i ++) {
         vec4 point = {
-            t->m[3][0] + anchor->offset[0] + ((i & 1) ? box->max[0] : box->min[0]),
-            t->m[3][1] + anchor->offset[1] + ((i & 2) ? box->max[1] : box->min[1]),
-            t->m[3][2] + anchor->offset[2] + ((i & 4) ? box->max[2] : box->min[2]),
+            (float)(t->position[0] - lens->eye[0]) + anchor->offset[0] +
+                ((i & 1) ? box->max[0] : box->min[0]),
+            (float)(t->position[1] - lens->eye[1]) + anchor->offset[1] +
+                ((i & 2) ? box->max[1] : box->min[1]),
+            (float)(t->position[2] - lens->eye[2]) + anchor->offset[2] +
+                ((i & 4) ? box->max[2] : box->min[2]),
             1.0f
         };
         glm_mat4_mulv(ECS_CONST_CAST(vec4*, lens->view_proj), point, clip[i]);
@@ -284,8 +291,8 @@ static void box_projection_store(
     WorldTransform *dst,
     const WorldTransform *src)
 {
-    if (ecs_os_memcmp(dst->m, src->m, ECS_SIZEOF(mat4))) {
-        ecs_os_memcpy(dst->m, src->m, ECS_SIZEOF(mat4));
+    if (!box_transform_equal(dst, src)) {
+        *dst = *src;
         ecs_modified(world, e, WorldTransform);
     }
 }
@@ -374,9 +381,7 @@ static void box_projection_transform(
             transformGetParentWorldTransform(world, parent, &buf) : NULL;
         transformSingle(t_parent, &next, p, r, s);
         if (!visible) {
-            glm_vec4_zero(next.m[0]);
-            glm_vec4_zero(next.m[1]);
-            glm_vec4_zero(next.m[2]);
+            glm_mat3_zero(next.basis);
         }
 
         box_projection_store(world, e, t, &next);

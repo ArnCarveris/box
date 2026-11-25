@@ -4,8 +4,8 @@
 //
 // A blade belongs to a cell of a grid of absolute world cells and takes its place, size, facing
 // and shade from a hash of the cell and the seed, and of the clump of a voronoi pattern over the
-// world it is in, so it stays where it is as the camera moves and across shifts of the
-// WorldOrigin. The blades are drawn as triangle strips of
+// world it is in, so it stays where it is as the camera and the render origin move. The blades
+// are drawn as triangle strips of
 // 2 * segments + 1 vertices built from the vertex index, the level of a draw in its first vertex.
 #pragma once
 
@@ -24,7 +24,7 @@ const GRASS_THIN_LEVELS: u32 = 6u;
 // Largest factor a blade widens by where the field thins
 const GRASS_WIDEN_MAX: f32 = 32.0;
 
-// The params of a Grass in a view (box_gpu_grass_params_t), in the local frame of the packet
+// The params of a Grass in a view (box_gpu_grass_params_t), relative to the render origin
 struct GrassParams {
     view_proj: mat4x4f,     // The view projection of the view
     camera: vec4f,          // Local position of the camera, w the distance the blades end at

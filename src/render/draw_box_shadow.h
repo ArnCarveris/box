@@ -143,7 +143,8 @@ bool box_draws_box_shadow_transition(
  * @param material The material components, with the rendered Tint, Opacity and fade
  * @param record The target of the record
  * @param shadow The BoxShadow to draw, the value its node renders
- * @param world World matrix of the shape, the one it renders at
+ * @param world World matrix of the shape relative to the render origin, the one it renders at
+ * @param origin The render origin of the packet
  * @param transform The box_render_transform_t of the shadow in the packet data, unaligned
  * @param shading The box_render_shading_t of the shadow in the packet data, unaligned
  */
@@ -152,6 +153,7 @@ void box_draws_box_shadow_patch(
     const box_draw_transition_box_shadow_t *record,
     const BoxShadow *shadow,
     mat4 world,
+    const double *origin,
     void *transform,
     void *shading);
 

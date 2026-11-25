@@ -63,7 +63,7 @@ fn terrain_tile(slot: u32) -> TerrainTileParams {
 
 // Clip position of a vertex of a tile, as vs_terrain and vs_terrain_depth place it.
 fn terrain_clip(slot: u32, local: vec3f) -> vec4f {
-    let world = instance_model(transforms[slot]) * vec4f(local, 1.0);
+    let world = instance_model(transforms[slot], view.origin) * vec4f(local, 1.0);
     return view.view_proj * world;
 }
 
@@ -71,7 +71,7 @@ fn terrain_vertex_out(v: VertexIn) -> TerrainOut {
     let slot = slot_of(v.slot);
     let t = terrain_tile(slot);
     let placed = terrain_vertex_of(t, v.position);
-    let model = instance_model(transforms[slot]);
+    let model = instance_model(transforms[slot], view.origin);
     let world = model * vec4f(placed.position, 1.0);
     let p = Placed(model, placed.normal, world, view.view_proj * world, placed.position,
         vec3f(0.0), vec4f(0.0, 0.0, 0.0, 1.0));
@@ -93,7 +93,7 @@ fn terrain_vertex_out(v: VertexIn) -> TerrainOut {
         mapped = 1.0 + material_blend(material);
         o.uv = vec4f(mapping_offset(material), o.uv.zw);
         if (material_world(material) || material_frame(material)) {
-            o.object = mapping_world(material, world.xyz, world_origin(view.origin));
+            o.object = mapping_world(material, world.xyz, render_origin(view.origin));
         } else {
             o.object = mapping_object(material, v.position, frame.scale);
         }
@@ -401,7 +401,7 @@ const TERRAIN_VARIATION_TINT: vec3f = vec3f(1.0, 0.85, 0.6);
 
 // What the albedo of the layers of a terrain fragment is multiplied by for the variation of the
 // blend: the height of layer 0 stretched over TERRAIN_VARIATION_PERIODS of the absolute world,
-// so it stays in place across shifts of the local origin, less its mean, the last level of its
+// so it stays in place across moves of the render origin, less its mean, the last level of its
 // mips. 1 without a variation or a height.
 @diagnostic(off, derivative_uniformity)
 fn terrain_variation(f: TerrainOut) -> vec3f {
@@ -412,7 +412,7 @@ fn terrain_variation(f: TerrainOut) -> vec3f {
         return vec3f(1.0);
     }
 
-    let o = world_origin(view.origin);
+    let o = render_origin(view.origin);
     let wide = TERRAIN_VARIATION_PERIODS.x;
     let fine = TERRAIN_VARIATION_PERIODS.y;
     let at_wide = (f.world.xz + vec2f(o.whole.xz % i32(wide)) + o.rest.xz) / wide;
@@ -467,7 +467,7 @@ fn terrain_strata(f: TerrainOut) -> TerrainStrata {
         return s;
     }
 
-    let o = world_origin(view.origin);
+    let o = render_origin(view.origin);
     let p = f.world + o.rest + vec3f(o.whole % vec3i(STRATA_SPAN));
     let broad = strata_noise(p.xz / 320.0, STRATA_SPAN / 320, 11u) * 2.0 - 1.0;
     let fine = strata_noise(p.xz / 96.0, STRATA_SPAN / 96, 12u) * 2.0 - 1.0;
@@ -843,7 +843,7 @@ fn terrain_grass(f: TerrainOut, near: Surface, geometric: vec3f, covered: f32) -
     }
 
     let v = to_eye / max(d, 1e-6);
-    let o = world_origin(view.origin);
+    let o = render_origin(view.origin);
     let xz = f.world.xz + vec2f(o.whole.xz) + o.rest.xz;
     let variation = grass_field_variation(xz, blending.grass_base.w);
     let ndv = max(dot(geometric, v), TERRAIN_GRASS_GRAZING);

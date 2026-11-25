@@ -139,7 +139,7 @@ void ProbeVolume_invalid_inside_rotated_box(void) {
 
     const WorldTransform *t = ecs_get(world, wall, WorldTransform);
     test_assert(t != NULL);
-    float along = t->m[0][0] * t->m[0][2] < 0 ? -0.5f : 0.5f;
+    float along = t->basis[0][0] * t->basis[0][2] < 0 ? -0.5f : 0.5f;
     box_render_probe_t probe;
     test_assert(box_render_bake_probe(world, 0, (vec3){0.5f, 0.5f, along}, &probe));
     test_flt(probe.position[0], 0.5f);

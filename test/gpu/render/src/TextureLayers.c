@@ -540,7 +540,7 @@ static unsigned char* water_ripples_render(
     }
 
     if (ring) {
-        float at[3] = {-3.46f, 0, 0};
+        double at[3] = {-3.46, 0, 0};
         test_bool(box_material_ripple_at(world, pond, at, 0.3f, 0.1f), true);
     }
 

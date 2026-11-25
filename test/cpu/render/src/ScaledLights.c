@@ -183,26 +183,33 @@ static const box_render_shadow_tile_t* scaled_tile(
 void ScaledLights_world_scale(void) {
     // lighting/lights
     WorldTransform t;
-    glm_mat4_identity(t.m);
+    mat4 m;
+    glm_mat4_identity(m);
+    box_transform_from_mat4(m, NULL, &t);
     test_assert(box_transform_world_scale(&t) == 1.0f);
 
-    glm_rotate(t.m, 0.7f, (vec3){0.3f, 0.8f, 0.5f});
+    glm_rotate(m, 0.7f, (vec3){0.3f, 0.8f, 0.5f});
+    box_transform_from_mat4(m, NULL, &t);
     test_assert(box_transform_world_scale(&t) == 1.0f);
 
-    glm_mat4_identity(t.m);
-    glm_scale(t.m, (vec3){2, 2, 2});
+    glm_mat4_identity(m);
+    glm_scale(m, (vec3){2, 2, 2});
+    box_transform_from_mat4(m, NULL, &t);
     test_flt(box_transform_world_scale(&t), 2.0f);
 
-    glm_mat4_identity(t.m);
-    glm_scale(t.m, (vec3){1, 3, 9});
+    glm_mat4_identity(m);
+    glm_scale(m, (vec3){1, 3, 9});
+    box_transform_from_mat4(m, NULL, &t);
     test_flt(box_transform_world_scale(&t), 3.0f);
 
-    glm_mat4_identity(t.m);
-    glm_scale(t.m, (vec3){-2, 2, 2});
+    glm_mat4_identity(m);
+    glm_scale(m, (vec3){-2, 2, 2});
+    box_transform_from_mat4(m, NULL, &t);
     test_flt(box_transform_world_scale(&t), 2.0f);
 
-    glm_mat4_identity(t.m);
-    glm_scale(t.m, (vec3){0, 1, 1});
+    glm_mat4_identity(m);
+    glm_scale(m, (vec3){0, 1, 1});
+    box_transform_from_mat4(m, NULL, &t);
     test_flt(box_transform_world_scale(&t), 0.0f);
 }
 

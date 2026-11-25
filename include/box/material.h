@@ -801,7 +801,7 @@ ECS_STRUCT(RippleSource, {
 /** A disturbance of the field of a Water that box_material_ripple_at queued */
 typedef struct box_material_ripple_t {
     ecs_entity_t water;     /**< Entity with the Water and WaterRipples */
-    float position[3];      /**< World position of the center */
+    double position[3];     /**< World position of the center */
     float radius;           /**< World units of the radius */
     float strength;         /**< World units the water at the center sinks */
     float foam;             /**< Foam added at the center, 0..1 is a share of solid foam */
@@ -823,7 +823,7 @@ typedef struct box_material_ripple_t {
 bool box_material_ripple_at(
     ecs_world_t *world,
     ecs_entity_t water,
-    const float *position,
+    const dvec3 position,
     float radius,
     float strength);
 
@@ -842,7 +842,7 @@ bool box_material_ripple_at(
 bool box_material_foam_at(
     ecs_world_t *world,
     ecs_entity_t water,
-    const float *position,
+    const dvec3 position,
     float radius,
     float amount);
 
@@ -1264,7 +1264,7 @@ ECS_ENUM(TextureLayerBlend, {
  * by the value of the layer by the coverage; normal mixes the shading normal toward the normal
  * of the layer (the geometric normal for a flat layer, which flattens as a water film does).
  * With an altitude_fade other than 0 the score is also scaled by how far the fragment is past
- * altitude in the absolute world (across shifts of the WorldOrigin), from 0 at altitude to 1 at
+ * altitude in the world, from 0 at altitude to 1 at
  * altitude + altitude_fade: above it for a positive fade, so snow lies on high peaks only and its
  * line moves down as the amount grows, below it for a negative one, so wet sand lies along a
  * shoreline only and its line moves up as the amount grows.

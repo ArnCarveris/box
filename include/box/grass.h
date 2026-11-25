@@ -42,8 +42,7 @@ extern "C" {
  * by world position (TerrainSampled, which the module adds to it), or with a terrain of 0 on the
  * horizontal plane through the position of the entity. Each blade belongs to a cell of a grid of
  * absolute world cells about 1 / sqrt(density) apart and takes its place, size, facing and shade
- * from a hash of the cell, so the blades stay where they are as the camera moves and across
- * shifts of the WorldOrigin. With mask a channel of the masks node of the terrain weighs the
+ * from a hash of the cell, so the blades stay where they are as the camera moves. With mask a channel of the masks node of the terrain weighs the
  * density, so blades only grow where the channel is high; a terrain without masks grows them
  * everywhere.
  *

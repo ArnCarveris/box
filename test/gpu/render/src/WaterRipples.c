@@ -285,7 +285,7 @@ void WaterRipples_ring_spreads(void) {
     ecs_entity_t pond = ripples_pond(world, 2, 0);
     ripples_frames(world, 2);
 
-    float at[3] = {0, 0, 0};
+    double at[3] = {0, 0, 0};
     test_bool(box_material_ripple_at(world, pond, at, 0.5f, 0.1f), true);
     ripples_frames(world, 30);
     ripples_field_t *f = ripples_read(world, pond);
@@ -318,7 +318,7 @@ void WaterRipples_ring_decays(void) {
         ecs_world_t *world = ripples_world();
         ecs_entity_t pond = ripples_pond(world, 2, dampings[i]);
         ripples_frames(world, 2);
-        float at[3] = {0, 0, 0};
+        double at[3] = {0, 0, 0};
         test_bool(box_material_ripple_at(world, pond, at, 0.5f, 0.1f), true);
         ripples_frames(world, 60);
         ripples_field_t *f = ripples_read(world, pond);
@@ -369,7 +369,7 @@ void WaterRipples_ring_drifts_with_flow(void) {
     ecs_set(world, pond, WaterFlow, {.velocity = {1, 0}});
     ripples_frames(world, 2);
 
-    float at[3] = {-2, 0, 0};
+    double at[3] = {-2, 0, 0};
     test_bool(box_material_ripple_at(world, pond, at, 0.5f, 0.1f), true);
     ripples_frames(world, 1);
     ripples_field_t *f = ripples_read(world, pond);
@@ -403,7 +403,7 @@ void WaterRipples_follow_keeps_ripples(void) {
         r->follow = boat;
         ecs_modified(world, pond, WaterRipples);
         ripples_frames(world, 2);
-        float at[3] = {0.5f, 0, 0.25f};
+        double at[3] = {0.5f, 0, 0.25f};
         test_bool(box_material_ripple_at(world, pond, at, 0.5f, 0.1f), true);
         ripples_frames(world, 10);
 
@@ -447,7 +447,7 @@ void WaterRipples_deterministic(void) {
         ecs_set(world, boat, Position, {-4, 0, 1});
         ecs_set(world, boat, Rotation, {0, 0.4f, 0});
         ecs_set(world, boat, RippleSource, {.extents = {0.6f, 0.25f}, .strength = 1});
-        float at[3] = {2, 0, -1};
+        double at[3] = {2, 0, -1};
         test_bool(box_material_ripple_at(world, pond, at, 0.4f, 0.08f), true);
         for (j = 0; j < 45; j ++) {
             ripples_frames(world, 1);
@@ -525,7 +525,7 @@ void WaterRipples_foam_fades(void) {
     ripples_foam_terms(world, pond, 0.5f, 0, 0);
     ripples_frames(world, 2);
 
-    float at[3] = {0, 0, 0};
+    double at[3] = {0, 0, 0};
     test_bool(box_material_foam_at(world, pond, at, 1, 0.8f), true);
     ripples_frames(world, 1);
     ripples_field_t *f = ripples_read_foam(world, pond);
@@ -556,7 +556,7 @@ void WaterRipples_foam_drifts_with_flow(void) {
     ecs_set(world, pond, WaterFlow, {.velocity = {1, 0}});
     ripples_frames(world, 2);
 
-    float at[3] = {-2, 0, 0};
+    double at[3] = {-2, 0, 0};
     test_bool(box_material_foam_at(world, pond, at, 0.5f, 0.5f), true);
     ripples_frames(world, 1);
     ripples_field_t *f = ripples_read_foam(world, pond);
@@ -586,7 +586,7 @@ void WaterRipples_foam_spreads(void) {
         ecs_entity_t pond = ripples_pond(world, 1, 0);
         ripples_foam_terms(world, pond, 0, spreads[i], 0);
         ripples_frames(world, 2);
-        float at[3] = {0, 0, 0};
+        double at[3] = {0, 0, 0};
         test_bool(box_material_foam_at(world, pond, at, 0.5f, 0.8f), true);
         ripples_frames(world, 120);
         ripples_field_t *f = ripples_read_foam(world, pond);
@@ -612,7 +612,7 @@ void WaterRipples_crest_foam(void) {
         ecs_entity_t pond = ripples_pond(world, 2, 0);
         ripples_foam_terms(world, pond, 0, 0, crests[i]);
         ripples_frames(world, 2);
-        float at[3] = {0, 0, 0};
+        double at[3] = {0, 0, 0};
         test_bool(box_material_ripple_at(world, pond, at, 0.5f, 0.3f), true);
         ripples_frames(world, 30);
         ripples_field_t *f = ripples_read_foam(world, pond);
@@ -633,7 +633,8 @@ void WaterRipples_no_foam_without_foam(void) {
     ecs_set(world, boat, Position, {-5, 0, 0});
     ecs_set(world, boat, RippleSource, {.extents = {0.4f, 0.2f}, .strength = 1});
 
-    float x = -5, at[3] = {2, 0, 2};
+    float x = -5;
+    double at[3] = {2, 0, 2};
     int32_t i;
     test_bool(box_material_ripple_at(world, pond, at, 0.5f, 0.1f), true);
     for (i = 0; i < 60; i ++) {
@@ -755,7 +756,7 @@ void WaterRipples_foam_follows_local_flow(void) {
     test_assert(fabsf(v[0] - 0.5f) < 1e-6f);
     test_assert(fabsf(v[1]) < 1e-6f);
 
-    float at[3] = {0, 0, -3};
+    double at[3] = {0, 0, -3};
     test_bool(box_material_foam_at(world, pond, at, 0.5f, 0.5f), true);
     ripples_frames(world, 1);
     ripples_field_t *f = ripples_read_foam(world, pond);
@@ -799,7 +800,7 @@ void WaterRipples_foam_bends_with_flow(void) {
     ripples_flow_at(world, pond, 4, -1, v);
     test_assert(v[0] == 0 && v[1] == 0);
 
-    float at[3] = {-2.5f, 0, 0};
+    double at[3] = {-2.5f, 0, 0};
     test_bool(box_material_foam_at(world, pond, at, 0.4f, 0.5f), true);
     ripples_frames(world, 1);
     ripples_field_t *f = ripples_read_foam(world, pond);
@@ -858,7 +859,7 @@ void WaterRipples_uniform_flow_unchanged(void) {
         ecs_set(world, boat, Rotation, {0, 0.4f, 0});
         ecs_set(world, boat, RippleSource, {.extents = {0.6f, 0.25f}, .strength = 1,
             .foam = 1});
-        float at[3] = {2, 0, -1};
+        double at[3] = {2, 0, -1};
         test_bool(box_material_ripple_at(world, pond, at, 0.4f, 0.08f), true);
         test_bool(box_material_foam_at(world, pond, at, 0.4f, 0.5f), true);
         for (j = 0; j < 45; j ++) {

@@ -42,8 +42,8 @@ void DynamicAdd_static_100k_add_dynamic(void) {
     for (int i = 0; i < count; i ++) {
         const WorldTransform *t = ecs_get(world, ents[i], WorldTransform);
         test_assert(t != NULL);
-        test_flt(t->m[3][0], (float)i);
-        test_flt(t->m[3][1], 1);
+        test_flt(t->position[0], (float)i);
+        test_flt(t->position[1], 1);
     }
 
     ecs_os_free(ents);
@@ -89,8 +89,8 @@ void DynamicAdd_static_100k_add_dynamic_in_system(void) {
     for (int i = 0; i < count; i ++) {
         const WorldTransform *t = ecs_get(world, ents[i], WorldTransform);
         test_assert(t != NULL);
-        test_flt(t->m[3][0], (float)i);
-        test_flt(t->m[3][1], 1);
+        test_flt(t->position[0], (float)i);
+        test_flt(t->position[1], 1);
     }
 
     ecs_os_free(ents);
@@ -119,7 +119,7 @@ void DynamicAdd_static_100k_add_dynamic_before_progress(void) {
     for (int i = 0; i < count; i ++) {
         const WorldTransform *t = ecs_get(world, ents[i], WorldTransform);
         test_assert(t != NULL);
-        test_flt(t->m[3][0], (float)i);
+        test_flt(t->position[0], (float)i);
     }
 
     ecs_os_free(ents);
@@ -153,8 +153,8 @@ void DynamicAdd_childof_100k_children_add_dynamic_to_root(void) {
         WorldTransform t_buf;
         const WorldTransform *t = box_transform_world(world, ents[i], &t_buf);
         test_assert(t != NULL);
-        test_flt(t->m[3][0], (float)i);
-        test_flt(t->m[3][1], 2);
+        test_flt(t->position[0], (float)i);
+        test_flt(t->position[1], 2);
     }
 
     ecs_os_free(ents);
@@ -189,8 +189,8 @@ void DynamicAdd_parent_100k_children_add_dynamic_to_root(void) {
         WorldTransform t_buf;
         const WorldTransform *t = box_transform_world(world, ents[i], &t_buf);
         test_assert(t != NULL);
-        test_flt(t->m[3][0], (float)i);
-        test_flt(t->m[3][1], 2);
+        test_flt(t->position[0], (float)i);
+        test_flt(t->position[1], 2);
     }
 
     ecs_os_free(ents);
@@ -226,8 +226,8 @@ void DynamicAdd_dynamic_100k_remove_dynamic(void) {
     for (int i = 0; i < count; i ++) {
         const WorldTransform *t = ecs_get(world, ents[i], WorldTransform);
         test_assert(t != NULL);
-        test_flt(t->m[3][0], (float)i);
-        test_flt(t->m[3][1], 3);
+        test_flt(t->position[0], (float)i);
+        test_flt(t->position[1], 3);
     }
 
     ecs_os_free(ents);
@@ -261,8 +261,8 @@ void DynamicAdd_static_100k_add_manual(void) {
     for (int i = 0; i < count; i ++) {
         const WorldTransform *t = ecs_get(world, ents[i], WorldTransform);
         test_assert(t != NULL);
-        test_flt(t->m[3][0], (float)i);
-        test_flt(t->m[3][1], 0);
+        test_flt(t->position[0], (float)i);
+        test_flt(t->position[1], 0);
     }
 
     ecs_os_free(ents);
@@ -294,8 +294,8 @@ void DynamicAdd_static_100k_add_velocity(void) {
         test_assert(ecs_has(world, ents[i], DynamicTransform));
         const WorldTransform *t = ecs_get(world, ents[i], WorldTransform);
         test_assert(t != NULL);
-        test_flt(t->m[3][0], (float)i);
-        test_flt(t->m[3][1], 1);
+        test_flt(t->position[0], (float)i);
+        test_flt(t->position[1], 1);
     }
 
     ecs_os_free(ents);
@@ -339,8 +339,8 @@ void DynamicAdd_static_100k_shapes_add_dynamic_velocity(void) {
     for (int i = 0; i < count; i ++) {
         const WorldTransform *t = ecs_get(world, ents[i], WorldTransform);
         test_assert(t != NULL);
-        test_flt(t->m[3][0], (float)i);
-        test_flt(t->m[3][1], 2);
+        test_flt(t->position[0], (float)i);
+        test_flt(t->position[1], 2);
     }
 
     ecs_os_free(ents);

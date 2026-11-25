@@ -93,7 +93,7 @@ static void BunnyPhysics(
         if (p[i].y <= ground) {
             if (playing && j[i].jumps > 0) {
                 ecs_entity_t dust = -j[i].v > hard ? g->dust_high : g->dust;
-                box_particle_burst_at(it->world, dust, (vec3){ p[i].x, ground, 0.0f }, 0.0f);
+                box_particle_burst_at(it->world, dust, (dvec3){ p[i].x, ground, 0.0f }, 0.0f);
             }
 
             p[i].y = ground;
@@ -165,7 +165,7 @@ static void BunnyCarrotScroll(
     for (int32_t i = 0; i < it->count; i ++) {
         p[i].x -= step;
         if (p[i].x < despawn_x) {
-            box_particle_burst_at(it->world, g->sparkle, (vec3){ p[i].x, p[i].y, 0.0f }, 0.0f);
+            box_particle_burst_at(it->world, g->sparkle, (dvec3){ p[i].x, p[i].y, 0.0f }, 0.0f);
             ecs_delete(it->stage, it->entities[i]);
             g->carrots ++;
             if (!(g->carrots % BUNNY_SPEED_UP_CARROTS)) {
@@ -233,7 +233,7 @@ static void bunny_hit(
 {
     const Position *p = ecs_get(world, g->player, Position);
     BunnyLives *lives = ecs_get_mut(world, g->player, BunnyLives);
-    box_particle_burst_at(world, g->hit, (vec3){ p->x, p->y, 0.0f }, 0.0f);
+    box_particle_burst_at(world, g->hit, (dvec3){ p->x, p->y, 0.0f }, 0.0f);
     lives->lives_left --;
     ecs_modified(world, g->player, BunnyLives);
     if (lives->lives_left <= 0) {

@@ -3,7 +3,7 @@
  * @brief Tests for the grass blades the GPU places and draws around the camera (box.grass,
  * gpu_grass.c): the blades stand on the plane or the terrain, take their level of detail from
  * their distance, thin out and widen further away, stay where they are as the camera moves and
- * across a shift of the WorldOrigin, follow the mask of the terrain, gather in clumps that share
+ * across a move of the render origin, follow the mask of the terrain, gather in clumps that share
  * their facing, never draw thinner than about a pixel, vary in color over the world, render lit,
  * take a stiffness and the phase of their clump in the wind, bend and move in it, show its gusts
  * as bands of light that roll downwind, show in the GPU stats, cast shadows into the cascades of
@@ -125,9 +125,9 @@ static void gr_position(
 {
     const WorldTransform *t = ecs_get(world, e, WorldTransform);
     test_assert(t != NULL);
-    out[0] = t->m[3][0];
-    out[1] = t->m[3][1];
-    out[2] = t->m[3][2];
+    out[0] = t->position[0];
+    out[1] = t->position[1];
+    out[2] = t->position[2];
 }
 
 /** Read back the blades of a Grass.
@@ -176,7 +176,7 @@ static uint64_t gr_key(
 /** Map the blades of a frame by the quantum of their absolute x and z.
  *
  * @param blades The blades
- * @param origin Absolute x and z of the local origin of the frame
+ * @param origin X and z of the render origin of the frame
  * @param out Receives the index plus one of a blade per quantum
  */
 static void gr_map(
@@ -198,9 +198,9 @@ static void gr_map(
  *
  * @param blades The blades of the other frame
  * @param map Their map (gr_map)
- * @param origin Absolute x and z of the local origin of the other frame
+ * @param origin X and z of the render origin of the other frame
  * @param b The blade
- * @param at Absolute x and z of the local origin of the frame of the blade
+ * @param at X and z of the render origin of the frame of the blade
  * @return Whether the other frame has it
  */
 static bool gr_match(
@@ -237,9 +237,9 @@ static bool gr_match(
  * another frame has at the same absolute place.
  *
  * @param a The blades of the frame
- * @param at Absolute x and z of the local origin of the frame
+ * @param at X and z of the render origin of the frame
  * @param b The blades of the other frame
- * @param origin Absolute x and z of the local origin of the other frame
+ * @param origin X and z of the render origin of the other frame
  * @param x0 Smallest absolute x of the rectangle
  * @param x1 Largest absolute x
  * @param z0 Smallest absolute z
@@ -402,33 +402,32 @@ void Grass_stays_put_as_camera_moves(void) {
     ecs_fini(world);
 }
 
-void Grass_stays_put_across_origin_shift(void) {
+void Grass_stays_put_across_origin_move(void) {
     ecs_world_t *world = gr_world("test/assets/grass/plane.flecs");
     ecs_entity_t meadow = gr_lookup(world, "meadow");
     ecs_entity_t camera = gr_lookup(world, "grass_camera");
     ecs_vec_t a, b;
     float eye[3];
+    double origin[3];
     int32_t found, count;
-    ecs_singleton_set(world, WorldOrigin, {.threshold = 4, .step = 4, .enabled = true});
-    ecs_add_id(world, camera, WorldFocus);
+    ecs_set(world, camera, Position, {1020, 2.2, 0});
     ecs_vec_init_t(NULL, &a, box_render_grass_blade_t, 0);
     ecs_vec_init_t(NULL, &b, box_render_grass_blade_t, 0);
     gr_frames(world, 10);
-    const WorldOrigin *o = ecs_singleton_get(world, WorldOrigin);
-    double before[2] = { o->x, o->z };
+    box_render_origin(world, origin);
+    double before[2] = { origin[0], origin[2] };
     gr_position(world, camera, eye);
     gr_blades(world, meadow, &a);
 
     ecs_set(world, camera, Position, {eye[0] + 5.0f, eye[1], eye[2]});
     gr_frames(world, 3);
-    o = ecs_singleton_get(world, WorldOrigin);
-    double after[2] = { o->x, o->z };
-    test_assert(after[0] != before[0]);
+    box_render_origin(world, origin);
+    double after[2] = { origin[0], origin[2] };
+    test_assert(before[0] == 0 && after[0] == 1024);
     gr_blades(world, meadow, &b);
-    count = gr_kept(&a, before, &b, after, before[0] + eye[0] + 1.0,
-        before[0] + eye[0] + 4.0, before[1] + eye[2] - 10.0, before[1] + eye[2] - 6.0,
-        &found);
-    printf("kept %d of %d across the shift\n", found, count);
+    count = gr_kept(&a, before, &b, after, eye[0] + 1.0, eye[0] + 4.0, eye[2] - 10.0,
+        eye[2] - 6.0, &found);
+    printf("kept %d of %d across the move of the render origin\n", found, count);
     test_assert(count > 50);
     test_assert(found * 100 >= count * 98);
     gr_expect_no_errors(world);

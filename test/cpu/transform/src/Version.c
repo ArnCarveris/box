@@ -25,7 +25,7 @@ void Version_static_version_is_frame(void) {
 
     test_uint(ecs_get(world, e, WorldTransformVersion)->version,
         (uint64_t)info->frame_count_total);
-    test_flt(ecs_get(world, e, WorldTransform)->m[3][0], 4);
+    test_flt(ecs_get(world, e, WorldTransform)->position[0], 4);
 
     ecs_fini(world);
 }
@@ -70,7 +70,7 @@ void Version_static_child_version_set_by_parent(void) {
         (uint64_t)info->frame_count_total);
     test_uint(ecs_get(world, child, WorldTransformVersion)->version,
         (uint64_t)info->frame_count_total);
-    test_flt(ecs_get(world, child, WorldTransform)->m[3][0], 12);
+    test_flt(ecs_get(world, child, WorldTransform)->position[0], 12);
 
     ecs_fini(world);
 }
@@ -95,7 +95,7 @@ void Version_static_parent_child_version_set_by_parent(void) {
         (uint64_t)info->frame_count_total);
     test_uint(ecs_get(world, child, WorldTransformVersion)->version,
         (uint64_t)info->frame_count_total);
-    test_flt(ecs_get(world, child, WorldTransform)->m[3][0], 12);
+    test_flt(ecs_get(world, child, WorldTransform)->position[0], 12);
 
     ecs_fini(world);
 }
@@ -116,12 +116,12 @@ void Version_static_dirty_entity_w_current_version_skipped(void) {
 
     ecs_progress(world, 0);
 
-    test_flt(ecs_get(world, e, WorldTransform)->m[3][0], 1);
+    test_flt(ecs_get(world, e, WorldTransform)->position[0], 1);
 
     ecs_set(world, e, Position, {7, 8, 9});
     ecs_progress(world, 0);
 
-    test_flt(ecs_get(world, e, WorldTransform)->m[3][0], 7);
+    test_flt(ecs_get(world, e, WorldTransform)->position[0], 7);
 
     ecs_fini(world);
 }
@@ -141,7 +141,7 @@ void Version_dynamic_version_not_written(void) {
     ecs_progress(world, 0);
     ecs_progress(world, 0);
 
-    test_flt(box_transform_world(world, child, &buf)->m[3][0], 3);
+    test_flt(box_transform_world(world, child, &buf)->position[0], 3);
     test_uint(ecs_get(world, parent, WorldTransformVersion)->version, 0);
     test_uint(ecs_get(world, child, WorldTransformVersion)->version, 0);
 

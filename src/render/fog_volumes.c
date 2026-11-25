@@ -265,12 +265,12 @@ void box_render_fog_offset(
 
 /** Write the record of a FogVolume: its box placed by the rotation and position of the world
  * transform, scale ignored, its values clamped to their ranges and the offset of its noise at a
- * time, moved back by the absolute position of the local origin.
+ * time, moved back by the render origin.
  *
  * @param fog The FogVolume
  * @param transform World transform of the entity
  * @param time Seconds the world has advanced in total, the time of the packet
- * @param origin Absolute position of the local origin (WorldOrigin)
+ * @param origin Render origin of the frame (box_render_origin)
  * @param out Receives the record
  */
 static void box_fog_record(
@@ -286,7 +286,7 @@ static void box_fog_record(
         vec3 axis = {0, 0, 0};
         vec3 column;
         axis[k] = 1.0f;
-        glm_vec3_copy(ECS_CONST_CAST(float*, transform->m[k]), column);
+        glm_vec3_copy(ECS_CONST_CAST(float*, transform->basis[k]), column);
         if (glm_vec3_norm(column) > 1e-12f) {
             glm_vec3_normalize_to(column, axis);
         }
@@ -295,7 +295,7 @@ static void box_fog_record(
         out->extent[k] = glm_max(fog->extent[k], 0.0f);
     }
 
-    glm_vec3_copy(ECS_CONST_CAST(float*, transform->m[3]), out->center);
+    box_dvec3_rel(transform->position, origin, out->center);
 
     out->density = glm_max(fog->density, 0.0f);
     out->absorption = glm_clamp(fog->absorption, 0.0f, 1.0f);

@@ -69,13 +69,12 @@ view {
 async {
   while true {
     await delay(0.1)
-    const o = WorldOrigin[WorldOrigin]
     const p = player[Position]
-    const x = p.x + o.x
-    const z = p.z + o.z
+    const x = p.x
+    const z = p.z
 
     if box.terrain.known(infinite_forest.land, x, z) {
-      const ground: f32 = box.terrain.height(infinite_forest.land, x, z) - o.y
+      const ground: f32 = box.terrain.height(infinite_forest.land, x, z)
       const y: f32 = state.fog_y + (ground - state.fog_y) * 0.15
 
       if abs(y - state.fog_y) > 0.02 {
@@ -83,11 +82,6 @@ async {
       }
     }
   }
-}
-
-// The local origin follows the player, so the far walk stays precise
-$ {
-  WorldOrigin: {enabled: true}
 }
 
 // The scene probe of the forest library (sky.flecs) follows the player and recaptures as it

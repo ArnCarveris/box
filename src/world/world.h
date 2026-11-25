@@ -29,7 +29,7 @@ bool box_world_is_root(
     const ecs_world_t *world,
     ecs_entity_t e);
 
-/** Get the local world position of an entity as of now: the Position of a root, which the
+/** Get the world position of an entity as of now: the Position of a root, which the
  * transforms of this frame did not compute yet, else the translation of its world transform.
  *
  * @param world The world
@@ -40,14 +40,7 @@ bool box_world_is_root(
 bool box_world_position(
     const ecs_world_t *world,
     ecs_entity_t e,
-    vec3 out);
-
-/** Register the rebase system and the queries of the shift.
- *
- * @param world The world
- */
-void box_world_origin_import(
-    ecs_world_t *world);
+    dvec3 out);
 
 /** Register the hooks of ChunkGrid, which the module registers, its gate and the system
  * that streams its cells.

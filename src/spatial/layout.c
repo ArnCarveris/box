@@ -347,7 +347,7 @@ static void authored_local(
     }
 
     if (p) {
-        glm_vec3_copy((vec3){p->x, p->y, p->z}, local[3]);
+        glm_vec3_copy((vec3){(float)p->x, (float)p->y, (float)p->z}, local[3]);
     }
 }
 
@@ -619,7 +619,7 @@ static bool basis_solve(
         WorldTransform t_buf;
         const WorldTransform *t = box_transform_world(ctx->world, n->entity, &t_buf);
         if (t) {
-            glm_mat4_copy(ECS_CONST_CAST(vec4 *, t->m), n->basis);
+            box_transform_mat4(t, NULL, n->basis);
         }
     }
 
@@ -1028,7 +1028,7 @@ static bool pose_solve(
 
         const WorldTransform *manual = ecs_get(world, e, WorldTransform);
         if (manual) {
-            glm_mat4_copy(ECS_CONST_CAST(vec4 *, manual->m), n->pose);
+            box_transform_mat4(manual, NULL, n->pose);
         }
     }
 
@@ -1333,8 +1333,8 @@ static void publish(
             out.manual = true;
         }
 
-        WorldTransform transform;
-        glm_mat4_copy(n->pose, transform.m);
+        WorldTransform transform = {0};
+        box_transform_from_mat4(n->pose, NULL, &transform);
         box_spatial_layout_set_changed(
             world, e, ecs_id(WorldTransform), sizeof(transform), &transform);
     } else if (out.manual) {

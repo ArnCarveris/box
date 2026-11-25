@@ -511,7 +511,7 @@ ECS_STRUCT(ParticleEffect, {
 ecs_entity_t box_particle_burst_at(
     ecs_world_t *world,
     ecs_entity_t effect,
-    const vec3 position,
+    const dvec3 position,
     float scale);
 
 /** Register the box.particle module.

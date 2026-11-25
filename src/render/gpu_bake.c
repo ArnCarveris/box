@@ -559,6 +559,7 @@ static void box_gpu_bake_jobs(
         box_gpu_bake_run_uniforms_t *u = (box_gpu_bake_run_uniforms_t*)ecs_vec_get_t(
             &b->run_data, uint8_t, r * BOX_GPU_BAKE_RUN_STRIDE);
         ecs_os_memset_t(u, 0, box_gpu_bake_run_uniforms_t);
+        box_gpu_origin_split(gpu->origin, u->origin);
         u->first = written;
         u->first_block = (uint32_t)ecs_vec_count(&b->block_data);
         run->first = written;

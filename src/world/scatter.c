@@ -55,7 +55,7 @@ typedef struct box_scatter_ctx_t {
     ecs_entity_t terrain;      /**< Ground Terrain, 0 for the plane */
     bool masks;                /**< Filters by a mask channel of the terrain */
     bool normals;              /**< Needs the normal of the ground */
-    double frame[3];           /**< Absolute position of the origin of the frame of the terrain */
+    double frame[3];           /**< World position of the origin of the frame of the terrain */
     double plane;              /**< Absolute Y of the plane without a terrain */
     double lattice;            /**< Edge of a cell of the lattice of candidates */
     double spacing;            /**< Least distance between instances */
@@ -250,13 +250,7 @@ static bool box_scatter_prepare(
     ctx->terrain = box_scatter_terrain(world, config);
     if (ctx->terrain) {
         const Terrain *t = ecs_get(world, ctx->terrain, Terrain);
-        vec3 zero = {0, 0, 0};
-        double local[3], origin[3];
-        box_terrain_origin(world, ctx->terrain, local);
-        box_world_to_absolute(world, zero, origin);
-        for (i = 0; i < 3; i ++) {
-            ctx->frame[i] = origin[i] + local[i];
-        }
+        box_terrain_origin(world, ctx->terrain, ctx->frame);
 
         ctx->masks = t->masks && config->mask_channel >= 0 && config->mask_channel < 4;
     }
@@ -488,13 +482,11 @@ static bool box_scatter_region(
     const Position *own = ecs_get(world, e, Position);
     const ChunkGridCell *cell = NULL;
     double offset[3] = {0, 0, 0};
-    vec3 local = {0, 0, 0};
     ecs_entity_t cur = e;
     bool result = false;
     int32_t a;
     if (config->extent[0] > 0 && config->extent[1] > 0) {
-        box_world_position(world, e, local);
-        box_world_to_absolute(world, local, anchor);
+        box_world_position(world, e, anchor);
         rect[0] = anchor[0];
         rect[1] = anchor[2];
         rect[2] = anchor[0] + (double)config->extent[0];

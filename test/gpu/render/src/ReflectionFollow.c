@@ -306,36 +306,3 @@ void ReflectionFollow_far_shapes_do_not_queue(void) {
 
     ecs_fini(world);
 }
-
-void ReflectionFollow_origin_shift_does_not_recapture(void) {
-    // reflection_probes/follow
-    ecs_world_t *world = world_new();
-    ecs_entity_t scene = scene_new(world, 0.1f);
-    ecs_entity_t focus = focus_new(world, scene);
-    ecs_set(world, focus, Position, {4, 0, 0});
-    test_assert(converge(world, scene, 50) < 50);
-    capture_expect(world, scene, 4, FOLLOW_HEIGHT, 0);
-
-    box_world_origin_shift(world, scene, (double[3]){ 256, 0, -512 });
-    frame(world);
-    test_int(box_render_reflect_queue(world, scene, NULL, 0), 0);
-    test_bool(ecs_get(world, scene, ReflectionBakeStatus)->converged, true);
-    capture_expect(world, scene, 4 - 256, FOLLOW_HEIGHT, 512);
-
-    int32_t i;
-    for (i = 0; i < 5; i ++) {
-        frame(world);
-        test_bool(ecs_get(world, scene, ReflectionBakeStatus)->converged, true);
-    }
-
-    /* The probe follows the focus from its shifted place */
-    const Position *p = ecs_get(world, focus, Position);
-    test_flt(p->x, 4 - 256);
-    ecs_set(world, focus, Position, {p->x + FOLLOW_DISTANCE + 1, 0, 512});
-    frame(world);
-    test_bool(ecs_get(world, scene, ReflectionBakeStatus)->converged, false);
-    test_assert(converge(world, scene, 50) < 50);
-    capture_expect(world, scene, 4 - 256 + FOLLOW_DISTANCE + 1, FOLLOW_HEIGHT, 512);
-
-    ecs_fini(world);
-}

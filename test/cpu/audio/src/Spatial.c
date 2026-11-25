@@ -424,7 +424,7 @@ void Spatial_play_at(void) {
     ecs_entity_t listener = spatial_listener(world, 0, 0, 0);
     float l, r;
     audio_run(world, 1);
-    test_bool(box_audio_play_at(world, dc, (vec3){5, 0, 0}, 1.0f), true);
+    test_bool(box_audio_play_at(world, dc, (dvec3){5, 0, 0}, 1.0f), true);
     audio_run(world, 3);
     spatial_pan(1, 1, &l, &r);
     spatial_expect(l, r);
@@ -435,7 +435,7 @@ void Spatial_play_at(void) {
     spatial_expect(l, r);
 
     int64_t skipped = box_audio_module_stats(world).out_of_range;
-    test_bool(box_audio_play_at(world, dc, (vec3){100, 0, 0}, 1.0f), true);
+    test_bool(box_audio_play_at(world, dc, (dvec3){100, 0, 0}, 1.0f), true);
     audio_run(world, 2);
     test_int(box_audio_module_stats(world).out_of_range, skipped + 1);
     test_int(ecs_singleton_get(world, AudioStatus)->voices, 1);
@@ -468,7 +468,7 @@ void Spatial_play_at_synth_and_file(void) {
     audio_run(world, 2);
     test_int(ecs_get(world, sounds[1], SoundStatus)->state, SoundReady);
     for (i = 0; i < 2; i ++) {
-        test_bool(box_audio_play_at(world, sounds[i], (vec3){-5, 0, 0}, 1.0f), true);
+        test_bool(box_audio_play_at(world, sounds[i], (dvec3){-5, 0, 0}, 1.0f), true);
         start = audio_tap_count;
         audio_run(world, 6);
         test_assert(audio_peak(audio_tap_l, start, audio_tap_count) > 0.6f);
@@ -978,7 +978,7 @@ void Spatial_cutoff_play_at(void) {
 
     /* Near, the one shot is bright */
     from = audio_tap_count;
-    test_bool(box_audio_play_at(world, tone, (vec3){0, 0, -0.5f}, 1.0f), true);
+    test_bool(box_audio_play_at(world, tone, (dvec3){0, 0, -0.5f}, 1.0f), true);
     audio_run(world, 6);
     test_assert(fabs(spatial_rms(audio_tap_l, audio_tap_count - SPATIAL_FILTER_MEASURE,
         audio_tap_count) - open) < 0.01 * open);
@@ -988,7 +988,7 @@ void Spatial_cutoff_play_at(void) {
 
     /* Far, it is dark from its first frame */
     from = audio_tap_count;
-    test_bool(box_audio_play_at(world, tone, (vec3){0, 0, -49}, 1.0f), true);
+    test_bool(box_audio_play_at(world, tone, (dvec3){0, 0, -49}, 1.0f), true);
     audio_run(world, 6);
     test_int(ecs_singleton_get(world, AudioStatus)->voices, 1);
     test_assert(audio_peak(audio_tap_l, from, audio_tap_count) < 0.01f);
@@ -1051,13 +1051,13 @@ void Spatial_cutoff_synth(void) {
     spatial_listener(world, 0, 0, 0);
     audio_run(world, 2);
 
-    test_bool(box_audio_play_at(world, beep, (vec3){0, 0, -0.5f}, 1.0f), true);
+    test_bool(box_audio_play_at(world, beep, (dvec3){0, 0, -0.5f}, 1.0f), true);
     audio_run(world, 8);
     near_ = spatial_rms(audio_tap_l, audio_tap_count - SPATIAL_FILTER_MEASURE, audio_tap_count);
     audio_run(world, 60);
     test_int(ecs_singleton_get(world, AudioStatus)->voices, 0);
 
-    test_bool(box_audio_play_at(world, beep, (vec3){0, 0, -49}, 1.0f), true);
+    test_bool(box_audio_play_at(world, beep, (dvec3){0, 0, -49}, 1.0f), true);
     audio_run(world, 8);
     far_ = spatial_rms(audio_tap_l, audio_tap_count - SPATIAL_FILTER_MEASURE, audio_tap_count);
     test_int(ecs_singleton_get(world, AudioStatus)->voices, 1);

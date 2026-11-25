@@ -29,8 +29,8 @@ struct Cascade {
     light: vec4f,
     // A point light tile: x the near plane, y the far plane
     planes: vec4f,
-    // The absolute position of the local origin (WorldOrigin) as box_gpu_origin_split packs it
-    // (world_origin.wgsl)
+    // The render origin as box_gpu_origin_split packs it
+    // (render_origin.wgsl)
     origin: vec4i,
 };
 
@@ -128,14 +128,14 @@ fn caster_wind(slot: u32, world: vec3f, model: mat4x4f) -> vec3f {
     if (material_wind) {
         let m = material_fetch(shadings[slot].material & 0xFFFFFFu);
         if (wind_sways(m)) {
-            result = world + wind_move(world, model, m, world_origin(cascade.origin)).offset;
+            result = world + wind_move(world, model, m, render_origin(cascade.origin)).offset;
         }
     }
     return result;
 }
 
 fn caster_world_mesh(slot: u32, vertex: vec3f) -> vec3f {
-    let model = instance_model(transforms[slot]);
+    let model = instance_model(transforms[slot], cascade.origin);
     return caster_wind(slot, (model * vec4f(vertex, 1.0)).xyz, model);
 }
 
@@ -145,7 +145,7 @@ fn caster_world(slot: u32, vertex: vec3f) -> vec3f {
     if (slot < arrayLength(&surfaces)) {
         surface_data = surfaces[slot];
     }
-    let model = instance_model(transforms[slot]);
+    let model = instance_model(transforms[slot], cascade.origin);
     var position = vertex;
     if (surface_data.p[19].x != 0.0) {
         position = vertex;
@@ -281,13 +281,13 @@ fn cutout_attributes(v: VertexIn, o: ptr<function, CasterOut>) {
 // position and normal: the object position and normal of the vertex.
 fn cutout_mapping(v: VertexIn, material: Material, position: vec3f, normal: vec3f,
     o: ptr<function, CasterOut>) {
-    let model = instance_model(transforms[slot_of(v.slot)]);
+    let model = instance_model(transforms[slot_of(v.slot)], cascade.origin);
     let c0 = model[0].xyz;
     let c1 = model[1].xyz;
     let c2 = model[2].xyz;
     var scaled = model;
     if (slot_of(v.slot) < arrayLength(&frames)) {
-        scaled = instance_frame(frames[slot_of(v.slot)], model);
+        scaled = instance_frame(frames[slot_of(v.slot)], model, cascade.origin);
     }
     let scale = vec3f(length(scaled[0].xyz), length(scaled[1].xyz), length(scaled[2].xyz));
     (*o).mapped = 1.0 + material_blend(material);
@@ -297,21 +297,21 @@ fn cutout_mapping(v: VertexIn, material: Material, position: vec3f, normal: vec3
     if (material_world(material)) {
         let flip = select(1.0, -1.0, dot(c0, cross(c1, c2)) < 0.0);
         (*o).object = mapping_world(material, (model * vec4f(position, 1.0)).xyz,
-            world_origin(cascade.origin));
+            render_origin(cascade.origin));
         (*o).object_normal = mat3x3f(cross(c1, c2), cross(c2, c0), cross(c0, c1)) *
             normal * flip;
     } else if (material_frame(material)) {
         var relative = model;
         var framed = false;
         if (slot_of(v.slot) < arrayLength(&frames)) {
-            relative = instance_frame(frames[slot_of(v.slot)], model);
+            relative = instance_frame(frames[slot_of(v.slot)], model, cascade.origin);
             framed = instance_framed(frames[slot_of(v.slot)], transforms[slot_of(v.slot)]);
         }
         let f = mapping_frame(material, relative, position, normal);
         (*o).object = f.object;
         if (!framed) {
             (*o).object += mapping_origin(material,
-                world_origin(cascade.origin));
+                render_origin(cascade.origin));
         }
         (*o).object_normal = f.normal;
     }
@@ -600,7 +600,8 @@ fn impostor_light_direction(world: vec4f) -> vec3f {
 
 @vertex fn vs_impostor(v: VertexIn, d: VertexData) -> ImpostorCasterOut {
     let slot = slot_of(v.slot);
-    let model = instance_model(transforms[slot]);
+    let rows = instance_rows(transforms[slot], cascade.origin);
+    let model = rows_model(rows);
     let grid = impostor_grid(d);
     let center = model * vec4f(grid.center, 1.0);
     let e = impostor_local_direction(model, impostor_light_direction(center), grid.hemisphere);
@@ -614,9 +615,9 @@ fn impostor_light_direction(world: vec4f) -> vec3f {
         caster_range(v.slot), 0u);
     o.eye = vec4f(e, grid.half);
     o.center = vec4f(grid.center, grid.ratio);
-    o.row0 = transforms[slot].rows[0];
-    o.row1 = transforms[slot].rows[1];
-    o.row2 = transforms[slot].rows[2];
+    o.row0 = rows[0];
+    o.row1 = rows[1];
+    o.row2 = rows[2];
     return o;
 }
 
