@@ -157,41 +157,34 @@ static Scatter sc_config(
     return result;
 }
 
-/** Collect the instances of a scatter in absolute coordinates.
+/** Collect the instances of a scatter.
  *
  * @param world The world
  * @param scatter The scatter entity
- * @param ax Absolute X of the scatter entity
- * @param ay Absolute Y of the scatter entity
- * @param az Absolute Z of the scatter entity
  * @param out Receives the instances after count of them
  * @param count Instances in out, incremented
  */
 static void sc_collect(
     ecs_world_t *world,
     ecs_entity_t scatter,
-    double ax,
-    double ay,
-    double az,
     sc_inst_t *out,
     int32_t *count)
 {
-    int32_t i;
-    ecs_iter_t it = ecs_children(world, scatter);
-    while (ecs_children_next(&it)) {
-        for (i = 0; i < it.count; i ++) {
-            ecs_entity_t e = it.entities[i];
-            const Position *p = ecs_get(world, e, Position);
-            const Rotation *r = ecs_get(world, e, Rotation);
-            const Scale *s = ecs_get(world, e, Scale);
-            test_assert(p != NULL && r != NULL && s != NULL);
-            test_assert(*count < SC_MAX);
-            out[*count] = (sc_inst_t){
-                .x = ax + p->x, .y = ay + p->y, .z = az + p->z, .r = *r, .s = *s,
-                .prefab = ecs_get_target(world, e, EcsIsA, 0)
-            };
-            (*count) ++;
-        }
+    int32_t i, n;
+    const ecs_entity_t *instances = box_scatter_instances(world, scatter, &n);
+    for (i = 0; i < n; i ++) {
+        ecs_entity_t e = instances[i];
+        const Position *p = ecs_get(world, e, Position);
+        const Rotation *r = ecs_get(world, e, Rotation);
+        const Scale *s = ecs_get(world, e, Scale);
+        test_assert(p != NULL && r != NULL && s != NULL);
+        test_assert(ecs_get_parent(world, e) == 0);
+        test_assert(*count < SC_MAX);
+        out[*count] = (sc_inst_t){
+            .x = p->x, .y = p->y, .z = p->z, .r = *r, .s = *s,
+            .prefab = ecs_get_target(world, e, EcsIsA, 0)
+        };
+        (*count) ++;
     }
 }
 
@@ -237,20 +230,20 @@ static double sc_min_distance(
     return result;
 }
 
-/** Count the children of an entity.
+/** Count the instances of a scatter whose entities are alive.
  *
  * @param world The world
- * @param e The entity
- * @return Number of children
+ * @param e The scatter entity
+ * @return Number of instances
  */
-static int32_t sc_children(
+static int32_t sc_instances(
     ecs_world_t *world,
     ecs_entity_t e)
 {
-    int32_t result = 0;
-    ecs_iter_t it = ecs_children(world, e);
-    while (ecs_children_next(&it)) {
-        result += it.count;
+    int32_t result = 0, i, n;
+    const ecs_entity_t *instances = box_scatter_instances(world, e, &n);
+    for (i = 0; i < n; i ++) {
+        result += ecs_is_alive(world, instances[i]);
     }
 
     return result;
@@ -428,7 +421,7 @@ void Scatter_defaults(void) {
     test_assert(ecs_has(world, e, ScatterStatus));
     ecs_progress(world, 0);
     test_int(ecs_get(world, e, ScatterStatus)->instances, 0);
-    test_int(sc_children(world, e), 0);
+    test_int(sc_instances(world, e), 0);
 
     ecs_fini(world);
 }
@@ -451,21 +444,19 @@ void Scatter_density_counts(void) {
     /* A jittered grid as large as the density asks has one candidate per lattice cell */
     const ScatterStatus *s = ecs_get(world, a, ScatterStatus);
     test_int(s->instances, 100);
-    test_int(sc_children(world, a), 100);
+    test_int(sc_instances(world, a), 100);
     test_int(ecs_get(world, b, ScatterStatus)->instances, 400);
     s = ecs_get(world, d, ScatterStatus);
     test_assert(s->instances >= 180 && s->instances <= 220);
     test_int(s->evaluations, 1);
 
-    /* On the plane Y 0 of the parent, here the world, so at -3 under the entity */
-    ecs_iter_t it = ecs_children(world, a);
-    int32_t i;
-    while (ecs_children_next(&it)) {
-        for (i = 0; i < it.count; i ++) {
-            const Position *p = ecs_get(world, it.entities[i], Position);
-            test_flt(p->y, -3);
-            test_assert(p->x >= 0 && p->x < 100 && p->z >= 0 && p->z < 100);
-        }
+    /* On the plane Y 0 of the parent, here the world, in absolute coordinates */
+    int32_t i, n;
+    const ecs_entity_t *instances = box_scatter_instances(world, a, &n);
+    for (i = 0; i < n; i ++) {
+        const Position *p = ecs_get(world, instances[i], Position);
+        test_flt(p->y, 0);
+        test_assert(p->x >= 0 && p->x < 100 && p->z >= 0 && p->z < 100);
     }
 
     /* Poisson disk: thinned to the density below its densest packing */
@@ -496,7 +487,7 @@ void Scatter_spacing_holds(void) {
         ecs_entity_t e = sc_scatter(world, 0, -30, 0, -30, &c);
         ecs_progress(world, 0);
         int32_t count = 0;
-        sc_collect(world, e, -30, 0, -30, insts, &count);
+        sc_collect(world, e, insts, &count);
         test_assert(count > 50);
         test_int(count, ecs_get(world, e, ScatterStatus)->instances);
         test_assert(sc_min_distance(insts, count) >= c.spacing - 1e-4);
@@ -529,9 +520,9 @@ void Scatter_cells_seamless(void) {
         ecs_progress(world, 0);
 
         int32_t nc = 0, nw = 0;
-        sc_collect(world, sa, -20, 0, 40, cells, &nc);
-        sc_collect(world, sb, 0, 0, 40, cells, &nc);
-        sc_collect(world, big, -20, 0, 40, whole, &nw);
+        sc_collect(world, sa, cells, &nc);
+        sc_collect(world, sb, cells, &nc);
+        sc_collect(world, big, whole, &nw);
         test_assert(nc > 30);
         test_int(nc, nw);
 
@@ -573,7 +564,7 @@ void Scatter_deterministic(void) {
     ecs_entity_t cell = sc_cell(world, 3, -4, 32, &c, &s);
     ecs_progress(world, 0);
     int32_t n1 = 0, n2 = 0, i;
-    sc_collect(world, s, 96, 0, -128, first, &n1);
+    sc_collect(world, s, first, &n1);
     test_assert(n1 > 0);
 
     /* Revisit the cell after other entities were made: the same instances */
@@ -584,7 +575,7 @@ void Scatter_deterministic(void) {
 
     cell = sc_cell(world, 3, -4, 32, &c, &s);
     ecs_progress(world, 0);
-    sc_collect(world, s, 96, 0, -128, again, &n2);
+    sc_collect(world, s, again, &n2);
     test_int(n1, n2);
     qsort(first, (size_t)n1, sizeof(sc_inst_t), sc_compare);
     qsort(again, (size_t)n2, sizeof(sc_inst_t), sc_compare);
@@ -601,7 +592,7 @@ void Scatter_deterministic(void) {
     ecs_set_ptr(world, s, Scatter, &c);
     ecs_progress(world, 0);
     n2 = 0;
-    sc_collect(world, s, 96, 0, -128, again, &n2);
+    sc_collect(world, s, again, &n2);
     qsort(again, (size_t)n2, sizeof(sc_inst_t), sc_compare);
     test_assert(n2 > 0);
     test_assert(n1 != n2 || first[0].x != again[0].x || first[0].z != again[0].z);
@@ -628,8 +619,8 @@ void Scatter_avoid(void) {
         bc.avoid[0] = ts;
         bs = sc_scatter(world, cell, 0, 0, 0, &bc);
         ecs_progress(world, 0);
-        sc_collect(world, ts, cx * 20, 0, 0, trees, &nt);
-        sc_collect(world, bs, cx * 20, 0, 0, bushes, &nb);
+        sc_collect(world, ts, trees, &nt);
+        sc_collect(world, bs, bushes, &nb);
         avoided += ecs_get(world, bs, ScatterStatus)->avoided;
     }
 
@@ -669,13 +660,13 @@ void Scatter_reevaluate_on_change(void) {
     const ScatterStatus *s = ecs_get(world, e, ScatterStatus);
     test_int(s->instances, 100);
     test_int(s->evaluations, 2);
-    test_int(sc_children(world, e), 100);
+    test_int(sc_instances(world, e), 100);
 
     c.items[0].prefab = 0;
     ecs_set_ptr(world, e, Scatter, &c);
     ecs_progress(world, 0);
     test_int(ecs_get(world, e, ScatterStatus)->instances, 0);
-    test_int(sc_children(world, e), 0);
+    test_int(sc_instances(world, e), 0);
 
     ecs_fini(world);
 }
@@ -701,19 +692,17 @@ void Scatter_bulk_instances(void) {
     printf("Scatter: %d instances in %.3f ms (%.3f ms created), %.0f per ms\n",
         s->instances, (double)s->time_ms, (double)s->create_ms, (double)s->per_ms);
 
-    int32_t trees = 0, bushes = 0, i;
-    ecs_iter_t it = ecs_children(world, e);
-    while (ecs_children_next(&it)) {
-        for (i = 0; i < it.count; i ++) {
-            ecs_entity_t inst = it.entities[i];
-            trees += ecs_has_pair(world, inst, EcsIsA, tree);
-            bushes += ecs_has_pair(world, inst, EcsIsA, bush);
-            test_assert(ecs_owns(world, inst, Position));
-            test_assert(ecs_owns(world, inst, Rotation));
-            test_assert(ecs_owns(world, inst, Scale));
-            test_assert(ecs_has(world, inst, WorldTransform));
-            test_assert(ecs_has_id(world, inst, SpatialIgnore));
-        }
+    int32_t trees = 0, bushes = 0, i, n;
+    const ecs_entity_t *instances = box_scatter_instances(world, e, &n);
+    for (i = 0; i < n; i ++) {
+        ecs_entity_t inst = instances[i];
+        trees += ecs_has_pair(world, inst, EcsIsA, tree);
+        bushes += ecs_has_pair(world, inst, EcsIsA, bush);
+        test_assert(ecs_owns(world, inst, Position));
+        test_assert(ecs_owns(world, inst, Rotation));
+        test_assert(ecs_owns(world, inst, Scale));
+        test_assert(ecs_has(world, inst, WorldTransform));
+        test_assert(ecs_has_id(world, inst, SpatialIgnore));
     }
 
     test_int(trees + bushes, 10000);
@@ -743,7 +732,7 @@ void Scatter_filter_mask(void) {
     sc_progress_filled(world, terrain, 6);
 
     int32_t nh = 0, ns = 0, i, inner = 0;
-    sc_collect(world, hard, -20, 0, -20, insts, &nh);
+    sc_collect(world, hard, insts, &nh);
     test_assert(nh > 0);
     test_assert(ecs_get(world, hard, ScatterStatus)->filtered > 0);
     for (i = 0; i < nh; i ++) {
@@ -751,7 +740,7 @@ void Scatter_filter_mask(void) {
     }
 
     /* The soft edge thins the density from X 10 down to X 0 */
-    sc_collect(world, soft, -20, 0, -20, insts, &ns);
+    sc_collect(world, soft, insts, &ns);
     test_assert(ns > nh);
     for (i = 0; i < ns; i ++) {
         test_assert(insts[i].x >= -1e-2);
@@ -785,7 +774,7 @@ void Scatter_filter_slope(void) {
     sc_progress_filled(world, terrain, 6);
 
     int32_t n = 0, i;
-    sc_collect(world, flat, -20, 0, -20, insts, &n);
+    sc_collect(world, flat, insts, &n);
     test_assert(n > 50);
     test_assert(ecs_get(world, flat, ScatterStatus)->filtered > 50);
     for (i = 0; i < n; i ++) {
@@ -794,7 +783,7 @@ void Scatter_filter_slope(void) {
     }
 
     n = 0;
-    sc_collect(world, steep, -20, 0, -20, insts, &n);
+    sc_collect(world, steep, insts, &n);
     test_assert(n > 50);
     for (i = 0; i < n; i ++) {
         test_assert(insts[i].x > -1);
@@ -823,7 +812,7 @@ void Scatter_filter_height(void) {
     sc_progress_filled(world, terrain, 6);
 
     int32_t n = 0, i;
-    sc_collect(world, e, -20, 0, -20, insts, &n);
+    sc_collect(world, e, insts, &n);
     test_assert(n > 50);
     test_assert(ecs_get(world, e, ScatterStatus)->filtered > n);
     for (i = 0; i < n; i ++) {
@@ -856,7 +845,7 @@ void Scatter_terrain_waits_and_aligns(void) {
     const ScatterStatus *st = ecs_get(world, s, ScatterStatus);
     test_bool(st->waiting, true);
     test_int(st->instances, 0);
-    test_int(sc_children(world, s), 0);
+    test_int(sc_instances(world, s), 0);
 
     sc_progress_filled(world, terrain, 6);
     st = ecs_get(world, s, ScatterStatus);
@@ -865,7 +854,7 @@ void Scatter_terrain_waits_and_aligns(void) {
     test_int(st->evaluations, 1);
 
     int32_t n = 0, i;
-    sc_collect(world, s, 0, 0, 0, insts, &n);
+    sc_collect(world, s, insts, &n);
     test_int(n, 16);
     vec3 normal = {-0.5f, 1, 0};
     glm_vec3_normalize(normal);
@@ -913,12 +902,11 @@ void Scatter_chunk_grid_script(void) {
     const ScatterStatus *s = ecs_get(world, ground, ScatterStatus);
     test_assert(s != NULL);
     test_int(s->instances, 16);
-    ecs_iter_t it = ecs_children(world, ground);
-    while (ecs_children_next(&it)) {
-        for (i = 0; i < it.count; i ++) {
-            test_assert(ecs_has_pair(world, it.entities[i], EcsIsA, tree) ||
-                ecs_has_pair(world, it.entities[i], EcsIsA, bush));
-        }
+    int32_t n;
+    const ecs_entity_t *instances = box_scatter_instances(world, ground, &n);
+    for (i = 0; i < n; i ++) {
+        test_assert(ecs_has_pair(world, instances[i], EcsIsA, tree) ||
+            ecs_has_pair(world, instances[i], EcsIsA, bush));
     }
 
     /* At level 1 the template scatters half as densely */
@@ -931,7 +919,7 @@ void Scatter_chunk_grid_script(void) {
     test_assert(ground != 0);
     s = ecs_get(world, ground, ScatterStatus);
     test_assert(s->instances > 0 && s->instances < 16);
-    test_int(sc_children(world, ground), s->instances);
+    test_int(sc_instances(world, ground), s->instances);
 
     ecs_fini(world);
 }
@@ -946,11 +934,9 @@ void Scatter_set_same_keeps_instances(void) {
     ecs_entity_t e = sc_scatter(world, 0, 0, 0, 0, &c);
     ecs_entity_t other = sc_scatter(world, 0, 100, 0, 0, &c);
     ecs_progress(world, 0);
-    ecs_entity_t first = 0;
-    ecs_iter_t it = ecs_children(world, e);
-    while (ecs_children_next(&it)) {
-        first = first ? first : it.entities[0];
-    }
+    int32_t n;
+    const ecs_entity_t *instances = box_scatter_instances(world, e, &n);
+    ecs_entity_t first = n ? instances[0] : 0;
 
     test_assert(first != 0);
     ecs_set_ptr(world, e, Scatter, &c);
@@ -959,7 +945,7 @@ void Scatter_set_same_keeps_instances(void) {
     test_int((int32_t)box_scatter_visits(world), 3);
     test_int(ecs_get(world, e, ScatterStatus)->evaluations, 1);
     test_assert(ecs_is_alive(world, first));
-    test_int(sc_children(world, e), 25);
+    test_int(sc_instances(world, e), 25);
 
     // A value changed in place and marked modified evaluates that scatter only
     Scatter *ptr = ecs_get_mut(world, e, Scatter);
@@ -989,23 +975,23 @@ void Scatter_enable_evaluates(void) {
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     test_int(ecs_get(world, e, ScatterStatus)->evaluations, 0);
-    test_int(sc_children(world, e), 0);
+    test_int(sc_instances(world, e), 0);
 
     ecs_enable(world, e, true);
     ecs_progress(world, 0);
     test_int(ecs_get(world, e, ScatterStatus)->evaluations, 1);
-    test_int(sc_children(world, e), 25);
+    test_int(sc_instances(world, e), 25);
 
     // A change while disabled applies when the scatter is enabled again
     ecs_enable(world, e, false);
     c.density = 4;
     ecs_set_ptr(world, e, Scatter, &c);
     ecs_progress(world, 0);
-    test_int(sc_children(world, e), 25);
+    test_int(sc_instances(world, e), 25);
     ecs_enable(world, e, true);
     ecs_progress(world, 0);
     test_int(ecs_get(world, e, ScatterStatus)->evaluations, 2);
-    test_int(sc_children(world, e), 100);
+    test_int(sc_instances(world, e), 100);
 
     // Enabling without a change evaluates nothing
     ecs_enable(world, e, false);
@@ -1028,15 +1014,15 @@ void Scatter_prefab_instance(void) {
     ecs_set(world, prefab, Position, {0, 0, 0});
     ecs_set_ptr(world, prefab, Scatter, &c);
     ecs_progress(world, 0);
-    test_int(sc_children(world, prefab), 0);
+    test_int(sc_instances(world, prefab), 0);
     test_int((int32_t)box_scatter_visits(world), 0);
 
     ecs_entity_t inst = ecs_new_w_pair(world, EcsIsA, prefab);
     ecs_progress(world, 0);
     test_assert(ecs_owns(world, inst, Scatter));
     test_int(ecs_get(world, inst, ScatterStatus)->instances, 25);
-    test_int(sc_children(world, inst), 25);
-    test_int(sc_children(world, prefab), 0);
+    test_int(sc_instances(world, inst), 25);
+    test_int(sc_instances(world, prefab), 0);
 
     ecs_fini(world);
 }
@@ -1070,6 +1056,78 @@ void Scatter_waiting_polls_until_ground(void) {
     sc_progress_filled(world, terrain, 3);
     test_assert(box_scatter_visits(world) == visits);
     test_int(ecs_get(world, s, ScatterStatus)->evaluations, 1);
+
+    ecs_fini(world);
+}
+
+void Scatter_instances_share_tables(void) {
+    // scenes/scatter
+    ecs_world_t *world = sc_world();
+    ecs_entity_t tree = sc_prefab(world, "ScatterTree");
+    Scatter c = sc_config(tree, 0, 1, 0, 1);
+    c.extent[0] = 50;
+    c.extent[1] = 50;
+    ecs_entity_t a = sc_scatter(world, 0, 0, 0, 0, &c);
+    ecs_entity_t b = sc_scatter(world, 0, 100, 0, 0, &c);
+    ecs_entity_t cell_a, cell_b;
+    sc_cell(world, 0, 0, 20, &c, &cell_a);
+    sc_cell(world, 1, 0, 20, &c, &cell_b);
+    ecs_progress(world, 0);
+
+    ecs_entity_t scatters[] = { a, b, cell_a, cell_b };
+    ecs_table_t *table = NULL;
+    int32_t s, i, n, total = 0;
+    for (s = 0; s < 4; s ++) {
+        const ecs_entity_t *instances = box_scatter_instances(world, scatters[s], &n);
+        test_assert(n > 0);
+        for (i = 0; i < n; i ++) {
+            test_assert(ecs_get_parent(world, instances[i]) == 0);
+            table = table ? table : ecs_get_table(world, instances[i]);
+            test_assert(ecs_get_table(world, instances[i]) == table);
+        }
+
+        total += n;
+    }
+
+    test_int(ecs_table_count(table), total);
+
+    ecs_fini(world);
+}
+
+void Scatter_delete_deletes_instances(void) {
+    // scenes/scatter
+    ecs_world_t *world = sc_world();
+    ecs_entity_t tree = sc_prefab(world, "ScatterTree");
+    Scatter c = sc_config(tree, 0, 1, 0, 1);
+    c.extent[0] = 50;
+    c.extent[1] = 50;
+    ecs_entity_t e = sc_scatter(world, 0, 0, 0, 0, &c);
+    ecs_entity_t removed = sc_scatter(world, 0, 100, 0, 0, &c);
+    ecs_entity_t kept = sc_scatter(world, 0, 200, 0, 0, &c);
+    ecs_entity_t s;
+    ecs_entity_t cell = sc_cell(world, 0, 0, 20, &c, &s);
+    ecs_progress(world, 0);
+
+    ecs_entity_t scatters[] = { e, removed, cell, kept };
+    ecs_entity_t owned[4][64];
+    int32_t counts[4], i, j;
+    for (i = 0; i < 4; i ++) {
+        ecs_entity_t scatter = i == 2 ? s : scatters[i];
+        const ecs_entity_t *instances = box_scatter_instances(world, scatter, &counts[i]);
+        test_assert(counts[i] > 0 && counts[i] <= 64);
+        ecs_os_memcpy_n(owned[i], instances, ecs_entity_t, counts[i]);
+    }
+
+    /* Deleting the scatter, removing its Scatter or deleting its cell deletes its instances */
+    ecs_delete(world, e);
+    ecs_remove(world, removed, Scatter);
+    ecs_delete(world, cell);
+    ecs_progress(world, 0);
+    for (i = 0; i < 4; i ++) {
+        for (j = 0; j < counts[i]; j ++) {
+            test_bool(ecs_is_alive(world, owned[i][j]), i == 3);
+        }
+    }
 
     ecs_fini(world);
 }

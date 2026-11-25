@@ -244,7 +244,9 @@
                     "set_same_keeps_instances",
                     "enable_evaluates",
                     "prefab_instance",
-                    "waiting_polls_until_ground"
+                    "waiting_polls_until_ground",
+                    "instances_share_tables",
+                    "delete_deletes_instances"
                 ]
             }
         ]

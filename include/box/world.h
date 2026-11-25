@@ -134,7 +134,8 @@ ECS_STRUCT(ScatterItem, {
     float weight;        /**< Weight of the prefab among the items, 0 or less for never */
 });
 
-/** Places instances of weighted prefabs over a region, as IsA children of the entity.
+/** Places instances of weighted prefabs over a region, as IsA root entities that the entity
+ * owns: they have absolute positions and are deleted with the Scatter.
  *
  * The region is the cell of the nearest ChunkGrid ancestor (ChunkGridCell), or extent meters
  * along X and Z from the entity. Placement is a function of absolute positions and the seed, so
@@ -247,6 +248,19 @@ void box_chunk_grid_work(
     const ecs_world_t *world,
     int64_t *updates,
     int64_t *scans);
+
+/** Get the instances a Scatter placed in its last finished evaluation. The pointer is valid
+ * until the scatter is evaluated again or its ScatterState is removed.
+ *
+ * @param world The world
+ * @param e The scatter entity
+ * @param count Receives the number of instances
+ * @return The instances, NULL when it has none
+ */
+const ecs_entity_t* box_scatter_instances(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    int32_t *count);
 
 /** Get the Scatters the scatter system looked at so far, for tests: those added, set or
  * enabled since its last run and those that wait for their ground.

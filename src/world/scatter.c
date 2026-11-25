@@ -1,7 +1,8 @@
 /**
  * @file world/scatter.c
  * @brief Scatter: deterministic placement of weighted prefab instances over a region or a
- * ChunkGrid cell, by density and spacing, filtered by the ground and created in bulk.
+ * ChunkGrid cell, by density and spacing, filtered by the ground and created in bulk as root
+ * entities that the scatter owns, so the instances of all scatters share tables.
  *
  * Candidates lie on a lattice in absolute world coordinates, each a function of its lattice
  * cell and the seed, so a region only picks the candidates within it and adjacent regions join.
@@ -37,6 +38,7 @@ typedef struct ScatterState {
     bool done;                 /**< Whether config holds a finished evaluation */
     int32_t evaluations;       /**< Finished evaluations */
     uint64_t pass;             /**< Run of the system that last visited it */
+    ecs_vec_t instances;       /**< ecs_entity_t of the instances it placed */
 } ScatterState;
 
 static ECS_COMPONENT_DECLARE(ScatterState);
@@ -78,7 +80,7 @@ typedef struct box_scatter_ground_t {
 /** An instance waiting for creation */
 typedef struct box_scatter_instance_t {
     int32_t item;              /**< Index of the item */
-    Position p;                /**< Position relative to the scatter entity */
+    Position p;                /**< Absolute position */
     Rotation r;                /**< Rotation */
     Scale s;                   /**< Scale */
 } box_scatter_instance_t;
@@ -109,6 +111,153 @@ static void box_scatter_ctor(
         values[i].scale_min = 1;
         values[i].scale_max = 1;
     }
+}
+
+/** Construct ScatterState values without instances.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_scatter_state_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    ScatterState *values = ptr;
+    int32_t i;
+    (void)ti;
+    ecs_os_memset(values, 0, ECS_SIZEOF(ScatterState) * count);
+    for (i = 0; i < count; i ++) {
+        ecs_vec_init_t(NULL, &values[i].instances, ecs_entity_t, 0);
+    }
+}
+
+/** Free the instance lists of ScatterState values, without deleting the instances.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_scatter_state_dtor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    ScatterState *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        ecs_vec_fini_t(NULL, &values[i].instances, ecs_entity_t);
+    }
+}
+
+/** Move ScatterState values, the instances with them.
+ *
+ * @param dst_ptr The destination components, constructed
+ * @param src_ptr The source components, left without instances
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_scatter_state_move(
+    void *dst_ptr,
+    void *src_ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    ScatterState *dst = dst_ptr, *src = src_ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        ecs_vec_fini_t(NULL, &dst[i].instances, ecs_entity_t);
+        dst[i] = src[i];
+        ecs_vec_init_t(NULL, &src[i].instances, ecs_entity_t, 0);
+    }
+}
+
+/** Copy ScatterState values as new ones: the instances belong to the source, so the copy owns
+ * none and evaluates its scatter again.
+ *
+ * @param dst_ptr The destination components, constructed
+ * @param src_ptr The source components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_scatter_state_copy(
+    void *dst_ptr,
+    const void *src_ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    (void)src_ptr;
+    box_scatter_state_dtor(dst_ptr, count, ti);
+    box_scatter_state_ctor(dst_ptr, count, ti);
+}
+
+/** Delete instances that are still alive.
+ *
+ * @param world The world
+ * @param instances The ecs_entity_t
+ */
+static void box_scatter_delete(
+    ecs_world_t *world,
+    const ecs_vec_t *instances)
+{
+    const ecs_entity_t *entities = ecs_vec_first_t(instances, ecs_entity_t);
+    int32_t i, count = ecs_vec_count(instances);
+    for (i = 0; i < count; i ++) {
+        if (ecs_is_alive(world, entities[i])) {
+            ecs_delete(world, entities[i]);
+        }
+    }
+}
+
+/** Delete the instances of scatters whose ScatterState is removed or deleted.
+ *
+ * @param it The iterator
+ */
+static void box_scatter_state_on_remove(
+    ecs_iter_t *it)
+{
+    ScatterState *states = ecs_field(it, ScatterState, 0);
+    int32_t i;
+    if (ecs_is_fini(it->world)) {
+        goto done;
+    }
+
+    for (i = 0; i < it->count; i ++) {
+        box_scatter_delete(it->world, &states[i].instances);
+        ecs_vec_clear(&states[i].instances);
+    }
+
+done:
+    return;
+}
+
+/** Delete the instances of scatters whose Scatter is removed, and forget the evaluation so that
+ * a Scatter added again places them again.
+ *
+ * @param it The iterator
+ */
+static void box_scatter_on_remove(
+    ecs_iter_t *it)
+{
+    int32_t i;
+    if (ecs_is_fini(it->world)) {
+        goto done;
+    }
+
+    for (i = 0; i < it->count; i ++) {
+        ScatterState *state = ecs_get_mut(it->world, it->entities[i], ScatterState);
+        if (state) {
+            box_scatter_delete(it->world, &state->instances);
+            ecs_vec_clear(&state->instances);
+            state->done = false;
+        }
+    }
+
+done:
+    return;
 }
 
 /** Mix the bits of a 64 bit value (splitmix64 finalizer).
@@ -614,8 +763,8 @@ static int32_t box_scatter_item(
     return result;
 }
 
-/** Fill the pose of an instance: its position on the ground relative to the scatter entity,
- * a random yaw, the tilt toward the normal of the ground by align and a random scale.
+/** Fill the pose of an instance: its absolute position on the ground, a random yaw, the tilt
+ * toward the normal of the ground by align and a random scale.
  *
  * The rotation is yaw, then pitch, then roll (Ry * Rx * Rz), so its up (-sin roll,
  * cos roll cos pitch, cos roll sin pitch) before the yaw is the tilted up turned back by it.
@@ -625,7 +774,6 @@ static int32_t box_scatter_item(
  * @param iz Row of the lattice cell
  * @param p The candidate
  * @param g Its ground
- * @param anchor Absolute position of the scatter entity
  * @param out Receives the pose
  */
 static void box_scatter_pose(
@@ -634,7 +782,6 @@ static void box_scatter_pose(
     int64_t iz,
     const double p[2],
     const box_scatter_ground_t *g,
-    const double anchor[3],
     box_scatter_instance_t *out)
 {
     const Scatter *c = ctx->config;
@@ -654,11 +801,7 @@ static void box_scatter_pose(
     float cy = cosf(yaw), sy = sinf(yaw);
     float nx = n[0] * cy - n[2] * sy, nz = n[0] * sy + n[2] * cy;
     nx = nx < -1 ? -1 : nx > 1 ? 1 : nx;
-    out->p = (Position){
-        (float)(p[0] - anchor[0]),
-        (float)(g->y - (double)c->sink - anchor[1]),
-        (float)(p[1] - anchor[2])
-    };
+    out->p = (Position){ p[0], g->y - (double)c->sink, p[1] };
     out->r = (Rotation){ atan2f(nz, n[1]), yaw, asinf(-nx) };
     out->s = (Scale){ scale, scale, scale };
 }
@@ -669,7 +812,6 @@ static void box_scatter_pose(
  * @param avoid The scatters it avoids
  * @param avoid_count Number of them
  * @param rect The absolute region
- * @param anchor Absolute position of the scatter entity
  * @param out Receives box_scatter_instance_t
  * @param status Counts the candidates
  */
@@ -678,7 +820,6 @@ static void box_scatter_place(
     const box_scatter_ctx_t *avoid,
     int32_t avoid_count,
     const double rect[4],
-    const double anchor[3],
     ecs_vec_t *out,
     ScatterStatus *status)
 {
@@ -726,7 +867,7 @@ static void box_scatter_place(
 
             box_scatter_instance_t *inst = ecs_vec_append_t(NULL, out, box_scatter_instance_t);
             inst->item = box_scatter_item(ctx, ix, iz);
-            box_scatter_pose(ctx, ix, iz, p, &g, anchor, inst);
+            box_scatter_pose(ctx, ix, iz, p, &g, inst);
         }
     }
 
@@ -734,19 +875,19 @@ done:
     return;
 }
 
-/** Create the instances of a scatter in bulk, a batch per item: IsA its prefab, ChildOf the
- * scatter entity, with Position, Rotation, Scale and optionally SpatialIgnore.
+/** Create the instances of a scatter in bulk, a batch per item: root entities, IsA its prefab,
+ * with Position, Rotation, Scale and optionally SpatialIgnore.
  *
  * @param world The world
- * @param e The scatter entity
  * @param config The scatter
  * @param instances The box_scatter_instance_t
+ * @param out Receives the ecs_entity_t of the instances
  */
 static void box_scatter_create(
     ecs_world_t *world,
-    ecs_entity_t e,
     const Scatter *config,
-    const ecs_vec_t *instances)
+    const ecs_vec_t *instances,
+    ecs_vec_t *out)
 {
     int32_t count = ecs_vec_count(instances), i, item;
     const box_scatter_instance_t *src = ecs_vec_first_t(instances, box_scatter_instance_t);
@@ -782,16 +923,16 @@ static void box_scatter_create(
             .count = n,
             .ids = {
                 ecs_pair(EcsIsA, prefab),
-                ecs_pair(EcsChildOf, e),
                 ecs_id(Position),
                 ecs_id(Rotation),
                 ecs_id(Scale),
                 config->spatial_ignore && SpatialIgnore ? SpatialIgnore : 0
             },
-            .data = (void*[]){ NULL, NULL, &p[offset[item]], &r[offset[item]],
-                &s[offset[item]], NULL }
+            .data = (void*[]){ NULL, &p[offset[item]], &r[offset[item]], &s[offset[item]],
+                NULL }
         };
-        ecs_bulk_init(world, &desc);
+        const ecs_entity_t *created = ecs_bulk_init(world, &desc);
+        ecs_os_memcpy_n(ecs_vec_grow_t(NULL, out, ecs_entity_t, n), created, ecs_entity_t, n);
     }
 
     ecs_os_free(p);
@@ -804,6 +945,7 @@ static void box_scatter_create(
  * @param world The world
  * @param e The scatter entity
  * @param config The scatter
+ * @param owned The ecs_entity_t of its instances, replaced when it finishes
  * @param status Receives the counts and times
  * @return Whether it finished, false while it waits for the ground
  */
@@ -811,6 +953,7 @@ static bool box_scatter_evaluate(
     ecs_world_t *world,
     ecs_entity_t e,
     const Scatter *config,
+    ecs_vec_t *owned,
     ScatterStatus *status)
 {
     box_scatter_ctx_t ctx, avoid[BOX_WORLD_SCATTER_AVOID];
@@ -843,14 +986,15 @@ static bool box_scatter_evaluate(
     }
 
     if (valid) {
-        box_scatter_place(&ctx, avoid, avoid_count, rect, anchor, &instances, status);
+        box_scatter_place(&ctx, avoid, avoid_count, rect, &instances, status);
     }
 
     ecs_os_get_time(&t);
-    ecs_delete_with(world, ecs_pair(EcsChildOf, e));
+    box_scatter_delete(world, owned);
+    ecs_vec_clear(owned);
     status->delete_ms = (float)(ecs_time_measure(&t) * 1000.0);
     ecs_os_get_time(&t);
-    box_scatter_create(world, e, config, &instances);
+    box_scatter_create(world, config, &instances, owned);
     status->create_ms = (float)(ecs_time_measure(&t) * 1000.0);
     status->instances = ecs_vec_count(&instances);
 
@@ -892,7 +1036,7 @@ static void box_scatter_queue_free(
  * differs from their last evaluation, and those that wait for their ground, which stay queued.
  *
  * Runs after the ChunkGrid cells of the frame were created. A scatter entity without a
- * Position gets one, so that its instances are placed relative to it.
+ * Position gets one, so that its region has an origin.
  *
  * @param it The iterator of the system
  */
@@ -937,8 +1081,13 @@ static void BoxWorldScatter(
         Scatter config;
         ScatterStatus status = {0};
         ecs_os_memcpy_t(&config, ptr, Scatter);
-        bool done = box_scatter_evaluate(world, e, &config, &status);
         state = ecs_ensure(world, e, ScatterState);
+        ecs_vec_t owned = state->instances;
+        ecs_vec_init_t(NULL, &state->instances, ecs_entity_t, 0);
+        bool done = box_scatter_evaluate(world, e, &config, &owned, &status);
+        state = ecs_ensure(world, e, ScatterState);
+        ecs_vec_fini_t(NULL, &state->instances, ecs_entity_t);
+        state->instances = owned;
         ecs_os_memcpy_t(&state->config, &config, Scatter);
         state->done = done;
         state->evaluations += done;
@@ -952,6 +1101,17 @@ static void BoxWorldScatter(
     ecs_vec_fini_t(NULL, &pending, ecs_entity_t);
 done:
     return;
+}
+
+const ecs_entity_t* box_scatter_instances(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    int32_t *count)
+{
+    const ScatterState *state = ecs_get(world, e, ScatterState);
+    *count = state ? ecs_vec_count(&state->instances) : 0;
+
+    return state ? ecs_vec_first_t(&state->instances, ecs_entity_t) : NULL;
 }
 
 int64_t box_scatter_visits(
@@ -974,10 +1134,17 @@ void box_world_scatter_import(
         .ctor = box_scatter_ctor,
         .on_add = box_scatter_queue_add,
         .on_set = box_scatter_queue_add,
+        .on_remove = box_scatter_on_remove,
         .ctx = queue,
         .ctx_free = box_scatter_queue_free
     });
-    ecs_set_hooks(world, ScatterState, { .ctor = flecs_default_ctor });
+    ecs_set_hooks(world, ScatterState, {
+        .ctor = box_scatter_state_ctor,
+        .dtor = box_scatter_state_dtor,
+        .move = box_scatter_state_move,
+        .copy = box_scatter_state_copy,
+        .on_remove = box_scatter_state_on_remove
+    });
     ecs_add_pair(world, ecs_id(Scatter), EcsWith, ecs_id(ScatterState));
     ecs_add_pair(world, ecs_id(Scatter), EcsWith, ecs_id(ScatterStatus));
 
