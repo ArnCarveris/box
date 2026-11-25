@@ -233,11 +233,11 @@ fn light_cell(p: vec3f) {
     }
 }
 
-// Shadow of the sun at a point of the fog: shadow_point faded toward 1 over the last part of the
-// shadow distance, from the fade start of the surfaces or FOG_SHADOW_FADE of the distance before
-// its end, whichever is earlier, so fog that goes on past the shadows shows no ring or wall
-// where they end.
-fn fog_shadow(p: vec3f) -> f32 {
+// Shadow of the sun at a point of the fog, local p and relative to the render origin relative:
+// shadow_point faded toward 1 over the last part of the shadow distance, from the fade start of
+// the surfaces or FOG_SHADOW_FADE of the distance before its end, whichever is earlier, so fog
+// that goes on past the shadows shows no ring or wall where they end.
+fn fog_shadow(p: vec3f, relative: vec3f) -> f32 {
     let end = view.shadow_params.y;
     let start = min(view.shadow_params.x, end * (1.0 - FOG_SHADOW_FADE));
     let depth = -(view.view * vec4f(p, 1.0)).z;
@@ -246,20 +246,21 @@ fn fog_shadow(p: vec3f) -> f32 {
         return 1.0;
     }
 
-    return mix(shadow_point(p, p - view.render_delta.xyz), 1.0, fade);
+    return mix(shadow_point(p, relative), 1.0, fade);
 }
 
 // Share of the sun the cell sees through the cascades: its shadow at the BOX_FROXEL_SAMPLES
 // points of the cell from a to b, offset inside their strata by offset, weighed by the density
 // there (cell_weights), so where a face of a volume meets a wall the light outside the wall does
-// not leak into the fog inside it.
-fn sun_visible(a: vec3f, b: vec3f, offset: f32) -> f32 {
+// not leak into the fog inside it. ra and rb are a and b relative to the render origin.
+fn sun_visible(a: vec3f, b: vec3f, ra: vec3f, rb: vec3f, offset: f32) -> f32 {
     var visible = 0.0;
     var total = 0.0;
     for (var j = 0u; j < BOX_FROXEL_SAMPLES; j++) {
         let w = cell_weights[j];
         if (w > 0.0) {
-            visible += w * fog_shadow(mix(a, b, froxel_sample(j, offset)));
+            let t = froxel_sample(j, offset);
+            visible += w * fog_shadow(mix(a, b, t), mix(ra, rb, t));
             total += w;
         }
     }
@@ -379,13 +380,16 @@ fn inject(@builtin(global_invocation_id) id: vec3u) {
     let jitter = cell_jitter(id);
     let uv = froxel_cell_point_uv(id.xy, jitter.xy);
     let ray = froxel_ray(uv);
+    let ray_relative = froxel_ray_relative(uv);
     let slices = f32(froxel.grid.z);
     let p = ray.origin + ray.dir * froxel_depth((f32(id.z) + jitter.z) / slices);
     // The near and far side of the cell along its ray, between which the faces of the volumes
     // and the sun's shadow are sampled, so they cover a share of the cell instead of stepping
-    // from slice to slice.
+    // from slice to slice; the shadow is looked up at them relative to the render origin.
     let a = ray.origin + ray.dir * froxel_depth(f32(id.z) / slices);
     let b = ray.origin + ray.dir * froxel_depth((f32(id.z) + 1.0) / slices);
+    let ra = ray_relative.origin + ray_relative.dir * froxel_depth(f32(id.z) / slices);
+    let rb = ray_relative.origin + ray_relative.dir * froxel_depth((f32(id.z) + 1.0) / slices);
     let dir = normalize(ray.dir);
     // The unjittered center of the cell, and the distance from it to its far corners: a cell
     // no box comes that near holds no fog at any jittered point, so it takes no history, and a
@@ -466,7 +470,7 @@ fn inject(@builtin(global_invocation_id) id: vec3u) {
     }
 
     if (any(sunlit > vec3f(0.0))) {
-        scatter += sunlit * sun_visible(a, b, jitter.z);
+        scatter += sunlit * sun_visible(a, b, ra, rb, jitter.z);
     }
 
     if (extinction > 0.0 && view.aerial.w > 0.0) {
@@ -497,7 +501,7 @@ fn integrate(@builtin(global_invocation_id) id: vec3u) {
         return;
     }
 
-    let stretch = length(froxel_ray(froxel_cell_uv(id.xy)).dir);
+    let stretch = length(froxel_ray_relative(froxel_cell_uv(id.xy)).dir);
     let slices = froxel.grid.z;
     var near_ = froxel_depth(0.0);
     var transmittance = 1.0;
@@ -590,7 +594,7 @@ fn slice_share(uv: vec2f, s: f32, f: f32) -> f32 {
 fn lookup(uv: vec2f, depth: f32) -> vec4f {
     var d = froxel.range.z;
     if (depth > 0.0) {
-        d = froxel_view_depth(froxel_world(uv, depth));
+        d = froxel_view_depth_relative(froxel_relative(uv, depth));
     }
 
     let slices = f32(froxel.grid.z);

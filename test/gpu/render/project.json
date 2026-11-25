@@ -2239,6 +2239,13 @@
                     "far_same_image",
                     "far_moving_no_jitter"
                 ]
+            },
+            {
+                "id": "RenderOriginFog",
+                "testcases": [
+                    "far_same_image",
+                    "far_moving_no_swim"
+                ]
             }
         ]
     }

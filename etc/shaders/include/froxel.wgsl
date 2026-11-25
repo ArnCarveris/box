@@ -7,7 +7,8 @@
 // The injected grid is temporal: the cells of the previous frame of the view are found through
 // its slicing, prev_depth_plane and prev_range.
 //
-// The includer declares the Froxel uniform as froxel.
+// The includer declares the Froxel uniform as froxel and, for froxel_ray, the View uniform as
+// view.
 #pragma once
 
 #include "froxel_share.wgsl"
@@ -32,6 +33,12 @@ struct Froxel {
     // x: view depth of the near plane and y: of the far end of the grid in the previous frame,
     // z: 1 for an orthographic camera then, w: 1 when inject blends with the previous cells
     prev_range: vec4f,
+    // Clip space of the target to a position relative to the render origin (local -
+    // View.render_delta), built in f64: the sun's shadow of the fog keeps the precision of the
+    // positions near it. inv_view_proj without a render origin
+    inv_view_proj_relative: mat4x4f,
+    // depth_plane of a position relative to the render origin
+    depth_plane_relative: vec4f,
 };
 
 // A ray of the grid through a point of the image: the world position at view depth 0 and the
@@ -42,27 +49,39 @@ struct FroxelRay {
     dir: vec3f,
 };
 
-// World position of a uv of the image, (0, 0) at its top left, at a clip depth.
-fn froxel_world(uv: vec2f, depth: f32) -> vec3f {
-    let p = froxel.inv_view_proj * vec4f(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0, depth, 1.0);
+// Position relative to the render origin (local - View.render_delta) of a uv of the image,
+// (0, 0) at its top left, at a clip depth: near the camera it keeps the precision that a world
+// position far from the local origin loses.
+fn froxel_relative(uv: vec2f, depth: f32) -> vec3f {
+    let p = froxel.inv_view_proj_relative * vec4f(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0, depth, 1.0);
     return p.xyz / p.w;
 }
 
-// View depth of a world position.
-fn froxel_view_depth(p: vec3f) -> f32 {
-    return dot(froxel.depth_plane, vec4f(p, 1.0));
+// View depth of a position relative to the render origin.
+fn froxel_view_depth_relative(p: vec3f) -> f32 {
+    return dot(froxel.depth_plane_relative, vec4f(p, 1.0));
 }
 
-// Ray of the grid through a uv of the image, from two points of it in reversed Z: the near plane
-// at 1 and a farther one at 0.5, finite with an infinite far plane too.
-fn froxel_ray(uv: vec2f) -> FroxelRay {
-    let a = froxel_world(uv, 1.0);
-    let b = froxel_world(uv, 0.5);
-    let da = froxel_view_depth(a);
-    let db = froxel_view_depth(b);
+// Ray of the grid through a uv of the image relative to the render origin, from two points of
+// it in reversed Z: the near plane at 1 and a farther one at 0.5, finite with an infinite far
+// plane too. The two points are a tenth of a unit apart for a near plane at 0.1, so they are
+// taken relative to the render origin, where their difference keeps its precision.
+fn froxel_ray_relative(uv: vec2f) -> FroxelRay {
+    let a = froxel_relative(uv, 1.0);
+    let b = froxel_relative(uv, 0.5);
+    let da = froxel_view_depth_relative(a);
+    let db = froxel_view_depth_relative(b);
     var r: FroxelRay;
     r.dir = (b - a) / select(db - da, 1e-6, abs(db - da) < 1e-6);
     r.origin = a - r.dir * da;
+    return r;
+}
+
+// Ray of the grid through a uv of the image in the world: froxel_ray_relative, its origin moved
+// by View.render_delta.
+fn froxel_ray(uv: vec2f) -> FroxelRay {
+    var r = froxel_ray_relative(uv);
+    r.origin = r.origin + view.render_delta.xyz;
     return r;
 }
 

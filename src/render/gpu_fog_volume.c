@@ -21,7 +21,7 @@
 #define BOX_GPU_FOG_UNIFORM_STRIDE (256u)
 
 /** Bytes of the uniform of a pass, Froxel in froxel.wgsl */
-#define BOX_GPU_FOG_UNIFORM_SIZE (176u)
+#define BOX_GPU_FOG_UNIFORM_SIZE (256u)
 
 /** Smallest buffer of the passes of a packet in bytes */
 #define BOX_GPU_FOG_BUFFER_MIN (16384u)
@@ -50,7 +50,17 @@ typedef struct box_gpu_fog_uniforms_t {
     float prev_range[4];            /**< View depth of the near plane and of the far end of the
                                      *   grid in the previous frame, 1 for orthographic, and 1
                                      *   when inject blends with the previous cells */
+    mat4 inv_view_proj_relative;    /**< Clip space of the target to a position relative to
+                                     *   the render origin, local - render_delta, built in f64;
+                                     *   inv_view_proj without a render origin */
+    float depth_plane_relative[4];  /**< depth_plane of a position relative to the render
+                                     *   origin */
 } box_gpu_fog_uniforms_t;
+
+_Static_assert(sizeof(box_gpu_fog_uniforms_t) == BOX_GPU_FOG_UNIFORM_SIZE,
+    "box_gpu_fog_uniforms_t matches Froxel of froxel.wgsl");
+_Static_assert(BOX_GPU_FOG_UNIFORM_SIZE <= BOX_GPU_FOG_UNIFORM_STRIDE,
+    "the uniform of a pass fits before its records");
 
 /** The froxel grid of a view in a target */
 typedef struct box_gpu_froxels_t {
@@ -690,14 +700,64 @@ static uint64_t box_gpu_fog_reserve(
     return offset;
 }
 
-/** Fill the uniform of a pass of a view in a target.
+/** Fill the members of the uniform of a pass about the render origin: the inverse view
+ * projection and the depth plane of the positions relative to it, so the rays of the grid and
+ * the sun's shadow of the fog keep the precision of the positions near it.
  *
+ * Clip space to world is the camera transform after the inverse projection, and the depth plane
+ * passes through the camera: only the translation of the camera moves, by minus the render
+ * origin in f64. Without a render origin they are copies of inv_view_proj and depth_plane.
+ *
+ * @param delta The render origin in local units
+ * @param v The view
+ * @param proj Projection of the view
+ * @param u The uniform, inv_view_proj and depth_plane set
+ */
+static void box_gpu_fog_relative(
+    const double delta[3],
+    const box_render_view_t *v,
+    const mat4 proj,
+    box_gpu_fog_uniforms_t *u)
+{
+    mat4 camera, inv_proj;
+    double w;
+    int32_t i;
+    if (delta[0] == 0.0 && delta[1] == 0.0 && delta[2] == 0.0) {
+        glm_mat4_copy(u->inv_view_proj, u->inv_view_proj_relative);
+        glm_vec4_copy(u->depth_plane, u->depth_plane_relative);
+        goto done;
+    }
+
+    glm_mat4_copy(ECS_CONST_CAST(vec4*, v->camera_transform), camera);
+    for (i = 0; i < 3; i ++) {
+        camera[3][i] = (float)((double)v->camera_transform[3][i] - delta[i]);
+    }
+
+    glm_mat4_inv(ECS_CONST_CAST(vec4*, proj), inv_proj);
+    glm_mat4_mul(camera, inv_proj, u->inv_view_proj_relative);
+
+    w = 0.0;
+    for (i = 0; i < 3; i ++) {
+        w -= (double)u->depth_plane[i] * ((double)v->camera_transform[3][i] - delta[i]);
+    }
+
+    glm_vec4_copy(u->depth_plane, u->depth_plane_relative);
+    u->depth_plane_relative[3] = (float)w;
+done:
+    return;
+}
+
+/** Fill the uniform of a pass of a view in a target. The near plane is found relative to the
+ * render origin, where its point keeps its precision far from the local origin.
+ *
+ * @param delta The render origin in local units
  * @param t The target, whose size the projection and the grid follow
  * @param v The view
  * @param segment The segment an apply draw takes, FULL for the compute passes
  * @param u Receives the uniform
  */
 static void box_gpu_fog_uniforms(
+    const double delta[3],
     const box_gpu_target_t *t,
     const box_render_view_t *v,
     box_gpu_fog_segment_t segment,
@@ -716,10 +776,12 @@ static void box_gpu_fog_uniforms(
         u->depth_plane[k] = -v->view_matrix[k][2];
     }
 
-    glm_mat4_mulv(u->inv_view_proj, near_point, near_point);
+    box_gpu_fog_relative(delta, v, proj, u);
+    glm_mat4_mulv(u->inv_view_proj_relative, near_point, near_point);
     float w = fabsf(near_point[3]) > 1e-12f ? near_point[3] : 1.0f;
-    float near_ = (u->depth_plane[0] * near_point[0] + u->depth_plane[1] * near_point[1] +
-        u->depth_plane[2] * near_point[2]) / w + u->depth_plane[3];
+    float near_ = (u->depth_plane_relative[0] * near_point[0] +
+        u->depth_plane_relative[1] * near_point[1] +
+        u->depth_plane_relative[2] * near_point[2]) / w + u->depth_plane_relative[3];
     int32_t width = t->desc.render_width > 0 ? t->desc.render_width : 1;
     int32_t height = t->desc.render_height > 0 ? t->desc.render_height : 1;
     box_render_froxel_grid(width, height, grid);
@@ -851,7 +913,7 @@ void box_gpu_fog_volumes_uniforms(
         goto done;
     }
 
-    box_gpu_fog_uniforms(t, v, BOX_GPU_FOG_SEGMENT_FULL, &f);
+    box_gpu_fog_uniforms(gpu->render_delta, t, v, BOX_GPU_FOG_SEGMENT_FULL, &f);
     u->fog_grid[0] = f.size[2];
     u->fog_grid[1] = f.size[3];
     u->fog_grid[2] = (float)f.grid[2];
@@ -872,7 +934,7 @@ WGPUTextureView box_gpu_fog_volumes_grid_view(
     box_gpu_fog_uniforms_t u;
     WGPUTextureView result = f->no_grid_view;
     if (box_gpu_fog_blends(gpu, t, v)) {
-        box_gpu_fog_uniforms(t, v, BOX_GPU_FOG_SEGMENT_FULL, &u);
+        box_gpu_fog_uniforms(gpu->render_delta, t, v, BOX_GPU_FOG_SEGMENT_FULL, &u);
         result = box_gpu_froxels_get(gpu, t, v, u.grid)->integrated_view;
     }
 
@@ -1000,7 +1062,7 @@ void box_gpu_fog_volumes_inject(
         }
     }
 
-    box_gpu_fog_uniforms(t, v, BOX_GPU_FOG_SEGMENT_FULL, &u);
+    box_gpu_fog_uniforms(gpu->render_delta, t, v, BOX_GPU_FOG_SEGMENT_FULL, &u);
     box_gpu_froxels_t *g = box_gpu_froxels_get(gpu, t, v, u.grid);
     box_gpu_history_desc_t desc = {
         .target = t->handle,
@@ -1127,7 +1189,7 @@ bool box_gpu_fog_volumes_draw(
         goto done;
     }
 
-    box_gpu_fog_uniforms(t, v, segment, &u);
+    box_gpu_fog_uniforms(gpu->render_delta, t, v, segment, &u);
     uint64_t records = (uint64_t)v->fog_count * sizeof(box_render_fog_volume_t);
     uint64_t offset = box_gpu_fog_reserve(gpu, BOX_GPU_FOG_UNIFORM_STRIDE + records);
     wgpuQueueWriteBuffer(gpu->queue, f->buffer, offset, &u, sizeof(u));
