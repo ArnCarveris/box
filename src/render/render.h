@@ -697,6 +697,24 @@ void box_render_origin_mapping(
     float scale_v,
     float out[4]);
 
+/** Get the whole repeats that box_render_origin_mapping wraps away, modulo a period, for a
+ * pattern that repeats over that many repeats of the texture: the four components in eight
+ * bits each, the first in the lowest.
+ *
+ * @param origin The absolute position of the local origin
+ * @param size TextureMapping.size, 1 when it is not above 0 and finite
+ * @param scale_u TextureTransform.scale_x
+ * @param scale_v TextureTransform.scale_y
+ * @param period Repeats of the pattern, 1 to 256
+ * @return The packed whole repeats
+ */
+uint32_t box_render_origin_repeats(
+    const double origin[3],
+    float size,
+    float scale_u,
+    float scale_v,
+    int32_t period);
+
 /** Repeats the projection of the absolute position of the local origin of a Water record wraps
  * to in the shaders (WATER_ORIGIN_PERIOD of material.wgsl): its foam samples scale the UVs by
  * Water.foam_scale and by a second, rotated scale of 1.63 (0.8, 0.6), which stay whole repeats

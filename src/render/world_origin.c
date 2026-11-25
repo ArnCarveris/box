@@ -69,3 +69,25 @@ void box_render_origin_mapping(
     out[2] = box_render_origin_wrap_float(origin[2] / s * u, 1.0);
     out[3] = box_render_origin_wrap_float(origin[0] / s * v, 1.0);
 }
+
+uint32_t box_render_origin_repeats(
+    const double origin[3],
+    float size,
+    float scale_u,
+    float scale_v,
+    int32_t period)
+{
+    double s = isfinite(size) && size > 0.0f ? (double)size : 1.0;
+    double u = isfinite(scale_u) ? (double)scale_u : 1.0;
+    double v = isfinite(scale_v) ? (double)scale_v : 1.0;
+    double values[4] = { origin[0] / s * u, origin[1] / s * v, origin[2] / s * u,
+        origin[0] / s * v };
+    uint32_t result = 0;
+    int32_t i;
+    for (i = 0; i < 4; i ++) {
+        uint32_t whole = (uint32_t)floor(box_render_origin_wrap(values[i], (double)period));
+        result |= (whole % (uint32_t)period & 0xffu) << (8 * i);
+    }
+
+    return result;
+}

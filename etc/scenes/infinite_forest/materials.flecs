@@ -93,7 +93,7 @@ assets {
       roughness: LayerMix,
       metallic: LayerMix,
       occlusion: LayerKeep,
-      normal: 0.6,
+      normal: 1,
       altitude: SNOW_LINE,
       altitude_fade: SNOW_FADE
     }

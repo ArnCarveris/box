@@ -155,6 +155,68 @@ fn layer_taps(maps: texture_2d_array<f32>, first: u32, flags: u32, want: u32, uv
     }
 }
 
+const LAYER_CELLS: f32 = 2.0;
+const LAYER_PERIOD: i32 = 64;
+const LAYER_SHARPNESS: f32 = 5.0;
+
+struct LayerTile {
+    uv: array<vec2f, 3>,
+    rotation: array<vec2f, 3>,
+    w: vec3f,
+};
+
+fn layer_tile_hash(cell: vec2i) -> u32 {
+    let period = LAYER_PERIOD * i32(LAYER_CELLS);
+    let c = vec2u(((cell % period) + period) % period);
+    var h = (c.x * 0x8da6b343u) ^ (c.y * 0xd8163841u);
+    h = (h ^ (h >> 16u)) * 0x7feb352du;
+    h = (h ^ (h >> 15u)) * 0x846ca68bu;
+    return h ^ (h >> 16u);
+}
+
+fn layer_tile(uv: vec2f) -> LayerTile {
+    let q = uv * LAYER_CELLS;
+    let base = vec2i(floor(q));
+    let f = fract(q);
+    let upper = f.x + f.y > 1.0;
+    let s = select(0, 1, upper);
+    let corners = array<vec2i, 3>(base + vec2i(s, s), base + vec2i(1, 0), base + vec2i(0, 1));
+    let b = select(vec3f(1.0 - f.x - f.y, f.x, f.y), vec3f(f.x + f.y - 1.0, 1.0 - f.y, 1.0 - f.x),
+        upper);
+    let p = pow(max(b, vec3f(0.0)), vec3f(LAYER_SHARPNESS));
+    var o: LayerTile;
+    o.w = p / max(p.x + p.y + p.z, 1e-6);
+    for (var i = 0u; i < 3u; i++) {
+        let h = layer_tile_hash(corners[i]);
+        let angle = f32(h & 0xffffu) / 65536.0 * 6.2831853;
+        let offset = vec2f(f32((h >> 16u) & 0xffu), f32(h >> 24u)) / 256.0;
+        let r = vec2f(cos(angle), sin(angle));
+        let center = vec2f(corners[i]) / LAYER_CELLS;
+        let d = uv - center;
+        o.rotation[i] = r;
+        o.uv[i] = vec2f(r.x * d.x - r.y * d.y, r.y * d.x + r.x * d.y) + center + offset;
+    }
+    return o;
+}
+
+fn layer_taps_tiled(maps: texture_2d_array<f32>, first: u32, flags: u32, want: u32, uv: vec2f,
+    gx: vec2f, gy: vec2f, tangent: vec3f, bitangent: vec3f, n: vec3f, w: f32,
+    o: ptr<function, LayerSample>)
+{
+    let t = layer_tile(uv);
+    for (var i = 0u; i < 3u; i++) {
+        let wi = w * t.w[i];
+        if (wi <= 0.0) {
+            continue;
+        }
+        let r = t.rotation[i];
+        let rx = vec2f(r.x * gx.x - r.y * gx.y, r.y * gx.x + r.x * gx.y);
+        let ry = vec2f(r.x * gy.x - r.y * gy.y, r.y * gy.x + r.x * gy.y);
+        layer_taps(maps, first, flags, want, t.uv[i], rx, ry, tangent * r.x - bitangent * r.y,
+            tangent * r.y + bitangent * r.x, n, wi, o);
+    }
+}
+
 // Sample the maps of a layer with its mapping: the UVs of the mesh with LAYER_UV, else the world
 // position projected on the plane of the dominant axis of the geometric normal (the faces of a
 // Box), the three projections blended above a blend of 0. dx and dy are the screen derivatives
@@ -189,7 +251,8 @@ fn layer_sample(maps: texture_2d_array<f32>, first: u32, l: TextureLayer, world:
         let w = select(one, mapping_weights(n, l.material.w), l.material.w > 0.0);
         // The UV scale applies before the projection, so the wrapped origin adds to whole
         // repeats of the texture
-        let scaled = vec4f(p.x * t.x, p.y * t.y, p.z * t.x, p.x * t.y) + l.origin;
+        let whole = vec4f((vec4u(l.flags.w) >> vec4u(0u, 8u, 16u, 24u)) & vec4u(0xffu));
+        let scaled = vec4f(p.x * t.x, p.y * t.y, p.z * t.x, p.x * t.y) + l.origin + whole;
         let planes = mapping_planes(scaled, sg);
         let gx = mapping_planes(vec4f(px, px.x), sg);
         let gy = mapping_planes(vec4f(py, py.x), sg);
@@ -199,7 +262,7 @@ fn layer_sample(maps: texture_2d_array<f32>, first: u32, l: TextureLayer, world:
             }
             let tangent = layer_along(mapping_tangent(k, sg), n);
             let bitangent = layer_along(mapping_bitangent(k), n);
-            layer_taps(maps, first, flags, want, planes[k] + t.zw, gx[k] * t.xy,
+            layer_taps_tiled(maps, first, flags, want, planes[k] + t.zw, gx[k] * t.xy,
                 gy[k] * t.xy, tangent, bitangent, n, w[k], &o);
         }
     }

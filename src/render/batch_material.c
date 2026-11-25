@@ -1495,6 +1495,8 @@ void box_draws_layer_pack(
     if (!(out->flags[0] & BOX_RENDER_LAYER_UV)) {
         box_render_origin_mapping(origin, out->material[2], out->transform[0],
             out->transform[1], out->origin);
+        out->flags[3] = box_render_origin_repeats(origin, out->material[2], out->transform[0],
+            out->transform[1], BOX_RENDER_LAYER_PERIOD);
     }
 
     if (isfinite(l->altitude) && isfinite(l->altitude_fade) && l->altitude_fade != 0.0f) {

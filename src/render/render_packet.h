@@ -510,6 +510,10 @@ static inline uint32_t box_render_page_kind(
 #define BOX_RENDER_LAYER_HAS_MASK (8u)
 #define BOX_RENDER_LAYER_UV (16u)
 
+/** Repeats of the texture of a world mapped layer over which the random offsets and rotations
+ * of its tiles repeat, LAYER_PERIOD of mesh_layers.wgsl */
+#define BOX_RENDER_LAYER_PERIOD (64)
+
 /** Anisotropic samples of the texture samplers when no surface sets them */
 #define BOX_RENDER_ANISOTROPY_DEFAULT (4)
 
@@ -2496,7 +2500,8 @@ typedef struct box_render_texture_layer_t {
     uint32_t flags[4];      /**< BOX_RENDER_LAYER_HAS_* and BOX_RENDER_LAYER_UV, then the
                              *   bits of the f32 local world height of TextureLayer.altitude
                              *   and of its altitude_fade (0 for none, negative to cover
-                             *   below the altitude), then 0 */
+                             *   below the altitude), then the whole repeats of the origin
+                             *   modulo BOX_RENDER_LAYER_PERIOD (box_render_origin_repeats) */
     float origin[4];        /**< Wrapped offset of the world projection for the absolute
                              *   position of the local origin (box_render_origin_mapping); 0 with
                              *   BOX_RENDER_LAYER_UV */

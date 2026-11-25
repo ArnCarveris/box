@@ -235,7 +235,7 @@ assets {
       roughness: LayerMix,
       metallic: LayerMix,
       occlusion: LayerKeep,
-      normal: 0.7
+      normal: 1
     }
     Rgb: {238, 242, 250}
     PbrMaterial: {roughness: 0.72, metallic: 0}
@@ -256,7 +256,7 @@ assets {
       roughness: LayerMix,
       metallic: LayerKeep,
       occlusion: LayerKeep,
-      normal: 0.5
+      normal: 1
     }
     Rgb: {238, 242, 250}
     PbrMaterial: {roughness: 0.72}
