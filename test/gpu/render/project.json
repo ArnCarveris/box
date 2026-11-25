@@ -2246,6 +2246,13 @@
                     "far_same_image",
                     "far_moving_no_swim"
                 ]
+            },
+            {
+                "id": "RenderOriginImpostor",
+                "testcases": [
+                    "far_same_image",
+                    "far_moving_no_swim"
+                ]
             }
         ]
     }

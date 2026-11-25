@@ -7,6 +7,10 @@
 //
 // The batch binds the albedo atlas as albedo_map, the depth atlas as orm_map and the normal
 // atlas as normal_map; the vertex stage reads the grid from the per vertex data of the card mesh.
+//
+// A card is placed relative to the render origin (instance_relative, render_view_proj of the
+// View), which keeps its precision near it, and its sun shadows are looked up at its surface
+// relative to it; it faces the camera, picks its views and is shaded in the local frame.
 #pragma once
 #include "impostor_card.wgsl"
 
@@ -27,17 +31,31 @@ struct ImpostorOut {
     @location(4) @interpolate(flat) eye: vec4f,
     // xyz the center of the sphere in the frame of the root
     @location(5) @interpolate(flat) center: vec4f,
+    // The rows of the local transform of the card
     @location(6) @interpolate(flat) row0: vec4f,
     @location(7) @interpolate(flat) row1: vec4f,
     @location(8) @interpolate(flat) row2: vec4f,
     // x the dither code of the DrawRange with draw_range, y the planet light slot, z the metallic
     // and roughness of the material of the card as unorm16
     @location(9) @interpolate(flat) misc: vec4u,
+    // xyz the translation of the card relative to the render origin, which takes the place of
+    // the translation of the local rows to place it relative to it (impostor_relative_model)
+    @location(10) @interpolate(flat) relative: vec4f,
 };
+
+// The transform of a card relative to the render origin: its local rows with the relative
+// translation; the local transform bit for bit without a render origin.
+fn impostor_relative_model(f: ImpostorOut) -> mat4x4f {
+    let r0 = vec4f(f.row0.xyz, f.relative.x);
+    let r1 = vec4f(f.row1.xyz, f.relative.y);
+    let r2 = vec4f(f.row2.xyz, f.relative.z);
+    return impostor_model(r0, r1, r2);
+}
 
 fn impostor_vertex(v: VertexIn, d: VertexData) -> ImpostorOut {
     let slot = slot_of(v.slot);
     let local = instance_local(transforms[slot], instance_page);
+    let relative = instance_relative(transforms[slot], instance_page);
     let model = instance_model(local);
     let shading = shadings[slot];
     let material = material_fetch(shading_material(shading));
@@ -58,7 +76,7 @@ fn impostor_vertex(v: VertexIn, d: VertexData) -> ImpostorOut {
     }
 
     var o: ImpostorOut;
-    o.pos = view.view_proj * (model * vec4f(grid.center + q, 1.0));
+    o.pos = view.render_view_proj * (instance_model(relative) * vec4f(grid.center + q, 1.0));
     o.plane01 = vec4f(planes[0], planes[1]);
     o.plane2 = planes[2];
     o.cells = vec4u(frames.cells, grid.frames | select(0u, 1u << 16u, grid.hemisphere));
@@ -70,6 +88,7 @@ fn impostor_vertex(v: VertexIn, d: VertexData) -> ImpostorOut {
     o.row2 = local.rows[2];
     o.misc = vec4u(vertex_range(v.slot), shading_planet(shading),
         pack2x16unorm(vec2f(material.metallic, material.roughness)), 0u);
+    o.relative = vec4f(relative.rows[0].w, relative.rows[1].w, relative.rows[2].w, 0.0);
     return o;
 }
 
@@ -169,6 +188,13 @@ fn impostor_world(f: ImpostorOut, s: ImpostorSurface) -> vec3f {
     return (model * vec4f(f.center.xyz + s.point, 1.0)).xyz;
 }
 
+// The position of the surface of a card at a fragment relative to the render origin, which its
+// sun shadows are looked up at.
+fn impostor_relative(f: ImpostorOut, s: ImpostorSurface) -> vec3f {
+    let model = impostor_relative_model(f);
+    return (model * vec4f(f.center.xyz + s.point, 1.0)).xyz;
+}
+
 // Whether the dither of the DrawRange of a card or its coverage drops a fragment.
 fn impostor_dropped(f: ImpostorOut, alpha: f32) -> bool {
     return (draw_range && !range_keeps(f.misc.x, f.pos.xy)) || alpha < IMPOSTOR_CUTOFF;
@@ -179,7 +205,8 @@ fn impostor_dropped(f: ImpostorOut, alpha: f32) -> bool {
 // the blend of the views toward the camera, and would shadow itself where they disagree.
 const IMPOSTOR_SHADOW_OFFSET: f32 = 0.1;
 
-// The point a card is lit at, moved toward the sun from the point of its surface.
+// The point a card is lit at, moved toward the sun from the point of its surface, local or
+// relative to the render origin.
 fn impostor_lit_at(model: mat4x4f, world: vec3f, radius: f32) -> vec3f {
     if (view.lights.x == 0u) {
         return world;
@@ -209,8 +236,10 @@ fn impostor_lit(f: ImpostorOut, c: ImpostorSurface) -> vec4f {
     s.normal = n;
     s.geometric = n;
     let v = normalize(view.camera.xyz - world);
-    let lit_at = impostor_lit_at(model, world, f.eye.w * f.weights.w);
-    let reflected = shade(s, v, lit_at, lit_at - view.render_delta.xyz);
+    let radius = f.eye.w * f.weights.w;
+    let lit_at = impostor_lit_at(model, world, radius);
+    let lit_relative = impostor_lit_at(model, impostor_relative(f, c), radius);
+    let reflected = shade(s, v, lit_at, lit_relative);
     var color = reflected.diffuse + reflected.specular;
     if (scene_aerial && view.aerial.w > 0.0) {
         color = aerial_perspective(color, 1.0, f.pos, world);

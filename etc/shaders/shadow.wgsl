@@ -1,8 +1,9 @@
 // Shadow pass: draws the shadow casters of a view into one cascade of its shadow map, depth
-// only. The casters of a cascade or a spot light tile are placed relative to the render origin
-// with Cascade.relative, which keeps their precision near it; the wind moves them, and the
-// projections of their materials map them, from their local position. Those of a point light
-// tile and the impostor cards stay in the local frame (Cascade.matrix).
+// only. The casters of a cascade or a spot light tile, the impostor cards among them, are placed
+// relative to the render origin with Cascade.relative, which keeps their precision near it; the
+// wind moves them, the projections of their materials map them, and the cards face the light,
+// from their local position. Those of a point light tile stay in the local frame; the point
+// light tiles draw no impostor cards.
 #ifdef BOX_SHADOW_CLIP_DISTANCES
 enable clip_distances;
 #endif
@@ -631,13 +632,15 @@ struct ImpostorCasterOut {
     @location(2) @interpolate(flat) eye: vec4f,
     // xyz the center of the sphere in the frame of the root, w its radius over the half size
     @location(3) @interpolate(flat) center: vec4f,
+    // The rows of the transform of the card relative to the render origin
     @location(4) @interpolate(flat) row0: vec4f,
     @location(5) @interpolate(flat) row1: vec4f,
     @location(6) @interpolate(flat) row2: vec4f,
 };
 
 // Direction toward the light at a world position: the gradient of the depth of the cascade or
-// tile there, which grows toward the light.
+// tile there, which grows toward the light. Only a direction, so it is taken in the local frame
+// (Cascade.matrix).
 fn impostor_light_direction(world: vec4f) -> vec3f {
     let m = cascade.matrix;
     let c = m * world;
@@ -649,6 +652,7 @@ fn impostor_light_direction(world: vec4f) -> vec3f {
 @vertex fn vs_impostor(v: VertexIn, d: VertexData) -> ImpostorCasterOut {
     let slot = slot_of(v.slot);
     let local = instance_local(transforms[slot], instance_page);
+    let relative = instance_relative(transforms[slot], instance_page);
     let model = instance_model(local);
     let grid = impostor_grid(d);
     let center = model * vec4f(grid.center, 1.0);
@@ -657,18 +661,20 @@ fn impostor_light_direction(world: vec4f) -> vec3f {
     let cell = impostor_nearest(grid.frames, grid.hemisphere, e);
     let dir = impostor_frame_direction(grid.frames, grid.hemisphere, impostor_unpack(cell));
     var o: ImpostorCasterOut;
-    o.pos = cascade.matrix * (model * vec4f(grid.center + q, 1.0));
+    o.pos = cascade.relative * (instance_model(relative) * vec4f(grid.center + q, 1.0));
     o.plane = impostor_plane(q, e, dir, grid.half);
     o.cell = vec4u(cell, grid.frames | select(0u, 1u << 16u, grid.hemisphere),
         caster_range(v.slot), 0u);
     o.eye = vec4f(e, grid.half);
     o.center = vec4f(grid.center, grid.ratio);
-    o.row0 = local.rows[0];
-    o.row1 = local.rows[1];
-    o.row2 = local.rows[2];
+    o.row0 = relative.rows[0];
+    o.row1 = relative.rows[1];
+    o.row2 = relative.rows[2];
     return o;
 }
 
+// The depth of the card where it covers: its surface relative to the render origin in the clip
+// space of the cascade (Cascade.relative), as vs_impostor places the card.
 @fragment fn fs_impostor(f: ImpostorCasterOut) -> @builtin(frag_depth) f32 {
     let frames = f.cell.y & 0xFFFFu;
     let hemisphere = (f.cell.y >> 16u) != 0u;
@@ -693,6 +699,6 @@ fn impostor_light_direction(world: vec4f) -> vec3f {
     let point = f.center.xyz + (axes[0] * a.x + axes[1] * a.y) * half +
         d * impostor_height(depth, half, f.center.w);
     let model = impostor_model(f.row0, f.row1, f.row2);
-    let clip = cascade.matrix * (model * vec4f(point, 1.0));
+    let clip = cascade.relative * (model * vec4f(point, 1.0));
     return clip.z / clip.w;
 }
