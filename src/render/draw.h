@@ -239,6 +239,9 @@ typedef struct box_draw_key_t {
     ecs_entity_t impostor;  /**< Entity with the Impostor whose cards the batch draws, one per
                              *   instance (box_draws_card), 0 for shapes: a batch of cards is
                              *   opaque, alpha tested and draws the atlases of the impostor */
+    ecs_entity_t terrain;   /**< Terrain whose tiles the batch draws, one per instance
+                             *   (box_render_terrain_draws), 0 for shapes: every terrain has a
+                             *   batch of its own, whose slot i is its i-th tile that draws */
     bool texture_blend;     /**< 3D shapes with a TextureBlend (texture_blend pipeline):
                              *   textures[0] is the owner of the TextureBlend, textures[2] and
                              *   textures[3] are 0, so the key does not grow */
@@ -1281,11 +1284,11 @@ bool box_draws_extended(
     ecs_entity_t e,
     const box_draw_key_t *key);
 
-/** Check whether a shape is a tile of a Terrain, which draws with the terrain shader.
+/** Check whether an entity is a Terrain, whose tiles draw with the terrain shader.
  *
  * @param world The world
  * @param e The entity
- * @return Whether it has a TerrainTile
+ * @return Whether it has a Terrain
  */
 bool box_draws_terrain(
     const ecs_world_t *world,
@@ -2962,6 +2965,62 @@ void box_draws_send_ordered(
     box_render_packet_t *p,
     box_render_draws_t *d);
 
+/** Compute the batch key of a shape.
+ *
+ * A shape under an active Opacity transition (TransitionOpacity) is keyed as if its alpha were
+ * below 1. A 3D shape draws with the mesh shader box_draws_shader picks, with the features
+ * box_draws_features gives; the Scene features that are off are ignored.
+ *
+ * A 3D shape that has or inherits Transmission, Distortion (box_draws_distorted), or Water
+ * with Scene.water (without its TextureBlend), is transmissive: it draws in the sorted blended
+ * pass, is not alpha tested and casts no shadow, whatever BlendMode, Opacity and AlphaCutoff.
+ *
+ * @param world The world
+ * @param d The state
+ * @param e The entity
+ * @param shape Its mesh
+ * @param alpha Resolved alpha of the shape
+ * @param key Receives the key
+ */
+void box_draws_key(
+    ecs_world_t *world,
+    box_render_draws_t *d,
+    ecs_entity_t e,
+    const ShapeMesh *shape,
+    float alpha,
+    box_draw_key_t *key);
+
+/** Compute the key of the batch of the tiles of a Terrain and the material its instances draw
+ * with, as box_draws_key does for a shape: from the components of the terrain entity, with the
+ * mesh and surface of the tiles. The batch is the terrain's own (box_draw_key_t.terrain), its
+ * transforms are static and not relative to a mover, and its material has no frame.
+ *
+ * @param world The world
+ * @param d The state
+ * @param terrain The terrain entity
+ * @param shape The grid mesh of the tiles, with a surface
+ * @param key Receives the key
+ * @param material Receives the material, whose pointers stay valid until the terrain changes
+ */
+void box_draws_terrain_key(
+    ecs_world_t *world,
+    box_render_draws_t *d,
+    ecs_entity_t terrain,
+    const ShapeMesh *shape,
+    box_draw_key_t *key,
+    box_draw_material_t *material);
+
+/** Bring the tiles that draw of every Terrain into the batch of their terrain: one instance per
+ * tile, written again when the tiles of the terrain changed (box_terrain_tiles_version), its
+ * key or its shading changed. The batches of terrains that lost their tiles are emptied.
+ *
+ * @param world The world
+ * @param d The state
+ */
+void box_render_terrain_draws(
+    ecs_world_t *world,
+    box_render_draws_t *d);
+
 /** List the instances of the draw of a batch of Terrain tiles nearest to the camera of the first
  * view of its scene first, so the near tiles hide the far ones in the depth test; the draw of
  * any other batch keeps the order of its slots.
@@ -3122,8 +3181,7 @@ void box_draws_batch_blend(
     box_render_batch_t *out);
 
 /** Get the entity whose TextureBlend a 3D shape draws with: the shape itself when it owns a
- * TileTerrain, the terrain of a TerrainTile with a TextureBlend (a copy of that of its
- * terrain), so the tiles of a terrain share a batch, else the owner of the TextureBlend it has
+ * TileTerrain, a Terrain with a TextureBlend itself, else the owner of the TextureBlend it has
  * or inherits, 0 when it has neither or is no mesh shape. Alpha tested, blended, transmissive
  * and triplanar shapes blend alike.
  *

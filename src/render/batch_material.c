@@ -1371,7 +1371,7 @@ bool box_draws_terrain(
     const ecs_world_t *world,
     ecs_entity_t e)
 {
-    return ecs_id(TerrainTile) && ecs_has(world, e, TerrainTile);
+    return ecs_id(Terrain) && ecs_has(world, e, Terrain);
 }
 
 uint32_t box_draws_features(

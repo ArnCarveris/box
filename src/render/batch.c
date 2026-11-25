@@ -55,6 +55,7 @@ static uint64_t box_draws_hash(
         (uint64_t)key->mover * 8 + (uint64_t)key->wind * 16) * 0x85EBCA77C2B2AE63ull;
     h ^= (((uint64_t)key->foam + 1) * 0x9FB21C651E98DF25ull) ^ box_draws_layers_hash(key);
     h ^= key->impostor * 0xD1B54A32D192ED03ull;
+    h ^= key->terrain * 0xA24BAED4963EE407ull;
     for (i = 0; i < BOX_RENDER_TEXTURE_SLOTS; i ++) {
         h = (h ^ (h >> 31)) * 0x9E3779B97F4A7C15ull + key->textures[i];
     }
@@ -93,7 +94,8 @@ static bool box_draws_key_eq(
         a->atmosphere == b->atmosphere && a->surface == b->surface && a->frame == b->frame &&
         a->box_shadow == b->box_shadow && a->slice == b->slice &&
         a->texture_blend == b->texture_blend && a->polygon == b->polygon && a->wind == b->wind &&
-        a->impostor == b->impostor && !ecs_os_memcmp(a->range, b->range, ECS_SIZEOF(a->range));
+        a->impostor == b->impostor && a->terrain == b->terrain &&
+        !ecs_os_memcmp(a->range, b->range, ECS_SIZEOF(a->range));
 }
 
 box_draw_batch_t* box_draws_batch(

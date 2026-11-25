@@ -12,7 +12,8 @@
             "../../../src/render",
             "../../../src/texture",
             "../../../src/geometry",
-            "../../../src/spatial"
+            "../../../src/spatial",
+            "../../../src/terrain"
         ]
     },
     "test": {
@@ -577,6 +578,15 @@
                     "box_not_reduced",
                     "surface_levels",
                     "released_with_shape"
+                ]
+            },
+            {
+                "id": "TerrainDraw",
+                "testcases": [
+                    "tiles_one_batch",
+                    "key_and_material_of_terrain",
+                    "remove_empties_batch",
+                    "instances_follow_tiles"
                 ]
             },
             {

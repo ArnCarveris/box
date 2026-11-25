@@ -775,7 +775,7 @@ static void BoxDrawsOnLightBake(
         for (b = 0; b < ecs_vec_count(&d->batches); b ++) {
             box_draw_batch_t *batch = box_draws_batch(d, b);
             if (!batch->alive || batch->key.scene != scene || batch->key.atlas ||
-                !box_render_is_mesh(batch->key.pipeline))
+                batch->key.terrain || !box_render_is_mesh(batch->key.pipeline))
             {
                 continue;
             }
@@ -791,6 +791,8 @@ static void BoxDrawsOnLightBake(
 /** Mark every shape in the mesh batches of a scene whose Scene was set, which changes the
  * features, the pipeline and the fallbacks of their keys, and their material records (TextureScroll
  * and Water follow their flags). The singleton is the Scene of the default scene.
+ *
+ * A terrain packs its material again; box_render_terrain_draws keys its batch in every extract.
  *
  * @param it The iterator of the observer
  */
@@ -810,6 +812,14 @@ static void BoxDrawsOnSceneFeatures(
             if (!batch->alive || batch->key.scene != scene || batch->key.atlas ||
                 !box_render_is_mesh(batch->key.pipeline))
             {
+                continue;
+            }
+
+            if (batch->key.terrain) {
+                if (ecs_is_alive(it->world, batch->key.terrain)) {
+                    box_draws_material_changed(d, batch->key.terrain);
+                }
+
                 continue;
             }
 
@@ -841,31 +851,13 @@ ecs_entity_t box_draws_blend_owner(
         goto done;
     }
 
-    const TerrainTile *tile = ecs_id(TerrainTile) ? ecs_get(world, e, TerrainTile) : NULL;
-    result = tile && tile->terrain ? tile->terrain
+    result = box_draws_terrain(world, e) ? e
         : ecs_get_target_for_id(world, e, EcsIsA, ecs_id(TextureBlend));
 done:
     return result;
 }
 
-/** Compute the batch key of a shape.
- *
- * A shape under an active Opacity transition (TransitionOpacity) is keyed as if its alpha were
- * below 1. A 3D shape draws with the mesh shader box_draws_shader picks, with the features
- * box_draws_features gives; the Scene features that are off are ignored.
- *
- * A 3D shape that has or inherits Transmission, Distortion (box_draws_distorted), or Water
- * with Scene.water (without its TextureBlend), is transmissive: it draws in the sorted blended
- * pass, is not alpha tested and casts no shadow, whatever BlendMode, Opacity and AlphaCutoff.
- *
- * @param world The world
- * @param d The state
- * @param e The entity
- * @param shape Its mesh
- * @param alpha Resolved alpha of the shape
- * @param key Receives the key
- */
-static void box_draws_key(
+void box_draws_key(
     ecs_world_t *world,
     box_render_draws_t *d,
     ecs_entity_t e,
@@ -1442,6 +1434,7 @@ static void BoxRenderExtractDraws(
     box_draws_process(world, d);
     box_draws_clips_send(world, d, p);
     box_draws_order_update(world, d);
+    box_render_terrain_draws(world, d);
     box_draws_send(world, d, p);
     RenderStatus *status = ecs_singleton_get_mut(world, RenderStatus);
     if (status) {

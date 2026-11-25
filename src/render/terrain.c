@@ -1,10 +1,12 @@
 /**
  * @file render/terrain.c
- * @brief Extract of the terrain tiles: the heights each tile that draws needs in the surface
- * assets of its grid mesh and its masks in the mask atlas of the mesh, appended to the packet for
- * the backend (box_gpu_terrain_heights), the grid of the tiles that draw of each terrain with
- * TerrainSampled (box_gpu_terrain_samples), the bakes of the tiles with masks and the order of
- * the tiles in their draw.
+ * @brief Draw path of the terrain tiles: the tiles that draw of a terrain are the instances of a
+ * batch of its own (box_render_terrain_draws), written from the tiles box.terrain keeps, which are
+ * not entities. The extract appends the heights each tile that draws needs in the surface assets
+ * of its grid mesh and its masks in the mask atlas of the mesh to the packet for the backend
+ * (box_gpu_terrain_heights), the grid of the tiles that draw of each terrain with TerrainSampled
+ * (box_gpu_terrain_samples), the bakes of the tiles with masks and the order of the tiles in
+ * their draw.
  */
 
 #include "render.h"
@@ -26,16 +28,35 @@ typedef struct box_render_terrain_cache_t {
     bool valid;             /**< The other members are set */
 } box_render_terrain_cache_t;
 
+/** The instances of the tiles of a terrain in its batch */
+typedef struct box_render_terrain_draw_t {
+    ecs_entity_t terrain;   /**< The terrain entity */
+    int32_t batch;          /**< Index of its batch, -1 for none */
+    uint32_t mesh;          /**< Grid mesh of its tiles, a reference taken from the mesh cache,
+                             *   0 for none */
+    int32_t vertices;       /**< Vertices per edge of the grid mesh */
+    int32_t version;        /**< Version of the tiles its instances were written for
+                             *   (box_terrain_tiles_version), -1 to write them again */
+    box_render_mesh_shading_t shading; /**< Shading of every instance */
+    bool masked;            /**< Its material takes the world mapping of a terrain with masks and
+                             *   a TextureBlend without a TextureMapping */
+    ecs_vec_t tiles;        /**< TerrainTile per slot of its batch */
+    int64_t tick;           /**< Extract of the draws that last saw the terrain */
+} box_render_terrain_draw_t;
+
 /** State of the extract of the terrain tiles */
 typedef struct box_render_terrain_t {
-    ecs_query_t *tiles;     /**< The tiles that draw, with change detection */
+    ecs_query_t *terrains;  /**< The terrains, whose tiles draw */
+    ecs_map_t draws;        /**< Terrain entity to its box_render_terrain_draw_t */
+    bool dirty;             /**< The instances of a terrain were written since heights was
+                             *   built */
     ecs_vec_t heights;      /**< box_render_terrain_height_t, the heights last built */
     ecs_map_t samples;      /**< Terrain entity to its box_render_terrain_cache_t */
     int32_t version;        /**< Bumped when heights is built */
     int32_t builds;         /**< Times heights was built */
     int32_t grids;          /**< Times the grid of a sampled terrain was built */
     bool complete;          /**< Every tile that draws had its heights and its mesh, so heights
-                             *   holds until a tile changes */
+                             *   holds until the instances of a terrain are written */
 } box_render_terrain_t;
 
 /** Singleton that holds the state of the extract of the terrain tiles */
@@ -45,12 +66,359 @@ typedef struct RenderTerrain {
 
 static ECS_COMPONENT_DECLARE(RenderTerrain);
 
-/** Append the heights of every terrain tile that draws and whose heights the backend has.
- * Disabled tiles do not match, so a tile is copied from the frame it draws.
+void box_draws_terrain_key(
+    ecs_world_t *world,
+    box_render_draws_t *d,
+    ecs_entity_t terrain,
+    const ShapeMesh *shape,
+    box_draw_key_t *key,
+    box_draw_material_t *material)
+{
+    DrawSlot slot = { .batch = -1, .slot = -1, .fade = 1.0f, .tint = { .keep = 1.0f } };
+    box_draws_shape_material(world, terrain, &slot, material);
+    material->inherited = NULL;
+    d->scene_table = NULL;
+    box_draws_key(world, d, terrain, shape, box_draws_alpha(material), key);
+    d->scene_table = NULL;
+    key->mover = false;
+    key->dynamic_transform = false;
+    key->frame = false;
+    key->terrain = terrain;
+}
+
+/** Get the state of the extract of the terrain tiles.
  *
- * The list is built again only when a tile that draws was added, removed, enabled, disabled or
- * had its TerrainTile or ShapeMesh set, or while a tile that draws waits for a texture or its
- * mesh; else the list built before is appended.
+ * @param world The world
+ * @return The state, NULL before the extract is imported
+ */
+static box_render_terrain_t* box_render_terrain_state(
+    const ecs_world_t *world)
+{
+    const RenderTerrain *m = ecs_id(RenderTerrain)
+        ? ecs_singleton_get(world, RenderTerrain) : NULL;
+
+    return m ? m->state : NULL;
+}
+
+/** Get the instances of the tiles of a terrain.
+ *
+ * @param state The state of the extract
+ * @param terrain The terrain entity
+ * @return The instances, NULL when the terrain draws no tiles
+ */
+static box_render_terrain_draw_t* box_render_terrain_draw_get(
+    const box_render_terrain_t *state,
+    ecs_entity_t terrain)
+{
+    return state ? ecs_map_get_deref(&state->draws, box_render_terrain_draw_t, terrain) : NULL;
+}
+
+/** Take the instances of the tiles of a terrain out of its batch, which is freed when empty.
+ *
+ * @param world The world
+ * @param d The state of the draws
+ * @param state The state of the extract
+ * @param td The instances
+ */
+static void box_render_terrain_draw_empty(
+    ecs_world_t *world,
+    box_render_draws_t *d,
+    box_render_terrain_t *state,
+    box_render_terrain_draw_t *td)
+{
+    box_draw_batch_t *b = td->batch >= 0 ? box_draws_batch(d, td->batch) : NULL;
+    if (b && b->alive && b->key.terrain == td->terrain) {
+        while (ecs_vec_count(&b->entities)) {
+            box_draws_slot_remove(world, d, td->batch, ecs_vec_count(&b->entities) - 1);
+        }
+    }
+
+    state->dirty = state->dirty || ecs_vec_count(&td->tiles) > 0;
+    td->batch = -1;
+    td->version = -1;
+    ecs_vec_clear(&td->tiles);
+}
+
+/** Take the instances of the tiles of a terrain out of its batch and release its grid mesh.
+ *
+ * @param world The world
+ * @param d The state of the draws
+ * @param state The state of the extract
+ * @param cache The mesh cache
+ * @param td The instances
+ */
+static void box_render_terrain_draw_clear(
+    ecs_world_t *world,
+    box_render_draws_t *d,
+    box_render_terrain_t *state,
+    box_mesh_cache_t *cache,
+    box_render_terrain_draw_t *td)
+{
+    box_render_terrain_draw_empty(world, d, state, td);
+    box_mesh_cache_release(cache, td->mesh);
+    td->mesh = 0;
+    td->vertices = 0;
+}
+
+/** Check whether the material of a terrain takes the world mapping of a terrain with masks and a
+ * TextureBlend that has no TextureMapping (box_draws_material_of).
+ *
+ * @param world The world
+ * @param e The terrain
+ * @return Whether it does
+ */
+static bool box_render_terrain_masked(
+    const ecs_world_t *world,
+    ecs_entity_t e)
+{
+    const Terrain *t = ecs_get(world, e, Terrain);
+
+    return t && t->masks && ecs_has(world, e, TextureBlend) && !ecs_has(world, e, TextureMapping);
+}
+
+/** Write the instance of a tile into a slot of the batch of its terrain: the tile at its world
+ * position scaled to its size, with the surface that tells the vertex stage where its heights are
+ * and how it morphs, recording the regions of a caster slot whose instance changed.
+ *
+ * @param world The world
+ * @param d The state of the draws
+ * @param b The batch
+ * @param slot The slot
+ * @param fresh Whether the slot was just added
+ * @param tile The tile
+ * @param shape The grid mesh of the tiles
+ * @return Whether the instance changed
+ */
+static bool box_render_terrain_draw_tile(
+    ecs_world_t *world,
+    box_render_draws_t *d,
+    box_draw_batch_t *b,
+    int32_t slot,
+    bool fresh,
+    const box_terrain_tile_t *tile,
+    ShapeMesh *shape)
+{
+    WorldTransform world_transform = {
+        .position = { tile->position[0], tile->position[1], tile->position[2] },
+        .basis = {{ 1.0f, 0.0f, 0.0f }, { 0.0f, 1.0f, 0.0f }, { 0.0f, 0.0f, 1.0f }}
+    };
+    box_render_transform_t model, was_transform;
+    box_render_surface_t surface, was_surface;
+    float size = isfinite(tile->shape.size) && tile->shape.size > 0.0f ? tile->shape.size : 1.0f;
+    bool result = fresh;
+    glm_vec3_copy((vec3){ size, 1.0f, size }, shape->scale);
+    box_terrain_tile_surface(&tile->shape, &shape->surface, shape->min, shape->max);
+    box_draws_transform(&model, &world_transform, shape);
+    ecs_os_memset_t(&surface, 0, box_render_surface_t);
+    box_draws_surface(&surface, shape);
+    box_render_transform_t *transform = box_draws_slot_transform(b, slot);
+    box_render_surface_t *own = box_draws_slot_surface(b, slot);
+    result = result || ecs_os_memcmp_t(transform, &model, box_render_transform_t) ||
+        ecs_os_memcmp_t(own, &surface, box_render_surface_t);
+    if (!result) {
+        goto done;
+    }
+
+    was_transform = *transform;
+    was_surface = *own;
+    *transform = model;
+    *own = surface;
+    if (!d->shadow_record || !box_draws_caster(b)) {
+        goto done;
+    }
+
+    if (fresh) {
+        box_draws_shadow_slot(world, d, b, slot);
+    } else {
+        box_draws_shadow_region(world, d, b, &was_transform, &was_surface);
+        box_draws_shadow_region(world, d, b, transform, own);
+    }
+
+done:
+    return result;
+}
+
+/** Bring the tiles that draw of a terrain into its batch.
+ *
+ * The key and the shading follow the components of the terrain, computed in every extract; the
+ * instances are written again when the version of the tiles, the key or the shading changed.
+ *
+ * @param world The world
+ * @param d The state of the draws
+ * @param state The state of the extract
+ * @param cache The mesh cache
+ * @param e The terrain
+ */
+static void box_render_terrain_draw(
+    ecs_world_t *world,
+    box_render_draws_t *d,
+    box_render_terrain_t *state,
+    box_mesh_cache_t *cache,
+    ecs_entity_t e)
+{
+    box_render_terrain_draw_t *td = box_render_terrain_draw_get(state, e);
+    box_draw_material_t material;
+    box_render_mesh_shading_t shading;
+    box_draw_key_t key;
+    ShapeMesh shape;
+    int32_t count = 0, drawn = 0, first = -1, i, slot = 0;
+    box_terrain_tile_t *const *tiles = box_terrain_tiles(world, e, &count);
+    if (!td) {
+        td = ecs_map_insert_alloc_t(&state->draws, box_render_terrain_draw_t, e);
+        ecs_os_memset_t(td, 0, box_render_terrain_draw_t);
+        td->terrain = e;
+        td->batch = -1;
+        td->version = -1;
+        ecs_vec_init_t(NULL, &td->tiles, TerrainTile, 0);
+    }
+
+    td->tick = d->tick;
+    for (i = 0; i < count; i ++) {
+        if (tiles[i]->enabled) {
+            first = first < 0 ? i : first;
+            drawn ++;
+        }
+    }
+
+    int32_t vertices = drawn ? box_terrain_vertices(tiles[first]->shape.resolution) : 0;
+    if (!drawn || vertices != td->vertices) {
+        box_render_terrain_draw_clear(world, d, state, cache, td);
+    }
+
+    if (!drawn) {
+        goto done;
+    }
+
+    if (!td->mesh) {
+        const box_shape_t *grid = box_mesh_cache_shape(cache, ecs_id(TerrainTile));
+        td->mesh = grid ? box_mesh_cache_acquire(cache, grid, &tiles[first]->shape) : 0;
+        td->vertices = vertices;
+    }
+
+    if (!td->mesh) {
+        goto done;
+    }
+
+    ecs_os_memset_t(&shape, 0, ShapeMesh);
+    shape.mesh = td->mesh;
+    glm_vec3_one(shape.scale);
+    box_terrain_tile_surface(&tiles[first]->shape, &shape.surface, shape.min, shape.max);
+    box_draws_terrain_key(world, d, e, &shape, &key, &material);
+    bool masked = box_render_terrain_masked(world, e);
+    if (masked != td->masked) {
+        box_draws_material_changed(d, e);
+        td->masked = masked;
+    }
+
+    box_draw_batch_t *b = td->batch >= 0 ? box_draws_batch(d, td->batch) : NULL;
+    if (!b || !b->alive || ecs_os_memcmp_t(&b->key, &key, box_draw_key_t)) {
+        box_render_terrain_draw_empty(world, d, state, td);
+        td->batch = box_draws_batch_ensure(d, &key);
+    }
+
+    ecs_os_memset_t(&shading, 0, box_render_mesh_shading_t);
+    box_draws_mesh_shading(&shading, box_draws_planet_material(
+        box_draws_material_id(world, d, e, true, key.dynamic_material), key.planet), &material);
+    int32_t version = box_terrain_tiles_version(world, e);
+    bool shaded = td->version == -1 ||
+        ecs_os_memcmp_t(&shading, &td->shading, box_render_mesh_shading_t);
+    if (version == td->version && !shaded) {
+        goto done;
+    }
+
+    b = box_draws_batch(d, td->batch);
+    int32_t had = ecs_vec_count(&b->entities);
+    while (ecs_vec_count(&b->entities) > drawn) {
+        box_draws_slot_remove(world, d, td->batch, ecs_vec_count(&b->entities) - 1);
+    }
+
+    while (ecs_vec_count(&b->entities) < drawn) {
+        box_draws_slot_add(d, td->batch, e);
+    }
+
+    bool written = version != td->version;
+    ecs_vec_set_count_t(NULL, &td->tiles, TerrainTile, drawn);
+    for (i = 0; i < count; i ++) {
+        const box_terrain_tile_t *tile = tiles[i];
+        uint8_t kinds = 0;
+        if (!tile->enabled) {
+            continue;
+        }
+
+        bool fresh = slot >= had;
+        if ((fresh || written) &&
+            box_render_terrain_draw_tile(world, d, b, slot, fresh, tile, &shape))
+        {
+            kinds |= BOX_DRAW_TRANSFORM | BOX_DRAW_SURFACE;
+        }
+
+        if (fresh || shaded) {
+            *box_draws_slot_mesh_shading(b, slot) = shading;
+            kinds |= BOX_DRAW_SHADING;
+        }
+
+        *ecs_vec_get_t(&td->tiles, TerrainTile, slot) = tile->shape;
+        if (kinds) {
+            box_draws_slot_changed(b, slot, kinds);
+        }
+
+        slot ++;
+    }
+
+    state->dirty = state->dirty || written;
+    td->version = version;
+    td->shading = shading;
+done:
+    return;
+}
+
+void box_render_terrain_draws(
+    ecs_world_t *world,
+    box_render_draws_t *d)
+{
+    box_render_terrain_t *state = box_render_terrain_state(world);
+    box_mesh_cache_t *cache = box_mesh_cache_of(world);
+    int32_t i;
+    if (!state || !cache) {
+        goto done;
+    }
+
+    ecs_iter_t it = ecs_query_iter(world, state->terrains);
+    while (ecs_query_next(&it)) {
+        for (i = 0; i < it.count; i ++) {
+            box_render_terrain_draw(world, d, state, cache, it.entities[i]);
+        }
+    }
+
+    ecs_entity_t stale;
+    do {
+        ecs_map_iter_t mit = ecs_map_iter(&state->draws);
+        box_render_terrain_draw_t *td = NULL;
+        stale = 0;
+        while (!stale && ecs_map_next(&mit)) {
+            td = ecs_map_ptr(&mit);
+            stale = td->tick != d->tick ? ecs_map_key(&mit) : 0;
+        }
+
+        if (stale) {
+            box_render_terrain_draw_clear(world, d, state, cache, td);
+            if (ecs_is_alive(world, stale)) {
+                box_draws_material_release(world, d, stale);
+            }
+
+            ecs_vec_fini_t(NULL, &td->tiles, TerrainTile);
+            ecs_map_remove_free(&state->draws, stale);
+        }
+    } while (stale);
+
+done:
+    return;
+}
+
+/** Append the heights of every terrain tile that draws and whose heights the backend has.
+ *
+ * The list is built again only when the instances of a terrain were written, or while a tile
+ * that draws waits for a texture or its mesh; else the list built before is appended.
  *
  * @param it The iterator of the system
  */
@@ -60,31 +428,32 @@ static void BoxRenderExtractTerrain(
     box_render_terrain_t *state = it->ctx;
     ecs_world_t *world = it->world;
     int32_t i, count;
-    if (ecs_query_changed(state->tiles) || !state->complete) {
+    if (state->dirty || !state->complete) {
         box_textures_t *t = box_textures_get(world);
-        ecs_iter_t qit = ecs_query_iter(world, state->tiles);
+        ecs_map_iter_t mit = ecs_map_iter(&state->draws);
         ecs_vec_clear(&state->heights);
         state->complete = true;
+        state->dirty = false;
         state->version ++;
         state->builds ++;
-        while (ecs_query_next(&qit)) {
-            const TerrainTile *tiles = ecs_field(&qit, TerrainTile, 0);
-            const ShapeMesh *shapes = ecs_field(&qit, ShapeMesh, 1);
-            for (i = 0; i < qit.count; i ++) {
+        while (ecs_map_next(&mit)) {
+            const box_render_terrain_draw_t *td = ecs_map_ptr(&mit);
+            const TerrainTile *tiles = ecs_vec_first(&td->tiles);
+            for (i = 0; i < ecs_vec_count(&td->tiles); i ++) {
                 uint32_t texture = box_textures_handle(t, tiles[i].texture);
                 uint32_t rough = box_textures_handle(t, tiles[i].rough);
                 uint32_t masks = tiles[i].masks ? box_textures_handle(t, tiles[i].masks) : 0;
                 uint32_t coarse = tiles[i].coarse
                     ? box_textures_handle(t, tiles[i].coarse) : 0;
-                state->complete = state->complete && texture && rough && shapes[i].mesh &&
+                state->complete = state->complete && texture && rough && td->mesh &&
                     (masks || !tiles[i].masks) && (coarse || !tiles[i].coarse);
-                if (!texture || !rough || !shapes[i].mesh) {
+                if (!texture || !rough || !td->mesh) {
                     continue;
                 }
 
                 *ecs_vec_append_t(NULL, &state->heights, box_render_terrain_height_t) =
                     (box_render_terrain_height_t){
-                        .mesh = shapes[i].mesh,
+                        .mesh = td->mesh,
                         .slot = (uint32_t)tiles[i].slot,
                         .texture = texture,
                         .rough = rough,
@@ -217,11 +586,13 @@ static void box_render_terrain_bakes(
     box_render_draws_t *d,
     const box_draw_batch_t *b)
 {
-    const ecs_entity_t *entities = ecs_vec_first(&b->entities);
-    int32_t count = ecs_vec_count(&b->entities), i;
+    const box_render_terrain_draw_t *td = box_render_terrain_draw_get(
+        box_render_terrain_state(d->world), b->key.terrain);
+    int32_t count = td ? ecs_vec_count(&td->tiles) : 0, i;
+    count = count < ecs_vec_count(&b->entities) ? count : ecs_vec_count(&b->entities);
     for (i = 0; i < count; i ++) {
-        const TerrainTile *tile = ecs_get(d->world, entities[i], TerrainTile);
-        if (!tile || !tile->masked) {
+        const TerrainTile *tile = ecs_vec_get_t(&td->tiles, TerrainTile, i);
+        if (!tile->masked) {
             continue;
         }
 
@@ -271,12 +642,9 @@ void box_draws_send_nearest(
 {
     const box_render_view_t *view = NULL;
     const box_render_transform_t *t = ecs_vec_first(&b->transforms);
-    const ecs_entity_t *entities = ecs_vec_first(&b->entities);
     int32_t count = ecs_vec_count(&b->transforms), i;
     uint32_t offset = 0;
-    if (!count || !b->key.surface || b->key.mover || !ecs_id(TerrainTile) ||
-        !ecs_is_alive(d->world, entities[0]) || !ecs_has(d->world, entities[0], TerrainTile))
-    {
+    if (!count || !b->key.terrain) {
         goto done;
     }
 
@@ -346,12 +714,14 @@ done:
  * @param world The world
  * @param t The textures
  * @param e The terrain
+ * @param mesh Grid mesh of the tiles of the terrain, 0 for none
  * @param c Receives the terrain and its grid
  */
 static void box_render_terrain_sample_build(
     ecs_world_t *world,
     box_textures_t *t,
     ecs_entity_t e,
+    uint32_t mesh,
     box_render_terrain_cache_t *c)
 {
     box_terrain_window_t w;
@@ -396,17 +766,14 @@ static void box_render_terrain_sample_build(
             continue;
         }
 
-        const ShapeMesh *shape = ecs_get(world, tile->entity, ShapeMesh);
-        if (!box_textures_handle(t, tile->texture) || !shape || !shape->mesh) {
+        if (!box_textures_handle(t, tile->texture) || !mesh) {
             c->complete = false;
             continue;
         }
 
-        s->mesh = s->mesh ? s->mesh : shape->mesh;
-        if (shape->mesh == s->mesh) {
-            grid[(uint32_t)tile->level * cells + (uint32_t)(z * w.cells + x)] =
-                (uint32_t)tile->slot + 1u;
-        }
+        s->mesh = mesh;
+        grid[(uint32_t)tile->level * cells + (uint32_t)(z * w.cells + x)] =
+            (uint32_t)tile->slot + 1u;
     }
 
 done:
@@ -440,7 +807,8 @@ static void box_render_terrain_sample(
 
     box_terrain_counters(world, e, &updates, &selects);
     if (!c->valid || !c->complete || c->updates != updates || c->version != state->version) {
-        box_render_terrain_sample_build(world, t, e, c);
+        const box_render_terrain_draw_t *td = box_render_terrain_draw_get(state, e);
+        box_render_terrain_sample_build(world, t, e, td ? td->mesh : 0, c);
         c->valid = true;
         c->updates = updates;
         c->version = state->version;
@@ -524,6 +892,14 @@ static void box_render_terrain_free(
     }
 
     ecs_map_fini(&state->samples);
+    it = ecs_map_iter(&state->draws);
+    while (ecs_map_next(&it)) {
+        box_render_terrain_draw_t *td = ecs_map_ptr(&it);
+        ecs_vec_fini_t(NULL, &td->tiles, TerrainTile);
+        ecs_os_free(td);
+    }
+
+    ecs_map_fini(&state->draws);
     ecs_vec_fini_t(NULL, &state->heights, box_render_terrain_height_t);
     ecs_os_free(state);
 }
@@ -547,14 +923,11 @@ void box_render_terrain_init(
     ecs_map_init(&state->samples, NULL);
     ECS_COMPONENT_DEFINE(world, RenderTerrain);
     ecs_singleton_set(world, RenderTerrain, { .state = state });
-    state->tiles = ecs_query(world, {
-        .entity = ecs_entity(world, { .name = "extract.TerrainTiles" }),
-        .terms = {
-            { .id = ecs_id(TerrainTile), .inout = EcsIn },
-            { .id = ecs_id(ShapeMesh), .inout = EcsIn }
-        },
-        .cache_kind = EcsQueryCacheAuto,
-        .flags = EcsQueryDetectChanges
+    ecs_map_init(&state->draws, NULL);
+    state->terrains = ecs_query(world, {
+        .entity = ecs_entity(world, { .name = "extract.Terrains" }),
+        .terms = {{ .id = ecs_id(Terrain), .src.id = EcsSelf, .inout = EcsInOutFilter }},
+        .cache_kind = EcsQueryCacheAuto
     });
 
     ecs_system(world, {

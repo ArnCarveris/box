@@ -347,7 +347,7 @@
                     "drawn_kept_past_budget",
                     "drops_within_budget",
                     "far_tiles",
-                    "materials_copied",
+                    "material_of_terrain",
                     "bounded_extent",
                     "remove_deletes_tiles",
                     "script",

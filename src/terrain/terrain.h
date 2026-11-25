@@ -37,22 +37,24 @@ void box_terrain_dims(
 /** Texels of the heights of a tile beyond each of its edges, for the normals and the morph */
 #define BOX_TERRAIN_BORDER (2)
 
-/** A tile of a Terrain, the shape of a tile entity, set by the engine.
+/** A tile of a Terrain as the renderer draws it, written by the engine.
  *
- * The shape is a grid of resolution vertices per edge over the unit square in XZ, with skirts
- * (vertices at y -1) below its edges, scaled to size. Its surface tells the vertex stage where
- * the heights of the tile are and how it morphs (box_terrain_tile_surface).
+ * Tiles are not entities. The renderer draws the tiles of a terrain as instances of the grid
+ * mesh of the TerrainTile shape, which is registered for the component so that the mesh cache
+ * makes the grid: resolution vertices per edge over the unit square in XZ, with skirts (vertices
+ * at y -1) below its edges, scaled to size. The surface of an instance tells the vertex stage
+ * where the heights of the tile are and how it morphs (box_terrain_tile_surface).
  */
 typedef struct TerrainTile {
     ecs_entity_t terrain;   /**< The terrain entity */
-    ecs_entity_t texture;   /**< Child entity with the TextureGraph of the heights */
-    ecs_entity_t masks;     /**< Child entity with the TextureGraph of the masks over the window
-                             *   of the heights, 0 without Terrain.masks */
-    ecs_entity_t coarse;    /**< Child entity with the TextureGraph of the masks of the next
-                             *   coarser level at every second texel of the window, 0 without
+    ecs_entity_t texture;   /**< Entity with the TextureGraph of the heights */
+    ecs_entity_t masks;     /**< Entity with the TextureGraph of the masks over the window of the
+                             *   heights, 0 without Terrain.masks */
+    ecs_entity_t coarse;    /**< Entity with the TextureGraph of the masks of the next coarser
+                             *   level at every second texel of the window, 0 without
                              *   Terrain.masks */
-    ecs_entity_t rough;     /**< Child entity with the TextureGraph of the heights at every
-                             *   second texel of the window, as the next coarser level has them */
+    ecs_entity_t rough;     /**< Entity with the TextureGraph of the heights at every second
+                             *   texel of the window, as the next coarser level has them */
     int32_t level;          /**< Level of detail, 0 the finest */
     int32_t ix;             /**< Column of the tile in the grid of its level */
     int32_t iz;             /**< Row of the tile in the grid of its level */
@@ -77,13 +79,15 @@ extern ECS_COMPONENT_DECLARE(TerrainTile);
 
 /** A tile of a Terrain as the engine keeps it */
 typedef struct box_terrain_tile_t {
-    ecs_entity_t entity;    /**< Tile entity, with TerrainTile */
-    ecs_entity_t texture;   /**< Child entity with the TextureGraph of the heights */
-    ecs_entity_t masks;     /**< Child entity with the TextureGraph of the masks, 0 for none */
-    ecs_entity_t coarse;    /**< Child entity with the TextureGraph of the masks of the next
-                             *   coarser level, 0 for none */
-    ecs_entity_t rough;     /**< Child entity with the TextureGraph of the heights of the next
-                             *   coarser level */
+    TerrainTile shape;      /**< What the renderer draws */
+    double position[3];     /**< World position of the center of the tile */
+    ecs_entity_t texture;   /**< Entity with the TextureGraph of the heights, a child of the
+                             *   container of the tiles */
+    ecs_entity_t masks;     /**< Entity with the TextureGraph of the masks, 0 for none */
+    ecs_entity_t coarse;    /**< Entity with the TextureGraph of the masks of the next coarser
+                             *   level, 0 for none */
+    ecs_entity_t rough;     /**< Entity with the TextureGraph of the heights of the next coarser
+                             *   level */
     int32_t level;          /**< Level of detail */
     int32_t ix;             /**< Column in the grid of its level */
     int32_t iz;             /**< Row in the grid of its level */
@@ -97,7 +101,7 @@ typedef struct box_terrain_tile_t {
     bool wanted;            /**< The focus needs it this frame */
     bool drawn;             /**< It draws this frame */
     bool keep;              /**< It stands in for a wanted tile that is not ready */
-    bool enabled;           /**< It is not disabled */
+    bool enabled;           /**< The renderer draws it */
     uint8_t before;         /**< Its wanted, drawn and keep before the update that runs */
 } box_terrain_tile_t;
 
@@ -112,6 +116,18 @@ box_terrain_tile_t* const* box_terrain_tiles(
     const ecs_world_t *world,
     ecs_entity_t terrain,
     int32_t *count);
+
+/** Get the version of the tiles of a terrain, which changes when the record, the position or
+ * the drawing of a tile changed or a tile was dropped, so the renderer writes its instances
+ * again.
+ *
+ * @param world The world
+ * @param terrain The terrain entity
+ * @return The version, 0 without tiles
+ */
+int32_t box_terrain_tiles_version(
+    const ecs_world_t *world,
+    ecs_entity_t terrain);
 
 /** Get how often the tiles of a terrain were updated and selected, for tests: an update that
  * found nothing changed and a selection for the same foci and settings do not count.
@@ -357,17 +373,6 @@ int32_t box_terrain_scene(
     ecs_entity_t scene,
     ecs_entity_t *out,
     int32_t max);
-
-/** Check whether an entity is a tile a Terrain draws, which rays and collisions skip for the
- * height field of the terrain.
- *
- * @param world The world
- * @param e The entity
- * @return Whether it has a TerrainTile
- */
-bool box_terrain_is_tile(
-    const ecs_world_t *world,
-    ecs_entity_t e);
 
 /** Register TerrainQueryStatus, the system that keeps the query tiles of every terrain and the
  * script functions of the queries, part of BoxTerrainImport after Terrain.

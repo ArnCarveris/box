@@ -45,8 +45,7 @@ static bool box_spatial_ray_bounds(
     const vec3 max,
     float *t)
 {
-    bool result = !box_terrain_is_tile(w->world, e) &&
-        box_bvh_ray_box(&w->ray, min, max, w->reach, t);
+    bool result = box_bvh_ray_box(&w->ray, min, max, w->reach, t);
     if (result && w->desc->filter) {
         result = w->desc->filter(w->desc->ctx, e, t) && *t <= w->reach;
     }

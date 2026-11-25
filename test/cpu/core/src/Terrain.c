@@ -1,7 +1,7 @@
 /**
  * @file Terrain.c
  * @brief Tests for the tiles of a Terrain without a GPU: the tiles the focus wants, made nearest
- * first within the budget, the TextureGraph and the shape of a tile, the coarse tiles kept until
+ * first within the budget, the TextureGraph and the record of a tile, the coarse tiles kept until
  * the finer ones are ready, tiles dropped within the budget, origin shifts and materials.
  *
  * The null backend computes no image, so the tests mark the heights of a tile ready by writing
@@ -14,6 +14,7 @@
 #include "texture.h"
 #include "terrain.h"
 #include "mesh_cache.h"
+#include "draw.h"
 
 /** Edge of a tile of level 0 in the tests */
 #define TT_TILE (16.0f)
@@ -168,7 +169,7 @@ void Terrain_budget_nearest_first(void) {
         test_int(tiles[i]->level, 0);
         test_assert(tt_distance(tiles[i], 0, 0) <= TT_TILE);
         test_bool(tiles[i]->drawn, false);
-        test_assert(ecs_has_id(world, tiles[i]->entity, EcsDisabled));
+        test_bool(tiles[i]->enabled, false);
     }
 
     ecs_progress(world, 0);
@@ -214,7 +215,10 @@ void Terrain_tile_graph_window(void) {
     const box_terrain_tile_t *t = tiles[0];
     const TextureGraph *graph = ecs_get(world, t->texture, TextureGraph);
     test_assert(graph != NULL);
-    test_assert(ecs_has_pair(world, t->texture, EcsChildOf, t->entity));
+    ecs_entity_t container = ecs_get_target(world, t->texture, EcsChildOf, 0);
+    test_assert(container != 0);
+    test_assert(container != terrain);
+    test_int(ecs_get_target(world, t->rough, EcsChildOf, 0), container);
     test_int(graph->output, ecs_get(world, terrain, Terrain)->height);
     test_int(graph->domain, DomainWorld);
     test_int(graph->format, GraphFloat);
@@ -236,28 +240,34 @@ void Terrain_tile_shape(void) {
     box_terrain_tile_t *const *tiles = box_terrain_tiles(world, terrain, &count);
     test_int(count, 1);
     const box_terrain_tile_t *t = tiles[0];
-    const ShapeMesh *sm = ecs_get(world, t->entity, ShapeMesh);
-    test_assert(sm != NULL);
-    test_flt(sm->scale[0], TT_TILE);
-    test_flt(sm->scale[1], 1.0f);
-    test_flt(sm->scale[2], TT_TILE);
-    test_flt(sm->surface.p[0][0], BOX_TERRAIN_SURFACE);
-    test_flt(sm->surface.p[1][0], (float)t->slot);
-    test_flt(sm->surface.p[1][1], (float)(box_terrain_row_bytes(n) / 4));
-    test_flt(sm->surface.p[1][2], (float)(n + 2 * BOX_TERRAIN_BORDER));
-    test_flt(sm->surface.p[1][3], (float)n);
-    test_flt(sm->surface.p[2][3], TT_RANGE);
-    test_flt(sm->surface.p[4][0], TT_TILE);
-    test_flt(sm->surface.p[4][3], 0.0f);
+    box_surface_data_t surface;
+    vec3 min, max;
+    test_int(t->shape.terrain, terrain);
+    test_int(t->shape.texture, t->texture);
+    test_int(t->shape.resolution, n);
+    test_flt(t->shape.size, TT_TILE);
+    box_terrain_tile_surface(&t->shape, &surface, min, max);
+    test_flt(surface.p[0][0], BOX_TERRAIN_SURFACE);
+    test_flt(surface.p[1][0], (float)t->slot);
+    test_flt(surface.p[1][1], (float)(box_terrain_row_bytes(n) / 4));
+    test_flt(surface.p[1][2], (float)(n + 2 * BOX_TERRAIN_BORDER));
+    test_flt(surface.p[1][3], (float)n);
+    test_flt(surface.p[2][3], TT_RANGE);
+    test_flt(surface.p[4][0], TT_TILE);
+    test_flt(surface.p[4][3], 0.0f);
 
-    const box_mesh_t *mesh = box_mesh_cache_get(box_mesh_cache_of(world), sm->mesh);
+    box_mesh_cache_t *cache = box_mesh_cache_of(world);
+    uint32_t handle = box_mesh_cache_acquire(cache,
+        box_mesh_cache_shape(cache, ecs_id(TerrainTile)), &t->shape);
+    const box_mesh_t *mesh = box_mesh_cache_get(cache, handle);
     test_assert(mesh != NULL);
     test_int(mesh->vertex_count, n * n + 4 * n);
     test_int(mesh->index_count, (n - 1) * (n - 1) * 6 + 4 * (n - 1) * 6);
     test_int(mesh->surface_asset_count, 1);
-    const Position *p = ecs_get(world, t->entity, Position);
-    test_flt(p->x, (t->ix + 0.5f) * TT_TILE);
-    test_flt(p->z, (t->iz + 0.5f) * TT_TILE);
+    box_mesh_cache_release(cache, handle);
+    test_flt(t->position[0], (t->ix + 0.5f) * TT_TILE);
+    test_flt(t->position[2], (t->iz + 0.5f) * TT_TILE);
+    test_int(ecs_count_id(world, ecs_id(TerrainTile)), 0);
     ecs_fini(world);
 }
 
@@ -279,7 +289,7 @@ void Terrain_ready_tiles_draw(void) {
     test_int(sum, count);
     for (i = 0; i < count; i ++) {
         test_bool(tiles[i]->drawn, true);
-        test_assert(!ecs_has_id(world, tiles[i]->entity, EcsDisabled));
+        test_bool(tiles[i]->enabled, true);
     }
 
     tt_expect_disjoint(tiles, count);
@@ -419,43 +429,38 @@ void Terrain_far_tiles(void) {
     for (i = 0; i < count; i ++) {
         const box_terrain_tile_t *t = tiles[i];
         double size = TT_TILE * (double)(1 << t->level);
-        const Position *p = ecs_get(world, t->entity, Position);
-        test_assert(p->x == (t->ix + 0.5) * size);
-        test_assert(p->z == (t->iz + 0.5) * size);
-        test_assert(p->x > 4194304.0 - 4096 && p->z < -2097152.0 + 4096);
+        test_assert(t->position[0] == (t->ix + 0.5) * size);
+        test_assert(t->position[2] == (t->iz + 0.5) * size);
+        test_assert(t->position[0] > 4194304.0 - 4096 && t->position[2] < -2097152.0 + 4096);
         test_bool(t->drawn, true);
     }
 
     ecs_fini(world);
 }
 
-void Terrain_materials_copied(void) {
+void Terrain_material_of_terrain(void) {
     ecs_entity_t terrain, focus;
     ecs_world_t *world = tt_world(&terrain, &focus, 4);
+    box_draw_material_t material;
     ecs_set(world, terrain, Rgb, {10, 200, 30});
     ecs_set(world, terrain, TextureMapping, {.mode = MappingWorld, .size = 8, .blend = 0.5f});
     ecs_progress(world, 0);
-    int32_t count, i;
-    box_terrain_tile_t *const *tiles = box_terrain_tiles(world, terrain, &count);
+    int32_t count;
+    box_terrain_tiles(world, terrain, &count);
     test_int(count, 4);
-    for (i = 0; i < count; i ++) {
-        const Rgb *c = ecs_get(world, tiles[i]->entity, Rgb);
-        test_assert(c != NULL);
-        test_int(c->g, 200);
-        const TextureMapping *m = ecs_get(world, tiles[i]->entity, TextureMapping);
-        test_assert(m != NULL);
-        test_int(m->mode, MappingWorld);
-    }
+    test_int(ecs_count_id(world, ecs_id(Rgb)), 1);
+    box_draws_material_of(world, terrain, 0, &material);
+    test_assert(material.color != NULL);
+    test_int(material.color->g, 200);
+    test_assert(material.mapping != NULL);
+    test_flt(material.mapping->size, 8.0f);
 
     ecs_set(world, terrain, Rgb, {50, 60, 70});
     ecs_remove(world, terrain, TextureMapping);
     ecs_progress(world, 0);
-    tiles = box_terrain_tiles(world, terrain, &count);
-    for (i = 0; i < count; i ++) {
-        test_int(ecs_get(world, tiles[i]->entity, Rgb)->g, 60);
-        test_assert(!ecs_has(world, tiles[i]->entity, TextureMapping));
-    }
-
+    box_draws_material_of(world, terrain, 0, &material);
+    test_int(material.color->g, 60);
+    test_assert(material.mapping == NULL);
     ecs_fini(world);
 }
 
@@ -475,8 +480,7 @@ void Terrain_bounded_extent(void) {
         test_assert((tiles[i]->ix + 1) * size > -40.0);
         test_assert(tiles[i]->iz * size < 40.0);
         test_assert((tiles[i]->iz + 1) * size > -40.0);
-        const ShapeMesh *sm = ecs_get(world, tiles[i]->entity, ShapeMesh);
-        test_flt(sm->surface.p[4][3], 1.0f);
+        test_bool(tiles[i]->shape.bounded, true);
     }
 
     ecs_fini(world);
@@ -491,7 +495,7 @@ void Terrain_remove_deletes_tiles(void) {
     test_int(count, 4);
     ecs_entity_t entities[4];
     for (i = 0; i < count; i ++) {
-        entities[i] = tiles[i]->entity;
+        entities[i] = tiles[i]->texture;
     }
 
     ecs_remove(world, terrain, Terrain);
@@ -547,8 +551,10 @@ void Terrain_masks_graph_windows(void) {
         const TextureGraph *coarse = ecs_get(world, t->coarse, TextureGraph);
         test_assert(fine != NULL);
         test_assert(coarse != NULL);
-        test_assert(ecs_has_pair(world, t->masks, EcsChildOf, t->entity));
-        test_assert(ecs_has_pair(world, t->coarse, EcsChildOf, t->entity));
+        ecs_entity_t container = ecs_get_target(world, t->texture, EcsChildOf, 0);
+        test_assert(container != 0);
+        test_int(ecs_get_target(world, t->masks, EcsChildOf, 0), container);
+        test_int(ecs_get_target(world, t->coarse, EcsChildOf, 0), container);
         test_int(fine->format, GraphLinear);
         test_int(coarse->format, GraphLinear);
         test_int(fine->domain, DomainWorld);
@@ -623,13 +629,18 @@ void Terrain_masks_blend_surface(void) {
     box_terrain_tile_t *const *tiles = box_terrain_tiles(world, terrain, &count);
     test_int(count, 4);
 
-    // Masks without a TextureBlend keep the plain material of the tiles
+    // Masks without a TextureBlend keep the plain material of the terrain
+    box_draw_material_t material;
+    box_surface_data_t surface;
+    vec3 min, max;
     for (i = 0; i < count; i ++) {
-        const ShapeMesh *sm = ecs_get(world, tiles[i]->entity, ShapeMesh);
-        test_flt(sm->surface.p[3][0], 0.0f);
-        test_bool(ecs_get(world, tiles[i]->entity, TerrainTile)->masked, false);
-        test_assert(!ecs_has(world, tiles[i]->entity, TextureMapping));
+        box_terrain_tile_surface(&tiles[i]->shape, &surface, min, max);
+        test_flt(surface.p[3][0], 0.0f);
+        test_bool(tiles[i]->shape.masked, false);
     }
+
+    box_draws_material_of(world, terrain, 0, &material);
+    test_assert(material.mapping == NULL);
 
     // With a TextureBlend the tiles blend by their masks, mapped on the world by default
     ecs_entity_t rock = ecs_new(world);
@@ -637,35 +648,30 @@ void Terrain_masks_blend_surface(void) {
     ecs_progress(world, 0);
     tiles = box_terrain_tiles(world, terrain, &count);
     for (i = 0; i < count; i ++) {
-        const ShapeMesh *sm = ecs_get(world, tiles[i]->entity, ShapeMesh);
-        test_flt(sm->surface.p[3][0], 1.0f);
-        test_bool(ecs_get(world, tiles[i]->entity, TerrainTile)->masked, true);
-        const TextureBlend *b = ecs_get(world, tiles[i]->entity, TextureBlend);
-        test_assert(b != NULL);
-        test_int(b->layers[0], rock);
-        const TextureMapping *m = ecs_get(world, tiles[i]->entity, TextureMapping);
-        test_assert(m != NULL);
-        test_int(m->mode, MappingWorld);
-        test_flt(m->size, 1.0f);
+        box_terrain_tile_surface(&tiles[i]->shape, &surface, min, max);
+        test_flt(surface.p[3][0], 1.0f);
+        test_bool(tiles[i]->shape.masked, true);
     }
+
+    box_draws_material_of(world, terrain, 0, &material);
+    test_assert(material.mapping != NULL);
+    test_int(material.mapping->mode, MappingWorld);
+    test_flt(material.mapping->size, 1.0f);
 
     // The TextureMapping of the terrain wins
     ecs_set(world, terrain, TextureMapping, {.mode = MappingWorld, .size = 4, .blend = 0.5f});
     ecs_progress(world, 0);
-    tiles = box_terrain_tiles(world, terrain, &count);
-    for (i = 0; i < count; i ++) {
-        const TextureMapping *m = ecs_get(world, tiles[i]->entity, TextureMapping);
-        test_flt(m->size, 4.0f);
-        test_flt(m->blend, 0.5f);
-    }
+    box_draws_material_of(world, terrain, 0, &material);
+    test_flt(material.mapping->size, 4.0f);
+    test_flt(material.mapping->blend, 0.5f);
 
     ecs_remove(world, terrain, TextureBlend);
     ecs_progress(world, 0);
     tiles = box_terrain_tiles(world, terrain, &count);
     for (i = 0; i < count; i ++) {
-        const ShapeMesh *sm = ecs_get(world, tiles[i]->entity, ShapeMesh);
-        test_flt(sm->surface.p[3][0], 0.0f);
-        test_assert(!ecs_has(world, tiles[i]->entity, TextureBlend));
+        box_terrain_tile_surface(&tiles[i]->shape, &surface, min, max);
+        test_flt(surface.p[3][0], 0.0f);
+        test_bool(tiles[i]->shape.masked, false);
     }
 
     ecs_fini(world);
@@ -734,10 +740,8 @@ void Terrain_sample_window_covers_drawn(void) {
         int32_t x = t->ix - w.first[t->level][0], z = t->iz - w.first[t->level][1];
         test_assert(x >= 0 && x < w.cells);
         test_assert(z >= 0 && z < w.cells);
-        const TerrainTile *tile = ecs_get(world, t->entity, TerrainTile);
-        test_assert(tile != NULL);
-        test_flt(tile->morph[0], w.morph[t->level][0]);
-        test_flt(tile->morph[1], w.morph[t->level][1]);
+        test_flt(t->shape.morph[0], w.morph[t->level][0]);
+        test_flt(t->shape.morph[1], w.morph[t->level][1]);
     }
 
     ecs_fini(world);
@@ -862,32 +866,27 @@ void Terrain_material_change_updates(void) {
         ecs_progress(world, 0);
     }
 
+    // The renderer reads the material of the terrain itself, so the tiles stay as they are
     box_terrain_counters(world, terrain, &updates, &selects);
     ecs_set(world, terrain, Rgb, {10, 200, 30});
+    ecs_add_id(world, terrain, NoShadow);
+    ecs_progress(world, 0);
+    box_terrain_counters(world, terrain, &u, &s);
+    test_int(u, updates);
+    test_int(s, selects);
+    box_terrain_tiles(world, terrain, &count);
+    test_assert(count > 0);
+
+    // A TextureBlend decides whether the tiles draw with masks, so the tiles update
+    ecs_entity_t rock = ecs_new(world);
+    ecs_set(world, terrain, TextureBlend, {.layers = {rock}});
     ecs_progress(world, 0);
     box_terrain_counters(world, terrain, &u, &s);
     test_assert(u > updates);
     test_int(s, selects);
-    box_terrain_tile_t *const *tiles = box_terrain_tiles(world, terrain, &count);
-    test_assert(count > 0);
-    for (i = 0; i < count; i ++) {
-        test_int(ecs_get(world, tiles[i]->entity, Rgb)->g, 200);
-    }
 
-    ecs_add_id(world, terrain, NoShadow);
+    ecs_remove(world, terrain, TextureBlend);
     ecs_progress(world, 0);
-    for (i = 0; i < count; i ++) {
-        test_assert(ecs_has_id(world, tiles[i]->entity, NoShadow));
-    }
-
-    ecs_remove(world, terrain, Rgb);
-    ecs_remove_id(world, terrain, NoShadow);
-    ecs_progress(world, 0);
-    for (i = 0; i < count; i ++) {
-        test_assert(!ecs_has(world, tiles[i]->entity, Rgb));
-        test_assert(!ecs_has_id(world, tiles[i]->entity, NoShadow));
-    }
-
     ecs_progress(world, 0);
     box_terrain_counters(world, terrain, &updates, &selects);
     for (i = 0; i < 4; i ++) {
@@ -930,8 +929,7 @@ void Terrain_readback_updates(void) {
     test_int(s, selects);
     tiles = box_terrain_tiles(world, terrain, &count);
     test_bool(tiles[0]->measured, true);
-    const TerrainTile *tile = ecs_get(world, tiles[0]->entity, TerrainTile);
-    test_flt(tile->min_height, 2);
-    test_flt(tile->max_height, 7);
+    test_flt(tiles[0]->shape.min_height, 2);
+    test_flt(tiles[0]->shape.max_height, 7);
     ecs_fini(world);
 }

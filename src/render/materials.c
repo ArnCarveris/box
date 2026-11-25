@@ -1142,6 +1142,25 @@ void box_draws_materials_observers(
     }
 }
 
+/** Get the TextureMapping a material owner draws with when it has none: world mapping for a
+ * Terrain with masks and a TextureBlend, whose masks weigh the layers in world space.
+ *
+ * @param world The world
+ * @param owner The owner
+ * @return The mapping, NULL for none
+ */
+static const TextureMapping* box_materials_default_mapping(
+    const ecs_world_t *world,
+    ecs_entity_t owner)
+{
+    static const TextureMapping world_mapping = { .mode = MappingWorld, .size = 1.0f };
+    const Terrain *terrain = box_draws_terrain(world, owner)
+        ? ecs_get(world, owner, Terrain) : NULL;
+
+    return terrain && terrain->masks && ecs_has(world, owner, TextureBlend)
+        ? &world_mapping : NULL;
+}
+
 void box_draws_material_of(
     const ecs_world_t *world,
     ecs_entity_t owner,
@@ -1156,6 +1175,10 @@ void box_draws_material_of(
         out->emissive = ecs_get(world, owner, Emissive);
         out->uv = ecs_get(world, owner, TextureTransform);
         out->mapping = ecs_get(world, owner, TextureMapping);
+        if (!out->mapping) {
+            out->mapping = box_materials_default_mapping(world, owner);
+        }
+
         out->scroll = ecs_get(world, owner, TextureScroll);
         out->cutoff = ecs_get(world, owner, AlphaCutoff);
         out->transmission = ecs_get(world, owner, Transmission);
