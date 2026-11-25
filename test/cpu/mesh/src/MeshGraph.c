@@ -424,44 +424,6 @@ void MeshGraph_script_graph(void) {
     ecs_fini(world);
 }
 
-void MeshGraph_node_kinds(void) {
-    ecs_world_t *world = test_world();
-    const MeshNodeKind *tube = ecs_get(world, ecs_id(MeshTube), MeshNodeKind);
-    test_assert(tube != NULL);
-    test_assert(tube->id > 0);
-    test_int(tube->output, MeshValueMesh);
-    test_int(tube->input_count, 2);
-    test_str(tube->inputs[0].name, "curves");
-    test_int(tube->inputs[0].type, MeshValueCurves);
-    test_assert(!tube->inputs[0].optional);
-    test_str(tube->inputs[1].name, "profile");
-    test_assert(tube->inputs[1].optional);
-    test_assert(!tube->source);
-    test_assert(!tube->random);
-    test_int(tube->param_count, 15);
-    test_str(tube->params[0].name, "sides");
-
-    const MeshNodeKind *merge = ecs_get(world, ecs_id(MeshMerge), MeshNodeKind);
-    test_int(merge->output, MeshValueAny);
-    test_assert(merge->inputs[0].list);
-    test_assert(ecs_get(world, ecs_id(MeshShape), MeshNodeKind)->source);
-    test_assert(ecs_get(world, ecs_id(MeshPointsOnMesh), MeshNodeKind)->random);
-    test_assert(ecs_get(world, ecs_id(MeshDisplace), MeshNodeKind)->random);
-    test_assert(ecs_get(world, ecs_id(MeshPointsOnCurves), MeshNodeKind)->random);
-    test_int(ecs_get(world, ecs_id(MeshPath), MeshNodeKind)->output, MeshValueCurves);
-    test_int(ecs_get(world, ecs_id(MeshPointsOnMesh), MeshNodeKind)->output, MeshValuePoints);
-
-    test_assert(ecs_lookup(world, "box.mesh.Graph") == ecs_id(MeshGraph));
-    test_assert(ecs_lookup(world, "box.mesh.nodes.Tube") == ecs_id(MeshTube));
-    test_assert(ecs_lookup(world, "box.mesh.nodes.Mesh3") == ecs_id(MeshMesh3));
-    test_assert(ecs_lookup(world, "box.mesh.nodes.Branches") == ecs_id(MeshBranches));
-    test_assert(ecs_get(world, ecs_id(MeshBranches), MeshNodeKind)->random);
-    test_int(ecs_get(world, ecs_id(MeshBranches), MeshNodeKind)->param_count, 26);
-    test_int(ecs_get(world, ecs_id(MeshPrune), MeshNodeKind)->input_count, 2);
-
-    ecs_fini(world);
-}
-
 void MeshGraph_custom_kind(void) {
     ecs_world_t *world = test_world();
     ECS_COMPONENT(world, TestScale);

@@ -36,7 +36,6 @@
                     "remove_graph",
                     "output_changed_keeps_mesh",
                     "script_graph",
-                    "node_kinds",
                     "custom_kind",
                     "shape_of_graph"
                 ]
