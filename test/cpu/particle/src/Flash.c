@@ -331,7 +331,7 @@ void Flash_dark_lights_cost_nothing(void) {
     ecs_set(world, view, View, {.camera = camera, .shadows.enabled = true});
     int32_t i;
     for (i = 0; i < 50; i ++) {
-        play(world, "Glow", (float)i);
+        play(world, "Glow", (float)i * 0.1f);
     }
 
     frame(world);

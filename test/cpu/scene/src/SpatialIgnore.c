@@ -112,7 +112,8 @@ void SpatialIgnore_moving_wave_not_refit(void) {
     vec3 min, max;
     test_assert(!box_spatial_bounds(world, part, NULL, min, max));
 
-    WorldTransform before = *ecs_get(world, part, WorldTransform);
+    WorldTransform t_buf;
+    WorldTransform before = *box_transform_world(world, part, &t_buf);
     for (i = 0; i < FRAMES; i ++) {
         box_spatial_hit_t hit = {0};
         box_spatial_ray_t ray = { .origin = {-30.0f, 10, -30.0f}, .dir = {0, -1, 0} };
@@ -126,7 +127,7 @@ void SpatialIgnore_moving_wave_not_refit(void) {
         test_int(stats.entities, 1);
     }
 
-    const WorldTransform *after = ecs_get(world, part, WorldTransform);
+    const WorldTransform *after = box_transform_world(world, part, &t_buf);
     test_assert(ecs_os_memcmp(before.m, after->m, sizeof(mat4)) != 0);
     test_assert(!ecs_has(world, part, SpatialPose));
 

@@ -443,8 +443,8 @@ static void box_pick_send(
 }
 
 /** Resolve the on.scroll waiters of the innermost entity on the path of the pick of a wheel
- * movement that waits for one. The path goes past the handler of the pick, so an Interactive
- * element inside a scroll view, such as a button, does not keep the wheel from the view.
+ * movement that waits for one. The path goes past an Interactive handler, so a button inside a
+ * scroll view does not keep the wheel from the view, and ends at the first InputBlocker.
  *
  * @param world The world
  * @param st The module state
@@ -460,7 +460,7 @@ static void box_pick_scroll(
     ecs_entity_t e = pick->target ? pick->target : st->screen;
     int32_t w, resolved = 0;
     for (; e && !resolved && ecs_is_alive(world, e);
-        e = pick->target ? ecs_get_parent(world, e) : 0)
+        e = pick->target && !ecs_has_id(world, e, InputBlocker) ? ecs_get_parent(world, e) : 0)
     {
         EcsScriptMouseEvent evt = *src;
         evt.target = e;

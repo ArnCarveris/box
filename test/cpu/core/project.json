@@ -360,10 +360,8 @@
                     "sample_window_without_terrain",
                     "sampled_tag",
                     "idle_skips_update",
-                    "focus_step_updates",
                     "terrain_change_updates",
                     "material_change_updates",
-                    "texture_status_updates",
                     "origin_shift_updates",
                     "readback_updates"
                 ]

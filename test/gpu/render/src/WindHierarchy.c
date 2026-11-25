@@ -898,8 +898,7 @@ static ecs_entity_t hier_deep_add(
 /** Which vertex of every card a marker box stands at */
 typedef enum hier_mark_t {
     HierStems,  /**< The stem of the card, its vertex of the lowest flutter weight, 0 */
-    HierTips,   /**< The tip of the card, its vertex of the highest flutter weight */
-    HierPivots  /**< The pivot of the twig of the card, with the data of its stem */
+    HierTips    /**< The tip of the card, its vertex of the highest flutter weight */
 } hier_mark_t;
 
 /** Flutter weight of a vertex of foliage, from its data channel BOX_MESH_DATA_FLUTTER.
@@ -1013,12 +1012,8 @@ static ecs_entity_t hier_cards(
 
         if (mark == HierStems) {
             hier_mark_box(&m, data, stem, cm->positions[stem], scramble);
-        } else if (mark == HierTips) {
-            hier_mark_box(&m, data, tip, cm->positions[tip], scramble);
         } else {
-            vec3 pivot = { data[BOX_MESH_DATA_PIVOT][stem],
-                data[BOX_MESH_DATA_PIVOT + 1][stem], data[BOX_MESH_DATA_PIVOT + 2][stem] };
-            hier_mark_box(&m, data, stem, pivot, scramble);
+            hier_mark_box(&m, data, tip, cm->positions[tip], scramble);
         }
 
         cards_count ++;
@@ -1380,49 +1375,3 @@ void WindHierarchy_card_stems_pinned_tips_flutter(void) {
     stbi_image_free(tips_windy);
 }
 
-/** With turning twigs every card of a Cards crown under a WindSway with pivots and foliage
- * turns about the pivot of its twig only: the pivots stay, the stems move with the twig, and
- * the seed, hue, growth and occlusion of the cards in data1 are not read as the pivot or the
- * stiffness of a parent, which a WindSway without foliage does read on the twigs of level 2 */
-void WindHierarchy_card_stems_turn_with_twig(void) {
-    // materials/wind_sway
-    unsigned char *pivots_calm = hier_cards_render(HierPivots, false, true, HIER_BRANCH, 0,
-        "hier_card_pivots_calm.png");
-    unsigned char *pivots_windy = hier_cards_render(HierPivots, false, true, HIER_BRANCH, 10,
-        "hier_card_pivots_windy.png");
-    float row_rest = hier_mean_row(pivots_calm, 0, HIER_SIZE - 1);
-    float row_moved = hier_mean_row(pivots_windy, 0, HIER_SIZE - 1);
-    float col_rest = hier_mean_column(pivots_calm, 0, HIER_SIZE - 1, 0, HIER_SIZE - 1);
-    float col_moved = hier_mean_column(pivots_windy, 0, HIER_SIZE - 1, 0, HIER_SIZE - 1);
-    test_assert(row_rest > 0.0f && row_moved > 0.0f);
-    test_assert(fabsf(row_moved - row_rest) < 0.3f);
-    test_assert(fabsf(col_moved - col_rest) < 0.3f);
-
-    unsigned char *stems_calm = hier_cards_render(HierStems, false, true, HIER_BRANCH, 0,
-        "hier_card_turn_calm.png");
-    unsigned char *stems_windy = hier_cards_render(HierStems, false, true, HIER_BRANCH, 10,
-        "hier_card_turn_windy.png");
-    int stems = hier_red_count(stems_calm);
-    test_assert(stems > 50);
-    test_assert(hier_red_diff(stems_calm, stems_windy) * 10 > stems);
-
-    /* Other values in data1 change nothing with foliage */
-    unsigned char *scrambled = hier_cards_render(HierStems, true, true, HIER_BRANCH, 10,
-        "hier_card_turn_scrambled.png");
-    test_assert(!memcmp(stems_windy, scrambled, HIER_SIZE * HIER_SIZE * 4));
-
-    /* Without foliage data1 is read as the parent of the twigs of level 2 */
-    unsigned char *parent = hier_cards_render(HierStems, false, false, HIER_BRANCH, 10,
-        "hier_card_parent.png");
-    unsigned char *parent_scrambled = hier_cards_render(HierStems, true, false, HIER_BRANCH,
-        10, "hier_card_parent_scrambled.png");
-    test_assert(memcmp(parent, parent_scrambled, HIER_SIZE * HIER_SIZE * 4) != 0);
-
-    stbi_image_free(pivots_calm);
-    stbi_image_free(pivots_windy);
-    stbi_image_free(stems_calm);
-    stbi_image_free(stems_windy);
-    stbi_image_free(scrambled);
-    stbi_image_free(parent);
-    stbi_image_free(parent_scrambled);
-}

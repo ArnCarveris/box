@@ -396,40 +396,6 @@ static ecs_entity_t wos_wind(
     return 0;
 }
 
-/** A noisy FogVolume of 1.7 units per noise cell in front of an emissive wall, seen in a
- * perspective view.
- *
- * @param world The world
- * @return 0, no texture
- */
-static ecs_entity_t wos_fog(
-    ecs_world_t *world)
-{
-    wos_view(world, (float[]){0, 0, 6}, 0, 0);
-    ecs_entity_t wall = ecs_new(world);
-    ecs_set(world, wall, Position, {0, 0, -4});
-    ecs_set(world, wall, Box, {30, 30, 0.2f});
-    ecs_set(world, wall, Rgb, {0, 0, 0});
-    ecs_set(world, wall, PbrMaterial, {.metallic = 1, .roughness = 1});
-    ecs_set(world, wall, Emissive, {.strength = 1, .color = {200, 200, 200}});
-
-    ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Position, {0, 0, 0});
-    ecs_add(world, e, FogVolume);
-    FogVolume *f = ecs_get_mut(world, e, FogVolume);
-    f->extent[0] = 10;
-    f->extent[1] = 10;
-    f->extent[2] = 2;
-    f->density = 0.5f;
-    f->absorption = 1;
-    f->edge_fade = 0;
-    f->noise_strength = 1;
-    f->noise_scale = 1.7f;
-    ecs_modified(world, e, FogVolume);
-
-    return 0;
-}
-
 void WorldOriginShading_mapping_world_shift(void) {
     // render/world_origin_shading
     wos_shift_same(wos_plane, (double[3]){ 2816, 0, -256 });
@@ -453,11 +419,6 @@ void WorldOriginShading_texture_layer_shift(void) {
 void WorldOriginShading_wind_sway_shift(void) {
     // render/world_origin_shading
     wos_shift_same(wos_wind, (double[3]){ 256, 256, -512 });
-}
-
-void WorldOriginShading_fog_volume_shift(void) {
-    // render/world_origin_shading
-    wos_shift_same(wos_fog, (double[3]){ 256, 0, 768 });
 }
 
 /** Render a magnified MappingWorld plane, its content and camera at x and z of offset, with a

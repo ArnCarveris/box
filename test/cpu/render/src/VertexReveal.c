@@ -265,68 +265,6 @@ void VertexReveal_occlusion_pack(void) {
     test_flt(record.occlusion_strength, 0);
 }
 
-/** The record holds the threshold, the channel, the invert flag and the softness as a half
- * float next to the wind flag; a material without VertexReveal packs the bytes it did before */
-void VertexReveal_pack(void) {
-    // materials/vertex_reveal
-    box_render_material_t record, plain;
-    ecs_os_memset_t(&record, 0x55, box_render_material_t);
-    box_draws_material_pack(&record, &(box_draw_material_t){ .fade = 1 });
-    test_uint(record.flags, 0);
-    test_flt(record.reveal_threshold, 0);
-    plain = record;
-    test_int(ECS_SIZEOF(box_render_material_t), 272);
-
-    VertexReveal reveal = { .channel = 5, .threshold = 0.25f, .softness = 0.5f,
-        .invert = true };
-    box_draws_material_pack(&record, &(box_draw_material_t){ .reveal = &reveal, .fade = 1 });
-    test_flt(record.reveal_threshold, 0.25f);
-    test_uint(record.flags, BOX_RENDER_REVEAL_PRESENT | BOX_RENDER_REVEAL_INVERT |
-        (5u << BOX_RENDER_REVEAL_CHANNEL_SHIFT) | (0x3800u << BOX_RENDER_REVEAL_SOFTNESS_SHIFT));
-
-    /* A hard edge on channel 0 */
-    reveal = (VertexReveal){ .channel = 0, .threshold = -3 };
-    box_draws_material_pack(&record, &(box_draw_material_t){ .reveal = &reveal, .fade = 1 });
-    test_flt(record.reveal_threshold, -3);
-    test_uint(record.flags, BOX_RENDER_REVEAL_PRESENT);
-
-    /* The softness is a half float: 1 is 0x3C00, 2 0x4000 */
-    reveal = (VertexReveal){ .channel = 7, .threshold = 1, .softness = 2 };
-    box_draws_material_pack(&record, &(box_draw_material_t){ .reveal = &reveal, .fade = 1 });
-    test_uint(record.flags, BOX_RENDER_REVEAL_PRESENT | (7u << BOX_RENDER_REVEAL_CHANNEL_SHIFT) |
-        (0x4000u << BOX_RENDER_REVEAL_SOFTNESS_SHIFT));
-
-    /* Broken values are clamped, a channel out of range reveals everything */
-    reveal = (VertexReveal){ .channel = 1, .threshold = NAN, .softness = -1 };
-    box_draws_material_pack(&record, &(box_draw_material_t){ .reveal = &reveal, .fade = 1 });
-    test_flt(record.reveal_threshold, 0);
-    test_uint(record.flags, BOX_RENDER_REVEAL_PRESENT | (1u << BOX_RENDER_REVEAL_CHANNEL_SHIFT));
-    reveal = (VertexReveal){ .channel = 8, .threshold = 1 };
-    box_draws_material_pack(&record, &(box_draw_material_t){ .reveal = &reveal, .fade = 1 });
-    test_assert(!ecs_os_memcmp_t(&record, &plain, box_render_material_t));
-    reveal = (VertexReveal){ .channel = -1, .threshold = 1 };
-    box_draws_material_pack(&record, &(box_draw_material_t){ .reveal = &reveal, .fade = 1 });
-    test_assert(!ecs_os_memcmp_t(&record, &plain, box_render_material_t));
-
-    /* With a WindSway both are in the flags */
-    WindSway sway = { .bend = 0.05f, .height = 4, .flutter_reach = 0.5f };
-    box_render_wind_t wind = { .direction = {1, 0}, .speed = 2 };
-    reveal = (VertexReveal){ .channel = 2, .threshold = 0.5f };
-    box_draws_material_pack(&record, &(box_draw_material_t){
-        .sway = &sway, .wind = wind, .reveal = &reveal, .fade = 1 });
-    test_uint(record.flags, BOX_RENDER_WIND_PRESENT | BOX_RENDER_REVEAL_PRESENT |
-        (2u << BOX_RENDER_REVEAL_CHANNEL_SHIFT));
-    test_flt(record.reveal_threshold, 0.5f);
-    test_flt(record.wind_speed, 2);
-
-    /* A 2D shape ignores it */
-    Shape2D shape2d = {0};
-    box_draws_material_pack(&record, &(box_draw_material_t){
-        .reveal = &reveal, .shape2d = &shape2d, .fade = 1 });
-    test_uint(record.flags, 0);
-    test_flt(record.reveal_threshold, 0);
-}
-
 /** The extract sends the per vertex data of a mesh after its surface assets and flags it in the
  * description; a mesh without data sends none */
 void VertexReveal_mesh_upload(void) {

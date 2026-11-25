@@ -1572,8 +1572,9 @@ void Spatial_dynamic_random_moves_vs_brute_force(void) {
     }
 
     ecs_progress(world, 0);
-    ecs_vec_t out;
+    ecs_vec_t out, movers;
     ecs_vec_init_t(NULL, &out, ecs_entity_t, 0);
+    ecs_vec_init_t(NULL, &movers, ecs_entity_t, 0);
     for (f = 0; f < FRAMES; f ++) {
         for (i = 0; i < COUNT; i ++) {
             int32_t r = rand() % 100;
@@ -1595,11 +1596,15 @@ void Spatial_dynamic_random_moves_vs_brute_force(void) {
             p->x += vel[i][0];
             p->y += vel[i][1];
             p->z += vel[i][2];
+            ecs_modified(world, shapes[i], Position);
+            ecs_modified(world, shapes[i], Rotation);
+            ecs_modified(world, shapes[i], Scale);
         }
 
         ecs_progress(world, 0);
         for (i = 0; i < COUNT; i ++) {
-            const WorldTransform *t = ecs_get(world, shapes[i], WorldTransform);
+            WorldTransform t_buf;
+            const WorldTransform *t = box_transform_world(world, shapes[i], &t_buf);
             const Box *b = ecs_get(world, shapes[i], Box);
             vec3 got_min, got_max;
             for (a = 0; a < 3; a ++) {
@@ -1634,9 +1639,16 @@ void Spatial_dynamic_random_moves_vs_brute_force(void) {
                 }
             }
 
+            vec3 lo = {c[0] - h, c[1] - h, c[2] - h}, hi = {c[0] + h, c[1] + h, c[2] + h};
+            ecs_vec_clear(&movers);
             ecs_vec_clear(&out);
-            test_int(box_spatial_overlap_box(world, 0, (vec3){c[0] - h, c[1] - h, c[2] - h},
-                (vec3){c[0] + h, c[1] + h, c[2] + h}, &out), count);
+            box_spatial_overlap_box(world, 0, lo, hi, &movers);
+            for (i = 0; i < ecs_vec_count(&movers); i ++) {
+                box_spatial_expand_box(world, *ecs_vec_get_t(&movers, ecs_entity_t, i),
+                    lo, hi, &out);
+            }
+
+            test_int(ecs_vec_count(&out), count);
             qsort(expect, (size_t)count, sizeof(ecs_entity_t), entity_compare);
             qsort(ecs_vec_first(&out), (size_t)count, sizeof(ecs_entity_t), entity_compare);
             for (i = 0; i < count; i ++) {
@@ -1646,6 +1658,7 @@ void Spatial_dynamic_random_moves_vs_brute_force(void) {
     }
 
     ecs_vec_fini_t(NULL, &out, ecs_entity_t);
+    ecs_vec_fini_t(NULL, &movers, ecs_entity_t);
     ecs_os_free(shapes);
     ecs_os_free(vel);
     ecs_os_free(min);
@@ -2219,7 +2232,8 @@ void Spatial_mover_moves_one_leaf(void) {
     test_assert(ecs_children_next(&it));
     ecs_entity_t e = it.entities[0];
     ecs_iter_fini(&it);
-    const WorldTransform *t = ecs_get(world, e, WorldTransform);
+    WorldTransform t_buf;
+    const WorldTransform *t = box_transform_world(world, e, &t_buf);
     box_spatial_hit_t hit = {0};
     box_spatial_ray_t ray = {
         .origin = {t->m[3][0], 10, t->m[3][2]}, .dir = {0, -1, 0}, .shapes = true };
@@ -2384,7 +2398,8 @@ void Spatial_mover_nested(void) {
     test_int(stats.movers, 2);
     test_int(stats.entities, 2);
 
-    const WorldTransform *t = ecs_get(world, cab, WorldTransform);
+    WorldTransform t_buf;
+    const WorldTransform *t = box_transform_world(world, cab, &t_buf);
     box_spatial_hit_t hit = {0};
     box_spatial_ray_t ray = { .origin = {t->m[3][0], t->m[3][1] + 10, t->m[3][2]},
         .dir = {0, -1, 0} };
@@ -2990,7 +3005,8 @@ void Spatial_mover_tree_nested(void) {
     test_int(box_spatial_expand_box(world, car, lo, hi, &out), 20);
     ecs_vec_fini_t(NULL, &out, ecs_entity_t);
 
-    const WorldTransform *t = ecs_get(world, inner[4], WorldTransform);
+    WorldTransform t_buf;
+    const WorldTransform *t = box_transform_world(world, inner[4], &t_buf);
     box_spatial_hit_t hit = {0};
     box_spatial_ray_t ray = { .origin = {t->m[3][0], t->m[3][1] + 50, t->m[3][2]},
         .dir = {0, -1, 0}, .shapes = true, .filter = count_filter };

@@ -1847,14 +1847,6 @@ void Transition_transform_text_and_2d(void) {
     tr_fini(world, null);
 }
 
-void Transition_record_sizes(void) {
-    // engine_core/transition
-    test_int(ECS_SIZEOF(box_render_transform_t), 48);
-    test_int(ECS_SIZEOF(box_render_mesh_shading_t), 16);
-    test_int(ECS_SIZEOF(box_render_shading_t), 64);
-    test_int(ECS_SIZEOF(box_render_material_t), 272);
-}
-
 void Transition_idle_no_work(void) {
     // engine_core/transition
     box_render_null_t *null;

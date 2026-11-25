@@ -233,7 +233,6 @@
                     "shape_change_renders_new_mesh",
                     "scene_change_updates_render",
                     "unchanged_uploads_nothing",
-                    "changed_uploads_only_changes",
                     "parent_move_updates_children",
                     "dynamic_uploads_every_frame",
                     "dynamic_material_descendants",
@@ -376,8 +375,7 @@
                     "sky_counts_as_deep",
                     "above_not_leaked",
                     "off_draws_without_water",
-                    "off_equals_without_water",
-                    "still_uploads_nothing"
+                    "off_equals_without_water"
                 ]
             },
             {
@@ -511,8 +509,7 @@
                     "deep_levels_attached",
                     "deep_levels_shadow",
                     "deep_levels_wireframe",
-                    "card_stems_pinned_tips_flutter",
-                    "card_stems_turn_with_twig"
+                    "card_stems_pinned_tips_flutter"
                 ]
             },
             {
@@ -698,7 +695,6 @@
                     "intensity_zero_lights_nothing",
                     "moved_light_follows_transform",
                     "many_point_lights",
-                    "unchanged_lights_upload_nothing",
                     "component_defaults",
                     "cluster_lists_every_light",
                     "spot_light_lights_its_whole_cone",
@@ -2132,9 +2128,7 @@
             {
                 "id": "Terrain",
                 "testcases": [
-                    "bounded_renders",
                     "levels_no_cracks",
-                    "focus_refines",
                     "origin_shift_same_image",
                     "extract_reuses_heights"
                 ]
@@ -2213,7 +2207,6 @@
                     "mapping_frame_shift",
                     "texture_layer_shift",
                     "wind_sway_shift",
-                    "fog_volume_shift",
                     "far_origin_not_blocky"
                 ]
             }

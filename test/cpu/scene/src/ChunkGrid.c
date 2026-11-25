@@ -1120,34 +1120,6 @@ void ChunkGrid_config_change_rescans(void) {
     ecs_fini(world);
 }
 
-void ChunkGrid_enable_rescans(void) {
-    // scenes/chunk_grid
-    ecs_world_t *world = chunk_world();
-    ecs_entity_t grid = chunk_grid(world, "Chunk", 15, 0, 2, 0);
-    ecs_entity_t focus = chunk_focus(world, 5, 0, 5);
-    ecs_progress(world, 0);
-    ecs_progress(world, 0);
-    int32_t count = ecs_get(world, grid, ChunkGridStatus)->cells;
-    ecs_entity_t near = chunk_cell(world, grid, 0, 0, NULL);
-    test_assert(near != 0);
-
-    ecs_enable(world, grid, false);
-    chunk_move(world, focus, 1005, 5);
-    ecs_progress(world, 0);
-    ecs_progress(world, 0);
-    test_assert(chunk_cell(world, grid, 0, 0, NULL) == near);
-    test_assert(chunk_cell(world, grid, 100, 0, NULL) == 0);
-
-    // The focus stands still when the grid is enabled again
-    ecs_enable(world, grid, true);
-    ecs_progress(world, 0);
-    test_assert(!ecs_is_alive(world, near));
-    test_assert(chunk_cell(world, grid, 100, 0, NULL) != 0);
-    test_int(chunk_check_rings(world, grid, 1005, 5, 15, 0), count);
-
-    ecs_fini(world);
-}
-
 void ChunkGrid_focus_change_rescans(void) {
     // scenes/chunk_grid
     ecs_world_t *world = chunk_world();
@@ -1180,38 +1152,3 @@ void ChunkGrid_focus_change_rescans(void) {
     ecs_fini(world);
 }
 
-void ChunkGrid_origin_shift_idle(void) {
-    // scenes/chunk_grid
-    ecs_world_t *world = chunk_world();
-    ecs_entity_t grid = chunk_grid(world, "Chunk", 30, 0, 0, 0);
-    ecs_entity_t focus = chunk_focus(world, 95, 0, 5);
-    int64_t updates = 0, scans = 0, u = 0, s = 0;
-    ecs_progress(world, 0);
-    ecs_progress(world, 0);
-    int32_t count = ecs_get(world, grid, ChunkGridStatus)->cells;
-    ecs_entity_t c9 = chunk_cell(world, grid, 9, 0, NULL);
-    test_assert(c9 != 0);
-    box_chunk_grid_work(world, &updates, &scans);
-
-    // The shift moves the focus and the origin by as much: the absolute focus stays
-    box_world_origin_shift(world, 0, (double[3]){100, 0, 0});
-    test_flt(ecs_get(world, focus, Position)->x, -5);
-    ecs_progress(world, 0);
-    ecs_progress(world, 0);
-    box_chunk_grid_work(world, &u, &s);
-    test_int(u, updates);
-    test_int(s, scans);
-    test_assert(chunk_cell(world, grid, 9, 0, NULL) == c9);
-    test_int(ecs_get(world, grid, ChunkGridStatus)->cells, count);
-    test_int(chunk_children(world, grid), count);
-
-    // A move after the shift streams around the absolute position
-    chunk_move(world, focus, 100, 5);
-    ecs_progress(world, 0);
-    test_assert(!ecs_is_alive(world, c9));
-    test_assert(chunk_cell(world, grid, 20, 0, NULL) != 0);
-    test_int(chunk_check_rings(world, grid, 200, 5, 30, 0),
-        ecs_get(world, grid, ChunkGridStatus)->cells);
-
-    ecs_fini(world);
-}

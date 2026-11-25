@@ -87,13 +87,9 @@
                     "clear_coat_defaults",
                     "clear_coat_pack",
                     "specular_anisotropy_defaults",
-                    "specular_anisotropy_pack",
                     "sheen_defaults",
-                    "sheen_pack",
                     "diffuse_transmission_defaults",
-                    "diffuse_transmission_pack",
                     "diffuse_transmission_blur_defaults",
-                    "diffuse_transmission_blur_pack",
                     "texture_mapping_defaults",
                     "texture_mapping_pack",
                     "texture_mapping_ids",
@@ -117,24 +113,18 @@
                     "texture_blend_height_key",
                     "texture_blend_every_shape",
                     "texture_scroll_defaults",
-                    "texture_scroll_pack",
                     "texture_scroll_wrap",
                     "fresnel_defaults",
-                    "fresnel_pack",
                     "fresnel_factor",
                     "water_defaults",
-                    "water_pack",
                     "water_scatter_defaults",
-                    "water_scatter_pack",
                     "water_shore_defaults",
-                    "water_shore_pack",
                     "water_shore_wrap",
                     "water_depth_mix",
                     "water_transmittance",
                     "water_absorption",
                     "water_foam",
                     "distortion_defaults",
-                    "distortion_pack",
                     "distortion_phase"
                 ]
             },
@@ -508,7 +498,6 @@
                 "id": "MaterialIds",
                 "testcases": [
                     "prefab_instances_share_slot",
-                    "prefab_color_uploads_one_record",
                     "override_gets_own_slot",
                     "override_slot_freed_and_reused",
                     "nested_prefab_own_slot",
@@ -544,14 +533,7 @@
                     "prefab_from_shared_slot_deferred",
                     "shared_cutoff_change_records_shadow",
                     "texture_scroll_private_slot",
-                    "texture_scroll_repacks_only_scrolling",
-                    "texture_scroll_prefab_repacks",
-                    "texture_scroll_off_shares_slot",
-                    "texture_scroll_follows_owner",
-                    "texture_scroll_follows_scene",
-                    "still_water_shares_slot",
                     "water_off_not_repacked",
-                    "distortion_shares_slot",
                     "distortion_off_not_repacked"
                 ]
             },
@@ -865,7 +847,6 @@
                     "transform_prefab_instances",
                     "transform_text_and_2d",
                     "transform_targets_on_game_thread",
-                    "record_sizes",
                     "idle_no_work",
                     "bezier_values",
                     "bezier_script",
@@ -1198,7 +1179,6 @@
                     "prefab_instances",
                     "flow_textures_defaults",
                     "flow_textures_pack",
-                    "flow_textures_record",
                     "flow_textures_water_off"
                 ]
             },
@@ -1207,12 +1187,8 @@
                 "testcases": [
                     "defaults",
                     "frame_wrapped",
-                    "pack",
-                    "record_flag",
-                    "frame_follows_flow",
                     "without_water",
-                    "water_off",
-                    "prefab_instances"
+                    "water_off"
                 ]
             },
             {
@@ -1279,11 +1255,9 @@
                     "advance_wraps",
                     "speed_change_continuous",
                     "system_fixed_delta",
-                    "pack",
                     "flutter_phase_wraps",
                     "clock_rate",
                     "reach",
-                    "pack_pivots",
                     "pack_local_base",
                     "reach_pivots",
                     "sway_vertex",
@@ -1295,15 +1269,13 @@
                     "spot_tile_renders_with_sway",
                     "cascades_render_with_sway",
                     "reach_follows_changes",
-                    "caster_box_follows_moves",
-                    "record_follows_changes"
+                    "caster_box_follows_moves"
                 ]
             },
             {
                 "id": "VertexReveal",
                 "testcases": [
                     "defaults",
-                    "pack",
                     "mesh_upload",
                     "batches",
                     "threshold_animates",

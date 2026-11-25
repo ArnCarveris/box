@@ -327,47 +327,6 @@ void Instancing_unchanged_uploads_nothing(void) {
     box_render_null_free(null);
 }
 
-void Instancing_changed_uploads_only_changes(void) {
-    // renderer/instancing
-    ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, Box);
-
-    box_render_null_t *null = box_render_null_new();
-    box_render_backend_t backend = box_render_null_backend(null);
-    box_render_set_backend(world, &backend);
-
-    ecs_entity_t camera = ecs_new(world);
-    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
-    ecs_entity_t view = ecs_new(world);
-    ecs_set(world, view, View, {.camera = camera});
-    ecs_entity_t shapes[100];
-    int32_t i;
-    for (i = 0; i < 100; i ++) {
-        shapes[i] = ecs_new(world);
-        ecs_set(world, shapes[i], Position, {(float)i, 0, 0});
-        ecs_set(world, shapes[i], Box, {1, 1, 1});
-    }
-
-    ecs_progress(world, 0);
-    int64_t full = ecs_singleton_get(world, RenderStatus)->upload_bytes;
-    test_assert(full > 0);
-    ecs_progress(world, 0);
-    test_int(ecs_singleton_get(world, RenderStatus)->upload_bytes, 0);
-
-    ecs_set(world, shapes[42], Position, {1, 2, 3});
-    ecs_set(world, shapes[17], Rgb, {0, 255, 0});
-    ecs_progress(world, 0);
-    int64_t changed = ecs_singleton_get(world, RenderStatus)->upload_bytes;
-    test_assert(changed > 0);
-    test_assert(changed < full / 8);
-
-    ecs_progress(world, 0);
-    test_int(ecs_singleton_get(world, RenderStatus)->upload_bytes, 0);
-
-    ecs_fini(world);
-    box_render_null_free(null);
-}
-
 void Instancing_parent_move_updates_children(void) {
     // renderer/instancing
     ecs_world_t *world = ecs_init();

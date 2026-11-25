@@ -126,6 +126,8 @@ typedef struct box_terrain_ctx_t {
                              *   terrain */
     ecs_vec_t terrain_list; /**< ecs_entity_t, the terrains to update this frame */
     ecs_id_t materials[BOX_TERRAIN_MATERIALS]; /**< Material components the tiles get */
+    ecs_entity_t module;    /**< The box.terrain module */
+    ecs_entity_t texture_observer; /**< The TextureStatus observer, made with the first terrain */
 } box_terrain_ctx_t;
 
 /** Singleton that holds the state of box.terrain */
@@ -1324,6 +1326,25 @@ static void box_terrain_status(
     }
 }
 
+/** Mark the tiles of the terrain of every tile texture whose TextureStatus was set, so their
+ * next update reads which tiles are ready and which heights changed.
+ *
+ * @param it The iterator of the observer
+ */
+static void BoxTerrainOnTextureStatus(
+    ecs_iter_t *it)
+{
+    box_terrain_ctx_t *ctx = it->ctx;
+    int32_t i;
+    for (i = 0; i < it->count; i ++) {
+        box_terrain_tiles_t *tiles = ecs_map_get_deref(&ctx->textures, box_terrain_tiles_t,
+            it->entities[i]);
+        if (tiles) {
+            tiles->dirty = true;
+        }
+    }
+}
+
 /** Get the tiles of a terrain, made on first use with a container in the scene of the terrain.
  *
  * @param world The world
@@ -1347,6 +1368,15 @@ static box_terrain_tiles_t* box_terrain_tiles_of(
         result->style = true;
         result->active = true;
         ecs_map_insert_ptr(&ctx->terrains, e, result);
+        if (!ctx->texture_observer) {
+            ctx->texture_observer = ecs_observer(world, {
+                .entity = ecs_entity(world, { .name = "OnTextureStatus", .parent = ctx->module }),
+                .query.terms = {{ .id = ecs_id(TextureStatus), .src.id = EcsSelf }},
+                .events = { EcsOnSet },
+                .callback = BoxTerrainOnTextureStatus,
+                .ctx = ctx
+            });
+        }
     }
 
     if (!result->container || !ecs_is_alive(world, result->container)) {
@@ -1676,25 +1706,6 @@ static void box_terrain_ctx_free(
     ecs_os_free(ctx);
 }
 
-/** Mark the tiles of the terrain of every tile texture whose TextureStatus was set, so their
- * next update reads which tiles are ready and which heights changed.
- *
- * @param it The iterator of the observer
- */
-static void BoxTerrainOnTextureStatus(
-    ecs_iter_t *it)
-{
-    box_terrain_ctx_t *ctx = it->ctx;
-    int32_t i;
-    for (i = 0; i < it->count; i ++) {
-        box_terrain_tiles_t *tiles = ecs_map_get_deref(&ctx->textures, box_terrain_tiles_t,
-            it->entities[i]);
-        if (tiles) {
-            tiles->dirty = true;
-        }
-    }
-}
-
 /** Mark the tiles of every terrain that got, lost or changed a material component, so their
  * next update hashes its materials again.
  *
@@ -1799,6 +1810,7 @@ void box_terrain_tiles_import(
     ecs_world_t *world)
 {
     box_terrain_ctx_t *ctx = ecs_os_calloc_t(box_terrain_ctx_t);
+    ctx->module = ecs_get_scope(world);
     ecs_map_init(&ctx->terrains, NULL);
     ecs_map_init(&ctx->textures, NULL);
     ecs_vec_init_t(NULL, &ctx->free_slots, int32_t, 0);
@@ -1833,14 +1845,6 @@ void box_terrain_tiles_import(
         .query.terms = {{ .id = ecs_id(Terrain), .src.id = EcsSelf }},
         .events = { EcsOnRemove },
         .callback = BoxTerrainOnRemoveTiles,
-        .ctx = ctx
-    });
-
-    ecs_observer(world, {
-        .entity = ecs_entity(world, { .name = "OnTextureStatus" }),
-        .query.terms = {{ .id = ecs_id(TextureStatus), .src.id = EcsSelf }},
-        .events = { EcsOnSet },
-        .callback = BoxTerrainOnTextureStatus,
         .ctx = ctx
     });
 

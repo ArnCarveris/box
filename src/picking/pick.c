@@ -610,18 +610,21 @@ void box_pick_meshes_fini(
  * @param e The entity
  * @param t Distance of the hit
  * @param ui Whether the entity is a UI element
+ * @param bare Whether the entity is a bare UI element
  */
 static void box_pick_candidate(
     box_pick_cast_t *cast,
     ecs_entity_t e,
     float t,
-    bool ui)
+    bool ui,
+    bool bare)
 {
     box_pick_candidate_t *c = ecs_vec_append_t(
         NULL, &cast->st->candidates, box_pick_candidate_t);
     c->entity = e;
     c->distance = t;
     c->ui = ui;
+    c->bare = bare;
 }
 
 /** Get whether a UI element is bare: it draws nothing and handles nothing, such as a layout
@@ -647,12 +650,9 @@ static bool box_pick_ui_bare(
 /** Narrow phase of the spatial ray: the area of a UI element, the outline of a polygon or the
  * triangles of a shape; a Terrain is hit where the spatial ray found its surface.
  *
- * A hit on a UI element or a 2D shape outside the area of a ClipChildren ancestor is no hit, as
- * it is not drawn there, and an element with PickThrough is never hit. Neither is a disabled
- * entity, which the index skips, an entity no longer alive or a bare element (box_pick_ui_bare).
- *
- * The distance it reports is moved out by the tie margin, so the walk still reaches every hit
- * that ties with the nearest one, which the selection weighs.
+ * Nothing outside the area of a ClipChildren ancestor, with PickThrough, disabled or no longer
+ * alive is hit. A bare element (box_pick_ui_bare) is kept as a bare candidate but is no hit, so
+ * it ends no walk; a hit is moved out by the tie margin, so the walk still reaches its ties.
  *
  * @param ctx The cast
  * @param e The entity whose bounds the ray hit
@@ -673,10 +673,10 @@ static bool box_pick_filter(
     bool terrain = alive && ecs_id(Terrain) && ecs_has(cast->world, e, Terrain);
     bool polygon = alive && !terrain && box_pick_polygon_size(cast->world, e, size);
     bool ui = polygon || (alive && !terrain && box_pick_ui_size(cast->world, e, size, &circle));
+    bool bare = ui && !polygon && box_pick_ui_bare(cast->world, e);
     bool result;
     if (!alive || ecs_has_id(cast->world, e, PickThrough) ||
-        ecs_has_id(cast->world, e, EcsDisabled) ||
-        (ui && !polygon && box_pick_ui_bare(cast->world, e)))
+        ecs_has_id(cast->world, e, EcsDisabled))
     {
         result = false;
     } else if (terrain) {
@@ -702,11 +702,11 @@ static bool box_pick_filter(
     }
 
     if (result) {
-        box_pick_candidate(cast, e, t, ui);
+        box_pick_candidate(cast, e, t, ui, bare);
         *distance = t + BOX_PICK_TIE * (t > 1.0f ? t : 1.0f);
     }
 
-    return result;
+    return result && !bare;
 }
 
 /** Collect the path of an entity from its root down.
@@ -857,7 +857,7 @@ bool box_pick_drawn_after(
 /** Choose the hit of a cast among its candidates.
  *
  * The nearest wins. Of the hits as near as it, UI elements win over shapes and the element
- * drawn last wins over the others.
+ * drawn last wins over the others. A bare candidate is never chosen.
  *
  * @param world The world
  * @param st The module state with the candidates
@@ -874,13 +874,15 @@ static bool box_pick_select(
     float best = INFINITY;
     bool result = false;
     for (i = 0; i < count; i ++) {
-        best = c[i].distance < best ? c[i].distance : best;
+        if (!c[i].bare) {
+            best = c[i].distance < best ? c[i].distance : best;
+        }
     }
 
     float tie = best + BOX_PICK_TIE * (best > 1.0f ? best : 1.0f);
     for (i = 0; i < count; i ++) {
         bool take = false;
-        if (c[i].distance > tie) {
+        if (c[i].bare || c[i].distance > tie) {
             continue;
         }
 
@@ -897,6 +899,78 @@ static bool box_pick_select(
         if (take) {
             *out = c[i];
             result = true;
+        }
+    }
+
+    return result;
+}
+
+/** Check whether the ray of the last cast is inside an entity: it is one of its candidates.
+ *
+ * @param st The module state with the candidates
+ * @param e The entity
+ * @return Whether it is a candidate
+ */
+static bool box_pick_is_candidate(
+    const box_pick_state_t *st,
+    ecs_entity_t e)
+{
+    const box_pick_candidate_t *c = ecs_vec_first_t(&st->candidates, box_pick_candidate_t);
+    int32_t i, count = ecs_vec_count(&st->candidates);
+    bool result = false;
+    for (i = 0; i < count && !result; i ++) {
+        result = c[i].entity == e;
+    }
+
+    return result;
+}
+
+/** Check whether an entity is a descendant of a hit with every element between them, as well as
+ * the entity itself, under the ray of the last cast.
+ *
+ * @param world The world
+ * @param st The module state with the candidates
+ * @param e The entity
+ * @param hit The hit
+ * @return Whether the entity is inside the hit
+ */
+static bool box_pick_inside_hit(
+    const ecs_world_t *world,
+    const box_pick_state_t *st,
+    ecs_entity_t e,
+    ecs_entity_t hit)
+{
+    int32_t depth = 0;
+    ecs_entity_t cur = ecs_get_parent(world, e);
+    while (cur && cur != hit && depth < BOX_PICK_CHAIN_MAX && box_pick_is_candidate(st, cur)) {
+        cur = ecs_get_parent(world, cur);
+        depth ++;
+    }
+
+    return cur && cur == hit;
+}
+
+/** Get the target of a hit: the bare candidate inside it (box_pick_inside_hit) drawn last, such
+ * as a layout item of an Interactive element that draws nothing, else the hit itself.
+ *
+ * @param world The world
+ * @param st The module state with the candidates of the cast that found the hit
+ * @param hit The hit
+ * @return The target
+ */
+static ecs_entity_t box_pick_target(
+    const ecs_world_t *world,
+    const box_pick_state_t *st,
+    ecs_entity_t hit)
+{
+    const box_pick_candidate_t *c = ecs_vec_first_t(&st->candidates, box_pick_candidate_t);
+    int32_t i, count = ecs_vec_count(&st->candidates);
+    ecs_entity_t result = hit;
+    for (i = 0; i < count; i ++) {
+        if (c[i].bare && box_pick_inside_hit(world, st, c[i].entity, hit) &&
+            (result == hit || box_pick_drawn_after(world, c[i].entity, result)))
+        {
+            result = c[i].entity;
         }
     }
 
@@ -1525,6 +1599,7 @@ static bool box_pick_view(
         goto done;
     }
 
+    ecs_entity_t target = box_pick_target(world, st, hit.entity);
     glm_vec3_scale(ray.dir, hit.distance, point);
     glm_vec3_add(point, ray.origin, point);
     if (!out->hit) {
@@ -1542,9 +1617,9 @@ static bool box_pick_view(
         goto done;
     }
 
-    ecs_entity_t handler = box_pick_handler(world, hit.entity);
+    ecs_entity_t handler = box_pick_handler(world, target);
     if (handler) {
-        out->target = hit.entity;
+        out->target = target;
         out->handler = handler;
         out->view = view;
         out->surface = *s;

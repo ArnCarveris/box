@@ -66,6 +66,7 @@ typedef struct box_pick_candidate_t {
     ecs_entity_t entity; /**< The entity */
     float distance;      /**< Distance along the ray */
     bool ui;             /**< A UI element hit by its bounds, drawn over shapes it ties with */
+    bool bare;           /**< A bare UI element, which only narrows the target of a hit */
 } box_pick_candidate_t;
 
 /** The triangle hierarchy of a unit mesh that picks test, which holds a reference to the mesh

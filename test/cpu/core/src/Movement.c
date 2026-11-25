@@ -126,8 +126,9 @@ void Movement_child_follows_parent(void) {
     }
 
     test_flt(ecs_get(world, child, Position)->x, 1);
+    WorldTransform t_buf;
     test_flt(ecs_get(world, parent, WorldTransform)->m[3][0], 4);
-    test_flt(ecs_get(world, child, WorldTransform)->m[3][0], 5);
+    test_flt(box_transform_world(world, child, &t_buf)->m[3][0], 5);
 
     ecs_fini(world);
 }

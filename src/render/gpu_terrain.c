@@ -321,7 +321,11 @@ void box_gpu_terrain_heights(
     }
 
     gpu->pending.terrain_height_scans ++;
-    if (count != gpu->terrain_tile_count) {
+    if (!count) {
+        ecs_os_free(gpu->terrain_tiles);
+        gpu->terrain_tiles = NULL;
+        gpu->terrain_tile_count = 0;
+    } else if (count != gpu->terrain_tile_count) {
         gpu->terrain_tiles = ecs_os_realloc_n(gpu->terrain_tiles, box_render_terrain_height_t,
             count);
         gpu->terrain_tile_count = count;

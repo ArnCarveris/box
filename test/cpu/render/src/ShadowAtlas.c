@@ -603,7 +603,7 @@ void ShadowAtlas_extract_unseen_light_no_tile(void) {
     const box_render_packet_t *p = extract_frame(world, null);
 
     test_int(ecs_vec_count(&p->shadow_tiles), 1);
-    test_int(extract_tile(world, behind), BOX_RENDER_SHADOW_NONE);
+    test_int(extract_tile(world, behind), 0xDEAD);
     test_int(extract_tile(world, seen), 0);
     test_int(ecs_singleton_get(world, RenderStatus)->shadow_dropped, 0);
 

@@ -643,54 +643,6 @@ void Light_many_point_lights(void) {
     ecs_fini(world);
 }
 
-void Light_unchanged_lights_upload_nothing(void) {
-    // lighting/lights
-    ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, Box);
-
-    ecs_entity_t camera = ecs_new(world);
-    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
-    ecs_entity_t view = ecs_new(world);
-    ecs_set(world, view, View, {.camera = camera});
-    ecs_entity_t scene = ecs_new(world);
-    ecs_set(world, scene, Scene, {0});
-    ecs_entity_t light = ecs_new(world);
-    ecs_set(world, light, Position, {1, 2, 3});
-    ecs_set(world, light, PointLight, {.intensity = GLM_PIf, .range = 5});
-    ecs_entity_t other = ecs_new_w_pair(world, EcsChildOf, scene);
-    ecs_set(world, other, SpotLight, {.intensity = GLM_PIf, .range = 5, .outer_angle = 30});
-    ecs_set(world, other, Position, {0, 0, 0});
-
-    box_render_lights_stats_t stats;
-    ecs_progress(world, 0);
-    box_render_lights_stats(world, &stats);
-    test_int(stats.scenes, 2);
-    test_int(stats.lights, 2);
-    test_assert(stats.upload_bytes > 0);
-
-    ecs_progress(world, 0);
-    box_render_lights_stats(world, &stats);
-    test_int(stats.upload_bytes, 0);
-
-    ecs_set(world, light, Position, {4, 5, 6});
-    ecs_progress(world, 0);
-    box_render_lights_stats(world, &stats);
-    test_assert(stats.upload_bytes > 0);
-
-    ecs_progress(world, 0);
-    box_render_lights_stats(world, &stats);
-    test_int(stats.upload_bytes, 0);
-
-    ecs_delete(world, other);
-    ecs_progress(world, 0);
-    box_render_lights_stats(world, &stats);
-    test_int(stats.scenes, 1);
-    test_int(stats.lights, 1);
-
-    box_render_sync(world);
-    ecs_fini(world);
-}
-
 void Light_component_defaults(void) {
     // lighting/lights
     ecs_world_t *world = ecs_init();

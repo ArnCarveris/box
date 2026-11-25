@@ -57,11 +57,12 @@ typedef struct {
 } transform_world_cached_t;
 
 /** The transforms of spread entities relative to their anchors. A local transform that changes
- * under an anchor advances its version; a change of a hierarchy, DynamicTransform, ManualTransform
- * or a removed Position advances the epoch. Anchors that move change neither. */
+ * under an anchor advances its version; a change of a hierarchy, DynamicTransform, ManualTransform,
+ * a removed Position or the update of the dynamic transforms in a frame, as their local transforms
+ * may be written without an event, advances the epoch. Anchors that move change neither. */
 typedef struct {
     transform_world_cached_t *entries; /**< TRANSFORM_WORLD_CACHE entries, NULL until used */
-    uint64_t epoch;               /**< Advances with every change of a hierarchy */
+    uint64_t epoch;               /**< Advances with every change of a hierarchy and frame */
     ecs_map_t versions;           /**< Anchor to its version, 0 for one not in the map */
 } transform_world_cache_t;
 

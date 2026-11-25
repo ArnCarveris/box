@@ -198,6 +198,7 @@ static void TransformDynamic(
     transform_dynamic_ctx_t *ctx = it->ctx;
     uint64_t max = transformDynamicMaxDepth(ctx->q_childof, 0);
     max = transformDynamicMaxDepth(ctx->q_parent, max);
+    transformWorldCacheInvalidate(it->world);
 
     for (uint64_t depth = 0; depth <= max; depth ++) {
         transformDynamicChildOf(it->world, ctx->q_childof, depth);

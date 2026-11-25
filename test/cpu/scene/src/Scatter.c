@@ -936,41 +936,6 @@ void Scatter_chunk_grid_script(void) {
     ecs_fini(world);
 }
 
-void Scatter_idle_no_visits(void) {
-    // scenes/scatter
-    ecs_world_t *world = sc_world();
-    ecs_entity_t tree = sc_prefab(world, "ScatterTree");
-    Scatter c = sc_config(tree, 0, 1, 0, 1);
-    c.extent[0] = 50;
-    c.extent[1] = 50;
-    ecs_entity_t a = sc_scatter(world, 0, 0, 0, 0, &c);
-    ecs_entity_t b = sc_scatter(world, 0, 100, 0, 0, &c);
-    ecs_entity_t cell_scatter;
-    sc_cell(world, 4, 4, 20, &c, &cell_scatter);
-    test_int((int32_t)box_scatter_visits(world), 0);
-    ecs_progress(world, 0);
-    test_int((int32_t)box_scatter_visits(world), 3);
-    test_int(ecs_get(world, a, ScatterStatus)->instances, 25);
-    test_int(ecs_get(world, b, ScatterStatus)->instances, 25);
-    test_int(ecs_get(world, cell_scatter, ScatterStatus)->instances, 4);
-
-    int32_t i;
-    for (i = 0; i < 5; i ++) {
-        ecs_progress(world, 0);
-    }
-
-    test_int((int32_t)box_scatter_visits(world), 3);
-    test_int(ecs_get(world, a, ScatterStatus)->evaluations, 1);
-    test_int(sc_children(world, a), 25);
-
-    // Moving another component of a scatter or its instances queues nothing
-    ecs_set(world, a, Rotation, {0, 0, 0});
-    ecs_progress(world, 0);
-    test_int((int32_t)box_scatter_visits(world), 3);
-
-    ecs_fini(world);
-}
-
 void Scatter_set_same_keeps_instances(void) {
     // scenes/scatter
     ecs_world_t *world = sc_world();

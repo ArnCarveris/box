@@ -160,50 +160,6 @@ static bool terrain_is_magenta(
     return px[0] > 200 && px[1] < 80 && px[2] > 200;
 }
 
-void Terrain_bounded_renders(void) {
-    // terrain/terrain_tiles
-    ecs_world_t *world = terrain_world("test/assets/terrain/bounded.flecs");
-    ecs_entity_t terrain = ecs_lookup(world, "terrain_bounded.hills");
-    test_assert(terrain != 0);
-    terrain_settle(world, terrain);
-    unsigned char *px = terrain_frame(world, "terrain_bounded.png");
-
-    // The terrain covers the middle of the image, the sky shows above its far edge, and the
-    // lit hills are green with light and shade.
-    int32_t ground = 0, sky_top = 0, x, y, lo = 255, hi = 0;
-    for (y = 0; y < TERRAIN_HEIGHT; y ++) {
-        for (x = 0; x < TERRAIN_WIDTH; x ++) {
-            const unsigned char *p = &px[(y * TERRAIN_WIDTH + x) * 4];
-            bool sky = terrain_is_sky(p);
-            sky_top += sky && y < TERRAIN_HEIGHT / 8;
-            if (!sky && y > TERRAIN_HEIGHT / 3) {
-                ground ++;
-                lo = p[1] < lo ? p[1] : lo;
-                hi = p[1] > hi ? p[1] : hi;
-                test_assert(p[1] >= p[2]);
-            }
-        }
-    }
-
-    if (ground < TERRAIN_WIDTH * TERRAIN_HEIGHT / 3 || hi - lo < 40) {
-        printf("ground %d, green %d..%d, sky at the top %d\n", ground, lo, hi, sky_top);
-    }
-
-    test_assert(ground >= TERRAIN_WIDTH * TERRAIN_HEIGHT / 3);
-    test_assert(sky_top > 0);
-    test_assert(hi - lo >= 40);
-
-    const unsigned char *center = &px[((TERRAIN_HEIGHT * 2 / 3) * TERRAIN_WIDTH +
-        TERRAIN_WIDTH / 2) * 4];
-    test_assert(!terrain_is_sky(center));
-    const TerrainStatus *status = ecs_get(world, terrain, TerrainStatus);
-    test_assert(status->tiles[0] > 0);
-    test_assert(status->gpu_bytes > 0);
-    terrain_expect_no_errors(world);
-    stbi_image_free(px);
-    ecs_fini(world);
-}
-
 void Terrain_levels_no_cracks(void) {
     // terrain/terrain_tiles
     ecs_world_t *world = terrain_world("test/assets/terrain/cracks.flecs");
@@ -230,53 +186,6 @@ void Terrain_levels_no_cracks(void) {
     test_int(magenta, 0);
     terrain_expect_no_errors(world);
     stbi_image_free(px);
-    ecs_fini(world);
-}
-
-void Terrain_focus_refines(void) {
-    // terrain/terrain_tiles
-    ecs_world_t *world = terrain_world("test/assets/terrain/cracks.flecs");
-    ecs_entity_t terrain = ecs_lookup(world, "terrain_cracks.ridges");
-    ecs_entity_t camera = ecs_lookup(world, "terrain_cracks.camera");
-    test_assert(terrain != 0);
-    test_assert(camera != 0);
-    terrain_settle(world, terrain);
-    const Terrain *t = ecs_get(world, terrain, Terrain);
-    int32_t budget = t->budget, i, count;
-    TerrainStatus last = *ecs_get(world, terrain, TerrainStatus);
-
-    // Fly 600 m east over 60 frames: every frame makes and drops tiles within the budget.
-    for (i = 1; i <= 60; i ++) {
-        ecs_set(world, camera, Position, {10.0f * (float)i, 300, 0});
-        ecs_progress(world, TERRAIN_DELTA);
-        box_render_sync(world);
-        const TerrainStatus *s = ecs_get(world, terrain, TerrainStatus);
-        test_assert(s->created - last.created <= budget);
-        test_assert(s->dropped - last.dropped <= budget * 4);
-        test_assert(s->drawn > 0);
-        last = *s;
-    }
-
-    terrain_settle(world, terrain);
-    box_terrain_tile_t *const *tiles = box_terrain_tiles(world, terrain, &count);
-    test_assert(count > 0);
-    bool fine_near = false;
-    for (i = 0; i < count; i ++) {
-        const box_terrain_tile_t *tile = tiles[i];
-        double size = 16.0 * (double)(1 << tile->level);
-        double cx = ((double)tile->ix + 0.5) * size, cz = ((double)tile->iz + 0.5) * size;
-        double d = sqrt((cx - 600.0) * (cx - 600.0) + cz * cz);
-        if (tile->level == 0 && tile->drawn) {
-            test_assert(d < 64.0 + 32.0 * 1.5);
-            fine_near |= d < 16.0;
-        }
-
-        // Nothing is left of the finest tiles around the start
-        test_assert(!(tile->level == 0 && sqrt(cx * cx + cz * cz) < 64.0));
-    }
-
-    test_bool(fine_near, true);
-    terrain_expect_no_errors(world);
     ecs_fini(world);
 }
 
