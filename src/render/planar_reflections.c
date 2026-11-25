@@ -23,6 +23,7 @@ typedef struct box_planar_entry_t {
     ecs_entity_t entity;    /**< Entity with the PlanarReflection */
     ecs_entity_t scene;     /**< Scene root of the entity, 0 for the default scene */
     box_render_planar_plane_t plane; /**< Its plane */
+    double distance;        /**< plane.plane[3] in f64 */
     float clip_offset;      /**< PlanarReflection.clip_offset */
     float resolution;       /**< PlanarReflection.resolution, clamped */
     float distortion;       /**< PlanarReflection.distortion, 0 when not finite */
@@ -202,6 +203,9 @@ static void box_planar_collect(
             glm_vec3_copy(normal, e->plane.plane);
             e->plane.plane[3] = -glm_vec3_dot(normal,
                 ECS_CONST_CAST(float*, t->m[3]));
+            e->distance = -((double)normal[0] * (double)t->m[3][0] +
+                (double)normal[1] * (double)t->m[3][1] +
+                (double)normal[2] * (double)t->m[3][2]);
             e->clip_offset = planars[i].clip_offset;
             e->resolution = glm_clamp(planars[i].resolution, BOX_PLANAR_RESOLUTION_MIN, 1.0f);
             if (!isfinite(e->resolution)) {
@@ -229,6 +233,8 @@ static void box_planar_record(
     box_render_planar_t *out)
 {
     vec4 eye;
+    double along;
+    int32_t i;
     ecs_os_memset_t(out, 0, box_render_planar_t);
     out->entity = e->entity;
     out->slot = slot;
@@ -241,6 +247,16 @@ static void box_planar_record(
     eye[3] = 1.0f;
     glm_mat4_mulv(out->reflection, eye, eye);
     glm_vec3_copy(eye, out->camera);
+    along = e->distance;
+    for (i = 0; i < 3; i ++) {
+        along += (double)out->plane[i] * (double)v->camera_transform[3][i];
+    }
+
+    for (i = 0; i < 3; i ++) {
+        out->eye[i] = (double)v->camera_transform[3][i] - 2.0 * along * (double)out->plane[i];
+    }
+
+    out->clip_distance = e->distance + (double)e->clip_offset;
     out->resolution = e->resolution;
     out->distortion = e->distortion;
     if (!box_render_draws_instance(world, e->entity, &out->exclude_page, &out->exclude_slot) ||

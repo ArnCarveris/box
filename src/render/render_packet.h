@@ -870,6 +870,9 @@ typedef struct box_render_planar_t {
     mat4 view_matrix;       /**< View matrix of the mirrored camera: the view matrix of the view
                              *   times the reflection */
     float camera[3];        /**< World position of the mirrored camera */
+    double eye[3];          /**< The position of the mirrored camera in f64, from the camera
+                             *   and the plane in f64, which the render origin is taken from */
+    double clip_distance;   /**< clip[3] in f64 */
     float resolution;       /**< PlanarReflection.resolution, 0.125 to 1 */
     uint32_t exclude_page;  /**< Handle of the transform stream of the instance page of the shape
                              *   of the entity, which the reflection does not draw, 0 for none */

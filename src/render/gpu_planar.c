@@ -371,6 +371,70 @@ static uint32_t box_gpu_planar_mips(
     return result > BOX_GPU_PLANAR_MIPS ? BOX_GPU_PLANAR_MIPS : result;
 }
 
+/** Fill the members of the uniforms of a reflection pass about the render origin: the
+ * mirrored view moved by minus the render origin, its translation and its oblique near plane
+ * built in f64 from the mirrored camera of the record, to keep the precision near the origin.
+ *
+ * The near plane turns with the view; its distance from the mirrored camera is the one of the
+ * clip plane of the record. Without a render origin render_view_proj is view_proj.
+ *
+ * @param delta The render origin in local units
+ * @param rec The record of the reflection
+ * @param proj Projection of the view
+ * @param view_matrix View matrix of the mirrored camera in the local frame
+ * @param clip The clip plane of the record in the view space of the mirrored camera
+ * @param clips Whether the clip plane crosses the frustum (box_render_planar_oblique): when
+ * not, the projection is proj
+ * @param u The uniforms, view_proj set
+ */
+static void box_gpu_planar_relative(
+    const double delta[3],
+    const box_render_planar_t *rec,
+    mat4 proj,
+    const mat4 view_matrix,
+    const vec4 clip,
+    bool clips,
+    box_gpu_view_uniforms_t *u)
+{
+    mat4 view, oblique;
+    vec4 near;
+    double eye[3], w;
+    int32_t i, j;
+    box_gpu_view_relative(delta, u);
+    if (delta[0] == 0.0 && delta[1] == 0.0 && delta[2] == 0.0) {
+        goto done;
+    }
+
+    glm_mat4_copy(ECS_CONST_CAST(vec4*, view_matrix), view);
+    for (i = 0; i < 3; i ++) {
+        eye[i] = rec->eye[i] - delta[i];
+    }
+
+    for (i = 0; i < 3; i ++) {
+        double t = 0.0;
+        for (j = 0; j < 3; j ++) {
+            t -= (double)view[j][i] * eye[j];
+        }
+
+        view[3][i] = (float)t;
+    }
+
+    w = rec->clip_distance;
+    for (i = 0; i < 3; i ++) {
+        w += (double)rec->clip[i] * rec->eye[i];
+    }
+
+    glm_vec4_copy(ECS_CONST_CAST(float*, clip), near);
+    near[3] = (float)w;
+    if (!clips || !box_render_planar_oblique(proj, near, oblique)) {
+        glm_mat4_copy(proj, oblique);
+    }
+
+    glm_mat4_mul(oblique, view, u->render_view_proj);
+done:
+    return;
+}
+
 int32_t box_gpu_planar_add(
     box_gpu_t *gpu,
     const box_gpu_target_t *t,
@@ -430,7 +494,8 @@ int32_t box_gpu_planar_add(
         *r = *u;
         glm_mat4_mul(oblique, pass->view_matrix, r->view_proj);
         glm_mat4_inv(r->view_proj, r->inv_view_proj);
-        box_gpu_view_relative(gpu->render_delta, r);
+        box_gpu_planar_relative(gpu->render_delta, rec, proj, pass->view_matrix, clip,
+            pass->clips, r);
         glm_mat4_mul(proj, pass->view_matrix, inv);
         glm_mat4_inv(inv, pass->sky_inv_view_proj);
         glm_vec3_copy(ECS_CONST_CAST(float*, rec->camera), r->camera);

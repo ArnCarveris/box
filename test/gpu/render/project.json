@@ -2232,6 +2232,13 @@
                     "far_same_image",
                     "far_moving_no_swim"
                 ]
+            },
+            {
+                "id": "RenderOriginPlanar",
+                "testcases": [
+                    "far_same_image",
+                    "far_moving_no_jitter"
+                ]
             }
         ]
     }
