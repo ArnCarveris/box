@@ -324,6 +324,10 @@ tree_editor {
       props.flare = v
     } else if n == "flare_height" {
       props.flare_height = v
+    } else if n == "pipe" {
+      props.pipe = v
+    } else if n == "twig" {
+      props.twig = v
     } else if n == "crown_base" {
       props.crown_base = v
     } else if n == "crown_top" {
@@ -416,8 +420,12 @@ tree_editor {
         props.b1.light = v
       } else if n == "noise" {
         props.b1.noise = v
-      } else if n == "exponent" {
-        props.b1.exponent = v
+      } else if n == "curve" {
+        props.b1.curve = v
+      } else if n == "curve_back" {
+        props.b1.curve_back = v
+      } else if n == "kink" {
+        props.b1.kink = v
       }
     } else if level == 2 {
       if n == "count" {
@@ -446,8 +454,12 @@ tree_editor {
         props.b2.light = v
       } else if n == "noise" {
         props.b2.noise = v
-      } else if n == "exponent" {
-        props.b2.exponent = v
+      } else if n == "curve" {
+        props.b2.curve = v
+      } else if n == "curve_back" {
+        props.b2.curve_back = v
+      } else if n == "kink" {
+        props.b2.kink = v
       }
     } else if level == 3 {
       if n == "count" {
@@ -476,8 +488,12 @@ tree_editor {
         props.b3.light = v
       } else if n == "noise" {
         props.b3.noise = v
-      } else if n == "exponent" {
-        props.b3.exponent = v
+      } else if n == "curve" {
+        props.b3.curve = v
+      } else if n == "curve_back" {
+        props.b3.curve_back = v
+      } else if n == "kink" {
+        props.b3.kink = v
       }
     } else if level == 4 {
       if n == "count" {
@@ -506,8 +522,12 @@ tree_editor {
         props.b4.light = v
       } else if n == "noise" {
         props.b4.noise = v
-      } else if n == "exponent" {
-        props.b4.exponent = v
+      } else if n == "curve" {
+        props.b4.curve = v
+      } else if n == "curve_back" {
+        props.b4.curve_back = v
+      } else if n == "kink" {
+        props.b4.kink = v
       }
     }
   }
@@ -638,13 +658,15 @@ tree_editor {
     "distribution: {b.distribution}, whorl: {b.whorl}, phyllotaxis: {b.phyllotaxis:.3}, " +
     "down: {b.down:.3}, down_end: {b.down_end:.3}, length: {b.length:.3}, " +
     "length_end: {b.length_end:.3}, gravity: {b.gravity:.3}, light: {b.light:.3}, " +
-    "noise: {b.noise:.3}, exponent: {b.exponent:.3}}"
+    "noise: {b.noise:.3}, curve: {b.curve:.3}, curve_back: {b.curve_back:.3}, " +
+    "kink: {b.kink:.3}}"
   }
 
   fn tree_snippet(p: Tree) -> string {
     "trees.Tree tree(seed: {p.seed}, height: {p.height:.3}, radius: {p.radius:.3}, " +
     "taper: {p.taper:.3}, bend: {p.bend:.3}, lean: {p.lean:.3}, twist: {p.twist:.3}, " +
     "flutes: {p.flutes}, flare: {p.flare:.3}, flare_height: {p.flare_height:.3}, " +
+    "pipe: {p.pipe:.3}, twig: {p.twig:.3}, " +
     "bark_material: {p.bark_material}, " +
     "b1: " + branch_snippet(p.b1) + ", b2: " + branch_snippet(p.b2) + ", " +
     "b3: " + branch_snippet(p.b3) + ", b4: " + branch_snippet(p.b4) + ", " +

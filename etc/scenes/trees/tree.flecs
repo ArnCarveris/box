@@ -36,13 +36,14 @@ trees {
   // distribution (whorl children per whorl, 0 for 3) and phyllotaxis (radians, 0 for the golden
   // angle); they leave it at down radians at the start to down_end at the end of the range (0
   // for down), length long (a fraction of the parent) at the start to length_end at the end (0
-  // for length); they bend down by gravity and toward the light by light (radians per meter),
-  // wander by noise and share the radius of their parent by the pipe model with exponent (0
-  // for 2). Members a Tree leaves out are 0.
+  // for length); they bend down by gravity and toward the light by light (radians per meter)
+  // and wander by noise. They turn by curve radians over their length toward the direction of
+  // their parent (negative away from it), by curve_back over their outer half instead when it
+  // is not 0, and zigzag by up to kink radians at every point. Members a Tree leaves out are 0.
   struct TreeBranches(
     count: i32, density: f32, start: f32, end: f32, distribution: BranchDistribution,
     whorl: i32, phyllotaxis: f32, down: f32, down_end: f32, length: f32, length_end: f32,
-    gravity: f32, light: f32, noise: f32, exponent: f32
+    gravity: f32, light: f32, noise: f32, curve: f32, curve_back: f32, kink: f32
   )
 
   template Tree {
@@ -60,6 +61,8 @@ trees {
     prop flare: f32 = 0.3          // Radius a flute adds at its crest, a fraction of the radius
     prop flare_height: f32 = 0     // Meters up the trunk the flutes fade over, 0 for 3 radii
     prop bark_material: entity = TreeBarkBeech
+    prop pipe: f32 = 2.3
+    prop twig: f32 = 0.004
     // A Mesh node of the scene merged into the bark, such as the fallen top of a snag, 0 for none
     prop bark_extra: entity = 0
 
@@ -67,16 +70,16 @@ trees {
     // along the trunk), when its count or density is above 0 and the level before it grows
     prop b1: TreeBranches = {count: 24, density: 0, start: 0.3, end: 0.95, distribution: Spiral,
       whorl: 3, phyllotaxis: 0, down: 1.0, down_end: 0.6, length: 0.45, length_end: 0.2,
-      gravity: 0.02, light: 0.03, noise: 0.1, exponent: 2.2}
+      gravity: 0.02, light: 0.03, noise: 0.1}
     prop b2: TreeBranches = {count: 7, density: 0, start: 0.2, end: 0.95, distribution: Alternate,
       whorl: 3, phyllotaxis: 0, down: 0.8, down_end: 0.6, length: 0.45, length_end: 0.3,
-      gravity: 0.03, light: 0.05, noise: 0.25, exponent: 2}
+      gravity: 0.03, light: 0.05, noise: 0.25}
     prop b3: TreeBranches = {count: 5, density: 0, start: 0.15, end: 0.95,
       distribution: Alternate, whorl: 3, phyllotaxis: 0, down: 0.7, down_end: 0.5, length: 0.45,
-      length_end: 0.3, gravity: 0.05, light: 0.1, noise: 0.4, exponent: 1.8}
+      length_end: 0.3, gravity: 0.05, light: 0.1, noise: 0.4}
     prop b4: TreeBranches = {count: 0, density: 0, start: 0.15, end: 0.95,
       distribution: Alternate, whorl: 3, phyllotaxis: 0, down: 0.7, down_end: 0.5, length: 0.4,
-      length_end: 0.3, gravity: 0.05, light: 0.1, noise: 0.5, exponent: 1.6}
+      length_end: 0.3, gravity: 0.05, light: 0.1, noise: 0.5}
 
     // Crown: the envelope that shortens (prune) or removes the branches that leave it, from
     // crown_base to crown_top of the height (an ellipsoid between them, a cone or cylinder from
@@ -160,22 +163,18 @@ trees {
     const w1 = b1.whorl > 0 ? b1.whorl : 3
     const de1 = b1.down_end != 0 ? b1.down_end : b1.down
     const le1 = b1.length_end != 0 ? b1.length_end : b1.length
-    const x1 = b1.exponent > 0 ? b1.exponent : 2
     const e2 = b2.end > b2.start ? b2.end : 1
     const w2 = b2.whorl > 0 ? b2.whorl : 3
     const de2 = b2.down_end != 0 ? b2.down_end : b2.down
     const le2 = b2.length_end != 0 ? b2.length_end : b2.length
-    const x2 = b2.exponent > 0 ? b2.exponent : 2
     const e3 = b3.end > b3.start ? b3.end : 1
     const w3 = b3.whorl > 0 ? b3.whorl : 3
     const de3 = b3.down_end != 0 ? b3.down_end : b3.down
     const le3 = b3.length_end != 0 ? b3.length_end : b3.length
-    const x3 = b3.exponent > 0 ? b3.exponent : 2
     const e4 = b4.end > b4.start ? b4.end : 1
     const w4 = b4.whorl > 0 ? b4.whorl : 3
     const de4 = b4.down_end != 0 ? b4.down_end : b4.down
     const le4 = b4.length_end != 0 ? b4.length_end : b4.length
-    const x4 = b4.exponent > 0 ? b4.exponent : 2
 
     // The envelope of the crown
     const crown_bottom = height * crown_base
@@ -210,8 +209,9 @@ trees {
         distribution: b1.distribution, whorl: w1, phyllotaxis: b1.phyllotaxis,
         down_angle: b1.down, down_angle_change: de1 - b1.down, length: b1.length,
         length_curve: [1, tree_length(b1.length, le1, 0.25), tree_length(b1.length, le1, 0.5), tree_length(b1.length, le1, 0.75), tree_length(b1.length, le1, 1)],
-        radius_exponent: x1, taper: 0.85, segments: 9, gravity: b1.gravity,
-        phototropism: b1.light, noise: b1.noise, angle_variation: 0.15, roll_variation: 0.4,
+        taper: 0.85, segments: 9, gravity: b1.gravity,
+        phototropism: b1.light, noise: b1.noise, curve: b1.curve,
+        curve_back: b1.curve_back, curve_variation: b1.kink, angle_variation: 0.15, roll_variation: 0.4,
         length_variation: 0.2, radius_variation: 0.1, seed: s + 1
       }
     }
@@ -223,8 +223,9 @@ trees {
         distribution: b2.distribution, whorl: w2, phyllotaxis: b2.phyllotaxis,
         down_angle: b2.down, down_angle_change: de2 - b2.down, length: b2.length,
         length_curve: [1, tree_length(b2.length, le2, 0.25), tree_length(b2.length, le2, 0.5), tree_length(b2.length, le2, 0.75), tree_length(b2.length, le2, 1)],
-        radius_exponent: x2, taper: 0.8, segments: 6, gravity: b2.gravity,
-        phototropism: b2.light, noise: b2.noise, angle_variation: 0.2, roll_variation: 0.5,
+        taper: 0.8, segments: 6, gravity: b2.gravity,
+        phototropism: b2.light, noise: b2.noise, curve: b2.curve,
+        curve_back: b2.curve_back, curve_variation: b2.kink, angle_variation: 0.2, roll_variation: 0.5,
         length_variation: 0.25, radius_variation: 0.1, seed: s + 2
       }
     }
@@ -236,8 +237,9 @@ trees {
         distribution: b3.distribution, whorl: w3, phyllotaxis: b3.phyllotaxis,
         down_angle: b3.down, down_angle_change: de3 - b3.down, length: b3.length,
         length_curve: [1, tree_length(b3.length, le3, 0.25), tree_length(b3.length, le3, 0.5), tree_length(b3.length, le3, 0.75), tree_length(b3.length, le3, 1)],
-        radius_exponent: x3, taper: 0.75, segments: 4, gravity: b3.gravity,
-        phototropism: b3.light, noise: b3.noise, angle_variation: 0.25, roll_variation: 0.6,
+        taper: 0.75, segments: 4, gravity: b3.gravity,
+        phototropism: b3.light, noise: b3.noise, curve: b3.curve,
+        curve_back: b3.curve_back, curve_variation: b3.kink, angle_variation: 0.25, roll_variation: 0.6,
         length_variation: 0.3, radius_variation: 0.1, seed: s + 3
       }
     }
@@ -249,16 +251,24 @@ trees {
         distribution: b4.distribution, whorl: w4, phyllotaxis: b4.phyllotaxis,
         down_angle: b4.down, down_angle_change: de4 - b4.down, length: b4.length,
         length_curve: [1, tree_length(b4.length, le4, 0.25), tree_length(b4.length, le4, 0.5), tree_length(b4.length, le4, 0.75), tree_length(b4.length, le4, 1)],
-        radius_exponent: x4, taper: 0.7, segments: 3, gravity: b4.gravity,
-        phototropism: b4.light, noise: b4.noise, angle_variation: 0.3, roll_variation: 0.6,
+        taper: 0.7, segments: 3, gravity: b4.gravity,
+        phototropism: b4.light, noise: b4.noise, curve: b4.curve,
+        curve_back: b4.curve_back, curve_variation: b4.kink, angle_variation: 0.3, roll_variation: 0.6,
         length_variation: 0.3, radius_variation: 0.1, seed: s + 4
       }
     }
 
-    pruned {
+    shortened {
       nodes.Prune: {
         curves: level4, shape: crown, center: {0, crown_y, 0}, size: {crown_r, crown_h, crown_r},
-        level: 1, shorten: prune, drop: bark_drop
+        level: 1, shorten: prune, lod_drop: -1
+      }
+    }
+
+    pruned {
+      nodes.PipeModel: {
+        curves: shortened, exponent: pipe, tip_length: 0.2, min_radius: twig, drop: bark_drop,
+        lod_drop: 0.04
       }
     }
 

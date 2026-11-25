@@ -1,6 +1,6 @@
 /**
  * @file mesh_graph/nodes_branch.c
- * @brief Nodes of mesh graphs that grow branching curves: Stem, Branches and Prune.
+ * @brief Nodes of mesh graphs that grow branching curves: Stem, Branches, Prune and PipeModel.
  */
 
 #include "mesh_graph.h"
@@ -23,7 +23,11 @@ typedef struct box_mg_grow_t {
     vec3 bend;                   /**< Turn of the direction per meter */
     float noise;                 /**< Turn of the noise per meter */
     float frequency;             /**< Noise cells per meter */
-    int32_t seed;                /**< Seed of the noise */
+    int32_t seed;                /**< Seed of the noise and the kinks */
+    vec3 axis;                   /**< Unit axis the curve turns about */
+    float curve;                 /**< Turn about axis over the length, or its inner half */
+    float curve_back;            /**< Turn about axis over the outer half, 0 for none */
+    float kink;                  /**< Largest random turn at each point */
 } box_mg_grow_t;
 
 /** The settings of a Branches with its defaults resolved */
@@ -134,8 +138,82 @@ static void box_mg_branch_attrs(
     }
 }
 
-/** Grow the points of a curve: positions and radii, the direction turning by the bend and
- * the noise after every segment.
+/** Turn a vector about a unit axis by an angle, from IEEE operations only.
+ *
+ * @param v The vector, turned in place
+ * @param axis The unit axis
+ * @param angle The angle in radians, counter-clockwise looking down the axis
+ */
+static void box_mg_turn(
+    vec3 v,
+    const vec3 axis,
+    float angle)
+{
+    float s, co;
+    vec3 across, result;
+    box_mg_sincos(angle, &s, &co);
+    glm_vec3_cross((float*)axis, v, across);
+    glm_vec3_scale(v, co, result);
+    glm_vec3_muladds(across, s, result);
+    glm_vec3_muladds((float*)axis, glm_vec3_dot((float*)axis, v) * (1.0f - co), result);
+    glm_vec3_copy(result, v);
+}
+
+/** Turn of a growing curve about its axis after a point: curve over the segments of the
+ * inner half and curve_back over the outer half, or curve over all of them.
+ *
+ * @param g How it grows
+ * @param segments Segments of the curve
+ * @param j The point
+ * @return The turn in radians
+ */
+static float box_mg_grow_curve(
+    const box_mg_grow_t *g,
+    int32_t segments,
+    int32_t j)
+{
+    int32_t inner = segments - segments / 2;
+    float result = g->curve / (float)segments;
+    if (g->curve_back != 0.0f) {
+        result = j < inner ? g->curve / (float)inner
+            : g->curve_back / (float)(segments - inner);
+    }
+
+    return result;
+}
+
+/** Turn a growing direction by a random kink: up to kink radians about a random axis across
+ * it.
+ *
+ * @param d The unit direction, turned in place
+ * @param kink The largest turn
+ * @param rand The random sequence of the curve
+ */
+static void box_mg_grow_kink(
+    vec3 d,
+    float kink,
+    box_mg_rand_t *rand)
+{
+    vec3 side, up, axis;
+    float s, co;
+    float spin = box_mg_rand_float(rand) * 2.0f * GLM_PIf;
+    float angle = kink * box_mg_rand_float(rand);
+    vec3 ref = { 0.0f, 1.0f, 0.0f };
+    if (fabsf(d[1]) > 0.9f) {
+        glm_vec3_copy((vec3){ 1.0f, 0.0f, 0.0f }, ref);
+    }
+
+    glm_vec3_cross(d, ref, side);
+    glm_vec3_normalize(side);
+    glm_vec3_cross(side, d, up);
+    box_mg_sincos(spin, &s, &co);
+    glm_vec3_scale(side, co, axis);
+    glm_vec3_muladds(up, s, axis);
+    box_mg_turn(d, axis, angle);
+}
+
+/** Grow the points of a curve: positions and radii, the direction turning by the bend, the
+ * noise, the curve about its axis and the kinks after every segment.
  *
  * @param c The curves, whose offsets give the curve segments + 1 points
  * @param curve The curve
@@ -148,7 +226,11 @@ static void box_mg_grow(
 {
     int32_t first = c->offsets[curve], j, segments = g->segments > 0 ? g->segments : 1;
     float ds = g->length / (float)segments, taper = glm_clamp(g->taper, 0.0f, 1.0f);
+    bool curved = (g->curve != 0.0f || g->curve_back != 0.0f) &&
+        glm_vec3_norm2((float*)g->axis) > 1e-12f;
+    box_mg_rand_t rand;
     vec3 p, d;
+    box_mg_rand_seed(&rand, g->seed, 0x6b696e6bu);
     glm_vec3_copy((float*)g->position, p);
     glm_vec3_copy((float*)g->direction, d);
     for (j = 0; j <= segments; j ++) {
@@ -169,6 +251,16 @@ static void box_mg_grow(
         glm_vec3_add(d, turned, turned);
         if (glm_vec3_norm2(turned) > 1e-12f) {
             glm_vec3_normalize_to(turned, d);
+        }
+
+        if (curved && j < segments) {
+            box_mg_turn(d, g->axis, box_mg_grow_curve(g, segments, j));
+            glm_vec3_normalize(d);
+        }
+
+        if (g->kink > 0.0f && j < segments) {
+            box_mg_grow_kink(d, g->kink, &rand);
+            glm_vec3_normalize(d);
         }
 
         glm_vec3_muladds(d, ds, p);
@@ -419,6 +511,14 @@ static void box_mg_branch_node(
         glm_vec3_scale(s.tangent, cd, g.direction);
         glm_vec3_muladds(radial, sd, g.direction);
         glm_vec3_normalize(g.direction);
+        glm_vec3_cross(radial, s.tangent, g.axis);
+        if (glm_vec3_norm2(g.axis) > 1e-12f) {
+            glm_vec3_normalize(g.axis);
+            g.curve = n->curve;
+            g.curve_back = n->curve_back;
+        }
+
+        g.kink = n->curve_variation;
         glm_vec3_scale((float*)b->light, n->phototropism, g.bend);
         g.bend[1] -= n->gravity;
         c->offsets[ci + 1] = c->offsets[ci] + b->segments + 1;
@@ -981,6 +1081,178 @@ static int box_mesh_prune_eval(
     return 0;
 }
 
+/** Order the curves of a Curves so every curve comes before its parent: by their depth in the
+ * hierarchy, deepest first.
+ *
+ * @param c The curves
+ * @param order Receives the curves in order
+ * @param roots Receives the stem each curve grows from
+ */
+static void box_mg_pipe_order(
+    const box_mg_curves_t *c,
+    int32_t *order,
+    int32_t *roots)
+{
+    int32_t count = c->curve_count, i, deepest = 0, at = 0, d;
+    int32_t *depth = ecs_os_malloc_n(int32_t, count + 1);
+    for (i = 0; i < count; i ++) {
+        int32_t k = i, steps = 0, p = c->parents[k];
+        while (p >= 0 && p < count && p != k && steps < count) {
+            k = p;
+            p = c->parents[k];
+            steps ++;
+        }
+
+        depth[i] = steps;
+        roots[i] = k;
+        deepest = steps > deepest ? steps : deepest;
+    }
+
+    for (d = deepest; d >= 0; d --) {
+        for (i = 0; i < count; i ++) {
+            if (depth[i] == d) {
+                order[at ++] = i;
+            }
+        }
+    }
+
+    ecs_os_free(depth);
+}
+
+/** Find the point of a parent at or before where a child sprouts: by the parent_t of the
+ * child, or else the point nearest to its root.
+ *
+ * @param c The curves
+ * @param along Length from the start of its curve of every point
+ * @param total Length of every curve
+ * @param pt The parent_t attribute, NULL for none
+ * @param child The child
+ * @param parent Its parent
+ * @return The point of the parent
+ */
+static int32_t box_mg_pipe_attach(
+    const box_mg_curves_t *c,
+    const float *along,
+    const float *total,
+    const float *pt,
+    int32_t child,
+    int32_t parent)
+{
+    int32_t first = c->offsets[parent], last = c->offsets[parent + 1] - 1, result = first, j;
+    if (pt) {
+        float at = pt[c->offsets[child]] * total[parent] + 1e-5f * total[parent];
+        for (j = first; j <= last && along[j] <= at; j ++) {
+            result = j;
+        }
+    } else {
+        float best = 1e30f;
+        for (j = first; j <= last; j ++) {
+            float d2 = glm_vec3_distance2(c->positions[j], c->positions[c->offsets[child]]);
+            if (d2 < best) {
+                best = d2;
+                result = j;
+            }
+        }
+    }
+
+    return result;
+}
+
+/** Set the radii of branching curves by the pipe model.
+ *
+ * @param node The MeshPipeModel
+ * @param inputs The curves
+ * @param counts Values per port
+ * @param out The curves with their new radii
+ * @param error Unused
+ * @return 0
+ */
+static int box_mesh_pipe_model_eval(
+    const void *node,
+    const box_mg_value_t *const *inputs,
+    const int32_t *counts,
+    box_mg_value_t *out,
+    char **error)
+{
+    const MeshPipeModel *n = node;
+    box_mg_curves_t *c = &out->curves;
+    (void)counts;
+    (void)error;
+    box_mg_value_copy(out, inputs[0]);
+    int32_t count = c->curve_count, i, j;
+    const float *pt = box_mg_attr_find(c->attrs, c->attr_count, "parent_t");
+    float exponent = n->exponent > 0.0f ? n->exponent : 2.0f, tip = glm_max(n->tip_length, 0.0f);
+    float *along = ecs_os_malloc_n(float, c->point_count + 1);
+    float *weight = ecs_os_calloc_n(float, c->point_count + 1);
+    float *total = ecs_os_malloc_n(float, count + 1);
+    float *scale = ecs_os_calloc_n(float, count + 1);
+    int32_t *order = ecs_os_malloc_n(int32_t, count + 1);
+    int32_t *roots = ecs_os_malloc_n(int32_t, count + 1);
+    for (i = 0; i < count; i ++) {
+        total[i] = c->offsets[i + 1] > c->offsets[i]
+            ? box_mg_curve_lengths(c, i, along + c->offsets[i]) : 0.0f;
+    }
+
+    box_mg_pipe_order(c, order, roots);
+    for (i = 0; i < count; i ++) {
+        int32_t curve = order[i], first = c->offsets[curve], last = c->offsets[curve + 1] - 1;
+        int32_t p = c->parents[curve];
+        float sum = 0.0f;
+        for (j = last; j >= first; j --) {
+            sum += weight[j];
+            weight[j] = total[curve] - along[j] + tip + sum;
+        }
+
+        if (last >= first && p >= 0 && p < count && p != curve &&
+            c->offsets[p + 1] > c->offsets[p])
+        {
+            weight[box_mg_pipe_attach(c, along, total, pt, curve, p)] += weight[first];
+        }
+    }
+
+    for (i = 0; i < count; i ++) {
+        int32_t first = c->offsets[i];
+        if (roots[i] == i && c->offsets[i + 1] > first && weight[first] > 0.0f) {
+            float radius = n->radius > 0.0f ? n->radius : c->radii[first];
+            scale[i] = radius / box_mg_pow(weight[first], 1.0f / exponent);
+        }
+    }
+
+    for (i = 0; i < count; i ++) {
+        float k = scale[roots[i]];
+        for (j = c->offsets[i]; j < c->offsets[i + 1]; j ++) {
+            float r = weight[j] > 0.0f ? k * box_mg_pow(weight[j], 1.0f / exponent) : 0.0f;
+            c->radii[j] = glm_max(r, n->min_radius);
+        }
+    }
+
+    if (n->drop > 0.0f) {
+        box_mg_curves_drop(c, n->drop, 1);
+    }
+
+    ecs_os_free(roots);
+    ecs_os_free(order);
+    ecs_os_free(scale);
+    ecs_os_free(total);
+    ecs_os_free(weight);
+    ecs_os_free(along);
+
+    return 0;
+}
+
+/** Reduce a MeshPipeModel for a level of detail: its drop grows by lod_drop per level.
+ *
+ * @param node The snapshot of the MeshPipeModel
+ * @param level The level
+ */
+static void box_mesh_pipe_model_lod(
+    void *node,
+    int32_t level)
+{
+    MeshPipeModel *n = node;
+    box_mg_drop_lod(&n->drop, n->lod_drop, level);
+}
+
 /** Construct MeshStem values with the documented defaults.
  *
  * @param ptr The values
@@ -1082,7 +1354,9 @@ void box_mesh_nodes_branch_register(
             BOX_MG_PARAM(MeshBranches, roll_variation),
             BOX_MG_PARAM(MeshBranches, length_variation),
             BOX_MG_PARAM(MeshBranches, radius_variation), BOX_MG_PARAM(MeshBranches, seed),
-            BOX_MG_PARAM(MeshBranches, drop), BOX_MG_PARAM(MeshBranches, lod_drop)
+            BOX_MG_PARAM(MeshBranches, drop), BOX_MG_PARAM(MeshBranches, lod_drop),
+            BOX_MG_PARAM(MeshBranches, curve), BOX_MG_PARAM(MeshBranches, curve_back),
+            BOX_MG_PARAM(MeshBranches, curve_variation)
         },
         .eval = box_mesh_branches_eval,
         .lod = box_mesh_branches_lod,
@@ -1103,5 +1377,17 @@ void box_mesh_nodes_branch_register(
         },
         .eval = box_mesh_prune_eval,
         .lod = box_mesh_prune_lod
+    });
+    box_mesh_node_register(world, &(box_mesh_node_desc_t){
+        .component = ecs_id(MeshPipeModel),
+        .output = MeshValueCurves,
+        .inputs = {{ "curves", offsetof(MeshPipeModel, curves), MeshValueCurves }},
+        .params = {
+            BOX_MG_PARAM(MeshPipeModel, exponent), BOX_MG_PARAM(MeshPipeModel, radius),
+            BOX_MG_PARAM(MeshPipeModel, tip_length), BOX_MG_PARAM(MeshPipeModel, min_radius),
+            BOX_MG_PARAM(MeshPipeModel, drop), BOX_MG_PARAM(MeshPipeModel, lod_drop)
+        },
+        .eval = box_mesh_pipe_model_eval,
+        .lod = box_mesh_pipe_model_lod
     });
 }

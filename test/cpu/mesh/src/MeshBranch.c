@@ -460,6 +460,144 @@ void MeshBranch_bends(void) {
     ecs_fini(world);
 }
 
+void MeshBranch_branches_curve(void) {
+    ecs_world_t *world = test_world();
+    ecs_entity_t trunk = trunk_node(world, 4, 0.2f, 0.5f);
+    ecs_entity_t up = branch_node(world, "up", ecs_id(MeshBranches), &(MeshBranches){
+        .curves = trunk, .count = 1, .end = 1, .down_angle = GLM_PI_2f, .length = 0.5f,
+        .segments = 8, .curve = 1 });
+    ecs_entity_t down = branch_node(world, "down", ecs_id(MeshBranches), &(MeshBranches){
+        .curves = trunk, .count = 1, .end = 1, .down_angle = GLM_PI_2f, .length = 0.5f,
+        .segments = 8, .curve = -1 });
+    box_mg_value_t *a = test_eval(world, up), *b = test_eval(world, down);
+    int32_t last = a->curves.offsets[2] - 1;
+    vec3 da, db;
+    glm_vec3_sub(a->curves.positions[last], a->curves.positions[last - 1], da);
+    glm_vec3_normalize(da);
+    glm_vec3_sub(b->curves.positions[last], b->curves.positions[last - 1], db);
+    glm_vec3_normalize(db);
+    test_near(da[1], sinf(1.0f), 1e-3f);
+    test_near(db[1], -sinf(1.0f), 1e-3f);
+    test_near(curve_length(&a->curves, 1), 2.0f, 1e-4f);
+
+    box_mg_value_release(a);
+    box_mg_value_release(b);
+    ecs_fini(world);
+}
+
+void MeshBranch_branches_curve_back(void) {
+    ecs_world_t *world = test_world();
+    ecs_entity_t trunk = trunk_node(world, 4, 0.2f, 0.5f);
+    ecs_entity_t s = branch_node(world, "s", ecs_id(MeshBranches), &(MeshBranches){
+        .curves = trunk, .count = 1, .end = 1, .down_angle = GLM_PI_2f, .length = 0.5f,
+        .segments = 8, .curve = 0.5f, .curve_back = -0.5f });
+    box_mg_value_t *v = test_eval(world, s);
+    int32_t first = v->curves.offsets[1], last = v->curves.offsets[2] - 1;
+    vec3 mid, end;
+    glm_vec3_sub(v->curves.positions[first + 4], v->curves.positions[first + 3], mid);
+    glm_vec3_normalize(mid);
+    glm_vec3_sub(v->curves.positions[last], v->curves.positions[last - 1], end);
+    glm_vec3_normalize(end);
+    test_near(mid[1], sinf(0.5f), 1e-3f);
+    test_near(end[1], 0, 1e-3f);
+
+    box_mg_value_release(v);
+    ecs_fini(world);
+}
+
+void MeshBranch_branches_kink(void) {
+    ecs_world_t *world = test_world();
+    ecs_entity_t trunk = trunk_node(world, 4, 0.2f, 0.5f);
+    ecs_entity_t straight = branch_node(world, "straight", ecs_id(MeshBranches),
+        &(MeshBranches){ .curves = trunk, .count = 3, .end = 1, .down_angle = GLM_PI_2f,
+        .length = 0.5f, .segments = 8 });
+    ecs_entity_t kinked = branch_node(world, "kinked", ecs_id(MeshBranches),
+        &(MeshBranches){ .curves = trunk, .count = 3, .end = 1, .down_angle = GLM_PI_2f,
+        .length = 0.5f, .segments = 8, .curve_variation = 0.3f });
+    box_mg_value_t *a = test_eval(world, straight), *b = test_eval(world, kinked);
+    int32_t i, j;
+    float most = 0;
+    for (i = 1; i <= 3; i ++) {
+        int32_t first = b->curves.offsets[i];
+        for (j = first + 1; j < b->curves.offsets[i + 1] - 1; j ++) {
+            vec3 s0, s1, k0, k1;
+            glm_vec3_sub(a->curves.positions[j], a->curves.positions[j - 1], s0);
+            glm_vec3_sub(a->curves.positions[j + 1], a->curves.positions[j], s1);
+            glm_vec3_sub(b->curves.positions[j], b->curves.positions[j - 1], k0);
+            glm_vec3_sub(b->curves.positions[j + 1], b->curves.positions[j], k1);
+            glm_vec3_normalize(s0);
+            glm_vec3_normalize(s1);
+            glm_vec3_normalize(k0);
+            glm_vec3_normalize(k1);
+            test_near(glm_vec3_dot(s0, s1), 1, 1e-5f);
+            float turn = acosf(glm_clamp(glm_vec3_dot(k0, k1), -1.0f, 1.0f));
+            test_assert(turn <= 0.3f + 1e-3f);
+            most = glm_max(most, turn);
+        }
+
+        test_near(curve_length(&b->curves, i), curve_length(&a->curves, i), 1e-4f);
+    }
+
+    test_assert(most > 0.05f);
+
+    box_mg_value_release(a);
+    box_mg_value_release(b);
+    ecs_fini(world);
+}
+
+void MeshBranch_pipe_model_tips(void) {
+    ecs_world_t *world = test_world();
+    ecs_entity_t trunk = trunk_node(world, 4, 0.2f, 0.5f);
+    ecs_entity_t limbs = branches_node(world, "limbs", trunk, MeshBranchOpposite, 6, 0.25f);
+    ecs_entity_t pipe = branch_node(world, "pipe", ecs_id(MeshPipeModel), &(MeshPipeModel){
+        .curves = limbs, .exponent = 2, .tip_length = 0.1f });
+    box_mg_value_t *v = test_eval(world, pipe);
+    const box_mg_curves_t *c = &v->curves;
+    int32_t i, j;
+    test_int(c->curve_count, 7);
+    test_near(c->radii[c->offsets[0]], 0.2f, 1e-5f);
+    for (i = 0; i < c->curve_count; i ++) {
+        for (j = c->offsets[i] + 1; j < c->offsets[i + 1]; j ++) {
+            test_assert(c->radii[j] <= c->radii[j - 1] + 1e-6f);
+        }
+    }
+
+    for (i = 1; i < c->curve_count; i ++) {
+        float base = c->radii[c->offsets[i]], tip = c->radii[c->offsets[i + 1] - 1];
+        float length = curve_length(c, i);
+        test_near(base * base * 0.1f, tip * tip * (length + 0.1f), 1e-6f);
+        test_assert(tip > 0);
+    }
+
+    box_mg_value_release(v);
+    ecs_fini(world);
+}
+
+void MeshBranch_pipe_model_conserve(void) {
+    ecs_world_t *world = test_world();
+    ecs_entity_t trunk = trunk_node(world, 4, 0.2f, 0.5f);
+    ecs_entity_t limbs = branches_node(world, "limbs", trunk, MeshBranchOpposite, 6, 0.25f);
+    ecs_entity_t pipe = branch_node(world, "pipe", ecs_id(MeshPipeModel), &(MeshPipeModel){
+        .curves = limbs, .exponent = 2, .radius = 0.3f, .tip_length = 0.1f });
+    box_mg_value_t *v = test_eval(world, pipe);
+    const box_mg_curves_t *c = &v->curves;
+    float root = c->radii[c->offsets[0]], shoots = curve_length(c, 0) + 0.1f;
+    int32_t i;
+    test_near(root, 0.3f, 1e-5f);
+    for (i = 1; i < c->curve_count; i ++) {
+        shoots += curve_length(c, i) + 0.1f;
+    }
+
+    for (i = 1; i < c->curve_count; i ++) {
+        float base = c->radii[c->offsets[i]];
+        test_near(base * base / (root * root), (curve_length(c, i) + 0.1f) / shoots, 1e-4f);
+        test_assert(base < root);
+    }
+
+    box_mg_value_release(v);
+    ecs_fini(world);
+}
+
 void MeshBranch_deterministic(void) {
     ecs_world_t *world = test_world();
     MeshBranches value = { .count = 5, .end = 1, .distribution = MeshBranchSpiral,

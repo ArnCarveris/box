@@ -76,7 +76,9 @@ tree_editor {
     Slider gravity(label: "Gravity", min: 0, max: 1.5, step: 0.005, value: b.gravity, decimals: 3, width: ROW_W)
     Slider light(label: "Toward light", min: 0, max: 0.4, step: 0.005, value: b.light, decimals: 3, width: ROW_W)
     Slider noise(label: "Noise", min: 0, max: 1, step: 0.01, value: b.noise, decimals: 2, width: ROW_W)
-    Slider exponent(label: "Pipe exponent (0 for 2)", min: 0, max: 3.5, step: 0.05, value: b.exponent, decimals: 2, width: ROW_W)
+    Slider curve(label: "Curve", min: -1.5, max: 1.5, step: 0.01, value: b.curve, decimals: 2, unit: " rad", width: ROW_W)
+    Slider curve_back(label: "Curve of outer half (0 same)", min: -1.5, max: 1.5, step: 0.01, value: b.curve_back, decimals: 2, unit: " rad", width: ROW_W)
+    Slider kink(label: "Kink", min: 0, max: 0.6, step: 0.01, value: b.kink, decimals: 2, unit: " rad", width: ROW_W)
   }
 
   // One level of detail in the stats: the vertices and triangles of the bark and the foliage
@@ -299,6 +301,8 @@ hud {
           Slider flutes(label: "Buttress flutes", min: 0, max: 12, step: 1, value: props.flutes, width: ROW_W)
           Slider flare(label: "Flute flare", min: 0, max: 1, step: 0.01, value: props.flare, decimals: 2, width: ROW_W)
           Slider flare_height(label: "Flute height (0 auto)", min: 0, max: 6, step: 0.1, value: props.flare_height, decimals: 1, unit: " m", width: ROW_W)
+          Slider pipe(label: "Pipe exponent", min: 1.5, max: 3.5, step: 0.05, value: props.pipe, decimals: 2, width: ROW_W)
+          Slider twig(label: "Twig radius", min: 0.001, max: 0.02, step: 0.001, value: props.twig, decimals: 3, unit: " m", width: ROW_W)
         }
 
         BranchGroup b1(title: "Branches 1 (limbs)", width: GROUP_W, b: props.b1, max_count: 220, max_density: 20)

@@ -416,6 +416,41 @@ ECS_STRUCT(MeshBranches, {
                               *   dropped, 0 for none */
     float lod_drop;          /**< What drop grows by per level of detail, 0 for 0.08,
                               *   negative for nothing */
+    float curve;             /**< Turn of a child over its length in radians, toward the
+                              *   direction of its parent as its down angle shrinks; negative
+                              *   turns it away */
+    float curve_back;        /**< Turn of the outer half of a child instead, curve then turns
+                              *   its inner half: an S curve when their signs differ; 0 for
+                              *   curve over the whole length */
+    float curve_variation;   /**< Largest random turn of a child at each of its points,
+                              *   radians, to a random side: the zigzag of its shoots */
+});
+
+/** Node of a MeshGraph that sets the radii of branching curves by the pipe model (Leonardo's
+ * rule): a branch is a bundle of pipes, one per length of shoot it carries, so the radius to
+ * the power of exponent at a point is the length of the curve beyond it, plus tip_length, plus
+ * the same sum of each child that sprouts beyond it. The radii of every stem and the curves that
+ * grow from it scale so the stem keeps its radius at the root, or gets radius.
+ *
+ * Branches thin out from limb to twig as the shoots they carry, instead of by a fixed factor
+ * per level, and a child is as much thinner than its parent as it carries less.
+ *
+ * With drop, the curves thinner than a fraction of the stems are dropped as Branches drops them:
+ * kept with the attribute dropped 1, without bark from a Tube.
+ */
+ECS_STRUCT(MeshPipeModel, {
+    ecs_entity_t curves;     /**< Curves input node */
+    float exponent;          /**< Exponent of the pipe model, 0 for 2: the cross section is
+                              *   kept; up to 3 for thicker children */
+    float radius;            /**< Radius of the stems at the root, 0 keeps theirs */
+    float tip_length;        /**< Length of shoot the tip of every curve carries beyond its
+                              *   end, so tips keep some radius */
+    float min_radius;        /**< Least radius of a point */
+    float drop;              /**< Curves with a parent whose base radius is under this
+                              *   fraction of the largest base radius of the stems are
+                              *   dropped, 0 for none */
+    float lod_drop;          /**< What drop grows by per level of detail, 0 for 0.08,
+                              *   negative for nothing */
 });
 
 /** Node of a MeshGraph that removes or shortens the curves of a Curves outside an envelope

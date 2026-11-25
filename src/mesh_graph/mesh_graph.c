@@ -701,6 +701,7 @@ static void box_mesh_register(
     ECS_META_COMPONENT(world, MeshStem);
     ECS_META_COMPONENT(world, MeshBranches);
     ECS_META_COMPONENT(world, MeshPrune);
+    ECS_META_COMPONENT(world, MeshPipeModel);
     ECS_META_COMPONENT(world, MeshCut);
     ECS_META_COMPONENT(world, MeshStrata);
     ECS_META_COMPONENT(world, MeshJitter);
