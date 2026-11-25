@@ -29,16 +29,6 @@ view {
   }
 
   film { Tonemap: {auto_exposure: exposure, operator_: TonyMcMapface} }
-  grade {
-    ColorGrading: {
-      temperature: forest_seasonal(season, -0.02, 0.03, 0.05, -0.1) - 0.06 * precipitation,
-      tint: forest_seasonal(season, -0.04, 0, 0.02, 0.01),
-      contrast: forest_seasonal(season, 1.04, 1.06, 1.08, 1.02),
-      saturation: forest_seasonal(season, 1.1, 1.06, 1.04, 0.84) * (1 - 0.22 * precipitation),
-      vibrance: forest_seasonal(season, 0.18, 0.12, 0.1, 0.02),
-      lift: {0, 0, forest_seasonal(season, 0, 0, 0, 0.012)}
-    }
-  }
   vignette { Vignette: {intensity: 0.2, radius: 0.8, smoothness: 0.5} }
   edges { Fxaa: {} }
 
@@ -70,7 +60,6 @@ view {
     effects: [
       {effect: sky},
       {effect: film},
-      {effect: grade},
       {effect: vignette},
       {effect: edges}
     ]
