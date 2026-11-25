@@ -34,6 +34,9 @@ ECS_COMPONENT_DECLARE(TerrainTile);
 /** Tiles dropped per frame, per tile of the budget */
 #define BOX_TERRAIN_DROPS (4)
 
+/** Tiles waiting for their heights at most, per tile of the budget */
+#define BOX_TERRAIN_WAITING (4)
+
 /** Material components of a terrain that its tiles get */
 #define BOX_TERRAIN_MATERIALS (13)
 
@@ -165,7 +168,7 @@ static void box_terrain_settings(
         out->max_height = 1024.0f;
     }
 
-    out->budget = t->budget > 0 ? t->budget : 8;
+    out->budget = t->budget > 0 ? t->budget : 4;
 }
 
 /** Get the edge of a tile of a level.
@@ -644,6 +647,28 @@ static bool box_terrain_texture_ready(
     return !texture || (status && status->state == TextureReady && status->revision > 0);
 }
 
+/** Check whether a texture of a tile failed to load, so that its heights never come.
+ *
+ * @param world The world
+ * @param t The tile
+ * @return Whether a texture of the tile failed
+ */
+static bool box_terrain_tile_failed(
+    const ecs_world_t *world,
+    const box_terrain_tile_t *t)
+{
+    ecs_entity_t textures[4] = { t->texture, t->rough, t->masks, t->coarse };
+    bool result = false;
+    int32_t i;
+    for (i = 0; i < 4; i ++) {
+        const TextureStatus *status = textures[i]
+            ? ecs_get(world, textures[i], TextureStatus) : NULL;
+        result = result || (status && status->state == TextureFailed);
+    }
+
+    return result;
+}
+
 /** Write the TerrainTile of a tile: its node, slot, focus and morph (box_terrain_morph).
  *
  * The vertex stage measures the distance along the ground, so the morph distances are those
@@ -748,6 +773,7 @@ static box_terrain_tile_t* box_terrain_tile_new(
     double size = box_terrain_size(s, node->level);
     double cell = size / (double)(s->resolution - 1);
     int32_t texels = s->resolution + 2 * BOX_TERRAIN_BORDER;
+    float priority = (float)-node->distance;
     t->level = node->level;
     t->ix = node->ix;
     t->iz = node->iz;
@@ -767,7 +793,8 @@ static box_terrain_tile_t* box_terrain_tile_new(
             .width = (float)(cell * (double)(texels - 1)),
             .depth = (float)(cell * (double)(texels - 1))
         },
-        .format = GraphFloat
+        .format = GraphFloat,
+        .priority = priority
     });
     ecs_set(world, t->texture, TextureReadback, { .keep = false });
     const TextureGraph *heights = ecs_get(world, t->texture, TextureGraph);
@@ -780,7 +807,8 @@ static box_terrain_tile_t* box_terrain_tile_new(
         .height = coarse,
         .domain = DomainWorld,
         .window = window,
-        .format = GraphFloat
+        .format = GraphFloat,
+        .priority = priority
     });
     ecs_set(world, t->rough, TextureReadback, { .keep = false });
     if (s->masks) {
@@ -791,7 +819,8 @@ static box_terrain_tile_t* box_terrain_tile_new(
             .height = texels,
             .domain = DomainWorld,
             .window = window,
-            .format = GraphLinear
+            .format = GraphLinear,
+            .priority = priority
         });
         t->coarse = ecs_new_w_pair(world, EcsChildOf, t->entity);
         ecs_set(world, t->coarse, TextureGraph, {
@@ -800,7 +829,8 @@ static box_terrain_tile_t* box_terrain_tile_new(
             .height = coarse,
             .domain = DomainWorld,
             .window = window,
-            .format = GraphLinear
+            .format = GraphLinear,
+            .priority = priority
         });
     }
 
@@ -1521,6 +1551,20 @@ static void box_terrain_update(
         list[i]->wanted = false;
     }
 
+    int32_t waiting = 0;
+    for (i = 0; i < ecs_vec_count(&tiles->list); i ++) {
+        box_terrain_tile_t *t = list[i];
+        if (!t->ready) {
+            t->ready = box_terrain_texture_ready(world, t->texture) &&
+                box_terrain_texture_ready(world, t->rough) &&
+                box_terrain_texture_ready(world, t->masks) &&
+                box_terrain_texture_ready(world, t->coarse);
+            changed |= t->ready;
+        }
+
+        waiting += !t->ready && !box_terrain_tile_failed(world, t);
+    }
+
     int32_t first = ecs_vec_count(&tiles->list);
     if (count) {
         if (refocus || !tiles->selected) {
@@ -1531,9 +1575,10 @@ static void box_terrain_update(
         for (i = 0; i < ecs_vec_count(&tiles->nodes); i ++) {
             const box_terrain_node_t *node = ecs_vec_get_t(&tiles->nodes, box_terrain_node_t, i);
             box_terrain_tile_t *t = box_terrain_find(tiles, node->level, node->ix, node->iz);
-            if (!t && made < s.budget) {
+            if (!t && made < s.budget && waiting < s.budget * BOX_TERRAIN_WAITING) {
                 t = box_terrain_tile_new(world, ctx, tiles, node);
                 made ++;
+                waiting ++;
             }
 
             if (t) {
@@ -1546,18 +1591,6 @@ static void box_terrain_update(
     } else {
         for (i = 0; i < ecs_vec_count(&tiles->list); i ++) {
             list[i]->wanted = true;
-        }
-    }
-
-    list = ecs_vec_first(&tiles->list);
-    for (i = 0; i < ecs_vec_count(&tiles->list); i ++) {
-        box_terrain_tile_t *t = list[i];
-        if (!t->ready && i < first) {
-            t->ready = box_terrain_texture_ready(world, t->texture) &&
-                box_terrain_texture_ready(world, t->rough) &&
-                box_terrain_texture_ready(world, t->masks) &&
-                box_terrain_texture_ready(world, t->coarse);
-            changed |= t->ready;
         }
     }
 

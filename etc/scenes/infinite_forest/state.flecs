@@ -31,7 +31,7 @@ state {
   export const TERRAIN_RESOLUTION: i32 = 33
   export const TERRAIN_LEVELS: i32 = 9
   export const TERRAIN_DETAIL: f32 = 80
-  export const TERRAIN_BUDGET: i32 = 24
+  export const TERRAIN_BUDGET: i32 = 4
   export const TERRAIN_QUERY_SPACING: f32 = 0.5
   export const TERRAIN_QUERY_RADIUS: f32 = 128
   export const TERRAIN_QUERY_HOLD: i32 = 1200

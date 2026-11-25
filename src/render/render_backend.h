@@ -642,6 +642,9 @@ typedef struct box_render_texture_graph_t {
     uint32_t texture_count;     /**< Textures after the parameters */
     uint32_t interpolate;       /**< 1 to crossfade keyframes of an animated graph with a rate
                                  *   (TextureGraph.interpolate) */
+    float priority;             /**< Order in which a frame that spreads its evaluations
+                                 *   evaluates the graphs out of date, higher first
+                                 *   (TextureGraph.priority) */
     float region[4];            /**< Longitude start and end, latitude start and end of the
                                  *   image on the sphere in radians, resolved (whole sphere
                                  *   (0, 2 pi, -pi / 2, pi / 2) by default), 0 on the plane */

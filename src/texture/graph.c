@@ -1223,6 +1223,7 @@ static box_texture_graph_t* box_texture_graph_compile(
     result->format = graph->format;
     result->rate = graph->rate > 0 ? graph->rate : 0;
     result->interpolate = graph->interpolate;
+    result->priority = graph->priority;
     result->node_count = ecs_vec_count(&b->nodes);
     result->nodes = ecs_os_memdup(ecs_vec_first(&b->nodes),
         result->node_count * ECS_SIZEOF(box_texture_graph_node_t));
@@ -1276,7 +1277,8 @@ static bool box_texture_graph_same(
         a->spacing[0] == b->spacing[0] && a->spacing[1] == b->spacing[1] &&
         a->apron == b->apron &&
         a->format == b->format && a->rate == b->rate &&
-        a->interpolate == b->interpolate && a->structure_hash == b->structure_hash &&
+        a->interpolate == b->interpolate && a->priority == b->priority &&
+        a->structure_hash == b->structure_hash &&
         a->param_hash == b->param_hash && a->node_count == b->node_count &&
         a->param_size == b->param_size && a->texture_count == b->texture_count &&
         (!a->param_size || !ecs_os_memcmp(a->params, b->params, a->param_size));

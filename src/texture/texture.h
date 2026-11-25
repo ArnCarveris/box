@@ -150,7 +150,8 @@ typedef struct box_texture_graph_t {
     TextureGraphFormat format;  /**< What the image stores */
     float rate;                 /**< Updates per second of an animated graph, 0 every frame */
     bool interpolate;           /**< Crossfade keys k / rate (TextureGraph.interpolate) */
-    int32_t node_count;         /**< Nodes in nodes */
+    float priority;             /**< Order of evaluation, higher first (TextureGraph.priority) */
+    int32_t node_count;        /**< Nodes in nodes */
     box_texture_graph_node_t *nodes; /**< The nodes, inputs first */
     int32_t param_size;         /**< Bytes in params */
     uint8_t *params;            /**< Parameter bytes of the nodes */

@@ -18,7 +18,7 @@ settings in `box.texture.graph` (`graph.Cache`, `graph.Stats`, `graph.Preview`);
 |---|---|---|
 | `Path` | `path`, `width`/`height` 0 (source size), `linear` false, `single_channel` false | stb_image raster or resvg `.svg` (one dimension keeps aspect). `linear` for linear-light color images (encoded to sRGB on load); leave off for ORM/normal maps. `single_channel` = R8 with mips, a quarter of RGBA8 (masks, cookies) |
 | `Gen` | `width` 0 = 512, `height` 0 = width, `seed`, `layers`, `source`, `output` GenHeight/GenAlbedo/GenNormal, `colors` (ramp keys `{pos, {r,g,b}}`), `palette`, `palette_layer` 0, `strength` 1 | Seamless, deterministic CPU generator on the job system |
-| `Graph` | `output` (node), `width` 0 = 512, `height` 0 = width, `domain` DomainPlane/DomainSphere/DomainWorld, `window` {`x`, `z` (f64), `width`, `depth` meters} on DomainWorld, `format` GraphColor/GraphLinear/GraphSingle/GraphHdr/GraphFloat (R32Float)/GraphFloat4 (RGBA32Float), `rate` 0, `interpolate` false | Per texel evaluation of a node graph on the render backend |
+| `Graph` | `output` (node), `width` 0 = 512, `height` 0 = width, `domain` DomainPlane/DomainSphere/DomainWorld, `window` {`x`, `z` (f64), `width`, `depth` meters} on DomainWorld, `format` GraphColor/GraphLinear/GraphSingle/GraphHdr/GraphFloat (R32Float)/GraphFloat4 (RGBA32Float), `rate` 0, `interpolate` false, `priority` 0 (higher evaluates first when a frame spreads its evaluations) | Per texel evaluation of a node graph on the render backend |
 
 The texture entity of a `Surface` (`Surface.texture`, box/surface.h) is also a texture entity:
 materials sample its image of the same frame.

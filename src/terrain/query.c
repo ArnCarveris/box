@@ -137,7 +137,7 @@ static void box_terrain_query_settings(
         out->max_height = 1024.0f;
     }
 
-    out->budget = t->budget > 0 ? t->budget : 8;
+    out->budget = t->budget > 0 ? t->budget : 4;
     out->hold = t->query_hold > 0 ? t->query_hold : BOX_TERRAIN_QUERY_HOLD;
 }
 
@@ -365,7 +365,8 @@ static ecs_entity_t box_terrain_query_texture(
             .width = (float)t->window[2],
             .depth = (float)t->window[2]
         },
-        .format = format
+        .format = format,
+        .priority = (float)-t->distance
     });
     ecs_set(world, result, TextureReadback, { .level = 0, .keep = true });
 

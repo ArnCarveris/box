@@ -81,11 +81,9 @@ void box_gpu_tg_track(
     }
 
     if (from) {
-        box_gpu_tg_graph_t **list = ecs_vec_first(from);
-        int32_t last = ecs_vec_count(from) - 1;
-        list[graph->slot] = list[last];
-        list[graph->slot]->slot = graph->slot;
-        ecs_vec_set_count_t(NULL, from, box_gpu_tg_graph_t*, last);
+        *ecs_vec_get_t(from, box_gpu_tg_graph_t*, graph->slot) = NULL;
+        tg->active_holes += from == &tg->active;
+        tg->watcher_holes += from == &tg->watchers;
     }
 
     if (to) {
@@ -94,6 +92,82 @@ void box_gpu_tg_track(
     }
 
     graph->track = track;
+done:
+    return;
+}
+
+/** Take the entries graphs left out of a list of the graph state, keeping the order of the
+ * others.
+ *
+ * @param list The list
+ * @param holes Entries of the list graphs left, reset
+ */
+static void box_gpu_tg_compact(
+    ecs_vec_t *list,
+    int32_t *holes)
+{
+    box_gpu_tg_graph_t **graphs = ecs_vec_first(list);
+    int32_t i, kept = 0, count = ecs_vec_count(list);
+    if (!*holes) {
+        goto done;
+    }
+
+    for (i = 0; i < count; i ++) {
+        if (graphs[i]) {
+            graphs[i]->slot = kept;
+            graphs[kept ++] = graphs[i];
+        }
+    }
+
+    ecs_vec_set_count_t(NULL, list, box_gpu_tg_graph_t*, kept);
+    *holes = 0;
+done:
+    return;
+}
+
+/** Order two graphs of a list by their priority, highest first, then by their place in the
+ * list.
+ *
+ * @param a The first graph
+ * @param b The second graph
+ * @return Negative, zero or positive
+ */
+static int box_gpu_tg_priority_compare(
+    const void *a,
+    const void *b)
+{
+    const box_gpu_tg_graph_t *ga = *(box_gpu_tg_graph_t* const*)a;
+    const box_gpu_tg_graph_t *gb = *(box_gpu_tg_graph_t* const*)b;
+    float pa = ga->desc.priority, pb = gb->desc.priority;
+    int result = (pa < pb) - (pa > pb);
+
+    return result ? result : (ga->slot > gb->slot) - (ga->slot < gb->slot);
+}
+
+/** Order a list of the graph state by the priority of its graphs, highest first, keeping the
+ * order of graphs of the same priority.
+ *
+ * @param list The list, without holes
+ */
+static void box_gpu_tg_prioritize(
+    ecs_vec_t *list)
+{
+    box_gpu_tg_graph_t **graphs = ecs_vec_first(list);
+    int32_t i, count = ecs_vec_count(list);
+    bool sorted = true;
+    for (i = 1; sorted && i < count; i ++) {
+        sorted = graphs[i - 1]->desc.priority >= graphs[i]->desc.priority;
+    }
+
+    if (sorted) {
+        goto done;
+    }
+
+    qsort(graphs, (size_t)count, sizeof(box_gpu_tg_graph_t*), box_gpu_tg_priority_compare);
+    for (i = 0; i < count; i ++) {
+        graphs[i]->slot = i;
+    }
+
 done:
     return;
 }
@@ -113,6 +187,9 @@ void box_gpu_tg_candidates(
 {
     int32_t i;
     bool watch = gpu->texture_serial != tg->serial;
+    box_gpu_tg_compact(&tg->active, &tg->active_holes);
+    box_gpu_tg_compact(&tg->watchers, &tg->watcher_holes);
+    box_gpu_tg_prioritize(&tg->active);
     for (i = 0; i < ecs_vec_count(&tg->active); i ++) {
         box_gpu_tg_graph_t *graph = *ecs_vec_get_t(&tg->active, box_gpu_tg_graph_t*, i);
         watch = watch || !graph->steady;

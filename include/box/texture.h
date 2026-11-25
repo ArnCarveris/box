@@ -345,6 +345,10 @@ ECS_STRUCT(TextureGraph, {
                                 *
                                 *   TextureStatus.revision increments when a change of the graph
                                 *   was evaluated, not per key or crossfade, as other updates */
+    float priority;            /**< Order in which a frame that spreads its evaluations over
+                                *   the frames after it evaluates the graphs that are out of
+                                *   date: higher first, in the order they were made among equal
+                                *   ones, default 0 */
 });
 
 /** Settings of the cache of the values the texture graphs materialize, a singleton.

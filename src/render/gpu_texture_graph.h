@@ -305,6 +305,8 @@ typedef struct box_gpu_texgraphs_t {
     ecs_vec_t active;           /**< box_gpu_tg_graph_t*, the graphs every packet looks at */
     ecs_vec_t watchers;         /**< box_gpu_tg_graph_t*, the graphs looked at after an image
                                  *   changed */
+    int32_t active_holes;       /**< Entries of active a graph left, NULL until compacted */
+    int32_t watcher_holes;      /**< Entries of watchers a graph left, NULL until compacted */
     uint32_t serial;            /**< Serial of the last image written when the last packet was
                                  *   evaluated */
 } box_gpu_texgraphs_t;

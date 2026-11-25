@@ -92,7 +92,9 @@ ECS_STRUCT(TileTerrain, {
  * The tiles form a quadtree: a tile of level L has an edge of tile_size * 2^L meters, and splits
  * into the four tiles of level L - 1 while a focus is closer than lod_distance * 2^(L - 1),
  * counting the height of the focus above or below the terrain around it.
- * Tiles are made nearest first, at most budget per frame, and a coarse tile draws until the
+ * Tiles are made nearest first, at most budget per frame and while fewer than four times the
+ * budget wait for their heights, which the backend evaluates nearest first
+ * (TextureGraph.priority), and a coarse tile draws until the
  * finer tiles that replace it have their heights, so the terrain has no holes. Unbounded, the
  * coarsest level reaches lod_distance * 2^(levels - 1) from each focus.
  *
@@ -147,7 +149,7 @@ ECS_STRUCT(Terrain, {
     float max_height;       /**< Highest height of the terrain, the top of the culling bounds of
                              *   the tiles; with min_height 0 or above it for -256 and 1024 */
     float min_height;       /**< Lowest height of the terrain, the bottom of the culling bounds */
-    int32_t budget;         /**< Tiles made per frame at most, 0 for 8; four times as many are
+    int32_t budget;         /**< Tiles made per frame at most, 0 for 4; four times as many are
                              *   dropped. Query tiles have a budget of their own as large */
     float query_spacing;    /**< Meters between the heights the CPU queries read near a focus,
                              *   0 for 0.5 */
