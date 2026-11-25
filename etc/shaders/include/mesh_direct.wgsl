@@ -95,9 +95,10 @@ fn light_reaches(ng: vec3f, l: vec3f, side: u32) -> bool {
 // openings, and the directional lights reach an area only through openings to the outdoors
 // (area_sun). The directional, cluster and portal lights share one loop, and the sides one loop
 // per light, so the shadows, the cookie and the lobes each have one call site: D3D compilers
-// inline every call.
-fn lights_direct(s: Surface, v: vec3f, world: vec3f, cluster: u32, sides: u32,
-    thickness: f32) -> Lit
+// inline every call. relative is world relative to the render origin, which the shadows of the
+// first directional light are looked up at.
+fn lights_direct(s: Surface, v: vec3f, world: vec3f, relative: vec3f, cluster: u32,
+    sides: u32, thickness: f32) -> Lit
 {
     var sum = Lit(vec3f(0.0), vec3f(0.0));
     var sky = vec3f(0.0);
@@ -137,9 +138,11 @@ fn lights_direct(s: Surface, v: vec3f, world: vec3f, cluster: u32, sides: u32,
 
         for (var side = 0u; side < sides; side++) {
             var at = world;
+            var at_relative = relative;
             var n = s.geometric;
             if (side == 1u) {
                 at = world - v * thickness;
+                at_relative = relative - v * thickness;
                 n = -s.geometric;
             }
 
@@ -159,9 +162,9 @@ fn lights_direct(s: Surface, v: vec3f, world: vec3f, cluster: u32, sides: u32,
                 }
                 if (i == 0u) {
                     if (side == 1u) {
-                        visible = shadow_factor_back(at, n) * (1.0 - s.shade);
+                        visible = shadow_factor_back(at, at_relative, n) * (1.0 - s.shade);
                     } else {
-                        visible = shadow_factor(at, n) * (1.0 - s.shade);
+                        visible = shadow_factor(at, at_relative, n) * (1.0 - s.shade);
                     }
                     if (scene_cookies) {
                         visible *= light_cookie(at, l, n);

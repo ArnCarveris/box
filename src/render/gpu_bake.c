@@ -930,8 +930,9 @@ static void box_gpu_bake_face(
     u->grid[1] = 1;
     u->grid[2] = 1;
     if (cascade) {
-        box_gpu_shadow_cascade_uniforms(u, 0, cascade, BOX_GPU_BAKE_SHADOW_BIAS,
-            BOX_GPU_BAKE_SHADOW_OFFSET, BOX_GPU_CAPTURE_SHADOW_RESOLUTION);
+        box_gpu_shadow_cascade_uniforms(u, 0, cascade, gpu->render_delta,
+            BOX_GPU_BAKE_SHADOW_BIAS, BOX_GPU_BAKE_SHADOW_OFFSET,
+            BOX_GPU_CAPTURE_SHADOW_RESOLUTION);
         u->shadow_params[0] = BOX_GPU_BAKE_FAR;
         u->shadow_params[1] = BOX_GPU_BAKE_FAR;
         box_gpu_shadow_filter_uniforms(u, 1, BOX_GPU_BAKE_SHADOW_FILTER,

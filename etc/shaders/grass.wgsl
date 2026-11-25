@@ -8,7 +8,9 @@
 //
 // A blade bends, shades and is placed in the local frame of the packet, and its clip position is
 // render_view_proj of its root relative to the render origin plus its shape around the root, so
-// it keeps its precision near the render origin. The shadow casters stay in the local frame.
+// it keeps its precision near the render origin. The blades that cast into the cascades are
+// placed relative to the render origin too (GrassParams.place); those of the light tiles stay in
+// the local frame. The sun shadows are looked up at the position relative to the render origin.
 //
 // A blade shorter than the fold height of its Grass folds into a V: the first half of its strip
 // runs from the tip of one half down to the root and the second half from the root up to the tip
@@ -160,6 +162,8 @@ struct VertexOut {
     // Angle the gust where the blade stands bends it over beyond the steady wind at this height,
     // below 0 in a lull
     @location(7) gust: f32,
+    // Position relative to the render origin, which the shadows are looked up at
+    @location(8) relative: vec3f,
 };
 
 // Point of a cubic bezier that starts at 0.
@@ -394,6 +398,7 @@ fn vs(@builtin(vertex_index) vertex: u32, @builtin(instance_index) instance: u32
     out.normal = s.normal;
     out.rounding = s.across * (s.side * ROUND * (1.0 - out.flatten));
     out.world = s.world;
+    out.relative = s.relative;
     out.clip = view.render_view_proj * vec4f(s.relative, 1.0);
     out.along = s.along;
     out.up = s.up;
@@ -411,23 +416,23 @@ fn grass_to_light(world: vec3f) -> vec3f {
     return normalize(params.light.xyz - world + vec3f(0.0, 1e-6, 0.0));
 }
 
-// The world position of a vertex of a blade that casts a shadow, which widens across the light
-// when the light sees it edge on.
-fn grass_caster(vertex: u32, instance: u32) -> vec3f {
+// The position of a vertex of a blade that casts a shadow relative to a local position, which
+// widens across the light when the light sees it edge on; its world position at an origin of 0.
+fn grass_caster(vertex: u32, instance: u32, origin: vec3f) -> vec3f {
     let lod = min(vertex / GRASS_LOD_VERTICES, GRASS_LODS - 1u);
     let b = grass_blade_of(vertex, instance);
     return grass_shape(b, lod, vertex % GRASS_LOD_VERTICES, grass_to_light(b.position),
-        vec3f(0.0)).world;
+        origin).relative;
 }
 
 // A blade that casts a shadow into a cascade of the directional light or a spot light tile, the
-// view projection of its params that of the cascade or the tile, depth only. Does not read the
-// view, the shadow pass binds none.
+// view projection of its params that of the cascade or the tile, of the positions relative to
+// GrassParams.place, depth only. Does not read the view, the shadow pass binds none.
 @vertex
 fn vs_shadow(@builtin(vertex_index) vertex: u32, @builtin(instance_index) instance: u32)
     -> @builtin(position) vec4f
 {
-    return params.view_proj * vec4f(grass_caster(vertex, instance), 1.0);
+    return params.view_proj * vec4f(grass_caster(vertex, instance, params.place.xyz), 1.0);
 }
 
 // A blade that casts a shadow into an octant of a point light tile, with its distances to the 3
@@ -452,7 +457,7 @@ fn grass_octant_signs(octant: u32) -> vec3f {
 fn vs_shadow_point(@builtin(vertex_index) vertex: u32, @builtin(instance_index) instance: u32)
     -> GrassPointOut
 {
-    let world = grass_caster(vertex, instance);
+    let world = grass_caster(vertex, instance, vec3f(0.0));
     let signs = grass_octant_signs(u32(max(params.light.w - 2.0, 0.0)));
     let v = world - params.light.xyz;
     let fold = select(0.0, 1.0, signs.z < 0.0);
@@ -494,9 +499,10 @@ fn grass_base_shadow(world: vec3f) -> f32 {
 
 // Light a blade reflects toward the eye: the ambient light, occluded toward its base, and the
 // directional lights, the first through its shadows and cookie, on its front with a specular
-// lobe and through it, the light through it tinted by the color of the blade.
-fn grass_light(world: vec3f, front: vec3f, n: vec3f, up: vec3f, along: f32, flatten: f32,
-    albedo: vec3f) -> vec3f
+// lobe and through it, the light through it tinted by the color of the blade. relative is the
+// position relative to the render origin, which the shadows are looked up at.
+fn grass_light(world: vec3f, relative: vec3f, front: vec3f, n: vec3f, up: vec3f, along: f32,
+    flatten: f32, albedo: vec3f) -> vec3f
 {
     let lit = normalize(mix(n, up, mix(NORMAL_UP, NORMAL_UP_FAR, flatten)));
     let v = grass_to_eye(world);
@@ -510,7 +516,7 @@ fn grass_light(world: vec3f, front: vec3f, n: vec3f, up: vec3f, along: f32, flat
         let l = normalize(light.position);
         var visible = shadow;
         if (i == 0u) {
-            visible *= shadow_factor(world, lit) * light_cookie(world, l, lit);
+            visible *= shadow_factor(world, relative, lit) * light_cookie(world, l, lit);
         }
 
         let diffuse = albedo * saturate(dot(lit, l));
@@ -537,7 +543,8 @@ fn fs(in: VertexOut, @builtin(front_facing) front: bool) -> @location(0) vec4f {
     let gradient = mix(params.base.rgb, params.tip.rgb, smoothstep(0.0, 1.0, along));
     let up = normalize(in.up);
     let albedo = gradient * in.color * max(1.0 + WIND_SHEEN * in.gust, 0.5);
-    var color = grass_light(in.world, flat_normal, n, up, along, in.flatten, albedo);
+    var color = grass_light(in.world, in.relative, flat_normal, n, up, along, in.flatten,
+        albedo);
     if (view.aerial.w > 0.0) {
         let ap = aerial_sample(in.clip, in.world);
         color = color * ap.a + ap.rgb;

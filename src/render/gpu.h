@@ -1377,7 +1377,8 @@ uint32_t box_gpu_grass_cascades(
  * @param v The view
  * @param cascade Index of the cascade
  * @param layer View of the layer of the cascade, which the pass loads
- * @param matrix Local world to clip space of the cascade
+ * @param matrix Clip space of the cascade of the positions relative to the render origin
+ * @param delta The render origin in local units
  */
 void box_gpu_grass_shadow(
     box_gpu_t *gpu,
@@ -1385,7 +1386,8 @@ void box_gpu_grass_shadow(
     const box_render_view_t *v,
     int32_t cascade,
     WGPUTextureView layer,
-    const float *matrix);
+    const float *matrix,
+    const double delta[3]);
 
 /** Check whether a Grass of a scene casts into the spot and point light tiles of its atlas
  * (Grass.shadow_lights), so its tiles render in every packet.
@@ -1784,11 +1786,13 @@ void box_gpu_shadow_render(
     int32_t index,
     int32_t slot);
 
-/** Write the uniforms of one cascade of a shadow lookup.
+/** Write the uniforms of one cascade of a shadow lookup, shadow_matrix and shadow_relative of
+ * the positions relative to the render origin.
  *
  * @param u The view uniforms
  * @param index The cascade
  * @param cascade The fitted cascade
+ * @param delta The render origin in local units
  * @param depth_bias Depth offset of the comparison in texels
  * @param normal_offset Offset along the geometric normal in texels at grazing light
  * @param resolution Edge of the cascade in texels
@@ -1797,6 +1801,7 @@ void box_gpu_shadow_cascade_uniforms(
     box_gpu_view_uniforms_t *u,
     int32_t index,
     const box_render_cascade_t *cascade,
+    const double delta[3],
     float depth_bias,
     float normal_offset,
     int32_t resolution);
@@ -2315,6 +2320,32 @@ void box_gpu_origin_split(
  */
 void box_gpu_shadow_origin(
     const double origin[3],
+    void *block);
+
+/** Write the uniforms of a cascade of the directional light into its block of the shadow pass:
+ * its matrix, the absolute position of the local origin and at BOX_GPU_SHADOW_RELATIVE its
+ * matrix of the positions relative to the render origin (box_render_cascade_relative).
+ *
+ * @param cascade The cascade
+ * @param delta The render origin in local units
+ * @param origin Absolute position of the local origin
+ * @param block The uniforms of the cascade
+ */
+void box_gpu_shadow_cascade_block(
+    const box_render_cascade_t *cascade,
+    const double delta[3],
+    const double origin[3],
+    void *block);
+
+/** Write the matrix of the positions relative to the render origin of a spot light tile at
+ * BOX_GPU_SHADOW_RELATIVE of its block: its matrix times a translation by the render origin,
+ * computed in f64 from the f32 matrix; the matrix bit for bit at a render origin of 0.
+ *
+ * @param delta The render origin in local units
+ * @param block The uniforms of the tile, its matrix set
+ */
+void box_gpu_shadow_relative(
+    const double delta[3],
     void *block);
 
 /** Check whether a pool of the scene of a view fades in front of the depth of the view, so the

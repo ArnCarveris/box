@@ -295,7 +295,7 @@ fn layer_blend3(mode: u32, v: vec3f, layer: vec3f, k: f32) -> vec3f {
 @diagnostic(off, derivative_uniformity)
 fn apply_layers(maps: texture_2d_array<f32>, first: u32, f: VertexOut, surface: LayerSurface)
     -> LayerSurface {
-    return apply_layers_at(maps, first, f.world, f.uv.xy, surface);
+    return apply_layers_at(maps, first, vo_world(f), f.uv.xy, surface);
 }
 
 var<private> layers_covered: f32;

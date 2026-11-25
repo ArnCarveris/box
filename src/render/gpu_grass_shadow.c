@@ -311,7 +311,8 @@ void box_gpu_grass_shadow(
     const box_render_view_t *v,
     int32_t cascade,
     WGPUTextureView layer,
-    const float *matrix)
+    const float *matrix,
+    const double delta[3])
 {
     box_gpu_grass_t *s = gpu->grass;
     WGPURenderPassEncoder pass = NULL;
@@ -342,6 +343,9 @@ void box_gpu_grass_shadow(
 
         params = e->shadow_params;
         ecs_os_memcpy_n(params.view_proj, matrix, float, 16);
+        params.place[0] = (float)delta[0];
+        params.place[1] = (float)delta[1];
+        params.place[2] = (float)delta[2];
         box_gpu_grass_cast(gpu, s, pass, e, &params);
     }
 

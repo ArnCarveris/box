@@ -354,12 +354,14 @@ void box_gpu_shadow_cascade_uniforms(
     box_gpu_view_uniforms_t *u,
     int32_t index,
     const box_render_cascade_t *cascade,
+    const double delta[3],
     float depth_bias,
     float normal_offset,
     int32_t resolution)
 {
     float extent = 0.5f * cascade->texel * (float)resolution;
     glm_mat4_copy(ECS_CONST_CAST(vec4*, cascade->matrix), u->shadow_matrix[index]);
+    box_render_cascade_relative(cascade, delta, u->shadow_relative[index]);
     u->shadow_depth[index] = cascade->depth_range / glm_max(extent, 1e-6f);
     u->shadow_bias[index] = depth_bias * cascade->texel / cascade->depth_range;
     u->shadow_offset[index] = normal_offset * cascade->texel;
@@ -396,6 +398,44 @@ void box_gpu_shadow_origin(
     int32_t split[4];
     box_gpu_origin_split(origin, split);
     ecs_os_memcpy((uint8_t*)block + BOX_GPU_SHADOW_ORIGIN, split, ECS_SIZEOF(split));
+}
+
+void box_gpu_shadow_cascade_block(
+    const box_render_cascade_t *cascade,
+    const double delta[3],
+    const double origin[3],
+    void *block)
+{
+    mat4 relative;
+    box_render_cascade_relative(cascade, delta, relative);
+    ecs_os_memcpy(block, cascade->matrix, sizeof(mat4));
+    ecs_os_memcpy((uint8_t*)block + BOX_GPU_SHADOW_RELATIVE, relative, sizeof(mat4));
+    box_gpu_shadow_origin(origin, block);
+}
+
+void box_gpu_shadow_relative(
+    const double delta[3],
+    void *block)
+{
+    mat4 matrix, relative;
+    int32_t r, k;
+    ecs_os_memcpy(matrix, block, sizeof(mat4));
+    glm_mat4_copy(matrix, relative);
+    if (delta[0] == 0.0 && delta[1] == 0.0 && delta[2] == 0.0) {
+        goto done;
+    }
+
+    for (r = 0; r < 4; r ++) {
+        double t = (double)matrix[3][r];
+        for (k = 0; k < 3; k ++) {
+            t += (double)matrix[k][r] * delta[k];
+        }
+
+        relative[3][r] = (float)t;
+    }
+
+done:
+    ecs_os_memcpy((uint8_t*)block + BOX_GPU_SHADOW_RELATIVE, relative, sizeof(mat4));
 }
 
 void box_gpu_shadow_filter_uniforms(
@@ -611,10 +651,9 @@ void box_gpu_shadow_uniforms(
 
         uint8_t *block = ecs_vec_get_t(&gpu->shadow_data, uint8_t,
             (slot * BOX_RENDER_SHADOW_CASCADES + i) * BOX_GPU_CASCADE_STRIDE);
-        ecs_os_memcpy(block, cascade.matrix, sizeof(mat4));
-        box_gpu_shadow_origin(gpu->origin, block);
-        box_gpu_shadow_cascade_uniforms(u, i, &cascade, s->depth_bias, s->normal_offset,
-            s->resolution);
+        box_gpu_shadow_cascade_block(&cascade, gpu->render_delta, gpu->origin, block);
+        box_gpu_shadow_cascade_uniforms(u, i, &cascade, gpu->render_delta, s->depth_bias,
+            s->normal_offset, s->resolution);
     }
 
     u->shadow_params[0] = distance - s->fade * (distance - last);
@@ -1223,7 +1262,7 @@ void box_gpu_shadow_render(
         wgpuRenderPassEncoderEnd(pass);
         wgpuRenderPassEncoderRelease(pass);
         box_gpu_grass_shadow(gpu, encoder, v, i, layers[i], (const float*)ecs_vec_get_t(
-            &gpu->shadow_data, uint8_t, offset));
+            &gpu->shadow_data, uint8_t, offset + BOX_GPU_SHADOW_RELATIVE), gpu->render_delta);
         box_gpu_count(gpu, BOX_GPU_STAT_CASCADE);
         if (store && complete) {
             store->valid |= 1u << i;
@@ -1282,6 +1321,10 @@ void box_gpu_shadow_capture_fit(
     out->matrix[3][3] = 1.0f;
     out->texel = 2.0f * extent / res;
     out->depth_range = range;
+    out->extent = extent;
+    out->center[0] = (double)cx;
+    out->center[1] = (double)cy;
+    out->center[2] = (double)d_far;
 }
 
 /** Create the shadow map of the probe captures, its uniform buffer and bind group.
@@ -1354,8 +1397,7 @@ WGPUTextureView box_gpu_shadow_capture(
 
     box_gpu_shadow_capture_ensure(gpu);
     uint8_t block[BOX_GPU_SHADOW_UNIFORM_SIZE] = {0};
-    ecs_os_memcpy(block, cascade->matrix, sizeof(mat4));
-    box_gpu_shadow_origin(packet->origin, block);
+    box_gpu_shadow_cascade_block(cascade, gpu->render_delta, packet->origin, block);
     wgpuQueueWriteBuffer(gpu->queue, gpu->capture_shadow_buffer, 0, block, sizeof(block));
     WGPURenderPassDepthStencilAttachment depth = {
         .view = gpu->capture_shadow_layer,
@@ -1525,6 +1567,7 @@ static void box_gpu_atlas_matrices(
             uint8_t *block = ecs_vec_get_t(&gpu->atlas_data, uint8_t,
                 first * BOX_GPU_CASCADE_STRIDE);
             ecs_os_memcpy(block, tile->matrix, sizeof(mat4));
+            box_gpu_shadow_relative(gpu->render_delta, block);
             box_gpu_shadow_origin(packet->origin, block);
             continue;
         }

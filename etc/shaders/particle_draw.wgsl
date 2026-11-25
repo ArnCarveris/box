@@ -50,6 +50,8 @@ struct VertexOut {
     @location(8) @interpolate(flat) look: vec4u,
     // x: softness, y: fraction lit
     @location(9) @interpolate(flat) params: vec2f,
+    // The position relative to the render origin, which the sun shadows are looked up at
+    @location(10) relative: vec3f,
 };
 
 // Screen width in pixels a card seen edge on keeps, so it shows as a thin line without holes.
@@ -209,6 +211,7 @@ fn vs(@builtin(vertex_index) vertex: u32, @builtin(instance_index) instance: u32
 
     out.clip = view.render_view_proj * vec4f(relative + spread, 1.0);
     out.world = world;
+    out.relative = relative + spread;
     out.depth = -(view.view * vec4f(world, 1.0)).z;
     out.opacity = particle_scaled(
         particle_draw(seed, p.index, STREAM_OPACITY, emitter.opacity_radial.xy),
@@ -248,10 +251,11 @@ fn diffuse(n: vec3f, l: vec3f) -> f32 {
 // Light a white particle reflects toward the eye: the directional lights, the first through its
 // shadow map and light cookie, the point and spot lights of the cluster of the fragment and the
 // ambient light. A billboard has no meaningful surface, so it passes a zero normal and the cookie
-// reads an isotropic footprint.
-fn particle_light(world: vec3f, n: vec3f) -> vec3f {
+// reads an isotropic footprint. relative is the position relative to the render origin, which
+// the shadows are looked up at.
+fn particle_light(world: vec3f, relative: vec3f, n: vec3f) -> vec3f {
     var sum = ambient(n);
-    var shadow = shadow_factor(world, n);
+    var shadow = shadow_factor(world, relative, n);
     if (view.lights.x > 0u) {
         shadow *= light_cookie(world, normalize(lights[0].position), vec3f(0.0));
     }
@@ -316,7 +320,7 @@ fn fs(in: VertexOut) -> @location(0) vec4f {
     }
 
     if (in.params.y > 0.0 && view.lights.z == 1u) {
-        let lit = particle_light(in.world, normalize(in.normal));
+        let lit = particle_light(in.world, in.relative, normalize(in.normal));
         color *= mix(vec3f(1.0), lit, in.params.y);
     }
 

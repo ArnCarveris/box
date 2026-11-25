@@ -209,7 +209,8 @@ fn impostor_lit(f: ImpostorOut, c: ImpostorSurface) -> vec4f {
     s.normal = n;
     s.geometric = n;
     let v = normalize(view.camera.xyz - world);
-    let reflected = shade(s, v, impostor_lit_at(model, world, f.eye.w * f.weights.w));
+    let lit_at = impostor_lit_at(model, world, f.eye.w * f.weights.w);
+    let reflected = shade(s, v, lit_at, lit_at - view.render_delta.xyz);
     var color = reflected.diffuse + reflected.specular;
     if (scene_aerial && view.aerial.w > 0.0) {
         color = aerial_perspective(color, 1.0, f.pos, world);

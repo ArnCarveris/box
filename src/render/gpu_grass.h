@@ -88,9 +88,12 @@ typedef struct box_gpu_grass_params_t {
     uint32_t hiz[4];                /**< Width, height and levels of the depth pyramid of the
                                      *   view the placement culls by occlusion against, 0
                                      *   levels for none */
+    float place[4];                 /**< The local position the blades that cast into a
+                                     *   cascade are placed relative to, the render origin,
+                                     *   which view_proj takes; 0 for the others, w unused */
 } box_gpu_grass_params_t;
 
-_Static_assert(sizeof(box_gpu_grass_params_t) == 352, "GrassParams of grass.wgsl");
+_Static_assert(sizeof(box_gpu_grass_params_t) == 368, "GrassParams of grass.wgsl");
 _Static_assert(sizeof(box_gpu_grass_params_t) <= BOX_GPU_GRASS_PARAMS_STRIDE,
     "the params of a Grass must fit in their stride");
 

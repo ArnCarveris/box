@@ -1367,6 +1367,14 @@
                     "wind_frame",
                     "wind_pack_base"
                 ]
+            },
+            {
+                "id": "RenderOriginShadow",
+                "testcases": [
+                    "relative_zero_same_matrix",
+                    "relative_far_precise",
+                    "snap_fixed_in_local_frame"
+                ]
             }
         ]
     }

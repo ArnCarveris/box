@@ -1,5 +1,8 @@
 // Shadow pass: draws the shadow casters of a view into one cascade of its shadow map, depth
-// only.
+// only. The casters of a cascade or a spot light tile are placed relative to the render origin
+// with Cascade.relative, which keeps their precision near it; the wind moves them, and the
+// projections of their materials map them, from their local position. Those of a point light
+// tile and the impostor cards stay in the local frame (Cascade.matrix).
 #ifdef BOX_SHADOW_CLIP_DISTANCES
 enable clip_distances;
 #endif
@@ -32,6 +35,10 @@ struct Cascade {
     // The absolute position of the local origin (WorldOrigin) as box_gpu_origin_split packs it
     // (world_origin.wgsl)
     origin: vec4i,
+    // matrix of the positions relative to the render origin (BOX_GPU_SHADOW_RELATIVE), which
+    // the casters of a cascade or a spot light tile are placed with; matrix without a render
+    // origin
+    relative: mat4x4f,
 };
 
 // 1 / sqrt(3), the length of the axis of an octant of a point light tile
@@ -46,7 +53,8 @@ const OCTANT_AXIS: f32 = 0.57735026919;
 // Transforms relative to the texture frame, read by MappingFrame materials only: the frame pages
 // have the stream, the other pages bind one zero record.
 @group(1) @binding(5) var<storage, read> frames: array<InstanceTransform>;
-// The render origin of the page; the casters render in the local frame (instance_local).
+// The render origin of the page: the casters of a cascade or a spot light tile are placed
+// relative to it (instance_relative), the others in the local frame (instance_local).
 @group(1) @binding(6) var<uniform> instance_page: InstancePage;
 
 @group(2) @binding(0) var albedo_map: texture_2d<f32>;
@@ -123,31 +131,53 @@ struct PointShadowOut {
 #endif
 };
 
-// A world position of a vertex of a caster moved by the WindSway of its material with
-// material_wind, as place_wind of place.wgsl moves it; the position otherwise.
+// The offset the WindSway of the material of a caster moves a vertex at a world position by with
+// material_wind, as place_wind of place.wgsl moves it; 0 otherwise.
 fn caster_wind(slot: u32, world: vec3f, model: mat4x4f) -> vec3f {
-    var result = world;
+    var result = vec3f(0.0);
     if (material_wind) {
         let m = material_fetch(shadings[slot].material & 0xFFFFFFu);
         if (wind_sways(m)) {
-            result = world + wind_move(world, model, m, world_origin(cascade.origin)).offset;
+            result = wind_move(world, model, m, world_origin(cascade.origin)).offset;
         }
     }
     return result;
 }
 
-fn caster_world_mesh(slot: u32, vertex: vec3f) -> vec3f {
-    let model = instance_model(instance_local(transforms[slot], instance_page));
-    return caster_wind(slot, (model * vec4f(vertex, 1.0)).xyz, model);
+// A vertex of a caster: its world position, or relative to the render origin, moved by the
+// wind of its world position.
+fn caster_placed(slot: u32, position: vec3f, relative: bool) -> vec3f {
+    let t = transforms[slot];
+    let model = instance_model(instance_local(t, instance_page));
+    let world = (model * vec4f(position, 1.0)).xyz;
+    var result = world;
+    if (relative) {
+        result = (instance_model(instance_relative(t, instance_page)) *
+            vec4f(position, 1.0)).xyz;
+    }
+    if (material_wind) {
+        result += caster_wind(slot, world, model);
+    }
+    return result;
 }
 
-// World position of a vertex of a caster; sets surface_data. A plain mesh page binds one zero
+// World position of a vertex of a mesh caster, which a point light tile places.
+fn caster_world_mesh(slot: u32, vertex: vec3f) -> vec3f {
+    return caster_placed(slot, vertex, false);
+}
+
+// Position of a vertex of a mesh caster relative to the render origin, which a cascade or a spot
+// light tile places.
+fn caster_relative_mesh(slot: u32, vertex: vec3f) -> vec3f {
+    return caster_placed(slot, vertex, true);
+}
+
+// Object position of a vertex of a caster; sets surface_data. A plain mesh page binds one zero
 // record as its surface stream, so a slot past it leaves surface_data zero (the plain mesh path).
-fn caster_world(slot: u32, vertex: vec3f) -> vec3f {
+fn caster_object(slot: u32, vertex: vec3f) -> vec3f {
     if (slot < arrayLength(&surfaces)) {
         surface_data = surfaces[slot];
     }
-    let model = instance_model(instance_local(transforms[slot], instance_page));
     var position = vertex;
     if (surface_data.p[19].x != 0.0) {
         position = vertex;
@@ -158,7 +188,18 @@ fn caster_world(slot: u32, vertex: vec3f) -> vec3f {
     } else if (surface_data.p[0].x != 0.0) {
         position = surface_position(i32(position.z), position.x, position.y);
     }
-    return caster_wind(slot, (model * vec4f(position, 1.0)).xyz, model);
+    return position;
+}
+
+// World position of a vertex of a caster, which a point light tile places; sets surface_data.
+fn caster_world(slot: u32, vertex: vec3f) -> vec3f {
+    return caster_placed(slot, caster_object(slot, vertex), false);
+}
+
+// Position of a vertex of a caster relative to the render origin, which a cascade or a spot light
+// tile places; sets surface_data.
+fn caster_relative(slot: u32, vertex: vec3f) -> vec3f {
+    return caster_placed(slot, caster_object(slot, vertex), true);
 }
 
 // Object position and normal of a vertex of a parametric surface caster, as place of place.wgsl
@@ -212,7 +253,12 @@ fn caster_dither(range: u32, pos: vec4f) {
 
 // Position of a vertex of a caster in the clip space of the cascade.
 fn caster_position(slot: u32, vertex: vec3f) -> vec4f {
-    return cascade.matrix * vec4f(caster_world(slot, vertex), 1.0);
+    return cascade.relative * vec4f(caster_relative(slot, vertex), 1.0);
+}
+
+// Position of a vertex of a mesh caster in the clip space of the cascade.
+fn caster_position_mesh(slot: u32, vertex: vec3f) -> vec4f {
+    return cascade.relative * vec4f(caster_relative_mesh(slot, vertex), 1.0);
 }
 
 // Axis signs of an octant: bit 0 negates x, bit 1 y and bit 2 z.
@@ -337,8 +383,7 @@ fn cutout_attributes_mesh(v: VertexIn, o: ptr<function, CasterOut>) {
 }
 
 @vertex fn vs(v: VertexIn) -> ShadowOut {
-    return ShadowOut(cascade.matrix * vec4f(caster_world_mesh(slot_of(v.slot), v.position), 1.0),
-        caster_range(v.slot));
+    return ShadowOut(caster_position_mesh(slot_of(v.slot), v.position), caster_range(v.slot));
 }
 
 @vertex fn vs_surface(v: VertexIn) -> ShadowOut {
@@ -348,7 +393,7 @@ fn cutout_attributes_mesh(v: VertexIn, o: ptr<function, CasterOut>) {
 fn caster_cutout(v: VertexIn) -> CasterOut {
     var o: CasterOut;
     o.range = caster_range(v.slot);
-    o.pos = cascade.matrix * vec4f(caster_world_mesh(slot_of(v.slot), v.position), 1.0);
+    o.pos = caster_position_mesh(slot_of(v.slot), v.position);
     cutout_attributes_mesh(v, &o);
     return o;
 }
@@ -371,8 +416,7 @@ fn caster_reveal(v: VertexIn, d: VertexData) -> f32 {
 // pivots reads.
 @vertex fn vs_data(v: VertexIn, d: VertexData) -> ShadowOut {
     wind_vertex_data(d.data0, d.data2, d.data3);
-    return ShadowOut(cascade.matrix * vec4f(caster_world_mesh(slot_of(v.slot), v.position), 1.0),
-        caster_range(v.slot));
+    return ShadowOut(caster_position_mesh(slot_of(v.slot), v.position), caster_range(v.slot));
 }
 
 @vertex fn vs_surface_data(v: VertexIn, d: VertexData) -> ShadowOut {

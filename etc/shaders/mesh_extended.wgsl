@@ -541,7 +541,9 @@ fn planar_radiance(p: PlanarLookup, n: vec3f, geometric: vec3f, roughness: f32,
 // transmission takes no ambient occlusion, which describes the front.
 // The shape of a planar reflection reflects its image (planar_radiance) in place of the probes,
 // with the base and the clear coat.
-fn shade_split(s: Surface, v: vec3f, world: vec3f, planar: PlanarLookup) -> Lit {
+// relative is world relative to the render origin, which the sun shadows are looked up at.
+fn shade_split(s: Surface, v: vec3f, world: vec3f, relative: vec3f, planar: PlanarLookup)
+    -> Lit {
     if (view.lights.z > 1u) {
         return impostor_channel(s.albedo, s.normal, world);
     }
@@ -632,7 +634,7 @@ fn shade_split(s: Surface, v: vec3f, world: vec3f, planar: PlanarLookup) -> Lit 
     }
 
     let sides = select(1u, 2u, s.back_factor > 0.0);
-    let direct = lights_direct(s, v, world, cluster, sides, s.thickness);
+    let direct = lights_direct(s, v, world, relative, cluster, sides, s.thickness);
     return Lit(direct.diffuse + indirect_diffuse, direct.specular + indirect_specular +
         s.emissive);
 }
@@ -753,7 +755,7 @@ fn distortion_sharp(f: VertexOut) -> bool {
 fn transmission(f: VertexOut, s: Surface, v: vec3f, reflected: Lit) -> vec4f {
     var ap = vec4f(0.0, 0.0, 0.0, 1.0);
     if (scene_aerial && view.aerial.w > 0.0) {
-        ap = aerial_sample(f.pos, f.world);
+        ap = aerial_sample(f.pos, vo_world(f));
     }
 
     let factor = vo_transmission(f).x;
@@ -776,7 +778,7 @@ fn transmission(f: VertexOut, s: Surface, v: vec3f, reflected: Lit) -> vec4f {
     let fresnel = select(f0_ior + (1.0 - f0_ior) * (fx2 * fx2 * fx), 0.0, sharp);
 
     let refracted = refract(-v, s.normal, 1.0 / max(ior, 0.001));
-    let exit_pos = f.world + normalize(refracted) * thickness * vo_model_scale(f);
+    let exit_pos = vo_world(f) + normalize(refracted) * thickness * vo_model_scale(f);
     let exit_clip = view.view_proj * vec4f(exit_pos, 1.0);
     var screen_uv = exit_clip.xy / exit_clip.w * vec2f(0.5, -0.5) + vec2f(0.5, 0.5);
     screen_uv = clamp(screen_uv + distortion_offset(f), vec2f(0.0), vec2f(1.0));
@@ -785,7 +787,7 @@ fn transmission(f: VertexOut, s: Surface, v: vec3f, reflected: Lit) -> vec4f {
     var bg_lod = s.roughness * max_mip;
     let diffuse_blur = vo_scalars(f).z;
     if (diffuse_blur > 0.0) {
-        bg_lod = transmission_blur_lod(f.world, screen_uv, diffuse_blur, bg_lod, max_mip);
+        bg_lod = transmission_blur_lod(vo_world(f), screen_uv, diffuse_blur, bg_lod, max_mip);
     }
     if (sharp) {
         bg_lod = 0.0;
@@ -956,8 +958,8 @@ fn water_flow_map(f: VertexOut, uv: vec2f) -> WaterFlowMap {
     o.weight = 1.0;
     o.dx = dpdx(uv);
     o.dy = dpdy(uv);
-    let wx = dpdx(f.world.xz);
-    let wy = dpdy(f.world.xz);
+    let wx = dpdx(vo_world(f).xz);
+    let wy = dpdy(vo_world(f).xz);
     let flow = vo_water_flow(f);
     if (!flow.on) {
         return o;
@@ -967,12 +969,12 @@ fn water_flow_map(f: VertexOut, uv: vec2f) -> WaterFlowMap {
     if (abs(det) < 1e-20) {
         return o;
     }
-    let world = water_flow_velocity(f.world, flow.velocity);
+    let world = water_flow_velocity(vo_world(f), flow.velocity);
     let inv_x = vec2f(wy.y, -wx.y) / det;
     let inv_y = vec2f(-wy.x, wx.x) / det;
     let along = world.x * inv_x + world.y * inv_y;
     let velocity = o.dx * along.x + o.dy * along.y;
-    let p0 = fract(flow.phase + water_flow_noise(f.world.xz));
+    let p0 = fract(flow.phase + water_flow_noise(vo_world(f).xz));
     let p1 = fract(p0 + 0.5);
     o.a = velocity * ((p0 - 0.5) * WATER_FLOW_PERIOD);
     o.b = velocity * ((p1 - 0.5) * WATER_FLOW_PERIOD);
@@ -1487,7 +1489,7 @@ fn water_caustics(f: VertexOut, world: vec3f, d: f32, n: vec3f) -> vec3f {
         return vec3f(1.0);
     }
 
-    var k = above * shadow_factor(world, n);
+    var k = above * shadow_factor(world, world - view.render_delta.xyz, n);
     if (scene_cookies) {
         k *= light_cookie(world, l, n);
     }
@@ -1548,12 +1550,12 @@ fn water_lit(f: VertexOut, shaded: Surface, height: f32) -> vec4f {
     s.sheen = vec3f(0.0);
     s.anisotropy = 0.0;
     s.albedo = vec3f(1.0);
-    let v = normalize(view.camera.xyz - f.world);
-    let reflected = shade_split(s, v, f.world, planar_lookup(f));
+    let v = normalize(view.camera.xyz - vo_world(f));
+    let reflected = shade_split(s, v, vo_world(f), f.relative, planar_lookup(f));
 
     var ap = vec4f(0.0, 0.0, 0.0, 1.0);
     if (scene_aerial && view.aerial.w > 0.0) {
-        ap = aerial_sample(f.pos, f.world);
+        ap = aerial_sample(f.pos, vo_world(f));
     }
 
     // The tilt of the normal map in view space moves the screen point, by a fraction of the
@@ -1575,8 +1577,8 @@ fn water_lit(f: VertexOut, shaded: Surface, height: f32) -> vec4f {
     var d = 0.0;
     var ray = 0.0;
     if (!deep) {
-        d = max(dot(f.world - behind.world, s.geometric), 0.0);
-        ray = length(behind.world - f.world);
+        d = max(dot(vo_world(f) - behind.world, s.geometric), 0.0);
+        ray = length(behind.world - vo_world(f));
     }
 
     var background = textureSampleLevel(opaque_snapshot, reflection_sampler, screen_uv,
@@ -1593,7 +1595,7 @@ fn water_lit(f: VertexOut, shaded: Surface, height: f32) -> vec4f {
     let through = water_transmittance(ray, m.water_visibility, deep);
     let foam = water_foam_mixed(d, m.water_foam_width, deep,
         (m.water_flags & WATER_FOAM_TEXTURE) != 0u, water_foam_texture(f, m),
-        water_ripples_foam(f.world), water_shore_foam(f.world, m, d, deep));
+        water_ripples_foam(vo_world(f)), water_shore_foam(vo_world(f), m, d, deep));
 
     let ndv = saturate(dot(s.normal, v));
     let fresnel = fresnel_schlick(ndv, vec3f(WATER_F0)).x;
@@ -1603,8 +1605,8 @@ fn water_lit(f: VertexOut, shaded: Surface, height: f32) -> vec4f {
     let scatter = water_scatter(m);
     if (scatter > 0.0 && view.lights.z != 0u) {
         let scatter_color = material_linear(unpack4x8unorm(water_scatter_color(m)).rgb);
-        glow += scatter_color * (scatter * water_scatter_light(f.world, s, v, height,
-            reflected.diffuse));
+        glow += scatter_color * (scatter * water_scatter_light(vo_world(f), f.relative, s, v,
+            height, reflected.diffuse));
     }
     let own = glow * (1.0 - through) * (1.0 - foam) + foam_color * reflected.diffuse * foam +
         reflected.specular;
@@ -1624,9 +1626,10 @@ const WATER_SCATTER_AMBIENT: f32 = 0.006;
 // saturate(0.5 - 0.5 l . n)^3, which glows through the crests seen against the sun where they
 // turn away from it, plus WATER_SCATTER_FACE saturate(v . n)^2 on the faces turned to the
 // viewer, and WATER_SCATTER_AMBIENT saturate(v . n)^2 of the diffuse light of the surface
-// (ambient). height is that of the waves, -1..1 (water_waves_height).
-fn water_scatter_light(world: vec3f, s: Surface, v: vec3f, height: f32, ambient: vec3f)
-    -> vec3f
+// (ambient). height is that of the waves, -1..1 (water_waves_height). relative is world
+// relative to the render origin, which the shadow is looked up at.
+fn water_scatter_light(world: vec3f, relative: vec3f, s: Surface, v: vec3f, height: f32,
+    ambient: vec3f) -> vec3f
 {
     let ndv = saturate(dot(s.normal, v));
     var light = ambient * (WATER_SCATTER_AMBIENT * ndv * ndv);
@@ -1635,7 +1638,7 @@ fn water_scatter_light(world: vec3f, s: Surface, v: vec3f, height: f32, ambient:
     }
 
     let l = normalize(lights[0].position);
-    var visible = shadow_factor(world, s.geometric);
+    var visible = shadow_factor(world, relative, s.geometric);
     if (scene_cookies) {
         visible *= light_cookie(world, l, s.geometric);
     }
@@ -1671,28 +1674,28 @@ fn lit(f: VertexOut, shaded: Surface) -> vec4f {
     range_fragment(f);
     planet_fragment(f);
     var s = shaded;
-    area_fragment(f.world, s.geometric);
+    area_fragment(vo_world(f), s.geometric);
     s.occlusion *= vo_occlusion(f);
     if (!transmissive && kind.blend_mode == 0u) {
         s.occlusion = min(s.occlusion, view_occlusion(f.pos));
     }
 
-    let v = normalize(view.camera.xyz - f.world);
+    let v = normalize(view.camera.xyz - vo_world(f));
     if (material_fresnel) {
         s = fresnel_rim(f, s, v);
     }
-    let reflected = shade_split(s, v, f.world, planar_lookup(f));
+    let reflected = shade_split(s, v, vo_world(f), f.relative, planar_lookup(f));
     if (transmissive) {
         return transmission(f, s, v, reflected);
     }
 
-    var color = area_fogged(reflected.diffuse + reflected.specular, s.alpha, f.world);
+    var color = area_fogged(reflected.diffuse + reflected.specular, s.alpha, vo_world(f));
     if (scene_aerial && view.aerial.w > 0.0) {
-        color = aerial_perspective(color, s.alpha, f.pos, f.world);
+        color = aerial_perspective(color, s.alpha, f.pos, vo_world(f));
     }
 
     if (view.fog_grid.w > 0.0) {
-        color = fog_blended(color, s.alpha, f.pos, f.world);
+        color = fog_blended(color, s.alpha, f.pos, vo_world(f));
     }
 
     return output(color, s.alpha);
@@ -1701,8 +1704,8 @@ fn lit(f: VertexOut, shaded: Surface) -> vec4f {
 @fragment fn fs(f: VertexOut, @builtin(front_facing) front: bool) -> @location(0) vec4f {
     if (water) {
         let geometric = normalize(f.normal);
-        let dx = dpdx(f.world.xz);
-        let dy = dpdy(f.world.xz);
+        let dx = dpdx(vo_world(f).xz);
+        let dy = dpdy(vo_world(f).xz);
         let w = water_layers(f, geometric, vo_water(f));
         var layers = w.layers;
         var variance = w.variance;
@@ -1712,23 +1715,23 @@ fn lit(f: VertexOut, shaded: Surface) -> vec4f {
             // The slopes of the spectrum add to those of the waves, the normal map blends over
             // both by the detail of the spectrum
             let detail = view.spectrum_a.z;
-            let spectrum = water_spectrum_sample(f.world.xz, dx, dy);
+            let spectrum = water_spectrum_sample(vo_world(f).xz, dx, dy);
             var slope = vec3f(spectrum.slope, 0.0);
             variance = variance * detail * detail + spectrum.variance;
             height = spectrum.height;
             if (waves != 0u) {
-                slope += water_waves_slope(waves, f.world.xz, dx, dy);
+                slope += water_waves_slope(waves, vo_world(f).xz, dx, dy);
                 variance += water_waves_faded(waves, dx, dy);
-                height += water_waves_height(waves, f.world.xz, dx, dy);
+                height += water_waves_height(waves, vo_world(f).xz, dx, dy);
             }
             layers.normal = water_slope_normal(slope, layers.normal, detail);
             height = clamp(height, -1.0, 1.0);
         } else if (waves != 0u) {
             variance = water_waves_variance(waves, dx, dy, variance);
-            layers.normal = water_waves_normal(waves, f.world.xz, dx, dy, layers.normal);
-            height = water_waves_height(waves, f.world.xz, dx, dy);
+            layers.normal = water_waves_normal(waves, vo_world(f).xz, dx, dy, layers.normal);
+            height = water_waves_height(waves, vo_world(f).xz, dx, dy);
         }
-        layers.normal = water_ripples_normal(f.world, layers.normal);
+        layers.normal = water_ripples_normal(vo_world(f), layers.normal);
         var s = surface_of(f, front, geometric, layers);
         s.roughness = water_roughness(s.roughness, variance);
         return water_lit(f, s, height);
@@ -1808,8 +1811,8 @@ fn layered(f: VertexOut, front: bool, s: Surface, maps: texture_2d_array<f32>, f
     -> @location(0) vec4f
 {
     let geometric = normalize(f.normal);
-    let dx = dpdx(f.world.xz);
-    let dy = dpdy(f.world.xz);
+    let dx = dpdx(vo_world(f).xz);
+    let dy = dpdy(vo_world(f).xz);
     let w = water_layers(f, geometric, vo_water(f));
     var layers = w.layers;
     var variance = w.variance;
@@ -1822,10 +1825,10 @@ fn layered(f: VertexOut, front: bool, s: Surface, maps: texture_2d_array<f32>, f
     var height = 0.0;
     if (waves != 0u) {
         variance = water_waves_variance(waves, dx, dy, variance);
-        layers.normal = water_waves_normal(waves, f.world.xz, dx, dy, layers.normal);
-        height = water_waves_height(waves, f.world.xz, dx, dy);
+        layers.normal = water_waves_normal(waves, vo_world(f).xz, dx, dy, layers.normal);
+        height = water_waves_height(waves, vo_world(f).xz, dx, dy);
     }
-    layers.normal = water_ripples_normal(f.world, layers.normal);
+    layers.normal = water_ripples_normal(vo_world(f), layers.normal);
     var s = surface_of(f, front, geometric, layers);
     s.roughness = water_roughness(s.roughness, variance);
     return water_lit(f, s, height);

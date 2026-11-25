@@ -82,7 +82,9 @@ fn light_lobes(s: Surface, v: vec3f, l: vec3f, radiance: vec3f, side: u32) -> Li
 // integrate the Fresnel over the GGX lobe of the roughness, so the grazing reflection of a rough
 // surface fades without a roughness aware f90. What the lobe reflects is not available to the
 // diffuse term, as 1 - F in light_lobes().
-fn shade(s: Surface, v: vec3f, world: vec3f) -> Lit {
+//
+// relative is world relative to the render origin, which the sun shadows are looked up at.
+fn shade(s: Surface, v: vec3f, world: vec3f, relative: vec3f) -> Lit {
     if (view.lights.z > 1u) {
         return impostor_channel(s.albedo, s.normal, world);
     }
@@ -105,7 +107,7 @@ fn shade(s: Surface, v: vec3f, world: vec3f) -> Lit {
         specular_occlusion(ndv, s.occlusion, a);
     let indirect_diffuse = (vec3f(1.0) - specular_albedo) * diffuse_color * e.diffuse *
         s.occlusion;
-    let direct = lights_direct(s, v, world, cluster, 1u, 0.0);
+    let direct = lights_direct(s, v, world, relative, cluster, 1u, 0.0);
     return Lit(direct.diffuse + indirect_diffuse, direct.specular + indirect_specular +
         s.emissive);
 }
@@ -114,21 +116,21 @@ fn lit(f: VertexOut, shaded: Surface) -> vec4f {
     range_fragment(f);
     planet_fragment(f);
     var s = shaded;
-    area_fragment(f.world, s.geometric);
+    area_fragment(vo_world(f), s.geometric);
     s.occlusion *= vo_occlusion(f);
     if (kind.blend_mode == 0u) {
         s.occlusion = min(s.occlusion, view_occlusion(f.pos));
     }
 
-    let v = normalize(view.camera.xyz - f.world);
-    let reflected = shade(s, v, f.world);
-    var color = area_fogged(reflected.diffuse + reflected.specular, s.alpha, f.world);
+    let v = normalize(view.camera.xyz - vo_world(f));
+    let reflected = shade(s, v, vo_world(f), f.relative);
+    var color = area_fogged(reflected.diffuse + reflected.specular, s.alpha, vo_world(f));
     if (scene_aerial && view.aerial.w > 0.0) {
-        color = aerial_perspective(color, s.alpha, f.pos, f.world);
+        color = aerial_perspective(color, s.alpha, f.pos, vo_world(f));
     }
 
     if (view.fog_grid.w > 0.0) {
-        color = fog_blended(color, s.alpha, f.pos, f.world);
+        color = fog_blended(color, s.alpha, f.pos, vo_world(f));
     }
 
     return output(color, s.alpha);

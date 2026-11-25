@@ -1676,6 +1676,9 @@ typedef struct box_render_cascade_t {
     mat4 matrix;            /**< World to shadow clip space, reversed Z: 1 nearest the light */
     float texel;            /**< World size of a texel of the cascade */
     float depth_range;      /**< World distance the depth of the cascade spans */
+    float extent;           /**< World half extent of the cascade across the light */
+    double center[3];       /**< Light space x and y of the center and depth of the far plane,
+                             *   in f64, which box_render_cascade_relative moves the matrix by */
 } box_render_cascade_t;
 
 /** Fit a cascade around the bounding sphere of a slice of the view frustum.
@@ -1705,6 +1708,20 @@ void box_render_shadow_cascade(
     int32_t resolution,
     float distance,
     box_render_cascade_t *out);
+
+/** Get the matrix of a cascade for positions relative to a render origin: the matrix times a
+ * translation by the render origin, whose translation is computed in f64 from the center of the
+ * cascade, so it keeps its precision near the render origin. The center stays snapped in the
+ * local frame, so the shadow edges do not move while the render origin follows the camera.
+ *
+ * @param cascade The cascade
+ * @param delta The render origin in local units
+ * @param out Receives the matrix, the matrix of the cascade bit for bit at a render origin of 0
+ */
+void box_render_cascade_relative(
+    const box_render_cascade_t *cascade,
+    const double delta[3],
+    mat4 out);
 
 /** Resolve the settings of a shadow atlas: resolution rounds down to a power of two within
  * BOX_RENDER_SHADOW_ATLAS_MIN and BOX_RENDER_SHADOW_ATLAS_MAX, min_tile to a power of two

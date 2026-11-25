@@ -56,6 +56,9 @@ struct GrassParams {
                             // placement, 0 for the one of the view
     hiz: vec4u,             // Width, height and levels of the depth pyramid of the view the
                             // placement culls by occlusion against, 0 levels for none
+    place: vec4f,           // The local position the blades that cast into a cascade are
+                            // placed relative to, the render origin, which view_proj takes; 0
+                            // for the others
 };
 
 // A blade (box_gpu_grass_blade_t), 48 bytes

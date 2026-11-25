@@ -300,7 +300,7 @@ static inline void box_gpu_api_copy_buffer(
 #define BOX_GPU_DEPTH_FORMAT (WGPUTextureFormat_Depth32FloatStencil8)
 
 /** Bytes between the uniforms of two views, a multiple of the dynamic offset alignment */
-#define BOX_GPU_VIEW_STRIDE (1280)
+#define BOX_GPU_VIEW_STRIDE (1536)
 
 /** Sampled textures per shader stage of the WebGPU default limits, which the device raises to
  * what the adapter offers */
@@ -322,12 +322,18 @@ static inline void box_gpu_api_copy_buffer(
 
 /** Bytes of the uniforms of one cascade, tile or octant of the shadow pass, Cascade of
  * etc/shaders/shadow.wgsl: the matrix, the light of a point light tile and its octant, its near
- * and far plane, then the absolute position of the local origin (BOX_GPU_SHADOW_ORIGIN) */
-#define BOX_GPU_SHADOW_UNIFORM_SIZE (sizeof(mat4) + 3 * sizeof(vec4))
+ * and far plane, the absolute position of the local origin (BOX_GPU_SHADOW_ORIGIN), then the
+ * matrix of the positions relative to the render origin (BOX_GPU_SHADOW_RELATIVE) */
+#define BOX_GPU_SHADOW_UNIFORM_SIZE (2 * sizeof(mat4) + 3 * sizeof(vec4))
 
 /** Byte offset of the absolute position of the local origin in the uniforms of a cascade, tile
  * or octant, as box_gpu_origin_split packs it */
 #define BOX_GPU_SHADOW_ORIGIN (sizeof(mat4) + 2 * sizeof(vec4))
+
+/** Byte offset of the matrix of the positions relative to the render origin in the uniforms of
+ * a cascade or a spot light tile, which the mesh, terrain and grass casters place their
+ * vertices with; the matrix itself at a render origin of 0 */
+#define BOX_GPU_SHADOW_RELATIVE (sizeof(mat4) + 3 * sizeof(vec4))
 
 /** Depth format of the shadow maps, cleared to 0 and compared with greater for reversed Z */
 #define BOX_GPU_SHADOW_FORMAT (WGPUTextureFormat_Depth32Float)
@@ -1289,6 +1295,9 @@ typedef struct box_gpu_view_uniforms_t {
                                      *   origin, local - render_delta, which the mesh passes
                                      *   place their vertices with; view_proj without one */
     vec4 render_delta;              /**< The render origin in local units, w unused */
+    mat4 shadow_relative[BOX_RENDER_SHADOW_CASCADES]; /**< shadow_matrix of the positions
+                                     *   relative to the render origin, which the shadow lookups
+                                     *   take; shadow_matrix without one */
 } box_gpu_view_uniforms_t;
 
 /** The render origin of an instance page as the shaders take it (InstancePage of
@@ -1303,6 +1312,10 @@ typedef struct box_gpu_instance_page_t {
 
 _Static_assert(sizeof(box_gpu_view_uniforms_t) <= BOX_GPU_VIEW_STRIDE,
     "the uniforms of a view fit in its stride");
+
+_Static_assert(offsetof(box_gpu_view_uniforms_t, shadow_relative) ==
+    offsetof(box_gpu_view_uniforms_t, render_delta) + sizeof(vec4),
+    "shadow_relative follows render_delta as in View of lights.wgsl");
 
 /** The shadow atlas of a scene: the depth texture its spot and point light tiles render into */
 typedef struct box_gpu_atlas_t {

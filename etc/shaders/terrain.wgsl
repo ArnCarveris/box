@@ -42,7 +42,8 @@ override material_triplanar: bool = true;
 // slot of the tile, the focus relative to its center and the morph distances in tile sizes
 // (pack2x16float); material its metallic and roughness, 1 plus its mapping blend (0 without a
 // mapping) and its emission (pack2x16float); extra the planet light slot in its second byte and
-// the dither code of the DrawRange in its high half.
+// the dither code of the DrawRange in its high half. relative the position relative to the
+// render origin, which the sun shadows are looked up at.
 struct TerrainOut {
     @builtin(position) @invariant pos: vec4f,
     @location(0) world: vec3f,
@@ -53,6 +54,7 @@ struct TerrainOut {
     @location(5) @interpolate(flat) tile: vec4u,
     @location(6) @interpolate(flat) material: vec4u,
     @location(7) @interpolate(flat) extra: u32,
+    @location(8) relative: vec3f,
 };
 
 // The TerrainTileParams of the instance of a slot, from its surface.
@@ -89,6 +91,7 @@ fn terrain_vertex_out(v: VertexIn) -> TerrainOut {
     var o: TerrainOut;
     o.pos = terrain_clip(slot, placed.position);
     o.world = world.xyz;
+    o.relative = relative.xyz;
     o.normal = frame.normal;
     o.color = vec4f(material_color(material, tint), shading.alpha);
     o.object = vec4f(0.0, 0.0, 0.0, 1.0);
@@ -642,7 +645,9 @@ fn terrain_indirect(world: vec3f, n: vec3f, spec: vec3f, roughness: f32, cluster
 
 // An unlit view shows the albedo as the diffuse part and the emission as the specular one, a
 // view of an impostor frame its channel (impostor_channel).
-fn shade(s: Surface, v: vec3f, world: vec3f) -> Lit {
+//
+// relative is world relative to the render origin, which the sun shadows are looked up at.
+fn shade(s: Surface, v: vec3f, world: vec3f, relative: vec3f) -> Lit {
     if (view.lights.z > 1u) {
         return impostor_channel(s.albedo, s.normal, world);
     }
@@ -665,7 +670,7 @@ fn shade(s: Surface, v: vec3f, world: vec3f) -> Lit {
         specular_occlusion(ndv, s.occlusion, a);
     let indirect_diffuse = (vec3f(1.0) - specular_albedo) * diffuse_color * e.diffuse *
         s.occlusion;
-    let direct = lights_direct(s, v, world, cluster, 1u, 0.0);
+    let direct = lights_direct(s, v, world, relative, cluster, 1u, 0.0);
     return Lit(direct.diffuse + indirect_diffuse, direct.specular + indirect_specular +
         s.emissive);
 }
@@ -818,7 +823,7 @@ fn terrain_lit(f: TerrainOut, shaded: Surface) -> vec4f {
     var s = shaded;
     s.occlusion = min(s.occlusion, view_occlusion(f.pos));
     let v = normalize(view.camera.xyz - f.world);
-    let reflected = shade(s, v, f.world);
+    let reflected = shade(s, v, f.world, f.relative);
     var color = reflected.diffuse + reflected.specular;
     if (scene_aerial && view.aerial.w > 0.0) {
         color = aerial_perspective(color, 1.0, f.pos, f.world);

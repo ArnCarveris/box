@@ -2225,6 +2225,13 @@
                     "render_origin_same_image",
                     "ship_light_no_rebake"
                 ]
+            },
+            {
+                "id": "RenderOriginShadow",
+                "testcases": [
+                    "far_same_image",
+                    "far_moving_no_swim"
+                ]
             }
         ]
     }

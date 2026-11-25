@@ -169,6 +169,46 @@ static void box_shadow_axes(
     glm_vec3_cross(right, forward, up);
 }
 
+/** Compute the center of a cascade in f64 from the camera, snapped to whole texels in light
+ * space as box_render_shadow_cascade snaps it in f32, so the snap stays fixed in the local frame
+ * however far from its origin the cascade is.
+ *
+ * @param camera World transform of the camera
+ * @param depth View depth of the center of the bounding sphere
+ * @param right The x axis of the light space
+ * @param up The y axis of the light space
+ * @param forward The direction the light travels in
+ * @param texel World size of a texel
+ * @param extent World half extent of the cascade
+ * @param out Receives the light space x and y of the center and the depth of the far plane
+ */
+static void box_shadow_center(
+    mat4 camera,
+    float depth,
+    const vec3 right,
+    const vec3 up,
+    const vec3 forward,
+    float texel,
+    float extent,
+    double out[3])
+{
+    double center[3], x = 0, y = 0, z = 0, step = (double)texel;
+    int32_t k;
+    for (k = 0; k < 3; k ++) {
+        center[k] = (double)camera[3][k] - (double)camera[2][k] * (double)depth;
+    }
+
+    for (k = 0; k < 3; k ++) {
+        x += (double)right[k] * center[k];
+        y += (double)up[k] * center[k];
+        z += (double)forward[k] * center[k];
+    }
+
+    out[0] = round(x / step) * step;
+    out[1] = round(y / step) * step;
+    out[2] = round(z / step) * step + (double)extent;
+}
+
 void box_render_shadow_cascade(
     mat4 camera,
     mat4 proj,
@@ -212,6 +252,36 @@ void box_render_shadow_cascade(
     out->matrix[3][3] = 1.0f;
     out->texel = texel;
     out->depth_range = range;
+    out->extent = extent;
+    box_shadow_center(camera, depth, right, up, forward, texel, extent, out->center);
+}
+
+void box_render_cascade_relative(
+    const box_render_cascade_t *cascade,
+    const double delta[3],
+    mat4 out)
+{
+    double t[3];
+    int32_t k;
+    glm_mat4_copy(ECS_CONST_CAST(vec4*, cascade->matrix), out);
+    if (delta[0] == 0.0 && delta[1] == 0.0 && delta[2] == 0.0) {
+        goto done;
+    }
+
+    t[0] = -cascade->center[0] / (double)cascade->extent;
+    t[1] = -cascade->center[1] / (double)cascade->extent;
+    t[2] = cascade->center[2] / (double)cascade->depth_range;
+    for (k = 0; k < 3; k ++) {
+        t[0] += (double)cascade->matrix[k][0] * delta[k];
+        t[1] += (double)cascade->matrix[k][1] * delta[k];
+        t[2] += (double)cascade->matrix[k][2] * delta[k];
+    }
+
+    out[3][0] = (float)t[0];
+    out[3][1] = (float)t[1];
+    out[3][2] = (float)t[2];
+done:
+    return;
 }
 
 /** What the cascades of a view were fitted to: a change renders every cascade at once */

@@ -158,8 +158,8 @@ fn blend_fragment(f: VertexOut) -> BlendFragment {
     }
     o.gx = dpdx(o.uv);
     o.gy = dpdy(o.uv);
-    o.px = dpdx(f.world);
-    o.py = dpdy(f.world);
+    o.px = dpdx(vo_world(f));
+    o.py = dpdy(vo_world(f));
     o.tiled = blending.flags & BLEND_TILES;
     if (o.tiled != 0u) {
         blend_tiles(&o);

@@ -246,7 +246,7 @@ fn fog_shadow(p: vec3f) -> f32 {
         return 1.0;
     }
 
-    return mix(shadow_point(p), 1.0, fade);
+    return mix(shadow_point(p, p - view.render_delta.xyz), 1.0, fade);
 }
 
 // Share of the sun the cell sees through the cascades: its shadow at the BOX_FROXEL_SAMPLES

@@ -1,4 +1,7 @@
 // Cascaded shadow map of the first directional light of the scene, read by the forward pass.
+// A position is looked up relative to the render origin (relative, local - render_delta) with
+// View.shadow_relative, which keeps its precision near the render origin; the view depth that
+// fades the shadows out is taken from the local position (world).
 #pragma once
 
 @group(0) @binding(3) var shadow_map: texture_depth_2d_array;
@@ -94,8 +97,8 @@ fn shadow_light() -> vec3f {
 // Distance of a position from the edge of the box of a cascade, shrunk by the margin, in half
 // extents of the cascade; negative outside. The box reaches far toward the light to hold the
 // casters, so only its clip depth bounds it on that side.
-fn shadow_box_edge(index: u32, world: vec3f) -> f32 {
-    let p = view.shadow_matrix[index] * vec4f(world, 1.0);
+fn shadow_box_edge(index: u32, relative: vec3f) -> f32 {
+    let p = view.shadow_relative[index] * vec4f(relative, 1.0);
     let far_ = 1.0 - p.z * view.shadow_depth[index];
     let edge = 1.0 - view.shadow_edge.x - max(max(abs(p.x), abs(p.y)), far_);
     return select(edge, -1.0, p.z > 1.0);
@@ -106,9 +109,9 @@ fn shadow_box_edge(index: u32, world: vec3f) -> f32 {
 // those of the other widths in loops with a constant bound that stop at the first weight of 0. The
 // offsets and weights rotate instead of being indexed by the loop: D3D compilers turn a local
 // indexed at run time into an indexable copy and are slow on loops with a run time bound.
-fn shadow_cascade(index: u32, world: vec3f, normal: vec3f, l: vec3f) -> f32 {
-    let offset = world + shadow_normal_offset(normal, l, view.shadow_offset[index]);
-    let p = view.shadow_matrix[index] * vec4f(offset, 1.0);
+fn shadow_cascade(index: u32, relative: vec3f, normal: vec3f, l: vec3f) -> f32 {
+    let offset = relative + shadow_normal_offset(normal, l, view.shadow_offset[index]);
+    let p = view.shadow_relative[index] * vec4f(offset, 1.0);
     let uv = p.xy * vec2f(0.5, -0.5) + vec2f(0.5);
     let depth = p.z + view.shadow_bias[index];
     let texel = vec2f(view.shadow_params.z);
@@ -180,10 +183,10 @@ fn shadow_cascade(index: u32, world: vec3f, normal: vec3f, l: vec3f) -> f32 {
     return sum;
 }
 
-// Fraction of the first directional light that reaches a position with a geometric normal. Both
-// cascades of a blend come from one call of shadow_cascade in a loop, as D3D compilers inline
-// every call.
-fn shadow_factor(world: vec3f, normal: vec3f) -> f32 {
+// Fraction of the first directional light that reaches a position with a geometric normal, at
+// its local position and relative to the render origin. Both cascades of a blend come from one
+// call of shadow_cascade in a loop, as D3D compilers inline every call.
+fn shadow_factor(world: vec3f, relative: vec3f, normal: vec3f) -> f32 {
     let count = view.shadow_config.x;
     let depth = -(view.view * vec4f(world, 1.0)).z;
     if (count == 0u || depth >= view.shadow_params.y) {
@@ -193,7 +196,7 @@ fn shadow_factor(world: vec3f, normal: vec3f) -> f32 {
     var index = count;
     var edge = 0.0;
     for (var i = 0u; i < count; i++) {
-        edge = shadow_box_edge(i, world);
+        edge = shadow_box_edge(i, relative);
         if (edge >= 0.0) {
             index = i;
             break;
@@ -208,13 +211,13 @@ fn shadow_factor(world: vec3f, normal: vec3f) -> f32 {
     let band = view.shadow_edge.y;
     let next = index + 1u;
     var cascades = 1u;
-    if (edge < band && next < count && shadow_box_edge(next, world) >= 0.0) {
+    if (edge < band && next < count && shadow_box_edge(next, relative) >= 0.0) {
         cascades = 2u;
     }
 
     var shadow = 1.0;
     for (var i = 0u; i < cascades; i++) {
-        let cascade = shadow_cascade(index + i, world, normal, l);
+        let cascade = shadow_cascade(index + i, relative, normal, l);
         if (i == 0u) {
             shadow = cascade;
         } else {
@@ -231,7 +234,7 @@ fn shadow_factor(world: vec3f, normal: vec3f) -> f32 {
 // back lobe of a diffuse transmission scatters toward the eye: the light is diffused on its way
 // through, so one bilinear comparison in the first cascade whose box holds the position stands in
 // for the filter and the blend into the next cascade of shadow_factor, with its offset and fade.
-fn shadow_factor_back(world: vec3f, normal: vec3f) -> f32 {
+fn shadow_factor_back(world: vec3f, relative: vec3f, normal: vec3f) -> f32 {
     let count = view.shadow_config.x;
     let depth = -(view.view * vec4f(world, 1.0)).z;
     if (count == 0u || depth >= view.shadow_params.y) {
@@ -240,9 +243,9 @@ fn shadow_factor_back(world: vec3f, normal: vec3f) -> f32 {
 
     let l = shadow_light();
     for (var i = 0u; i < count; i++) {
-        if (shadow_box_edge(i, world) >= 0.0) {
-            let offset = world + shadow_normal_offset(normal, l, view.shadow_offset[i]);
-            let p = view.shadow_matrix[i] * vec4f(offset, 1.0);
+        if (shadow_box_edge(i, relative) >= 0.0) {
+            let offset = relative + shadow_normal_offset(normal, l, view.shadow_offset[i]);
+            let p = view.shadow_relative[i] * vec4f(offset, 1.0);
             let uv = p.xy * vec2f(0.5, -0.5) + vec2f(0.5);
             let shadow = textureSampleCompareLevel(shadow_map, shadow_sampler, uv, i,
                 p.z + view.shadow_bias[i]);
@@ -259,7 +262,7 @@ fn shadow_factor_back(world: vec3f, normal: vec3f) -> f32 {
 // volume, which has no surface: one bilinear comparison in the first cascade whose box holds the
 // point, with the depth bias of the cascade but no normal offset, no filter, no blend into the
 // next cascade and no fade. 1 without shadows, beyond them and past the last cascade.
-fn shadow_point(world: vec3f) -> f32 {
+fn shadow_point(world: vec3f, relative: vec3f) -> f32 {
     let count = view.shadow_config.x;
     let depth = -(view.view * vec4f(world, 1.0)).z;
     if (count == 0u || depth >= view.shadow_params.y) {
@@ -267,8 +270,8 @@ fn shadow_point(world: vec3f) -> f32 {
     }
 
     for (var i = 0u; i < count; i++) {
-        if (shadow_box_edge(i, world) >= 0.0) {
-            let p = view.shadow_matrix[i] * vec4f(world, 1.0);
+        if (shadow_box_edge(i, relative) >= 0.0) {
+            let p = view.shadow_relative[i] * vec4f(relative, 1.0);
             let uv = p.xy * vec2f(0.5, -0.5) + vec2f(0.5);
             let compare = p.z + view.shadow_bias[i];
             return textureSampleCompareLevel(shadow_map, shadow_sampler, uv, i, compare);

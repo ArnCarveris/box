@@ -116,6 +116,9 @@ struct View {
     render_view_proj: mat4x4f,
     // The render origin in local units (xyz)
     render_delta: vec4f,
+    // shadow_matrix of the positions relative to the render origin, which the shadow lookups
+    // take (shadow.wgsl); shadow_matrix without a render origin
+    shadow_relative: array<mat4x4f, 4>,
 };
 
 // shadow is the index of the tile record of a spot or point light in the shadow atlas of the

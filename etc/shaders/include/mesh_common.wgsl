@@ -149,7 +149,9 @@ const REFLECTION_NORMALIZE_MAX: f32 = 2.0;
 
 struct VertexOut {
     @builtin(position) @invariant pos: vec4f,
-    @location(0) world: vec3f,
+    // The position relative to the render origin (Placed.relative), which the shadows are
+    // looked up at; vo_world takes it back to the local position the shading takes
+    @location(0) relative: vec3f,
     @location(1) normal: vec3f,
     @location(2) color: vec4f,
     @location(3) @interpolate(flat) flat0: vec4u,
@@ -197,6 +199,12 @@ struct VertexOut {
     // fragment stage has no inter stage variable left.
     @location(9) @interpolate(flat) planar: u32,
 };
+
+// The local position of a fragment, which the shading takes: its position relative to the render
+// origin moved back by it; the relative position bit for bit without a render origin.
+fn vo_world(f: VertexOut) -> vec3f {
+    return f.relative + view.render_delta.xyz;
+}
 
 // Slot of the material table of an instance, below the planet light slot of its shading.
 fn shading_material(s: MeshShading) -> u32 {
@@ -577,7 +585,7 @@ fn vertex_out(p: Placed, material: Material, frame: ModelFrame, s: VertexShading
 {
     var o: VertexOut;
     o.pos = p.pos;
-    o.world = p.world.xyz;
+    o.relative = p.relative.xyz;
     o.normal = frame.normal;
     o.color = s.color;
     o.flat0 = vec4u(pack2x16float(material.emissive.xy),
