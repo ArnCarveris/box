@@ -101,7 +101,8 @@ fn terrain_vertex_out(v: VertexIn) -> TerrainOut {
     o.tile = vec4u(u32(t.grid.x), pack2x16float(t.morph.xy / size),
         pack2x16float(t.morph.zw / size), 0u);
     o.material = vec4u(pack2x16float(vec2f(material.metallic, material.roughness)),
-        pack2x16float(vec2f(mapped, 0.0)), pack2x16float(material.emissive.xy),
+        pack2x16float(vec2f(mapped, material.uv.y / max(material.mapping_size, 1e-6))),
+        pack2x16float(material.emissive.xy),
         pack2x16float(vec2f(material.emissive.z, 0.0)));
     o.extra = vertex_range(v.slot) << 16u;
     if (scene_planet_light) {
@@ -348,7 +349,8 @@ struct BlendSample {
     normal: vec3f,
 };
 
-fn terrain_pair_sample(p: TerrainPair, w: vec2f, uv: vec2f, gx: vec2f, gy: vec2f) -> BlendSample {
+fn terrain_pair_sample(p: TerrainPair, w: vec2f, uv: vec2f, gx: vec2f, gy: vec2f,
+    tint: vec3f) -> BlendSample {
     var o: BlendSample;
     o.albedo = vec4f(0.0);
     o.orm = vec3f(0.0);
@@ -362,7 +364,9 @@ fn terrain_pair_sample(p: TerrainPair, w: vec2f, uv: vec2f, gx: vec2f, gy: vec2f
         let at = uv * t.xy + t.zw;
         let lx = gx * t.xy;
         let ly = gy * t.xy;
-        o.albedo += w[i] * textureSampleGrad(blend_albedo, material_sampler, at, k, lx, ly);
+        let shade = select(vec3f(1.0), tint, k + 1u == (blending.strata & 0xffu));
+        o.albedo += w[i] * textureSampleGrad(blend_albedo, material_sampler, at, k, lx, ly) *
+            vec4f(shade, 1.0);
         o.orm += w[i] * textureSampleGrad(blend_orm, material_sampler, at, k, lx, ly).rgb;
         m += w[i] * (textureSampleGrad(blend_normal, material_sampler, at, k, lx, ly).xyz * 2.0 -
             1.0);
@@ -424,6 +428,67 @@ fn terrain_variation(f: TerrainOut) -> vec3f {
     return max(vec3f(1.0) + blending.variation * k * TERRAIN_VARIATION_TINT, vec3f(0.0));
 }
 
+const STRATA_SPAN: i32 = 30720;
+
+struct TerrainStrata {
+    lift: f32,
+    tint: vec3f,
+};
+
+fn strata_hash(c: vec2i, seed: u32) -> f32 {
+    var h = (bitcast<u32>(c.x) * 0x8da6b343u) ^ (bitcast<u32>(c.y) * 0xd8163841u) ^
+        (seed * 0xcb1ab31fu);
+    h = (h ^ (h >> 16u)) * 0x7feb352du;
+    h = (h ^ (h >> 15u)) * 0x846ca68bu;
+    h = h ^ (h >> 16u);
+    return f32(h >> 8u) / 16777216.0;
+}
+
+fn strata_noise(p: vec2f, period: i32, seed: u32) -> f32 {
+    let i = vec2i(floor(p));
+    let f = fract(p);
+    let u = f * f * (3.0 - 2.0 * f);
+    let a = ((i % period) + period) % period;
+    let b = (((i + 1) % period) + period) % period;
+    let h00 = strata_hash(a, seed);
+    let h10 = strata_hash(vec2i(b.x, a.y), seed);
+    let h01 = strata_hash(vec2i(a.x, b.y), seed);
+    let h11 = strata_hash(b, seed);
+    return mix(mix(h00, h10, u.x), mix(h01, h11, u.x), u.y);
+}
+
+fn terrain_strata(f: TerrainOut) -> TerrainStrata {
+    var s: TerrainStrata;
+    s.lift = 0.0;
+    s.tint = vec3f(1.0);
+    let fold = blending.strata_fold;
+    let tint = f32((blending.strata >> 8u) & 0xffu) / 255.0;
+    if ((blending.strata & 0xffu) == 0u || (fold <= 0.0 && tint <= 0.0)) {
+        return s;
+    }
+
+    let o = world_origin(view.origin);
+    let p = f.world + o.rest + vec3f(o.whole % vec3i(STRATA_SPAN));
+    let broad = strata_noise(p.xz / 320.0, STRATA_SPAN / 320, 11u) * 2.0 - 1.0;
+    let fine = strata_noise(p.xz / 96.0, STRATA_SPAN / 96, 12u) * 2.0 - 1.0;
+    let beds = strata_noise(vec2f(p.y / 40.0, 0.5), STRATA_SPAN / 40, 13u) * 2.0 - 1.0;
+    let lift = fold * (broad + 0.4 * fine + 0.6 * beds);
+    let period = STRATA_SPAN / 30;
+    let y = (p.y + lift) / 30.0;
+    let t = y + 0.45 * (strata_noise(vec2f(y * 0.5, 3.5), period / 2, 16u) * 2.0 - 1.0);
+    let c = i32(floor(t));
+    let a = ((c % period) + period) % period;
+    let b = (((c + 1) % period) + period) % period;
+    let edge = smoothstep(0.8, 1.0, fract(t));
+    let band = mix(strata_hash(vec2i(a, 0), 14u), strata_hash(vec2i(b, 0), 14u), edge) * 2.0 -
+        1.0;
+    let hue = mix(strata_hash(vec2i(a, 0), 15u), strata_hash(vec2i(b, 0), 15u), edge) * 2.0 - 1.0;
+    s.lift = lift * unpack2x16float(f.material.y).y;
+    s.tint = max(vec3f(1.0) + tint * (band * vec3f(1.0, 0.94, 0.86) +
+        hue * vec3f(0.35, 0.05, -0.3)), vec3f(0.0));
+    return s;
+}
+
 // The layers of a fragment of a TextureBlend and how low it lies in their heights.
 struct TerrainLayers {
     layers: Layers,
@@ -445,13 +510,15 @@ fn terrain_blend_layers(f: TerrainOut, geometric: vec3f) -> TerrainLayers {
     o.layers.emissive = vec3f(1.0);
     o.layers.orm = vec3f(0.0);
     if (material_triplanar && mapped > 1.0) {
-        let dx = dpdx(f.object);
-        let dy = dpdy(f.object);
+        let strata = terrain_strata(f);
+        let object = f.object + vec4f(0.0, strata.lift, 0.0, 0.0);
+        let dx = dpdx(object);
+        let dy = dpdy(object);
         let n = f.normal;
         let s = mapping_signs(n);
         let dominant = mapping_axis(n);
         let w = terrain_biplanar(mapping_weights(n, mapped - 1.0), dominant);
-        var planes = mapping_planes(f.object, s);
+        var planes = mapping_planes(object, s);
         var gx = mapping_planes(dx, s);
         var gy = mapping_planes(dy, s);
         let lw = terrain_pair_heights(pair, planes[dominant] + f.uv.xy, gx[dominant],
@@ -466,7 +533,8 @@ fn terrain_blend_layers(f: TerrainOut, geometric: vec3f) -> TerrainLayers {
             if (k == dominant) {
                 o.layers.frame = Frame(tangent, bitangent, false);
             }
-            let b = terrain_pair_sample(pair, lw, planes[k] + f.uv.xy, gx[k], gy[k]);
+            let b = terrain_pair_sample(pair, lw, planes[k] + f.uv.xy, gx[k], gy[k],
+                strata.tint);
             o.layers.albedo += w[k] * b.albedo;
             o.layers.orm += w[k] * b.orm;
             let m = b.normal;
@@ -484,7 +552,7 @@ fn terrain_blend_layers(f: TerrainOut, geometric: vec3f) -> TerrainLayers {
     let gx = dpdx(uv);
     let gy = dpdy(uv);
     let lw = terrain_pair_heights(pair, uv, gx, gy);
-    let b = terrain_pair_sample(pair, lw, uv, gx, gy);
+    let b = terrain_pair_sample(pair, lw, uv, gx, gy, vec3f(1.0));
     o.layers.albedo = vec4f(b.albedo.rgb * variation, b.albedo.a);
     o.layers.orm = b.orm;
     o.layers.frame = cotangent_frame_grad(geometric, dpdx(f.world), dpdy(f.world), gx, gy);

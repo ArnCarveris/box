@@ -22,8 +22,8 @@ struct BlendUniforms {
     terrain: u32,
     bake: u32,
     variation: f32,
-    pad1: u32,
-    pad2: u32,
+    strata: u32,
+    strata_fold: f32,
     grass_base: vec4f,          // Linear color at the base of the blades, variation
     grass_tip: vec4f,           // Linear color at the tip, share of the ground covered from
                                 // above

@@ -22,8 +22,10 @@ assets {
     }
 
     bed_uv { nodes.Combine: {r: u, g: v_beds, b_value: 0, a_value: 1} }
+    fold_n { nodes.Noise: {channels: 3, frequency: 1, octaves: 2, seed: 152} }
+    bed_fold { nodes.Warp: {coords: bed_uv, offset: fold_n, amount_value: 0.07} }
     sway_n { nodes.Noise: {channels: 3, frequency: 2, octaves: 3, seed: 140} }
-    bed_w { nodes.Warp: {coords: bed_uv, offset: sway_n, amount_value: 0.02} }
+    bed_w { nodes.Warp: {coords: bed_fold, offset: sway_n, amount_value: 0.035} }
 
     bed_blocks {
       nodes.Blocks: {coords: bed_w, courses: beds, per_course: 1, jitter: 0.5, seed: 141}

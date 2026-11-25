@@ -9,6 +9,7 @@
 #include "draw.h"
 #include "../terrain/terrain.h"
 #include <math.h>
+#include <float.h>
 
 /** Color of a shape without Rgb, display encoded */
 static const uint8_t box_draws_default_color[3] = { 204, 204, 204 };
@@ -1418,6 +1419,19 @@ static float box_draws_layer_clamp(
     float fallback)
 {
     return isfinite(v) ? glm_clamp(v, lo, hi) : fallback;
+}
+
+void box_draws_blend_world(
+    const TextureBlend *blend,
+    box_render_texture_blend_t *out)
+{
+    out->variation = box_draws_layer_clamp(blend->variation, 0.0f, 1.0f, 0.0f);
+    out->strata = blend->strata > 0 && blend->strata <= BOX_RENDER_BLEND_LAYERS
+        ? (uint32_t)blend->strata : 0u;
+    out->strata_fold = out->strata
+        ? box_draws_layer_clamp(blend->strata_fold, 0.0f, FLT_MAX, 0.0f) : 0.0f;
+    out->strata_tint = out->strata
+        ? box_draws_layer_clamp(blend->strata_tint, 0.0f, 1.0f, 0.0f) : 0.0f;
 }
 
 void box_draws_layer_pack(

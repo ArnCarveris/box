@@ -61,7 +61,9 @@ typedef struct box_gpu_blend_uniforms_t {
     uint32_t bake;      /**< BOX_GPU_BLEND_TERRAIN: texels along an edge of the bake of a tile
                          *   | cells across the bake atlas << 16, 0 without a bake atlas */
     float variation;    /**< TextureBlend.variation, 0 for none */
-    uint32_t pad[2];    /**< Zero */
+    uint32_t strata;    /**< TextureBlend.strata, one plus the layer, 0 for none, with the
+                         *   strata_tint in eight bits above */
+    float strata_fold;  /**< TextureBlend.strata_fold, 0 for none */
     box_render_grass_far_t grass; /**< BOX_GPU_BLEND_TERRAIN: the far field of the Grass on the
                          *   terrain (box_render_grass_far_of), written every packet, all zero
                          *   without one */

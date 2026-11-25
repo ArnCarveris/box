@@ -1209,6 +1209,16 @@ ECS_STRUCT(TextureBlend, {
                              *   brightness over patches of meters to tens of meters, from the
                              *   height of layer 0, so the ground does not look the same
                              *   everywhere: 0 (the default) for none, clamped to 0..1 */
+    int32_t strata;         /**< On a Terrain with a triplanar mapping, one plus the layer
+                             *   whose beds follow the strata of the world, 0 (the default)
+                             *   for none: the side projections of the layers rise and fall
+                             *   with the folds of the strata and that layer takes the tint of
+                             *   the formation it lies in, so a large rock face does not repeat
+                             *   the same beds */
+    float strata_fold;      /**< Meters the strata rise and fall over hundreds of meters, and
+                             *   their beds thicken and thin over the height, 0 for none */
+    float strata_tint;      /**< How far the brightness and hue of the formations of the strata
+                             *   layer vary over the height, 0 for none, clamped to 0..1 */
 });
 
 /** How a TextureLayer changes one property of the surface beneath it where it covers it */

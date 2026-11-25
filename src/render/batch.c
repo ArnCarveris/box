@@ -1103,8 +1103,7 @@ void box_draws_batch_blend(
         }
 
         r->contrast = contrast;
-        r->variation = isfinite(blend->variation) ? glm_clamp(blend->variation, 0.0f, 1.0f)
-            : 0.0f;
+        box_draws_blend_world(blend, r);
         for (k = 0; k < BOX_RENDER_BLEND_LAYERS; k ++) {
             ecs_entity_t layer = blend->layers[k];
             bool alive = layer && ecs_is_alive(d->world, layer);

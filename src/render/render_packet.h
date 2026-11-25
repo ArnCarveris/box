@@ -2477,7 +2477,10 @@ typedef struct box_render_texture_blend_t {
     uint32_t quality;   /**< Largest dimension of a slice, the texture quality of the surfaces */
     float contrast;     /**< TextureBlend.contrast, 0 for the linear blend without heights */
     float variation;    /**< TextureBlend.variation, 0 for none */
-    uint32_t tiles;     /**< 1 for a TileTerrain, whose mask is its grid of kind indices */
+    uint32_t strata;    /**< TextureBlend.strata, one plus the layer, 0 for none */
+    float strata_fold;  /**< TextureBlend.strata_fold, 0 for none */
+    float strata_tint;  /**< TextureBlend.strata_tint, 0..1 */
+    uint32_t tiles;    /**< 1 for a TileTerrain, whose mask is its grid of kind indices */
     uint32_t terrain;   /**< Handle of the grid mesh of the tiles of a Terrain with masks, whose
                          *   mask is the mask atlas of the mesh, else 0 */
 } box_render_texture_blend_t;

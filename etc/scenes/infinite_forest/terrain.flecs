@@ -587,7 +587,10 @@ infinite_forest {
       layers: [infinite_forest_floor, infinite_forest_grass, infinite_forest_dirt, terrain_cliff],
       heights: [litter_height, infinite_forest_grass_height, path_height, terrain_cliff_height],
       contrast: 6,
-      variation: 0.4
+      variation: 0.4,
+      strata: 4,
+      strata_fold: 7,
+      strata_tint: 0.45
     }
 
     texture.Mapping: {mode: MappingWorld, size: GROUND_MAP_SIZE, blend: 0.15}

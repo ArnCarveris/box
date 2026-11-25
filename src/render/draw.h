@@ -3160,6 +3160,16 @@ void box_draws_batch_layers(
     const box_draw_batch_t *b,
     box_render_batch_t *out);
 
+/** Resolve the variation and the strata of a TextureBlend, which vary its layers over the
+ * world on a Terrain.
+ *
+ * @param blend The TextureBlend
+ * @param out Receives the variation, strata, strata_fold and strata_tint, clamped
+ */
+void box_draws_blend_world(
+    const TextureBlend *blend,
+    box_render_texture_blend_t *out);
+
 /** Pack the values of a TextureLayer entity as the mesh shaders read them.
  *
  * @param world The world
