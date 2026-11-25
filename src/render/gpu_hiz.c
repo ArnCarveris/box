@@ -169,6 +169,11 @@ static void box_gpu_hiz_free(
         wgpuTextureViewRelease(hiz->mips[i]);
     }
 
+    if (hiz->first) {
+        wgpuBindGroupRelease(hiz->first);
+        wgpuTextureViewRelease(hiz->first_depth);
+    }
+
     wgpuTextureViewRelease(hiz->view);
     wgpuTextureRelease(hiz->texture);
     ecs_os_free(hiz);
@@ -673,25 +678,34 @@ void box_gpu_hiz_build(
         goto done;
     }
 
-    WGPUBindGroupEntry entries[2 + BOX_GPU_HIZ_STEP] = {
-        { .binding = 8, .textureView = depth },
-        { .binding = 14, .sampler = c->hiz_sampler }
-    };
-    box_gpu_hiz_targets(c, hiz, 0, &entries[2]);
-    WGPUBindGroup first = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
-        .layout = c->hiz_first_layout,
-        .entryCount = 2 + BOX_GPU_HIZ_STEP,
-        .entries = entries
-    });
+    if (hiz->first_depth != depth) {
+        WGPUBindGroupEntry entries[2 + BOX_GPU_HIZ_STEP] = {
+            { .binding = 8, .textureView = depth },
+            { .binding = 14, .sampler = c->hiz_sampler }
+        };
+        box_gpu_hiz_targets(c, hiz, 0, &entries[2]);
+        if (hiz->first) {
+            wgpuBindGroupRelease(hiz->first);
+            wgpuTextureViewRelease(hiz->first_depth);
+        }
+
+        hiz->first = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
+            .layout = c->hiz_first_layout,
+            .entryCount = 2 + BOX_GPU_HIZ_STEP,
+            .entries = entries
+        });
+        hiz->first_depth = depth;
+        wgpuTextureViewAddRef(depth);
+    }
+
     WGPUComputePassEncoder pass = box_gpu_profile_compute_pass(gpu, encoder, "hiz");
-    box_gpu_hiz_dispatch(pass, c->hiz_first, first, hiz, 0, 2);
+    box_gpu_hiz_dispatch(pass, c->hiz_first, hiz->first, hiz, 0, 2);
     for (i = BOX_GPU_HIZ_STEP; i < hiz->levels; i += BOX_GPU_HIZ_STEP) {
         box_gpu_hiz_dispatch(pass, c->hiz_reduce, hiz->reduce[i], hiz, i, 1);
     }
 
     wgpuComputePassEncoderEnd(pass);
     wgpuComputePassEncoderRelease(pass);
-    wgpuBindGroupRelease(first);
 done:
     return;
 }

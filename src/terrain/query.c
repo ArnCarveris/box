@@ -54,8 +54,11 @@ typedef struct box_terrain_query_node_t {
     double distance;        /**< Distance to the nearest focus, negative when requested */
 } box_terrain_query_node_t;
 
+struct box_terrain_query_ctx_t;
+
 /** The query tiles of a terrain */
 typedef struct box_terrain_query_t {
+    struct box_terrain_query_ctx_t *ctx; /**< The state of the queries */
     ecs_entity_t entity;    /**< The terrain entity */
     ecs_entity_t scene;     /**< Scene of the terrain when it was last updated */
     ecs_entity_t container; /**< Parent of the texture entities of the tiles */
@@ -64,11 +67,25 @@ typedef struct box_terrain_query_t {
     ecs_map_t requests;     /**< Key of a requested tile of level 0 to the frame of the request */
     box_terrain_query_settings_t settings; /**< Settings the tiles were made with */
     bool made;              /**< settings holds the settings of the tiles */
+    double local[3];        /**< Position of the terrain of the last frame */
+    bool placed;            /**< local holds a position */
+    double foci[BOX_TERRAIN_FOCI][2]; /**< Foci the tiles were last selected for */
+    int32_t focus_count;    /**< Foci in foci, -1 before the first selection */
+    uint64_t expiry;        /**< First frame in which a request no longer holds */
+    uint32_t readbacks;     /**< Serial of the CPU copies the status was computed with */
+    int32_t missing;        /**< Tiles wanted that the budget did not make, as of the status */
+    int32_t requested;      /**< Requests as of the status */
+    bool dirty;             /**< A request asked for a tile no request held */
+    bool active;            /**< The last update made or dropped a tile, so the next may too */
+    int32_t updates;        /**< Updates that selected the tiles */
+    int32_t statuses;       /**< Computations of the status */
 } box_terrain_query_t;
 
 /** State of the queries of box.terrain in a world */
 typedef struct box_terrain_query_ctx_t {
     ecs_map_t terrains;     /**< Terrain entity to its box_terrain_query_t */
+    uint64_t serial;        /**< Bumped when a terrain gets or loses a query tile or its
+                             *   settings, scene or position change (box_terrain_revision) */
     ecs_vec_t nodes;        /**< box_terrain_query_node_t, the tiles a terrain wants */
     ecs_map_t seen;         /**< Key of a node to its index + 1 in nodes */
     ecs_vec_t terrain_list; /**< ecs_entity_t, the terrains to update this frame */
@@ -270,7 +287,10 @@ static box_terrain_query_t* box_terrain_query_ensure(
     box_terrain_query_t *result = ecs_map_get_deref(&ctx->terrains, box_terrain_query_t, e);
     if (!result) {
         result = ecs_os_calloc_t(box_terrain_query_t);
+        result->ctx = ctx;
         result->entity = e;
+        result->focus_count = -1;
+        result->active = true;
         ecs_map_init(&result->map, NULL);
         ecs_map_init(&result->requests, NULL);
         ecs_vec_init_t(NULL, &result->list, box_terrain_query_tile_t*, 0);
@@ -382,6 +402,7 @@ static box_terrain_query_tile_t* box_terrain_query_tile_new(
         : 0;
     ecs_map_insert_ptr(&q->map, box_terrain_query_key(t->level, t->ix, t->iz), t);
     *ecs_vec_append_t(NULL, &q->list, box_terrain_query_tile_t*) = t;
+    q->ctx->serial ++;
 
     return t;
 }
@@ -411,6 +432,8 @@ static void box_terrain_query_tile_drop(
     ecs_map_remove(&q->map, box_terrain_query_key(t->level, t->ix, t->iz));
     ecs_vec_remove_t(&q->list, box_terrain_query_tile_t*, index);
     ecs_os_free(t);
+    q->ctx->serial ++;
+    q->active = true;
 }
 
 /** Delete every query tile of a terrain.
@@ -792,6 +815,7 @@ void box_terrain_request(
     int32_t ix0 = box_terrain_query_index(r[0], edge), ix1 = box_terrain_query_index(r[2], edge);
     int32_t iz0 = box_terrain_query_index(r[1], edge), iz1 = box_terrain_query_index(r[3], edge);
     uint64_t frame = (uint64_t)ecs_get_world_info(world)->frame_count_total;
+    int32_t held = ecs_map_count(&q->requests);
     if ((int64_t)(ix1 - ix0 + 1) * (iz1 - iz0 + 1) > BOX_TERRAIN_QUERY_MAX) {
         goto done;
     }
@@ -802,8 +826,36 @@ void box_terrain_request(
         }
     }
 
+    q->dirty = q->dirty || ecs_map_count(&q->requests) != held;
+
 done:
     return;
+}
+
+uint64_t box_terrain_revision(
+    const ecs_world_t *world)
+{
+    const box_terrain_query_ctx_t *ctx = box_terrain_query_ctx(world);
+    const box_textures_t *textures = box_textures_get(world);
+    const WorldOriginStatus *origin = ecs_id(WorldOriginStatus)
+        ? ecs_singleton_get(world, WorldOriginStatus) : NULL;
+
+    return (ctx ? ctx->serial : 0) + (textures ? textures->readback_serial : 0) +
+        (origin ? (uint64_t)origin->shifts : 0);
+}
+
+void box_terrain_query_counters(
+    const ecs_world_t *world,
+    ecs_entity_t terrain,
+    int32_t *updates,
+    int32_t *statuses)
+{
+    box_terrain_query_ctx_t *ctx = box_terrain_query_ctx(world);
+    const box_terrain_query_t *q = ctx
+        ? ecs_map_get_deref(&ctx->terrains, box_terrain_query_t, terrain)
+        : NULL;
+    *updates = q ? q->updates : 0;
+    *statuses = q ? q->statuses : 0;
 }
 
 void box_terrain_origin(
@@ -1129,8 +1181,8 @@ static int box_terrain_query_node_compare(
     return (da > db) - (da < db);
 }
 
-/** Collect the nodes the foci and the requests of a terrain want, and forget the requests
- * that no longer hold.
+/** Collect the nodes the foci and the requests of a terrain want, forget the requests
+ * that no longer hold and find the first frame in which one of the others no longer does.
  *
  * @param world The world
  * @param ctx The state
@@ -1171,6 +1223,7 @@ static void box_terrain_query_select(
         }
     }
 
+    q->expiry = UINT64_MAX;
     ecs_map_iter_t it = ecs_map_iter(&q->requests);
     while (ecs_map_next(&it)) {
         uint64_t key = ecs_map_key(&it), when = ecs_map_value(&it);
@@ -1178,6 +1231,9 @@ static void box_terrain_query_select(
             *ecs_vec_append_t(NULL, &ctx->expired, uint64_t) = key;
             continue;
         }
+
+        q->expiry = when + (uint64_t)s->hold + 1 < q->expiry
+            ? when + (uint64_t)s->hold + 1 : q->expiry;
 
         box_terrain_query_unkey(key, &ix, &iz);
         if (box_terrain_query_inside(s, 0, ix, iz)) {
@@ -1265,6 +1321,10 @@ static void box_terrain_query_status(
 /** Update the query tiles of a terrain: make the ones the foci and requests want nearest first
  * within the budget and drop the ones no focus is near and no request holds within the budget.
  *
+ * The tiles are selected only when the Terrain, the foci or the requests changed, a request no
+ * longer holds or the update before made or dropped a tile; the status is computed only when a
+ * tile, a request or a CPU copy of a texture changed.
+ *
  * @param world The world
  * @param ctx The state
  * @param e The terrain
@@ -1278,65 +1338,126 @@ static void box_terrain_query_update(
 {
     box_terrain_query_settings_t s;
     box_terrain_query_t *q = box_terrain_query_ensure(ctx, e);
-    double local[3], foci[BOX_TERRAIN_FOCI][2];
+    const box_textures_t *textures = box_textures_get(world);
+    double local[3], foci[BOX_TERRAIN_FOCI][2], seen[BOX_TERRAIN_FOCI][2];
     int32_t i, count, made = 0, drops = 0, missing = 0;
+    uint64_t frame = (uint64_t)ecs_get_world_info(world)->frame_count_total;
+    uint32_t readbacks = textures ? textures->readback_serial : 0;
+    ecs_entity_t scene = box_world_scene_of(world, e);
     box_terrain_query_settings(value, &s);
-    if (q->made && ecs_os_memcmp(&q->settings, &s, ECS_SIZEOF(box_terrain_query_settings_t))) {
+    bool reset = !q->made ||
+        ecs_os_memcmp(&q->settings, &s, ECS_SIZEOF(box_terrain_query_settings_t));
+    if (q->made && reset) {
         box_terrain_query_drop_all(world, q, true);
+    }
+
+    if (reset || scene != q->scene) {
+        ctx->serial ++;
     }
 
     q->settings = s;
     q->made = true;
-    q->scene = box_world_scene_of(world, e);
+    q->scene = scene;
     if (!q->container || !ecs_is_alive(world, q->container)) {
         box_terrain_query_drop_all(world, q, false);
         q->container = q->scene ? ecs_new_w_pair(world, EcsChildOf, q->scene) : ecs_new(world);
+        reset = true;
     }
 
     if (!s.height) {
+        if (!reset && !ecs_vec_count(&q->list) && !ecs_map_count(&q->requests)) {
+            goto done;
+        }
+
         box_terrain_query_drop_all(world, q, true);
         ecs_map_clear(&q->requests);
+        q->active = false;
+        q->dirty = false;
         goto status;
     }
 
     box_terrain_local(world, e, local);
+    if (!q->placed || local[0] != q->local[0] || local[1] != q->local[1] ||
+        local[2] != q->local[2])
+    {
+        ecs_os_memcpy_n(q->local, local, double, 3);
+        q->placed = true;
+        ctx->serial ++;
+    }
+
     count = box_terrain_foci(world, e, local, foci, NULL);
-    box_terrain_query_select(world, ctx, q, foci, count);
-    for (i = 0; i < ecs_vec_count(&q->list); i ++) {
-        (*ecs_vec_get_t(&q->list, box_terrain_query_tile_t*, i))->wanted = false;
+    ecs_os_memset_n(seen, 0, double, 2 * BOX_TERRAIN_FOCI);
+    ecs_os_memcpy_n(seen, foci, double, 2 * count);
+    bool walked = count != q->focus_count ||
+        ecs_os_memcmp(seen, q->foci, ECS_SIZEOF(double) * 2 * BOX_TERRAIN_FOCI);
+    bool expire = ecs_map_count(&q->requests) && frame >= q->expiry;
+    bool news = readbacks != q->readbacks;
+    bool run = reset || walked || expire || q->dirty || q->active;
+    bool changed = reset || news;
+    if (!run && !news) {
+        goto done;
     }
 
-    for (i = 0; i < ecs_vec_count(&ctx->nodes); i ++) {
-        const box_terrain_query_node_t *node =
-            ecs_vec_get_t(&ctx->nodes, box_terrain_query_node_t, i);
-        box_terrain_query_tile_t *t = box_terrain_query_find(q, node->level, node->ix,
-            node->iz);
-        if (!t && made < s.budget) {
-            t = box_terrain_query_tile_new(world, q, node);
-            made ++;
+    q->readbacks = readbacks;
+    if (run) {
+        q->updates ++;
+        q->dirty = false;
+        q->focus_count = count;
+        ecs_os_memcpy_n(q->foci, seen, double, 2 * BOX_TERRAIN_FOCI);
+        box_terrain_query_select(world, ctx, q, foci, count);
+        for (i = 0; i < ecs_vec_count(&q->list); i ++) {
+            box_terrain_query_tile_t *t = *ecs_vec_get_t(&q->list, box_terrain_query_tile_t*, i);
+            t->before = t->wanted;
+            t->wanted = false;
         }
 
-        if (t) {
-            t->wanted = true;
-            t->distance = node->distance;
-        } else {
-            missing ++;
+        int32_t first = ecs_vec_count(&q->list);
+        for (i = 0; i < ecs_vec_count(&ctx->nodes); i ++) {
+            const box_terrain_query_node_t *node =
+                ecs_vec_get_t(&ctx->nodes, box_terrain_query_node_t, i);
+            box_terrain_query_tile_t *t = box_terrain_query_find(q, node->level, node->ix,
+                node->iz);
+            if (!t && made < s.budget) {
+                t = box_terrain_query_tile_new(world, q, node);
+                made ++;
+            }
+
+            if (t) {
+                t->wanted = true;
+                t->distance = node->distance;
+            } else {
+                missing ++;
+            }
         }
+
+        for (i = ecs_vec_count(&q->list) - 1; i >= 0; i --) {
+            const box_terrain_query_tile_t *t =
+                *ecs_vec_get_t(&q->list, box_terrain_query_tile_t*, i);
+            changed |= i < first && t->wanted != t->before;
+            if (!t->wanted && !box_terrain_query_near(q, t, foci, count) &&
+                drops < s.budget * BOX_TERRAIN_QUERY_DROPS)
+            {
+                box_terrain_query_tile_drop(world, q, i, true);
+                drops ++;
+            }
+        }
+
+        q->active = made || drops;
+        changed |= made || drops || missing != q->missing ||
+            ecs_map_count(&q->requests) != q->requested;
     }
 
-    for (i = ecs_vec_count(&q->list) - 1; i >= 0; i --) {
-        const box_terrain_query_tile_t *t =
-            *ecs_vec_get_t(&q->list, box_terrain_query_tile_t*, i);
-        if (!t->wanted && !box_terrain_query_near(q, t, foci, count) &&
-            drops < s.budget * BOX_TERRAIN_QUERY_DROPS)
-        {
-            box_terrain_query_tile_drop(world, q, i, true);
-            drops ++;
-        }
+    if (!changed) {
+        goto done;
     }
 
 status:
+    q->missing = missing;
+    q->requested = ecs_map_count(&q->requests);
+    q->statuses ++;
     box_terrain_query_status(world, q, missing);
+done:
+    return;
 }
 
 /** Update the query tiles of every terrain in EcsPostUpdate. The system is immediate to create
@@ -1405,6 +1526,7 @@ static void BoxTerrainOnRemoveQuery(
         }
 
         box_terrain_query_drop_all(it->world, q, false);
+        ctx->serial ++;
         if (q->container && ecs_is_alive(it->world, q->container)) {
             ecs_delete(it->stage, q->container);
         }

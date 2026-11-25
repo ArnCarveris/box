@@ -7,6 +7,7 @@
 #include "app.h"
 #include "benchmark.h"
 #include "watch.h"
+#include "assign.h"
 #include "../render/render.h"
 #include "../transform/transform_version.h"
 #include "../audio/output.h"
@@ -45,7 +46,15 @@ typedef struct box_app_clock_t {
     box_app_series_t dropped;   /**< 1 for a recent dropped frame, else 0 */
     int32_t errors;             /**< Errors the process had logged when the module was imported */
     ecs_entity_t scene;         /**< Script entity of App.scene, 0 when none was loaded */
+    bool serving;               /**< The REST API is served */
+    bool stats;                 /**< The flecs stats are collected for a client of the REST API */
+    int64_t requests;           /**< HTTP requests the process had received at the last one seen */
+    double requested;           /**< Wall seconds of the frame that saw the last request */
 } box_app_clock_t;
+
+/** Seconds without a request to the REST API after which the flecs stats are no longer
+ * collected */
+#define BOX_APP_STATS_IDLE (5.0)
 
 /** Messages of error level the process has logged while the log hook was installed */
 static int32_t box_app_log_errors;
@@ -245,6 +254,44 @@ done:
     return;
 }
 
+/** Collect the flecs stats only while a client uses the REST API.
+ *
+ * The stats cost every frame: the monitor systems copy them and flecs times every system. A
+ * request turns them on, and they stay on until no request arrived for BOX_APP_STATS_IDLE
+ * seconds, so the explorer, which polls, sees them while it is connected.
+ *
+ * @param world The world or a stage
+ * @param clock The clock of the frame systems
+ * @param wall Wall seconds of the frame
+ */
+static void box_app_stats(
+    ecs_world_t *world,
+    box_app_clock_t *clock,
+    double wall)
+{
+#ifdef __EMSCRIPTEN__
+    (void)world;
+    (void)clock;
+    (void)wall;
+#else
+    int64_t requests = clock->serving ? ecs_http_request_received_count : clock->requests;
+    bool stats = clock->stats;
+    if (requests != clock->requests) {
+        clock->requests = requests;
+        clock->requested = wall;
+        stats = true;
+    } else if (stats && wall - clock->requested > BOX_APP_STATS_IDLE) {
+        stats = false;
+    }
+
+    if (stats != clock->stats) {
+        clock->stats = stats;
+        ecs_enable(world, ecs_id(FlecsStats), stats);
+        ecs_measure_system_time(ECS_CONST_CAST(ecs_world_t*, ecs_get_world(world)), stats);
+    }
+#endif
+}
+
 /** Count the frame, start the clock on the first frame, stop the world when App says so and
  * sleep when a headless process used more than its CPU budget since the previous frame.
  *
@@ -262,9 +309,11 @@ static void BoxAppFrame(
     box_app_clock_t *clock = it->ctx;
     const App *app = ecs_singleton_get(it->world, App);
     AppStatus *status = ecs_singleton_get_mut(it->world, AppStatus);
-    double cpu = box_app_cpu_time();
+    bool paced = app && app->headless && !app->unpaced && !app->benchmark;
+    double cpu = paced ? box_app_cpu_time() : 0;
     double wall = box_app_wall_time();
     double pace = wall;
+    box_app_stats(it->world, clock, wall);
     if (!app || !status) {
         goto done;
     }
@@ -285,7 +334,7 @@ static void BoxAppFrame(
         ecs_quit(it->world);
     }
 
-    if (app->headless && !app->unpaced && !app->benchmark && clock->wall > 0) {
+    if (paced && clock->wall > 0 && clock->cpu > 0) {
         double sleep = box_app_pace(cpu - clock->cpu, wall - clock->pace, app->cpu_budget);
         if (sleep > 0) {
             double now = box_wait_until(wall + sleep);
@@ -1009,8 +1058,15 @@ static void box_app_serve(
     (void)world;
     (void)port;
 #else
+    box_app_clock_t *clock = box_app_clock(world);
     ECS_IMPORT(world, FlecsStats);
-    ecs_enable(world, ecs_id(FlecsStats), true);
+    ecs_enable(world, ecs_id(FlecsStats), false);
+    ecs_measure_system_time(world, false);
+    if (clock) {
+        clock->serving = true;
+        clock->requests = ecs_http_request_received_count;
+    }
+
     ecs_singleton_set(world, EcsRest, { .port = (uint16_t)port });
 #endif
 }
@@ -1269,6 +1325,7 @@ void BoxAppImport(
     ecs_singleton_set(world, FrameTiming, {0});
     ecs_singleton_add(world, FrameSamples);
     box_file_watch_init(world);
+    box_app_assign_init(world);
 
     ecs_observer(world, {
         .entity = ecs_entity(world, { .name = "OnSet" }),

@@ -130,6 +130,11 @@ typedef struct box_gpu_atmos_view_t {
                                      *   uniforms, 0 for none */
     box_gpu_atmos_uniforms_t last;  /**< Uniforms of the view written last, which the planar
                                      *   reflections copy */
+    const void *luts;               /**< LUTs the sky view and aerial perspective were last
+                                     *   written from, NULL before the first time */
+    int32_t builds;                 /**< Builds of those LUTs then */
+    int32_t revision;               /**< Revision of the shader of the pipelines then */
+    bool fog_written;               /**< The fog color was written from that sky view */
     WGPUBuffer mirrors[BOX_PLANAR_REFLECTION_MAX]; /**< Uniforms of the sky of each planar
                                      *   reflection slot, created on first use */
 } box_gpu_atmos_view_t;
@@ -745,7 +750,7 @@ static void box_gpu_atmos_stamps(
 #ifndef __EMSCRIPTEN__
     for (i = 0; i < BOX_GPU_ATMOS_READBACKS; i ++) {
         if (a->readbacks[i].state == BOX_GPU_ATMOS_MAPPING) {
-            wgpuDevicePoll(gpu->device, false, NULL);
+            box_gpu_poll(gpu);
             break;
         }
     }
@@ -824,7 +829,7 @@ static WGPUComputePassEncoder box_gpu_atmos_begin(
     box_gpu_atmos_readback_t *r = a->current != -1 ? &a->readbacks[a->current] : NULL;
     WGPUPassTimestampWrites writes;
     const WGPUPassTimestampWrites *timed = NULL;
-    if (r && r->count + 2 <= BOX_GPU_ATMOS_STAMPS) {
+    if (r && r->count + 2 <= BOX_GPU_ATMOS_STAMPS && box_gpu_profile_timed(gpu)) {
         uint32_t first = (uint32_t)a->current * BOX_GPU_ATMOS_STAMPS + r->count;
         writes = (WGPUPassTimestampWrites){
             .querySet = a->queries,
@@ -1398,8 +1403,26 @@ void box_gpu_atmosphere_view(
     glm_mat4_mul(proj, ECS_CONST_CAST(vec4*, v->view_matrix), view_proj);
     glm_mat4_inv(view_proj, u.inv_view_proj);
     box_gpu_atmos_clouds(gpu, v, s, &u);
+    bool fog = box_gpu_atmos_has_fog(packet, v);
+    if (s->luts == l && s->builds == l->builds && s->revision == a->revision &&
+        !ecs_os_memcmp(&u, &s->last, sizeof(u)))
+    {
+        if (fog && s->fog_written) {
+            s->fog_frame = packet->frame;
+        } else if (fog) {
+            box_gpu_atmos_fog(gpu, encoder, packet, l, s);
+            s->fog_written = true;
+        }
+
+        goto done;
+    }
+
     wgpuQueueWriteBuffer(gpu->queue, s->uniforms, 0, &u, sizeof(u));
     s->last = u;
+    s->luts = l;
+    s->builds = l->builds;
+    s->revision = a->revision;
+    s->fog_written = fog;
 
     uint64_t size = sizeof(box_gpu_atmos_uniforms_t);
     WGPUBindGroupEntry sky[5] = {
@@ -1422,7 +1445,7 @@ void box_gpu_atmosphere_view(
     box_gpu_atmos_dispatch(gpu, encoder, BOX_RENDER_ATMOS_AERIAL, aerial, 6,
         BOX_RENDER_ATMOS_AERIAL_SIZE, BOX_RENDER_ATMOS_AERIAL_SIZE,
         BOX_RENDER_ATMOS_AERIAL_SIZE);
-    if (box_gpu_atmos_has_fog(packet, v)) {
+    if (fog) {
         box_gpu_atmos_fog(gpu, encoder, packet, l, s);
     }
 

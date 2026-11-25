@@ -708,7 +708,7 @@ static void box_gpu_cull_batch_part(
             args[1] = 0;
             args[2] = 0;
             args[3] = 0;
-            args[4] = 0;
+            args[4] = gpu->first_instance ? d->base + (uint32_t)i * d->count : 0;
         }
 
         d->lod = UINT32_MAX;
@@ -726,12 +726,18 @@ static void box_gpu_cull_batch_part(
                 for (l = 0; l < levels; l ++) {
                     uint32_t *args = ecs_vec_grow_t(
                         NULL, &c->arg_data, uint32_t, BOX_GPU_CULL_ARGS);
+                    uint32_t run = d->lod_base + (uint32_t)l * d->lod_stride;
+                    if (i == 1) {
+                        run = d->lod_base + (uint32_t)levels * d->lod_stride +
+                            (uint32_t)l * d->count;
+                    }
+
                     args[0] = ecs_map_get_deref(
                         &gpu->meshes, box_gpu_mesh_t, meshes[l])->index_count;
                     args[1] = 0;
                     args[2] = 0;
                     args[3] = 0;
-                    args[4] = 0;
+                    args[4] = gpu->first_instance ? run : 0;
                 }
             }
 

@@ -20,6 +20,29 @@
 #include <stdlib.h>
 #include <string.h>
 
+/** Singleton with the system of the probe extract, so its state is found without a lookup */
+typedef struct RenderReflectSystem {
+    ecs_entity_t system;        /**< The system, whose context is the state */
+} RenderReflectSystem;
+
+static ECS_COMPONENT_DECLARE(RenderReflectSystem);
+
+/** Get the system of the reflection probe extract of a world.
+ *
+ * @param world The world
+ * @return The system, NULL before box.render was imported or after the system was deleted
+ */
+static const ecs_system_t* box_reflect_system_ctx(
+    const ecs_world_t *world)
+{
+    ecs_entity_t id = ecs_id(RenderReflectSystem);
+    const RenderReflectSystem *c = id && ecs_is_alive(world, id)
+        ? ecs_get_id(world, id, id) : NULL;
+
+    return c && c->system && ecs_is_alive(world, c->system)
+        ? ecs_system_get(world, c->system) : NULL;
+}
+
 /** Face edge of a probe cubemap in texels at least */
 #define BOX_REFLECT_RESOLUTION_MIN (8)
 
@@ -1623,13 +1646,17 @@ void box_render_reflect_init(
     r->bakes = box_reflect_query(world, ecs_id(ReflectionBake), false, "ReflectionBakes");
     r->probes = box_reflect_query(world, ecs_id(ReflectionProbe), true, "ReflectionProbes");
 
-    ecs_system(world, {
+    ecs_set_name_prefix(world, "Render");
+    ECS_COMPONENT_DEFINE(world, RenderReflectSystem);
+    ecs_set_name_prefix(world, NULL);
+    ecs_entity_t extract = ecs_system(world, {
         .entity = ecs_entity(world, { .name = "extract.Reflect" }),
         .phase = RenderExtract,
         .run = BoxRenderExtractReflect,
         .ctx = r,
         .ctx_free = box_reflect_free
     });
+    ecs_singleton_set(world, RenderReflectSystem, { extract });
 }
 
 /** Get the state of the reflection probe extract of a world.
@@ -1640,8 +1667,7 @@ void box_render_reflect_init(
 static const box_render_reflect_t* box_reflect_state(
     const ecs_world_t *world)
 {
-    ecs_entity_t system = ecs_lookup(world, "box.render.extract.Reflect");
-    const ecs_system_t *sys = system ? ecs_system_get(world, system) : NULL;
+    const ecs_system_t *sys = box_reflect_system_ctx(world);
 
     return sys ? sys->ctx : NULL;
 }

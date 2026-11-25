@@ -142,6 +142,24 @@ typedef struct box_controller_hit_t {
     vec3 wall;     /**< Normal of the steep surface that faces up the most, zero for none */
 } box_controller_hit_t;
 
+/** The last move of a body that stood still and stayed where it was: while the body, its feet
+ * and what it can collide with stay the same, a move without velocity ends the same way.
+ *
+ * Added with FirstPersonController.
+ */
+typedef struct ControllerRest {
+    bool valid;                 /**< The fields below describe a move that changed nothing */
+    bool below_known;           /**< below holds what the ground search found at the feet */
+    bool below;                 /**< Whether ground was found below the feet */
+    Position feet;              /**< Where the feet stood */
+    box_controller_body_t body; /**< The body that stood there */
+    uint64_t spatial;           /**< Revision of the shapes of the scene that do not move */
+    uint64_t terrain;           /**< Revision of the terrains */
+    box_controller_hit_t hit;   /**< What the move ran into */
+} ControllerRest;
+
+extern ECS_COMPONENT_DECLARE(ControllerRest);
+
 /** Resolve the collider of an indexed shape.
  *
  * The tiles a Terrain draws have none: bodies collide with its height field instead.
@@ -251,6 +269,45 @@ bool box_controller_move(
     vec3 velocity,
     float dt,
     box_controller_hit_t *hit);
+
+/** Move a body as box_controller_move does, without the collision tests while it rests.
+ *
+ * A body without velocity whose last move left its feet in place stays there, with the same
+ * hit, until its body or feet change, a shape of its scene that does not move or a terrain
+ * changes, or a mover comes near: only then is the move computed again.
+ *
+ * @param world The world
+ * @param rest The rest of the body, written
+ * @param body The body
+ * @param feet The bottom of the capsule, written in place
+ * @param velocity Velocity in units per second, written when the move is blocked
+ * @param dt Seconds the frame took
+ * @param hit Receives what the move ran into, may be NULL
+ * @return Whether the position changed
+ */
+bool box_controller_move_rest(
+    ecs_world_t *world,
+    ControllerRest *rest,
+    const box_controller_body_t *body,
+    Position *feet,
+    vec3 velocity,
+    float dt,
+    box_controller_hit_t *hit);
+
+/** Search the ground below the feet of a body as box_controller_ground_below does, once while
+ * the body rests.
+ *
+ * @param world The world
+ * @param rest The rest of the body, as box_controller_move_rest left it
+ * @param body The body
+ * @param feet The bottom of the capsule
+ * @return Whether ground was found below the feet
+ */
+bool box_controller_ground_below_rest(
+    ecs_world_t *world,
+    ControllerRest *rest,
+    const box_controller_body_t *body,
+    const Position *feet);
 
 /** Test whether a body fits at a position without overlapping a shape of its scene.
  *

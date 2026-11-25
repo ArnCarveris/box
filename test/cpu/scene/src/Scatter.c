@@ -935,3 +935,176 @@ void Scatter_chunk_grid_script(void) {
 
     ecs_fini(world);
 }
+
+void Scatter_idle_no_visits(void) {
+    // scenes/scatter
+    ecs_world_t *world = sc_world();
+    ecs_entity_t tree = sc_prefab(world, "ScatterTree");
+    Scatter c = sc_config(tree, 0, 1, 0, 1);
+    c.extent[0] = 50;
+    c.extent[1] = 50;
+    ecs_entity_t a = sc_scatter(world, 0, 0, 0, 0, &c);
+    ecs_entity_t b = sc_scatter(world, 0, 100, 0, 0, &c);
+    ecs_entity_t cell_scatter;
+    sc_cell(world, 4, 4, 20, &c, &cell_scatter);
+    test_int((int32_t)box_scatter_visits(world), 0);
+    ecs_progress(world, 0);
+    test_int((int32_t)box_scatter_visits(world), 3);
+    test_int(ecs_get(world, a, ScatterStatus)->instances, 25);
+    test_int(ecs_get(world, b, ScatterStatus)->instances, 25);
+    test_int(ecs_get(world, cell_scatter, ScatterStatus)->instances, 4);
+
+    int32_t i;
+    for (i = 0; i < 5; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    test_int((int32_t)box_scatter_visits(world), 3);
+    test_int(ecs_get(world, a, ScatterStatus)->evaluations, 1);
+    test_int(sc_children(world, a), 25);
+
+    // Moving another component of a scatter or its instances queues nothing
+    ecs_set(world, a, Rotation, {0, 0, 0});
+    ecs_progress(world, 0);
+    test_int((int32_t)box_scatter_visits(world), 3);
+
+    ecs_fini(world);
+}
+
+void Scatter_set_same_keeps_instances(void) {
+    // scenes/scatter
+    ecs_world_t *world = sc_world();
+    ecs_entity_t tree = sc_prefab(world, "ScatterTree");
+    Scatter c = sc_config(tree, 0, 1, 0, 1);
+    c.extent[0] = 50;
+    c.extent[1] = 50;
+    ecs_entity_t e = sc_scatter(world, 0, 0, 0, 0, &c);
+    ecs_entity_t other = sc_scatter(world, 0, 100, 0, 0, &c);
+    ecs_progress(world, 0);
+    ecs_entity_t first = 0;
+    ecs_iter_t it = ecs_children(world, e);
+    while (ecs_children_next(&it)) {
+        first = first ? first : it.entities[0];
+    }
+
+    test_assert(first != 0);
+    ecs_set_ptr(world, e, Scatter, &c);
+    ecs_set_ptr(world, e, Scatter, &c);
+    ecs_progress(world, 0);
+    test_int((int32_t)box_scatter_visits(world), 3);
+    test_int(ecs_get(world, e, ScatterStatus)->evaluations, 1);
+    test_assert(ecs_is_alive(world, first));
+    test_int(sc_children(world, e), 25);
+
+    // A value changed in place and marked modified evaluates that scatter only
+    Scatter *ptr = ecs_get_mut(world, e, Scatter);
+    ptr->density = 4;
+    ecs_modified(world, e, Scatter);
+    ecs_progress(world, 0);
+    test_int((int32_t)box_scatter_visits(world), 4);
+    test_int(ecs_get(world, e, ScatterStatus)->evaluations, 2);
+    test_int(ecs_get(world, e, ScatterStatus)->instances, 100);
+    test_assert(!ecs_is_alive(world, first));
+    test_int(ecs_get(world, other, ScatterStatus)->evaluations, 1);
+    ecs_progress(world, 0);
+    test_int((int32_t)box_scatter_visits(world), 4);
+
+    ecs_fini(world);
+}
+
+void Scatter_enable_evaluates(void) {
+    // scenes/scatter
+    ecs_world_t *world = sc_world();
+    ecs_entity_t tree = sc_prefab(world, "ScatterTree");
+    Scatter c = sc_config(tree, 0, 1, 0, 1);
+    c.extent[0] = 50;
+    c.extent[1] = 50;
+    ecs_entity_t e = sc_scatter(world, 0, 0, 0, 0, &c);
+    ecs_enable(world, e, false);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    test_int(ecs_get(world, e, ScatterStatus)->evaluations, 0);
+    test_int(sc_children(world, e), 0);
+
+    ecs_enable(world, e, true);
+    ecs_progress(world, 0);
+    test_int(ecs_get(world, e, ScatterStatus)->evaluations, 1);
+    test_int(sc_children(world, e), 25);
+
+    // A change while disabled applies when the scatter is enabled again
+    ecs_enable(world, e, false);
+    c.density = 4;
+    ecs_set_ptr(world, e, Scatter, &c);
+    ecs_progress(world, 0);
+    test_int(sc_children(world, e), 25);
+    ecs_enable(world, e, true);
+    ecs_progress(world, 0);
+    test_int(ecs_get(world, e, ScatterStatus)->evaluations, 2);
+    test_int(sc_children(world, e), 100);
+
+    // Enabling without a change evaluates nothing
+    ecs_enable(world, e, false);
+    ecs_progress(world, 0);
+    ecs_enable(world, e, true);
+    ecs_progress(world, 0);
+    test_int(ecs_get(world, e, ScatterStatus)->evaluations, 2);
+
+    ecs_fini(world);
+}
+
+void Scatter_prefab_instance(void) {
+    // scenes/scatter
+    ecs_world_t *world = sc_world();
+    ecs_entity_t tree = sc_prefab(world, "ScatterTree");
+    Scatter c = sc_config(tree, 0, 1, 0, 1);
+    c.extent[0] = 50;
+    c.extent[1] = 50;
+    ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
+    ecs_set(world, prefab, Position, {0, 0, 0});
+    ecs_set_ptr(world, prefab, Scatter, &c);
+    ecs_progress(world, 0);
+    test_int(sc_children(world, prefab), 0);
+    test_int((int32_t)box_scatter_visits(world), 0);
+
+    ecs_entity_t inst = ecs_new_w_pair(world, EcsIsA, prefab);
+    ecs_progress(world, 0);
+    test_assert(ecs_owns(world, inst, Scatter));
+    test_int(ecs_get(world, inst, ScatterStatus)->instances, 25);
+    test_int(sc_children(world, inst), 25);
+    test_int(sc_children(world, prefab), 0);
+
+    ecs_fini(world);
+}
+
+void Scatter_waiting_polls_until_ground(void) {
+    // scenes/scatter
+    ecs_world_t *world = sc_world();
+    ecs_entity_t tree = sc_prefab(world, "ScatterTree");
+    ecs_entity_t terrain = sc_terrain(world);
+    sc_height_fn = sc_slope;
+    sc_mask_fn = NULL;
+    Scatter c = sc_config(tree, 0, 4, 0, 8);
+    c.ground = terrain;
+    ecs_entity_t s;
+    sc_cell(world, 0, 0, 20, &c, &s);
+    ecs_progress(world, 0);
+    test_int((int32_t)box_scatter_visits(world), 1);
+    test_bool(ecs_get(world, s, ScatterStatus)->waiting, true);
+    ecs_progress(world, 0);
+    test_int((int32_t)box_scatter_visits(world), 2);
+    test_bool(ecs_get(world, s, ScatterStatus)->waiting, true);
+
+    sc_progress_filled(world, terrain, 6);
+    const ScatterStatus *st = ecs_get(world, s, ScatterStatus);
+    test_bool(st->waiting, false);
+    test_int(st->instances, 16);
+    test_int(st->evaluations, 1);
+
+    // Once placed the scatter leaves the queue
+    int64_t visits = box_scatter_visits(world);
+    sc_progress_filled(world, terrain, 3);
+    test_assert(box_scatter_visits(world) == visits);
+    test_int(ecs_get(world, s, ScatterStatus)->evaluations, 1);
+
+    ecs_fini(world);
+}

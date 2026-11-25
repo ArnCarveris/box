@@ -12,6 +12,8 @@
 #ifdef BOX_RENDER_WGPU
 
 BOX_GPU_THREAD_LOCAL box_gpu_api_t box_gpu_api;
+BOX_GPU_THREAD_LOCAL box_gpu_api_shared_t box_gpu_api_shared;
+BOX_GPU_THREAD_LOCAL WGPUCommandEncoder box_gpu_frame_shared;
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -269,7 +271,8 @@ static void box_gpu_device_init(
     WGPUDeviceDescriptor desc = WGPU_DEVICE_DESCRIPTOR_INIT;
     WGPUFeatureName timestamps = WGPUFeatureName_TimestampQuery;
     WGPUFeatureName clip = WGPUFeatureName_ClipDistances;
-    WGPUFeatureName features[2];
+    WGPUFeatureName first = WGPUFeatureName_IndirectFirstInstance;
+    WGPUFeatureName features[3];
     WGPULimits adapter = WGPU_LIMITS_INIT, limits = WGPU_LIMITS_INIT;
     size_t feature_count = 0;
     if (wgpuAdapterHasFeature(gpu->adapter, timestamps)) {
@@ -278,6 +281,10 @@ static void box_gpu_device_init(
 
     if (wgpuAdapterHasFeature(gpu->adapter, clip)) {
         features[feature_count ++] = clip;
+    }
+
+    if (wgpuAdapterHasFeature(gpu->adapter, first)) {
+        features[feature_count ++] = first;
     }
 
     desc.requiredFeatureCount = feature_count;
@@ -311,10 +318,15 @@ static void box_gpu_device_init(
         gpu->queue = wgpuDeviceGetQueue(gpu->device);
         gpu->timestamps = wgpuDeviceHasFeature(gpu->device, timestamps);
         gpu->clip_distances = wgpuDeviceHasFeature(gpu->device, clip);
+        gpu->first_instance = wgpuDeviceHasFeature(gpu->device, first) && !getenv("BOX_NO_FI");
     }
 }
 
 /** Create the instance, adapter and device.
+ *
+ * The instance has the flags of the build of wgpu less the validation of indirect calls, which
+ * copies the arguments of every indirect draw through a compute pass before each render pass:
+ * the arguments are written by the cull shader of the backend only.
  *
  * @param gpu The backend
  * @return 0 when the device exists, nonzero when it could not be created
@@ -325,7 +337,17 @@ static int box_gpu_create(
     int result = -1;
     wgpuSetLogCallback(box_gpu_log, NULL);
     wgpuSetLogLevel(WGPULogLevel_Warn);
-    gpu->instance = wgpuCreateInstance(NULL);
+    WGPUInstanceExtras extras = {
+        .chain = { .sType = (WGPUSType)WGPUSType_InstanceExtras },
+#ifdef FLECS_DEBUG
+        .flags = WGPUInstanceFlag_Debug | WGPUInstanceFlag_Validation
+#else
+        .flags = WGPUInstanceFlag_Empty
+#endif
+    };
+    gpu->instance = wgpuCreateInstance(&(WGPUInstanceDescriptor){
+        .nextInChain = &extras.chain
+    });
     if (!gpu->instance) {
         ecs_err("cannot create a webgpu instance");
         goto done;
@@ -507,6 +529,8 @@ static void box_gpu_render(
 {
     box_gpu_t *gpu = ctx;
     int32_t i, count = ecs_vec_count(&packet->resources);
+    gpu->polled = false;
+    gpu->forward_stamp ++;
     box_gpu_packet_count(gpu, packet);
     box_gpu_pipelines_deliver(gpu, packet);
     box_gpu_shader_deliver(gpu);
@@ -521,6 +545,7 @@ static void box_gpu_render(
             box_gpu_shader_apply(gpu, r->op, r->handle,
                 r->size >= sizeof(box_render_shader_desc_t) ? data : NULL);
         } else if (r->kind == BOX_RENDER_MESH) {
+            gpu->mesh_serial ++;
             box_gpu_mesh_apply(gpu, r->op, r->handle,
                 r->size >= sizeof(box_render_mesh_desc_t) ? data : NULL);
         } else if (r->kind == BOX_RENDER_BUFFER) {
@@ -591,12 +616,14 @@ static void box_gpu_render(
     box_gpu_planets_begin(gpu);
     box_gpu_debug_begin(gpu);
     box_gpu_grass_begin(gpu, packet);
+    box_gpu_frame_submit(gpu);
     box_gpu_bake_capture(gpu, packet);
     box_gpu_atlas_render(gpu, packet);
     box_gpu_targets_render(gpu, packet);
     box_gpu_grass_end(gpu, packet);
     box_gpu_impostor_render(gpu, packet);
     box_gpu_profile_frame(gpu, packet);
+    box_gpu_frame_submit(gpu);
     box_gpu_pace(gpu);
 
     box_gpu_effects_sweep(gpu, packet);
@@ -653,6 +680,7 @@ static void box_gpu_fini(
     void *ctx)
 {
     box_gpu_t *gpu = ctx;
+    box_gpu_frame_drop();
     box_gpu_pipelines_fini(gpu);
     box_gpu_profile_fini(gpu);
     if (gpu->device) {
@@ -718,6 +746,81 @@ static void box_gpu_free(
     ecs_vec_fini_t(NULL, &gpu->timings, box_render_gpu_timing_t);
     ecs_os_mutex_free(gpu->lock);
     ecs_os_free(gpu);
+}
+
+WGPUCommandEncoder box_gpu_frame_encoder(
+    box_gpu_t *gpu)
+{
+    if (!box_gpu_frame_shared) {
+        box_gpu_frame_shared = wgpuDeviceCreateCommandEncoder(gpu->device, NULL);
+    }
+
+    return box_gpu_frame_shared;
+}
+
+void box_gpu_frame_submit(
+    box_gpu_t *gpu)
+{
+    if (box_gpu_frame_shared) {
+        wgpuQueueSubmit(gpu->queue, 0, NULL);
+    }
+}
+
+void box_gpu_frame_drop(void)
+{
+    if (box_gpu_frame_shared) {
+        wgpuCommandEncoderRelease(box_gpu_frame_shared);
+        box_gpu_frame_shared = NULL;
+    }
+}
+
+void box_gpu_poll(
+    box_gpu_t *gpu)
+{
+#ifndef __EMSCRIPTEN__
+    if (!gpu->polled) {
+        gpu->polled = true;
+        wgpuDevicePoll(gpu->device, false, NULL);
+    }
+#else
+    (void)gpu;
+#endif
+}
+
+bool box_gpu_write_changed(
+    box_gpu_t *gpu,
+    box_gpu_written_t *w,
+    bool fresh,
+    WGPUBuffer buffer,
+    uint64_t offset,
+    const void *data,
+    size_t size)
+{
+    bool result = fresh || !w->data || w->size != size || w->offset != offset ||
+        ecs_os_memcmp(w->data, data, (ecs_size_t)size);
+    if (!result) {
+        goto done;
+    }
+
+    if (w->capacity < size) {
+        ecs_os_free(w->data);
+        w->data = ecs_os_malloc((ecs_size_t)size);
+        w->capacity = size;
+    }
+
+    ecs_os_memcpy(w->data, data, (ecs_size_t)size);
+    w->size = size;
+    w->offset = offset;
+    wgpuQueueWriteBuffer(gpu->queue, buffer, offset, data, size);
+done:
+    return result;
+}
+
+void box_gpu_written_free(
+    box_gpu_written_t *w)
+{
+    ecs_os_free(w->data);
+    ecs_os_memset_t(w, 0, box_gpu_written_t);
 }
 
 WGPUComputePassEncoder box_gpu_compute_begin(
@@ -1002,6 +1105,9 @@ void box_gpu_stats_publish(
     s->texture_graph_misses += p->texture_graph_misses;
     s->texture_graph_evictions += p->texture_graph_evictions;
     s->texture_graph_updates += p->texture_graph_updates;
+    s->texture_graph_visits += p->texture_graph_visits;
+    s->terrain_height_scans += p->terrain_height_scans;
+    s->ripple_dispatches += p->ripple_dispatches;
     s->texture_graph_cached_bytes = (int64_t)gpu->texture_graph_cached_bytes;
     s->texture_graph_cached = gpu->texture_graph_cached;
     if (s->copy_staging > s->copy_staging_peak) {

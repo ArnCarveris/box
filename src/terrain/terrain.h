@@ -98,6 +98,7 @@ typedef struct box_terrain_tile_t {
     bool drawn;             /**< It draws this frame */
     bool keep;              /**< It stands in for a wanted tile that is not ready */
     bool enabled;           /**< It is not disabled */
+    uint8_t before;         /**< Its wanted, drawn and keep before the update that runs */
 } box_terrain_tile_t;
 
 /** Get the tiles of a terrain, for tests.
@@ -111,6 +112,76 @@ box_terrain_tile_t* const* box_terrain_tiles(
     const ecs_world_t *world,
     ecs_entity_t terrain,
     int32_t *count);
+
+/** Get how often the tiles of a terrain were updated and selected, for tests: an update that
+ * found nothing changed and a selection for the same foci and settings do not count.
+ *
+ * @param world The world
+ * @param terrain The terrain entity
+ * @param updates Receives the updates that went over the tiles
+ * @param selects Receives the selections of the nodes the foci want
+ */
+void box_terrain_counters(
+    const ecs_world_t *world,
+    ecs_entity_t terrain,
+    int32_t *updates,
+    int32_t *selects);
+
+/** Get a counter of the world that changes whenever an answer of box_terrain_scene,
+ * box_terrain_ground or of a height, normal, mask or ray query of any terrain could differ from
+ * before, and not while none can.
+ *
+ * It changes when a terrain got or lost query tiles, when its settings, scene or position
+ * changed (seen by the system of the query tiles in EcsPostUpdate), when a CPU copy of a
+ * texture arrived, changed or was freed and when the world origin shifted.
+ *
+ * @param world The world
+ * @return The counter
+ */
+uint64_t box_terrain_revision(
+    const ecs_world_t *world);
+
+/** Get how often the query tiles of a terrain were updated and their status was computed, for
+ * tests: a frame in which nothing they depend on changed does not count.
+ *
+ * @param world The world
+ * @param terrain The terrain entity
+ * @param updates Receives the updates that selected the query tiles
+ * @param statuses Receives the computations of the TerrainQueryStatus
+ */
+void box_terrain_query_counters(
+    const ecs_world_t *world,
+    ecs_entity_t terrain,
+    int32_t *updates,
+    int32_t *statuses);
+
+/** Get how often the render extract built the heights of the tiles that draw and the grid of a
+ * terrain with TerrainSampled, for tests: a frame that appends what was built before does not
+ * count.
+ *
+ * @param world The world
+ * @param heights Receives the builds of the heights
+ * @param grids Receives the builds of the grids
+ */
+void box_render_terrain_counters(
+    const ecs_world_t *world,
+    int32_t *heights,
+    int32_t *grids);
+
+/** Get the vertices per edge of a tile from a resolution: odd, 5 to 257, 65 for 0 or less.
+ *
+ * @param resolution The resolution
+ * @return Vertices per edge
+ */
+int32_t box_terrain_vertices(
+    int32_t resolution);
+
+/** Register the TerrainTile shape, after TerrainTile.
+ *
+ * @param world The world
+ */
+void box_terrain_tile_shape(
+    ecs_world_t *world);
 
 /** Register the TerrainTile shape and the system that keeps the tiles of every terrain, part of
  * BoxTerrainImport after Terrain and TerrainStatus.
@@ -259,6 +330,7 @@ typedef struct box_terrain_query_tile_t {
                              *   meters from the first texel of a row to the last */
     double distance;        /**< Distance to the nearest focus when it was last wanted */
     bool wanted;            /**< The foci or a request want it this frame */
+    bool before;            /**< Its wanted before the update that runs */
 } box_terrain_query_tile_t;
 
 /** Get the query tiles of a terrain, for tests.

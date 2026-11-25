@@ -88,10 +88,10 @@ extern "C" {
  *
  * box.fps writes them while the panel is open, only where they changed. A new sample goes to the
  * bar of the oldest sample in the column right of the newest, so it evaluates one bar and the
- * parent.
+ * parent; several at once, what a panel with an interval gets, move the parent once.
  *
- * Every BOX_FPS_BARS samples, and when the samples changed otherwise, bar_i gets the sample of
- * age BOX_FPS_BARS - 1 - i in column i again. */
+ * Every BOX_FPS_BARS samples that arrive one at a time, and when the samples changed otherwise,
+ * bar_i gets the sample of age BOX_FPS_BARS - 1 - i in column i again. */
 #define BOX_FPS_BAR_MUT BOX_FPS_BAR ".mut"
 
 /** Path of the template of the script that the parent of the bars, BOX_FPS_CHART_BARS,
@@ -190,20 +190,28 @@ extern "C" {
 /** Path of the template of the script that the GPU stats panel instantiates */
 #define BOX_GPU_TEMPLATE "box.fps.GpuWidget"
 
+/** Seconds between two updates of the fps and load panels by default (FpsPanel.interval and
+ * LoadPanel.interval) */
+#define BOX_FPS_INTERVAL (0.25f)
+
 /** Seconds GpuStats averages over by default (GpuPanel.interval) */
 #define BOX_GPU_INTERVAL (0.5f)
 
-/** The fps panel singleton: whether it is shown.
+/** The fps panel singleton: whether it is shown and how often it shows new samples.
  *
  * A change applies in the next frame. The panel shows FrameSamples (box/app.h), takes neither
  * the pointer nor the keyboard and takes its background, text and border from UiTheme.
  */
 ECS_STRUCT(FpsPanel, {
     bool open;          /**< Shown, the fps command flips it */
+    float interval;     /**< Seconds between two updates from the samples the engine adds,
+                         *   BOX_FPS_INTERVAL by default; 0 or less updates on every sample.
+                         *   Samples written while FrameSamples.hold is set show at once. */
 });
 
-/** The frames of the last second of FrameSamples, written by box.fps while the panel is open
- * whenever FrameSamples is set or notified, read by the summary of the panel.
+/** The frames of the last second of FrameSamples, read by the summary of the panel. Written
+ * while the panel is open, every FpsPanel.interval, when the panel shows it differently: frames,
+ * a time to a tenth, fps to a whole number or the color of the mean changed.
  *
  * The last second is the newest samples up to the first one that brings their sum to
  * BOX_FPS_SUMMARY_MS, or all of them when they sum to less.
@@ -215,17 +223,22 @@ ECS_STRUCT(FpsSummary, {
     double fps;         /**< Frames per second, 1000 / mean_ms, 0 without samples */
 });
 
-/** The load panel singleton: whether it is shown.
+/** The load panel singleton: whether it is shown and how often it shows new samples.
  *
  * A change applies in the next frame. The panel shows LoadSamples, takes neither the pointer
  * nor the keyboard and takes its background, text and border from UiTheme.
  */
 ECS_STRUCT(LoadPanel, {
     bool open;          /**< Shown, the load command flips it */
+    float interval;     /**< Seconds between two updates from the samples the engine adds,
+                         *   BOX_FPS_INTERVAL by default; 0 or less updates on every sample */
 });
 
 /** Milliseconds the threads of box worked in the recent frames, one sample per frame, written by
  * box.fps at the start of every frame into each member whose hold is false.
+ *
+ * The engine writes the samples without notifying them, except while the load panel is open,
+ * every LoadPanel.interval, so OnSet observers and change detection do not see every sample.
  *
  * A sample is the time a thread worked between the starts of the frame before and this one, so
  * it lines up with FrameSamples. A thread that waits for another or for the GPU does not work.
@@ -248,8 +261,9 @@ ECS_STRUCT(LoadStat, {
     double share;       /**< Percent of the frame time the thread worked, 0 without samples */
 });
 
-/** The last second of LoadSamples, written by box.fps while the load panel is open whenever
- * LoadSamples is set or notified, read by the heads of the rows of the panel.
+/** The last second of LoadSamples, read by the heads of the rows of the load panel. Written
+ * while it is open, when LoadSamples is notified and the panel shows it differently: frames,
+ * workers, a time to a tenth, a share to a whole number or the color of a mean changed.
  *
  * The last second is the frames of FpsSummary: the newest frame samples up to the first one that
  * brings their sum to BOX_FPS_SUMMARY_MS, or all of them when they sum to less.

@@ -8,8 +8,8 @@ the script `etc/fps/fps.flecs` (script module `box.fps`), reloaded when the file
 
 | Name (script) | C type | Fields / role |
 |---|---|---|
-| `box.fps.Panel` | `FpsPanel` | `open`: shown; a change applies next frame. Singleton, closed by default |
-| `box.fps.Summary` | `FpsSummary` | `frames`, `mean_ms`, `worst_ms`, `fps` (1000 / mean) of the last second of samples; 0 without samples. Written only while the panel is open, when `FrameSamples` is set or notified |
+| `box.fps.Panel` | `FpsPanel` | `open`: shown; a change applies next frame. `interval`: seconds between two updates from engine samples (0.25 by default, 0 or less: every sample; held samples show at once). Singleton, closed by default |
+| `box.fps.Summary` | `FpsSummary` | `frames`, `mean_ms`, `worst_ms`, `fps` (1000 / mean) of the last second of samples; 0 without samples. Written only while the panel is open, every `interval`, when what the panel shows of it (frames, times to 0.1 ms, whole fps, color) changed |
 
 Input data is `FrameSamples` (`box.app`, see [app.md](app.md)): a ring of 240 frame intervals in ms, `count`,
 `next`, `hold` (engine adds no samples while set, for fixed test data).
@@ -70,8 +70,9 @@ number of points, at least 3. Green <= 60 fps (+0.5 ms), yellow down to 30 fps, 
 - The bars rotate instead of all being rewritten: a new sample writes `ms`/`col` of one bar (the
   oldest, moved to the column right of the newest) and `first` of `chart.bars`
   (`box.fps.FpsBars`), which shifts every bar left. Neither the chart nor `bars` has a `Layout`,
-  so a sample lays nothing out. Every 120 samples (or when samples change otherwise) columns
-  reset to 0..119.
+  so a sample lays nothing out. Every 120 samples that arrive one at a time (or when samples
+  change otherwise) columns reset to 0..119. The samples of an interval rotate one bar each and
+  write `first` once.
 - `bar_N` keeps its name but not its place: it is not always the newest sample.
 - A bar that read `FrameSamples` itself would re-evaluate every frame; keep per-sample data in
   the muts written from C.

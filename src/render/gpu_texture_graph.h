@@ -145,6 +145,15 @@ typedef struct box_gpu_tg_pooled_t {
     int64_t last;               /**< Packet it was last used in */
 } box_gpu_tg_pooled_t;
 
+/** List of the graph state a graph is in, which decides when a packet looks at it */
+typedef enum box_gpu_tg_track_t {
+    BOX_GPU_TG_IDLE,            /**< None: up to date, not live and it samples no texture, so
+                                 *   no packet looks at it until it is activated */
+    BOX_GPU_TG_ACTIVE,          /**< tg->active: every packet looks at it */
+    BOX_GPU_TG_WATCHER          /**< tg->watchers: up to date and not live, but it samples
+                                 *   textures, so the packets after an image changed look at it */
+} box_gpu_tg_track_t;
+
 /** A texture graph the main thread sent, under its texture handle */
 typedef struct box_gpu_tg_graph_t {
     uint32_t handle;            /**< Texture handle */
@@ -184,6 +193,12 @@ typedef struct box_gpu_tg_graph_t {
     double blended;             /**< World time of the last crossfade, NAN for none */
     int64_t mark;               /**< Packet whose evaluation order it was put in */
     int32_t eval;               /**< Index of its evaluation in the packet, -1 for none */
+    box_gpu_tg_track_t track;   /**< List of the graph state that holds it */
+    int32_t slot;               /**< Its index in that list */
+    bool live;                  /**< Its image changes without a change of the graph: it is
+                                 *   animated, or samples a target or the image of a live graph */
+    bool steady;                /**< It is live and up to date, so its evaluations change no
+                                 *   image a watching graph samples */
 } box_gpu_tg_graph_t;
 
 /** A materialized value of the cache, shared by the graphs whose node has its content hash.
@@ -287,6 +302,11 @@ typedef struct box_gpu_texgraphs_t {
                                  *   RGBA16Float images, 0 before they are compiled */
     WGPUComputePipeline blend_pipelines[2]; /**< Their pipelines once created */
     uint64_t blend_prelude;     /**< Hash of the shared code they were compiled with */
+    ecs_vec_t active;           /**< box_gpu_tg_graph_t*, the graphs every packet looks at */
+    ecs_vec_t watchers;         /**< box_gpu_tg_graph_t*, the graphs looked at after an image
+                                 *   changed */
+    uint32_t serial;            /**< Serial of the last image written when the last packet was
+                                 *   evaluated */
 } box_gpu_texgraphs_t;
 
 /** Get the bytes of a texel of a format of an intermediate, a cached value or a readback.
@@ -566,6 +586,55 @@ void box_gpu_tg_order(
     box_gpu_texgraphs_t *tg,
     box_gpu_tg_graph_t *graph,
     ecs_vec_t *order);
+
+/** Put a graph in a list of the graph state, taking it out of the one it is in.
+ *
+ * @param tg The graph state
+ * @param graph The graph
+ * @param track The list
+ */
+void box_gpu_tg_track(
+    box_gpu_texgraphs_t *tg,
+    box_gpu_tg_graph_t *graph,
+    box_gpu_tg_track_t track);
+
+/** Make every packet look at a graph until it is up to date again: it changed, its program
+ * has to be made again or a readback asks for it.
+ *
+ * @param tg The graph state
+ * @param graph The graph
+ */
+void box_gpu_tg_activate(
+    box_gpu_texgraphs_t *tg,
+    box_gpu_tg_graph_t *graph);
+
+/** Put the graphs a packet looks at in its evaluation order: the active ones, and the watchers
+ * when an image was written since the last packet or an active graph is not steady, as its
+ * evaluation writes an image they may sample.
+ *
+ * @param gpu The backend
+ * @param tg The graph state
+ * @param order Receives box_gpu_tg_graph_t*
+ */
+void box_gpu_tg_candidates(
+    box_gpu_t *gpu,
+    box_gpu_texgraphs_t *tg,
+    ecs_vec_t *order);
+
+/** Put a graph a packet looked at in the list of its state after the packet: active while it
+ * is not up to date, live or has readbacks waiting, else a watcher when it samples textures.
+ *
+ * @param gpu The backend
+ * @param tg The graph state
+ * @param graph The graph
+ * @param settled It is up to date: unchanged since its image was written, with the program
+ * of its key, or it cannot be evaluated until it changes
+ */
+void box_gpu_tg_settle(
+    box_gpu_t *gpu,
+    box_gpu_texgraphs_t *tg,
+    box_gpu_tg_graph_t *graph,
+    bool settled);
 
 /** Count a graph that a draw sampled as sampling the graphs whose images it samples, so an
  * animated graph that only another drawn graph samples keeps updating.

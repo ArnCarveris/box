@@ -59,6 +59,8 @@ static box_gpu_texgraphs_t* box_gpu_tg_get(
     ecs_vec_init_t(NULL, &tg->layouts, box_gpu_tg_layout_t*, 0);
     ecs_vec_init_t(NULL, &tg->pool, box_gpu_tg_pooled_t*, 0);
     ecs_vec_init_t(NULL, &tg->reads, box_gpu_tg_read_t*, 0);
+    ecs_vec_init_t(NULL, &tg->active, box_gpu_tg_graph_t*, 0);
+    ecs_vec_init_t(NULL, &tg->watchers, box_gpu_tg_graph_t*, 0);
     ecs_map_init(&tg->cache, NULL);
     tg->budget = (uint64_t)BOX_GPU_TG_CACHE_BUDGET;
     tg->next_shader = BOX_GPU_TEXTURE_GRAPH_SHADER_FIRST;
@@ -1142,6 +1144,7 @@ static void box_gpu_tg_graph_free(
 
     box_gpu_tg_keyframes_free(gpu, graph);
     box_gpu_tg_graph_desc_free(graph);
+    box_gpu_tg_track(tg, graph, BOX_GPU_TG_IDLE);
     ecs_vec_fini_t(NULL, &graph->forced, int32_t);
     ecs_os_free(graph);
     gpu->texture_graph_count --;
@@ -1265,6 +1268,7 @@ void box_gpu_texture_graph_apply(
     graph->key = 0;
     graph->dirty = true;
     graph->keys_valid = false;
+    box_gpu_tg_activate(tg, graph);
     if (!desc->interpolate || !(desc->rate > 0) || desc->format == GraphSingle ||
         desc->format == GraphFloat || desc->format == GraphFloat4)
     {
@@ -1323,6 +1327,7 @@ stale:
             for (i = 0; i < graph->desc.node_count; i ++) {
                 if (graph->nodes[i].kind == handle) {
                     graph->key = 0;
+                    box_gpu_tg_activate(tg, graph);
                 }
             }
         }
@@ -1354,7 +1359,9 @@ void box_gpu_texture_graph_prelude(
 
     ecs_map_iter_t it = ecs_map_iter(&tg->graphs);
     while (ecs_map_next(&it)) {
-        ((box_gpu_tg_graph_t*)ecs_map_ptr(&it))->key = 0;
+        box_gpu_tg_graph_t *graph = ecs_map_ptr(&it);
+        graph->key = 0;
+        box_gpu_tg_activate(tg, graph);
     }
 }
 
@@ -1405,6 +1412,34 @@ static bool box_gpu_tg_graph_ready(
         result = true;
     }
 
+done:
+    return result;
+}
+
+/** Check whether a graph is up to date after a packet: its image was written since it changed
+ * with the program of its key, whose pipelines exist, or it cannot be evaluated until its
+ * description, a kind of its nodes or the shared code changes.
+ *
+ * @param gpu The backend
+ * @param graph The graph
+ * @return Whether no packet has to look at it for its own sake
+ */
+static bool box_gpu_tg_graph_settled(
+    box_gpu_t *gpu,
+    box_gpu_tg_graph_t *graph)
+{
+    bool result = graph->invalid != NULL;
+    if (result || !graph->key) {
+        goto done;
+    }
+
+    if (graph->pending) {
+        result = graph->pending->failed;
+        goto done;
+    }
+
+    result = !graph->dirty && graph->written && graph->current &&
+        graph->current->key == graph->key && box_gpu_tg_program_ready(gpu, graph->current);
 done:
     return result;
 }
@@ -1658,15 +1693,15 @@ void box_gpu_texture_graphs_evaluate(
     tg->budget = packet->texture_graph_budget > 0
         ? (uint64_t)packet->texture_graph_budget : (uint64_t)BOX_GPU_TG_CACHE_BUDGET;
     box_gpu_tg_poll(gpu, tg);
-    box_gpu_tg_requests(gpu, tg);
+    if (requested) {
+        box_gpu_tg_requests(gpu, tg);
+    }
+
     box_gpu_tg_stamps_init(gpu, tg);
     ecs_vec_init_t(NULL, &evals, box_gpu_tg_eval_t, 0);
     ecs_vec_init_t(NULL, &order, box_gpu_tg_graph_t*, 0);
-    ecs_map_iter_t it = ecs_map_iter(&tg->graphs);
-    while (ecs_map_next(&it)) {
-        box_gpu_tg_order(tg, ecs_map_ptr(&it), &order);
-    }
-
+    box_gpu_tg_candidates(gpu, tg, &order);
+    gpu->pending.texture_graph_visits += ecs_vec_count(&order);
     box_gpu_tg_graph_t **graphs = ecs_vec_first(&order);
     for (i = ecs_vec_count(&order) - 1; i >= 0; i --) {
         box_gpu_tg_propagate(tg, graphs[i]);
@@ -1815,7 +1850,10 @@ void box_gpu_texture_graphs_evaluate(
 sweep:
     for (i = 0; i < ecs_vec_count(&order); i ++) {
         graphs[i]->eval = -1;
+        box_gpu_tg_settle(gpu, tg, graphs[i], box_gpu_tg_graph_settled(gpu, graphs[i]));
     }
+
+    tg->serial = gpu->texture_serial;
 
     ecs_vec_fini_t(NULL, &order, box_gpu_tg_graph_t*);
     ecs_vec_fini_t(NULL, &evals, box_gpu_tg_eval_t);
@@ -1899,6 +1937,8 @@ void box_gpu_texture_graphs_fini(
     ecs_vec_fini_t(NULL, &tg->layouts, box_gpu_tg_layout_t*);
     ecs_vec_fini_t(NULL, &tg->pool, box_gpu_tg_pooled_t*);
     ecs_vec_fini_t(NULL, &tg->reads, box_gpu_tg_read_t*);
+    ecs_vec_fini_t(NULL, &tg->active, box_gpu_tg_graph_t*);
+    ecs_vec_fini_t(NULL, &tg->watchers, box_gpu_tg_graph_t*);
     ecs_os_free(tg->prelude);
     ecs_os_free(tg);
     gpu->texture_graphs = NULL;

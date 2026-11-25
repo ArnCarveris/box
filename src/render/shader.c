@@ -5,6 +5,9 @@
  * Shaders are preprocessed in RenderExtract when they were set or the file watch of box.app
  * found a change of a file they read, and their code goes into the packet; the backend compiles
  * it on the thread that renders.
+ *
+ * The extract only looks at the shaders in its list: the ones to preprocess or send, and the
+ * engine shaders that wait for a packet that uses them.
  */
 
 #define BOX_SHADER_IMPL
@@ -29,7 +32,18 @@ typedef struct box_shader_t {
     char *label;            /**< Path the code was read from, the label of the module */
     ecs_vec_t sources;      /**< char*, files the lines of the code come from */
     ecs_vec_t lines;        /**< box_shader_loc_t, source position of every line of the code */
+    bool listed;            /**< The shader is in the list the extract looks at */
 } box_shader_t;
+
+/** What the batches of a packet draw with, gathered in one pass for the shaders sent on demand */
+typedef struct box_shader_batches_t {
+    bool scanned;           /**< The batches were looked at */
+    uint64_t pipelines;     /**< Bit h: a batch draws with the engine shader of handle h */
+    uint64_t layers;        /**< Bit h: a batch with texture layers draws with a shader whose
+                             *   layers module has handle h */
+    bool meshes;            /**< A batch draws with a mesh shader */
+    bool transmissive;      /**< A batch is transmissive */
+} box_shader_batches_t;
 
 /** State of the box.shader module shared by its observers and its extract system */
 typedef struct box_shader_state_t {
@@ -47,6 +61,11 @@ typedef struct box_shader_state_t {
     int32_t sent_base;          /**< sent before the modules of the report */
     int32_t arrived_base;       /**< arrived when the report started */
     int32_t pipelines_base;     /**< Pipelines the backend had created when the report started */
+    ecs_vec_t active;           /**< box_shader_t*, the shaders the extract looks at: the ones to
+                                 *   preprocess or send and the ones that wait for a packet that
+                                 *   uses them */
+    int32_t waiting;            /**< Shaders whose awaited is set */
+    box_shader_work_t work;     /**< Work the extract did, for tests */
 } box_shader_state_t;
 
 ECS_COMPONENT_DECLARE(Shader);
@@ -253,9 +272,25 @@ static void box_shader_state_release(
 
     ecs_map_fini(&state->shaders);
     ecs_vec_fini_t(NULL, &state->destroyed, uint32_t);
+    ecs_vec_fini_t(NULL, &state->active, box_shader_t*);
     ecs_os_free(state);
 done:
     return;
+}
+
+/** Put a shader in the list the extract looks at.
+ *
+ * @param state The module state
+ * @param s The shader
+ */
+static void box_shader_list(
+    box_shader_state_t *state,
+    box_shader_t *s)
+{
+    if (!s->listed) {
+        s->listed = true;
+        *ecs_vec_append_t(NULL, &state->active, box_shader_t*) = s;
+    }
 }
 
 /** Get the engine side of a shader, creating it on first use.
@@ -281,6 +316,7 @@ static box_shader_t* box_shader_ensure(
     ecs_vec_init_t(NULL, &result->sources, char*, 0);
     ecs_vec_init_t(NULL, &result->lines, box_shader_loc_t, 0);
     ecs_map_insert_ptr(&state->shaders, entity, result);
+    box_shader_list(state, result);
 done:
     return result;
 }
@@ -413,8 +449,10 @@ static void box_shader_backend(
         box_shader_t *s = ecs_map_ptr(&it);
         s->sent = false;
         s->awaited = 0;
+        box_shader_list(state, s);
     }
 
+    state->waiting = 0;
     ecs_vec_clear(&state->destroyed);
     state->backend = backend->ctx;
     state->render = backend->render;
@@ -439,13 +477,71 @@ static void box_shader_changed(
     (void)world;
     if (s) {
         s->dirty = true;
+        box_shader_list(state, s);
     }
+}
+
+/** Check whether a batch of a packet draws with a shader, looking at the batches once per
+ * packet for every shader that asks.
+ *
+ * @param p The packet
+ * @param handle Handle of the shader
+ * @param use What the batches of the packet draw with, gathered on first use
+ * @param work Receives the pass over the batches
+ * @return Whether a batch uses the shader, see box_shader_used
+ */
+static bool box_shader_batches_use(
+    const box_render_packet_t *p,
+    uint32_t handle,
+    box_shader_batches_t *use,
+    box_shader_work_t *work)
+{
+    bool meshes = handle == BOX_RENDER_SHADER_CLUSTER ||
+        handle == BOX_RENDER_SHADER_SHADOW || handle == BOX_RENDER_SHADER_SHADOW_CLIP ||
+        handle == BOX_RENDER_SHADER_CULL;
+    bool result = false;
+    int32_t i;
+    if (handle >= 64) {
+        for (i = 0; i < ecs_vec_count(&p->batches) && !result; i ++) {
+            result = ecs_vec_get_t(&p->batches, box_render_batch_t, i)->pipeline == handle;
+        }
+
+        goto done;
+    }
+
+    if (!use->scanned) {
+        use->scanned = true;
+        work->scans ++;
+        for (i = 0; i < ecs_vec_count(&p->batches); i ++) {
+            const box_render_batch_t *b = ecs_vec_get_t(&p->batches, box_render_batch_t, i);
+            if (b->pipeline < 64) {
+                use->pipelines |= 1ull << b->pipeline;
+            }
+
+            if (b->texture_layers) {
+                use->layers |= 1ull << box_render_mesh_layers(b->pipeline);
+            }
+
+            use->meshes = use->meshes || box_render_is_mesh(b->pipeline);
+            use->transmissive = use->transmissive || b->transmissive;
+        }
+    }
+
+    result = (!meshes && ((use->pipelines >> handle) & 1)) ||
+        (handle == BOX_RENDER_SHADER_CULL &&
+            ((use->pipelines >> BOX_RENDER_SHADER_SHAPE2D) & 1)) ||
+        (meshes && use->meshes) || ((use->layers >> handle) & 1) ||
+        (handle == BOX_RENDER_SHADER_TRANSMISSION && use->transmissive);
+done:
+    return result;
 }
 
 /** Check whether a batch or a scatter of a packet runs a shader.
  *
  * @param p The packet
  * @param handle Handle of the shader
+ * @param use What the batches of the packet draw with, gathered on first use
+ * @param work Receives the pass over the batches
  * @return Whether a batch uses the shader as its pipeline, it scatters and runs a scatter, it
  * composes and places a mover page, or
  * it assigns lights to clusters or draws shadow casters (either variant of the shadow shader)
@@ -474,16 +570,12 @@ static void box_shader_changed(
  */
 static bool box_shader_used(
     const box_render_packet_t *p,
-    uint32_t handle)
+    uint32_t handle,
+    box_shader_batches_t *use,
+    box_shader_work_t *work)
 {
     bool result = handle == BOX_RENDER_SHADER_SCATTER && ecs_vec_count(&p->scatters);
     result = result || (handle == BOX_RENDER_SHADER_COMPOSE && ecs_vec_count(&p->composes));
-
-    bool meshes = handle == BOX_RENDER_SHADER_CLUSTER ||
-        handle == BOX_RENDER_SHADER_SHADOW || handle == BOX_RENDER_SHADER_SHADOW_CLIP ||
-        handle == BOX_RENDER_SHADER_CULL;
-    uint32_t pipeline = meshes ? UINT32_MAX : handle;
-    uint32_t also = handle == BOX_RENDER_SHADER_CULL ? BOX_RENDER_SHADER_SHAPE2D : pipeline;
     int32_t i;
     if (box_render_effects_use(p, handle)) {
         result = true;
@@ -620,19 +712,7 @@ static bool box_shader_used(
         result = true;
     }
 
-    for (i = 0; i < ecs_vec_count(&p->batches); i ++) {
-        const box_render_batch_t *b = ecs_vec_get_t(&p->batches, box_render_batch_t, i);
-        if (b->pipeline == pipeline || b->pipeline == also ||
-            (meshes && box_render_is_mesh(b->pipeline)) ||
-            (b->texture_layers && handle == box_render_mesh_layers(b->pipeline)) ||
-            (handle == BOX_RENDER_SHADER_TRANSMISSION && b->transmissive))
-        {
-            result = true;
-            break;
-        }
-    }
-
-    return result;
+    return result || box_shader_batches_use(p, handle, use, work);
 }
 
 /** Rewrite the line of a GPU message from the preprocessed code to the source file and line.
@@ -688,6 +768,7 @@ static void box_shader_results(
             if (s->awaited && r.revision >= s->awaited) {
                 s->awaited = 0;
                 state->arrived ++;
+                state->waiting --;
             }
 
             ecs_os_free(s->gpu_error);
@@ -721,6 +802,7 @@ static void box_shader_await(
     const box_render_gpu_stats_t *stats)
 {
     if (s->handle != BOX_RENDER_SHADER_SHADOW_CLIP || stats->clip_distances) {
+        state->waiting += !s->awaited;
         s->awaited = s->revision;
         state->sent ++;
     }
@@ -739,17 +821,17 @@ static void box_shader_report(
     box_shader_state_t *state,
     const box_render_gpu_stats_t *stats)
 {
-    int32_t waiting = 0;
-    ecs_map_iter_t it = ecs_map_iter(&state->shaders);
-    while (ecs_map_next(&it)) {
-        box_shader_t *s = ecs_map_ptr(&it);
-        if (stats->failed) {
-            s->awaited = 0;
+    int32_t waiting;
+    if (stats->failed && state->waiting) {
+        ecs_map_iter_t it = ecs_map_iter(&state->shaders);
+        while (ecs_map_next(&it)) {
+            ((box_shader_t*)ecs_map_ptr(&it))->awaited = 0;
         }
 
-        waiting += s->awaited != 0;
+        state->waiting = 0;
     }
 
+    waiting = state->waiting;
     bool busy = waiting || stats->pipelines_building > 0;
     if (busy && !state->task) {
         state->task = box_task_start(world, BOX_TASK_SHADERS, true, 0);
@@ -772,6 +854,9 @@ static void box_shader_report(
 
 /** Preprocess changed shaders and send new code and removed shaders to the renderer.
  *
+ * Only the shaders in the list are looked at. One leaves it once it has nothing to preprocess
+ * or send; an engine shader sent on demand stays until a packet uses it.
+ *
  * @param it The iterator of the system
  */
 static void BoxShaderExtract(
@@ -780,8 +865,9 @@ static void BoxShaderExtract(
     box_shader_state_t *state = it->ctx;
     ecs_world_t *world = it->stage;
     box_render_gpu_stats_t stats;
+    box_shader_batches_t use = {0};
     bool gpu = box_render_gpu_stats(world, &stats);
-    int32_t i;
+    int32_t i, count, kept = 0;
     box_shader_backend(state, box_render_get_backend(world));
     box_shader_results(world, state);
     for (i = 0; i < ecs_vec_count(&state->destroyed); i ++) {
@@ -790,14 +876,19 @@ static void BoxShaderExtract(
     }
 
     ecs_vec_clear(&state->destroyed);
-    ecs_map_iter_t mit = ecs_map_iter(&state->shaders);
-    while (ecs_map_next(&mit)) {
-        box_shader_t *s = ecs_map_ptr(&mit);
+    count = ecs_vec_count(&state->active);
+    for (i = 0; i < count; i ++) {
+        box_shader_t *s = *ecs_vec_get_t(&state->active, box_shader_t*, i);
+        state->work.visits ++;
         if (s->builtin && !gpu) {
+            s->listed = false;
             continue;
         }
 
-        if (s->on_demand && !s->sent && !box_shader_used(box_render_packet(world), s->handle)) {
+        if (s->on_demand && !s->sent && !box_shader_used(box_render_packet(world), s->handle,
+            &use, &state->work))
+        {
+            *ecs_vec_get_t(&state->active, box_shader_t*, kept ++) = s;
             continue;
         }
 
@@ -811,11 +902,29 @@ static void BoxShaderExtract(
                 box_shader_await(state, s, &stats);
             }
         }
+
+        s->listed = false;
     }
 
+    ecs_vec_set_count_t(NULL, &state->active, box_shader_t*, kept);
+    state->work.active = kept;
     if (gpu) {
         box_shader_report(world, state, &stats);
     }
+}
+
+bool box_shader_work(
+    const ecs_world_t *world,
+    box_shader_work_t *out)
+{
+    ecs_entity_t system = ecs_lookup(world, "box.shader.Extract");
+    const ecs_system_t *s = system ? ecs_system_get(world, system) : NULL;
+    ecs_os_memset_t(out, 0, box_shader_work_t);
+    if (s && s->ctx) {
+        *out = ((const box_shader_state_t*)s->ctx)->work;
+    }
+
+    return s && s->ctx;
 }
 
 /** Mark set shaders for preprocessing.
@@ -828,7 +937,9 @@ static void BoxShaderOnSet(
     box_shader_state_t *state = it->ctx;
     int32_t i;
     for (i = 0; i < it->count; i ++) {
-        box_shader_ensure(state, it->entities[i], 0)->dirty = true;
+        box_shader_t *s = box_shader_ensure(state, it->entities[i], 0);
+        s->dirty = true;
+        box_shader_list(state, s);
     }
 }
 
@@ -846,6 +957,22 @@ static void BoxShaderOnRemove(
         box_shader_t *s = ecs_map_get_deref(&state->shaders, box_shader_t, it->entities[i]);
         if (s && s->sent) {
             *ecs_vec_append_t(NULL, &state->destroyed, uint32_t) = s->handle;
+        }
+
+        if (s && s->awaited) {
+            state->waiting --;
+        }
+
+        if (s && s->listed) {
+            int32_t j, kept = 0, count = ecs_vec_count(&state->active);
+            box_shader_t **active = ecs_vec_first(&state->active);
+            for (j = 0; j < count; j ++) {
+                if (active[j] != s) {
+                    active[kept ++] = active[j];
+                }
+            }
+
+            ecs_vec_set_count_t(NULL, &state->active, box_shader_t*, kept);
         }
 
         if (s) {
@@ -943,6 +1070,7 @@ void BoxShaderImport(
     box_shader_state_t *state = ecs_os_calloc_t(box_shader_state_t);
     ecs_map_init(&state->shaders, NULL);
     ecs_vec_init_t(NULL, &state->destroyed, uint32_t, 0);
+    ecs_vec_init_t(NULL, &state->active, box_shader_t*, 0);
     state->last_handle = BOX_RENDER_SHADER_FIRST - 1;
     state->refs = 3;
     state->watch = box_file_watch_kind(world, "shader", box_shader_changed, state);

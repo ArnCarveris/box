@@ -30,8 +30,9 @@ state {
 }
 
 async {
+  await next_frame()
+
   while true {
-    await next_frame()
     const fx: f32 = state.forest_fog_wind_x(state.wind)
     const fz: f32 = state.forest_fog_wind_z(state.wind)
 
@@ -42,5 +43,7 @@ async {
     if abs(fz - state.fog_wind_z) > 0.0001 {
       state.fog_wind_z = fz
     }
+
+    await on.assign(state)
   }
 }

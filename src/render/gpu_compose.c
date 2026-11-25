@@ -223,7 +223,7 @@ void box_gpu_compose(
         goto done;
     }
 
-    WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(gpu->device, NULL);
+    WGPUCommandEncoder encoder = box_gpu_frame_encoder(gpu);
     WGPUComputePassEncoder pass = box_gpu_profile_compute_pass(gpu, encoder, "compose");
     wgpuComputePassEncoderSetPipeline(pass, pipeline);
     for (i = 0; i < count; i ++) {
@@ -233,10 +233,6 @@ void box_gpu_compose(
 
     wgpuComputePassEncoderEnd(pass);
     wgpuComputePassEncoderRelease(pass);
-    WGPUCommandBuffer commands = wgpuCommandEncoderFinish(encoder, NULL);
-    wgpuQueueSubmit(gpu->queue, 1, &commands);
-    wgpuCommandBufferRelease(commands);
-    wgpuCommandEncoderRelease(encoder);
 done:
     return;
 }

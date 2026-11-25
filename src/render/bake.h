@@ -206,6 +206,7 @@ typedef struct box_render_bake_t {
     bool measured;          /**< probe_ms comes from a measurement */
     int32_t pending;        /**< Probes left in the volumes that can progress */
     ecs_vec_t changes;      /**< box_bake_change_t, shapes changed since the last extract */
+    int64_t resolved;       /**< Changes box_bake_changes resolved into regions so far */
     ecs_vec_t regions;      /**< box_bake_region_t, what those shapes covered before and after
                              *   their change, kept until the next extract */
     bool reflecting;        /**< A scene has ReflectionBake, so changes are recorded without a

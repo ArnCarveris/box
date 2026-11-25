@@ -184,9 +184,21 @@ box_texture_readback_t* box_texture_readback_ensure(
     if (!*ptr) {
         *ptr = ecs_os_calloc_t(box_texture_readback_t);
         (*ptr)->entity = e;
+        (*ptr)->serial = &t->readback_serial;
     }
 
     return *ptr;
+}
+
+void box_texture_readback_touch(
+    box_textures_t *t,
+    ecs_entity_t e)
+{
+    box_texture_readback_t *rb = box_texture_readback_get(t, e);
+    if (rb && !rb->listed) {
+        rb->listed = true;
+        *ecs_vec_append_t(NULL, &t->readback_dirty, ecs_entity_t) = e;
+    }
 }
 
 void box_texture_readback_clear(
@@ -199,6 +211,9 @@ void box_texture_readback_clear(
     rb->format = ReadbackNone;
     rb->revision = 0;
     rb->level = 0;
+    if (rb->serial) {
+        (*rb->serial) ++;
+    }
 }
 
 /** Halve the size of texels, averaging 2 x 2 texels; an odd last row or column is averaged
@@ -270,6 +285,9 @@ void box_texture_readback_store(
     rb->format = format;
     rb->revision = revision;
     rb->level = level;
+    if (rb->serial) {
+        (*rb->serial) ++;
+    }
 }
 
 /** Get the copy of a texture entity that is ready.
@@ -348,6 +366,23 @@ static void box_texture_readback_free(
         ecs_os_free(rb->data);
         ecs_os_free(rb);
         ecs_map_remove(&t->readbacks, e);
+        t->readback_serial ++;
+    }
+}
+
+/** Create the copy of a texture whose TextureReadback is added or set and put it in the list
+ * of copies to update, so the copies are only looked at when something changed.
+ *
+ * @param it The iterator of the observer
+ */
+static void BoxTextureReadbackOnSet(
+    ecs_iter_t *it)
+{
+    box_textures_t *t = box_textures_get(it->world);
+    int32_t i;
+    for (i = 0; t && i < it->count; i ++) {
+        box_texture_readback_ensure(t, it->entities[i]);
+        box_texture_readback_touch(t, it->entities[i]);
     }
 }
 
@@ -496,6 +531,14 @@ void box_texture_readbacks_init(
     ecs_entity_t module = ecs_get_scope(world);
     ecs_map_init(&t->readbacks, NULL);
     ecs_set_hooks(world, TextureReadback, { .ctor = box_texture_readback_ctor });
+    ecs_observer(world, {
+        .entity = ecs_entity(world, { .name = "ReadbackOnSet" }),
+        .query.terms = {{ .id = ecs_id(TextureReadback), .src.id = EcsSelf }},
+        .query.flags = EcsQueryMatchPrefab | EcsQueryMatchDisabled,
+        .events = { EcsOnAdd, EcsOnSet },
+        .callback = BoxTextureReadbackOnSet
+    });
+
     ecs_observer(world, {
         .entity = ecs_entity(world, { .name = "ReadbackOnRemove" }),
         .query.terms = {{ .id = ecs_id(TextureReadback) }},

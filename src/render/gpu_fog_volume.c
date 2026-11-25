@@ -1076,9 +1076,12 @@ void box_gpu_fog_volumes_inject(
     box_gpu_froxels_history(g, packet, box_render_fog_distance(v->fog_distance), h.valid, &u);
     uint64_t records = (uint64_t)v->fog_count * sizeof(box_render_fog_volume_t);
     uint64_t offset = box_gpu_fog_reserve(gpu, BOX_GPU_FOG_UNIFORM_STRIDE + records);
-    wgpuQueueWriteBuffer(gpu->queue, f->buffer, offset, &u, sizeof(u));
-    wgpuQueueWriteBuffer(gpu->queue, f->buffer, offset + BOX_GPU_FOG_UNIFORM_STRIDE,
-        fogs, (size_t)records);
+    uint8_t *block = ecs_os_calloc((ecs_size_t)(BOX_GPU_FOG_UNIFORM_STRIDE + records));
+    ecs_os_memcpy(block, &u, sizeof(u));
+    ecs_os_memcpy(block + BOX_GPU_FOG_UNIFORM_STRIDE, fogs, (ecs_size_t)records);
+    wgpuQueueWriteBuffer(gpu->queue, f->buffer, offset, block,
+        (size_t)(BOX_GPU_FOG_UNIFORM_STRIDE + records));
+    ecs_os_free(block);
 
     WGPUBindGroupEntry inject[7] = {
         {

@@ -619,8 +619,9 @@ assets {
 
 // The counts follow the sliders
 async {
+  await next_frame()
+
   while true {
-    await next_frame()
     const s = state.season
     const h = state.hour
     const t = state.temperature
@@ -657,5 +658,7 @@ async {
     if ng != state.gnat_swarms {
       state.gnat_swarms = ng
     }
+
+    await on.assign(state)
   }
 }

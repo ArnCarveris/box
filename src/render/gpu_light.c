@@ -545,7 +545,7 @@ static void box_gpu_cluster_poll(
 {
 #ifndef __EMSCRIPTEN__
     if (c->state == BOX_GPU_CLUSTER_MAPPING) {
-        wgpuDevicePoll(gpu->device, false, NULL);
+        box_gpu_poll(gpu);
     }
 #endif
 

@@ -179,9 +179,10 @@ batch splits after one page worth of instances.
 - Static streams upload only changed slots through the scatter pass (entry = 4-byte slot + record,
   segments 16-byte header, 256-byte aligned). `DynamicTransform` batches upload all transforms
   every frame; `DynamicMaterial` batches all shading every frame.
-- Material table: 192-byte records shared by content (hashed, ref counted); a steady frame hashes
+- Material table: 336-byte records shared by content (hashed, ref counted); a steady frame hashes
   nothing. Prefabs, `DynamicMaterial` shapes, `TextureScroll` and running material transitions
-  get private records; dynamic/scrolling ones re-upload every frame.
+  get private records; dynamic ones re-upload every frame, scrolling ones only on change (the
+  shader animates them from a per-frame clock in record 0).
 - Runs and page buffers grow by 1.5x (multiple of 4, min 16 slots); a new batch starts at its
   exact count. Grown buffers keep old contents with GPU copies; pages never shrink.
 - 48-byte full 3x4 transforms are required (shear from rotated children of nonuniform parents).

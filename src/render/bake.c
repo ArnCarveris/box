@@ -1677,6 +1677,12 @@ static void BoxRenderExtractBake(
         }
     }
 
+    if (!ecs_vec_count(&b->volumes) && b->next_handle == 1 && !b->task) {
+        box_bake_changes(world, b);
+        b->shifting = false;
+        goto done;
+    }
+
     box_bake_views(world, b, p);
     for (i = 0; i < ecs_vec_count(&b->volumes); i ++) {
         box_bake_volume_t *v = ecs_vec_get_t(&b->volumes, box_bake_volume_t, i);
@@ -1693,6 +1699,8 @@ static void BoxRenderExtractBake(
     box_bake_progress(it, b, p);
     box_bake_report(world, b);
     box_bake_display(b, p);
+done:
+    return;
 }
 
 /** Free the state of the bake extract.

@@ -51,6 +51,8 @@ typedef struct box_spatial_item_t {
     bool stretched;      /**< The dynamic leaf of the item reaches ahead of its margin */
     bool disabled;       /**< The entity is disabled, queries skip the item */
     int32_t mover;       /**< Mover the item is the leaf of, -1 for the item of an entity */
+    uint32_t sig;        /**< Hash of the world transform and local bounds of a static or UI
+                          *   item as of its last update */
 } box_spatial_item_t;
 
 /** A shape under a mover */
@@ -92,6 +94,8 @@ typedef struct box_spatial_scene_t {
     ecs_vec_t stretched;  /**< int32_t, dynamic items whose leaf may reach ahead */
     int32_t free_item;    /**< First free item, -1 when there is none */
     int32_t count;        /**< Items in use */
+    uint64_t revision;    /**< Changes of the static and UI items so far
+                           *   (box_spatial_static_revision) */
 } box_spatial_scene_t;
 
 /** The spatial index of a world */
@@ -113,6 +117,8 @@ typedef struct box_spatial_t {
     bool stale;                /**< Leaves may lag behind the entities since the last update */
     bool queried;              /**< The index was queried since the last update */
     int32_t refs;              /**< Observers and systems that use the state */
+    uint64_t revision;         /**< Above the revision every dropped scene had, the revision
+                                *   of a scene without an index */
 } box_spatial_t;
 
 /** Singleton through which the queries find the index of a world */

@@ -72,6 +72,9 @@ static void box_textures_free(
     ecs_vec_fini_t(NULL, &t->queued, ecs_entity_t);
     ecs_vec_fini_t(NULL, &t->released, uint32_t);
     ecs_vec_fini_t(NULL, &t->free_handles, uint32_t);
+    ecs_vec_fini_t(NULL, &t->waiting, ecs_entity_t);
+    ecs_vec_fini_t(NULL, &t->readback_dirty, ecs_entity_t);
+    ecs_map_fini(&t->handles);
     box_texture_sync_release(t->sync);
     ecs_os_free(t);
 }
@@ -498,6 +501,7 @@ static void box_texture_request_gen(
             box_texture_t *tex = box_texture_entry(t, e);
             tex->generation ++;
             tex->waiting = true;
+            *ecs_vec_append_t(NULL, &t->waiting, ecs_entity_t) = e;
             ecs_os_free(tex->source_name);
             tex->source_name = removed && exists ? ecs_get_path(world, gen->source) : NULL;
             box_texture_status(world, e, TextureLoading, box_texture_revision(world, e), NULL);
@@ -783,6 +787,8 @@ static void box_texture_forget(
 
         if (tex->handle) {
             *ecs_vec_append_t(NULL, &t->released, uint32_t) = tex->handle;
+            ecs_map_remove(&t->handles, tex->handle);
+            t->bind_serial ++;
         }
 
         ecs_map_remove(&t->textures, e);
@@ -1341,7 +1347,7 @@ static void box_textures_warn_timeout(
 }
 
 /** Fail the textures that still wait for their source to get a TextureGen, or whose source
- * lost it or was deleted.
+ * lost it or was deleted. They come from the list their wait put them in.
  *
  * @param world The world
  * @param t The registry
@@ -1351,17 +1357,24 @@ static void box_textures_fail_waiting(
     box_textures_t *t)
 {
     ecs_vec_t waiting;
+    int32_t i, count = ecs_vec_count(&t->waiting);
+    if (!count) {
+        goto done;
+    }
+
+    t->work.waiting ++;
     ecs_vec_init_t(NULL, &waiting, ecs_entity_t, 0);
-    ecs_map_iter_t it = ecs_map_iter(&t->textures);
-    while (ecs_map_next(&it)) {
-        box_texture_t *tex = ecs_map_ptr(&it);
-        if (tex->waiting) {
+    for (i = 0; i < count; i ++) {
+        ecs_entity_t e = *ecs_vec_get_t(&t->waiting, ecs_entity_t, i);
+        box_texture_t *tex = ecs_map_get_deref(&t->textures, box_texture_t, e);
+        if (tex && tex->waiting) {
             tex->waiting = false;
-            *ecs_vec_append_t(NULL, &waiting, ecs_entity_t) = tex->entity;
+            *ecs_vec_append_t(NULL, &waiting, ecs_entity_t) = e;
         }
     }
 
-    int32_t i, count = ecs_vec_count(&waiting);
+    ecs_vec_clear(&t->waiting);
+    count = ecs_vec_count(&waiting);
     ecs_entity_t *entities = ecs_vec_first_t(&waiting, ecs_entity_t);
     for (i = 0; i < count; i ++) {
         ecs_entity_t e = entities[i];
@@ -1372,6 +1385,58 @@ static void box_textures_fail_waiting(
     }
 
     ecs_vec_fini_t(NULL, &waiting, ecs_entity_t);
+done:
+    return;
+}
+
+/** Load the textures again when the texture quality of the surfaces changed. The surfaces are
+ * only looked at after one of them changed.
+ *
+ * @param world The world
+ * @param t The registry
+ */
+static void box_textures_quality_update(
+    ecs_world_t *world,
+    box_textures_t *t)
+{
+    int32_t quality = 0, i;
+    if (!ecs_query_changed(t->quality_surfaces)) {
+        goto done;
+    }
+
+    t->work.quality ++;
+    ecs_iter_t it = ecs_query_iter(world, t->quality_surfaces);
+    while (ecs_query_next(&it)) {
+        const Surface *s = ecs_field(&it, Surface, 0);
+        for (i = 0; i < it.count; i ++) {
+            int32_t q = s[i].texture_quality ? (int32_t)s[i].texture_quality
+                : BOX_TEXTURE_QUALITY_DEFAULT;
+            quality = q > quality ? q : quality;
+        }
+    }
+
+    quality = quality ? quality : BOX_TEXTURE_QUALITY_DEFAULT;
+    if (t->quality && quality != t->quality) {
+        t->quality = quality;
+        box_textures_reload(world, t, false);
+    }
+
+done:
+    return;
+}
+
+/** Count the entities with a TextureNodePreview, so the previews are only looked at while
+ * there are some.
+ *
+ * @param it The iterator of the observer
+ */
+static void BoxTexturePreviewCount(
+    ecs_iter_t *it)
+{
+    box_textures_t *t = ecs_is_fini(it->world) ? NULL : box_textures_get(it->world);
+    if (t) {
+        t->previews += it->event == EcsOnAdd ? it->count : -it->count;
+    }
 }
 
 /** Report the loads and generations in flight and fail the textures whose source got no
@@ -1395,12 +1460,7 @@ static void BoxTextureUpdate(
     box_task_remaining(it->world, &t->load_task, BOX_TASK_TEXTURES, true, t->loads);
     box_task_remaining(it->world, &t->gen_task, BOX_TASK_TEXTURE_GEN, true, t->gens);
     box_textures_fail_waiting(it->world, t);
-    int32_t quality = box_textures_quality(it->world, t);
-    if (t->quality && quality != t->quality) {
-        t->quality = quality;
-        box_textures_reload(it->world, t, false);
-    }
-
+    box_textures_quality_update(it->world, t);
     if (!app || !app->headless || app->async_loads) {
         goto done;
     }
@@ -1622,6 +1682,9 @@ void BoxTextureImport(
     ecs_vec_init_t(NULL, &t->queued, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &t->released, uint32_t, 0);
     ecs_vec_init_t(NULL, &t->free_handles, uint32_t, 0);
+    ecs_vec_init_t(NULL, &t->waiting, ecs_entity_t, 0);
+    ecs_vec_init_t(NULL, &t->readback_dirty, ecs_entity_t, 0);
+    ecs_map_init(&t->handles, NULL);
     t->next_handle = 1;
     t->sync = ecs_os_calloc_t(box_texture_sync_t);
     t->sync->lock = ecs_os_mutex_new();
@@ -1630,6 +1693,18 @@ void BoxTextureImport(
         .entity = ecs_entity(world, { .name = "Surfaces" }),
         .terms = {{ .id = ecs_id(Surface), .inout = EcsIn }},
         .cache_kind = EcsQueryCacheAuto
+    });
+    t->quality_surfaces = ecs_query(world, {
+        .entity = ecs_entity(world, { .name = "QualitySurfaces" }),
+        .terms = {{ .id = ecs_id(Surface), .inout = EcsIn }},
+        .cache_kind = EcsQueryCacheAuto,
+        .flags = EcsQueryDetectChanges
+    });
+    t->anisotropy_surfaces = ecs_query(world, {
+        .entity = ecs_entity(world, { .name = "AnisotropySurfaces" }),
+        .terms = {{ .id = ecs_id(Surface), .inout = EcsIn }},
+        .cache_kind = EcsQueryCacheAuto,
+        .flags = EcsQueryDetectChanges
     });
     t->watch = box_file_watch_kind(world, "texture", box_texture_changed, NULL);
     ecs_singleton_ensure(world, TextureRegistry)->textures = t;
@@ -1693,6 +1768,14 @@ void BoxTextureImport(
         .query.terms = {{ .id = ecs_id(TextureGraph) }},
         .events = { EcsOnRemove },
         .callback = BoxTextureGraphOnRemove
+    });
+
+    ecs_observer(world, {
+        .entity = ecs_entity(world, { .name = "PreviewCount", .parent = graph }),
+        .query.terms = {{ .id = ecs_id(TextureNodePreview), .src.id = EcsSelf }},
+        .query.flags = EcsQueryMatchPrefab | EcsQueryMatchDisabled,
+        .events = { EcsOnAdd, EcsOnRemove },
+        .callback = BoxTexturePreviewCount
     });
 
     ecs_system(world, {

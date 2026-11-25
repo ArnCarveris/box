@@ -754,27 +754,25 @@ done:
     return;
 }
 
-/** Deliver the readbacks of the previews, request the next ones, forget removed previews and
- * write the statistics of the texture graphs.
+/** Deliver the readbacks of the previews, request the next ones and forget removed previews.
  *
  * The nodes are found with ecs_each_id rather than a query made at import, because box.surface
  * imports box.render before box.texture registers TextureNodePreview.
  *
  * @param it The iterator of the system
+ * @param t The registry
+ * @param p The state of the previews
+ * @return Nodes with a TextureNodePreview
  */
-static void BoxRenderTexturePreviews(
-    ecs_iter_t *it)
+static int32_t box_render_previews_update(
+    ecs_iter_t *it,
+    box_textures_t *t,
+    box_render_previews_t *p)
 {
     ecs_world_t *world = it->world;
-    box_render_previews_t *p = box_render_previews_get(world);
-    box_textures_t *t = box_textures_get(world);
     double now = (double)ecs_get_world_info(world)->world_time_total;
     bool inflight = false;
     int32_t i, count = 0;
-    if (!p || !t || !ecs_id(TextureNodePreview)) {
-        goto done;
-    }
-
     ecs_map_iter_t mit = ecs_map_iter(&p->previews);
     while (!inflight && ecs_map_next(&mit)) {
         inflight = ((box_render_preview_t*)ecs_map_ptr(&mit))->ticket != 0;
@@ -803,7 +801,31 @@ static void BoxRenderTexturePreviews(
     }
 
     box_render_previews_prune(world, it->stage, p);
-    box_render_previews_stats(world, it->stage, p, count);
+
+    return count;
+}
+
+/** Update the previews and write the statistics of the texture graphs. The previews are only
+ * looked at while a node has a TextureNodePreview, one is to forget or a readback is delivered.
+ *
+ * @param it The iterator of the system
+ */
+static void BoxRenderTexturePreviews(
+    ecs_iter_t *it)
+{
+    box_render_previews_t *p = box_render_previews_get(it->world);
+    box_textures_t *t = box_textures_get(it->world);
+    int32_t count = 0;
+    if (!p || !t || !ecs_id(TextureNodePreview)) {
+        goto done;
+    }
+
+    if (t->previews > 0 || ecs_map_count(&p->previews) || ecs_vec_count(&p->delivered)) {
+        t->work.previews ++;
+        count = box_render_previews_update(it, t, p);
+    }
+
+    box_render_previews_stats(it->world, it->stage, p, count);
 done:
     return;
 }

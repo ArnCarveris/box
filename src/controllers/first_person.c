@@ -344,6 +344,7 @@ static void box_first_person_crouch(
  * @param world The world
  * @param e The controlled entity
  * @param fp The controller, its velocity, height, grounded and climb state are written
+ * @param rest The rest of the body, written
  * @param p The position of the eye, written in place
  * @param dt Seconds the frame took
  * @return Whether the position changed
@@ -352,6 +353,7 @@ static bool box_first_person_step(
     ecs_world_t *world,
     ecs_entity_t e,
     FirstPersonController *fp,
+    ControllerRest *rest,
     Position *p,
     float dt)
 {
@@ -365,10 +367,10 @@ static bool box_first_person_step(
     bool landed = false;
     bool result = false;
     box_first_person_body(world, e, fp, height, &body);
-    box_controller_move(world, &body, &feet, fp->velocity, dt, &hit);
+    box_controller_move_rest(world, rest, &body, &feet, fp->velocity, dt, &hit);
     landed = !hit.grounded && (feet.y < fp->ground ||
         (feet.y <= fp->ground + BOX_FIRST_PERSON_SNAP && fp->velocity[1] <= 0));
-    landed = landed && !box_controller_ground_below(world, &body, &feet);
+    landed = landed && !box_controller_ground_below_rest(world, rest, &body, &feet);
     if (landed) {
         feet.y = fp->ground;
         fp->velocity[1] = fp->velocity[1] < 0 ? 0 : fp->velocity[1];
@@ -416,6 +418,7 @@ void BoxFirstPersonControllerUpdate(
     FirstPersonController *fp = ecs_field(it, FirstPersonController, 0);
     Position *p = ecs_field(it, Position, 1);
     Rotation *r = ecs_field(it, Rotation, 2);
+    ControllerRest *rest = ecs_field(it, ControllerRest, 3);
     const FirstPersonActionMap *map = ecs_singleton_get(it->world, FirstPersonActionMap);
     box_first_person_input_t in = { 0 };
     float dt = fminf(it->delta_time, BOX_CONTROLLER_DT_MAX);
@@ -435,7 +438,7 @@ void BoxFirstPersonControllerUpdate(
         box_first_person_state(&fp[i], &in, dt);
         box_first_person_crouch(it->world, e, &fp[i], &in, &p[i]);
         box_first_person_accelerate(&fp[i], &in, r[i].y, dt);
-        if (box_first_person_step(it->world, e, &fp[i], &p[i], dt)) {
+        if (box_first_person_step(it->world, e, &fp[i], &rest[i], &p[i], dt)) {
             ecs_modified(it->world, e, Position);
         }
     }

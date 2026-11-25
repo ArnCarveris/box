@@ -258,7 +258,11 @@
                     "queued_again_not_duplicated",
                     "unrelated_changes_queue_nothing",
                     "scene_without_bake_records_nothing",
-                    "quit_records_nothing"
+                    "quit_records_nothing",
+                    "idle_frames_resolve_no_changes",
+                    "repeated_change_records_once",
+                    "look_change_in_shift_frame_queues",
+                    "table_flags_skip_records"
                 ]
             },
             {
@@ -543,6 +547,8 @@
                     "texture_scroll_repacks_only_scrolling",
                     "texture_scroll_prefab_repacks",
                     "texture_scroll_off_shares_slot",
+                    "texture_scroll_follows_owner",
+                    "texture_scroll_follows_scene",
                     "still_water_shares_slot",
                     "water_off_not_repacked",
                     "distortion_shares_slot",
@@ -1287,7 +1293,10 @@
                     "calm_and_removed",
                     "spot_tile_kept_without_sway",
                     "spot_tile_renders_with_sway",
-                    "cascades_render_with_sway"
+                    "cascades_render_with_sway",
+                    "reach_follows_changes",
+                    "caster_box_follows_moves",
+                    "record_follows_changes"
                 ]
             },
             {

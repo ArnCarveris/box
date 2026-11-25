@@ -223,6 +223,22 @@ static void BoxDrawsOnMove(
     box_draws_on_move(it, BOX_DRAW_ALL);
 }
 
+/** Remember the entities that became or stopped being a scene as roots of subtrees whose key
+ * may have changed, and pack the scrolling slots of the material table from their owners again,
+ * whose scene may be another one.
+ *
+ * @param it The iterator of the observer
+ */
+static void BoxDrawsOnScene(
+    ecs_iter_t *it)
+{
+    if (!ecs_is_fini(it->world)) {
+        box_draws_materials_refresh(it->ctx);
+    }
+
+    box_draws_on_move(it, BOX_DRAW_ALL);
+}
+
 /** Remember the entities of an observer event as roots of subtrees whose shading changed: the
  * Opacity and the Tint of the ancestors.
  *
@@ -583,6 +599,10 @@ static void box_draws_walk(
             int32_t children = -2;
             ecs_vec_remove_last(&d->walk);
             DrawSlot *s = box_draws_mark_slot(world, d, cur.e, moved.kinds);
+            if ((moved.kinds & BOX_DRAW_BOTH) == BOX_DRAW_BOTH) {
+                box_draws_material_moved(d, cur.e);
+            }
+
             if (s) {
                 s->fade = box_draws_fade_chain(d, cur.fade, &s->tint);
                 s->changed |= BOX_DRAW_FADE;
@@ -779,6 +799,10 @@ static void BoxDrawsOnSceneFeatures(
 {
     box_render_draws_t *d = it->ctx;
     int32_t i, b, s;
+    if (!ecs_is_fini(it->world)) {
+        box_draws_materials_refresh(d);
+    }
+
     for (i = 0; !ecs_is_fini(it->world) && i < it->count; i ++) {
         ecs_entity_t scene = it->entities[i] == ecs_id(Scene) ? 0 : it->entities[i];
         for (b = 0; b < ecs_vec_count(&d->batches); b ++) {
@@ -1108,6 +1132,15 @@ static void box_draws_update_shape(
     bool faded = false;
     s->dirty = false;
     d->stats.processed ++;
+    if (drawn && s->batch >= 0 &&
+        (kinds & (BOX_DRAW_ALL | BOX_DRAW_SLOT | BOX_DRAW_FADE)) == BOX_DRAW_TRANSFORM)
+    {
+        b = box_draws_batch(d, s->batch);
+        material = (box_draw_material_t){ .fade = s->fade };
+        kept = true;
+        goto write;
+    }
+
     if (drawn) {
         if (!(kinds & BOX_DRAW_FADE)) {
             s->fade = box_draws_fade(world, e, &s->tint);
@@ -1184,6 +1217,10 @@ write:
 
     if (kinds & (BOX_DRAW_TRANSFORM | BOX_DRAW_FRAME)) {
         kinds |= BOX_DRAW_MOVER;
+    }
+
+    if (kept && b->key.wind && (kinds & BOX_DRAW_SHADING)) {
+        b->reach_dirty = true;
     }
 
     kinds &= box_draws_batch_kinds(b);
@@ -1635,7 +1672,7 @@ static void box_draws_observers(
         .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnMove);
     box_draws_observer(world, d, "DrawsOnScene", (ecs_observer_desc_t){
         .query.terms = {{ .id = ecs_id(Scene) }},
-        .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnMove);
+        .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnScene);
     box_draws_observer(world, d, "DrawsOnChildOf", (ecs_observer_desc_t){
         .query.terms = {{ .id = ecs_pair(EcsChildOf, EcsWildcard) }},
         .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnHierarchy);

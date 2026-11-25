@@ -150,15 +150,43 @@ box_gpu_blend_group_t* box_gpu_blend_group_get(
     const box_render_packet_t *packet,
     const box_render_batch_t *b);
 
-/** Make the bind groups, arrays and buffers of the TextureLayers batches of a packet, and
- * release the groups and buffers no batch of the packet draws with.
+/** Get where the group the batch at an index of the last packets drew with is remembered, so a
+ * batch that did not change finds its group without a search.
+ *
+ * @param hints The groups by batch index, grown to the batches of the packet
+ * @param packet The packet
+ * @param b The batch
+ * @return The slot of the batch, NULL when the batch is not one of the packet
+ */
+void** box_gpu_batch_hint(
+    ecs_vec_t *hints,
+    const box_render_packet_t *packet,
+    const box_render_batch_t *b);
+
+/** Get the bind group of a TextureLayers batch, created on first use, and write the buffers of
+ * its layers whose values changed. Once per packet, when a texture changed since it last did
+ * or its blend group or buffers differ, it checks its array, the blend group of a blend batch
+ * and the images of a plain one, and binds them again when one changed.
+ *
+ * The array holds the albedo, ORM, normal and mask of each layer, after the heights of the
+ * layers of a TextureBlend, whose blend group lends the rest of its entries.
  *
  * @param gpu The backend
- * @param packet The packet
+ * @param packet The packet of the batch
+ * @param b The batch, box_gpu_layered
+ * @return The bind group
  */
-void box_gpu_layers_prepare(
+WGPUBindGroup box_gpu_layer_group(
     box_gpu_t *gpu,
-    const box_render_packet_t *packet);
+    const box_render_packet_t *packet,
+    const box_render_batch_t *b);
+
+/** Release the layers groups and layer buffers no batch of the packet drew with.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_layers_sweep(
+    box_gpu_t *gpu);
 
 /** Release the layers groups and the layer buffers.
  *

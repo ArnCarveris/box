@@ -496,6 +496,8 @@ static void box_gpu_buffer_free(
     }
 
     wgpuBufferRelease(b->buffer);
+    ecs_os_free(b->mirror);
+    ecs_os_free(b->mirror_known);
     ecs_os_free(b);
     box_gpu_count(gpu, BOX_GPU_STAT_BUFFER_DESTROYED);
 }
@@ -811,6 +813,51 @@ done:
     return;
 }
 
+/** Check whether a buffer holds the bytes of an upload already, and keep them in its mirror
+ * when it does not: the uploads of a buffer of at most BOX_GPU_UPLOAD_MIRROR bytes are mirrored
+ * on the CPU until a copy or a scatter writes it.
+ *
+ * @param b The buffer
+ * @param u The upload, within the buffer
+ * @param data Its bytes
+ * @return Whether the upload would write what the buffer holds
+ */
+static bool box_gpu_upload_same(
+    box_gpu_buffer_t *b,
+    const box_render_upload_t *u,
+    const void *data)
+{
+    uint32_t first = u->offset / 4u, last = (u->offset + u->size) / 4u, w;
+    int32_t words = (int32_t)((b->size / 4u + 31u) / 32u);
+    bool result = false;
+    if (b->size > BOX_GPU_UPLOAD_MIRROR || !u->size) {
+        goto done;
+    }
+
+    if (!b->mirror) {
+        b->mirror = ecs_os_malloc((ecs_size_t)b->size);
+        b->mirror_known = ecs_os_calloc_n(uint32_t, words);
+    } else if (b->mirror_version != b->version) {
+        ecs_os_memset_n(b->mirror_known, 0, uint32_t, words);
+    }
+
+    result = b->mirror_version == b->version;
+    for (w = first; result && w < last; w ++) {
+        result = (b->mirror_known[w / 32u] >> (w % 32u)) & 1u;
+    }
+
+    result = result && !ecs_os_memcmp(b->mirror + u->offset, data, (ecs_size_t)u->size);
+    if (!result) {
+        ecs_os_memcpy(b->mirror + u->offset, data, (ecs_size_t)u->size);
+        for (w = first; w < last; w ++) {
+            b->mirror_known[w / 32u] |= 1u << (w % 32u);
+        }
+    }
+
+done:
+    return result;
+}
+
 void box_gpu_upload(
     box_gpu_t *gpu,
     const box_render_packet_t *packet)
@@ -820,6 +867,7 @@ void box_gpu_upload(
         const box_render_upload_t *u = ecs_vec_get_t(
             &packet->uploads, box_render_upload_t, i);
         box_gpu_buffer_t *b = ecs_map_get_deref(&gpu->buffers, box_gpu_buffer_t, u->buffer);
+        const void *data = box_render_packet_data(packet, u->data);
         if (!b || (uint64_t)u->offset + u->size > b->size || (u->offset | u->size) & 3) {
             ecs_err("upload of %u bytes at %u does not fit buffer %u",
                 u->size, u->offset, u->buffer);
@@ -827,9 +875,13 @@ void box_gpu_upload(
             continue;
         }
 
-        wgpuQueueWriteBuffer(gpu->queue, b->buffer, u->offset,
-            box_render_packet_data(packet, u->data), u->size);
+        if (box_gpu_upload_same(b, u, data)) {
+            continue;
+        }
+
+        wgpuQueueWriteBuffer(gpu->queue, b->buffer, u->offset, data, u->size);
         b->version = ++ gpu->buffer_writes;
+        b->mirror_version = b->version;
     }
 }
 

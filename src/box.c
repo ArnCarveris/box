@@ -28,6 +28,7 @@ void BoxImport(
     ECS_IMPORT(world, FlecsScriptMath);
     ECS_IMPORT(world, FlecsStats);
     ecs_enable(world, ecs_id(FlecsStats), false);
+    ecs_measure_system_time(world, false);
     ECS_IMPORT(world, BoxTask);
     ECS_IMPORT(world, BoxCurve);
     ECS_IMPORT(world, BoxAnimation);

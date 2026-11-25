@@ -36,9 +36,17 @@ typedef struct ScatterState {
     Scatter config;            /**< Config of the last finished evaluation */
     bool done;                 /**< Whether config holds a finished evaluation */
     int32_t evaluations;       /**< Finished evaluations */
+    uint64_t pass;             /**< Run of the system that last visited it */
 } ScatterState;
 
 static ECS_COMPONENT_DECLARE(ScatterState);
+
+/** The scatters that the system has to look at, filled by the hooks of Scatter */
+typedef struct box_scatter_queue_t {
+    ecs_vec_t pending;         /**< ecs_entity_t added, set or enabled, or waiting */
+    uint64_t pass;             /**< Number of the run of the system */
+    int64_t visits;            /**< Scatters the system compared so far */
+} box_scatter_queue_t;
 
 /** A Scatter prepared for sampling */
 typedef struct box_scatter_ctx_t {
@@ -76,7 +84,7 @@ typedef struct box_scatter_instance_t {
 } box_scatter_instance_t;
 
 /** Construct Scatter values with the defaults, their padding zero so that the system can
- * compare them by bytes.
+ * compare a set value with the last evaluated one by bytes.
  *
  * @param ptr The components
  * @param count Number of components
@@ -862,9 +870,37 @@ done:
     return result;
 }
 
-/** Evaluate the scatters whose config changed since their last evaluation, or that wait for
- * their ground, after the ChunkGrid cells of the frame were created. A scatter entity without
- * a Position gets one, so that its instances are placed relative to it.
+/** Queue the scatters of a hook or observer for the next run of the system.
+ *
+ * @param it The iterator, its ctx the queue
+ */
+static void box_scatter_queue_add(
+    ecs_iter_t *it)
+{
+    box_scatter_queue_t *queue = it->ctx;
+    int32_t i;
+    for (i = 0; i < it->count; i ++) {
+        *ecs_vec_append_t(NULL, &queue->pending, ecs_entity_t) = it->entities[i];
+    }
+}
+
+/** Free the queue of scatters.
+ *
+ * @param ptr The queue
+ */
+static void box_scatter_queue_free(
+    void *ptr)
+{
+    box_scatter_queue_t *queue = ptr;
+    ecs_vec_fini_t(NULL, &queue->pending, ecs_entity_t);
+    ecs_os_free(queue);
+}
+
+/** Evaluate the queued scatters: those added, set or enabled since the last run whose config
+ * differs from their last evaluation, and those that wait for their ground, which stay queued.
+ *
+ * Runs after the ChunkGrid cells of the frame were created. A scatter entity without a
+ * Position gets one, so that its instances are placed relative to it.
  *
  * @param it The iterator of the system
  */
@@ -872,65 +908,99 @@ static void BoxWorldScatter(
     ecs_iter_t *it)
 {
     ecs_world_t *world = it->world;
-    ecs_vec_t dirty;
-    int32_t i;
-    ecs_vec_init_t(NULL, &dirty, ecs_entity_t, 0);
-    while (ecs_query_next(it)) {
-        const Scatter *config = ecs_field(it, Scatter, 0);
-        const ScatterState *state = ecs_field(it, ScatterState, 1);
-        for (i = 0; i < it->count; i ++) {
-            if (!state[i].done ||
-                ecs_os_memcmp(&state[i].config, &config[i], ECS_SIZEOF(Scatter)))
-            {
-                *ecs_vec_append_t(NULL, &dirty, ecs_entity_t) = it->entities[i];
-            }
-        }
+    box_scatter_queue_t *queue = it->ctx;
+    ecs_vec_t pending = queue->pending;
+    int32_t i, count = ecs_vec_count(&pending);
+    if (!count) {
+        goto done;
     }
 
-    for (i = 0; i < ecs_vec_count(&dirty); i ++) {
-        ecs_entity_t e = *ecs_vec_get_t(&dirty, ecs_entity_t, i);
-        if (ecs_is_alive(world, e) && !ecs_has(world, e, Position)) {
-            ecs_set(world, e, Position, {0, 0, 0});
+    ecs_vec_init_t(NULL, &queue->pending, ecs_entity_t, 0);
+    queue->pass ++;
+    for (i = 0; i < count; i ++) {
+        ecs_entity_t e = *ecs_vec_get_t(&pending, ecs_entity_t, i);
+        if (!ecs_is_alive(world, e) || ecs_has_id(world, e, EcsPrefab) ||
+            ecs_has_id(world, e, EcsDisabled))
+        {
+            continue;
         }
 
-        const Scatter *ptr = ecs_is_alive(world, e) ? ecs_get(world, e, Scatter) : NULL;
-        if (!ptr) {
+        const Scatter *ptr = ecs_get(world, e, Scatter);
+        ScatterState *state = ptr ? ecs_get_mut(world, e, ScatterState) : NULL;
+        if (!state || state->pass == queue->pass) {
             continue;
+        }
+
+        state->pass = queue->pass;
+        queue->visits ++;
+        if (state->done && !ecs_os_memcmp(&state->config, ptr, ECS_SIZEOF(Scatter))) {
+            continue;
+        }
+
+        if (!ecs_has(world, e, Position)) {
+            ecs_set(world, e, Position, {0, 0, 0});
+            ptr = ecs_get(world, e, Scatter);
         }
 
         Scatter config;
         ScatterStatus status = {0};
         ecs_os_memcpy_t(&config, ptr, Scatter);
         bool done = box_scatter_evaluate(world, e, &config, &status);
-        ScatterState *state = ecs_ensure(world, e, ScatterState);
+        state = ecs_ensure(world, e, ScatterState);
         ecs_os_memcpy_t(&state->config, &config, Scatter);
         state->done = done;
         state->evaluations += done;
         status.evaluations = state->evaluations;
         ecs_set_ptr(world, e, ScatterStatus, &status);
+        if (!done) {
+            *ecs_vec_append_t(NULL, &queue->pending, ecs_entity_t) = e;
+        }
     }
 
-    ecs_vec_fini_t(NULL, &dirty, ecs_entity_t);
+    ecs_vec_fini_t(NULL, &pending, ecs_entity_t);
+done:
+    return;
+}
+
+int64_t box_scatter_visits(
+    const ecs_world_t *world)
+{
+    const ecs_type_hooks_t *hooks = ecs_get_hooks(world, Scatter);
+    const box_scatter_queue_t *queue = hooks ? hooks->ctx : NULL;
+
+    return queue ? queue->visits : 0;
 }
 
 void box_world_scatter_import(
     ecs_world_t *world)
 {
+    box_scatter_queue_t *queue = ecs_os_calloc_t(box_scatter_queue_t);
+    ecs_vec_init_t(NULL, &queue->pending, ecs_entity_t, 0);
     ECS_COMPONENT_DEFINE(world, ScatterState);
 
-    ecs_set_hooks(world, Scatter, { .ctor = box_scatter_ctor });
+    ecs_set_hooks(world, Scatter, {
+        .ctor = box_scatter_ctor,
+        .on_add = box_scatter_queue_add,
+        .on_set = box_scatter_queue_add,
+        .ctx = queue,
+        .ctx_free = box_scatter_queue_free
+    });
     ecs_set_hooks(world, ScatterState, { .ctor = flecs_default_ctor });
     ecs_add_pair(world, ecs_id(Scatter), EcsWith, ecs_id(ScatterState));
     ecs_add_pair(world, ecs_id(Scatter), EcsWith, ecs_id(ScatterStatus));
 
+    ecs_observer(world, {
+        .query.terms = {{ .id = ecs_id(Scatter) }, { .id = EcsDisabled }},
+        .events = { EcsOnRemove },
+        .callback = box_scatter_queue_add,
+        .ctx = queue
+    });
+
     ecs_system(world, {
         .entity = ecs_entity(world, { .name = "ScatterPlace" }),
         .phase = EcsPostUpdate,
-        .query.terms = {
-            { .id = ecs_id(Scatter), .inout = EcsIn },
-            { .id = ecs_id(ScatterState), .inout = EcsIn }
-        },
         .run = BoxWorldScatter,
+        .ctx = queue,
         .immediate = true
     });
 }

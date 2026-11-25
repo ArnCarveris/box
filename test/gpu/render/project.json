@@ -1295,6 +1295,15 @@
                 ]
             },
             {
+                "id": "FrameCost",
+                "testcases": [
+                    "compute_passes_share_a_pass",
+                    "target_cleared_by_first_pass",
+                    "atmosphere_passes_only_when_changed",
+                    "cull_uploads_only_when_changed"
+                ]
+            },
+            {
                 "id": "PipelineCache",
                 "testcases": [
                     "every_state_combination_draws",
@@ -2126,7 +2135,8 @@
                     "bounded_renders",
                     "levels_no_cracks",
                     "focus_refines",
-                    "origin_shift_same_image"
+                    "origin_shift_same_image",
+                    "extract_reuses_heights"
                 ]
             },
             {
@@ -2173,7 +2183,8 @@
                     "after_origin_shift",
                     "coarse_levels_further_out",
                     "beyond_windows_not_found",
-                    "untagged_has_no_bindings"
+                    "untagged_has_no_bindings",
+                    "grid_built_on_change"
                 ]
             },
             {

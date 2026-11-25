@@ -358,7 +358,14 @@
                     "sample_window_covers_drawn",
                     "sample_window_follows_focus",
                     "sample_window_without_terrain",
-                    "sampled_tag"
+                    "sampled_tag",
+                    "idle_skips_update",
+                    "focus_step_updates",
+                    "terrain_change_updates",
+                    "material_change_updates",
+                    "texture_status_updates",
+                    "origin_shift_updates",
+                    "readback_updates"
                 ]
             },
             {
@@ -400,7 +407,12 @@
                     "terrain_position",
                     "ray",
                     "script",
-                    "remove_deletes_tiles"
+                    "remove_deletes_tiles",
+                    "idle_skips_update",
+                    "focus_moves_updates",
+                    "readback_updates_status",
+                    "request_expires_idle",
+                    "revision"
                 ]
             },
             {
@@ -783,6 +795,17 @@
                     "component",
                     "component_next_to_dependency",
                     "component_declared_by_script"
+                ]
+            },
+            {
+                "id": "ScriptAssign",
+                "testcases": [
+                    "waits_without_assignment",
+                    "resumes_on_assignment",
+                    "other_scope_does_not_resume",
+                    "resumes_on_assignment_by_task",
+                    "deleted_script_stops_waiting",
+                    "no_scope_rejects"
                 ]
             }
         ]

@@ -1943,6 +1943,144 @@ void MaterialIds_texture_scroll_off_shares_slot(void) {
     box_render_null_free(null);
 }
 
+/** A scrolling slot is packed from its owner when the owner changes and from what was read then
+ * in the frames between: a changed velocity, color or UV transform of the owner or of its prefab
+ * reaches the record, which keeps scrolling */
+void MaterialIds_texture_scroll_follows_owner(void) {
+    // materials/material_ids
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.texture_scroll = true});
+    ecs_entity_t a = ecs_new(world);
+    ecs_set(world, a, Box, {1, 1, 1});
+    ecs_set(world, a, Position, {0, 0, 0});
+    ecs_set(world, a, Rgb, {40, 80, 120});
+    ecs_set(world, a, TextureScroll, {.velocity = {0.3f, 0}});
+    ecs_entity_t prefab = prefab_new(world);
+    ecs_set(world, prefab, Rgb, {1, 2, 3});
+    ecs_set(world, prefab, TextureScroll, {.velocity = {0, 0.25f}});
+    ecs_entity_t instance = instance_new(world, prefab, 3);
+    frame_dt(world, 1.0f / 60.0f);
+    frame_dt(world, 1.0f / 60.0f);
+    uint32_t id = id_of(world, a), pid = id_of(world, prefab);
+    test_assert(id != 0 && id != UINT32_MAX && pid != 0 && pid != UINT32_MAX && id != pid);
+    test_uint(shading_of(world, instance)->material, pid);
+    float u = record_of(world, id)->uv[2], v = record_of(world, pid)->uv[3];
+    int32_t i;
+    for (i = 0; i < 3; i ++) {
+        box_render_draws_stats_t stats = frame_dt(world, 1.0f / 60.0f);
+        test_int(stats.material_bytes, 2 * MATERIAL);
+        test_assert(fabsf(record_of(world, id)->uv[2] - u - 0.3f / 60.0f) < 1e-4f);
+        test_assert(fabsf(record_of(world, pid)->uv[3] - v - 0.25f / 60.0f) < 1e-4f);
+        u = record_of(world, id)->uv[2];
+        v = record_of(world, pid)->uv[3];
+    }
+
+    /* Another velocity scrolls at its rate from the next frame on */
+    ecs_set(world, a, TextureScroll, {.velocity = {0.6f, 0}});
+    frame_dt(world, 1.0f / 60.0f);
+    u = record_of(world, id_of(world, a))->uv[2];
+    for (i = 0; i < 3; i ++) {
+        frame_dt(world, 1.0f / 60.0f);
+        test_uint(id_of(world, a), id);
+        test_assert(fabsf(record_of(world, id)->uv[2] - u - 0.6f / 60.0f) < 1e-4f);
+        u = record_of(world, id)->uv[2];
+    }
+
+    /* A color and a UV transform reach the record, which scrolls on from the new offset */
+    ecs_set(world, a, Rgb, {200, 100, 50});
+    ecs_set(world, a, TextureTransform, {2, 3, 0, 0.5f});
+    frame_dt(world, 1.0f / 60.0f);
+    test_uint(record_of(world, id)->color, color_word(200, 100, 50));
+    test_flt(record_of(world, id)->uv[0], 2);
+    test_flt(record_of(world, id)->uv[3], 0.5f);
+    u = record_of(world, id)->uv[2];
+    frame_dt(world, 1.0f / 60.0f);
+    test_assert(fabsf(record_of(world, id)->uv[2] - u - 0.6f / 60.0f) < 1e-4f);
+    test_uint(record_of(world, id)->color, color_word(200, 100, 50));
+    test_flt(record_of(world, id)->uv[3], 0.5f);
+
+    /* So do the color and the velocity of the prefab */
+    ecs_set(world, prefab, Rgb, {9, 8, 7});
+    ecs_set(world, prefab, TextureScroll, {.velocity = {0, 0.5f}});
+    frame_dt(world, 1.0f / 60.0f);
+    test_uint(id_of(world, prefab), pid);
+    test_uint(record_of(world, pid)->color, color_word(9, 8, 7));
+    v = record_of(world, pid)->uv[3];
+    for (i = 0; i < 3; i ++) {
+        frame_dt(world, 1.0f / 60.0f);
+        test_assert(fabsf(record_of(world, pid)->uv[3] - v - 0.5f / 60.0f) < 1e-4f);
+        v = record_of(world, pid)->uv[3];
+    }
+
+    /* A removed TextureScroll of the prefab stops its record */
+    ecs_remove(world, prefab, TextureScroll);
+    frame_dt(world, 1.0f / 60.0f);
+    frame_dt(world, 1.0f / 60.0f);
+    test_flt(record_of(world, id_of(world, prefab))->uv[3], 0);
+    box_render_draws_stats_t stats = frame_dt(world, 1.0f / 60.0f);
+    test_int(stats.material_bytes, MATERIAL);
+    test_flt(record_of(world, id_of(world, prefab))->uv[3], 0);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+/** A scrolling shape that moves into a scene without Scene.texture_scroll stops scrolling there,
+ * also when it keeps its slot for its WindSway, and scrolls again when it moves back */
+void MaterialIds_texture_scroll_follows_scene(void) {
+    // materials/material_ids
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.texture_scroll = true,
+        .shader_features.Extended.wind = true});
+    ecs_singleton_set(world, Wind, {.direction = {1, 0}, .speed = 4});
+    ecs_entity_t other = ecs_new(world);
+    ecs_set(world, other, Scene, {.shader_features.Extended.wind = true});
+    ecs_entity_t group = ecs_new(world);
+    ecs_entity_t a = ecs_new_w_pair(world, EcsChildOf, group);
+    ecs_set(world, a, Box, {1, 1, 1});
+    ecs_set(world, a, Position, {0, 0, 0});
+    ecs_set(world, a, TextureScroll, {.velocity = {0.3f, 0}});
+    ecs_set(world, a, WindSway, {.bend = 0.05f, .height = 2});
+    frame_dt(world, 1.0f / 60.0f);
+    frame_dt(world, 1.0f / 60.0f);
+    uint32_t id = id_of(world, a);
+    test_assert(id != 0 && id != UINT32_MAX);
+    float u = record_of(world, id)->uv[2];
+    frame_dt(world, 1.0f / 60.0f);
+    test_assert(fabsf(record_of(world, id)->uv[2] - u - 0.3f / 60.0f) < 1e-4f);
+    test_uint(record_of(world, id)->flags, BOX_RENDER_WIND_PRESENT);
+
+    /* Its parent moves into the other scene: the record sways and no longer scrolls */
+    ecs_add_pair(world, group, EcsChildOf, other);
+    frame_dt(world, 1.0f / 60.0f);
+    frame_dt(world, 1.0f / 60.0f);
+    id = id_of(world, a);
+    test_assert(id != 0 && id != UINT32_MAX);
+    int32_t i;
+    for (i = 0; i < 3; i ++) {
+        float offset = record_of(world, id)->wind_offset[0];
+        frame_dt(world, 1.0f / 60.0f);
+        test_flt(record_of(world, id)->uv[2], 0);
+        test_uint(record_of(world, id)->flags, BOX_RENDER_WIND_PRESENT);
+        test_assert(record_of(world, id)->wind_offset[0] != offset);
+    }
+
+    /* Back in the default scene it scrolls again */
+    ecs_remove_pair(world, group, EcsChildOf, other);
+    frame_dt(world, 1.0f / 60.0f);
+    frame_dt(world, 1.0f / 60.0f);
+    id = id_of(world, a);
+    u = record_of(world, id)->uv[2];
+    test_assert(u > 0);
+    frame_dt(world, 1.0f / 60.0f);
+    test_assert(fabsf(record_of(world, id)->uv[2] - u - 0.3f / 60.0f) < 1e-4f);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
 void MaterialIds_still_water_shares_slot(void) {
     // materials/material_ids
     box_render_null_t *null;

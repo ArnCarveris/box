@@ -9,6 +9,29 @@
 
 #include "render.h"
 
+/** Singleton with the system of the shadow extract, so its state is found without a lookup */
+typedef struct RenderShadowsSystem {
+    ecs_entity_t system;        /**< The system, whose context is the state */
+} RenderShadowsSystem;
+
+static ECS_COMPONENT_DECLARE(RenderShadowsSystem);
+
+/** Get the system of the shadow extract of a world.
+ *
+ * @param world The world
+ * @return The system, NULL before box.render was imported or after the system was deleted
+ */
+static const ecs_system_t* box_shadows_system_ctx(
+    const ecs_world_t *world)
+{
+    ecs_entity_t id = ecs_id(RenderShadowsSystem);
+    const RenderShadowsSystem *c = id && ecs_is_alive(world, id)
+        ? ecs_get_id(world, id, id) : NULL;
+
+    return c && c->system && ecs_is_alive(world, c->system)
+        ? ecs_system_get(world, c->system) : NULL;
+}
+
 /** Smallest edge of a cascade in texels */
 #define BOX_SHADOW_RESOLUTION_MIN (16)
 
@@ -459,8 +482,7 @@ uint32_t box_render_shadow_rendered(
     const ecs_world_t *world,
     ecs_entity_t view)
 {
-    ecs_entity_t system = ecs_lookup(world, "box.render.extract.Shadows");
-    const ecs_system_t *sys = system ? ecs_system_get(world, system) : NULL;
+    const ecs_system_t *sys = box_shadows_system_ctx(world);
     const box_shadows_t *state = sys ? sys->ctx : NULL;
     const box_shadows_history_t *h = state
         ? ecs_map_get_deref(&state->views, box_shadows_history_t, view)
@@ -472,8 +494,7 @@ uint32_t box_render_shadow_rendered(
 void box_render_shadows_reset(
     ecs_world_t *world)
 {
-    ecs_entity_t system = ecs_lookup(world, "box.render.extract.Shadows");
-    const ecs_system_t *sys = system ? ecs_system_get(world, system) : NULL;
+    const ecs_system_t *sys = box_shadows_system_ctx(world);
     box_shadows_t *state = sys ? sys->ctx : NULL;
     if (!state) {
         goto done;
@@ -494,11 +515,15 @@ void box_render_shadows_init(
 {
     box_shadows_t *state = ecs_os_calloc_t(box_shadows_t);
     ecs_map_init(&state->views, NULL);
-    ecs_system(world, {
+    ecs_set_name_prefix(world, "Render");
+    ECS_COMPONENT_DEFINE(world, RenderShadowsSystem);
+    ecs_set_name_prefix(world, NULL);
+    ecs_entity_t extract = ecs_system(world, {
         .entity = ecs_entity(world, { .name = "extract.Shadows" }),
         .phase = RenderExtract,
         .run = BoxRenderExtractShadows,
         .ctx = state,
         .ctx_free = box_shadows_free
     });
+    ecs_singleton_set(world, RenderShadowsSystem, { extract });
 }

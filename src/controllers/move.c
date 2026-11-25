@@ -51,6 +51,9 @@
 /** Contact normals a move keeps to clip the velocity with */
 #define BOX_MOVE_NORMALS (8)
 
+/** Distance around a resting body within which a mover makes it move again */
+#define BOX_MOVE_REST_PAD (0.5f)
+
 /** Terrains a move collides with at the most */
 #define BOX_MOVE_TERRAINS (4)
 
@@ -1048,6 +1051,114 @@ done:
     feet->x = pos[0];
     feet->y = pos[1];
     feet->z = pos[2];
+
+    return result;
+}
+
+/** Get the box a resting body can touch: its capsule grown by its step and probe heights.
+ *
+ * @param body The body
+ * @param feet The bottom of the capsule
+ * @param min Receives the minimum corner
+ * @param max Receives the maximum corner
+ */
+static void box_move_rest_box(
+    const box_controller_body_t *body,
+    const Position *feet,
+    vec3 min,
+    vec3 max)
+{
+    float pad = body->radius + body->step + body->probe + BOX_MOVE_REST_PAD;
+    min[0] = feet->x - pad;
+    min[1] = feet->y - pad;
+    min[2] = feet->z - pad;
+    max[0] = feet->x + pad;
+    max[1] = feet->y + body->height + pad;
+    max[2] = feet->z + pad;
+}
+
+/** Whether a body still rests as its last move left it.
+ *
+ * @param world The world
+ * @param rest The rest of the body
+ * @param body The body
+ * @param feet The bottom of the capsule
+ * @param velocity Velocity of the body
+ * @return true when a move would end as the last one did
+ */
+static bool box_move_rests(
+    ecs_world_t *world,
+    const ControllerRest *rest,
+    const box_controller_body_t *body,
+    const Position *feet,
+    const vec3 velocity)
+{
+    vec3 min, max;
+    bool result = rest->valid && velocity[0] == 0 && velocity[1] == 0 && velocity[2] == 0 &&
+        feet->x == rest->feet.x && feet->y == rest->feet.y && feet->z == rest->feet.z &&
+        body->entity == rest->body.entity && body->scene == rest->body.scene &&
+        body->radius == rest->body.radius && body->height == rest->body.height &&
+        body->step == rest->body.step && body->probe == rest->body.probe &&
+        body->upright == rest->body.upright &&
+        rest->terrain == box_terrain_revision(world) &&
+        rest->spatial == box_spatial_static_revision(world, body->scene);
+    if (result) {
+        box_move_rest_box(body, feet, min, max);
+        result = !box_spatial_movers_overlap_box(world, body->scene, min, max);
+    }
+
+    return result;
+}
+
+bool box_controller_move_rest(
+    ecs_world_t *world,
+    ControllerRest *rest,
+    const box_controller_body_t *body,
+    Position *feet,
+    vec3 velocity,
+    float dt,
+    box_controller_hit_t *hit)
+{
+    bool still = velocity[0] == 0 && velocity[1] == 0 && velocity[2] == 0;
+    bool result = false;
+    if (box_move_rests(world, rest, body, feet, velocity)) {
+        if (hit) {
+            *hit = rest->hit;
+        }
+
+        goto done;
+    }
+
+    ecs_os_zeromem(rest);
+    rest->feet = *feet;
+    rest->body = *body;
+    rest->terrain = box_terrain_revision(world);
+    rest->spatial = box_spatial_static_revision(world, body->scene);
+    result = box_controller_move(world, body, feet, velocity, dt, &rest->hit);
+    if (hit) {
+        *hit = rest->hit;
+    }
+
+    rest->valid = still && !result && velocity[0] == 0 && velocity[1] == 0 && velocity[2] == 0;
+
+done:
+    return result;
+}
+
+bool box_controller_ground_below_rest(
+    ecs_world_t *world,
+    ControllerRest *rest,
+    const box_controller_body_t *body,
+    const Position *feet)
+{
+    bool result;
+    if (rest->valid && rest->below_known) {
+        result = rest->below;
+    } else {
+        result = box_controller_ground_below(world, body, feet);
+        rest->below = result;
+        rest->below_known = rest->valid;
+    }
 
     return result;
 }

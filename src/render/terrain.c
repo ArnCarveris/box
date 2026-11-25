@@ -14,36 +14,92 @@
 #include "draw.h"
 #include <math.h>
 
+/** A terrain with TerrainSampled as it was last appended to a packet */
+typedef struct box_render_terrain_cache_t {
+    box_render_terrain_sample_t sample; /**< The terrain, its grid not set */
+    uint32_t *grid;         /**< The grid of the windows of its levels, NULL without one */
+    uint32_t size;          /**< Bytes of grid */
+    int32_t updates;        /**< Updates of the tiles of the terrain the grid was built at */
+    int32_t version;        /**< Version of the heights the grid was built at */
+    int64_t frame;          /**< Frame it was last appended in */
+    bool complete;          /**< Every tile that draws had its heights and its mesh */
+    bool valid;             /**< The other members are set */
+} box_render_terrain_cache_t;
+
+/** State of the extract of the terrain tiles */
+typedef struct box_render_terrain_t {
+    ecs_query_t *tiles;     /**< The tiles that draw, with change detection */
+    ecs_vec_t heights;      /**< box_render_terrain_height_t, the heights last built */
+    ecs_map_t samples;      /**< Terrain entity to its box_render_terrain_cache_t */
+    int32_t version;        /**< Bumped when heights is built */
+    int32_t builds;         /**< Times heights was built */
+    int32_t grids;          /**< Times the grid of a sampled terrain was built */
+    bool complete;          /**< Every tile that draws had its heights and its mesh, so heights
+                             *   holds until a tile changes */
+} box_render_terrain_t;
+
+/** Singleton that holds the state of the extract of the terrain tiles */
+typedef struct RenderTerrain {
+    box_render_terrain_t *state; /**< The state */
+} RenderTerrain;
+
+static ECS_COMPONENT_DECLARE(RenderTerrain);
+
 /** Append the heights of every terrain tile that draws and whose heights the backend has.
  * Disabled tiles do not match, so a tile is copied from the frame it draws.
+ *
+ * The list is built again only when a tile that draws was added, removed, enabled, disabled or
+ * had its TerrainTile or ShapeMesh set, or while a tile that draws waits for a texture or its
+ * mesh; else the list built before is appended.
  *
  * @param it The iterator of the system
  */
 static void BoxRenderExtractTerrain(
     ecs_iter_t *it)
 {
-    const TerrainTile *tiles = ecs_field(it, TerrainTile, 0);
-    const ShapeMesh *shapes = ecs_field(it, ShapeMesh, 1);
-    box_textures_t *t = box_textures_get(it->world);
-    box_render_packet_t *p = NULL;
-    int32_t i;
-    for (i = 0; i < it->count; i ++) {
-        uint32_t texture = box_textures_handle(t, tiles[i].texture);
-        uint32_t rough = box_textures_handle(t, tiles[i].rough);
-        if (!texture || !rough || !shapes[i].mesh) {
-            continue;
-        }
+    box_render_terrain_t *state = it->ctx;
+    ecs_world_t *world = it->world;
+    int32_t i, count;
+    if (ecs_query_changed(state->tiles) || !state->complete) {
+        box_textures_t *t = box_textures_get(world);
+        ecs_iter_t qit = ecs_query_iter(world, state->tiles);
+        ecs_vec_clear(&state->heights);
+        state->complete = true;
+        state->version ++;
+        state->builds ++;
+        while (ecs_query_next(&qit)) {
+            const TerrainTile *tiles = ecs_field(&qit, TerrainTile, 0);
+            const ShapeMesh *shapes = ecs_field(&qit, ShapeMesh, 1);
+            for (i = 0; i < qit.count; i ++) {
+                uint32_t texture = box_textures_handle(t, tiles[i].texture);
+                uint32_t rough = box_textures_handle(t, tiles[i].rough);
+                uint32_t masks = tiles[i].masks ? box_textures_handle(t, tiles[i].masks) : 0;
+                uint32_t coarse = tiles[i].coarse
+                    ? box_textures_handle(t, tiles[i].coarse) : 0;
+                state->complete = state->complete && texture && rough && shapes[i].mesh &&
+                    (masks || !tiles[i].masks) && (coarse || !tiles[i].coarse);
+                if (!texture || !rough || !shapes[i].mesh) {
+                    continue;
+                }
 
-        p = p ? p : box_render_packet(it->world);
-        *ecs_vec_append_t(NULL, &p->terrain_heights, box_render_terrain_height_t) =
-            (box_render_terrain_height_t){
-                .mesh = shapes[i].mesh,
-                .slot = (uint32_t)tiles[i].slot,
-                .texture = texture,
-                .rough = rough,
-                .masks = tiles[i].masks ? box_textures_handle(t, tiles[i].masks) : 0,
-                .coarse = tiles[i].coarse ? box_textures_handle(t, tiles[i].coarse) : 0
-            };
+                *ecs_vec_append_t(NULL, &state->heights, box_render_terrain_height_t) =
+                    (box_render_terrain_height_t){
+                        .mesh = shapes[i].mesh,
+                        .slot = (uint32_t)tiles[i].slot,
+                        .texture = texture,
+                        .rough = rough,
+                        .masks = masks,
+                        .coarse = coarse
+                    };
+            }
+        }
+    }
+
+    count = ecs_vec_count(&state->heights);
+    if (count) {
+        box_render_packet_t *p = box_render_packet(world);
+        ecs_os_memcpy_n(ecs_vec_grow_t(NULL, &p->terrain_heights, box_render_terrain_height_t,
+            count), ecs_vec_first(&state->heights), box_render_terrain_height_t, count);
     }
 }
 
@@ -210,7 +266,7 @@ static int box_draws_nearest_cmp(
 void box_draws_send_nearest(
     box_render_packet_t *p,
     box_render_draws_t *d,
-    const box_draw_batch_t *b,
+    box_draw_batch_t *b,
     box_render_batch_t *out)
 {
     const box_render_view_t *view = NULL;
@@ -242,21 +298,36 @@ void box_draws_send_nearest(
     }
 
     float cx = view->camera_transform[3][0], cz = view->camera_transform[3][2];
-    ecs_vec_clear(&d->sorted);
-    box_draw_sorted_t *sorted = ecs_vec_grow_t(NULL, &d->sorted, box_draw_sorted_t, count);
-    for (i = 0; i < count; i ++) {
-        float dx = fabsf(cx - t[i].rows[0][3]) - 0.5f * fabsf(t[i].rows[0][0]);
-        float dz = fabsf(cz - t[i].rows[2][3]) - 0.5f * fabsf(t[i].rows[2][2]);
-        dx = dx > 0.0f ? dx : 0.0f;
-        dz = dz > 0.0f ? dz : 0.0f;
-        sorted[i] = (box_draw_sorted_t){ .depth = dx * dx + dz * dz, .slot = i };
+    if (b->nearest_dirty || b->key.dynamic_transform || ecs_vec_count(&b->nearest) != count ||
+        b->nearest_at[0] != cx || b->nearest_at[1] != cz)
+    {
+        ecs_vec_clear(&d->sorted);
+        box_draw_sorted_t *sorted = ecs_vec_grow_t(NULL, &d->sorted, box_draw_sorted_t, count);
+        for (i = 0; i < count; i ++) {
+            float dx = fabsf(cx - t[i].rows[0][3]) - 0.5f * fabsf(t[i].rows[0][0]);
+            float dz = fabsf(cz - t[i].rows[2][3]) - 0.5f * fabsf(t[i].rows[2][2]);
+            dx = dx > 0.0f ? dx : 0.0f;
+            dz = dz > 0.0f ? dz : 0.0f;
+            sorted[i] = (box_draw_sorted_t){ .depth = dx * dx + dz * dz, .slot = i };
+        }
+
+        qsort(sorted, (size_t)count, sizeof(box_draw_sorted_t), box_draws_nearest_cmp);
+        ecs_vec_set_count_t(NULL, &b->nearest, uint32_t, count);
+        uint32_t *made = ecs_vec_first_t(&b->nearest, uint32_t);
+        for (i = 0; i < count; i ++) {
+            made[i] = (uint32_t)sorted[i].slot;
+        }
+
+        b->nearest_dirty = false;
+        b->nearest_at[0] = cx;
+        b->nearest_at[1] = cz;
     }
 
-    qsort(sorted, (size_t)count, sizeof(box_draw_sorted_t), box_draws_nearest_cmp);
+    const uint32_t *order = ecs_vec_first_t(&b->nearest, uint32_t);
     uint32_t *slots = box_render_packet_reserve(p,
         (uint32_t)count * (uint32_t)sizeof(uint32_t), &offset);
     for (i = 0; i < count; i ++) {
-        slots[i] = b->first + (uint32_t)sorted[i].slot;
+        slots[i] = b->first + order[i];
     }
 
     out->first_instance = 0;
@@ -266,43 +337,38 @@ done:
     return;
 }
 
-/** Append a terrain with TerrainSampled to the packet: the windows of its levels with the slot
- * of the tile that draws at each node, from the tiles that draw this frame, whose heights the
- * extract of the tiles appends.
+/** Build a terrain with TerrainSampled: the windows of its levels with the slot of the tile
+ * that draws at each node, from the tiles that draw this frame, whose heights the extract of the
+ * tiles appends.
  *
  * @param world The world
  * @param t The textures
  * @param e The terrain
+ * @param c Receives the terrain and its grid
  */
-static void box_render_terrain_sample(
+static void box_render_terrain_sample_build(
     ecs_world_t *world,
     box_textures_t *t,
-    ecs_entity_t e)
+    ecs_entity_t e,
+    box_render_terrain_cache_t *c)
 {
     box_terrain_window_t w;
-    box_render_packet_t *p = box_render_packet(world);
-    box_render_terrain_sample_t *s = ecs_vec_append_t(NULL, &p->terrain_samples,
-        box_render_terrain_sample_t);
-    double local[3];
+    box_render_terrain_sample_t *s = &c->sample;
     int32_t count = 0, i, level;
     ecs_os_memset_t(s, 0, box_render_terrain_sample_t);
     s->terrain = e;
-    box_terrain_local(world, e, local);
-    const WorldOrigin *o = ecs_id(WorldOrigin) ? ecs_singleton_get(world, WorldOrigin) : NULL;
-    s->origin[0] = local[0] + (o ? o->x : 0.0);
-    s->origin[1] = local[1] + (o ? o->y : 0.0);
-    s->origin[2] = local[2] + (o ? o->z : 0.0);
+    c->complete = true;
+    c->size = 0;
     if (!box_terrain_window(world, e, &w)) {
         goto done;
     }
 
     const Terrain *value = ecs_get(world, e, Terrain);
-    uint32_t cells = (uint32_t)(w.cells * w.cells), offset;
-    uint32_t size = (uint32_t)w.levels * cells * (uint32_t)sizeof(uint32_t);
-    uint32_t *grid = box_render_packet_reserve(p, size, &offset);
-    s = ecs_vec_last_t(&p->terrain_samples, box_render_terrain_sample_t);
-    ecs_os_memset(grid, 0, (ecs_size_t)size);
-    s->grid = offset;
+    uint32_t cells = (uint32_t)(w.cells * w.cells);
+    c->size = (uint32_t)w.levels * cells * (uint32_t)sizeof(uint32_t);
+    c->grid = ecs_os_realloc(c->grid, (ecs_size_t)(c->size ? c->size : 1));
+    uint32_t *grid = c->grid;
+    ecs_os_memset(grid, 0, (ecs_size_t)c->size);
     s->levels = w.levels;
     s->cells = w.cells;
     s->resolution = w.resolution;
@@ -323,13 +389,14 @@ static void box_render_terrain_sample(
         const box_terrain_tile_t *tile = tiles[i];
         int32_t x = tile->ix - w.first[tile->level][0], z = tile->iz - w.first[tile->level][1];
         if (!tile->enabled || tile->level >= w.levels || x < 0 || z < 0 || x >= w.cells ||
-            z >= w.cells || !box_textures_handle(t, tile->texture))
+            z >= w.cells)
         {
             continue;
         }
 
         const ShapeMesh *shape = ecs_get(world, tile->entity, ShapeMesh);
-        if (!shape || !shape->mesh) {
+        if (!box_textures_handle(t, tile->texture) || !shape || !shape->mesh) {
+            c->complete = false;
             continue;
         }
 
@@ -344,31 +411,161 @@ done:
     return;
 }
 
-/** Append every terrain with TerrainSampled to the packet.
+/** Append a terrain with TerrainSampled to the packet, at the position it has now.
+ *
+ * It is built again only when the tiles of the terrain were updated, the heights of the tiles
+ * that draw were built again or a tile that draws waits for a texture or its mesh.
+ *
+ * @param world The world
+ * @param state The state of the extract
+ * @param t The textures
+ * @param e The terrain
+ */
+static void box_render_terrain_sample(
+    ecs_world_t *world,
+    box_render_terrain_t *state,
+    box_textures_t *t,
+    ecs_entity_t e)
+{
+    box_render_packet_t *p = box_render_packet(world);
+    box_render_terrain_cache_t *c = ecs_map_get_deref(&state->samples,
+        box_render_terrain_cache_t, e);
+    double local[3];
+    int32_t updates, selects;
+    if (!c) {
+        c = ecs_os_calloc_t(box_render_terrain_cache_t);
+        ecs_map_insert_ptr(&state->samples, e, c);
+    }
+
+    box_terrain_counters(world, e, &updates, &selects);
+    if (!c->valid || !c->complete || c->updates != updates || c->version != state->version) {
+        box_render_terrain_sample_build(world, t, e, c);
+        c->valid = true;
+        c->updates = updates;
+        c->version = state->version;
+        state->grids ++;
+    }
+
+    c->frame = ecs_get_world_info(world)->frame_count_total;
+    box_terrain_local(world, e, local);
+    const WorldOrigin *o = ecs_id(WorldOrigin) ? ecs_singleton_get(world, WorldOrigin) : NULL;
+    c->sample.origin[0] = local[0] + (o ? o->x : 0.0);
+    c->sample.origin[1] = local[1] + (o ? o->y : 0.0);
+    c->sample.origin[2] = local[2] + (o ? o->z : 0.0);
+    box_render_terrain_sample_t *s = ecs_vec_append_t(NULL, &p->terrain_samples,
+        box_render_terrain_sample_t);
+    *s = c->sample;
+    if (c->size) {
+        uint32_t offset;
+        uint32_t *grid = box_render_packet_reserve(p, c->size, &offset);
+        ecs_os_memcpy(grid, c->grid, (ecs_size_t)c->size);
+        s = ecs_vec_last_t(&p->terrain_samples, box_render_terrain_sample_t);
+        s->grid = offset;
+    }
+}
+
+/** Free a sampled terrain as it was last appended.
+ *
+ * @param c The terrain
+ */
+static void box_render_terrain_cache_free(
+    box_render_terrain_cache_t *c)
+{
+    ecs_os_free(c->grid);
+    ecs_os_free(c);
+}
+
+/** Append every terrain with TerrainSampled to the packet, and forget those that no longer
+ * have the tag.
  *
  * @param it The iterator of the system
  */
 static void BoxRenderExtractTerrainSamples(
     ecs_iter_t *it)
 {
+    box_render_terrain_t *state = it->ctx;
     box_textures_t *t = box_textures_get(it->world);
-    int32_t i;
-    for (i = 0; i < it->count; i ++) {
-        box_render_terrain_sample(it->world, t, it->entities[i]);
+    int64_t frame = ecs_get_world_info(it->world)->frame_count_total;
+    int32_t i, count = 0;
+    while (ecs_iter_next(it)) {
+        for (i = 0; i < it->count; i ++) {
+            box_render_terrain_sample(it->world, state, t, it->entities[i]);
+        }
+
+        count += it->count;
     }
+
+    while (ecs_map_count(&state->samples) > count) {
+        ecs_map_iter_t mit = ecs_map_iter(&state->samples);
+        ecs_entity_t stale = 0;
+        while (!stale && ecs_map_next(&mit)) {
+            const box_render_terrain_cache_t *c = ecs_map_ptr(&mit);
+            stale = c->frame != frame ? ecs_map_key(&mit) : 0;
+        }
+
+        if (!stale) {
+            break;
+        }
+
+        box_render_terrain_cache_free(ecs_map_get_deref(&state->samples,
+            box_render_terrain_cache_t, stale));
+        ecs_map_remove(&state->samples, stale);
+    }
+}
+
+/** Free the state of the extract of the terrain tiles.
+ *
+ * @param ptr The state
+ */
+static void box_render_terrain_free(
+    void *ptr)
+{
+    box_render_terrain_t *state = ptr;
+    ecs_map_iter_t it = ecs_map_iter(&state->samples);
+    while (ecs_map_next(&it)) {
+        box_render_terrain_cache_free(ecs_map_ptr(&it));
+    }
+
+    ecs_map_fini(&state->samples);
+    ecs_vec_fini_t(NULL, &state->heights, box_render_terrain_height_t);
+    ecs_os_free(state);
+}
+
+void box_render_terrain_counters(
+    const ecs_world_t *world,
+    int32_t *heights,
+    int32_t *grids)
+{
+    const RenderTerrain *m = ecs_id(RenderTerrain)
+        ? ecs_singleton_get(world, RenderTerrain) : NULL;
+    *heights = m && m->state ? m->state->builds : 0;
+    *grids = m && m->state ? m->state->grids : 0;
 }
 
 void box_render_terrain_init(
     ecs_world_t *world)
 {
-    ecs_system(world, {
-        .entity = ecs_entity(world, { .name = "extract.TerrainHeights" }),
-        .phase = RenderExtract,
-        .query.terms = {
+    box_render_terrain_t *state = ecs_os_calloc_t(box_render_terrain_t);
+    ecs_vec_init_t(NULL, &state->heights, box_render_terrain_height_t, 0);
+    ecs_map_init(&state->samples, NULL);
+    ECS_COMPONENT_DEFINE(world, RenderTerrain);
+    ecs_singleton_set(world, RenderTerrain, { .state = state });
+    state->tiles = ecs_query(world, {
+        .entity = ecs_entity(world, { .name = "extract.TerrainTiles" }),
+        .terms = {
             { .id = ecs_id(TerrainTile), .inout = EcsIn },
             { .id = ecs_id(ShapeMesh), .inout = EcsIn }
         },
-        .callback = BoxRenderExtractTerrain
+        .cache_kind = EcsQueryCacheAuto,
+        .flags = EcsQueryDetectChanges
+    });
+
+    ecs_system(world, {
+        .entity = ecs_entity(world, { .name = "extract.TerrainHeights" }),
+        .phase = RenderExtract,
+        .run = BoxRenderExtractTerrain,
+        .ctx = state,
+        .ctx_free = box_render_terrain_free
     });
 
     ecs_system(world, {
@@ -378,6 +575,7 @@ void box_render_terrain_init(
             { .id = ecs_id(Terrain), .inout = EcsIn },
             { .id = TerrainSampled }
         },
-        .callback = BoxRenderExtractTerrainSamples
+        .run = BoxRenderExtractTerrainSamples,
+        .ctx = state
     });
 }

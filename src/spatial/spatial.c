@@ -293,7 +293,9 @@ static void BoxSpatialOnDisabled(
             box_spatial_scene_t *s = p && p->item >= 0 ?
                 box_spatial_scene(index, p->scene) : NULL;
             if (s) {
-                box_spatial_item(s, p->item)->disabled = disabled;
+                box_spatial_item_t *item = box_spatial_item(s, p->item);
+                s->revision += item->tree != BOX_SPATIAL_DYNAMIC && item->disabled != disabled;
+                item->disabled = disabled;
             }
 
             if (p && p->mover >= 0) {
@@ -415,6 +417,37 @@ static void box_spatial_world_bounds(
     }
 }
 
+/** Hash the world transform and the local bounds of an entity, which tell whether a static or
+ * UI item changed where its world bounds did not.
+ *
+ * @param t The world transform
+ * @param l_min Minimum corner of the local bounds
+ * @param l_max Maximum corner of the local bounds
+ * @return The hash, never 0
+ */
+static uint32_t box_spatial_signature(
+    const WorldTransform *t,
+    const vec3 l_min,
+    const vec3 l_max)
+{
+    float values[22];
+    uint64_t h = 0x9E3779B97F4A7C15ull;
+    int32_t i;
+    ecs_os_memcpy(values, t->m, sizeof(mat4));
+    glm_vec3_copy(ECS_CONST_CAST(float*, l_min), &values[16]);
+    glm_vec3_copy(ECS_CONST_CAST(float*, l_max), &values[19]);
+    for (i = 0; i < 22; i += 2) {
+        uint64_t w;
+        ecs_os_memcpy(&w, &values[i], sizeof(uint64_t));
+        h = (h ^ w) * 0xBF58476D1CE4E5B9ull;
+        h ^= h >> 29;
+    }
+
+    uint32_t result = (uint32_t)(h ^ (h >> 32));
+
+    return result ? result : 1;
+}
+
 /** Keep the world transform of a dynamic shape with it, or drop it from a shape that is no
  * longer an indexed dynamic shape.
  *
@@ -513,14 +546,22 @@ static void box_spatial_refresh(
     }
 
     int32_t tree = ui ? BOX_SPATIAL_UI : dynamic ? BOX_SPATIAL_DYNAMIC : BOX_SPATIAL_STATIC;
+    box_spatial_scene_t *s = NULL;
     if (indexed && p->item < 0) {
-        box_spatial_scene_t *s = box_spatial_scene_ensure(index, scene);
+        s = box_spatial_scene_ensure(index, scene);
         p->scene = scene;
         p->item = box_spatial_item_add(s, e, tree, min, max, index->frame);
         box_spatial_item(s, p->item)->disabled = ecs_has_id(world, e, EcsDisabled);
     } else if (indexed) {
-        box_spatial_item_set(
-            box_spatial_scene(index, scene), p->item, tree, min, max, index->frame);
+        s = box_spatial_scene(index, scene);
+        box_spatial_item_set(s, p->item, tree, min, max, index->frame);
+    }
+
+    if (indexed && tree != BOX_SPATIAL_DYNAMIC) {
+        box_spatial_item_t *item = box_spatial_item(s, p->item);
+        uint32_t sig = box_spatial_signature(t, l_min, l_max);
+        s->revision += item->sig != sig && item->sig != 0;
+        item->sig = sig;
     }
 
     index->stats.updated += indexed;
@@ -667,6 +708,8 @@ box_spatial_t* box_spatial_of(
  * When the index was queried since the last update the leaves are placed at once, as the
  * next frame most likely queries again: its first query then finds them in place.
  *
+ * An update without changed entities, subtrees, movers or emptied scenes visits nothing.
+ *
  * @param world The world
  * @param index The index
  */
@@ -674,23 +717,31 @@ static void box_spatial_process(
     ecs_world_t *world,
     box_spatial_t *index)
 {
-    const box_mesh_cache_t *cache = box_mesh_cache_of(world);
     bool queried = index->queried;
     int32_t i;
     index->queried = false;
     index->stats.updated = 0;
     index->stats.rebound = 0;
     index->stats.moved = 0;
+    index->stats.visited = 0;
     index->frame ++;
-    box_spatial_walk(world, index, &index->rescoped, true);
-    for (i = 0; i < ecs_vec_count(&index->dirty); i ++) {
-        box_spatial_refresh(world, index, cache, *ecs_vec_get_t(&index->dirty, ecs_entity_t, i));
+    index->stale = true;
+    if (ecs_vec_count(&index->rescoped) || ecs_vec_count(&index->dirty) ||
+        ecs_vec_count(&index->changed) || ecs_vec_count(&index->empty))
+    {
+        const box_mesh_cache_t *cache = box_mesh_cache_of(world);
+        box_spatial_walk(world, index, &index->rescoped, true);
+        for (i = 0; i < ecs_vec_count(&index->dirty); i ++) {
+            box_spatial_refresh(world, index, cache,
+                *ecs_vec_get_t(&index->dirty, ecs_entity_t, i));
+        }
+
+        index->stats.visited = ecs_vec_count(&index->dirty) + ecs_vec_count(&index->changed);
+        ecs_vec_clear(&index->dirty);
+        box_spatial_movers_refit(world, index);
+        box_spatial_commit(index);
     }
 
-    ecs_vec_clear(&index->dirty);
-    box_spatial_movers_refit(world, index);
-    index->stale = true;
-    box_spatial_commit(index);
     if (queried) {
         box_spatial_sync(world, index);
     }
@@ -748,6 +799,22 @@ void box_spatial_shift(
     if (s) {
         box_spatial_scene_shift(index, s, offset, shifts, ctx);
     }
+}
+
+uint64_t box_spatial_static_revision(
+    const ecs_world_t *world,
+    ecs_entity_t scene)
+{
+    const box_spatial_t *index = box_spatial_get(world);
+    const box_spatial_scene_t *s = index ? box_spatial_scene(index, scene) : NULL;
+    uint64_t result = 0;
+    if (s) {
+        result = s->revision;
+    } else if (index) {
+        result = index->revision;
+    }
+
+    return result;
 }
 
 void box_spatial_stats(

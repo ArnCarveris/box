@@ -1,7 +1,8 @@
 /**
  * @file fps/load.c
  * @brief The samples of the load panel: at the start of every frame the time the main thread,
- * the renderer, the audio thread and the job workers worked since the frame before.
+ * the renderer, the audio thread and the job workers worked since the frame before. LoadSamples
+ * is notified while the load panel is open, every interval of LoadPanel.
  *
  * Every thread has a clock that is busy while it works and waits while it blocks. The main thread
  * gets its clock from box.fps: busy from the start of the frame until the LoadEnd phase, after
@@ -23,6 +24,7 @@ typedef struct box_fps_load_t {
     box_load_bound_t prev;      /**< Clock the main thread had before the frame bound main */
     bool bound;                 /**< main is bound to the main thread */
     bool sampled;               /**< The totals were read at the start of a frame before */
+    double notified;            /**< Time LoadSamples was last notified, 0 before */
     double last[BOX_FPS_LOAD_CLOCKS]; /**< Seconds of the main thread, the renderer working, the
                                  *   renderer waiting and the audio thread at the last read */
     double jobs[BOX_JOBS_MAX_WORKERS]; /**< Seconds of every job worker at the last read */
@@ -99,8 +101,33 @@ static bool box_fps_load_add(
     return result;
 }
 
+/** Whether LoadSamples is notified now: while the load panel is open, every sample when its
+ * interval is 0 or less, else when the interval passed since the last time.
+ *
+ * @param world The world
+ * @param load The state of the samples
+ * @return Whether the samples that were added are notified
+ */
+static bool box_fps_load_due(
+    const ecs_world_t *world,
+    box_fps_load_t *load)
+{
+    const LoadPanel *panel = ecs_singleton_get(world, LoadPanel);
+    bool result = panel && panel->open;
+    if (result && panel->interval > 0) {
+        double now = box_fps_now();
+        result = now - load->notified >= (double)panel->interval;
+        if (result) {
+            load->notified = now;
+        }
+    }
+
+    return result;
+}
+
 /** Sample the threads at the start of a frame: what they worked since the start of the frame
- * before goes to LoadSamples, notified when a series took it. Then the main thread works.
+ * before goes to LoadSamples, notified when a series took it and box_fps_load_due. Then the main
+ * thread works.
  *
  * The system is immediate, so LoadSamples is set while the world is not readonly and the bars
  * of the load panel follow it at once.
@@ -131,7 +158,7 @@ static void BoxFpsLoadSample(
         added |= box_fps_load_add(&samples->jobs, ms[4]);
     }
 
-    if (added) {
+    if (added && box_fps_load_due(world, load)) {
         ecs_singleton_modified(world, LoadSamples);
     }
 
@@ -234,6 +261,26 @@ void box_load_summarize(
     }
 }
 
+/** Whether the load panel shows two stats differently: the times and the share as the script
+ * formats them, or the color of the share.
+ *
+ * @param a A stat
+ * @param b Another stat
+ * @return Whether what the panel shows of them differs
+ */
+static bool box_load_stat_differs(
+    const LoadStat *a,
+    const LoadStat *b)
+{
+    char ta[96], tb[96];
+    ecs_os_snprintf(ta, sizeof(ta), "%.1f %.1f %.0f %d", a->mean_ms, a->worst_ms, a->share,
+        box_fps_level(a->mean_ms));
+    ecs_os_snprintf(tb, sizeof(tb), "%.1f %.1f %.0f %d", b->mean_ms, b->worst_ms, b->share,
+        box_fps_level(b->mean_ms));
+
+    return ecs_os_strcmp(ta, tb) != 0;
+}
+
 void box_fps_load_summary_sync(
     ecs_world_t *world)
 {
@@ -242,7 +289,13 @@ void box_fps_load_summary_sync(
     const LoadSummary *cur = ecs_singleton_get(world, LoadSummary);
     box_load_summarize(ecs_singleton_get(world, FrameSamples),
         ecs_singleton_get(world, LoadSamples), box_jobs_load(world, busy), &sum);
-    if (!cur || ecs_os_memcmp_t(cur, &sum, LoadSummary)) {
+    if (!cur || cur->frames != sum.frames || cur->workers != sum.workers ||
+        box_load_stat_differs(&cur->main, &sum.main) ||
+        box_load_stat_differs(&cur->render, &sum.render) ||
+        box_load_stat_differs(&cur->gpu, &sum.gpu) ||
+        box_load_stat_differs(&cur->audio, &sum.audio) ||
+        box_load_stat_differs(&cur->jobs, &sum.jobs))
+    {
         ecs_singleton_set_ptr(world, LoadSummary, &sum);
     }
 }

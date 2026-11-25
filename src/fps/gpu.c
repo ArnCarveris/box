@@ -347,7 +347,7 @@ static void BoxFpsGpuSample(
     box_render_gpu_stats_t now;
     box_render_draws_stats_t draws;
     box_mesh_graph_stats_t mesh;
-    double time = box_fps_gpu_now();
+    double time;
     if (open != g->active) {
         box_render_gpu_stats_detail(world, open);
         g->active = open;
@@ -358,6 +358,7 @@ static void BoxFpsGpuSample(
         goto done;
     }
 
+    time = box_fps_gpu_now();
     gpu = box_render_gpu_stats(world, &now);
     box_render_draws_stats(world, &draws);
     box_mesh_graph_stats(world, &mesh);

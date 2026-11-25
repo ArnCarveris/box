@@ -6,9 +6,9 @@
  * bake is three captures of that scene into targets that exist for one packet, unlit, one per
  * channel (box_render_view_t.impostor), which the backend copies into the atlases.
  *
- * A bake swaps in its atlases after its last view; a change of the source makes a new copy and
- * bakes again. Every instance of the prefab of a ready bake gets a card beyond Impostor.distance
- * (ImpostorDraw), a slot of the draws that no entity holds, and its shapes end there.
+ * A bake swaps in its atlases after its last view; a source that changed is copied and baked
+ * again, which the observers of the entities and textures its hash read tell. Every instance of
+ * the prefab of a ready bake gets a card beyond Impostor.distance, a slot of the draws.
  */
 
 #include "render.h"
@@ -33,6 +33,9 @@
 /** Deepest hierarchy or prefab chain the hash walks */
 #define BOX_IMPOSTOR_DEPTH_MAX (32)
 
+/** Value of a member that the sources of several impostors read */
+#define BOX_IMPOSTOR_SHARED (UINT64_MAX)
+
 /** Roughness of the material of the cards, which the atlases do not hold */
 #define BOX_IMPOSTOR_ROUGHNESS (0.8f)
 
@@ -49,6 +52,8 @@ typedef struct box_impostor_t {
     ecs_entity_t scene;         /**< Scene root of the copy */
     ecs_entity_t copy;          /**< Root of the copy of the hierarchy */
     uint64_t hash;              /**< Hash of the source when the copy was made */
+    bool changed;               /**< A member changed since the source was hashed */
+    ecs_vec_t members;          /**< ecs_entity_t, members the hash of the source registered */
     bool rebake;                /**< box_impostor_rebake asked for a bake */
     int32_t settle;             /**< Frames until the bounds of the copy are read */
     bool baking;                /**< A bake is in progress */
@@ -83,6 +88,11 @@ typedef struct box_impostor_read_t {
 typedef struct box_impostors_t {
     ecs_map_t impostors;        /**< Entity to box_impostor_t* */
     ecs_map_t watched;          /**< Components the hash reads, mapped to 1 */
+    ecs_map_t members;          /**< Entities and textures the hashes read, mapped to their
+                                 *   impostor or BOX_IMPOSTOR_SHARED */
+    bool observing;             /**< The observers of the members exist */
+    bool work;                  /**< Something changed, bakes or waits for the next packet */
+    int32_t hashes;             /**< Sources hashed since the world was created */
     ecs_vec_t sent;             /**< uint32_t, targets the previous packet created */
     ecs_vec_t released;         /**< uint32_t, atlases to destroy in the next packet */
     ecs_vec_t reads;            /**< box_impostor_read_t to add to the next packet */
@@ -121,6 +131,7 @@ static void box_impostor_free(
     }
 
     ecs_map_fini(&imp->cards);
+    ecs_vec_fini_t(NULL, &imp->members, ecs_entity_t);
     ecs_os_free(imp);
 }
 
@@ -155,6 +166,7 @@ static void box_render_impostors_dtor(
 
         ecs_map_fini(&s->impostors);
         ecs_map_fini(&s->watched);
+        ecs_map_fini(&s->members);
         ecs_vec_fini_t(NULL, &s->sent, uint32_t);
         ecs_vec_fini_t(NULL, &s->released, uint32_t);
         ecs_vec_fini_t(NULL, &s->reads, box_impostor_read_t);
@@ -371,6 +383,91 @@ done:
     return;
 }
 
+/** Mark an impostor, or every impostor, for a new hash of its source.
+ *
+ * @param s The impostor state
+ * @param source The entity with Impostor, BOX_IMPOSTOR_SHARED for every impostor
+ */
+static void box_impostor_mark(
+    box_impostors_t *s,
+    uint64_t source)
+{
+    if (source == BOX_IMPOSTOR_SHARED) {
+        ecs_map_iter_t it = ecs_map_iter(&s->impostors);
+        while (ecs_map_next(&it)) {
+            ((box_impostor_t*)ecs_map_ptr(&it))->changed = true;
+        }
+    } else {
+        box_impostor_t *imp = ecs_map_get_deref(&s->impostors, box_impostor_t, source);
+        if (imp) {
+            imp->changed = true;
+        }
+    }
+
+    s->work = true;
+}
+
+/** Mark the impostor of an entity when the hash of a source read it.
+ *
+ * @param s The impostor state
+ * @param e The entity
+ */
+static void box_impostor_mark_member(
+    box_impostors_t *s,
+    ecs_entity_t e)
+{
+    const ecs_map_val_t *v = e ? ecs_map_get(&s->members, e) : NULL;
+    if (v) {
+        box_impostor_mark(s, *v);
+    }
+}
+
+/** Register an entity the hash of a source reads as a member of its impostor.
+ *
+ * @param s The impostor state
+ * @param imp The impostor
+ * @param source The entity with Impostor
+ * @param e The entity
+ */
+static void box_impostor_member_add(
+    box_impostors_t *s,
+    box_impostor_t *imp,
+    ecs_entity_t source,
+    ecs_entity_t e)
+{
+    ecs_map_val_t *v = ecs_map_get(&s->members, e);
+    if (!v) {
+        ecs_map_insert(&s->members, e, source);
+        *ecs_vec_append_t(NULL, &imp->members, ecs_entity_t) = e;
+    } else if (*v != source) {
+        *v = BOX_IMPOSTOR_SHARED;
+    }
+}
+
+/** Forget the members the last hash of a source registered. A member that several impostors
+ * share stays, so it keeps marking all of them.
+ *
+ * @param s The impostor state
+ * @param imp The impostor
+ * @param source The entity with Impostor
+ */
+static void box_impostor_members_clear(
+    box_impostors_t *s,
+    box_impostor_t *imp,
+    ecs_entity_t source)
+{
+    int32_t i;
+    for (i = 0; i < ecs_vec_count(&imp->members); i ++) {
+        ecs_entity_t e = *ecs_vec_get_t(&imp->members, ecs_entity_t, i);
+        const ecs_map_val_t *v = ecs_map_get(&s->members, e);
+        if (v && *v == source) {
+            ecs_map_remove(&s->members, e);
+        }
+    }
+
+    ecs_vec_clear(&imp->members);
+}
+
 /** Check whether a component is a pose of an entity.
  *
  * @param id The component
@@ -406,9 +503,12 @@ static uint64_t box_impostor_fnv(
 
 /** Hash the images of the textures a component refers to by its entity members, such as the
  * maps of PbrTextures: the state and revision of their loads and their size, so that a texture
- * that loads or changes bakes again.
+ * that loads or changes bakes again. The textures become members of the impostor.
  *
  * @param world The world
+ * @param s The impostor state
+ * @param imp The impostor
+ * @param source The entity with Impostor
  * @param id The component
  * @param ptr Its value
  * @param h The hash
@@ -416,6 +516,9 @@ static uint64_t box_impostor_fnv(
  */
 static uint64_t box_impostor_hash_textures(
     const ecs_world_t *world,
+    box_impostors_t *s,
+    box_impostor_t *imp,
+    ecs_entity_t source,
     ecs_id_t id,
     const void *ptr,
     uint64_t h)
@@ -433,6 +536,10 @@ static uint64_t box_impostor_hash_textures(
             const TextureStatus *status = t && ecs_is_alive(world, t)
                 ? ecs_get(world, t, TextureStatus) : NULL;
             const Texture *size = status ? ecs_get(world, t, Texture) : NULL;
+            if (t && ecs_is_alive(world, t)) {
+                box_impostor_member_add(s, imp, source, t);
+            }
+
             if (status) {
                 h = box_impostor_fnv(h, &status->state, ECS_SIZEOF(status->state));
                 h = box_impostor_fnv(h, &status->revision, ECS_SIZEOF(status->revision));
@@ -447,10 +554,13 @@ static uint64_t box_impostor_hash_textures(
     return h;
 }
 
-/** Hash the watched components of an entity and of its prefabs.
+/** Hash the watched components of an entity and of its prefabs, which become members of the
+ * impostor.
  *
  * @param world The world
  * @param s The impostor state
+ * @param imp The impostor
+ * @param source The entity with Impostor
  * @param e The entity
  * @param h The hash
  * @param root Whether the entity is the root of the source, whose pose the bake leaves out
@@ -459,7 +569,9 @@ static uint64_t box_impostor_hash_textures(
  */
 static uint64_t box_impostor_hash_entity(
     const ecs_world_t *world,
-    const box_impostors_t *s,
+    box_impostors_t *s,
+    box_impostor_t *imp,
+    ecs_entity_t source,
     ecs_entity_t e,
     uint64_t h,
     bool root,
@@ -467,6 +579,7 @@ static uint64_t box_impostor_hash_entity(
 {
     const ecs_type_t *type = ecs_get_type(world, e);
     int32_t i;
+    box_impostor_member_add(s, imp, source, e);
     if (!type) {
         goto done;
     }
@@ -477,7 +590,7 @@ static uint64_t box_impostor_hash_entity(
             if (ECS_PAIR_FIRST(id) == EcsIsA && depth < BOX_IMPOSTOR_DEPTH_MAX) {
                 ecs_entity_t base = ecs_pair_second(world, id);
                 h = box_impostor_fnv(h, &base, ECS_SIZEOF(base));
-                h = box_impostor_hash_entity(world, s, base, h, root, depth + 1);
+                h = box_impostor_hash_entity(world, s, imp, source, base, h, root, depth + 1);
             }
 
             continue;
@@ -492,7 +605,7 @@ static uint64_t box_impostor_hash_entity(
         h = box_impostor_fnv(h, &id, ECS_SIZEOF(id));
         if (ti && ptr) {
             h = box_impostor_fnv(h, ptr, ti->size);
-            h = box_impostor_hash_textures(world, id, ptr, h);
+            h = box_impostor_hash_textures(world, s, imp, source, id, ptr, h);
         }
     }
 
@@ -504,6 +617,8 @@ done:
  *
  * @param world The world
  * @param s The impostor state
+ * @param imp The impostor
+ * @param source The entity with Impostor
  * @param e The entity
  * @param h The hash
  * @param root Whether the entity is the root of the source
@@ -512,14 +627,16 @@ done:
  */
 static uint64_t box_impostor_hash_tree(
     const ecs_world_t *world,
-    const box_impostors_t *s,
+    box_impostors_t *s,
+    box_impostor_t *imp,
+    ecs_entity_t source,
     ecs_entity_t e,
     uint64_t h,
     bool root,
     int32_t depth)
 {
     h = box_impostor_fnv(h, &e, ECS_SIZEOF(e));
-    h = box_impostor_hash_entity(world, s, e, h, root, 0);
+    h = box_impostor_hash_entity(world, s, imp, source, e, h, root, 0);
     if (depth >= BOX_IMPOSTOR_DEPTH_MAX) {
         goto done;
     }
@@ -528,7 +645,8 @@ static uint64_t box_impostor_hash_tree(
     while (ecs_children_next(&it)) {
         int32_t i;
         for (i = 0; i < it.count; i ++) {
-            h = box_impostor_hash_tree(world, s, it.entities[i], h, false, depth + 1);
+            h = box_impostor_hash_tree(world, s, imp, source, it.entities[i], h, false,
+                depth + 1);
         }
     }
 
@@ -713,8 +831,95 @@ static void box_impostor_restart(
     imp->status_dirty = true;
 }
 
+/** A member of an impostor changed: a watched component, a texture or its place in a hierarchy
+ * was added, set or removed. Its impostor hashes its source again.
+ *
+ * @param it The iterator of the observer
+ */
+static void box_impostor_on_member(
+    ecs_iter_t *it)
+{
+    box_impostors_t *s = it->ctx;
+    ecs_id_t id = ecs_field_id(it, 0);
+    int32_t i;
+    if (ecs_is_fini(it->world) || !ecs_map_count(&s->members)) {
+        goto done;
+    }
+
+    if (ECS_IS_PAIR(id) && ECS_PAIR_FIRST(id) == EcsChildOf) {
+        box_impostor_mark_member(s, ecs_pair_second(it->world, id));
+    }
+
+    for (i = 0; i < it->count; i ++) {
+        box_impostor_mark_member(s, it->entities[i]);
+    }
+
+done:
+    return;
+}
+
+/** Observe a component or pair of the members of the impostors.
+ *
+ * @param world The world
+ * @param s The impostor state
+ * @param id The component or pair
+ */
+static void box_impostor_observe_id(
+    ecs_world_t *world,
+    box_impostors_t *s,
+    ecs_id_t id)
+{
+    ecs_observer(world, {
+        .query.terms = {{ .id = id, .src.id = EcsSelf, .inout = EcsInOutNone }},
+        .query.flags = EcsQueryMatchPrefab | EcsQueryMatchDisabled,
+        .events = { EcsOnAdd, EcsOnSet, EcsOnRemove },
+        .callback = box_impostor_on_member,
+        .ctx = s
+    });
+}
+
+/** Create the observers of the members when the first impostor is made, so a world without
+ * impostors has none: one per component the hash reads, of the images of the textures and of
+ * the children of the hierarchies.
+ *
+ * @param world The world
+ * @param s The impostor state
+ */
+static void box_impostor_observe(
+    ecs_world_t *world,
+    box_impostors_t *s)
+{
+    ecs_entity_t scope = ecs_set_scope(world, 0);
+    ecs_map_iter_t it = ecs_map_iter(&s->watched);
+    while (ecs_map_next(&it)) {
+        box_impostor_observe_id(world, s, ecs_map_key(&it));
+    }
+
+    if (!ecs_map_get(&s->watched, ecs_id(Texture))) {
+        box_impostor_observe_id(world, s, ecs_id(Texture));
+    }
+
+    if (!ecs_map_get(&s->watched, ecs_id(TextureStatus))) {
+        box_impostor_observe_id(world, s, ecs_id(TextureStatus));
+    }
+
+    ecs_observer(world, {
+        .query.terms = {{ .id = ecs_pair(EcsChildOf, EcsWildcard), .src.id = EcsSelf }},
+        .query.flags = EcsQueryMatchPrefab | EcsQueryMatchDisabled,
+        .events = { EcsOnAdd, EcsOnRemove },
+        .callback = box_impostor_on_member,
+        .ctx = s
+    });
+
+    ecs_set_scope(world, scope);
+    s->observing = true;
+}
+
 /** Follow the changes of an impostor: a source that changed gets a new copy, and a change of
  * the source or of the grid starts a bake.
+ *
+ * The source is hashed when the impostor is new or a member of it changed, which registers its
+ * members again.
  *
  * @param world The world
  * @param s The impostor state
@@ -729,14 +934,28 @@ static void box_impostor_update(
 {
     box_impostor_t *imp = ecs_map_get_deref(&s->impostors, box_impostor_t, e);
     int32_t frames, resolution;
-    uint64_t hash = box_impostor_hash_tree(world, s, e, 14695981039346656037ull, true, 0);
+    uint64_t hash;
     if (!imp) {
         imp = ecs_os_calloc_t(box_impostor_t);
         ecs_map_insert_ptr(&s->impostors, e, imp);
         ecs_map_init(&imp->cards, NULL);
+        ecs_vec_init_t(NULL, &imp->members, ecs_entity_t, 0);
         imp->status_dirty = true;
         imp->dirty = true;
+        imp->changed = true;
         imp->distance = -1.0f;
+    }
+
+    if (!s->observing) {
+        box_impostor_observe(world, s);
+    }
+
+    hash = imp->hash;
+    if (imp->changed) {
+        imp->changed = false;
+        box_impostor_members_clear(s, imp, e);
+        hash = box_impostor_hash_tree(world, s, imp, e, e, 14695981039346656037ull, true, 0);
+        s->hashes ++;
     }
 
     if (!imp->scene || !ecs_is_alive(world, imp->scene)) {
@@ -1237,7 +1456,8 @@ done:
  * the impostors and send the views of their bakes within the budget.
  *
  * The system is immediate, so the scenes and copies it makes exist at once and the status it
- * sets is visible in the same frame.
+ * sets is visible in the same frame. It returns at once while no impostor, member or instance
+ * changed, none bakes, nothing waits for the next packet and the backend is the same.
  *
  * @param it The iterator of the system
  */
@@ -1250,7 +1470,13 @@ static void BoxRenderExtractImpostors(
     int32_t i, budget = b ? glm_imax(b->frames, 1) : BOX_IMPOSTOR_BUDGET;
     box_render_packet_t *p = NULL;
     bool any = false;
-    ecs_iter_t qit = ecs_query_iter(world, s->query);
+    ecs_iter_t qit;
+    if (!s->work && box_render_get_backend(world)->generation == s->generation) {
+        goto done;
+    }
+
+    s->work = false;
+    qit = ecs_query_iter(world, s->query);
     while (ecs_query_next(&qit)) {
         const Impostor *values = ecs_field(&qit, Impostor, 0);
         for (i = 0; i < qit.count; i ++) {
@@ -1262,6 +1488,7 @@ static void BoxRenderExtractImpostors(
     if (!any && !ecs_vec_count(&s->sent) && !ecs_vec_count(&s->released) &&
         !ecs_vec_count(&s->reads))
     {
+        s->generation = box_render_get_backend(world)->generation;
         goto done;
     }
 
@@ -1318,7 +1545,10 @@ static void BoxRenderExtractImpostors(
         }
 
         box_impostor_cards(world, s, imp, e);
+        s->work |= imp->baking || imp->changed || imp->rebake;
     }
+
+    s->work |= ecs_vec_count(&s->sent) || ecs_vec_count(&s->released);
 
 done:
     return;
@@ -1340,9 +1570,14 @@ static void box_impostor_on_instance(
         goto done;
     }
 
-    imp = ecs_map_get_deref(&s->impostors, box_impostor_t, ECS_PAIR_SECOND(id));
+    imp = ecs_map_get_deref(&s->impostors, box_impostor_t, ecs_pair_second(it->world, id));
     if (imp) {
         imp->dirty = true;
+        s->work = true;
+    }
+
+    for (i = 0; i < it->count; i ++) {
+        box_impostor_mark_member(s, it->entities[i]);
     }
 
     for (i = 0; imp && it->event == EcsOnRemove && i < it->count; i ++) {
@@ -1353,6 +1588,20 @@ static void box_impostor_on_instance(
 
 done:
     return;
+}
+
+/** An Impostor was added or set: the system follows it in the next extract. A hook, so that it
+ * also runs for prefabs.
+ *
+ * @param it The iterator of the hook
+ */
+static void box_impostor_on_set(
+    ecs_iter_t *it)
+{
+    box_impostors_t *s = box_impostors_get(it->world);
+    if (s) {
+        s->work = true;
+    }
 }
 
 /** Free the bake of an impostor whose component is removed, with its scene and copy. A hook,
@@ -1381,8 +1630,10 @@ static void box_impostor_on_remove(
             ecs_delete(it->world, imp->scene);
         }
 
+        box_impostor_members_clear(s, imp, it->entities[i]);
         ecs_map_remove(&s->impostors, it->entities[i]);
         box_impostor_free(s, imp);
+        s->work = true;
     }
 
 done:
@@ -1399,7 +1650,16 @@ void box_impostor_rebake(
         : NULL;
     if (imp) {
         imp->rebake = true;
+        s->work = true;
     }
+}
+
+int32_t box_render_impostor_hashes(
+    const ecs_world_t *world)
+{
+    box_impostors_t *s = box_impostors_get(world);
+
+    return s ? s->hashes : 0;
 }
 
 int box_impostor_write(
@@ -1422,6 +1682,7 @@ int box_impostor_write(
     box_impostor_read_t *r = ecs_vec_append_t(NULL, &s->reads, box_impostor_read_t);
     r->atlas = imp->front[channel];
     r->path = ecs_os_strdup(path);
+    s->work = true;
     result = 0;
 done:
     return result;
@@ -1454,6 +1715,8 @@ void box_render_impostors_init(
 
     ecs_set_hooks(world, Impostor, {
         .ctor = box_impostor_ctor,
+        .on_add = box_impostor_on_set,
+        .on_set = box_impostor_on_set,
         .on_remove = box_impostor_on_remove
     });
     ecs_set_hooks(world, ImpostorBudget, { .ctor = box_impostor_budget_ctor });
@@ -1464,6 +1727,8 @@ void box_render_impostors_init(
     box_impostors_t *s = ecs_os_calloc_t(box_impostors_t);
     ecs_map_init(&s->impostors, NULL);
     ecs_map_init(&s->watched, NULL);
+    ecs_map_init(&s->members, NULL);
+    s->work = true;
     ecs_vec_init_t(NULL, &s->sent, uint32_t, 0);
     ecs_vec_init_t(NULL, &s->released, uint32_t, 0);
     ecs_vec_init_t(NULL, &s->reads, box_impostor_read_t, 0);

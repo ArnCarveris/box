@@ -367,3 +367,33 @@ bool box_draws_store_reserve(
 done:
     return result;
 }
+
+void box_render_draws_page(
+    ecs_world_t *world,
+    int32_t slots)
+{
+    ecs_entity_t system = ecs_lookup(world, "box.render.extract.Draws");
+    const ecs_system_t *s = system ? ecs_system_get(world, system) : NULL;
+    if (s && s->ctx && slots > 0) {
+        box_render_draws_t *d = s->ctx;
+        for (int32_t i = 0; i < BOX_DRAWS_STORES; i ++) {
+            d->stores[i].slots = (uint32_t)slots < d->stores[i].max
+                ? (uint32_t)slots : d->stores[i].max;
+        }
+    }
+}
+
+void box_render_draws_chunk(
+    ecs_world_t *world,
+    int32_t instances)
+{
+    ecs_entity_t system = ecs_lookup(world, "box.render.extract.Draws");
+    const ecs_system_t *s = system ? ecs_system_get(world, system) : NULL;
+    if (s && s->ctx && instances > 0) {
+        box_render_draws_t *d = s->ctx;
+        for (int32_t i = 0; i < BOX_DRAWS_STORES; i ++) {
+            d->stores[i].chunk = (uint32_t)instances < d->stores[i].max
+                ? (uint32_t)instances : d->stores[i].max;
+        }
+    }
+}

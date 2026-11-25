@@ -202,7 +202,9 @@ prefab Grass { Quad: {0.3, 0.8}; PbrTextures: {albedo: blade}; AlphaCutoff: {}
 
 - Material records are shared by content hash: shapes with identical values share one slot.
   Prefabs, `DynamicMaterial` batches, `texture.Scroll`, `WindSway`, moving `Distortion`/rippling
-  `Water` and running transitions own a private slot packed every frame or on change.
+  `Water` and running transitions own a private slot, packed when the material changes; the
+  shader moves scroll offsets and phases on from a per-frame clock (`DynamicMaterial` and
+  transitions pack every frame).
 - `WindSway` costs a material read and the sway math per vertex in every pass of its batches,
   and re-renders the shadow tiles and cascades of its casters every frame while the wind blows.
 - Put materials on prefabs so instances share them; avoid `DynamicMaterial` unless values truly

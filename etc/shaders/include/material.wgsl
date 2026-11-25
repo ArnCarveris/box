@@ -135,6 +135,19 @@ struct Material {
     // VertexOcclusion strength 0..1 with OCCLUSION_PRESENT, 0 without
     occlusion_strength: f32,
     wind_pad: f32,
+    // What moves the words that change with the time, per second (box_render_material_t
+    // motion_*), all 0 for a material that stands still: [0] the TextureScroll velocity of uv.zw
+    // (xy) and of normal_offset (zw); [1] the velocity of water_ripple_offset (xy) and of the
+    // water frame of the caustics in cells (zw); [2] the rates of the caustics phase (x), the
+    // shore phase (y), the distortion or water flow phase (z) and the flutter phase (w, per
+    // second of the wind clock); [3] the rate of the branch phase (x, per second of the wind
+    // clock).
+    // In record 0, which never moves, they hold the clock of the frame instead
+    // (box_render_material_clock_t): [0] the seconds since the epoch the records are packed for
+    // (x), those of the wind clock (y) and the wrapped offset of the gust field (zw); [1] the
+    // direction (xy), speed (z) and gust (w) of the Wind; [2] 1 over its gust scale (x) and the
+    // phase of its sway (y).
+    motion: array<vec4f, 4>,
 };
 
 // Water.scatter_color of a Water record, display encoded, r | g << 8 | b << 16, 0 without a
@@ -249,9 +262,52 @@ fn revealed(edge: f32, pixel: vec2f) -> bool {
     return edge >= 0.0 && edge >= dither;
 }
 
-// Record of a material id; an id past the table reads the default material of slot 0.
+// Record of a material id at the time of the frame; an id past the table reads the default
+// material of slot 0. The words that change with the time are packed for the epoch of the
+// table and moved on here by their motion words times the clock of the frame, which record 0
+// holds, so the CPU packs a record only when its material changes. The Wind of a WindSway
+// record is that of the frame.
 fn material_fetch(id: u32) -> Material {
-    return materials[select(0u, id, id < arrayLength(&materials))];
+    let at = select(0u, id, id < arrayLength(&materials));
+    var m = materials[at];
+    if (at == 0u) {
+        return m;
+    }
+    let c0 = materials[0].motion[0];
+    let t = c0.x;
+    let uv = m.motion[0];
+    let water = m.motion[1];
+    let rates = m.motion[2];
+    if (any(uv != vec4f(0.0))) {
+        m.uv = vec4f(m.uv.xy, m.uv.zw + uv.xy * t);
+        m.normal_offset += uv.zw * t;
+    }
+    if (any(water != vec4f(0.0))) {
+        m.water_ripple_offset += water.xy * t;
+        m.fresnel_color = bitcast<vec2u>(bitcast<vec2f>(m.fresnel_color) + water.zw * t);
+    }
+    if (rates.x != 0.0) {
+        m.fresnel_opacity = fract(m.fresnel_opacity + rates.x * t);
+    }
+    if (rates.y != 0.0) {
+        m.thickness = fract(m.thickness + rates.y * t);
+    }
+    if (rates.z != 0.0) {
+        m.distortion_phase = fract(m.distortion_phase + rates.z * t);
+    }
+    if ((m.flags & 1u) != 0u) {
+        let c1 = materials[0].motion[1];
+        let c2 = materials[0].motion[2];
+        m.wind_offset = c0.zw;
+        m.wind_direction = c1.xy;
+        m.wind_speed = c1.z;
+        m.wind_gust = c1.w;
+        m.wind_frequency = c2.x;
+        m.wind_sway = c2.y;
+        m.wind_flutter_phase = fract(m.wind_flutter_phase + rates.w * c0.y);
+        m.wind_branch_phase = fract(m.wind_branch_phase + m.motion[3].x * c0.y);
+    }
+    return m;
 }
 
 // The material projects its texture coordinates from the object or the world position

@@ -71,6 +71,17 @@ typedef struct box_terrain_node_t {
     double distance;        /**< Distance to the nearest focus */
 } box_terrain_node_t;
 
+/** The heights of the grid around a focus that give its clearance (box_terrain_clearance) */
+typedef struct box_terrain_grid_t {
+    int32_t x0;             /**< Column of the first sample */
+    int32_t z0;             /**< Row of the first sample */
+    double step;            /**< Meters between the samples */
+    double lo;              /**< Lowest height known, above hi when none is */
+    double hi;              /**< Highest height known */
+    uint64_t revision;      /**< box_terrain_revision the heights were read at */
+    bool valid;             /**< The other members are set */
+} box_terrain_grid_t;
+
 /** The tiles of a terrain */
 typedef struct box_terrain_tiles_t {
     ecs_map_t map;          /**< Key of a node to its box_terrain_tile_t */
@@ -89,6 +100,21 @@ typedef struct box_terrain_tiles_t {
     uint64_t materials;     /**< Hash of the material components the tiles have */
     int32_t created;        /**< Tiles made */
     int32_t dropped;        /**< Tiles deleted */
+    ecs_vec_t nodes;        /**< box_terrain_node_t, the nodes the foci want, nearest first */
+    ecs_map_t roots;        /**< Keys of the root nodes the foci select */
+    bool selected;          /**< nodes and roots are those of the settings and foci */
+    double seen[BOX_TERRAIN_FOCI][3]; /**< Foci of the last frame as they are, x, z and y in the
+                             *   frame of the terrain */
+    int32_t seen_count;     /**< Foci in seen, -1 before the first frame */
+    box_terrain_grid_t grids[BOX_TERRAIN_FOCI]; /**< Heights around each focus */
+    double radius;          /**< Terrain.query_radius the clearances were measured with */
+    bool query_only;        /**< Terrain.query_only of the last frame */
+    uint64_t revision;      /**< box_terrain_revision of the last frame */
+    bool dirty;             /**< The status of a texture of a tile was set since the last update */
+    bool style;             /**< A material component of the terrain changed since its hash */
+    bool active;            /**< The last update changed a tile, so the next one may too */
+    int32_t updates;        /**< Updates that went over the tiles */
+    int32_t selects;        /**< Selections of the nodes the foci want */
 } box_terrain_tiles_t;
 
 /** State of box.terrain in a world */
@@ -96,8 +122,8 @@ typedef struct box_terrain_ctx_t {
     ecs_map_t terrains;     /**< Terrain entity to its box_terrain_tiles_t */
     ecs_vec_t free_slots;   /**< int32_t, slots of the heights given back */
     int32_t next_slot;      /**< Slot after the highest one taken */
-    ecs_vec_t nodes;        /**< box_terrain_node_t, the nodes a terrain wants this frame */
-    ecs_map_t roots;        /**< Keys of the root nodes already selected this frame */
+    ecs_map_t textures;     /**< Texture entity of a tile to the box_terrain_tiles_t of its
+                             *   terrain */
     ecs_vec_t terrain_list; /**< ecs_entity_t, the terrains to update this frame */
     ecs_id_t materials[BOX_TERRAIN_MATERIALS]; /**< Material components the tiles get */
 } box_terrain_ctx_t;
@@ -108,34 +134,6 @@ typedef struct TerrainModule {
 } TerrainModule;
 
 static ECS_COMPONENT_DECLARE(TerrainModule);
-
-/** Get the vertices per edge of a tile from a resolution: odd, 5 to 257, 65 for 0 or less.
- *
- * @param resolution The resolution
- * @return Vertices per edge
- */
-static int32_t box_terrain_vertices(
-    int32_t resolution)
-{
-    int32_t result = resolution > 0 ? resolution : 65;
-    result = result < 5 ? 5 : result > 257 ? 257 : result;
-
-    return result + ((result & 1) ? 0 : 1);
-}
-
-int32_t box_terrain_coarse_texels(
-    int32_t resolution)
-{
-    return (box_terrain_vertices(resolution) + 2 * BOX_TERRAIN_BORDER + 1) / 2;
-}
-
-uint32_t box_terrain_row_bytes(
-    int32_t resolution)
-{
-    uint32_t texels = (uint32_t)box_terrain_vertices(resolution) + 2u * BOX_TERRAIN_BORDER;
-
-    return (texels * 4u + 255u) & ~255u;
-}
 
 /** Apply the defaults and limits of a Terrain.
  *
@@ -316,7 +314,7 @@ static bool box_terrain_inside(
 /** Select the tiles of a node: the node itself, or the tiles of its four children while a focus
  * is within the range of the finer level.
  *
- * @param ctx The state
+ * @param tiles The tiles, receive the nodes
  * @param s The settings
  * @param foci The foci
  * @param count Number of foci
@@ -325,7 +323,7 @@ static bool box_terrain_inside(
  * @param iz The row
  */
 static void box_terrain_select_node(
-    box_terrain_ctx_t *ctx,
+    box_terrain_tiles_t *tiles,
     const box_terrain_settings_t *s,
     const double foci[][3],
     int32_t count,
@@ -341,18 +339,19 @@ static void box_terrain_select_node(
 
     distance = box_terrain_nearest(s, level, ix, iz, foci, count);
     if (level > 0 && distance < box_terrain_range(s, level - 1) &&
-        ecs_vec_count(&ctx->nodes) + 4 <= BOX_TERRAIN_MAX_TILES)
+        ecs_vec_count(&tiles->nodes) + 4 <= BOX_TERRAIN_MAX_TILES)
     {
         for (b = 0; b < 2; b ++) {
             for (a = 0; a < 2; a ++) {
-                box_terrain_select_node(ctx, s, foci, count, level - 1, ix * 2 + a, iz * 2 + b);
+                box_terrain_select_node(tiles, s, foci, count, level - 1, ix * 2 + a,
+                    iz * 2 + b);
             }
         }
 
         goto done;
     }
 
-    *ecs_vec_append_t(NULL, &ctx->nodes, box_terrain_node_t) = (box_terrain_node_t){
+    *ecs_vec_append_t(NULL, &tiles->nodes, box_terrain_node_t) = (box_terrain_node_t){
         .level = level, .ix = ix, .iz = iz, .distance = distance };
 done:
     return;
@@ -376,21 +375,21 @@ static int box_terrain_node_compare(
 /** Select the tiles the foci want: the root nodes of the coarsest level within its range of a
  * focus (and inside the extent of a bounded terrain), refined around the foci, nearest first.
  *
- * @param ctx The state, receives the nodes
+ * @param tiles The tiles, receive the nodes and the root nodes
  * @param s The settings
  * @param foci The foci
  * @param count Number of foci
  */
 static void box_terrain_select(
-    box_terrain_ctx_t *ctx,
+    box_terrain_tiles_t *tiles,
     const box_terrain_settings_t *s,
     const double foci[][3],
     int32_t count)
 {
     int32_t top = s->levels - 1, i, ix, iz;
     double size = box_terrain_size(s, top), range = box_terrain_range(s, top);
-    ecs_vec_clear(&ctx->nodes);
-    ecs_map_clear(&ctx->roots);
+    ecs_vec_clear(&tiles->nodes);
+    ecs_map_clear(&tiles->roots);
     for (i = 0; i < count; i ++) {
         double lo_x = foci[i][0] - range, hi_x = foci[i][0] + range;
         double lo_z = foci[i][1] - range, hi_z = foci[i][1] + range;
@@ -410,22 +409,24 @@ static void box_terrain_select(
         for (iz = z0; iz <= z1; iz ++) {
             for (ix = x0; ix <= x1; ix ++) {
                 uint64_t key = box_terrain_key(top, ix, iz);
-                if (ecs_map_get(&ctx->roots, key) ||
+                if (ecs_map_get(&tiles->roots, key) ||
                     box_terrain_node_distance(s, top, ix, iz, foci[i]) >= range)
                 {
                     continue;
                 }
 
-                ecs_map_insert(&ctx->roots, key, 1);
-                box_terrain_select_node(ctx, s, foci, count, top, ix, iz);
+                ecs_map_insert(&tiles->roots, key, 1);
+                box_terrain_select_node(tiles, s, foci, count, top, ix, iz);
             }
         }
     }
 
-    if (ecs_vec_count(&ctx->nodes) > 1) {
-        qsort(ecs_vec_first(&ctx->nodes), (size_t)ecs_vec_count(&ctx->nodes),
+    if (ecs_vec_count(&tiles->nodes) > 1) {
+        qsort(ecs_vec_first(&tiles->nodes), (size_t)ecs_vec_count(&tiles->nodes),
             sizeof(box_terrain_node_t), box_terrain_node_compare);
     }
+
+    tiles->selects ++;
 }
 
 /** Take a slot for the heights of a tile.
@@ -804,6 +805,12 @@ static box_terrain_tile_t* box_terrain_tile_new(
     ecs_map_insert_ptr(&tiles->map, box_terrain_key(t->level, t->ix, t->iz), t);
     *ecs_vec_append_t(NULL, &tiles->list, box_terrain_tile_t*) = t;
     tiles->created ++;
+    ecs_map_insert_ptr(&ctx->textures, t->texture, tiles);
+    ecs_map_insert_ptr(&ctx->textures, t->rough, tiles);
+    if (t->masks) {
+        ecs_map_insert_ptr(&ctx->textures, t->masks, tiles);
+        ecs_map_insert_ptr(&ctx->textures, t->coarse, tiles);
+    }
 
     return t;
 }
@@ -829,6 +836,14 @@ static void box_terrain_tile_drop(
     }
 
     box_terrain_slot_give(ctx, t->slot);
+    ecs_map_remove(&ctx->textures, t->texture);
+    ecs_map_remove(&ctx->textures, t->rough);
+    if (t->masks) {
+        ecs_map_remove(&ctx->textures, t->masks);
+        ecs_map_remove(&ctx->textures, t->coarse);
+    }
+
+    tiles->active = true;
     ecs_map_remove(&tiles->map, box_terrain_key(t->level, t->ix, t->iz));
     ecs_vec_remove_t(&tiles->list, box_terrain_tile_t*, index);
     ecs_os_free(t);
@@ -852,6 +867,7 @@ static void box_terrain_drop_all(
 
     tiles->positioned = false;
     tiles->materials = 0;
+    tiles->style = true;
 }
 
 /** Stop drawing every tile under a coarser tile that draws, so the tiles that draw do not
@@ -937,13 +953,13 @@ static bool box_terrain_covered(
 /** Check whether a tile lies in a root node the foci selected this frame (box_terrain_select),
  * whose area the wanted tiles cover.
  *
- * @param ctx The state
+ * @param tiles The tiles, with the root nodes the foci select
  * @param t The tile
  * @param levels Levels of the terrain
  * @return Whether the foci want the area of the tile
  */
 static bool box_terrain_selected(
-    const box_terrain_ctx_t *ctx,
+    const box_terrain_tiles_t *tiles,
     const box_terrain_tile_t *t,
     int32_t levels)
 {
@@ -954,7 +970,7 @@ static bool box_terrain_selected(
         iz = box_terrain_half(iz);
     }
 
-    return ecs_map_get(&ctx->roots, box_terrain_key(level, ix, iz)) != NULL;
+    return ecs_map_get(&tiles->roots, box_terrain_key(level, ix, iz)) != NULL;
 }
 
 /** Decide which tiles draw: a wanted tile that is ready; for one that is not, its nearest ready
@@ -964,13 +980,11 @@ static bool box_terrain_selected(
  * that draw do not cover all of it, as when the budget has not made its replacements yet, so
  * the terrain never shows a hole where it showed ground.
  *
- * @param ctx The state, with the root nodes the foci select
- * @param tiles The tiles
+ * @param tiles The tiles, with the root nodes the foci select
  * @param levels Levels of the terrain
  * @param focused Whether the foci selected the tiles, else every tile is wanted
  */
 static void box_terrain_resolve(
-    const box_terrain_ctx_t *ctx,
     box_terrain_tiles_t *tiles,
     int32_t levels,
     bool focused)
@@ -1026,7 +1040,7 @@ static void box_terrain_resolve(
 
     for (i = 0; i < count; i ++) {
         box_terrain_tile_t *t = list[i];
-        if (t->enabled && t->ready && !t->drawn && box_terrain_selected(ctx, t, levels) &&
+        if (t->enabled && t->ready && !t->drawn && box_terrain_selected(tiles, t, levels) &&
             !box_terrain_covered(tiles, t, levels))
         {
             t->drawn = true;
@@ -1104,9 +1118,14 @@ int32_t box_terrain_foci(
  * heights of the terrain within the reach of its coarse query tiles, sampled on a grid fixed in
  * the frame of the terrain, 0 where none of them is known or it is between them.
  *
+ * The heights of the grid are read again only when the focus reaches other samples or the
+ * heights changed (box_terrain_revision).
+ *
  * @param world The world
  * @param e The terrain
  * @param value The terrain value
+ * @param grid The heights of the grid around the focus, kept between calls
+ * @param revision The box_terrain_revision of the world
  * @param x X of the focus in the frame of the terrain
  * @param z Z of the focus in the frame of the terrain
  * @param y Y of the focus in the frame of the terrain
@@ -1116,6 +1135,8 @@ static double box_terrain_clearance(
     const ecs_world_t *world,
     ecs_entity_t e,
     const Terrain *value,
+    box_terrain_grid_t *grid,
+    uint64_t revision,
     double x,
     double z,
     double y)
@@ -1124,23 +1145,35 @@ static double box_terrain_clearance(
         ? value->query_radius : 64.0;
     double reach = radius * BOX_TERRAIN_QUERY_SCALE;
     double step = 2.0 * reach / (double)(BOX_TERRAIN_CLEARANCE_SAMPLES - 1);
-    double lo = DBL_MAX, hi = -DBL_MAX, result = 0.0;
+    double lo, hi, result = 0.0;
     int32_t x0 = (int32_t)ceil((x - reach) / step), z0 = (int32_t)ceil((z - reach) / step);
     int32_t i, j;
     float h;
-    if (box_terrain_height(world, e, x, z, &h)) {
-        lo = hi = h;
-    }
-
-    for (j = 0; j < BOX_TERRAIN_CLEARANCE_SAMPLES; j ++) {
-        for (i = 0; i < BOX_TERRAIN_CLEARANCE_SAMPLES; i ++) {
-            if (box_terrain_height(world, e, (double)(x0 + i) * step,
-                (double)(z0 + j) * step, &h))
-            {
-                lo = fmin(lo, h);
-                hi = fmax(hi, h);
+    if (!grid->valid || grid->x0 != x0 || grid->z0 != z0 || grid->step != step ||
+        grid->revision != revision)
+    {
+        lo = DBL_MAX;
+        hi = -DBL_MAX;
+        for (j = 0; j < BOX_TERRAIN_CLEARANCE_SAMPLES; j ++) {
+            for (i = 0; i < BOX_TERRAIN_CLEARANCE_SAMPLES; i ++) {
+                if (box_terrain_height(world, e, (double)(x0 + i) * step,
+                    (double)(z0 + j) * step, &h))
+                {
+                    lo = fmin(lo, h);
+                    hi = fmax(hi, h);
+                }
             }
         }
+
+        *grid = (box_terrain_grid_t){ .x0 = x0, .z0 = z0, .step = step, .lo = lo, .hi = hi,
+            .revision = revision, .valid = true };
+    }
+
+    lo = grid->lo;
+    hi = grid->hi;
+    if (box_terrain_height(world, e, x, z, &h)) {
+        lo = fmin(lo, h);
+        hi = fmax(hi, h);
     }
 
     if (lo <= hi) {
@@ -1307,7 +1340,12 @@ static box_terrain_tiles_t* box_terrain_tiles_of(
     if (!result) {
         result = ecs_os_calloc_t(box_terrain_tiles_t);
         ecs_map_init(&result->map, NULL);
+        ecs_map_init(&result->roots, NULL);
         ecs_vec_init_t(NULL, &result->list, box_terrain_tile_t*, 0);
+        ecs_vec_init_t(NULL, &result->nodes, box_terrain_node_t, 0);
+        result->seen_count = -1;
+        result->style = true;
+        result->active = true;
         ecs_map_insert_ptr(&ctx->terrains, e, result);
     }
 
@@ -1324,14 +1362,31 @@ static box_terrain_tiles_t* box_terrain_tiles_of(
         ecs_os_memset_n(result->filters, 0, ecs_entity_t, BOX_TERRAIN_LEVELS + 1);
         result->positioned = false;
         result->materials = 0;
+        result->style = true;
+        result->active = true;
     }
 
     return result;
 }
 
+/** Get the wanted, drawn and keep of a tile as bits.
+ *
+ * @param t The tile
+ * @return The bits
+ */
+static uint8_t box_terrain_tile_bits(
+    const box_terrain_tile_t *t)
+{
+    return (uint8_t)((t->wanted ? 1 : 0) | (t->drawn ? 2 : 0) | (t->keep ? 4 : 0));
+}
+
 /** Update the tiles of a terrain: select the tiles the foci want, make the missing ones nearest
  * first within the budget, find which tiles draw, drop the others within the budget and keep
  * the TerrainTile, the position and the materials of each tile current.
+ *
+ * It goes over the tiles only when the Terrain, its position, the foci beyond their step, the
+ * heights the queries read, the status of a texture of a tile or a material of the terrain
+ * changed, or the update before changed a tile. The nodes are selected only for other foci.
  *
  * @param world The world
  * @param ctx The state
@@ -1347,9 +1402,40 @@ static void box_terrain_update(
     box_terrain_settings_t s;
     box_terrain_tiles_t *tiles = box_terrain_tiles_of(world, ctx, e);
     double local[3], foci[BOX_TERRAIN_FOCI][2], heights[BOX_TERRAIN_FOCI];
-    double around[BOX_TERRAIN_FOCI][3];
+    double seen[BOX_TERRAIN_FOCI][3], around[BOX_TERRAIN_FOCI][3];
+    double radius = isfinite(value->query_radius) && value->query_radius > 0.0f
+        ? value->query_radius : 64.0;
     int32_t i, count, made = 0, drops = 0, missing = 0, budget;
+    uint64_t revision = box_terrain_revision(world);
     box_terrain_settings(value, &s);
+    bool reset = !tiles->made ||
+        ecs_os_memcmp(&tiles->settings, &s, ECS_SIZEOF(box_terrain_settings_t)) ||
+        radius != tiles->radius || value->query_only != tiles->query_only;
+    box_terrain_local(world, e, local);
+    count = box_terrain_foci(world, e, local, foci, heights);
+    ecs_os_memset_n(seen, 0, double, 3 * BOX_TERRAIN_FOCI);
+    for (i = 0; i < count; i ++) {
+        seen[i][0] = foci[i][0];
+        seen[i][1] = foci[i][1];
+        seen[i][2] = heights[i];
+    }
+
+    bool walked = count != tiles->seen_count ||
+        ecs_os_memcmp(seen, tiles->seen, ECS_SIZEOF(double) * 3 * BOX_TERRAIN_FOCI);
+    bool moved = !tiles->positioned || local[0] != tiles->placed[0] ||
+        local[1] != tiles->placed[1] || local[2] != tiles->placed[2];
+    bool news = revision != tiles->revision;
+    if (!reset && !walked && !moved && !news && !tiles->dirty && !tiles->style &&
+        !tiles->active)
+    {
+        goto done;
+    }
+
+    ecs_os_memcpy_n(tiles->seen, seen, double, 3 * BOX_TERRAIN_FOCI);
+    tiles->seen_count = count;
+    tiles->revision = revision;
+    tiles->radius = radius;
+    tiles->query_only = value->query_only;
     budget = s.budget;
     s.budget = tiles->settings.budget;
     if (tiles->made &&
@@ -1362,39 +1448,58 @@ static void box_terrain_update(
 
     tiles->settings = s;
     tiles->made = true;
+    tiles->selected = tiles->selected && !reset;
     if (!s.height || value->query_only) {
         box_terrain_drop_all(world, ctx, tiles);
+        tiles->dirty = false;
+        tiles->active = false;
+        tiles->updates ++;
         goto status;
     }
 
-    box_terrain_local(world, e, local);
-    count = box_terrain_foci(world, e, local, foci, heights);
     for (i = 0; i < count; i ++) {
         around[i][0] = foci[i][0];
         around[i][1] = foci[i][1];
-        around[i][2] = box_terrain_clearance(world, e, value, foci[i][0], foci[i][1],
-            heights[i]);
+        around[i][2] = box_terrain_clearance(world, e, value, &tiles->grids[i], revision,
+            foci[i][0], foci[i][1], heights[i]);
     }
 
     bool refocus = count && box_terrain_refocus(tiles, around, count);
-    bool moved = !tiles->positioned || local[0] != tiles->placed[0] ||
-        local[1] != tiles->placed[1] || local[2] != tiles->placed[2];
-    uint64_t materials = box_terrain_materials_hash(world, ctx, e);
-    bool restyle = materials != tiles->materials;
-    tiles->materials = materials;
+    if (!reset && !moved && !news && !refocus && !tiles->dirty && !tiles->style &&
+        !tiles->active)
+    {
+        goto done;
+    }
+
+    bool restyle = false;
+    if (tiles->style) {
+        uint64_t materials = box_terrain_materials_hash(world, ctx, e);
+        restyle = materials != tiles->materials;
+        tiles->materials = materials;
+        tiles->style = false;
+    }
+
+    bool changed = reset || moved || refocus || restyle;
+    tiles->updates ++;
+    tiles->dirty = false;
     tiles->positioned = true;
     ecs_os_memcpy_n(tiles->placed, local, double, 3);
 
     box_terrain_tile_t **list = ecs_vec_first(&tiles->list);
     for (i = 0; i < ecs_vec_count(&tiles->list); i ++) {
+        list[i]->before = box_terrain_tile_bits(list[i]);
         list[i]->wanted = false;
     }
 
     int32_t first = ecs_vec_count(&tiles->list);
     if (count) {
-        box_terrain_select(ctx, &s, tiles->foci, tiles->focus_count);
-        for (i = 0; i < ecs_vec_count(&ctx->nodes); i ++) {
-            const box_terrain_node_t *node = ecs_vec_get_t(&ctx->nodes, box_terrain_node_t, i);
+        if (refocus || !tiles->selected) {
+            box_terrain_select(tiles, &s, tiles->foci, tiles->focus_count);
+            tiles->selected = true;
+        }
+
+        for (i = 0; i < ecs_vec_count(&tiles->nodes); i ++) {
+            const box_terrain_node_t *node = ecs_vec_get_t(&tiles->nodes, box_terrain_node_t, i);
             box_terrain_tile_t *t = box_terrain_find(tiles, node->level, node->ix, node->iz);
             if (!t && made < s.budget) {
                 t = box_terrain_tile_new(world, ctx, tiles, node);
@@ -1422,10 +1527,11 @@ static void box_terrain_update(
                 box_terrain_texture_ready(world, t->rough) &&
                 box_terrain_texture_ready(world, t->masks) &&
                 box_terrain_texture_ready(world, t->coarse);
+            changed |= t->ready;
         }
     }
 
-    box_terrain_resolve(ctx, tiles, s.levels, count > 0);
+    box_terrain_resolve(tiles, s.levels, count > 0);
     for (i = ecs_vec_count(&tiles->list) - 1; i >= 0; i --) {
         box_terrain_tile_t *t = *ecs_vec_get_t(&tiles->list, box_terrain_tile_t*, i);
         bool fresh = i >= first;
@@ -1448,14 +1554,19 @@ static void box_terrain_update(
             box_terrain_materials_copy(world, ctx, e, t->entity);
         }
 
+        changed |= measured || t->drawn != t->enabled ||
+            box_terrain_tile_bits(t) != t->before;
         if (t->drawn != t->enabled) {
             ecs_enable(world, t->entity, t->drawn);
             t->enabled = t->drawn;
         }
     }
 
+    tiles->active = changed || made || drops;
 status:
     box_terrain_status(world, e, tiles, missing);
+done:
+    return;
 }
 
 /** Update the tiles of every terrain, in EcsPostUpdate before the world origin shifts. The system
@@ -1499,7 +1610,9 @@ static void box_terrain_tiles_free(
     }
 
     ecs_vec_fini_t(NULL, &tiles->list, box_terrain_tile_t*);
+    ecs_vec_fini_t(NULL, &tiles->nodes, box_terrain_node_t);
     ecs_map_fini(&tiles->map);
+    ecs_map_fini(&tiles->roots);
     ecs_os_free(tiles);
 }
 
@@ -1557,11 +1670,61 @@ static void box_terrain_ctx_free(
     }
 
     ecs_map_fini(&ctx->terrains);
-    ecs_map_fini(&ctx->roots);
+    ecs_map_fini(&ctx->textures);
     ecs_vec_fini_t(NULL, &ctx->free_slots, int32_t);
-    ecs_vec_fini_t(NULL, &ctx->nodes, box_terrain_node_t);
     ecs_vec_fini_t(NULL, &ctx->terrain_list, ecs_entity_t);
     ecs_os_free(ctx);
+}
+
+/** Mark the tiles of the terrain of every tile texture whose TextureStatus was set, so their
+ * next update reads which tiles are ready and which heights changed.
+ *
+ * @param it The iterator of the observer
+ */
+static void BoxTerrainOnTextureStatus(
+    ecs_iter_t *it)
+{
+    box_terrain_ctx_t *ctx = it->ctx;
+    int32_t i;
+    for (i = 0; i < it->count; i ++) {
+        box_terrain_tiles_t *tiles = ecs_map_get_deref(&ctx->textures, box_terrain_tiles_t,
+            it->entities[i]);
+        if (tiles) {
+            tiles->dirty = true;
+        }
+    }
+}
+
+/** Mark the tiles of every terrain that got, lost or changed a material component, so their
+ * next update hashes its materials again.
+ *
+ * @param it The iterator of the observer
+ */
+static void BoxTerrainOnMaterial(
+    ecs_iter_t *it)
+{
+    box_terrain_ctx_t *ctx = it->ctx;
+    int32_t i;
+    for (i = 0; i < it->count; i ++) {
+        box_terrain_tiles_t *tiles = ecs_map_get_deref(&ctx->terrains, box_terrain_tiles_t,
+            it->entities[i]);
+        if (tiles) {
+            tiles->style = true;
+        }
+    }
+}
+
+void box_terrain_counters(
+    const ecs_world_t *world,
+    ecs_entity_t terrain,
+    int32_t *updates,
+    int32_t *selects)
+{
+    const TerrainModule *m = ecs_singleton_get(world, TerrainModule);
+    box_terrain_tiles_t *tiles = m && m->ctx
+        ? ecs_map_get_deref(&m->ctx->terrains, box_terrain_tiles_t, terrain) : NULL;
+    *updates = tiles ? tiles->updates : 0;
+    *selects = tiles ? tiles->selects : 0;
 }
 
 ecs_entity_t box_terrain_mask_node(
@@ -1632,167 +1795,13 @@ done:
     return result;
 }
 
-void box_terrain_tile_surface(
-    const TerrainTile *tile,
-    box_surface_data_t *data,
-    vec3 min,
-    vec3 max)
-{
-    int32_t resolution = box_terrain_vertices(tile->resolution);
-    data->p[0][0] = BOX_TERRAIN_SURFACE;
-    data->p[1][0] = (float)tile->slot;
-    data->p[1][1] = (float)(box_terrain_row_bytes(resolution) / 4u);
-    data->p[1][2] = (float)(resolution + 2 * BOX_TERRAIN_BORDER);
-    data->p[1][3] = (float)resolution;
-    data->p[2][0] = tile->focus[0];
-    data->p[2][1] = tile->focus[1];
-    data->p[2][2] = tile->morph[0];
-    data->p[2][3] = tile->morph[1];
-    data->p[3][0] = tile->masked ? 1.0f : 0.0f;
-    data->p[4][0] = tile->size;
-    data->p[4][1] = tile->skirt;
-    data->p[4][2] = (float)tile->level;
-    data->p[4][3] = tile->bounded ? 1.0f : 0.0f;
-    data->p[5][0] = tile->clip[0];
-    data->p[5][1] = tile->clip[1];
-    data->p[5][2] = tile->clip[2];
-    data->p[5][3] = tile->clip[3];
-    glm_vec3_copy((vec3){ -0.5f, tile->min_height - tile->skirt, -0.5f }, min);
-    glm_vec3_copy((vec3){ 0.5f, tile->max_height, 0.5f }, max);
-}
-
-/** Key of the mesh of a TerrainTile: its vertices per edge.
- *
- * @param value The tile
- * @param key The key
- */
-static void box_terrain_tile_key(
-    const void *value,
-    box_shape_key_t *key)
-{
-    const TerrainTile *t = value;
-    key->i[0] = box_terrain_vertices(t->resolution);
-}
-
-/** Scale of a TerrainTile: its edge along x and z.
- *
- * @param value The tile
- * @param scale The scale
- */
-static void box_terrain_tile_scale(
-    const void *value,
-    vec3 scale)
-{
-    const TerrainTile *t = value;
-    float size = isfinite(t->size) && t->size > 0.0f ? t->size : 1.0f;
-    glm_vec3_copy((vec3){ size, 1.0f, size }, scale);
-}
-
-/** Surface of a TerrainTile.
- *
- * @param value The tile
- * @param data The surface
- * @param min The minimum corner of the local bounds
- * @param max The maximum corner of the local bounds
- */
-static void box_terrain_tile_data(
-    const void *value,
-    box_surface_data_t *data,
-    vec3 min,
-    vec3 max)
-{
-    box_terrain_tile_surface(value, data, min, max);
-}
-
-/** Append the skirt of an edge of the grid: a copy of each vertex of the edge at y -1 and the
- * quads between them, facing out.
- *
- * @param mesh The mesh
- * @param n Vertices per edge
- * @param start Index of the first vertex of the edge
- * @param stride Index step along the edge
- * @param outward Direction out of the grid across the edge
- */
-static void box_terrain_skirt(
-    box_mesh_t *mesh,
-    int32_t n,
-    int32_t start,
-    int32_t stride,
-    const vec3 outward)
-{
-    int32_t first = mesh->vertex_count, k;
-    for (k = 0; k < n; k ++) {
-        const box_vertex_t *top = &mesh->vertices[start + k * stride];
-        vec3 position = { top->position[0], -1.0f, top->position[2] };
-        box_mesh_vertex(mesh, position, (vec3){ 0.0f, 1.0f, 0.0f }, top->uv[0], top->uv[1]);
-    }
-
-    vec3 a, b, normal;
-    glm_vec3_sub(mesh->vertices[first].position, mesh->vertices[start].position, a);
-    glm_vec3_sub(mesh->vertices[start + stride].position, mesh->vertices[start].position, b);
-    glm_vec3_cross(a, b, normal);
-    bool flip = glm_vec3_dot(normal, ECS_CONST_CAST(float*, outward)) < 0.0f;
-    for (k = 0; k < n - 1; k ++) {
-        int32_t t0 = start + k * stride, t1 = start + (k + 1) * stride;
-        int32_t s0 = first + k, s1 = first + k + 1;
-        if (flip) {
-            box_mesh_triangle(mesh, t0, t1, s0);
-            box_mesh_triangle(mesh, t1, s1, s0);
-        } else {
-            box_mesh_triangle(mesh, t0, s0, t1);
-            box_mesh_triangle(mesh, t1, s0, s1);
-        }
-    }
-}
-
-/** Generate the grid of a TerrainTile: n x n vertices over the unit square in XZ, each cell split
- * from its lower to its higher corner as the morphed cells are, skirts at y -1 below the edges,
- * and one surface asset, so its draws bind the heights the backend copies into the assets.
- *
- * @param value The tile
- * @param key The key
- * @param mesh The mesh
- */
-static void box_terrain_tile_generate(
-    const void *value,
-    const box_shape_key_t *key,
-    box_mesh_t *mesh)
-{
-    int32_t n = box_terrain_vertices(key->i[0]), i, j;
-    float last = (float)(n - 1);
-    (void)value;
-    for (j = 0; j < n; j ++) {
-        for (i = 0; i < n; i ++) {
-            float u = (float)i / last, v = (float)j / last;
-            box_mesh_vertex(mesh, (vec3){ u - 0.5f, 0.0f, v - 0.5f },
-                (vec3){ 0.0f, 1.0f, 0.0f }, u, v);
-        }
-    }
-
-    for (j = 0; j < n - 1; j ++) {
-        for (i = 0; i < n - 1; i ++) {
-            int32_t a = j * n + i, b = a + 1, c = a + n + 1, d = a + n;
-            box_mesh_triangle(mesh, a, c, b);
-            box_mesh_triangle(mesh, a, d, c);
-        }
-    }
-
-    box_terrain_skirt(mesh, n, 0, 1, (vec3){ 0.0f, 0.0f, -1.0f });
-    box_terrain_skirt(mesh, n, n - 1, n, (vec3){ 1.0f, 0.0f, 0.0f });
-    box_terrain_skirt(mesh, n, (n - 1) * n, 1, (vec3){ 0.0f, 0.0f, 1.0f });
-    box_terrain_skirt(mesh, n, 0, n, (vec3){ -1.0f, 0.0f, 0.0f });
-    mesh->surface_assets = ecs_os_calloc_n(vec4, 1);
-    mesh->surface_asset_count = 1;
-}
-
 void box_terrain_tiles_import(
     ecs_world_t *world)
 {
     box_terrain_ctx_t *ctx = ecs_os_calloc_t(box_terrain_ctx_t);
     ecs_map_init(&ctx->terrains, NULL);
-    ecs_map_init(&ctx->roots, NULL);
+    ecs_map_init(&ctx->textures, NULL);
     ecs_vec_init_t(NULL, &ctx->free_slots, int32_t, 0);
-    ecs_vec_init_t(NULL, &ctx->nodes, box_terrain_node_t, 0);
     ecs_vec_init_t(NULL, &ctx->terrain_list, ecs_entity_t, 0);
     ecs_id_t materials[BOX_TERRAIN_MATERIALS] = {
         ecs_id(Rgb), ecs_id(Tint), ecs_id(PbrMaterial), ecs_id(ClearCoat), ecs_id(Sheen),
@@ -1807,13 +1816,7 @@ void box_terrain_tiles_import(
     ECS_COMPONENT_DEFINE(world, TerrainModule);
     ecs_singleton_set(world, TerrainModule, { .ctx = ctx });
 
-    box_shape_register(world, &(box_shape_desc_t){
-        .component = ecs_id(TerrainTile),
-        .key = box_terrain_tile_key,
-        .generate = box_terrain_tile_generate,
-        .scale = box_terrain_tile_scale,
-        .surface = box_terrain_tile_data
-    });
+    box_terrain_tile_shape(world);
 
     ecs_system(world, {
         .entity = ecs_entity(world, { .name = "Tiles" }),
@@ -1832,6 +1835,32 @@ void box_terrain_tiles_import(
         .callback = BoxTerrainOnRemoveTiles,
         .ctx = ctx
     });
+
+    ecs_observer(world, {
+        .entity = ecs_entity(world, { .name = "OnTextureStatus" }),
+        .query.terms = {{ .id = ecs_id(TextureStatus), .src.id = EcsSelf }},
+        .events = { EcsOnSet },
+        .callback = BoxTerrainOnTextureStatus,
+        .ctx = ctx
+    });
+
+    int32_t i;
+    for (i = 0; i < BOX_TERRAIN_MATERIALS; i ++) {
+        const ecs_type_info_t *ti = materials[i] ? ecs_get_type_info(world, materials[i]) : NULL;
+        if (!materials[i]) {
+            continue;
+        }
+
+        ecs_observer(world, {
+            .query.terms = {
+                { .id = materials[i] },
+                { .id = ecs_id(Terrain), .src.id = EcsSelf, .inout = EcsInOutFilter }
+            },
+            .events = { EcsOnAdd, EcsOnRemove, ti && ti->size ? EcsOnSet : 0 },
+            .callback = BoxTerrainOnMaterial,
+            .ctx = ctx
+        });
+    }
 }
 
 bool box_terrain_is_tile(

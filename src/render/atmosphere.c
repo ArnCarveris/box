@@ -19,6 +19,29 @@
 #include <stdlib.h>
 #include <string.h>
 
+/** Singleton with the system of the atmosphere extract, so its state is found without a lookup */
+typedef struct RenderAtmosphereSystem {
+    ecs_entity_t system;        /**< The system, whose context is the state */
+} RenderAtmosphereSystem;
+
+static ECS_COMPONENT_DECLARE(RenderAtmosphereSystem);
+
+/** Get the system of the atmosphere extract of a world.
+ *
+ * @param world The world
+ * @return The system, NULL before box.render was imported or after the system was deleted
+ */
+static const ecs_system_t* box_atmosphere_system_ctx(
+    const ecs_world_t *world)
+{
+    ecs_entity_t id = ecs_id(RenderAtmosphereSystem);
+    const RenderAtmosphereSystem *c = id && ecs_is_alive(world, id)
+        ? ecs_get_id(world, id, id) : NULL;
+
+    return c && c->system && ecs_is_alive(world, c->system)
+        ? ecs_system_get(world, c->system) : NULL;
+}
+
 /** First handle of the LUTs of an atmosphere */
 #define BOX_ATMOS_HANDLE_FIRST (1)
 
@@ -108,8 +131,7 @@ static float box_atmos_extract_linear(
 static box_render_atmos_t* box_atmos_state(
     const ecs_world_t *world)
 {
-    ecs_entity_t system = ecs_lookup(world, "box.render.extract.Atmosphere");
-    const ecs_system_t *s = system ? ecs_system_get(world, system) : NULL;
+    const ecs_system_t *s = box_atmosphere_system_ctx(world);
 
     return s ? s->ctx : NULL;
 }
@@ -1240,13 +1262,17 @@ void box_render_atmosphere_init(
     ecs_vec_init_t(NULL, &a->free_handles, uint32_t, 0);
     a->next_handle = BOX_ATMOS_HANDLE_FIRST;
 
-    ecs_system(world, {
+    ecs_set_name_prefix(world, "Render");
+    ECS_COMPONENT_DEFINE(world, RenderAtmosphereSystem);
+    ecs_set_name_prefix(world, NULL);
+    ecs_entity_t extract = ecs_system(world, {
         .entity = ecs_entity(world, { .name = "extract.Atmosphere" }),
         .phase = RenderExtract,
         .run = BoxRenderExtractAtmosphere,
         .ctx = a,
         .ctx_free = box_atmos_free
     });
+    ecs_singleton_set(world, RenderAtmosphereSystem, { extract });
 }
 
 void box_render_atmosphere_views_init(

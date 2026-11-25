@@ -1250,3 +1250,259 @@ void Wind_cascades_render_with_sway(void) {
     ecs_fini(world);
     box_render_null_free(null);
 }
+
+/** The reach of a wind batch follows what it is computed from: the WindSway its slots inherit or
+ * own, the slots it has and the speed of the Wind */
+void Wind_reach_follows_changes(void) {
+    // materials/wind_sway
+    box_render_null_t *null;
+    ecs_entity_t view;
+    ecs_world_t *world = wind_world(&null, &view);
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.wind = true});
+    ecs_singleton_set(world, Wind, {.direction = {1, 0}, .speed = 8, .gust = 0.5f,
+        .gust_scale = 20});
+    ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
+    ecs_set(world, prefab, Box, {1, 1, 1});
+    ecs_set(world, prefab, WindSway, {.bend = 0.05f, .height = 2});
+    ecs_entity_t a = ecs_new_w_pair(world, EcsIsA, prefab);
+    ecs_set(world, a, Position, {0, 0, 0});
+    ecs_entity_t b = ecs_new_w_pair(world, EcsIsA, prefab);
+    ecs_set(world, b, Position, {3, 0, 0});
+    int32_t f;
+    for (f = 0; f < 3; f ++) {
+        wind_frame(world, null);
+    }
+
+    test_assert(wind_batch(world, a) == wind_batch(world, b));
+    box_render_wind_t frame;
+    box_render_wind_frame(world, &frame);
+    WindSway sway = {.bend = 0.05f, .height = 2};
+    float reach = box_render_wind_reach(&sway, &frame, 0);
+    test_assert(reach > 0.0f);
+    test_flt(wind_draw(world, null, a)->wind_reach, reach);
+
+    /* The reach is kept while nothing changes */
+    for (f = 0; f < 3; f ++) {
+        wind_frame(world, null);
+        test_flt(wind_draw(world, null, a)->wind_reach, reach);
+        test_bool(wind_batch(world, a)->reach_valid, true);
+        test_bool(wind_batch(world, a)->reach_dirty, false);
+    }
+
+    /* A WindSway set on the prefab reaches its instances */
+    ecs_set(world, prefab, WindSway, {.bend = 0.1f, .height = 2});
+    for (f = 0; f < 3; f ++) {
+        wind_frame(world, null);
+    }
+
+    sway.bend = 0.1f;
+    float wide = box_render_wind_reach(&sway, &frame, 0);
+    test_assert(wide > reach);
+    test_flt(wind_draw(world, null, a)->wind_reach, wide);
+    const box_render_batch_t *td = wind_draw(world, null, a);
+    test_assert(td->max[0] >= 3.5f + wide && td->max[0] < 3.5f + wide + 0.01f);
+
+    /* An override on one instance grows the reach of its batch, and its removal with the
+     * instance shrinks it again */
+    ecs_set(world, b, WindSway, {.bend = 0.3f, .height = 2});
+    for (f = 0; f < 3; f ++) {
+        wind_frame(world, null);
+    }
+
+    sway.bend = 0.3f;
+    float widest = box_render_wind_reach(&sway, &frame, 0);
+    test_flt(wind_draw(world, null, b)->wind_reach, widest);
+    ecs_delete(world, b);
+    for (f = 0; f < 3; f ++) {
+        wind_frame(world, null);
+    }
+
+    test_flt(wind_draw(world, null, a)->wind_reach, wide);
+
+    /* A new instance of a prefab with a wider sway joins and grows it */
+    ecs_entity_t c = ecs_new_w_pair(world, EcsIsA, prefab);
+    ecs_set(world, c, Position, {6, 0, 0});
+    ecs_set(world, c, WindSway, {.bend = 0.3f, .height = 2});
+    for (f = 0; f < 3; f ++) {
+        wind_frame(world, null);
+    }
+
+    test_flt(wind_draw(world, null, c)->wind_reach, widest);
+    ecs_delete(world, c);
+
+    /* The speed of the Wind changes it, a calm clears it */
+    ecs_singleton_set(world, Wind, {.direction = {1, 0}, .speed = 2, .gust = 0.5f,
+        .gust_scale = 20});
+    for (f = 0; f < 3; f ++) {
+        wind_frame(world, null);
+    }
+
+    box_render_wind_frame(world, &frame);
+    sway.bend = 0.1f;
+    float slow = box_render_wind_reach(&sway, &frame, 0);
+    test_assert(slow > 0.0f && slow < wide);
+    test_flt(wind_draw(world, null, a)->wind_reach, slow);
+    td = wind_draw(world, null, a);
+    test_assert(td->max[0] >= 0.5f + slow && td->max[0] < 0.5f + slow + 0.01f);
+
+    ecs_singleton_set(world, Wind, {.direction = {1, 0}, .speed = 0});
+    for (f = 0; f < 3; f ++) {
+        wind_frame(world, null);
+    }
+
+    test_flt(wind_draw(world, null, a)->wind_reach, 0);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+/** The box around the swaying casters of a batch, which its shadow region is made from every
+ * frame, is kept while they stand still and follows a caster that moves, joins or leaves */
+void Wind_caster_box_follows_moves(void) {
+    // atmosphere/wind
+    box_render_null_t *null;
+    ecs_entity_t view;
+    ecs_world_t *world = wind_world(&null, &view);
+    wind_shadows(world, view);
+    ecs_singleton_set(world, Wind, {.direction = {1, 0}, .speed = 5, .gust = 0.5f,
+        .gust_scale = 20});
+    ecs_entity_t light = wind_spot(world, (vec3){0, 4, 0});
+    ecs_entity_t caster = ecs_new(world);
+    ecs_set(world, caster, Position, {0, 2, 0});
+    ecs_set(world, caster, Box, {1, 1, 1});
+    ecs_set(world, caster, WindSway, {.bend = 0.05f, .height = 1, .base = 1.5f});
+    int32_t f;
+    for (f = 0; f < 3; f ++) {
+        test_bool(wind_tile_renders(world, null, light), true);
+    }
+
+    box_draw_batch_t *b = wind_batch(world, caster);
+    test_bool(b->wind_boxed, true);
+    test_bool(b->wind_box_dirty, false);
+    test_assert(fabsf(b->wind_min[0] + 0.5f) < 1e-4f && fabsf(b->wind_max[0] - 0.5f) < 1e-4f);
+    test_assert(fabsf(b->wind_min[1] - 1.5f) < 1e-4f && fabsf(b->wind_max[1] - 2.5f) < 1e-4f);
+
+    /* A moved caster moves the box */
+    ecs_set(world, caster, Position, {1, 2, 0});
+    test_bool(wind_tile_renders(world, null, light), true);
+    test_bool(wind_tile_renders(world, null, light), true);
+    b = wind_batch(world, caster);
+    test_bool(b->wind_box_dirty, false);
+    test_assert(fabsf(b->wind_min[0] - 0.5f) < 1e-4f && fabsf(b->wind_max[0] - 1.5f) < 1e-4f);
+
+    /* A second caster of the batch grows it, and shrinks it when it is deleted */
+    ecs_entity_t other = ecs_new(world);
+    ecs_set(world, other, Position, {-2, 2, 0});
+    ecs_set(world, other, Box, {1, 1, 1});
+    ecs_set(world, other, WindSway, {.bend = 0.05f, .height = 1, .base = 1.5f});
+    test_bool(wind_tile_renders(world, null, light), true);
+    test_bool(wind_tile_renders(world, null, light), true);
+    test_assert(wind_batch(world, other) == wind_batch(world, caster));
+    b = wind_batch(world, caster);
+    test_assert(fabsf(b->wind_min[0] + 2.5f) < 1e-4f && fabsf(b->wind_max[0] - 1.5f) < 1e-4f);
+    ecs_delete(world, other);
+    test_bool(wind_tile_renders(world, null, light), true);
+    test_bool(wind_tile_renders(world, null, light), true);
+    b = wind_batch(world, caster);
+    test_assert(fabsf(b->wind_min[0] - 0.5f) < 1e-4f && fabsf(b->wind_max[0] - 1.5f) < 1e-4f);
+
+    /* Moved out of the reach of the light, its tile is rendered once more and then kept */
+    ecs_set(world, caster, Position, {0, 2, -60});
+    test_bool(wind_tile_renders(world, null, light), true);
+    test_bool(wind_tile_renders(world, null, light), false);
+    test_bool(wind_tile_renders(world, null, light), false);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+/** The record of a swaying shape moves with the wind every frame and follows a change of its
+ * WindSway, of the WindSway of its prefab and of the Wind */
+void Wind_record_follows_changes(void) {
+    // materials/wind_sway
+    box_render_null_t *null;
+    ecs_entity_t view;
+    ecs_world_t *world = wind_world(&null, &view);
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.wind = true});
+    ecs_singleton_set(world, Wind, {.direction = {1, 0}, .speed = 4, .gust = 0.5f,
+        .gust_scale = 20});
+    ecs_entity_t tree = wind_box(world, 0, 0);
+    ecs_set(world, tree, WindSway, {.bend = 0.05f, .height = 2, .flutter = 0.1f,
+        .flutter_frequency = 2, .flutter_reach = 0.3f});
+    ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
+    ecs_set(world, prefab, Box, {1, 1, 1});
+    ecs_set(world, prefab, Rgb, {10, 20, 30});
+    ecs_set(world, prefab, WindSway, {.bend = 0.02f, .height = 3});
+    ecs_entity_t instance = ecs_new_w_pair(world, EcsIsA, prefab);
+    ecs_set(world, instance, Position, {3, 0, 0});
+    int32_t f;
+    for (f = 0; f < 3; f ++) {
+        wind_frame(world, null);
+    }
+
+    /* The offset of the gust field, the sway and the flutter phase are those of each frame */
+    for (f = 0; f < 4; f ++) {
+        float offset = wind_record(world, tree)->wind_offset[0];
+        float phase = wind_record(world, tree)->wind_flutter_phase;
+        wind_frame(world, null);
+        box_render_wind_t frame;
+        box_render_wind_frame(world, &frame);
+        const box_render_material_t *r = wind_record(world, tree);
+        test_flt(r->wind_offset[0], frame.offset[0]);
+        test_flt(r->wind_sway, frame.sway);
+        test_assert(fabs(wind_step(offset, r->wind_offset[0],
+            BOX_WIND_GUST_PERIOD * 20.0) - 4.0 * WIND_DELTA) < 1e-4);
+        test_assert(fabs(wind_step(phase, r->wind_flutter_phase, 1.0) -
+            2.0 * box_render_wind_clock_rate(&(Wind){.speed = 4}) * WIND_DELTA) < 1e-5);
+        test_flt(wind_record(world, prefab)->wind_offset[0], frame.offset[0]);
+        test_flt(wind_record(world, prefab)->wind_bend, 0.02f);
+        test_uint(wind_record(world, instance) == wind_record(world, prefab), true);
+    }
+
+    /* A set WindSway reaches the record of the shape, and of the prefab of an instance */
+    ecs_set(world, tree, WindSway, {.bend = 0.2f, .height = 5, .flutter = 0.1f,
+        .flutter_frequency = 2, .flutter_reach = 0.3f});
+    ecs_set(world, prefab, WindSway, {.bend = 0.07f, .height = 3});
+    wind_frame(world, null);
+    wind_frame(world, null);
+    test_flt(wind_record(world, tree)->wind_bend, 0.2f);
+    test_flt(wind_record(world, tree)->wind_height, 5);
+    test_flt(wind_record(world, prefab)->wind_bend, 0.07f);
+
+    /* A color set on the prefab reaches its record, which keeps moving */
+    ecs_set(world, prefab, Rgb, {200, 100, 50});
+    wind_frame(world, null);
+    wind_frame(world, null);
+    test_uint(wind_record(world, prefab)->color, 200u | (100u << 8) | (50u << 16));
+    float offset = wind_record(world, prefab)->wind_offset[0];
+    wind_frame(world, null);
+    test_assert(wind_record(world, prefab)->wind_offset[0] != offset);
+    test_flt(wind_record(world, prefab)->wind_bend, 0.07f);
+
+    /* The Wind reaches every record */
+    ecs_singleton_set(world, Wind, {.direction = {0, 1}, .speed = 9, .gust = 0.25f,
+        .gust_scale = 20});
+    wind_frame(world, null);
+    wind_frame(world, null);
+    test_flt(wind_record(world, tree)->wind_speed, 9);
+    test_flt(wind_record(world, tree)->wind_direction[1], 1);
+    test_flt(wind_record(world, tree)->wind_gust, 0.25f);
+    test_flt(wind_record(world, prefab)->wind_speed, 9);
+
+    /* Without Scene.wind the records are those without a WindSway */
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.wind = false});
+    wind_frame(world, null);
+    wind_frame(world, null);
+    test_uint(wind_record(world, tree)->flags, 0);
+    test_uint(wind_record(world, prefab)->flags, 0);
+    test_flt(wind_record(world, prefab)->wind_speed, 0);
+    ecs_singleton_set(world, Scene, {.shader_features.Extended.wind = true});
+    wind_frame(world, null);
+    wind_frame(world, null);
+    test_uint(wind_record(world, tree)->flags, BOX_RENDER_WIND_PRESENT);
+    test_uint(wind_record(world, prefab)->flags, BOX_RENDER_WIND_PRESENT);
+    test_flt(wind_record(world, prefab)->wind_speed, 9);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}

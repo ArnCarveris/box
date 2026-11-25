@@ -265,20 +265,21 @@ void box_draws_water_waves_advance(
 
         bool alive = ecs_is_alive(world, s->owner) &&
             ecs_map_get(&m->owned, (ecs_map_key_t)s->owner) != NULL;
+        const box_draw_material_t *kept = &material;
         if (alive) {
             box_draws_material_of(world, s->owner, m->time, &material);
         }
 
-        if (!alive || !material.waves) {
+        if (!alive || !kept->waves) {
             ecs_os_memset_t(s, 0, box_draw_water_waves_state_t);
             ecs_os_memset_t(&w->table[i], 0, box_render_water_waves_t);
             w->dirty = true;
             continue;
         }
 
-        box_draws_water_waves_step(s->phases, material.waves, material.flow, m->time - s->time);
+        box_draws_water_waves_step(s->phases, kept->waves, kept->flow, m->time - s->time);
         s->time = m->time;
-        box_water_waves_pack_at(&w->table[i], material.waves, s->phases, material.origin);
+        box_water_waves_pack_at(&w->table[i], kept->waves, s->phases, m->origin);
         w->dirty = true;
     }
 

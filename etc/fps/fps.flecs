@@ -23,12 +23,12 @@
 // Every bar is an FpsBar of its own with a fixed name, which reads only its own muts: ms, the
 // frame time of the sample it shows, and col, the column it stands in. bars reads only its mut
 // first, the column at the left edge of the chart, and moves all bars left by that many slots.
-// box.fps writes them whenever FrameSamples is set or notified, and only what changed. A new
-// sample rotates the bars: box.fps writes it only to the bar of the oldest sample, with the
-// column right of the newest bar, and moves bars one slot left, so a new sample evaluates one
-// bar and bars, whatever the samples are, and none when it is as long as the one before it.
-// Every 120 samples, and when the samples changed otherwise, box.fps writes the columns 0 to 119
-// and first 0 again, so the columns stay small and every position a whole point.
+// box.fps writes them every Panel.interval (at once for held samples or an interval of 0), and
+// only what changed. A new sample rotates the bars: box.fps writes it only to the bar of the
+// oldest sample, with the column right of the newest bar, and moves bars left once, so a new
+// sample evaluates one bar, whatever the samples are, and none when the samples are steady.
+// Every 120 samples that arrive one at a time, and when the samples changed otherwise, box.fps
+// writes the columns 0 to 119 and first 0 again, so every position stays a whole point.
 //
 // A script cannot do that: a bar that read FrameSamples itself would be evaluated again for
 // every sample. ms, col and first are data only: the height, color and place of a bar stay

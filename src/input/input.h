@@ -127,6 +127,8 @@ typedef struct InputActions {
     ecs_query_t *bindings;             /**< Entities with a Binding */
     ecs_query_t *actions;              /**< Entities with an Action and its ActionState */
     uint8_t press_mods[BOX_KEY_COUNT]; /**< Modifier keys held when each key last went down */
+    bool idle;                         /**< The last update found no key held and no hold, raised
+                                        *   no event and left every action released */
 } InputActions;
 
 extern ECS_COMPONENT_DECLARE(InputActions);

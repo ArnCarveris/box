@@ -309,8 +309,11 @@ void box_gpu_shadow_fini(
     gpu->shadow_point_shader = 0;
 
     if (gpu->shadow_buffer) {
+        wgpuBindGroupRelease(gpu->shadow_group);
+        gpu->shadow_group = NULL;
         wgpuBufferRelease(gpu->shadow_buffer);
         gpu->shadow_buffer = NULL;
+        box_gpu_written_free(&gpu->shadow_written);
     }
 
     if (gpu->shadow_empty_view) {
@@ -656,12 +659,14 @@ void box_gpu_shadow_upload(
         goto done;
     }
 
-    if (!gpu->shadow_buffer || count > gpu->shadow_capacity) {
+    bool fresh = !gpu->shadow_buffer || count > gpu->shadow_capacity;
+    if (fresh) {
         while (capacity < count) {
             capacity *= 2;
         }
 
         if (gpu->shadow_buffer) {
+            wgpuBindGroupRelease(gpu->shadow_group);
             wgpuBufferRelease(gpu->shadow_buffer);
         }
 
@@ -670,10 +675,18 @@ void box_gpu_shadow_upload(
             .usage = WGPUBufferUsage_Uniform | WGPUBufferUsage_CopyDst,
             .size = (uint64_t)capacity * BOX_RENDER_SHADOW_CASCADES * BOX_GPU_CASCADE_STRIDE
         });
+        WGPUBindGroupEntry entry = {
+            .binding = 0, .buffer = gpu->shadow_buffer, .size = BOX_GPU_SHADOW_UNIFORM_SIZE
+        };
+        gpu->shadow_group = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
+            .layout = gpu->shadow_layout,
+            .entryCount = 1,
+            .entries = &entry
+        });
     }
 
-    wgpuQueueWriteBuffer(gpu->queue, gpu->shadow_buffer, 0, ecs_vec_first(&gpu->shadow_data),
-        (size_t)(used < size ? used : size));
+    box_gpu_write_changed(gpu, &gpu->shadow_written, fresh, gpu->shadow_buffer, 0,
+        ecs_vec_first(&gpu->shadow_data), (size_t)(used < size ? used : size));
 done:
     return;
 }
@@ -1208,14 +1221,7 @@ void box_gpu_shadow_render(
         store->revision = gpu->shadow_revision;
     }
 
-    WGPUBindGroupEntry entry = {
-        .binding = 0, .buffer = gpu->shadow_buffer, .size = BOX_GPU_SHADOW_UNIFORM_SIZE
-    };
-    WGPUBindGroup group = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
-        .layout = gpu->shadow_layout,
-        .entryCount = 1,
-        .entries = &entry
-    });
+    WGPUBindGroup group = gpu->shadow_group;
     for (i = 0; i < v->shadows.cascades; i ++) {
         uint32_t offset = (uint32_t)((slot * BOX_RENDER_SHADOW_CASCADES + i) *
             BOX_GPU_CASCADE_STRIDE);
@@ -1279,7 +1285,6 @@ void box_gpu_shadow_render(
         }
     }
 
-    wgpuBindGroupRelease(group);
 done:
     return;
 }

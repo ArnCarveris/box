@@ -167,7 +167,7 @@ static void box_gpu_terrain_masks(
         }
 
         if (!*encoder) {
-            *encoder = wgpuDeviceCreateCommandEncoder(gpu->device, NULL);
+            *encoder = box_gpu_frame_encoder(gpu);
         }
 
         wgpuCommandEncoderCopyTextureToTexture(*encoder,
@@ -283,7 +283,7 @@ static void box_gpu_terrain_copy(
     }
 
     if (!*encoder) {
-        *encoder = wgpuDeviceCreateCommandEncoder(gpu->device, NULL);
+        *encoder = box_gpu_frame_encoder(gpu);
     }
 
     wgpuCommandEncoderCopyTextureToBuffer(*encoder,
@@ -312,6 +312,25 @@ void box_gpu_terrain_heights(
     const box_render_terrain_height_t *heights = ecs_vec_first(&packet->terrain_heights);
     int32_t i, count = ecs_vec_count(&packet->terrain_heights), pass;
     WGPUCommandEncoder encoder = NULL;
+    if (count == gpu->terrain_tile_count && gpu->terrain_tile_textures == gpu->texture_serial &&
+        gpu->terrain_tile_meshes == gpu->mesh_serial && (!count ||
+        !ecs_os_memcmp(heights, gpu->terrain_tiles,
+            count * ECS_SIZEOF(box_render_terrain_height_t))))
+    {
+        goto done;
+    }
+
+    gpu->pending.terrain_height_scans ++;
+    if (count != gpu->terrain_tile_count) {
+        gpu->terrain_tiles = ecs_os_realloc_n(gpu->terrain_tiles, box_render_terrain_height_t,
+            count);
+        gpu->terrain_tile_count = count;
+    }
+
+    if (count) {
+        ecs_os_memcpy_n(gpu->terrain_tiles, heights, box_render_terrain_height_t, count);
+    }
+
     for (pass = 0; pass < 2; pass ++) {
         for (i = 0; i < count; i ++) {
             const box_render_terrain_height_t *h = &heights[i];
@@ -355,12 +374,10 @@ void box_gpu_terrain_heights(
         }
     }
 
-    if (encoder) {
-        WGPUCommandBuffer commands = wgpuCommandEncoderFinish(encoder, NULL);
-        wgpuQueueSubmit(gpu->queue, 1, &commands);
-        wgpuCommandBufferRelease(commands);
-        wgpuCommandEncoderRelease(encoder);
-    }
+    gpu->terrain_tile_textures = gpu->texture_serial;
+    gpu->terrain_tile_meshes = gpu->mesh_serial;
+done:
+    return;
 }
 
 /** Bindings of the bind group of a sampled terrain (terrain_sample.wgsl) */
@@ -413,6 +430,7 @@ void box_gpu_terrain_init(
             .entries = entries
         });
     ecs_map_init(&gpu->terrain_samples, NULL);
+    gpu->terrain_tile_count = -1;
 }
 
 /** Release the bindings of a sampled terrain.
@@ -451,6 +469,9 @@ void box_gpu_terrain_fini(
     }
 
     ecs_map_fini(&gpu->terrain_samples);
+    ecs_os_free(gpu->terrain_tiles);
+    gpu->terrain_tiles = NULL;
+    gpu->terrain_tile_count = -1;
     if (gpu->terrain_sample_layout) {
         wgpuBindGroupLayoutRelease(gpu->terrain_sample_layout);
         gpu->terrain_sample_layout = NULL;

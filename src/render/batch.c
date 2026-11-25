@@ -28,7 +28,8 @@ _Static_assert(sizeof(box_render_shading_t) == 64, "Shape2DShading of shape2d.wg
 _Static_assert(sizeof(box_render_mesh_shading_t) == 16, "MeshShading of instance.wgsl");
 _Static_assert(BOX_DRAWS_PAGE_BYTES / sizeof(box_render_transform_t) <= (1u << 22),
     "A visible slot keeps the bits above RANGE_SLOT_BITS of draw_range.wgsl for its dither code");
-_Static_assert(sizeof(box_render_material_t) == 272, "Material of material.wgsl");
+_Static_assert(sizeof(box_render_material_t) == 336, "Material of material.wgsl");
+_Static_assert(sizeof(box_render_material_clock_t) == 64, "motion of material.wgsl");
 _Static_assert(BOX_RENDER_MATERIALS_MAX <= BOX_RENDER_MESH_MATERIAL_MASK,
     "the material slots fit below the planet light slot of a mesh shading");
 
@@ -325,6 +326,7 @@ int32_t box_draws_batch_ensure(
         ecs_vec_init_t(NULL, &b->frame_srcs, box_draw_frame_src_t, 0);
         ecs_vec_init_t(NULL, &b->movers, uint32_t, 0);
         ecs_vec_init_t(NULL, &b->groups, box_draw_group_t, 0);
+        ecs_vec_init_t(NULL, &b->nearest, uint32_t, 0);
         for (int32_t s = 0; s < BOX_DRAWS_STREAMS; s ++) {
             ecs_vec_init_t(NULL, &b->changed[s], int32_t, 0);
         }
@@ -343,6 +345,12 @@ int32_t box_draws_batch_ensure(
     b->world_dirty = true;
     b->world_valid = false;
     b->groups_dirty = true;
+    b->wind_reach = 0.0f;
+    b->reach_dirty = true;
+    b->reach_valid = false;
+    b->wind_box_dirty = true;
+    b->nearest_dirty = true;
+    b->wind_boxed = false;
     b->live_frames = 0;
     b->was_ready = false;
     b->transform_frame = -1;
@@ -419,6 +427,8 @@ void box_draws_slot_changed(
     if (kinds & (BOX_DRAW_TRANSFORM | BOX_DRAW_SURFACE)) {
         b->world_dirty = true;
         b->groups_dirty = true;
+        b->wind_box_dirty = true;
+        b->nearest_dirty = true;
     }
 
     if ((kinds & BOX_DRAW_SURFACE) &&
@@ -481,6 +491,9 @@ int32_t box_draws_slot_add(
         box_render_transform_t);
     b->world_dirty = true;
     b->groups_dirty = true;
+    b->reach_dirty = true;
+    b->wind_box_dirty = true;
+    b->nearest_dirty = true;
 
     return result;
 }
@@ -755,6 +768,9 @@ void box_draws_slot_remove(
 
     b->world_dirty = true;
     b->groups_dirty = true;
+    b->reach_dirty = true;
+    b->wind_box_dirty = true;
+    b->nearest_dirty = true;
     ecs_vec_remove_last(&b->entities);
     ecs_vec_remove_last(&b->transforms);
     ecs_vec_remove_last(flat ? &b->shadings : &b->mesh_shadings);
@@ -1783,12 +1799,17 @@ static void box_draws_fill_transform(
  * DynamicTransform shapes and the shading of the DynamicMaterial shapes. A DynamicMaterial
  * shape without DynamicTransform keeps its static transform.
  *
+ * The DynamicMaterial shapes without DynamicTransform are only looked for while a batch holds
+ * one, as their query visits every table of shapes.
+ *
  * @param world The world
  * @param d The state
+ * @param materials Whether a batch of DynamicMaterial shapes is alive
  */
 static void box_draws_dynamic(
     ecs_world_t *world,
-    box_render_draws_t *d)
+    box_render_draws_t *d,
+    bool materials)
 {
     ecs_id_t spread = ecs_pair(EcsIsA, DynamicTransformSpread);
     ecs_iter_t it = ecs_query_iter(world, d->dynamic_transform);
@@ -1802,12 +1823,19 @@ static void box_draws_dynamic(
         }
     }
 
+    if (!materials) {
+        goto done;
+    }
+
     it = ecs_query_iter(world, d->dynamic_material);
     while (ecs_query_next(&it)) {
         if (!box_transform_dynamic(world, it.table)) {
             box_draws_fill_material(&it, d, !ecs_field_is_self(&it, 9));
         }
     }
+
+done:
+    return;
 }
 
 void box_draws_send(
@@ -1818,7 +1846,7 @@ void box_draws_send(
     box_mesh_cache_t *cache = box_mesh_cache_of(world);
     int32_t i, count = ecs_vec_count(&d->batches);
     uint64_t changes = 0, copies = 0;
-    bool views = ecs_vec_count(&p->views) != 0, bounds = false;
+    bool views = ecs_vec_count(&p->views) != 0, bounds = false, materials = false;
     int32_t levels = box_draws_lod_levels(p);
     d->textures = box_textures_get(world);
     d->world = world;
@@ -1840,6 +1868,7 @@ void box_draws_send(
         }
 
         d->stats.batches ++;
+        materials |= b->key.dynamic_material;
         if (b->key.dynamic_transform || b->key.dynamic_material || b->key.mover) {
             d->stats.dynamic += ecs_vec_count(&b->entities);
         } else {
@@ -1862,7 +1891,7 @@ void box_draws_send(
     }
 
     box_draws_movers_send(world, d, p);
-    box_draws_dynamic(world, d);
+    box_draws_dynamic(world, d, materials);
     box_draws_live_frames(world, d);
     box_draws_materials_send(world, d, p);
     box_draws_shadow_materials(world, d);
@@ -1955,6 +1984,7 @@ void box_draws_batches_fini(
         ecs_vec_fini_t(NULL, &b->frame_srcs, box_draw_frame_src_t);
         ecs_vec_fini_t(NULL, &b->movers, uint32_t);
         ecs_vec_fini_t(NULL, &b->groups, box_draw_group_t);
+        ecs_vec_fini_t(NULL, &b->nearest, uint32_t);
         for (int32_t s = 0; s < BOX_DRAWS_STREAMS; s ++) {
             ecs_vec_fini_t(NULL, &b->changed[s], int32_t);
         }
@@ -1967,34 +1997,4 @@ void box_draws_batches_fini(
     }
 
     ecs_map_fini(&d->lookup);
-}
-
-void box_render_draws_page(
-    ecs_world_t *world,
-    int32_t slots)
-{
-    ecs_entity_t system = ecs_lookup(world, "box.render.extract.Draws");
-    const ecs_system_t *s = system ? ecs_system_get(world, system) : NULL;
-    if (s && s->ctx && slots > 0) {
-        box_render_draws_t *d = s->ctx;
-        for (int32_t i = 0; i < BOX_DRAWS_STORES; i ++) {
-            d->stores[i].slots = (uint32_t)slots < d->stores[i].max
-                ? (uint32_t)slots : d->stores[i].max;
-        }
-    }
-}
-
-void box_render_draws_chunk(
-    ecs_world_t *world,
-    int32_t instances)
-{
-    ecs_entity_t system = ecs_lookup(world, "box.render.extract.Draws");
-    const ecs_system_t *s = system ? ecs_system_get(world, system) : NULL;
-    if (s && s->ctx && instances > 0) {
-        box_render_draws_t *d = s->ctx;
-        for (int32_t i = 0; i < BOX_DRAWS_STORES; i ++) {
-            d->stores[i].chunk = (uint32_t)instances < d->stores[i].max
-                ? (uint32_t)instances : d->stores[i].max;
-        }
-    }
 }

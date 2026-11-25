@@ -19,11 +19,21 @@ typedef struct box_render_textures_t {
     const void *backend;    /**< Context of the backend the textures were sent to */
     void (*render)(void*, const box_render_packet_t*); /**< Render callback of that backend */
     int32_t generation;         /**< Generation of that backend, see box_render_backend_t */
+    uint32_t anisotropy;        /**< Sampler anisotropy of the surfaces, 0 before the first scan */
+    uint32_t bind_serial;       /**< bind_serial of the registry at the last pass over the graphs
+                                 *   that sample textures */
+    uint32_t target_serial;     /**< Serial of the texture targets at that pass */
+    int32_t target_live;        /**< Texture targets set at that pass */
 } box_render_textures_t;
 
 /** Singleton with the texture entities surfaces render into */
 typedef struct RenderTargetTextures {
-    ecs_map_t *targets;     /**< Texture entity to target handle */
+    ecs_map_t *targets;     /**< Texture entity to the epoch it was last set in, in the high
+                             *   half, and its target handle */
+    uint32_t epoch;         /**< Bumped by every clear: an entry of another epoch is not set */
+    int32_t live;           /**< Entries set in the epoch */
+    uint32_t serial;        /**< Bumped when an entry is set that was not set in the previous
+                             *   epoch or that had another handle */
 } RenderTargetTextures;
 
 static ECS_COMPONENT_DECLARE(RenderTargetTextures);
@@ -71,33 +81,42 @@ static void box_render_target_textures_move(
             box_render_target_textures_dtor(&d[i], 1, ti);
         }
 
-        d[i].targets = s[i].targets;
+        d[i] = s[i];
         s[i].targets = NULL;
     }
 }
 
-/** Get the map of the texture entities surfaces render into.
+/** Get the texture entities surfaces render into.
  *
  * @param world The world
- * @return The map, NULL when box.render is not imported
+ * @return The singleton, NULL when box.render is not imported
  */
-static ecs_map_t* box_render_target_textures(
+static RenderTargetTextures* box_render_target_textures(
     const ecs_world_t *world)
 {
     const RenderTargetTextures *t = ecs_id(RenderTargetTextures)
         ? ecs_singleton_get(world, RenderTargetTextures)
         : NULL;
 
-    return t ? t->targets : NULL;
+    return t && t->targets ? ECS_CONST_CAST(RenderTargetTextures*, t) : NULL;
 }
 
 void box_render_texture_targets_clear(
     ecs_world_t *world)
 {
-    ecs_map_t *map = box_render_target_textures(world);
-    if (map) {
-        ecs_map_clear(map);
+    RenderTargetTextures *t = box_render_target_textures(world);
+    if (!t) {
+        goto done;
     }
+
+    if (ecs_map_count(t->targets) > 4 * t->live + 64) {
+        ecs_map_clear(t->targets);
+    }
+
+    t->epoch ++;
+    t->live = 0;
+done:
+    return;
 }
 
 void box_render_texture_target(
@@ -105,9 +124,18 @@ void box_render_texture_target(
     ecs_entity_t texture,
     uint32_t target)
 {
-    ecs_map_t *map = box_render_target_textures(world);
-    if (map && texture && target) {
-        *ecs_map_ensure(map, texture) = target;
+    RenderTargetTextures *t = box_render_target_textures(world);
+    if (t && texture && target) {
+        ecs_map_val_t *val = ecs_map_ensure(t->targets, texture);
+        uint32_t epoch = (uint32_t)(*val >> 32), handle = (uint32_t)*val;
+        if (epoch != t->epoch) {
+            t->live ++;
+            t->serial += epoch != t->epoch - 1 || handle != target;
+        } else {
+            t->serial += handle != target;
+        }
+
+        *val = ((ecs_map_val_t)t->epoch << 32) | target;
     }
 }
 
@@ -115,10 +143,11 @@ uint32_t box_render_texture_target_handle(
     const ecs_world_t *world,
     ecs_entity_t texture)
 {
-    ecs_map_t *map = box_render_target_textures(world);
-    const ecs_map_val_t *target = map && texture ? ecs_map_get(map, texture) : NULL;
+    const RenderTargetTextures *t = box_render_target_textures(world);
+    const ecs_map_val_t *target = t && texture ? ecs_map_get(t->targets, texture) : NULL;
 
-    return target ? BOX_RENDER_TEXTURE_TARGET | (uint32_t)*target : 0;
+    return target && (uint32_t)(*target >> 32) == t->epoch
+        ? BOX_RENDER_TEXTURE_TARGET | (uint32_t)*target : 0;
 }
 
 /** Get the anisotropic samples of the samplers: the most any surface asks for.
@@ -133,7 +162,7 @@ static uint32_t box_render_anisotropy(
 {
     uint32_t result = 0;
     int32_t i;
-    ecs_iter_t it = ecs_query_iter(world, t->surfaces);
+    ecs_iter_t it = ecs_query_iter(world, t->anisotropy_surfaces);
     while (ecs_query_next(&it)) {
         const Surface *s = ecs_field(&it, Surface, 0);
         for (i = 0; i < it.count; i ++) {
@@ -176,7 +205,14 @@ static void box_render_texture_handle_of(
         ecs_vec_remove_last(&t->free_handles);
     } else if (!tex->handle) {
         tex->handle = t->next_handle ++;
+    } else {
+        goto done;
     }
+
+    *ecs_map_ensure(&t->handles, tex->handle) = (ecs_map_val_t)(uintptr_t)tex;
+    t->bind_serial ++;
+done:
+    return;
 }
 
 /** Send the node kinds the backend does not have.
@@ -245,16 +281,21 @@ static uint32_t box_render_texture_graph_source(
 /** Send the compiled graph of a texture, which the backend evaluates into its image, with the
  * handles of the textures it samples now.
  *
+ * The outcome of a graph the GPU backend did not report yet is awaited: it reports a serial of
+ * a graph once, so a graph sent again with the same serial has none to wait for.
+ *
  * @param world The world
  * @param p The packet
  * @param t The registry
  * @param tex The texture
+ * @param gpu The GPU backend renders the world
  */
 static void box_render_texture_graph_send(
     const ecs_world_t *world,
     box_render_packet_t *p,
     box_textures_t *t,
-    box_texture_t *tex)
+    box_texture_t *tex,
+    bool gpu)
 {
     box_texture_graph_t *graph = tex->graph;
     int32_t i, j;
@@ -314,29 +355,68 @@ static void box_render_texture_graph_send(
     }
 
     tex->graph_sent = true;
+    if (gpu && tex->graph_outcome != tex->graph_serial && !tex->graph_awaited) {
+        tex->graph_awaited = true;
+        t->graph_awaited ++;
+    }
 }
 
 /** Queue the sent graphs again whose sampled textures got another backend handle, such as a
  * texture whose first image went to the backend after the graph, so the backend binds it.
  *
+ * Only the graphs that sample textures are looked at, and only after a texture got or lost its
+ * handle or the textures surfaces render into changed.
+ *
  * @param world The world
+ * @param state The state of the extract
  * @param t The registry
  */
 static void box_render_texture_graphs_rebind(
     const ecs_world_t *world,
+    box_render_textures_t *state,
     box_textures_t *t)
 {
-    int32_t i;
-    ecs_map_iter_t it = ecs_map_iter(&t->textures);
-    while (ecs_map_next(&it)) {
-        box_texture_t *tex = ecs_map_ptr(&it);
+    const RenderTargetTextures *targets = box_render_target_textures(world);
+    uint32_t target_serial = targets ? targets->serial : 0;
+    int32_t target_live = targets ? targets->live : 0;
+    int32_t i, j, kept = 0, count = ecs_vec_count(&t->graph_sampling);
+    ecs_entity_t *sampling = ecs_vec_first(&t->graph_sampling);
+    if (state->bind_serial == t->bind_serial && state->target_serial == target_serial &&
+        state->target_live == target_live)
+    {
+        goto done;
+    }
+
+    state->bind_serial = t->bind_serial;
+    state->target_serial = target_serial;
+    state->target_live = target_live;
+    if (!count) {
+        goto done;
+    }
+
+    t->work.rebinds ++;
+    for (i = 0; i < count; i ++) {
+        box_texture_t *tex = ecs_map_get_deref(&t->textures, box_texture_t, sampling[i]);
+        if (tex) {
+            tex->graph_sampling = false;
+        }
+    }
+
+    for (i = 0; i < count; i ++) {
+        box_texture_t *tex = ecs_map_get_deref(&t->textures, box_texture_t, sampling[i]);
         bool changed = false;
-        if (!tex->graph || !tex->graph_sent || tex->graph_queued) {
+        if (!tex || tex->graph_sampling || !tex->graph || !tex->graph->texture_count) {
             continue;
         }
 
-        for (i = 0; i < tex->graph->texture_count && !changed; i ++) {
-            const box_texture_graph_texture_t *src = &tex->graph->textures[i];
+        tex->graph_sampling = true;
+        sampling[kept ++] = sampling[i];
+        if (!tex->graph_sent || tex->graph_queued) {
+            continue;
+        }
+
+        for (j = 0; j < tex->graph->texture_count && !changed; j ++) {
+            const box_texture_graph_texture_t *src = &tex->graph->textures[j];
             changed = src->handle != box_render_texture_graph_source(world, t, src->entity);
         }
 
@@ -345,6 +425,10 @@ static void box_render_texture_graphs_rebind(
             *ecs_vec_append_t(NULL, &t->graph_queued, ecs_entity_t) = tex->entity;
         }
     }
+
+    ecs_vec_set_count_t(NULL, &t->graph_sampling, ecs_entity_t, kept);
+done:
+    return;
 }
 
 /** Destroy the graphs of removed textures, before their images are destroyed.
@@ -370,21 +454,26 @@ static void box_render_texture_graphs_release(
  * to send no kind is sent, so a world without graphs sends nothing.
  *
  * @param world The world
+ * @param state The state of the extract
  * @param p The packet
  * @param t The registry
  */
 static void box_render_texture_graphs_send(
-    const ecs_world_t *world,
+    ecs_world_t *world,
+    box_render_textures_t *state,
     box_render_packet_t *p,
     box_textures_t *t)
 {
+    box_render_gpu_stats_t stats;
     int32_t i, count;
     ecs_entity_t *queued;
-    box_render_texture_graphs_rebind(world, t);
+    bool gpu = false;
+    box_render_texture_graphs_rebind(world, state, t);
     count = ecs_vec_count(&t->graph_queued);
     queued = ecs_vec_first(&t->graph_queued);
     if (count) {
         box_render_texture_kinds_send(p, t);
+        gpu = box_render_gpu_stats(world, &stats);
     }
 
     for (i = 0; i < count; i ++) {
@@ -397,7 +486,7 @@ static void box_render_texture_graphs_send(
     for (i = 0; i < count; i ++) {
         box_texture_t *tex = ecs_map_get_deref(&t->textures, box_texture_t, queued[i]);
         if (tex && tex->graph_queued && tex->graph) {
-            box_render_texture_graph_send(world, p, t, tex);
+            box_render_texture_graph_send(world, p, t, tex, gpu);
         }
 
         if (tex) {
@@ -418,16 +507,11 @@ static box_texture_t* box_render_texture_graph_of(
     box_textures_t *t,
     uint32_t handle)
 {
-    box_texture_t *result = NULL;
-    ecs_map_iter_t it = ecs_map_iter(&t->textures);
-    while (handle && !result && ecs_map_next(&it)) {
-        box_texture_t *tex = ecs_map_ptr(&it);
-        if (tex->handle == handle && tex->graph) {
-            result = tex;
-        }
-    }
+    box_texture_t *result = handle
+        ? ecs_map_get_deref(&t->handles, box_texture_t, handle)
+        : NULL;
 
-    return result;
+    return result && result->graph ? result : NULL;
 }
 
 /** Apply an outcome of the GPU backend to the texture of its graph, unless a newer graph was
@@ -445,7 +529,17 @@ static void box_render_texture_graph_outcome(
 {
     box_texture_t *tex = box_render_texture_graph_of(t, r->handle);
     int32_t revision;
-    if (!tex || tex->graph_serial != r->serial || !ecs_is_alive(world, tex->entity)) {
+    if (!tex || tex->graph_serial != r->serial) {
+        goto done;
+    }
+
+    tex->graph_outcome = r->serial;
+    if (tex->graph_awaited) {
+        tex->graph_awaited = false;
+        t->graph_awaited --;
+    }
+
+    if (!ecs_is_alive(world, tex->entity)) {
         goto done;
     }
 
@@ -470,6 +564,7 @@ static void box_render_texture_graph_outcome(
 
     tex->sent = true;
     tex->revision ++;
+    box_texture_readback_touch(t, tex->entity);
     ecs_set(world, tex->entity, Texture, {
         .width = tex->graph->width, .height = tex->graph->height });
     box_texture_status(world, tex->entity, TextureReady, revision + 1, NULL);
@@ -477,7 +572,8 @@ done:
     return;
 }
 
-/** Apply the outcomes of the graphs the GPU backend evaluated or failed.
+/** Apply the outcomes of the graphs the GPU backend evaluated or failed. They are only taken
+ * from the backend while the outcome of a graph is awaited.
  *
  * @param world The world or a stage
  * @param t The registry
@@ -488,6 +584,11 @@ static void box_render_texture_graph_outcomes(
 {
     ecs_vec_t results;
     int32_t i;
+    if (t->graph_awaited <= 0) {
+        goto done;
+    }
+
+    t->work.outcomes ++;
     ecs_vec_init_t(NULL, &results, box_render_texture_graph_result_t, 0);
     box_render_gpu_texture_graph_results(world, &results);
     for (i = 0; i < ecs_vec_count(&results); i ++) {
@@ -498,6 +599,8 @@ static void box_render_texture_graph_outcomes(
     }
 
     ecs_vec_fini_t(NULL, &results, box_render_texture_graph_result_t);
+done:
+    return;
 }
 
 bool box_render_texture_graph_read(
@@ -586,7 +689,11 @@ static void box_render_texture_graphs_requeue(
         }
 
         tex->graph_sent = false;
+        tex->graph_awaited = false;
+        tex->graph_outcome = 0;
     }
+
+    t->graph_awaited = 0;
 }
 
 /** Send the image of a texture.
@@ -611,6 +718,7 @@ static uint32_t box_render_texture_send(
     ecs_os_memcpy(desc + 1, tex->pixels, (ecs_size_t)size);
     tex->sent = true;
     tex->revision ++;
+    box_texture_readback_touch(t, tex->entity);
 
     return size;
 }
@@ -722,10 +830,15 @@ static void BoxRenderExtractTextures(
 
     ecs_vec_clear(&t->released);
     box_render_textures_send(p, t, restart);
-    box_render_texture_graphs_send(world, p, t);
+    box_render_texture_graphs_send(world, state, p, t);
     const TextureGraphCache *cache = ecs_singleton_get(world, TextureGraphCache);
     p->texture_graph_budget = cache ? cache->budget : 0;
-    p->anisotropy = box_render_anisotropy(world, t);
+    if (ecs_query_changed(t->anisotropy_surfaces) || !state->anisotropy) {
+        state->anisotropy = box_render_anisotropy(world, t);
+        t->work.anisotropy ++;
+    }
+
+    p->anisotropy = state->anisotropy;
 done:
     return;
 }
@@ -744,7 +857,7 @@ void box_render_textures_init(
         .move = box_render_target_textures_move
     });
     ecs_map_init(targets, NULL);
-    ecs_singleton_set(world, RenderTargetTextures, { .targets = targets });
+    ecs_singleton_set(world, RenderTargetTextures, { .targets = targets, .epoch = 1 });
     ecs_system(world, {
         .entity = ecs_entity(world, { .name = "extract.Textures" }),
         .phase = RenderExtract,

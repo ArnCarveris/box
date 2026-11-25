@@ -81,7 +81,14 @@
                     "dynamic_resized_at_rest",
                     "dynamic_moved_without_queries",
                     "dynamic_placed_by_update_after_query",
-                    "dynamic_placed_by_query_when_idle"
+                    "dynamic_placed_by_query_when_idle",
+                    "idle_update_visits_nothing",
+                    "update_visits_what_changed",
+                    "static_revision_follows_changes",
+                    "static_revision_unchanged_bounds",
+                    "static_revision_scene",
+                    "static_revision_ignores_movers",
+                    "movers_overlap_box"
                 ]
             },
             {
@@ -228,7 +235,14 @@
                     "endless_walk",
                     "ground",
                     "budget_ms_spreads_deletes",
-                    "budget_ms_keeps_returning_cells"
+                    "budget_ms_keeps_returning_cells",
+                    "idle_no_work",
+                    "small_move_no_scan",
+                    "walk_matches_every_frame",
+                    "config_change_rescans",
+                    "enable_rescans",
+                    "focus_change_rescans",
+                    "origin_shift_idle"
                 ]
             },
             {
@@ -246,7 +260,12 @@
                     "filter_slope",
                     "filter_height",
                     "terrain_waits_and_aligns",
-                    "chunk_grid_script"
+                    "chunk_grid_script",
+                    "idle_no_visits",
+                    "set_same_keeps_instances",
+                    "enable_evaluates",
+                    "prefab_instance",
+                    "waiting_polls_until_ground"
                 ]
             }
         ]

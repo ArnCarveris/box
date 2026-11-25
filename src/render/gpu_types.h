@@ -53,6 +53,96 @@ typedef struct box_gpu_api_t {
 /** The webgpu commands this thread recorded, defined in gpu.c */
 extern BOX_GPU_THREAD_LOCAL box_gpu_api_t box_gpu_api;
 
+/** The command encoder the stages of a packet share (box_gpu_frame_encoder), NULL while none
+ * recorded into it since the last submit, defined in gpu.c */
+extern BOX_GPU_THREAD_LOCAL WGPUCommandEncoder box_gpu_frame_shared;
+
+/** The compute pass the untimed compute passes recorded one after the other into a command
+ * encoder share, as every pass costs the backend two command buffers and its resource tracking.
+ *
+ * Each dispatch of a compute pass is a usage scope of its own, so a dispatch reads what the
+ * one before it wrote as it would in a pass of its own. */
+typedef struct box_gpu_api_shared_t {
+    WGPUCommandEncoder encoder;     /**< Encoder of the open pass, NULL for none */
+    WGPUComputePassEncoder pass;    /**< The open pass */
+} box_gpu_api_shared_t;
+
+/** The shared compute pass open on this thread, defined in gpu.c */
+extern BOX_GPU_THREAD_LOCAL box_gpu_api_shared_t box_gpu_api_shared;
+
+/** End the shared compute pass of a command encoder, before the encoder records anything else.
+ *
+ * @param encoder The encoder
+ */
+static inline void box_gpu_api_flush(
+    WGPUCommandEncoder encoder)
+{
+    if (box_gpu_api_shared.pass && box_gpu_api_shared.encoder == encoder) {
+        wgpuComputePassEncoderEnd(box_gpu_api_shared.pass);
+        wgpuComputePassEncoderRelease(box_gpu_api_shared.pass);
+        box_gpu_api_shared.pass = NULL;
+        box_gpu_api_shared.encoder = NULL;
+    }
+}
+
+/** Begin a compute pass, or continue the shared compute pass of the encoder for a pass
+ * without timestamps, and count the passes begun.
+ *
+ * A pass with timestamps is a pass of its own. So is a pass of an encoder other than the one
+ * of the shared pass while that one is open, as its user may still record into it.
+ *
+ * @param encoder The encoder
+ * @param desc The pass, NULL for an untimed pass
+ * @return The pass
+ */
+static inline WGPUComputePassEncoder box_gpu_api_compute_pass(
+    WGPUCommandEncoder encoder,
+    WGPUComputePassDescriptor const *desc)
+{
+    box_gpu_api_shared_t *s = &box_gpu_api_shared;
+    WGPUComputePassEncoder result = NULL;
+    bool plain = !desc || (!desc->timestampWrites && !desc->nextInChain && !desc->label.length);
+    if (plain && s->pass && s->encoder == encoder) {
+        result = s->pass;
+        goto done;
+    }
+
+    box_gpu_api_flush(encoder);
+    box_gpu_api.compute_passes ++;
+    result = wgpuCommandEncoderBeginComputePass(encoder, desc);
+    if (plain && !s->pass) {
+        s->encoder = encoder;
+        s->pass = result;
+    }
+
+done:
+    return result;
+}
+
+/** End a compute pass; the shared pass stays open until its encoder records anything else.
+ *
+ * @param pass The pass
+ */
+static inline void box_gpu_api_compute_end(
+    WGPUComputePassEncoder pass)
+{
+    if (pass != box_gpu_api_shared.pass) {
+        wgpuComputePassEncoderEnd(pass);
+    }
+}
+
+/** Release a compute pass; the shared pass is released when it ends.
+ *
+ * @param pass The pass
+ */
+static inline void box_gpu_api_compute_release(
+    WGPUComputePassEncoder pass)
+{
+    if (pass != box_gpu_api_shared.pass) {
+        wgpuComputePassEncoderRelease(pass);
+    }
+}
+
 /** Count a direct draw of a render pass and record it.
  *
  * @param pass The render pass
@@ -134,7 +224,9 @@ static inline void box_gpu_api_dispatch(
     wgpuComputePassEncoderDispatchWorkgroups(pass, x, y, z);
 }
 
-/** Count a submit and make it.
+/** Count a submit and make it. The commands the stages of the packet recorded into their shared
+ * encoder (box_gpu_frame_encoder) are submitted with it, before its command buffers, so they
+ * run in the order they were recorded.
  *
  * @param queue The queue
  * @param count Command buffers
@@ -145,9 +237,34 @@ static inline void box_gpu_api_submit(
     size_t count,
     WGPUCommandBuffer const *buffers)
 {
+    WGPUCommandEncoder shared = box_gpu_frame_shared;
+    WGPUCommandBuffer both[2];
     box_gpu_api.submits ++;
     box_gpu_api.command_buffers += (int32_t)count;
-    wgpuQueueSubmit(queue, count, buffers);
+    if (!shared) {
+        wgpuQueueSubmit(queue, count, buffers);
+        goto done;
+    }
+
+    box_gpu_frame_shared = NULL;
+    box_gpu_api.command_buffers ++;
+    box_gpu_api_flush(shared);
+    both[0] = wgpuCommandEncoderFinish(shared, NULL);
+    if (count == 1) {
+        both[1] = buffers[0];
+        wgpuQueueSubmit(queue, 2, both);
+    } else {
+        wgpuQueueSubmit(queue, 1, both);
+        if (count) {
+            box_gpu_api.submits ++;
+            wgpuQueueSubmit(queue, count, buffers);
+        }
+    }
+
+    wgpuCommandBufferRelease(both[0]);
+    wgpuCommandEncoderRelease(shared);
+done:
+    return;
 }
 
 /** Count a buffer write and make it.
@@ -211,16 +328,31 @@ static inline void box_gpu_api_copy_buffer(
 {
     box_gpu_api.copies ++;
     box_gpu_api.copy_bytes += (int64_t)size;
+    box_gpu_api_flush(encoder);
     wgpuCommandEncoderCopyBufferToBuffer(encoder, src, src_offset, dst, dst_offset, size);
 }
 
 /** Count a pass, a bind, a draw or a copy whose arguments are not counted, then call the API */
 #define BOX_GPU_API_COUNT(field, call) (box_gpu_api.field ++, call)
 
-#define wgpuCommandEncoderBeginRenderPass(...) \
-    BOX_GPU_API_COUNT(render_passes, wgpuCommandEncoderBeginRenderPass(__VA_ARGS__))
-#define wgpuCommandEncoderBeginComputePass(...) \
-    BOX_GPU_API_COUNT(compute_passes, wgpuCommandEncoderBeginComputePass(__VA_ARGS__))
+/** End the shared compute pass of an encoder, count a command of the encoder and record it */
+#define BOX_GPU_API_ENCODER(encoder, field, call) \
+    (box_gpu_api_flush(encoder), box_gpu_api.field ++, call)
+
+#define wgpuCommandEncoderBeginRenderPass(encoder, ...) \
+    BOX_GPU_API_ENCODER(encoder, render_passes, \
+        wgpuCommandEncoderBeginRenderPass(encoder, __VA_ARGS__))
+#define wgpuCommandEncoderBeginComputePass box_gpu_api_compute_pass
+#define wgpuComputePassEncoderEnd box_gpu_api_compute_end
+#define wgpuComputePassEncoderRelease box_gpu_api_compute_release
+#define wgpuCommandEncoderFinish(encoder, ...) \
+    (box_gpu_api_flush(encoder), wgpuCommandEncoderFinish(encoder, __VA_ARGS__))
+#define wgpuCommandEncoderRelease(encoder) \
+    (box_gpu_api_flush(encoder), wgpuCommandEncoderRelease(encoder))
+#define wgpuCommandEncoderClearBuffer(encoder, ...) \
+    (box_gpu_api_flush(encoder), wgpuCommandEncoderClearBuffer(encoder, __VA_ARGS__))
+#define wgpuCommandEncoderResolveQuerySet(encoder, ...) \
+    (box_gpu_api_flush(encoder), wgpuCommandEncoderResolveQuerySet(encoder, __VA_ARGS__))
 #define wgpuRenderPassEncoderSetPipeline(...) \
     BOX_GPU_API_COUNT(pipelines, wgpuRenderPassEncoderSetPipeline(__VA_ARGS__))
 #define wgpuRenderBundleEncoderSetPipeline(...) \
@@ -259,12 +391,15 @@ static inline void box_gpu_api_copy_buffer(
 #define wgpuQueueWriteBuffer box_gpu_api_write_buffer
 #define wgpuQueueWriteTexture box_gpu_api_write_texture
 #define wgpuCommandEncoderCopyBufferToBuffer box_gpu_api_copy_buffer
-#define wgpuCommandEncoderCopyBufferToTexture(...) \
-    BOX_GPU_API_COUNT(copies, wgpuCommandEncoderCopyBufferToTexture(__VA_ARGS__))
-#define wgpuCommandEncoderCopyTextureToBuffer(...) \
-    BOX_GPU_API_COUNT(copies, wgpuCommandEncoderCopyTextureToBuffer(__VA_ARGS__))
-#define wgpuCommandEncoderCopyTextureToTexture(...) \
-    BOX_GPU_API_COUNT(copies, wgpuCommandEncoderCopyTextureToTexture(__VA_ARGS__))
+#define wgpuCommandEncoderCopyBufferToTexture(encoder, ...) \
+    BOX_GPU_API_ENCODER(encoder, copies, \
+        wgpuCommandEncoderCopyBufferToTexture(encoder, __VA_ARGS__))
+#define wgpuCommandEncoderCopyTextureToBuffer(encoder, ...) \
+    BOX_GPU_API_ENCODER(encoder, copies, \
+        wgpuCommandEncoderCopyTextureToBuffer(encoder, __VA_ARGS__))
+#define wgpuCommandEncoderCopyTextureToTexture(encoder, ...) \
+    BOX_GPU_API_ENCODER(encoder, copies, \
+        wgpuCommandEncoderCopyTextureToTexture(encoder, __VA_ARGS__))
 
 /** Color format of offscreen targets */
 #define BOX_GPU_OFFSCREEN_FORMAT (WGPUTextureFormat_RGBA8UnormSrgb)
@@ -596,6 +731,10 @@ typedef struct box_gpu_blend_group_t {
     int64_t checked;                /**< Frame its arrays and images were last checked */
     int64_t bound;                  /**< Frame its bind group was last made, which the layers
                                      *   groups that extend it compare */
+    uint32_t seen_textures;         /**< Texture serial of the backend when its arrays and
+                                     *   images were last compared and found current, 0 for
+                                     *   never */
+    uint32_t seen_meshes;           /**< Mesh serial of the backend at that check */
     struct box_gpu_blend_group_t *next; /**< Next group */
 } box_gpu_blend_group_t;
 
@@ -642,6 +781,8 @@ typedef struct box_gpu_layer_group_t {
     WGPUBindGroup group;            /**< The bind group, NULL until made */
     int64_t used;                   /**< Frame of the last packet that drew with it */
     int64_t checked;                /**< Frame it was last checked */
+    uint32_t seen_textures;         /**< Texture serial of the backend when its array and images
+                                     *   were last compared and found current, 0 for never */
     struct box_gpu_layer_group_t *next; /**< Next group */
 } box_gpu_layer_group_t;
 
@@ -679,7 +820,16 @@ typedef struct box_gpu_buffer_t {
     WGPUBuffer composed;            /**< World records the compose pass writes from a transform
                                      *   or frame stream of a mover page, which the passes bind in
                                      *   place of the stream; NULL for any other buffer */
+    uint8_t *mirror;                /**< The bytes the uploads wrote into a buffer of at most
+                                     *   BOX_GPU_UPLOAD_MIRROR bytes, so an upload of the bytes
+                                     *   it holds is not written; NULL until its first upload */
+    uint32_t *mirror_known;         /**< Bit per 4 bytes of mirror: an upload wrote them */
+    uint64_t mirror_version;        /**< version after the last upload: a later write of
+                                     *   another kind makes the mirror unknown again */
 } box_gpu_buffer_t;
+
+/** Bytes of the largest buffer whose uploads are mirrored on the CPU (box_gpu_upload) */
+#define BOX_GPU_UPLOAD_MIRROR ((uint64_t)1 << 20)
 
 /** How box_gpu_copy runs a copy of a packet */
 typedef enum box_gpu_copy_mode_t {
@@ -720,6 +870,9 @@ typedef struct box_gpu_hiz_t {
     WGPUTextureView view;           /**< View of every level, read by the cull pass */
     WGPUTextureView mips[BOX_GPU_HIZ_LEVELS]; /**< View of each level */
     WGPUBindGroup reduce[BOX_GPU_HIZ_LEVELS]; /**< Reduces the level below into each level */
+    WGPUBindGroup first;            /**< Reduces first_depth into its first levels, made on use */
+    WGPUTextureView first_depth;    /**< Depth the first group binds, a reference of its own, so
+                                     *   no other view has its handle while the group is kept */
 } box_gpu_hiz_t;
 
 /** A buffer of history words, at most one storage binding window large */
@@ -1059,6 +1212,22 @@ typedef struct box_gpu_cluster_t {
                                      *   fewer lights or probes than reach, warned once */
 } box_gpu_cluster_t;
 
+/** The material group of a batch found earlier in a packet (box_gpu_forward_group) */
+typedef struct box_gpu_forward_memo_t {
+    uint64_t stamp;                 /**< gpu->forward_stamp when it was found */
+    uint32_t rendering;             /**< Target being rendered then, whose image no batch samples */
+    WGPUBindGroup group;            /**< The group */
+} box_gpu_forward_memo_t;
+
+/** The bytes the backend last wrote to a range of a buffer that only it writes, kept so that
+ * writing the same bytes again is skipped: every write on the queue allocates a staging buffer */
+typedef struct box_gpu_written_t {
+    uint8_t *data;                  /**< The bytes, NULL before the first write */
+    uint64_t size;                  /**< Bytes written */
+    uint64_t capacity;              /**< Bytes data holds */
+    uint64_t offset;                /**< Byte offset of the range in the buffer */
+} box_gpu_written_t;
+
 /** Visible slots and slot lists of a group of draws, each bound whole as storage */
 typedef struct box_gpu_cull_page_t {
     WGPUBuffer visible;             /**< Slots of the visible instances of its draws */
@@ -1071,6 +1240,8 @@ typedef struct box_gpu_cull_page_t {
     uint32_t table_base;            /**< First scan word of its tables */
     ecs_vec_t table_data;           /**< uint32_t, its tables and workgroup lists */
     ecs_vec_t list_data;            /**< uint32_t, the slot lists of the target */
+    box_gpu_written_t table_written; /**< Tables last written to the scan buffer */
+    box_gpu_written_t list_written; /**< Slot lists last written to the list buffer */
     uint32_t used;                  /**< Visible slots its draws use in the target */
     WGPUBindGroup group;            /**< Binds the shared buffers and its own */
 } box_gpu_cull_page_t;
@@ -1116,6 +1287,8 @@ typedef struct box_gpu_cull_t {
     uint64_t jobs_size;             /**< Bytes of the job buffer */
     uint64_t args_size;             /**< Bytes of the argument buffer */
     uint64_t counters_size;         /**< Bytes of the counter buffer */
+    box_gpu_written_t uniforms_written; /**< Uniforms last written to the uniform buffer */
+    box_gpu_written_t jobs_written; /**< Jobs last written to the job buffer */
     ecs_vec_t pages;                /**< box_gpu_cull_page_t, kept between targets */
     int32_t page_count;             /**< Pages the draws of the target use */
     uint32_t window;                /**< Slots of a page and words of a history page */
@@ -1174,6 +1347,10 @@ typedef struct box_gpu_cull_t {
     WGPURenderPassEncoder mesh_pass; /**< Pass the mesh buffers below were bound in */
     WGPUBuffer mesh_vertices;       /**< Vertex buffer bound at slot 0 of mesh_pass */
     uint64_t mesh_vertex_offset;    /**< Its offset */
+    WGPUBuffer mesh_visible;        /**< Visible slots bound whole in mesh_pass on a device with
+                                     *   indirect-first-instance, NULL for none */
+    WGPUBuffer mesh_data;           /**< Per vertex data bound at slot 2 of mesh_pass */
+    uint64_t mesh_data_offset;      /**< Its offset */
     WGPUBuffer mesh_indices;        /**< Index buffer bound in mesh_pass */
     uint64_t mesh_index_offset;     /**< Its offset */
 } box_gpu_cull_t;
@@ -1534,6 +1711,29 @@ typedef struct box_gpu_t {
     box_gpu_layer_group_t *layer_groups; /**< Bind groups of the TextureLayers batches */
     uint64_t blend_bytes;           /**< Bytes of the blend arrays */
     int64_t blend_frame;            /**< Packets the blend caches have seen */
+    ecs_vec_t blend_hints;          /**< box_gpu_blend_group_t*, the blend group the batch at
+                                     *   each index of the last packets drew with, compared
+                                     *   before the groups are searched */
+    ecs_vec_t layer_hints;          /**< box_gpu_layer_group_t*, the same for the layers groups */
+    ecs_vec_t forward_memo;         /**< box_gpu_forward_memo_t per batch of the packet: the
+                                     *   group box_gpu_forward_group found for it, valid while its
+                                     *   stamp is forward_stamp */
+    uint64_t forward_stamp;         /**< Changes with every packet and whenever a material, blend
+                                     *   or layers group is released or bound again */
+    int32_t blend_alive;            /**< Blend groups, layers groups and layer buffers alive */
+    int32_t blend_marks;            /**< Of those, the ones the batches of the packet drew
+                                     *   with, so a packet that drew with all sweeps none */
+    bool blend_arrays_stale;        /**< A group let go of an array since the arrays no group
+                                     *   uses were last released */
+    bool blend_retry;               /**< An array of the packet could not be built yet, so the
+                                     *   groups keep checking their arrays */
+    uint32_t mesh_serial;           /**< Mesh creates, replacements and destroys applied, which
+                                     *   the caches keyed on a mesh compare */
+    box_render_terrain_height_t *terrain_tiles; /**< The terrain tiles of the last packet whose
+                                     *   heights and masks were walked (box_gpu_terrain_heights) */
+    int32_t terrain_tile_count;     /**< Tiles in terrain_tiles, -1 before the first walk */
+    uint32_t terrain_tile_textures; /**< Texture serial of the backend after that walk */
+    uint32_t terrain_tile_meshes;   /**< Mesh serial of the backend at that walk */
     WGPUPipelineLayout mesh_layout; /**< Pipeline layout of the forward pass */
     WGPUBindGroupLayout prepass_empty_layout; /**< An empty bind group layout */
     WGPUBindGroup prepass_empty;    /**< The empty bind group of prepass_empty_layout */
@@ -1607,8 +1807,11 @@ typedef struct box_gpu_t {
                                      *   that keep cascades between frames */
     ecs_vec_t cascade_slots;        /**< box_gpu_cascade_slot_t of each view slot of a target */
     WGPUBuffer shadow_buffer;       /**< Cascade matrices of the views of a target */
+    WGPUBindGroup shadow_group;     /**< Binds a cascade of shadow_buffer for the shadow passes,
+                                     *   made with the buffer */
     int32_t shadow_capacity;        /**< Views the cascade buffer holds */
     ecs_vec_t shadow_data;          /**< Bytes of the cascade matrices of a target */
+    box_gpu_written_t shadow_written; /**< Cascade matrices last written to shadow_buffer */
     double origin[3];               /**< Absolute position of the local origin of the packet
                                      *   the views are written for, which the cascades take */
     WGPUTexture capture_shadow;     /**< Shadow map of the probe captures, one cascade */
@@ -1668,6 +1871,13 @@ typedef struct box_gpu_t {
     ecs_map_t meshes;               /**< Handle to box_gpu_mesh_t */
     ecs_vec_t mesh_pages;           /**< box_gpu_mesh_page_t, the pages of the mesh pool */
     uint64_t mesh_ids;              /**< Last id given to a mesh */
+    WGPUTextureView clear_view;     /**< Image of the target being rendered that is not cleared
+                                     *   yet: the first render pass that loads it clears it to
+                                     *   clear_color instead (box_gpu_profile_render_pass), NULL
+                                     *   once a pass cleared it */
+    WGPUColor clear_color;          /**< Linear clear color of that target */
+    bool polled;                    /**< The device was polled for the packet being rendered
+                                     *   (box_gpu_poll) */
     WGPUDevice paced_device;        /**< Device the submissions of paced were made on */
     uint64_t paced[BOX_GPU_FRAMES_IN_FLIGHT]; /**< Submission index of each frame in flight */
     int32_t paced_count;            /**< Frames in paced */
@@ -1720,6 +1930,10 @@ typedef struct box_gpu_t {
     uint32_t rendering;             /**< Target that is rendering, materials cannot sample it */
     bool timestamps;                /**< The device has timestamp queries */
     bool clip_distances;            /**< The device has clip distances */
+    bool first_instance;            /**< The device has indirect-first-instance: the arguments of
+                                     *   an indirect draw hold the first visible entry of its
+                                     *   run, so a pass binds the visible slots of a page once
+                                     *   for all its draws instead of once per draw */
     box_gpu_bake_t *bake;           /**< Probe captures, created on the first capture */
     box_gpu_atmos_t *atmosphere;    /**< Atmosphere passes */
     ecs_map_t environments;         /**< Handle to box_gpu_environment_t* */

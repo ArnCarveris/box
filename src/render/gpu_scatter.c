@@ -234,7 +234,7 @@ void box_gpu_scatter(
         goto done;
     }
 
-    WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(gpu->device, NULL);
+    WGPUCommandEncoder encoder = box_gpu_frame_encoder(gpu);
     WGPUComputePassEncoder pass = box_gpu_profile_compute_pass(gpu, encoder, "scatter");
     wgpuComputePassEncoderSetPipeline(pass, pipeline);
     for (i = 0; i < count; i ++) {
@@ -244,10 +244,6 @@ void box_gpu_scatter(
 
     wgpuComputePassEncoderEnd(pass);
     wgpuComputePassEncoderRelease(pass);
-    WGPUCommandBuffer commands = wgpuCommandEncoderFinish(encoder, NULL);
-    wgpuQueueSubmit(gpu->queue, 1, &commands);
-    wgpuCommandBufferRelease(commands);
-    wgpuCommandEncoderRelease(encoder);
 done:
     gpu->pending.scattered += (int32_t)copied;
 

@@ -260,6 +260,8 @@ void box_gpu_cull_fini(
         box_gpu_cull_release(&pg->scan);
         ecs_vec_fini_t(NULL, &pg->list_data, uint32_t);
         ecs_vec_fini_t(NULL, &pg->table_data, uint32_t);
+        box_gpu_written_free(&pg->list_written);
+        box_gpu_written_free(&pg->table_written);
     }
 
     ecs_vec_fini_t(NULL, &c->pages, box_gpu_cull_page_t);
@@ -283,6 +285,8 @@ void box_gpu_cull_fini(
     c->bound = false;
     box_gpu_cull_release(&c->uniforms);
     box_gpu_cull_release(&c->jobs);
+    box_gpu_written_free(&c->uniforms_written);
+    box_gpu_written_free(&c->jobs_written);
     box_gpu_cull_release(&c->args);
     box_gpu_cull_release(&c->counters);
     if (c->parallel) {
@@ -506,7 +510,7 @@ static void box_gpu_cull_readback_poll(
 #ifndef __EMSCRIPTEN__
     for (i = 0; i < BOX_GPU_CULL_READBACKS; i ++) {
         if (c->readbacks[i].state == BOX_GPU_READBACK_MAPPING) {
-            wgpuDevicePoll(gpu->device, false, NULL);
+            box_gpu_poll(gpu);
             break;
         }
     }
@@ -606,7 +610,9 @@ done:
     return result;
 }
 
-/** Make the buffers of a page hold its slots and lists, upload its lists and bind it.
+/** Make the buffers of a page hold its slots and lists, upload its lists and bind it. The lists
+ * and tables that are the ones the page uploaded last are not uploaded again: the cull shader
+ * writes neither.
  *
  * @param gpu The backend
  * @param pg The page
@@ -623,12 +629,14 @@ static void box_gpu_cull_page_upload(
         gpu->pending.cull_page_slots = (int32_t)pg->used;
     }
 
+    bool lists_new, scan_new;
     grown |= box_gpu_cull_reserve(gpu, &pg->visible, &pg->visible_size,
         (uint64_t)pg->used * sizeof(uint32_t), WGPUBufferUsage_Storage | WGPUBufferUsage_Vertex);
-    grown |= box_gpu_cull_reserve(gpu, &pg->lists, &pg->lists_size,
+    lists_new = box_gpu_cull_reserve(gpu, &pg->lists, &pg->lists_size,
         (uint64_t)lists * sizeof(uint32_t), WGPUBufferUsage_Storage);
-    grown |= box_gpu_cull_reserve(gpu, &pg->scan, &pg->scan_size,
+    scan_new = box_gpu_cull_reserve(gpu, &pg->scan, &pg->scan_size,
         (uint64_t)pg->scan_used * sizeof(uint32_t), WGPUBufferUsage_Storage);
+    grown |= lists_new || scan_new;
     if (grown || !pg->group) {
         WGPUBindGroupEntry entries[8] = {
             {
@@ -655,14 +663,16 @@ static void box_gpu_cull_page_upload(
     }
 
     if (lists) {
-        wgpuQueueWriteBuffer(gpu->queue, pg->lists, 0, ecs_vec_first(&pg->list_data),
-            (size_t)lists * sizeof(uint32_t));
+        box_gpu_write_changed(gpu, &pg->list_written, lists_new, pg->lists, 0,
+            ecs_vec_first(&pg->list_data), (size_t)lists * sizeof(uint32_t));
     }
 
     if (ecs_vec_count(&pg->table_data)) {
-        wgpuQueueWriteBuffer(gpu->queue, pg->scan, (uint64_t)pg->table_base * sizeof(uint32_t),
-            ecs_vec_first(&pg->table_data),
+        box_gpu_write_changed(gpu, &pg->table_written, scan_new, pg->scan,
+            (uint64_t)pg->table_base * sizeof(uint32_t), ecs_vec_first(&pg->table_data),
             (size_t)ecs_vec_count(&pg->table_data) * sizeof(uint32_t));
+    } else {
+        pg->table_written.size = 0;
     }
 }
 
@@ -920,12 +930,13 @@ void box_gpu_cull_upload(
     box_gpu_cull_tables(gpu);
     box_gpu_cull_lod_upload(gpu);
     uint64_t uniforms = (uint64_t)ecs_vec_count(&c->uniform_data);
-    grown |= box_gpu_cull_reserve(gpu, &c->uniforms, &c->uniforms_size,
+    bool uniforms_new = box_gpu_cull_reserve(gpu, &c->uniforms, &c->uniforms_size,
         uniforms > BOX_GPU_CULL_FRUSTUMS_SIZE ? uniforms : BOX_GPU_CULL_FRUSTUMS_SIZE,
         WGPUBufferUsage_Uniform);
-    grown |= box_gpu_cull_reserve(gpu, &c->jobs, &c->jobs_size,
+    bool jobs_new = box_gpu_cull_reserve(gpu, &c->jobs, &c->jobs_size,
         (uint64_t)ecs_vec_count(&c->job_data) * sizeof(box_gpu_cull_job_t),
         WGPUBufferUsage_Storage);
+    grown |= uniforms_new || jobs_new;
     grown |= box_gpu_cull_reserve(gpu, &c->args, &c->args_size,
         (uint64_t)ecs_vec_count(&c->arg_data) * sizeof(uint32_t),
         WGPUBufferUsage_Storage | WGPUBufferUsage_Indirect | WGPUBufferUsage_CopySrc);
@@ -937,9 +948,10 @@ void box_gpu_cull_upload(
 
     c->bound = true;
     if (ecs_vec_count(&c->dispatches)) {
-        wgpuQueueWriteBuffer(gpu->queue, c->uniforms, 0, ecs_vec_first(&c->uniform_data),
-            (size_t)ecs_vec_count(&c->uniform_data));
-        wgpuQueueWriteBuffer(gpu->queue, c->jobs, 0, ecs_vec_first(&c->job_data),
+        box_gpu_write_changed(gpu, &c->uniforms_written, uniforms_new, c->uniforms, 0,
+            ecs_vec_first(&c->uniform_data), (size_t)ecs_vec_count(&c->uniform_data));
+        box_gpu_write_changed(gpu, &c->jobs_written, jobs_new, c->jobs, 0,
+            ecs_vec_first(&c->job_data),
             (size_t)ecs_vec_count(&c->job_data) * sizeof(box_gpu_cull_job_t));
         wgpuQueueWriteBuffer(gpu->queue, c->args, 0, ecs_vec_first(&c->arg_data),
             (size_t)ecs_vec_count(&c->arg_data) * sizeof(uint32_t));
@@ -1205,7 +1217,8 @@ done:
  * @param slot Slot of the view in the view buffer
  * @param late The phase
  * @param out Receives the timestamps
- * @return The timestamps, NULL without timestamp queries, room or dispatches to time
+ * @return The timestamps, NULL without timestamp queries, room or dispatches to time, and
+ * while the passes are not timed (box_gpu_profile_timed)
  */
 static const WGPUPassTimestampWrites* box_gpu_cull_timed(
     box_gpu_t *gpu,
@@ -1216,7 +1229,9 @@ static const WGPUPassTimestampWrites* box_gpu_cull_timed(
     box_gpu_cull_t *c = &gpu->cull;
     const WGPUPassTimestampWrites *result = NULL;
     int32_t i, d;
-    if (!c->stamps || !c->bound || !c->parallel || c->stamp_count + 2 > BOX_GPU_CULL_STAMPS) {
+    if (!c->stamps || !c->bound || !c->parallel || c->stamp_count + 2 > BOX_GPU_CULL_STAMPS ||
+        !box_gpu_profile_timed(gpu))
+    {
         goto done;
     }
 
@@ -1574,6 +1589,8 @@ static bool box_gpu_cull_draw_mesh(
         c->mesh_pass = pass;
         c->mesh_vertices = NULL;
         c->mesh_indices = NULL;
+        c->mesh_visible = NULL;
+        c->mesh_data = NULL;
     }
 
     if (instances != *bound) {
@@ -1588,14 +1605,22 @@ static bool box_gpu_cull_draw_mesh(
         c->mesh_vertex_offset = m->offset;
     }
 
-    if (m->data_size) {
+    if (m->data_size && (c->mesh_data != m->buffer || c->mesh_data_offset != m->data_offset)) {
         wgpuRenderPassEncoderSetVertexBuffer(pass, 2, m->buffer, m->data_offset, m->data_size);
         box_gpu_count(gpu, BOX_GPU_STAT_DATA_BIND);
+        c->mesh_data = m->buffer;
+        c->mesh_data_offset = m->data_offset;
     }
 
-    wgpuRenderPassEncoderSetVertexBuffer(pass, 1, ecs_vec_get_t(&c->pages,
-        box_gpu_cull_page_t, (int32_t)page)->visible,
-        (uint64_t)base * sizeof(uint32_t), (uint64_t)count * sizeof(uint32_t));
+    WGPUBuffer visible = ecs_vec_get_t(&c->pages, box_gpu_cull_page_t, (int32_t)page)->visible;
+    if (!gpu->first_instance) {
+        wgpuRenderPassEncoderSetVertexBuffer(pass, 1, visible,
+            (uint64_t)base * sizeof(uint32_t), (uint64_t)count * sizeof(uint32_t));
+    } else if (c->mesh_visible != visible) {
+        wgpuRenderPassEncoderSetVertexBuffer(pass, 1, visible, 0, WGPU_WHOLE_SIZE);
+        c->mesh_visible = visible;
+    }
+
     if (c->mesh_indices != m->buffer || c->mesh_index_offset != m->index_offset) {
         wgpuRenderPassEncoderSetIndexBuffer(
             pass, m->buffer, WGPUIndexFormat_Uint32, m->index_offset, m->index_size);
@@ -1668,6 +1693,8 @@ bool box_gpu_cull_draw_wire(
 
     c->mesh_vertices = NULL;
     c->mesh_indices = NULL;
+    c->mesh_visible = NULL;
+    c->mesh_data = NULL;
     ecs_assert(!ecs_vec_get_t(&c->arg_data, uint32_t, (int32_t)args * BOX_GPU_CULL_ARGS)[2] &&
         !ecs_vec_get_t(&c->arg_data, uint32_t, (int32_t)args * BOX_GPU_CULL_ARGS)[3],
         ECS_INTERNAL_ERROR, "a wire draw needs firstIndex and baseVertex 0");
@@ -1679,7 +1706,8 @@ bool box_gpu_cull_draw_wire(
 
     wgpuRenderPassEncoderSetVertexBuffer(pass, 0, ecs_vec_get_t(&c->pages,
         box_gpu_cull_page_t, (int32_t)draw->page)->visible,
-        (uint64_t)base * sizeof(uint32_t), (uint64_t)draw->count * sizeof(uint32_t));
+        gpu->first_instance ? 0 : (uint64_t)base * sizeof(uint32_t),
+        gpu->first_instance ? WGPU_WHOLE_SIZE : (uint64_t)draw->count * sizeof(uint32_t));
     wgpuRenderPassEncoderSetIndexBuffer(
         pass, sequence, WGPUIndexFormat_Uint32, 0, WGPU_WHOLE_SIZE);
     wgpuRenderPassEncoderDrawIndexedIndirect(pass, c->args,

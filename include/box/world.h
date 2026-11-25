@@ -109,7 +109,8 @@ ECS_STRUCT(ChunkGrid, {
                           *   The grid asks the terrain for them (box_terrain_request) */
 });
 
-/** Cells of a ChunkGrid, written by the engine next to it every frame */
+/** Cells of a ChunkGrid, written by the engine next to it in every frame in which the grid
+ * has work and in the frame after it */
 ECS_STRUCT(ChunkGridStatus, {
     int32_t loaded[8];   /**< Loaded cells per level */
     int32_t cells;       /**< Loaded cells */
@@ -318,6 +319,27 @@ ecs_entity_t box_chunk_grid_cell(
     ecs_entity_t grid,
     const int32_t cell[3],
     int32_t *level);
+
+/** Get how much the stream of the ChunkGrids did so far, for tests: nothing in a frame in
+ * which no focus moved, no grid, template or scene changed and no grid has work left.
+ *
+ * @param world The world
+ * @param updates Receives the grids the stream looked at, may be NULL
+ * @param scans Receives the scans of the cells of a grid, may be NULL
+ */
+void box_chunk_grid_work(
+    const ecs_world_t *world,
+    int64_t *updates,
+    int64_t *scans);
+
+/** Get the Scatters the scatter system looked at so far, for tests: those added, set or
+ * enabled since its last run and those that wait for their ground.
+ *
+ * @param world The world
+ * @return Number of scatters it compared with their last evaluation
+ */
+int64_t box_scatter_visits(
+    const ecs_world_t *world);
 
 /** Register the box.world module.
  *

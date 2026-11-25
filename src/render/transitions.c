@@ -1564,7 +1564,8 @@ static void box_transition_send_materials(
             continue;
         }
 
-        box_draws_material_of(world, item->entity, p->time, &material);
+        box_draws_material_of(world, item->entity, d->materials.epoch, &material);
+        box_draws_material_epoch(&d->materials, &material);
         material.water_waves = material.waves
             ? box_draws_water_waves_find(&d->materials, item->entity) : 0u;
         if (material.caustics) {

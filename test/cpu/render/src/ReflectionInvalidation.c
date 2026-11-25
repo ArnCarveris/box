@@ -1039,3 +1039,150 @@ void ReflectionInvalidation_quit_records_nothing(void) {
 
     ecs_fini(world);
 }
+
+void ReflectionInvalidation_idle_frames_resolve_no_changes(void) {
+    // reflection_probes/invalidation
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t scene = scene_new(world, true);
+    probe_new(world, scene, -10, 2);
+    ecs_entity_t shape = shape_new(world, scene, -10, 2);
+    shape_new(world, scene, 10, 2);
+    ecs_entity_t parent = ecs_new_w_pair(world, EcsChildOf, scene);
+    ecs_set(world, parent, Position, {0, 0, 5});
+    shape_new(world, parent, 0, 0);
+    ecs_progress(world, 0);
+    settle(world, scene);
+
+    box_render_bake_t *b = box_bake_state(world);
+    test_assert(b != NULL);
+    int64_t resolved = b->resolved;
+    int32_t i;
+    for (i = 0; i < 4; i ++) {
+        ecs_progress(world, 0);
+        test_int(ecs_vec_count(&b->changes), 0);
+        test_int(ecs_vec_count(&b->regions), 0);
+        test_assert(b->resolved == resolved);
+        test_int(queued_count(world, scene), 0);
+    }
+
+    ecs_set(world, shape, Rgb, {255, 0, 0});
+    test_int(ecs_vec_count(&b->changes), 1);
+    frame_expect(world, scene, 2);
+    test_assert(b->resolved == resolved + 1);
+    test_int(ecs_vec_count(&b->changes), 0);
+    test_int(ecs_vec_count(&b->regions), 2);
+
+    ecs_progress(world, 0);
+    test_int(ecs_vec_count(&b->regions), 0);
+    test_assert(b->resolved == resolved + 1);
+    ecs_progress(world, 0);
+    test_assert(b->resolved == resolved + 1);
+
+    ecs_fini(world);
+}
+
+void ReflectionInvalidation_repeated_change_records_once(void) {
+    // reflection_probes/invalidation
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t scene = scene_new(world, false);
+    ecs_entity_t a = probe_new(world, scene, -10, 2);
+    ecs_entity_t c = probe_new(world, scene, 10, 2);
+    ecs_entity_t shape = shape_new(world, scene, -10, 2);
+    ecs_entity_t other = shape_new(world, scene, 0, 30);
+    ecs_progress(world, 0);
+    settle(world, scene);
+
+    box_render_bake_t *b = box_bake_state(world);
+    test_assert(b != NULL);
+    int64_t resolved = b->resolved;
+    ecs_set(world, shape, Rgb, {255, 0, 0});
+    ecs_set(world, shape, Emissive, {.strength = 2});
+    ecs_set(world, shape, PbrMaterial, {.roughness = 0.5f});
+    test_int(ecs_vec_count(&b->changes), 1);
+    test_bool(ecs_vec_first_t(&b->changes, box_bake_change_t)->geometry, false);
+    ecs_set(world, shape, Box, {1, 2, 1});
+    ecs_progress(world, 0);
+    test_assert(b->resolved >= resolved + 1);
+    test_bool(is_queued(world, scene, a), true);
+    test_bool(is_queued(world, scene, c), false);
+    settle(world, scene);
+
+    ecs_set(world, shape, Rgb, {0, 255, 0});
+    ecs_set(world, other, Rgb, {0, 255, 0});
+    ecs_set(world, shape, Rgb, {0, 0, 255});
+    test_int(ecs_vec_count(&b->changes), 3);
+    frame_expect(world, scene, 1);
+    test_bool(is_queued(world, scene, a), true);
+    settle(world, scene);
+
+    ecs_set(world, shape, Rgb, {9, 9, 9});
+    move(world, shape, 10, 2);
+    frame_expect(world, scene, 2);
+    test_bool(is_queued(world, scene, a), true);
+    test_bool(is_queued(world, scene, c), true);
+
+    ecs_fini(world);
+}
+
+void ReflectionInvalidation_look_change_in_shift_frame_queues(void) {
+    // reflection_probes/invalidation
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t scene = scene_new(world, false);
+    ecs_entity_t a = probe_new(world, scene, -10, 2);
+    ecs_entity_t shape = shape_new(world, scene, -10, 2);
+    shape_new(world, scene, 0, 30);
+    ecs_progress(world, 0);
+    settle(world, scene);
+
+    box_render_bake_t *b = box_bake_state(world);
+    test_assert(b != NULL);
+    box_world_origin_shift(world, scene, (double[3]){ 256, 0, -512 });
+    ecs_progress(world, 0);
+    test_int(ecs_vec_count(&b->regions), 0);
+    settle(world, scene);
+
+    ecs_set(world, shape, Rgb, {255, 0, 0});
+    box_world_origin_shift(world, scene, (double[3]){ 256, 0, 0 });
+    ecs_progress(world, 0);
+    test_int(ecs_vec_count(&b->regions), 2);
+    test_bool(is_queued(world, scene, a), true);
+
+    ecs_fini(world);
+}
+
+void ReflectionInvalidation_table_flags_skip_records(void) {
+    // reflection_probes/invalidation
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t scene = scene_new(world, false);
+    probe_new(world, scene, -10, 2);
+    ecs_entity_t shape = shape_new(world, scene, -10, 2);
+    ecs_entity_t hidden = shape_new(world, scene, -10, 0);
+    ecs_add_id(world, hidden, NoBake);
+    ecs_entity_t mover = shape_new(world, scene, -10, -2);
+    ecs_add_id(world, mover, DynamicTransform);
+    ecs_entity_t empty = ecs_new_w_pair(world, EcsChildOf, scene);
+    ecs_set(world, empty, Position, {-10, 1, 1});
+    ecs_progress(world, 0);
+    settle(world, scene);
+
+    box_render_bake_t *b = box_bake_state(world);
+    test_assert(b != NULL);
+    ecs_set(world, hidden, Rgb, {255, 0, 0});
+    ecs_set(world, mover, Rgb, {255, 0, 0});
+    ecs_set(world, empty, Rgb, {255, 0, 0});
+    test_int(ecs_vec_count(&b->changes), 0);
+    ecs_set(world, shape, Rgb, {255, 0, 0});
+    test_int(ecs_vec_count(&b->changes), 1);
+    test_assert(ecs_vec_first_t(&b->changes, box_bake_change_t)->entity == shape);
+    frame_expect(world, scene, 1);
+
+    ecs_fini(world);
+}

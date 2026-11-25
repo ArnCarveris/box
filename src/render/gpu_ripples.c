@@ -49,6 +49,23 @@ typedef struct box_gpu_ripple_record_t {
                                      *   field */
 } box_gpu_ripple_record_t;
 
+/** Height of a cell in cells below which a field without sources counts as flat: the slope
+ * between two cells is then below what a normal shows */
+#define BOX_GPU_RIPPLES_FLAT_HEIGHT (1e-5f)
+
+/** Foam of a cell below which a field without sources counts as flat */
+#define BOX_GPU_RIPPLES_FLAT_FOAM (1e-4f)
+
+/** What the flow pass of a field reads besides its rectangles: while it is the same the
+ * velocity texture is */
+typedef struct box_gpu_ripple_flow_key_t {
+    uint32_t resolution;            /**< Cells per side */
+    int32_t origin[2];              /**< Texel of the window corner */
+    float velocity[2];              /**< Velocity of the frame */
+    float cell;                     /**< World units of a cell */
+    bool valid;                     /**< The velocity texture was written */
+} box_gpu_ripple_flow_key_t;
+
 /** A field of the backend */
 typedef struct box_gpu_ripple_field_t {
     ecs_entity_t water;             /**< Water entity, the key */
@@ -71,6 +88,14 @@ typedef struct box_gpu_ripple_field_t {
                                      *   foam[1] into the scratch texture, for the frame */
     WGPUBindGroup settle[4];        /**< Group k copies the scratch texture back into the
                                      *   texture of advect[k], for the frame */
+    uint32_t groups_serial;         /**< Serial of the buffers of the state the groups bind */
+    bool flat;                      /**< The heights and the foam are zero in every cell, which
+                                     *   the steps without a source keep, so none is recorded */
+    float height_bound;             /**< Estimate of the largest height of a cell: what the
+                                     *   sources added, less what the steps since damped */
+    float foam_bound;               /**< The same for the foam, at most 1 */
+    box_gpu_ripple_flow_key_t flow_key; /**< What the velocity texture was written from */
+    ecs_vec_t flow_rects;           /**< box_render_ripple_flow_t it was written from */
     int32_t current;                /**< Texture of the latest heights */
     int32_t origin[2];              /**< Texel of the window corner */
     float corner[2];                /**< World XZ of the window corner */
@@ -116,6 +141,8 @@ struct box_gpu_ripples_t {
     uint64_t sources_size;          /**< Bytes of the source buffer */
     WGPUBuffer flows;               /**< box_render_ripple_flow_t of the frame */
     uint64_t flows_size;            /**< Bytes of the rectangle buffer */
+    uint32_t buffers_serial;        /**< Times one of the three buffers was created, which the
+                                     *   groups of the fields compare */
     WGPUTexture none;               /**< 1x1 zero r32float, bound by views without a field */
     WGPUTextureView none_view;      /**< Its view */
     WGPUTexture none_flow;          /**< 1x1 zero rgba32float, the velocity of views without a
@@ -391,6 +418,7 @@ static void box_gpu_ripples_field_free(
 {
     box_gpu_ripples_groups_release(f);
     box_gpu_ripples_textures_release(f);
+    ecs_vec_fini_t(NULL, &f->flow_rects, box_render_ripple_flow_t);
     ecs_os_free(f);
 }
 
@@ -536,10 +564,12 @@ static box_gpu_ripple_field_t* box_gpu_ripples_ensure(
     if (!f) {
         f = ecs_os_calloc_t(box_gpu_ripple_field_t);
         f->water = rec->water;
+        ecs_vec_init_t(NULL, &f->flow_rects, box_render_ripple_flow_t, 0);
         *ecs_vec_append_t(NULL, &s->fields, box_gpu_ripple_field_t*) = f;
     }
 
     if (!f->textures[0] || f->resolution != rec->resolution) {
+        box_gpu_ripples_groups_release(f);
         box_gpu_ripples_textures_release(f);
         for (i = 0; i < 2; i ++) {
             f->textures[i] = box_gpu_ripples_texture(gpu, rec->resolution);
@@ -556,6 +586,10 @@ static box_gpu_ripple_field_t* box_gpu_ripples_ensure(
 
         f->resolution = rec->resolution;
         f->current = 0;
+        f->flat = true;
+        f->height_bound = 0.0f;
+        f->foam_bound = 0.0f;
+        f->flow_key.valid = false;
         *fresh = true;
     }
 
@@ -568,13 +602,15 @@ static box_gpu_ripple_field_t* box_gpu_ripples_ensure(
  * @param rec The record of the field
  * @param first Whether it is the first step of the frame
  * @param t Time fraction of the frame at the end of the step
+ * @param all The window counts as moved by its resolution, so clear flattens every cell
  * @return Its slot
  */
 static uint32_t box_gpu_ripples_step(
     box_gpu_ripples_t *s,
     const box_render_water_ripples_t *rec,
     bool first,
-    float t)
+    float t,
+    bool all)
 {
     uint32_t result = (uint32_t)ecs_vec_count(&s->step_data) / BOX_GPU_RIPPLES_STEP_STRIDE;
     uint8_t *bytes = ecs_vec_grow_t(NULL, &s->step_data, uint8_t,
@@ -585,8 +621,8 @@ static uint32_t box_gpu_ripples_step(
     step->grid[1] = (uint32_t)rec->origin[0];
     step->grid[2] = (uint32_t)rec->origin[1];
     step->grid[3] = (uint32_t)rec->source_count;
-    step->shift[0] = rec->shift[0];
-    step->shift[1] = rec->shift[1];
+    step->shift[0] = all ? (int32_t)rec->resolution : rec->shift[0];
+    step->shift[1] = all ? (int32_t)rec->resolution : rec->shift[1];
     step->shift[2] = first ? 1 : 0;
     step->shift[3] = rec->source_first;
     step->wave[0] = rec->courant2;
@@ -630,7 +666,8 @@ static void box_gpu_ripples_dispatch(
     d->pass = pass;
 }
 
-/** Make a buffer hold at least a size, created again larger when it does not.
+/** Make a buffer hold at least a size, created again larger when it does not, which makes the
+ * fields bind their groups again.
  *
  * @param gpu The backend
  * @param buffer The buffer
@@ -649,6 +686,7 @@ static void box_gpu_ripples_reserve(
         BOX_GPU_RIPPLES_RELEASE(*buffer, wgpuBufferRelease);
         *size = needed < 256 ? 256 : needed;
         *buffer = box_gpu_ripples_buffer(gpu, *size, usage);
+        gpu->ripples->buffers_serial ++;
     }
 }
 
@@ -677,8 +715,8 @@ static void box_gpu_ripples_record(
     f->height = rec->height;
 }
 
-/** Create the groups of the frame of a field: the two of the steps, the one of the flow pass and
- * the ones of the advect and settle passes.
+/** Create the groups of a field when it has none of its textures and the buffers of the state:
+ * the two of the steps, the one of the flow pass and the ones of the advect and settle passes.
  *
  * @param gpu The backend
  * @param f The field
@@ -689,7 +727,12 @@ static void box_gpu_ripples_groups(
 {
     box_gpu_ripples_t *s = gpu->ripples;
     int32_t k;
+    if (f->groups[0] && f->groups_serial == s->buffers_serial) {
+        goto done;
+    }
+
     box_gpu_ripples_groups_release(f);
+    f->groups_serial = s->buffers_serial;
     for (k = 0; k < 2; k ++) {
         WGPUBindGroupEntry entries[6] = {
             { .binding = 0, .textureView = f->views[k] },
@@ -751,6 +794,92 @@ static void box_gpu_ripples_groups(
             .entries = advect
         });
     }
+
+done:
+    return;
+}
+
+/** Check whether the velocity texture of a field has to be written again: the window, the
+ * velocity of the frame or a rectangle differs from what it was written from. Keeps what it is
+ * written from now.
+ *
+ * @param f The field
+ * @param packet The packet
+ * @param rec The record of the field
+ * @return Whether the flow pass runs
+ */
+static bool box_gpu_ripples_flow_changed(
+    box_gpu_ripple_field_t *f,
+    const box_render_packet_t *packet,
+    const box_render_water_ripples_t *rec)
+{
+    box_gpu_ripple_flow_key_t key = {
+        .resolution = rec->resolution,
+        .origin = { rec->origin[0], rec->origin[1] },
+        .velocity = { rec->velocity[0], rec->velocity[1] },
+        .cell = rec->cell,
+        .valid = true
+    };
+    const box_render_ripple_flow_t *rects = rec->flow_count
+        ? ecs_vec_get_t(&packet->ripple_flows, box_render_ripple_flow_t, rec->flow_first)
+        : NULL;
+    bool result = !f->flow_key.valid || f->flow_key.resolution != key.resolution ||
+        f->flow_key.origin[0] != key.origin[0] || f->flow_key.origin[1] != key.origin[1] ||
+        f->flow_key.velocity[0] != key.velocity[0] ||
+        f->flow_key.velocity[1] != key.velocity[1] || f->flow_key.cell != key.cell ||
+        ecs_vec_count(&f->flow_rects) != rec->flow_count;
+    if (!result && rec->flow_count) {
+        result = ecs_os_memcmp(ecs_vec_first(&f->flow_rects), rects,
+            rec->flow_count * ECS_SIZEOF(box_render_ripple_flow_t)) != 0;
+    }
+
+    if (result) {
+        f->flow_key = key;
+        ecs_vec_set_count_t(NULL, &f->flow_rects, box_render_ripple_flow_t, rec->flow_count);
+        if (rec->flow_count) {
+            ecs_os_memcpy_n(ecs_vec_first(&f->flow_rects), rects, box_render_ripple_flow_t,
+                rec->flow_count);
+        }
+    }
+
+    return result;
+}
+
+/** Advance the estimates of the largest height and foam of a field over the steps of a frame:
+ * the sources add theirs, a step keeps the square root of the velocity it keeps of the heights
+ * and the factor it keeps of the foam, which also forms where the heights can be steep.
+ *
+ * @param f The field
+ * @param packet The packet
+ * @param rec The record of the field
+ */
+static void box_gpu_ripples_bounds(
+    box_gpu_ripple_field_t *f,
+    const box_render_packet_t *packet,
+    const box_render_water_ripples_t *rec)
+{
+    float keep = rec->keep >= 0.0f && rec->keep < 1.0f ? sqrtf(rec->keep) : 1.0f;
+    float foam_keep = rec->foam_keep >= 0.0f && rec->foam_keep < 1.0f ? rec->foam_keep : 1.0f;
+    float steep = rec->cell > 0.0f ? 1.5f / rec->cell : 0.0f;
+    uint32_t k;
+    int32_t i;
+    for (k = 0; k < rec->steps; k ++) {
+        float height = f->height_bound * keep, foam = f->foam_bound * foam_keep;
+        for (i = 0; i < rec->source_count; i ++) {
+            const box_render_ripple_source_t *src = ecs_vec_get_t(&packet->ripple_sources,
+                box_render_ripple_source_t, rec->source_first + i);
+            if (src->once && k) {
+                continue;
+            }
+
+            height += isfinite(src->amount) ? fabsf(src->amount) : INFINITY;
+            foam += isfinite(src->foam) ? fabsf(src->foam) : INFINITY;
+        }
+
+        foam += rec->crest * glm_max(height * steep - BOX_RENDER_RIPPLE_CREST_SLOPE, 0.0f);
+        f->height_bound = height;
+        f->foam_bound = glm_min(foam, 1.0f);
+    }
 }
 
 void box_gpu_ripples_simulate(
@@ -802,17 +931,43 @@ void box_gpu_ripples_simulate(
             field ++;
         }
 
-        uint32_t first = box_gpu_ripples_step(s, rec, false, 0.0f);
-        if (!fresh && (rec->reset || rec->shift[0] || rec->shift[1])) {
+        bool sources = rec->steps && rec->source_count;
+        bool flow = box_gpu_ripples_flow_changed(f, packet, rec);
+        if (f->flat && !sources) {
+            if (flow) {
+                box_gpu_ripples_dispatch(s, field, 0,
+                    box_gpu_ripples_step(s, rec, false, 0.0f, false), BoxGpuRipplesFlow);
+            }
+
+            continue;
+        }
+
+        box_gpu_ripples_bounds(f, packet, rec);
+        if (!sources && f->foam_bound < BOX_GPU_RIPPLES_FLAT_FOAM &&
+            f->height_bound < BOX_GPU_RIPPLES_FLAT_HEIGHT * rec->cell)
+        {
+            uint32_t all = box_gpu_ripples_step(s, rec, false, 0.0f, true);
+            box_gpu_ripples_dispatch(s, field, 0, all, BoxGpuRipplesClear);
+            box_gpu_ripples_dispatch(s, field, 1, all, BoxGpuRipplesClear);
+            box_gpu_ripples_dispatch(s, field, 0, all, BoxGpuRipplesFlow);
+            f->flat = true;
+            f->height_bound = 0.0f;
+            f->foam_bound = 0.0f;
+            continue;
+        }
+
+        uint32_t first = box_gpu_ripples_step(s, rec, false, 0.0f, false);
+        if (!fresh && !f->flat && (rec->reset || rec->shift[0] || rec->shift[1])) {
             box_gpu_ripples_dispatch(s, field, 0, first, BoxGpuRipplesClear);
             box_gpu_ripples_dispatch(s, field, 1, first, BoxGpuRipplesClear);
         }
 
+        f->flat = false;
         box_gpu_ripples_dispatch(s, field, 0, first, BoxGpuRipplesFlow);
         int32_t current = f->current;
         for (k = 0; k < rec->steps; k ++) {
             uint32_t slot = box_gpu_ripples_step(s, rec, k == 0,
-                (float)(k + 1) / (float)rec->steps);
+                (float)(k + 1) / (float)rec->steps, false);
             if (rec->flowing) {
                 int32_t moved[3] = { current, 1 - current, 2 + current }, m;
                 for (m = 0; m < 3; m ++) {
@@ -858,8 +1013,9 @@ void box_gpu_ripples_simulate(
         box_gpu_ripples_groups(gpu, *ecs_vec_get_t(&s->fields, box_gpu_ripple_field_t*, i));
     }
 
-    WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(gpu->device, NULL);
+    WGPUCommandEncoder encoder = box_gpu_frame_encoder(gpu);
     WGPUComputePassEncoder pass = box_gpu_profile_compute_pass(gpu, encoder, "ripples");
+    gpu->pending.ripple_dispatches += ecs_vec_count(&s->dispatches);
     for (i = 0; i < ecs_vec_count(&s->dispatches); i ++) {
         const box_gpu_ripple_dispatch_t *d = ecs_vec_get_t(
             &s->dispatches, box_gpu_ripple_dispatch_t, i);
@@ -897,14 +1053,6 @@ void box_gpu_ripples_simulate(
 
     wgpuComputePassEncoderEnd(pass);
     wgpuComputePassEncoderRelease(pass);
-    WGPUCommandBuffer commands = wgpuCommandEncoderFinish(encoder, NULL);
-    wgpuQueueSubmit(gpu->queue, 1, &commands);
-    wgpuCommandBufferRelease(commands);
-    wgpuCommandEncoderRelease(encoder);
-    for (i = 0; i < ecs_vec_count(&s->fields); i ++) {
-        box_gpu_ripples_groups_release(*ecs_vec_get_t(&s->fields, box_gpu_ripple_field_t*, i));
-    }
-
 done:
     return;
 }

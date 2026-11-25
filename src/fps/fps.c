@@ -8,9 +8,9 @@
  * The script draws everything the panels show. C creates the scene, camera and view, places the
  * panels at the top right of the surface, loads the script and loads it again when it changes.
  *
- * C provides the data: the summaries, the time and column of every bar of a chart and the first
- * column of their parent, which rotate the bars so a new sample writes one bar and the parent,
- * written only when they changed, and the colors and limits of the bars.
+ * C provides the data, every interval of a panel and only what changed: the summaries, the time
+ * and column of every bar and the first column of their parent, which rotate the bars. The
+ * update system runs when a panel singleton, the script, the surface or the content changed.
  */
 
 #define BOX_FPS_IMPL
@@ -25,6 +25,13 @@
 
 /** Surface height in points while the world has no Surface */
 #define BOX_FPS_DEFAULT_HEIGHT (720.0f)
+
+/** Frames the update system keeps running after a change, for content that follows it late */
+#define BOX_FPS_SETTLE (2)
+
+/** Column the parent of the bars may reach while several samples at once rotate the bars. A bar
+ * stands at most BOX_FPS_BARS columns further, and 4 points per column stay whole numbers. */
+#define BOX_FPS_COLUMNS (65536)
 
 /** The bars of a chart, which show a series of samples, and what was written to them */
 typedef struct box_fps_chart_t {
@@ -49,6 +56,7 @@ typedef struct box_fps_panel_t {
     const char *tmpl;           /**< Path of the template of the script it instantiates */
     ecs_entity_t entity;        /**< The panel while it is shown, else 0 */
     int32_t chart_count;        /**< Charts of the panel */
+    double refreshed;           /**< Time the samples last reached the panel, 0 before */
     box_fps_chart_t charts[BOX_LOAD_ROWS]; /**< Its charts, in the order of their samples */
 } box_fps_panel_t;
 
@@ -69,10 +77,12 @@ typedef struct box_fps_t {
     bool missing;               /**< The script was not found since a panel opened */
     bool shown;                 /**< The content is shown */
     bool relayout;              /**< The surface changed since the screen was sized */
+    bool dirty;                 /**< A panel singleton was set since the last update */
+    int32_t settle;             /**< Frames the update still runs after the last change */
     ecs_entity_t surface;       /**< Surface the screen fills, 0 while the world has none */
     float width;                /**< Surface width in points the screen was sized for */
     float height;               /**< Surface height in points the screen was sized for */
-    ecs_query_t *surfaces;      /**< Entities with a Surface */
+    ecs_query_t *surfaces;      /**< Entities with a Surface, which detects their changes */
 } box_fps_t;
 
 /** Paths of the parents of the bars of the load panel, in the order of LoadSamples */
@@ -107,7 +117,41 @@ void box_fps_summarize(
     out->fps = sum > 0 ? 1000.0 * (double)frames / sum : 0;
 }
 
-/** Write the summary of the frame samples to FpsSummary when it differs from it.
+double box_fps_now(void)
+{
+    ecs_time_t t;
+    ecs_os_get_time(&t);
+
+    return (double)t.sec + (double)t.nanosec * 1e-9;
+}
+
+int32_t box_fps_level(
+    double ms)
+{
+    return ms > BOX_FPS_SLOW_MS ? 2 : (ms > BOX_FPS_FAST_MS ? 1 : 0);
+}
+
+/** Whether the panel shows two summaries differently: the frames, the times and the rate as the
+ * script formats them, or the color of the rate.
+ *
+ * @param a A summary
+ * @param b Another summary
+ * @return Whether what the panel shows of them differs
+ */
+static bool box_fps_summary_differs(
+    const FpsSummary *a,
+    const FpsSummary *b)
+{
+    char ta[96], tb[96];
+    ecs_os_snprintf(ta, sizeof(ta), "%d %.1f %.1f %.0f %d", a->frames, a->mean_ms, a->worst_ms,
+        a->fps, box_fps_level(a->mean_ms));
+    ecs_os_snprintf(tb, sizeof(tb), "%d %.1f %.1f %.0f %d", b->frames, b->mean_ms, b->worst_ms,
+        b->fps, box_fps_level(b->mean_ms));
+
+    return ecs_os_strcmp(ta, tb) != 0;
+}
+
+/** Write the summary of the frame samples to FpsSummary when the panel shows it differently.
  *
  * @param world The world
  */
@@ -117,11 +161,34 @@ static void box_fps_summary_sync(
     FpsSummary sum;
     const FpsSummary *cur = ecs_singleton_get(world, FpsSummary);
     box_fps_summarize(ecs_singleton_get(world, FrameSamples), &sum);
-    if (!cur || cur->frames != sum.frames || cur->mean_ms != sum.mean_ms ||
-        cur->worst_ms != sum.worst_ms || cur->fps != sum.fps)
-    {
+    if (!cur || box_fps_summary_differs(cur, &sum)) {
         ecs_singleton_set_ptr(world, FpsSummary, &sum);
     }
+}
+
+/** Whether new samples reach a panel now: always when its interval is 0 or less or the samples
+ * are held, else when the interval passed since they last did.
+ *
+ * @param panel The panel
+ * @param interval Seconds between two updates of the panel
+ * @param held The engine adds no samples, so they changed because someone wrote them
+ * @return Whether the panel shows the samples now
+ */
+static bool box_fps_panel_due(
+    box_fps_panel_t *panel,
+    float interval,
+    bool held)
+{
+    bool result = interval <= 0 || held;
+    if (!result) {
+        double now = box_fps_now();
+        result = now - panel->refreshed >= (double)interval;
+        if (result) {
+            panel->refreshed = now;
+        }
+    }
+
+    return result;
 }
 
 /** Largest size of the bar mut variables, which C fills on the stack */
@@ -280,15 +347,61 @@ static void box_fps_first_write(
     chart->first = first;
 }
 
+/** Find how many samples are new to the bars of a chart: the smallest number of samples the
+ * series moved by so that every older sample is the one a bar shows already.
+ *
+ * @param chart The chart
+ * @param ms The samples by age, BOX_FPS_BARS of them
+ * @return The new samples, 0 when the bars show the series, BOX_FPS_BARS when no bar can stay
+ */
+static int32_t box_fps_bars_shift(
+    const box_fps_chart_t *chart,
+    const double *ms)
+{
+    int32_t result, age;
+    for (result = 0; result < BOX_FPS_BARS; result ++) {
+        for (age = result; age < BOX_FPS_BARS; age ++) {
+            if (ms[age] != chart->bar_ms[box_fps_bar_of(chart, age - result)]) {
+                break;
+            }
+        }
+
+        if (age == BOX_FPS_BARS) {
+            break;
+        }
+    }
+
+    return result;
+}
+
+/** Count the bars that writing the series in place writes: bar_i the sample of age BOX_FPS_BARS
+ * - 1 - i in column i, and the parent when it is not at column 0.
+ *
+ * @param chart The chart
+ * @param ms The samples by age, BOX_FPS_BARS of them
+ * @return The bars and the parent that would be written
+ */
+static int32_t box_fps_bars_rebase_cost(
+    const box_fps_chart_t *chart,
+    const double *ms)
+{
+    int32_t i, result = chart->first != 0;
+    for (i = 0; i < BOX_FPS_BARS; i ++) {
+        result += ms[BOX_FPS_BARS - 1 - i] != chart->bar_ms[i] || i != chart->bar_col[i];
+    }
+
+    return result;
+}
+
 /** Make the bars of a chart show a series of samples, writing only what changed.
  *
- * Samples the bars show already write nothing. Those shifted by one, a new sample, go to the bar
- * of the oldest sample with the column right of the newest bar, and the parent moves one slot
- * left, so a new sample evaluates one bar and the parent, whatever the samples are.
+ * A new sample goes to the bar of the oldest sample, in the column right of the newest bar, and
+ * the parent moves one slot left. Several new samples at once, what a panel with an interval
+ * gets, do so when that writes less than the series in place, up to column BOX_FPS_COLUMNS.
  *
- * Otherwise, and when first would reach BOX_FPS_BARS, bar_i gets the sample of age BOX_FPS_BARS
- * - 1 - i and column i and the parent first 0, so columns stay below 2 * BOX_FPS_BARS. Every bar
- * whose sample or column changed is written, every bar when the bars were found again.
+ * Otherwise, and when a single new sample would move first to BOX_FPS_BARS, bar_i gets the
+ * sample of age BOX_FPS_BARS - 1 - i and column i and the parent first 0: every bar whose sample
+ * or column changed is written, every bar when the bars were found again.
  *
  * @param world The world
  * @param chart The chart
@@ -300,8 +413,8 @@ static void box_fps_bars_sync(
     const FrameSamples *samples)
 {
     double ms[BOX_FPS_BARS];
-    bool all = false, same = true, shifted;
-    int32_t age, i;
+    bool all = false, rotate;
+    int32_t age, i, shift;
     if (!box_fps_bars_valid(world, chart)) {
         chart->ready = box_fps_bars_resolve(world, chart);
         all = true;
@@ -311,22 +424,27 @@ static void box_fps_bars_sync(
         goto done;
     }
 
-    shifted = !all && chart->first + 1 < BOX_FPS_BARS;
     for (age = 0; age < BOX_FPS_BARS; age ++) {
         ms[age] = samples ? box_frame_sample(samples, age) : 0;
-        same = same && ms[age] == chart->bar_ms[box_fps_bar_of(chart, age)];
-        shifted = shifted && (!age || ms[age] == chart->bar_ms[box_fps_bar_of(chart, age - 1)]);
     }
 
-    if (!all && same) {
+    shift = all ? BOX_FPS_BARS : box_fps_bars_shift(chart, ms);
+    if (!shift) {
         goto done;
     }
 
-    if (shifted) {
-        i = box_fps_bar_of(chart, BOX_FPS_BARS - 1);
-        box_fps_bar_write(world, chart, i, ms[0], chart->bar_col[chart->head] + 1);
-        chart->head = i;
-        box_fps_first_write(world, chart, chart->first + 1);
+    rotate = shift == 1 && chart->first + 1 < BOX_FPS_BARS;
+    rotate = rotate || (shift > 1 && shift < BOX_FPS_BARS &&
+        chart->first + shift < BOX_FPS_COLUMNS &&
+        shift + 1 < box_fps_bars_rebase_cost(chart, ms));
+    if (rotate) {
+        for (age = shift - 1; age >= 0; age --) {
+            i = box_fps_bar_of(chart, BOX_FPS_BARS - 1);
+            box_fps_bar_write(world, chart, i, ms[age], chart->bar_col[chart->head] + 1);
+            chart->head = i;
+        }
+
+        box_fps_first_write(world, chart, chart->first + shift);
         goto done;
     }
 
@@ -393,8 +511,8 @@ static void box_fps_panel_reset(
     }
 }
 
-/** FrameSamples was set or notified: summarize them again and write the samples of the bars
- * that changed while the fps panel is open.
+/** FrameSamples was set or notified: while the fps panel is open and its interval passed,
+ * summarize them again and write the samples of the bars that changed.
  *
  * @param it Iterator of the observer
  */
@@ -403,13 +521,31 @@ static void box_fps_samples_on_set(
 {
     box_fps_t *fps = it->ctx;
     if (fps->fps.entity) {
-        box_fps_summary_sync(it->world);
-        box_fps_panel_bars_sync(it->world, fps, &fps->fps, false);
+        const FpsPanel *panel = ecs_singleton_get(it->world, FpsPanel);
+        const FrameSamples *samples = ecs_singleton_get(it->world, FrameSamples);
+        if (box_fps_panel_due(&fps->fps, panel ? panel->interval : 0,
+            !samples || samples->hold))
+        {
+            box_fps_summary_sync(it->world);
+            box_fps_panel_bars_sync(it->world, fps, &fps->fps, false);
+        }
     }
 }
 
-/** LoadSamples was set or notified: summarize them again and write the samples of the bars that
- * changed while the load panel is open.
+/** A panel singleton was set or removed: the update system opens and closes the panels again.
+ *
+ * @param it Iterator of the observer
+ */
+static void box_fps_panel_on_set(
+    ecs_iter_t *it)
+{
+    box_fps_t *fps = it->ctx;
+    fps->dirty = true;
+}
+
+/** LoadSamples was set or notified, which the engine does every interval of the load panel
+ * while it is open: summarize them again and write the samples of the bars that changed while
+ * the load panel is open.
  *
  * @param it Iterator of the observer
  */
@@ -751,6 +887,8 @@ static void box_fps_hide(
     fps->load.entity = 0;
     fps->gpu.entity = 0;
     fps->shown = false;
+    fps->fps.refreshed = 0;
+    fps->load.refreshed = 0;
     box_fps_panel_reset(&fps->fps);
     box_fps_panel_reset(&fps->load);
     box_fps_panel_reset(&fps->gpu);
@@ -824,8 +962,66 @@ done:
     return;
 }
 
+/** Whether the entities of a panel that is shown are alive: the panel and the first bar and the
+ * parent of the bars of every chart that was found.
+ *
+ * @param world The world
+ * @param panel The panel
+ * @return Whether nothing of it was deleted
+ */
+static bool box_fps_panel_alive(
+    const ecs_world_t *world,
+    const box_fps_panel_t *panel)
+{
+    bool result = !panel->entity || ecs_is_alive(world, panel->entity);
+    int32_t i;
+    for (i = 0; panel->entity && result && i < panel->chart_count; i ++) {
+        const box_fps_chart_t *chart = &panel->charts[i];
+        result = !chart->ready || (ecs_is_alive(world, chart->bars[0]) &&
+            ecs_is_alive(world, chart->parent));
+    }
+
+    return result;
+}
+
+/** Whether the update system has work: a panel singleton was set, the script changed on disk,
+ * a change still settles, or, while the content is shown, an entity of it was deleted or a
+ * surface changed.
+ *
+ * @param world The world
+ * @param fps The panel state
+ * @return Whether the panels must be opened, closed, found or placed again
+ */
+static bool box_fps_update_due(
+    ecs_world_t *world,
+    box_fps_t *fps)
+{
+    bool changed = fps->dirty || fps->reload;
+    if (fps->shown && !changed) {
+        changed = !ecs_is_alive(world, fps->view) || !ecs_is_alive(world, fps->root) ||
+            !ecs_is_alive(world, fps->screen) || !box_fps_panel_alive(world, &fps->fps) ||
+            !box_fps_panel_alive(world, &fps->load) || !box_fps_panel_alive(world, &fps->gpu) ||
+            ecs_query_changed(fps->surfaces);
+    }
+
+    if (changed) {
+        fps->settle = BOX_FPS_SETTLE + 1;
+    }
+
+    fps->dirty = false;
+    if (fps->settle > 0) {
+        fps->settle --;
+        changed = true;
+    }
+
+    return changed;
+}
+
 /** Open and close the panels from the FpsPanel, LoadPanel and GpuPanel singletons, keep their
  * script loaded and place them. The content is shown while a panel is open.
+ *
+ * Returns at once unless box_fps_update_due: a frame in which nothing changed reads no
+ * singleton, looks nothing up and writes nothing.
  *
  * @param it Iterator of the system, which has no terms
  */
@@ -834,18 +1030,27 @@ static void BoxFpsUpdate(
 {
     ecs_world_t *world = it->world;
     box_fps_t *fps = it->ctx;
-    const FpsPanel *fps_panel = ecs_singleton_get(world, FpsPanel);
-    const LoadPanel *load_panel = ecs_singleton_get(world, LoadPanel);
-    const GpuPanel *gpu_panel = ecs_singleton_get(world, GpuPanel);
-    bool fps_open = fps_panel && fps_panel->open;
-    bool load_open = load_panel && load_panel->open;
-    bool gpu_open = gpu_panel && gpu_panel->open;
-    bool any = fps_open || load_open || gpu_open;
+    const FpsPanel *fps_panel;
+    const LoadPanel *load_panel;
+    const GpuPanel *gpu_panel;
+    bool fps_open, load_open, gpu_open, any;
+    if (!box_fps_update_due(world, fps)) {
+        goto done;
+    }
+
+    fps_panel = ecs_singleton_get(world, FpsPanel);
+    load_panel = ecs_singleton_get(world, LoadPanel);
+    gpu_panel = ecs_singleton_get(world, GpuPanel);
+    fps_open = fps_panel && fps_panel->open;
+    load_open = load_panel && load_panel->open;
+    gpu_open = gpu_panel && gpu_panel->open;
+    any = fps_open || load_open || gpu_open;
     if (!any && fps->shown) {
         box_fps_hide(world, fps);
     }
 
     if (!any) {
+        fps->settle = 0;
         goto done;
     }
 
@@ -870,6 +1075,44 @@ static void BoxFpsUpdate(
 
 done:
     return;
+}
+
+/** Construct FpsPanel: closed, showing new samples every BOX_FPS_INTERVAL.
+ *
+ * @param ptr The panels
+ * @param count Number of panels
+ * @param ti Type info, unused
+ */
+static void box_fps_panel_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    FpsPanel *panels = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        panels[i] = (FpsPanel){ .interval = BOX_FPS_INTERVAL };
+    }
+}
+
+/** Construct LoadPanel: closed, showing new samples every BOX_FPS_INTERVAL.
+ *
+ * @param ptr The panels
+ * @param count Number of panels
+ * @param ti Type info, unused
+ */
+static void box_fps_load_panel_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    LoadPanel *panels = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        panels[i] = (LoadPanel){ .interval = BOX_FPS_INTERVAL };
+    }
 }
 
 /** Free the panel state when the world is deleted.
@@ -969,9 +1212,9 @@ void BoxFpsImport(
     ECS_META_COMPONENT(world, GpuGrassStats);
     ECS_META_COMPONENT(world, GpuTimeStats);
     ECS_META_COMPONENT(world, GpuStats);
-    ecs_set_hooks(world, FpsPanel, { .ctor = flecs_default_ctor });
+    ecs_set_hooks(world, FpsPanel, { .ctor = box_fps_panel_ctor });
     ecs_set_hooks(world, FpsSummary, { .ctor = flecs_default_ctor });
-    ecs_set_hooks(world, LoadPanel, { .ctor = flecs_default_ctor });
+    ecs_set_hooks(world, LoadPanel, { .ctor = box_fps_load_panel_ctor });
     ecs_set_hooks(world, LoadSamples, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, LoadSummary, { .ctor = flecs_default_ctor });
 
@@ -1006,10 +1249,51 @@ void BoxFpsImport(
     ecs_singleton_set(world, LoadSummary, {0});
     fps->watch = box_file_watch_kind(world, "fps script", box_fps_script_changed, fps);
 
+    fps->dirty = true;
     fps->surfaces = ecs_query(world, {
         .entity = ecs_entity(world, { .name = "Surfaces" }),
-        .terms = {{ .id = ecs_id(Surface), .inout = EcsIn }},
-        .cache_kind = EcsQueryCacheAuto
+        .terms = {
+            { .id = ecs_id(Surface), .inout = EcsIn },
+            { .id = ecs_id(SurfaceStatus), .inout = EcsIn, .oper = EcsOptional }
+        },
+        .cache_kind = EcsQueryCacheAuto,
+        .flags = EcsQueryDetectChanges
+    });
+
+    ecs_observer(world, {
+        .entity = ecs_entity(world, { .name = "PanelOnSet" }),
+        .query.terms = {{
+            .id = ecs_id(FpsPanel),
+            .src.id = ecs_id(FpsPanel),
+            .inout = EcsInOutNone
+        }},
+        .events = { EcsOnSet, EcsOnRemove },
+        .callback = box_fps_panel_on_set,
+        .ctx = fps
+    });
+
+    ecs_observer(world, {
+        .entity = ecs_entity(world, { .name = "LoadPanelOnSet" }),
+        .query.terms = {{
+            .id = ecs_id(LoadPanel),
+            .src.id = ecs_id(LoadPanel),
+            .inout = EcsInOutNone
+        }},
+        .events = { EcsOnSet, EcsOnRemove },
+        .callback = box_fps_panel_on_set,
+        .ctx = fps
+    });
+
+    ecs_observer(world, {
+        .entity = ecs_entity(world, { .name = "GpuPanelOnSet" }),
+        .query.terms = {{
+            .id = ecs_id(GpuPanel),
+            .src.id = ecs_id(GpuPanel),
+            .inout = EcsInOutNone
+        }},
+        .events = { EcsOnSet, EcsOnRemove },
+        .callback = box_fps_panel_on_set,
+        .ctx = fps
     });
 
     ecs_observer(world, {

@@ -197,7 +197,7 @@ state {
   export mut wind: f32 = START_WIND
   export mut hour: f32 = START_HOUR
 
-  // Derived from season and hour, kept up to date every frame
+  // Derived from season and hour, kept up to date whenever the state is assigned
   export mut temperature: f32 = forest_temperature(START_SEASON, START_HOUR)
   export mut precip_kind: i32 = forest_precip_kind(forest_temperature(START_SEASON, START_HOUR))
 
@@ -209,8 +209,9 @@ state {
 }
 
 async {
+  await next_frame()
+
   while true {
-    await next_frame()
     const t: f32 = state.forest_temperature(state.season, state.hour)
 
     if abs(t - state.temperature) > 0.0001 {
@@ -222,5 +223,7 @@ async {
     if k != state.precip_kind {
       state.precip_kind = k
     }
+
+    await on.assign(state)
   }
 }

@@ -323,19 +323,18 @@ done:
     return;
 }
 
-/** Record the region of the casters of a wind batch, the box around the world box of every slot
- * grown by its reach, so the shadow tiles it reaches render again.
+/** Compute the box around the world box of every slot of a wind caster batch, before its
+ * reach. The box of a batch whose slots are placed once is kept until a slot or its transform
+ * changes, or the local bounds of its slots do.
  *
  * @param d The state
  * @param b The batch, a ready caster batch with a WindSway
  * @param cache The mesh cache
- * @param reach Distance to grow the box by
  */
-static void box_draws_wind_region(
+static void box_draws_wind_box(
     box_render_draws_t *d,
     box_draw_batch_t *b,
-    box_mesh_cache_t *cache,
-    float reach)
+    box_mesh_cache_t *cache)
 {
     const box_render_transform_t *t = ecs_vec_first(&b->transforms);
     vec3 lo = { FLT_MAX, FLT_MAX, FLT_MAX }, hi = { -FLT_MAX, -FLT_MAX, -FLT_MAX };
@@ -362,6 +361,12 @@ static void box_draws_wind_region(
             any = true;
         }
     } else if (box_draws_local_box(b, cache, local)) {
+        if (!b->key.dynamic_transform && !b->wind_box_dirty && !b->bounds_dirty &&
+            !ecs_os_memcmp(local, b->wind_local, ECS_SIZEOF(local)))
+        {
+            goto done;
+        }
+
         for (i = 0; i < count; i ++) {
             box_draws_place_box(&t[i], local, &local[3], center, extent);
             for (r = 0; r < 3; r ++) {
@@ -371,9 +376,35 @@ static void box_draws_wind_region(
 
             any = true;
         }
+
+        ecs_os_memcpy(b->wind_local, local, ECS_SIZEOF(local));
+        b->wind_box_dirty = b->bounds_dirty;
     }
 
-    if (!any) {
+    b->wind_boxed = any;
+    glm_vec3_copy(lo, b->wind_min);
+    glm_vec3_copy(hi, b->wind_max);
+done:
+    return;
+}
+
+/** Record the region of the casters of a wind batch, the box around the world box of every slot
+ * grown by its reach, so the shadow tiles it reaches render again.
+ *
+ * @param d The state
+ * @param b The batch, a ready caster batch with a WindSway
+ * @param cache The mesh cache
+ * @param reach Distance to grow the box by
+ */
+static void box_draws_wind_region(
+    box_render_draws_t *d,
+    box_draw_batch_t *b,
+    box_mesh_cache_t *cache,
+    float reach)
+{
+    int32_t r;
+    box_draws_wind_box(d, b, cache);
+    if (!b->wind_boxed) {
         goto done;
     }
 
@@ -381,12 +412,53 @@ static void box_draws_wind_region(
         box_render_shadow_region_t);
     out->scene = b->key.scene;
     for (r = 0; r < 3; r ++) {
-        out->min[r] = lo[r] - reach;
-        out->max[r] = hi[r] + reach;
+        out->min[r] = b->wind_min[r] - reach;
+        out->max[r] = b->wind_max[r] + reach;
     }
 
 done:
     return;
+}
+
+/** Compute the reach of a wind batch: the largest reach of the WindSway of its slots. The slots
+ * of a table that inherit their WindSway share it, so it is read once per run of a table.
+ *
+ * @param world The world
+ * @param b The batch
+ * @param wind The Wind of the extract
+ * @param size Size of its slots
+ * @return The reach
+ */
+static float box_draws_wind_reach(
+    const ecs_world_t *world,
+    const box_draw_batch_t *b,
+    const box_render_wind_t *wind,
+    float size)
+{
+    const ecs_entity_t *entities = ecs_vec_first(&b->entities);
+    const ecs_table_t *shared = NULL;
+    float result = 0.0f, inherited = 0.0f;
+    int32_t s, count = ecs_vec_count(&b->entities);
+    for (s = 0; s < count; s ++) {
+        if (!entities[s] || !ecs_is_alive(world, entities[s])) {
+            continue;
+        }
+
+        const ecs_table_t *table = ecs_get_table(world, entities[s]);
+        if (table && table == shared) {
+            result = glm_max(result, inherited);
+            continue;
+        }
+
+        float reach = box_render_wind_reach(ecs_get(world, entities[s], WindSway), wind, size);
+        result = glm_max(result, reach);
+        if (table && !ecs_table_has_id(world, table, ecs_id(WindSway))) {
+            shared = table;
+            inherited = reach;
+        }
+    }
+
+    return result;
 }
 
 void box_draws_wind(
@@ -394,7 +466,7 @@ void box_draws_wind(
     box_render_draws_t *d,
     box_mesh_cache_t *cache)
 {
-    int32_t i, s, k, count = ecs_vec_count(&d->batches);
+    int32_t i, k, count = ecs_vec_count(&d->batches);
     box_render_wind_frame(world, &d->wind);
     bool blowing = d->wind.speed > 0.0f;
     bool moved = blowing || d->wind_blew;
@@ -406,19 +478,26 @@ void box_draws_wind(
             continue;
         }
 
-        const ecs_entity_t *entities = ecs_vec_first(&b->entities);
-        float reach = 0.0f;
         float size = b->world_valid
             ? 2.0f * glm_max(b->world_radius - b->world_wind * 1.7321f, 0.0f) : 0.0f;
-        for (s = 0; blowing && s < ecs_vec_count(&b->entities); s ++) {
-            if (entities[s] && ecs_is_alive(world, entities[s])) {
-                reach = glm_max(reach, box_render_wind_reach(
-                    ecs_get(world, entities[s], WindSway), &d->wind, size));
-            }
+        float was = b->wind_reach;
+        if (!blowing) {
+            b->wind_reach = 0.0f;
+            b->reach_valid = false;
+        } else if (b->reach_dirty || !b->reach_valid || b->reach_speed != d->wind.speed ||
+            b->reach_gust != d->wind.gust || b->reach_size != size ||
+            b->reach_sways != d->sways)
+        {
+            b->wind_reach = box_draws_wind_reach(world, b, &d->wind, size);
+            b->reach_dirty = false;
+            b->reach_valid = true;
+            b->reach_speed = d->wind.speed;
+            b->reach_gust = d->wind.gust;
+            b->reach_size = size;
+            b->reach_sways = d->sways;
         }
 
-        float was = b->wind_reach;
-        b->wind_reach = reach;
+        float reach = b->wind_reach;
         if (!b->ready || !moved || !box_draws_caster(b)) {
             continue;
         }

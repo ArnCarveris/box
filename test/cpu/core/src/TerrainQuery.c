@@ -472,3 +472,170 @@ void TerrainQuery_remove_deletes_tiles(void) {
     test_assert(!ecs_has(world, terrain, TerrainQueryStatus));
     ecs_fini(world);
 }
+
+void TerrainQuery_idle_skips_update(void) {
+    ecs_entity_t terrain;
+    ecs_world_t *world = tq_world(&terrain, false, 0);
+    int32_t i, updates, statuses, u, s;
+    for (i = 0; i < 4; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    box_terrain_query_counters(world, terrain, &updates, &statuses);
+    test_assert(updates > 0);
+    test_assert(statuses > 0);
+    uint64_t revision = box_terrain_revision(world);
+    for (i = 0; i < 8; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    box_terrain_query_counters(world, terrain, &u, &s);
+    test_int(u, updates);
+    test_int(s, statuses);
+    test_assert(box_terrain_revision(world) == revision);
+    ecs_fini(world);
+}
+
+void TerrainQuery_focus_moves_updates(void) {
+    ecs_entity_t terrain;
+    ecs_world_t *world = tq_world(&terrain, false, 0);
+    int32_t i, updates, statuses, u, s, count, n;
+    for (i = 0; i < 4; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    box_terrain_query_counters(world, terrain, &updates, &statuses);
+    box_terrain_query_tiles(world, terrain, &count);
+    ecs_iter_t it = ecs_each_id(world, WorldFocus);
+    test_bool(ecs_each_next(&it), true);
+    ecs_entity_t focus = it.entities[0];
+    ecs_iter_fini(&it);
+
+    ecs_set(world, focus, Position, {0.25f, 10, 0});
+    ecs_progress(world, 0);
+    box_terrain_query_counters(world, terrain, &u, &s);
+    test_int(u, updates + 1);
+    test_int(s, statuses);
+    box_terrain_query_tiles(world, terrain, &n);
+    test_int(n, count);
+
+    ecs_set(world, focus, Position, {5000, 10, 0});
+    for (i = 0; i < 4; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    box_terrain_query_counters(world, terrain, &u, &s);
+    test_assert(s > statuses);
+    box_terrain_query_tile_t *const *tiles = box_terrain_query_tiles(world, terrain, &n);
+    test_int(n, count);
+    for (i = 0; i < n; i ++) {
+        double edge = 0.5 * BOX_TERRAIN_QUERY_CELLS *
+            (tiles[i]->level ? BOX_TERRAIN_QUERY_SCALE : 1);
+        test_assert(((double)tiles[i]->ix + 1) * edge > 4000);
+    }
+
+    ecs_fini(world);
+}
+
+void TerrainQuery_readback_updates_status(void) {
+    ecs_entity_t terrain;
+    ecs_world_t *world = tq_world(&terrain, false, 0);
+    int32_t i, updates, statuses, u, s, count;
+    for (i = 0; i < 4; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    box_terrain_query_counters(world, terrain, &updates, &statuses);
+    box_terrain_query_tiles(world, terrain, &count);
+    test_int(ecs_get(world, terrain, TerrainQueryStatus)->resident, 0);
+    uint64_t revision = box_terrain_revision(world);
+    tq_fill(world, terrain, -1, tq_plane);
+    test_assert(box_terrain_revision(world) != revision);
+    ecs_progress(world, 0);
+    box_terrain_query_counters(world, terrain, &u, &s);
+    test_int(u, updates);
+    test_int(s, statuses + 1);
+    const TerrainQueryStatus *status = ecs_get(world, terrain, TerrainQueryStatus);
+    test_int(status->resident, count);
+    test_int(status->pending, 0);
+    ecs_fini(world);
+}
+
+void TerrainQuery_request_expires_idle(void) {
+    ecs_entity_t terrain;
+    ecs_world_t *world = tq_world(&terrain, false, 0);
+    int32_t i, updates, statuses, u, s;
+    for (i = 0; i < 4; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    box_terrain_request(world, terrain, 300, 300, 310, 310);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    test_int(ecs_get(world, terrain, TerrainQueryStatus)->requested, 1);
+    box_terrain_query_counters(world, terrain, &updates, &statuses);
+
+    for (i = 0; i < 4; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    box_terrain_query_counters(world, terrain, &u, &s);
+    test_int(u, updates);
+    test_int(ecs_get(world, terrain, TerrainQueryStatus)->requested, 1);
+
+    box_terrain_request(world, terrain, 300, 300, 310, 310);
+    for (i = 0; i < 6; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    test_int(ecs_get(world, terrain, TerrainQueryStatus)->requested, 1);
+    for (i = 0; i < 8; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    box_terrain_query_counters(world, terrain, &u, &s);
+    test_assert(u > updates);
+    test_int(ecs_get(world, terrain, TerrainQueryStatus)->requested, 0);
+    ecs_fini(world);
+}
+
+void TerrainQuery_revision(void) {
+    ecs_entity_t terrain;
+    ecs_world_t *world = tq_world(&terrain, false, 0);
+    int32_t i;
+    uint64_t revision = box_terrain_revision(world);
+    ecs_progress(world, 0);
+    test_assert(box_terrain_revision(world) != revision);
+    for (i = 0; i < 4; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    revision = box_terrain_revision(world);
+    for (i = 0; i < 4; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    test_assert(box_terrain_revision(world) == revision);
+
+    ecs_set(world, terrain, Position, {4, 0, 0});
+    ecs_progress(world, 0);
+    test_assert(box_terrain_revision(world) != revision);
+    for (i = 0; i < 4; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    revision = box_terrain_revision(world);
+    Terrain *t = ecs_get_mut(world, terrain, Terrain);
+    t->query_spacing = 1;
+    ecs_modified(world, terrain, Terrain);
+    ecs_progress(world, 0);
+    test_assert(box_terrain_revision(world) != revision);
+    for (i = 0; i < 4; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    revision = box_terrain_revision(world);
+    ecs_delete(world, terrain);
+    test_assert(box_terrain_revision(world) != revision);
+    ecs_fini(world);
+}

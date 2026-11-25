@@ -75,6 +75,8 @@ typedef struct box_spatial_stats_t {
     int32_t rebound;  /**< Movers and dynamic UI elements whose transform changed since the
                        *   last update */
     int32_t moved;    /**< Dynamic leaves the last update moved in their tree */
+    int32_t visited;  /**< Changed entities and movers the last update looked at, 0 for an
+                       *   update that found nothing to do */
 } box_spatial_stats_t;
 
 /** Counters of the spatial layout of a world */
@@ -160,6 +162,36 @@ int32_t box_spatial_overlap_sphere(
     const vec3 center,
     float radius,
     ecs_vec_t *result);
+
+/** Get a counter that changes whenever a query on the static and UI trees of a scene can answer
+ * differently: an entity indexed, removed, disabled, moved, reshaped, a scene that gains or
+ * loses its index, a shift of the world origin. Movers do not count.
+ *
+ * Reading it places nothing. A change counts with the update that indexes it, a removal, a
+ * disabled entity and a shift at once, a dynamic UI element when a query places it.
+ *
+ * @param world The world
+ * @param scene The scene, 0 for the default scene
+ * @return The counter, 0 when box.spatial was not imported
+ */
+uint64_t box_spatial_static_revision(
+    const ecs_world_t *world,
+    ecs_entity_t scene);
+
+/** Test whether the fat leaf of an enabled entry of the dynamic tree of a scene, a mover,
+ * overlaps a box. A scene without such leaves answers false without placing anything.
+ *
+ * @param world The world
+ * @param scene The scene, 0 for the default scene
+ * @param min Minimum corner of the box
+ * @param max Maximum corner of the box
+ * @return Whether a leaf of the dynamic tree overlaps the box
+ */
+bool box_spatial_movers_overlap_box(
+    ecs_world_t *world,
+    ecs_entity_t scene,
+    const vec3 min,
+    const vec3 max);
 
 /** Get the bounds the index holds for an entity: for a shape under a mover its bounds from its
  * world transform, for a mover without a shape the bounds of the shapes under it.

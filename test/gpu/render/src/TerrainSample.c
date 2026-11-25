@@ -436,3 +436,41 @@ void TerrainSample_untagged_has_no_bindings(void) {
     ts_expect_no_errors(world);
     ecs_fini(world);
 }
+
+void TerrainSample_grid_built_on_change(void) {
+    ecs_entity_t terrain;
+    ecs_world_t *world = ts_world(&terrain);
+    ts_wait(world, terrain, -8, -8, 72, 72);
+    int32_t i, heights, grids, h, g;
+    for (i = 0; i < 8; i ++) {
+        ts_frame(world);
+    }
+
+    box_render_terrain_counters(world, &heights, &grids);
+    test_assert(grids > 0);
+    for (i = 0; i < 8; i ++) {
+        ts_frame(world);
+    }
+
+    box_render_terrain_counters(world, &h, &g);
+    test_int(g, grids);
+    test_int(h, heights);
+    double xz[TS_POINTS][2];
+    ts_result_t results[TS_POINTS];
+    ts_points(32, 32, 40, xz);
+    ts_probe_absolute(world, terrain, (const double (*)[2])xz, TS_POINTS, results);
+    ts_expect_queries(world, terrain, (const double (*)[2])xz, results, TS_POINTS, 0.0f);
+
+    ecs_entity_t walker = ecs_lookup(world, "sample_walker");
+    test_assert(walker != 0);
+    ecs_set(world, walker, Position, {232, 30, 32});
+    ts_frame(world);
+    ts_wait(world, terrain, 192, -8, 272, 72);
+    box_render_terrain_counters(world, &h, &g);
+    test_assert(g > grids);
+    ts_points(232, 32, 40, xz);
+    ts_probe_absolute(world, terrain, (const double (*)[2])xz, TS_POINTS, results);
+    ts_expect_queries(world, terrain, (const double (*)[2])xz, results, TS_POINTS, 0.0f);
+    ts_expect_no_errors(world);
+    ecs_fini(world);
+}

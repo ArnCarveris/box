@@ -1835,7 +1835,49 @@ typedef struct box_render_material_t {
     float occlusion_strength; /**< VertexOcclusion.strength clamped to 0..1 of a record with
                              *   BOX_RENDER_OCCLUSION_PRESENT, 0 without one */
     float wind_pad;         /**< 0, pads the record to a multiple of 16 bytes */
+    float motion_uv[2];     /**< TextureScroll.velocity, texture widths per second the shader
+                             *   moves uv[2] and uv[3] by (material_fetch of material.wgsl), 0
+                             *   without one or when not finite */
+    float motion_normal[2]; /**< TextureScroll.normal_velocity, which moves normal_offset */
+    float motion_ripple[2]; /**< Water.ripple_velocity of a Water with a ripple scale, which
+                             *   moves water_ripple_offset, 0 without */
+    float motion_caustics[2]; /**< Cells per second the water frame of the WaterCaustics moves:
+                             *   the WaterFlow velocity over the scale, which moves
+                             *   caustics_offset, 0 without */
+    float motion_caustics_phase; /**< WaterCaustics.speed over BOX_RENDER_CAUSTICS_LOOP, loops
+                             *   per second of caustics_phase, 0 without */
+    float motion_shore;     /**< 1 over Water.shore_period, waves per second of
+                             *   water_shore_phase, 0 without shore waves */
+    float motion_phase;     /**< Distortion.speed, cycles per second of distortion_phase; for a
+                             *   Water whose textures flow 1 over BOX_RENDER_WATER_FLOW_PERIOD,
+                             *   which moves water_flow_phase; 0 without */
+    float motion_flutter;   /**< WindSway.flutter_frequency, cycles per second of the wind clock
+                             *   of wind_flutter_phase, 0 without one or when not finite */
+    float motion_branch;    /**< WindSway.branch_frequency with BOX_RENDER_WIND_PIVOTS, cycles
+                             *   per second of the wind clock of wind_branch_phase, 0 without */
+    float motion_pad[3];    /**< 0, pads the record to a multiple of 16 bytes */
 } box_render_material_t;
+
+/** The clock of a frame, which the 16 motion words of record 0 of the material table hold on
+ * the GPU (the default material never moves): the words of a record that change with the time
+ * are packed for the epoch of the table, and material_fetch of material.wgsl moves them on by
+ * their motion words times the seconds since. It is uploaded every frame, so a frame in which no
+ * material changed uploads no record. */
+typedef struct box_render_material_clock_t {
+    float time;             /**< Seconds of render time since the epoch of the table */
+    float clock;            /**< Seconds of the wind clock (WindStatus.clock) since the epoch */
+    float wind_offset[2];   /**< box_render_wind_t.offset of the frame */
+    float wind_direction[2]; /**< box_render_wind_t.direction of the frame */
+    float wind_speed;       /**< box_render_wind_t.speed of the frame */
+    float wind_gust;        /**< box_render_wind_t.gust of the frame */
+    float wind_frequency;   /**< box_render_wind_t.frequency of the frame */
+    float wind_sway;        /**< box_render_wind_t.sway of the frame */
+    float pad[6];           /**< 0 */
+} box_render_material_clock_t;
+
+/** Seconds after which the material table starts a new epoch and packs its moving records for
+ * it, so the seconds since stay exact enough in a float */
+#define BOX_RENDER_MATERIAL_EPOCH (256.0)
 
 /** Flag of a record with a VertexOcclusion whose channel is 0..7 (box_render_material_t.flags) */
 #define BOX_RENDER_OCCLUSION_PRESENT (1u << 7)

@@ -17,7 +17,8 @@ using state
 // wet darkens and smooths what lies beneath by its porosity, the puddles stand in the low, flat
 // places of the floor with the rings of the rain on them, snow settles on what faces up, and the
 // rain rings the brook. Only the layer entities follow the levels, never the plants that list
-// them, so the integration costs no more than writing four layers a frame.
+// them, so the integration costs no more than writing four layers a frame, and nothing once the
+// levels rest: the block then waits for the state to be assigned.
 state {
   // Seconds of the scene for the weather to change the surfaces: to soak fully in heavy rain, to
   // dry at DRY_AT °C without rain, to fill the puddles in heavy rain and to drain them, to cover
@@ -282,8 +283,14 @@ assets {
 // The weather integrates over time: the levels follow the rain, the snow and the temperature
 async {
   mut last: f64 = box.app.Status[box.app.Status].elapsed
+  mut idle: bool = false
 
   while true {
+    if idle {
+      await on.assign(state)
+      last = box.app.Status[box.app.Status].elapsed
+    }
+
     await next_frame()
     const now = box.app.Status[box.app.Status].elapsed
     const fixed = App[App].delta_time
@@ -324,5 +331,17 @@ async {
     if abs(r - state.rain) > 0.001 {
       state.rain = r
     }
+
+    // The weather rests when the longest frame would change no level: until the state is
+    // assigned again, nothing is left to integrate
+    const dr = max(d, 0.1)
+    const melt_r = min(state.snow, state.forest_melt(t, r) * dr)
+    const sn_r: f32 = clamp(state.snow + s * dr / SNOW_TIME - melt_r, 0, 1)
+    const soak_r = r > 0.02 ? (0.3 + 0.7 * r) * dr / WET_TIME : 0
+    const w_r: f32 = clamp(state.wet + soak_r + melt_r * 4 - state.wet * state.forest_drying(t, r) * dr, 0, 1)
+    const fill_r = r > PUDDLE_RAIN ? (r - PUDDLE_RAIN) / (1 - PUDDLE_RAIN) * state.wet * state.wet : 0
+    const pd_r: f32 = clamp(state.puddles + (fill_r / PUDDLE_TIME - drain / DRAIN_TIME) * dr + melt_r * 1.5, 0, 1)
+    idle = abs(sn_r - state.snow) <= 0.00001 && abs(w_r - state.wet) <= 0.00001 &&
+      abs(pd_r - state.puddles) <= 0.00001 && abs(r - state.rain) <= 0.001
   }
 }

@@ -36,6 +36,68 @@ void box_gpu_count(
     box_gpu_t *gpu,
     box_gpu_stat_t stat);
 
+/** Get the command encoder the stages of a packet share, created on first use after a submit.
+ *
+ * Every submit on the queue of the thread submits it first (box_gpu_api_submit), so the
+ * commands of a stage with an encoder of its own still run after the ones recorded here before
+ * it. The writes on the queue made before that submit are applied before all of its commands:
+ * a stage records here only passes that read no buffer or texture a later stage of the packet
+ * writes through the queue. A buffer a stage maps must not be used here unless the stage
+ * submits (box_gpu_frame_submit) before it maps.
+ *
+ * @param gpu The backend
+ * @return The encoder, owned by the backend
+ */
+WGPUCommandEncoder box_gpu_frame_encoder(
+    box_gpu_t *gpu);
+
+/** Submit the commands recorded into the shared encoder of the packet, if any.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_frame_submit(
+    box_gpu_t *gpu);
+
+/** Release the shared encoder of the packet without submitting it, for a device that is
+ * released. */
+void box_gpu_frame_drop(void);
+
+/** Poll the device without waiting, so the maps that completed call back, once per packet: the
+ * stages of a packet that wait for a map share the poll of the first one that asks.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_poll(
+    box_gpu_t *gpu);
+
+/** Write bytes to a range of a buffer that only the backend writes, unless they are the bytes
+ * it wrote there last.
+ *
+ * @param gpu The backend
+ * @param w The bytes written last, updated
+ * @param fresh Whether the buffer was created since, or a pass wrote the range: write always
+ * @param buffer The buffer
+ * @param offset Byte offset of the range
+ * @param data The bytes
+ * @param size Bytes of data
+ * @return Whether the bytes were written
+ */
+bool box_gpu_write_changed(
+    box_gpu_t *gpu,
+    box_gpu_written_t *w,
+    bool fresh,
+    WGPUBuffer buffer,
+    uint64_t offset,
+    const void *data,
+    size_t size);
+
+/** Forget the bytes last written to a range of a buffer and free them.
+ *
+ * @param w The bytes written last
+ */
+void box_gpu_written_free(
+    box_gpu_written_t *w);
+
 /** Begin a compute pass, timed when it has timestamp writes, and measured by the GPU profile
  * under a label: with the timestamps of the writes, or with its own without writes.
  *
@@ -1184,8 +1246,22 @@ void box_gpu_profile_borrow(
     const char *label,
     const WGPUPassTimestampWrites *writes);
 
+/** Check whether the passes that time themselves write their timestamps: while the detailed
+ * stats (box_render_gpu_stats_detail) or the GPU profile are on. A pass with timestamps is a
+ * pass of its own, so without them the compute passes of a frame share one
+ * (box_gpu_api_compute_pass).
+ *
+ * @param gpu The backend
+ * @return Whether the cull, atmosphere and grass compute passes are timed
+ */
+bool box_gpu_profile_timed(
+    box_gpu_t *gpu);
+
 /** Begin a render pass that the GPU profile measures under a label when it is on, with the
  * timestamp writes of the pass when it has them.
+ *
+ * The first pass that attaches the image of the target being rendered clears it to the clear
+ * color of the target when it would load it (gpu->clear_view).
  *
  * @param gpu The backend
  * @param encoder The encoder
@@ -2028,6 +2104,9 @@ void box_gpu_atmosphere_environment(
 /** Record the sky view and then the aerial perspective pass of a view whose scene has built
  * atmosphere LUTs, before its forward pass, and the fog in scatter color when it runs a
  * HeightFog whose atmosphere is that of its scene; other views record nothing.
+ *
+ * A view whose uniforms and LUTs are those its passes last ran with records nothing either: its
+ * sky view, aerial perspective and fog color still hold what the passes would write.
  *
  * @param gpu The backend
  * @param t The target

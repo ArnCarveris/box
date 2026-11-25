@@ -18,6 +18,29 @@
 #include <math.h>
 #include <stdlib.h>
 
+/** Singleton with the system of the ripple extract, so its state is found without a lookup */
+typedef struct RenderRipplesSystem {
+    ecs_entity_t system;        /**< The system, whose context is the state */
+} RenderRipplesSystem;
+
+static ECS_COMPONENT_DECLARE(RenderRipplesSystem);
+
+/** Get the system of the ripple extract of a world.
+ *
+ * @param world The world
+ * @return The system, NULL before box.render was imported or after the system was deleted
+ */
+static const ecs_system_t* box_ripples_system_ctx(
+    const ecs_world_t *world)
+{
+    ecs_entity_t id = ecs_id(RenderRipplesSystem);
+    const RenderRipplesSystem *c = id && ecs_is_alive(world, id)
+        ? ecs_get_id(world, id, id) : NULL;
+
+    return c && c->system && ecs_is_alive(world, c->system)
+        ? ecs_system_get(world, c->system) : NULL;
+}
+
 /** A field of WaterRipples the extract keeps between frames */
 typedef struct box_ripple_field_t {
     ecs_entity_t water;     /**< Entity with the WaterRipples */
@@ -238,8 +261,7 @@ void box_render_ripples_foam(
 static box_render_ripples_state_t* box_ripples_state(
     const ecs_world_t *world)
 {
-    ecs_entity_t system = ecs_lookup(world, "box.render.extract.WaterRipples");
-    const ecs_system_t *s = system ? ecs_system_get(world, system) : NULL;
+    const ecs_system_t *s = box_ripples_system_ctx(world);
 
     return s ? s->ctx : NULL;
 }
@@ -996,11 +1018,15 @@ void box_render_water_ripples_init(
         .cache_kind = EcsQueryCacheAuto
     });
 
-    ecs_system(world, {
+    ecs_set_name_prefix(world, "Render");
+    ECS_COMPONENT_DEFINE(world, RenderRipplesSystem);
+    ecs_set_name_prefix(world, NULL);
+    ecs_entity_t extract = ecs_system(world, {
         .entity = ecs_entity(world, { .name = "extract.WaterRipples" }),
         .phase = RenderExtract,
         .run = BoxRenderExtractRipples,
         .ctx = l,
         .ctx_free = box_ripples_free
     });
+    ecs_singleton_set(world, RenderRipplesSystem, { extract });
 }

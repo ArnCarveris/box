@@ -60,6 +60,13 @@ typedef struct box_texture_t {
     bool graph_pending;     /**< The backend evaluates the graphs, and the outcome of the graph
                              *   of graph_serial did not arrive: Texture and TextureStatus wait
                              *   for it */
+    bool graph_listed;      /**< The entity is in the list of graphs to build */
+    uint32_t graph_pass;    /**< Graph build pass that last took the entity */
+    bool graph_sampling;    /**< The entity is in the list of graphs that sample textures */
+    bool graph_awaited;     /**< The GPU backend got the graph of graph_serial and its outcome did
+                             *   not arrive, counted in the registry */
+    uint32_t graph_outcome; /**< Serial of the last graph whose outcome the current backend
+                             *   reported, 0 for none: it reports a serial once */
 } box_texture_t;
 
 /** A node kind of the registry, see box_texture_node_register */
@@ -170,7 +177,23 @@ typedef struct box_texture_readback_t {
     bool failed;                /**< The last readback failed */
     TextureReadbackStatus status; /**< Last status written */
     bool status_written;        /**< status was written */
+    uint32_t *serial;           /**< readback_serial of the registry, bumped when the copy
+                                 *   changes, NULL for a copy outside a registry */
+    bool listed;                /**< The entity is in the list of copies to update */
 } box_texture_readback_t;
+
+/** Work the texture systems did since the registry was created, for tests: a world in which
+ * nothing changes adds to none of them */
+typedef struct box_texture_work_t {
+    int32_t quality;            /**< Scans of the surfaces for the texture quality */
+    int32_t anisotropy;         /**< Scans of the surfaces for the sampler anisotropy */
+    int32_t waiting;            /**< Passes over the textures that wait for their source */
+    int32_t builds;             /**< Passes over the graphs to build */
+    int32_t rebinds;            /**< Passes over the graphs that sample textures */
+    int32_t outcomes;           /**< Times the graph outcomes of the backend were taken */
+    int32_t readbacks;          /**< Copies looked at for a new image revision */
+    int32_t previews;           /**< Passes over the nodes with a TextureNodePreview */
+} box_texture_work_t;
 
 /** Main thread state of the textures of a world */
 typedef struct box_textures_t {
@@ -197,8 +220,29 @@ typedef struct box_textures_t {
     ecs_map_t readbacks;        /**< Entity to box_texture_readback_t*, the CPU copies of the
                                  *   textures with a TextureReadback */
     uint32_t readback_ticket;   /**< Number of the next readback of a copy */
+    uint32_t readback_serial;   /**< Bumped when the CPU copy of any texture is stored, cleared
+                                 *   or freed, so its readers see when to read again */
     ecs_map_t reach;            /**< Entity to the number of graphs whose last build reached it,
                                  *   so a change of an entity no graph reached touches none */
+    ecs_query_t *quality_surfaces; /**< Entities with a Surface, whose changes compute the
+                                 *   texture quality again */
+    ecs_query_t *anisotropy_surfaces; /**< Entities with a Surface, whose changes compute the
+                                 *   sampler anisotropy again */
+    ecs_vec_t waiting;          /**< ecs_entity_t, textures whose waiting was set */
+    ecs_vec_t graph_build;      /**< ecs_entity_t, textures whose graph is dirty, waits or is
+                                 *   held: the graphs the next graph build looks at */
+    uint32_t graph_pass;        /**< Graph build passes run */
+    ecs_vec_t graph_sampling;   /**< ecs_entity_t, textures whose compiled graph samples textures */
+    uint32_t bind_serial;       /**< Bumped when a texture gets or loses its backend handle, so
+                                 *   the graphs that sample textures check their handles again */
+    ecs_map_t handles;          /**< Backend handle to box_texture_t* */
+    int32_t graph_awaited;      /**< Textures whose graph_awaited is set: the outcomes of the
+                                 *   backend are only taken while there are some */
+    ecs_vec_t readback_dirty;   /**< ecs_entity_t, textures whose copy has to be looked at: its
+                                 *   TextureReadback or image changed or its readback is in
+                                 *   flight */
+    int32_t previews;           /**< Entities with a TextureNodePreview */
+    box_texture_work_t work;    /**< Work the texture systems did, for tests */
 } box_textures_t;
 
 /** Singleton that holds the registry of a world */
@@ -554,6 +598,15 @@ void box_texture_graph_clear(
     box_textures_t *t,
     box_texture_t *tex);
 
+/** Put a texture in the list of graphs the next graph build looks at.
+ *
+ * @param t The registry
+ * @param tex The entry of the texture
+ */
+void box_texture_graph_list(
+    box_textures_t *t,
+    box_texture_t *tex);
+
 /** Mark every graph dirty that reached an entity in its last build, such as a node or a
  * texture it samples, or every graph.
  *
@@ -631,6 +684,15 @@ box_texture_readback_t* box_texture_readback_get(
  * @return The copy
  */
 box_texture_readback_t* box_texture_readback_ensure(
+    box_textures_t *t,
+    ecs_entity_t e);
+
+/** Put the CPU copy of a texture in the list of copies to update, when it has one.
+ *
+ * @param t The registry
+ * @param e The texture entity
+ */
+void box_texture_readback_touch(
     box_textures_t *t,
     ecs_entity_t e);
 

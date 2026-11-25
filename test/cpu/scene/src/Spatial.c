@@ -3015,3 +3015,371 @@ void Spatial_mover_tree_nested(void) {
 
     ecs_fini(world);
 }
+
+void Spatial_idle_update_visits_nothing(void) {
+    // spatial/index
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    int32_t i;
+    for (i = 0; i < 16; i ++) {
+        ecs_entity_t e = ecs_new(world);
+        ecs_set(world, e, Position, {(float)i * 2, 0, 0});
+        ecs_set(world, e, Box, {1, 1, 1});
+    }
+
+    box_spatial_stats_t stats;
+    ecs_progress(world, 0);
+    box_spatial_stats(world, &stats);
+    test_int(stats.entities, 16);
+    test_assert(stats.visited >= 16);
+    ecs_progress(world, 0);
+
+    /* Frames in which nothing changes visit no entity, with and without queries */
+    for (i = 0; i < 4; i ++) {
+        ecs_progress(world, 0);
+        box_spatial_stats(world, &stats);
+        test_int(stats.visited, 0);
+        test_int(stats.updated, 0);
+        test_int(stats.rebound, 0);
+        test_int(stats.moved, 0);
+        test_int(stats.entities, 16);
+    }
+
+    ecs_vec_t out;
+    ecs_vec_init_t(NULL, &out, ecs_entity_t, 0);
+    for (i = 0; i < 4; i ++) {
+        ecs_vec_clear(&out);
+        test_int(box_spatial_overlap_box(world, 0, (vec3){-1, -1, -1}, (vec3){2.4f, 1, 1},
+            &out), 2);
+        ecs_progress(world, 0);
+        box_spatial_stats(world, &stats);
+        test_int(stats.visited, 0);
+        test_int(stats.updated, 0);
+    }
+
+    ecs_vec_fini_t(NULL, &out, ecs_entity_t);
+    ecs_fini(world);
+}
+
+void Spatial_update_visits_what_changed(void) {
+    // spatial/index
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t e[4];
+    int32_t i;
+    for (i = 0; i < 4; i ++) {
+        e[i] = ecs_new(world);
+        ecs_set(world, e[i], Position, {(float)i * 4, 0, 0});
+        ecs_set(world, e[i], Box, {1, 1, 1});
+    }
+
+    box_spatial_stats_t stats;
+    ecs_vec_t out;
+    ecs_vec_init_t(NULL, &out, ecs_entity_t, 0);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    box_spatial_stats(world, &stats);
+    test_int(stats.visited, 0);
+
+    /* A moved entity is the only one the update visits */
+    ecs_set(world, e[1], Position, {4, 10, 0});
+    ecs_progress(world, 0);
+    box_spatial_stats(world, &stats);
+    test_int(stats.visited, 1);
+    test_int(stats.updated, 1);
+    test_int(box_spatial_overlap_sphere(world, 0, (vec3){4, 10, 0}, 0.1f, &out), 1);
+    test_assert(*ecs_vec_get_t(&out, ecs_entity_t, 0) == e[1]);
+    ecs_vec_clear(&out);
+    test_int(box_spatial_overlap_sphere(world, 0, (vec3){4, 0, 0}, 0.1f, &out), 0);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    box_spatial_stats(world, &stats);
+    test_int(stats.visited, 0);
+
+    /* An added entity is indexed by the next update */
+    ecs_entity_t added = ecs_new(world);
+    ecs_set(world, added, Position, {0, 20, 0});
+    ecs_set(world, added, Box, {1, 1, 1});
+    ecs_progress(world, 0);
+    box_spatial_stats(world, &stats);
+    test_int(stats.visited, 1);
+    test_int(stats.entities, 5);
+    test_int(box_spatial_overlap_sphere(world, 0, (vec3){0, 20, 0}, 0.1f, &out), 1);
+    ecs_vec_clear(&out);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    box_spatial_stats(world, &stats);
+    test_int(stats.visited, 0);
+
+    /* A resized entity gets its new bounds */
+    ecs_set(world, e[2], Box, {3, 1, 1});
+    ecs_progress(world, 0);
+    box_spatial_stats(world, &stats);
+    test_int(stats.visited, 1);
+    test_int(box_spatial_overlap_sphere(world, 0, (vec3){9.4f, 0, 0}, 0.05f, &out), 1);
+    ecs_vec_clear(&out);
+
+    /* A deleted entity leaves the index at once and the updates after it stay idle */
+    ecs_delete(world, e[3]);
+    test_int(box_spatial_overlap_sphere(world, 0, (vec3){12, 0, 0}, 0.1f, &out), 0);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    box_spatial_stats(world, &stats);
+    test_int(stats.visited, 0);
+    test_int(stats.entities, 4);
+
+    ecs_vec_fini_t(NULL, &out, ecs_entity_t);
+    ecs_fini(world);
+}
+
+void Spatial_static_revision_follows_changes(void) {
+    // spatial/index
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t a = ecs_new(world);
+    ecs_set(world, a, Position, {0, 0, 0});
+    ecs_set(world, a, Box, {1, 1, 1});
+    uint64_t before = box_spatial_static_revision(world, 0);
+    ecs_progress(world, 0);
+    uint64_t r = box_spatial_static_revision(world, 0);
+    test_assert(r != before);
+
+    /* Idle frames and queries leave it as it is */
+    ecs_vec_t out;
+    ecs_vec_init_t(NULL, &out, ecs_entity_t, 0);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    test_int(box_spatial_overlap_sphere(world, 0, (vec3){0, 0, 0}, 0.1f, &out), 1);
+    ecs_progress(world, 0);
+    test_assert(box_spatial_static_revision(world, 0) == r);
+
+    /* An entity indexed */
+    ecs_entity_t b = ecs_new(world);
+    ecs_set(world, b, Position, {5, 0, 0});
+    ecs_set(world, b, Box, {1, 1, 1});
+    test_assert(box_spatial_static_revision(world, 0) == r);
+    ecs_progress(world, 0);
+    test_assert(box_spatial_static_revision(world, 0) != r);
+    r = box_spatial_static_revision(world, 0);
+    ecs_progress(world, 0);
+    test_assert(box_spatial_static_revision(world, 0) == r);
+
+    /* Moved: the counter changed by the time a query finds it at its new place */
+    ecs_set(world, b, Position, {8, 0, 0});
+    ecs_progress(world, 0);
+    test_assert(box_spatial_static_revision(world, 0) != r);
+    r = box_spatial_static_revision(world, 0);
+    ecs_vec_clear(&out);
+    test_int(box_spatial_overlap_sphere(world, 0, (vec3){8, 0, 0}, 0.1f, &out), 1);
+    test_assert(box_spatial_static_revision(world, 0) == r);
+
+    /* Resized */
+    ecs_set(world, b, Box, {2, 1, 1});
+    ecs_progress(world, 0);
+    test_assert(box_spatial_static_revision(world, 0) != r);
+    r = box_spatial_static_revision(world, 0);
+
+    /* Disabled and enabled, at once */
+    ecs_enable(world, b, false);
+    test_assert(box_spatial_static_revision(world, 0) != r);
+    r = box_spatial_static_revision(world, 0);
+    ecs_enable(world, b, true);
+    test_assert(box_spatial_static_revision(world, 0) != r);
+    r = box_spatial_static_revision(world, 0);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    r = box_spatial_static_revision(world, 0);
+    ecs_progress(world, 0);
+    test_assert(box_spatial_static_revision(world, 0) == r);
+
+    /* A shift of the world origin */
+    box_spatial_shift(world, 0, (vec3){-16, 0, 0}, NULL, NULL);
+    test_assert(box_spatial_static_revision(world, 0) != r);
+    r = box_spatial_static_revision(world, 0);
+
+    /* Removed, at once */
+    ecs_delete(world, b);
+    test_assert(box_spatial_static_revision(world, 0) != r);
+    r = box_spatial_static_revision(world, 0);
+    ecs_remove(world, a, Box);
+    test_assert(box_spatial_static_revision(world, 0) != r);
+
+    ecs_vec_fini_t(NULL, &out, ecs_entity_t);
+    ecs_fini(world);
+}
+
+void Spatial_static_revision_unchanged_bounds(void) {
+    // spatial/index
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Position, {0, 0, 0});
+    ecs_set(world, e, Rotation, {0, 0.5f, 0});
+    ecs_set(world, e, Box, {2, 1, 1});
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    uint64_t r = box_spatial_static_revision(world, 0);
+    vec3 min, max, min2, max2;
+    test_assert(box_spatial_bounds(world, e, NULL, min, max));
+
+    /* Set to the values it has: the entity is visited but nothing about it changed */
+    ecs_set(world, e, Position, {0, 0, 0});
+    ecs_set(world, e, Box, {2, 1, 1});
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    test_assert(box_spatial_static_revision(world, 0) == r);
+
+    /* Mirrored rotation: the same world bounds around another box */
+    ecs_set(world, e, Rotation, {0, -0.5f, 0});
+    ecs_progress(world, 0);
+    test_assert(box_spatial_bounds(world, e, NULL, min2, max2));
+    test_flt(min[0], min2[0]);
+    test_flt(max[2], max2[2]);
+    test_assert(box_spatial_static_revision(world, 0) != r);
+
+    ecs_fini(world);
+}
+
+void Spatial_static_revision_scene(void) {
+    // spatial/index
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t scene = ecs_new(world);
+    ecs_set(world, scene, Scene, {0});
+    ecs_entity_t other = ecs_new(world);
+    ecs_set(world, other, Position, {0, 0, 0});
+    ecs_set(world, other, Box, {1, 1, 1});
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    uint64_t root = box_spatial_static_revision(world, 0);
+    uint64_t none = box_spatial_static_revision(world, scene);
+
+    /* The scene gets an index with its first entity, which leaves the default scene alone */
+    ecs_entity_t e = ecs_new_w_pair(world, EcsChildOf, scene);
+    ecs_set(world, e, Position, {0, 0, 0});
+    ecs_set(world, e, Box, {1, 1, 1});
+    ecs_progress(world, 0);
+    uint64_t first = box_spatial_static_revision(world, scene);
+    test_assert(first != none);
+    test_assert(box_spatial_static_revision(world, 0) == root);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    test_assert(box_spatial_static_revision(world, scene) == first);
+
+    /* It loses the index with its last entity */
+    ecs_delete(world, e);
+    uint64_t removed = box_spatial_static_revision(world, scene);
+    test_assert(removed != first);
+    ecs_progress(world, 0);
+    uint64_t gone = box_spatial_static_revision(world, scene);
+    test_assert(gone != first && gone != none);
+    test_assert(box_spatial_static_revision(world, 0) == root);
+
+    /* And gets a new one, which no earlier value of the counter stands for */
+    e = ecs_new_w_pair(world, EcsChildOf, scene);
+    ecs_set(world, e, Position, {0, 0, 0});
+    ecs_set(world, e, Box, {1, 1, 1});
+    ecs_progress(world, 0);
+    uint64_t again = box_spatial_static_revision(world, scene);
+    test_assert(again != gone && again != removed && again != first && again != none);
+
+    ecs_fini(world);
+}
+
+void Spatial_static_revision_ignores_movers(void) {
+    // spatial/movers
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t wall = ecs_new(world);
+    ecs_set(world, wall, Position, {0, 0, 0});
+    ecs_set(world, wall, Box, {1, 1, 1});
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    uint64_t r = box_spatial_static_revision(world, 0);
+
+    /* A mover enters the dynamic tree, moves and leaves it */
+    ecs_entity_t mover = ecs_new(world);
+    ecs_add(world, mover, DynamicTransform);
+    ecs_set(world, mover, Position, {10, 0, 0});
+    ecs_set(world, mover, Box, {1, 1, 1});
+    ecs_progress(world, 0);
+    vec3 min, max;
+    test_assert(box_spatial_bounds(world, mover, NULL, min, max));
+    ecs_set(world, mover, Position, {12, 0, 0});
+    ecs_progress(world, 0);
+    test_assert(box_spatial_bounds(world, mover, NULL, min, max));
+    test_flt(min[0], 11.5f);
+    ecs_progress(world, 0);
+    test_assert(box_spatial_static_revision(world, 0) == r);
+    ecs_delete(world, mover);
+    ecs_progress(world, 0);
+    test_assert(box_spatial_static_revision(world, 0) == r);
+
+    /* A static entity that becomes a mover leaves the static tree */
+    ecs_add(world, wall, DynamicTransform);
+    ecs_progress(world, 0);
+    test_assert(box_spatial_static_revision(world, 0) != r);
+
+    ecs_fini(world);
+}
+
+void Spatial_movers_overlap_box(void) {
+    // spatial/movers
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t wall = ecs_new(world);
+    ecs_set(world, wall, Position, {0, 0, 0});
+    ecs_set(world, wall, Box, {1, 1, 1});
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+
+    /* Without movers nothing overlaps, static shapes do not count and nothing is placed */
+    box_spatial_stats_t stats;
+    test_bool(box_spatial_movers_overlap_box(world, 0, (vec3){-1, -1, -1}, (vec3){1, 1, 1}),
+        false);
+    ecs_progress(world, 0);
+    ecs_set(world, wall, Position, {0, 0, 0});
+    ecs_progress(world, 0);
+    box_spatial_stats(world, &stats);
+    test_int(stats.movers, 0);
+    ecs_entity_t scene = ecs_new(world);
+    ecs_set(world, scene, Scene, {0});
+    test_bool(box_spatial_movers_overlap_box(world, scene, (vec3){-1, -1, -1},
+        (vec3){1, 1, 1}), false);
+
+    ecs_entity_t mover = ecs_new(world);
+    ecs_add(world, mover, DynamicTransform);
+    ecs_set(world, mover, Position, {10, 0, 0});
+    ecs_set(world, mover, Box, {1, 1, 1});
+    ecs_progress(world, 0);
+    test_bool(box_spatial_movers_overlap_box(world, 0, (vec3){9, -1, -1}, (vec3){11, 1, 1}),
+        true);
+    test_bool(box_spatial_movers_overlap_box(world, 0, (vec3){-1, -1, -1}, (vec3){1, 1, 1}),
+        false);
+    test_bool(box_spatial_movers_overlap_box(world, scene, (vec3){9, -1, -1},
+        (vec3){11, 1, 1}), false);
+
+    /* The mover is placed where it moved to before the box is tested */
+    ecs_set(world, mover, Position, {30, 0, 0});
+    ecs_progress(world, 0);
+    test_bool(box_spatial_movers_overlap_box(world, 0, (vec3){29, -1, -1}, (vec3){31, 1, 1}),
+        true);
+    test_bool(box_spatial_movers_overlap_box(world, 0, (vec3){9, -1, -1}, (vec3){11, 1, 1}),
+        false);
+
+    /* A disabled mover does not count */
+    ecs_enable(world, mover, false);
+    test_bool(box_spatial_movers_overlap_box(world, 0, (vec3){29, -1, -1}, (vec3){31, 1, 1}),
+        false);
+    ecs_enable(world, mover, true);
+    test_bool(box_spatial_movers_overlap_box(world, 0, (vec3){29, -1, -1}, (vec3){31, 1, 1}),
+        true);
+
+    ecs_delete(world, mover);
+    ecs_progress(world, 0);
+    test_bool(box_spatial_movers_overlap_box(world, 0, (vec3){29, -1, -1}, (vec3){31, 1, 1}),
+        false);
+
+    ecs_fini(world);
+}

@@ -36,7 +36,15 @@ typedef struct box_tod_ecliptic_t {
 typedef struct box_tod_state_t {
     ecs_query_t *lights;    /**< Entities with DirectionalLight and the scene they are in */
     ecs_query_t *atmospheres; /**< Entities with Atmosphere and the scene they are in */
+    ecs_map_t skies;        /**< Entity to the box_tod_cached_t of its last sky */
 } box_tod_state_t;
+
+/** The sky of a time of day and what it was computed from */
+typedef struct box_tod_cached_t {
+    TimeOfDay time;         /**< The time of day */
+    TimeOfDayStatus from;   /**< The status the sky was computed from */
+    TimeOfDayStatus sky;    /**< The status with the sky */
+} box_tod_cached_t;
 
 /** Wrap an angle in degrees into 0 to 360.
  *
@@ -449,6 +457,40 @@ done:
     return;
 }
 
+/** Compute the sky of a status as box_tod_sky does, once for a time of day and status that
+ * stay the same: a clock that stands still computes nothing.
+ *
+ * @param state The state of the system
+ * @param e The entity with TimeOfDay
+ * @param t The time of day
+ * @param status The status, its sky is written
+ */
+static void box_tod_sky_cached(
+    box_tod_state_t *state,
+    ecs_entity_t e,
+    const TimeOfDay *t,
+    TimeOfDayStatus *status)
+{
+    box_tod_cached_t **slot = (box_tod_cached_t**)ecs_map_ensure(&state->skies, e);
+    box_tod_cached_t *c = *slot;
+    if (!c) {
+        c = *slot = ecs_os_calloc_t(box_tod_cached_t);
+    } else if (!ecs_os_memcmp(&c->time, t, ECS_SIZEOF(TimeOfDay)) &&
+        !ecs_os_memcmp(&c->from, status, ECS_SIZEOF(TimeOfDayStatus)))
+    {
+        *status = c->sky;
+        goto done;
+    }
+
+    c->time = *t;
+    c->from = *status;
+    box_tod_sky(t, status);
+    c->sky = *status;
+
+done:
+    return;
+}
+
 /** Advance the time of day of every scene, write its status and point its sun and moon when
  * they changed.
  *
@@ -469,7 +511,7 @@ static void BoxTimeOfDayUpdate(
                 status.day_of_year, &status);
         }
 
-        box_tod_sky(&t[i], &status);
+        box_tod_sky_cached(state, e, &t[i], &status);
         if (ecs_os_memcmp(&status, &s[i], ECS_SIZEOF(TimeOfDayStatus))) {
             ecs_set_ptr(it->stage, e, TimeOfDayStatus, &status);
         }
@@ -489,6 +531,13 @@ static void BoxTimeOfDayUpdate(
 static void box_tod_free(
     void *ctx)
 {
+    box_tod_state_t *state = ctx;
+    ecs_map_iter_t it = ecs_map_iter(&state->skies);
+    while (ecs_map_next(&it)) {
+        ecs_os_free(ecs_map_ptr(&it));
+    }
+
+    ecs_map_fini(&state->skies);
     ecs_os_free(ctx);
 }
 
@@ -524,6 +573,7 @@ void box_tod_init(
     ecs_world_t *world)
 {
     box_tod_state_t *state = ecs_os_calloc_t(box_tod_state_t);
+    ecs_map_init(&state->skies, NULL);
     state->lights = box_tod_scene_query(world, ecs_id(DirectionalLight), "TimeOfDayLights");
     state->atmospheres = box_tod_scene_query(world, ecs_id(Atmosphere), "TimeOfDayAtmospheres");
 

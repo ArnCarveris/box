@@ -15,6 +15,29 @@
 #include <float.h>
 #include <math.h>
 
+/** Singleton with the system of the light extract, so its state is found without a lookup */
+typedef struct RenderLightsSystem {
+    ecs_entity_t system;        /**< The system, whose context is the state */
+} RenderLightsSystem;
+
+static ECS_COMPONENT_DECLARE(RenderLightsSystem);
+
+/** Get the system of the light extract of a world.
+ *
+ * @param world The world
+ * @return The system, NULL before box.render was imported or after the system was deleted
+ */
+static const ecs_system_t* box_lights_system_ctx(
+    const ecs_world_t *world)
+{
+    ecs_entity_t id = ecs_id(RenderLightsSystem);
+    const RenderLightsSystem *c = id && ecs_is_alive(world, id)
+        ? ecs_get_id(world, id, id) : NULL;
+
+    return c && c->system && ecs_is_alive(world, c->system)
+        ? ecs_system_get(world, c->system) : NULL;
+}
+
 /** Lights the light buffer of a scene holds at least */
 #define BOX_LIGHTS_MIN_CAPACITY (16)
 
@@ -1658,21 +1681,24 @@ void box_render_lights_init(
     l->stars = box_render_stars_new(world);
     l->transitions = box_render_transitions_get(world);
 
-    ecs_system(world, {
+    ecs_set_name_prefix(world, "Render");
+    ECS_COMPONENT_DEFINE(world, RenderLightsSystem);
+    ecs_set_name_prefix(world, NULL);
+    ecs_entity_t extract = ecs_system(world, {
         .entity = ecs_entity(world, { .name = "extract.Lights" }),
         .phase = RenderExtract,
         .run = BoxRenderExtractLights,
         .ctx = l,
         .ctx_free = box_lights_free
     });
+    ecs_singleton_set(world, RenderLightsSystem, { extract });
 }
 
 void box_render_lights_stats(
     const ecs_world_t *world,
     box_render_lights_stats_t *stats)
 {
-    ecs_entity_t system = ecs_lookup(world, "box.render.extract.Lights");
-    const ecs_system_t *s = system ? ecs_system_get(world, system) : NULL;
+    const ecs_system_t *s = box_lights_system_ctx(world);
     ecs_os_memset_t(stats, 0, box_render_lights_stats_t);
     if (s && s->ctx) {
         *stats = ((const box_render_lights_t*)s->ctx)->stats;
@@ -1682,8 +1708,7 @@ void box_render_lights_stats(
 const void* box_render_lights_state(
     const ecs_world_t *world)
 {
-    ecs_entity_t system = ecs_lookup(world, "box.render.extract.Lights");
-    const ecs_system_t *sys = system ? ecs_system_get(world, system) : NULL;
+    const ecs_system_t *sys = box_lights_system_ctx(world);
 
     return sys ? sys->ctx : NULL;
 }

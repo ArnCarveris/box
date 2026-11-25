@@ -326,3 +326,51 @@ void Terrain_origin_shift_same_image(void) {
     ecs_fini(a);
     ecs_fini(b);
 }
+
+void Terrain_extract_reuses_heights(void) {
+    // terrain/terrain_tiles
+    ecs_world_t *world = terrain_world("test/assets/terrain/cracks.flecs");
+    ecs_entity_t terrain = ecs_lookup(world, "terrain_cracks.ridges");
+    ecs_entity_t camera = ecs_lookup(world, "terrain_cracks.camera");
+    test_assert(terrain != 0);
+    test_assert(camera != 0);
+    terrain_settle(world, terrain);
+    int32_t i, heights, grids, h, g, updates, selects, u, s;
+    for (i = 0; i < 8; i ++) {
+        ecs_progress(world, TERRAIN_DELTA);
+        box_render_sync(world);
+    }
+
+    box_render_terrain_counters(world, &heights, &grids);
+    box_terrain_counters(world, terrain, &updates, &selects);
+    test_assert(heights > 0);
+    TerrainStatus before = *ecs_get(world, terrain, TerrainStatus);
+    for (i = 0; i < 8; i ++) {
+        ecs_progress(world, TERRAIN_DELTA);
+        box_render_sync(world);
+    }
+
+    box_render_terrain_counters(world, &h, &g);
+    box_terrain_counters(world, terrain, &u, &s);
+    test_int(h, heights);
+    test_int(u, updates);
+    test_int(s, selects);
+    test_int(ecs_os_memcmp(&before, ecs_get(world, terrain, TerrainStatus),
+        ECS_SIZEOF(TerrainStatus)), 0);
+
+    for (i = 1; i <= 20; i ++) {
+        ecs_set(world, camera, Position, {10.0f * (float)i, 300, 0});
+        ecs_progress(world, TERRAIN_DELTA);
+        box_render_sync(world);
+    }
+
+    terrain_settle(world, terrain);
+    box_render_terrain_counters(world, &h, &g);
+    box_terrain_counters(world, terrain, &u, &s);
+    test_assert(h > heights);
+    test_assert(u > updates);
+    test_assert(s > selects);
+    test_assert(ecs_get(world, terrain, TerrainStatus)->created > before.created);
+    terrain_expect_no_errors(world);
+    ecs_fini(world);
+}

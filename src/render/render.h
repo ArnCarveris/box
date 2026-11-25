@@ -319,6 +319,24 @@ void box_render_texture_readbacks_init(
 void box_render_texture_previews_init(
     ecs_world_t *world);
 
+/** Work the shader extract of a world did since box.shader was imported, for tests */
+typedef struct box_shader_work_t {
+    int32_t visits;             /**< Shaders the extract looked at */
+    int32_t scans;              /**< Passes over the batches of a packet for the shaders that
+                                 *   are sent on demand */
+    int32_t active;             /**< Shaders the extract looks at in every frame now */
+} box_shader_work_t;
+
+/** Get the work the shader extract of a world did, for tests.
+ *
+ * @param world The world
+ * @param out Receives the counters, zero without box.shader
+ * @return Whether the world has box.shader
+ */
+bool box_shader_work(
+    const ecs_world_t *world,
+    box_shader_work_t *out);
+
 /** Counters of the light extract of a world */
 typedef struct box_render_lights_stats_t {
     int32_t scenes;             /**< Scenes that have lights */
@@ -2470,6 +2488,15 @@ uint32_t box_render_impostor_atlas(
     const ecs_world_t *world,
     ecs_entity_t impostor,
     ImpostorChannel channel);
+
+/** Get how often the sources of the impostors were hashed, for tests: a source is hashed when
+ * its impostor is new or an entity or texture its last hash read changed, never per frame.
+ *
+ * @param world The world
+ * @return The hashes since the world was created, 0 when box.render is not imported
+ */
+int32_t box_render_impostor_hashes(
+    const ecs_world_t *world);
 
 /** Set the cards of an impostor (ImpostorDraw): the prefab whose mesh and material they draw
  * and the distance beyond which they draw, or remove every card of the impostor.

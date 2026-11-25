@@ -802,3 +802,273 @@ void Terrain_sampled_tag(void) {
     test_bool(ecs_has_id(world, hills, TerrainSampled), true);
     ecs_fini(world);
 }
+
+void Terrain_idle_skips_update(void) {
+    ecs_entity_t terrain, focus;
+    ecs_world_t *world = tt_world(&terrain, &focus, 1000);
+    int32_t i, updates, selects, u, s;
+    ecs_progress(world, 0);
+    tt_ready(world, terrain);
+    for (i = 0; i < 4; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    box_terrain_counters(world, terrain, &updates, &selects);
+    test_assert(updates > 0);
+    test_int(selects, 1);
+    TerrainStatus before = *ecs_get(world, terrain, TerrainStatus);
+    test_int(before.pending, 0);
+    test_assert(before.drawn > 0);
+    uint64_t revision = box_terrain_revision(world);
+    for (i = 0; i < 8; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    box_terrain_counters(world, terrain, &u, &s);
+    test_int(u, updates);
+    test_int(s, selects);
+    test_assert(box_terrain_revision(world) == revision);
+    test_int(ecs_os_memcmp(&before, ecs_get(world, terrain, TerrainStatus),
+        ECS_SIZEOF(TerrainStatus)), 0);
+    ecs_fini(world);
+}
+
+void Terrain_focus_step_updates(void) {
+    ecs_entity_t terrain, focus;
+    ecs_world_t *world = tt_world(&terrain, &focus, 1000);
+    int32_t i, updates, selects, u, s, count;
+    ecs_progress(world, 0);
+    tt_ready(world, terrain);
+    for (i = 0; i < 4; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    box_terrain_counters(world, terrain, &updates, &selects);
+    int32_t created = ecs_get(world, terrain, TerrainStatus)->created;
+
+    for (i = 1; i <= 4; i ++) {
+        ecs_set(world, focus, Position, {0.2f * (float)i, 10, 0});
+        ecs_progress(world, 0);
+    }
+
+    box_terrain_counters(world, terrain, &u, &s);
+    test_int(u, updates);
+    test_int(s, selects);
+
+    ecs_set(world, focus, Position, {3, 10, 0});
+    ecs_progress(world, 0);
+    box_terrain_counters(world, terrain, &u, &s);
+    test_assert(u > updates);
+    test_int(s, selects + 1);
+    box_terrain_tile_t *const *tiles = box_terrain_tiles(world, terrain, &count);
+    test_assert(count > 0);
+    const TerrainTile *tile = ecs_get(world, tiles[0]->entity, TerrainTile);
+    double size = TT_TILE * (double)(1 << tiles[0]->level);
+    test_flt(tile->focus[0], (float)(3.0 - ((double)tiles[0]->ix + 0.5) * size));
+
+    ecs_set(world, focus, Position, {400, 10, 0});
+    ecs_progress(world, 0);
+    tt_ready(world, terrain);
+    for (i = 0; i < 4; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    const TerrainStatus *status = ecs_get(world, terrain, TerrainStatus);
+    test_assert(status->created > created);
+    test_assert(status->dropped > 0);
+    test_int(status->pending, 0);
+    tiles = box_terrain_tiles(world, terrain, &count);
+    for (i = 0; i < count; i ++) {
+        test_assert(tt_distance(tiles[i], 400, 0) < TT_RANGE * 8);
+        test_assert(tt_distance(tiles[i], 0, 0) > 0);
+    }
+
+    box_terrain_counters(world, terrain, &updates, &selects);
+    for (i = 0; i < 4; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    box_terrain_counters(world, terrain, &u, &s);
+    test_int(u, updates);
+    test_int(s, selects);
+    ecs_fini(world);
+}
+
+void Terrain_terrain_change_updates(void) {
+    ecs_entity_t terrain, focus;
+    ecs_world_t *world = tt_world(&terrain, &focus, 1000);
+    int32_t i, updates, selects, u, s;
+    ecs_progress(world, 0);
+    tt_ready(world, terrain);
+    for (i = 0; i < 4; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    box_terrain_counters(world, terrain, &updates, &selects);
+    int32_t created = ecs_get(world, terrain, TerrainStatus)->created;
+    Terrain *t = ecs_get_mut(world, terrain, Terrain);
+    t->budget = 500;
+    ecs_modified(world, terrain, Terrain);
+    ecs_progress(world, 0);
+    box_terrain_counters(world, terrain, &u, &s);
+    test_assert(u > updates);
+    test_int(ecs_get(world, terrain, TerrainStatus)->created, created);
+
+    t = ecs_get_mut(world, terrain, Terrain);
+    t->lod_distance = TT_RANGE * 2;
+    ecs_modified(world, terrain, Terrain);
+    ecs_progress(world, 0);
+    box_terrain_counters(world, terrain, &u, &s);
+    test_assert(s > selects);
+    test_assert(ecs_get(world, terrain, TerrainStatus)->created > created);
+    ecs_fini(world);
+}
+
+void Terrain_material_change_updates(void) {
+    ecs_entity_t terrain, focus;
+    ecs_world_t *world = tt_world(&terrain, &focus, 1000);
+    int32_t i, updates, selects, u, s, count;
+    ecs_progress(world, 0);
+    tt_ready(world, terrain);
+    for (i = 0; i < 4; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    box_terrain_counters(world, terrain, &updates, &selects);
+    ecs_set(world, terrain, Rgb, {10, 200, 30});
+    ecs_progress(world, 0);
+    box_terrain_counters(world, terrain, &u, &s);
+    test_assert(u > updates);
+    test_int(s, selects);
+    box_terrain_tile_t *const *tiles = box_terrain_tiles(world, terrain, &count);
+    test_assert(count > 0);
+    for (i = 0; i < count; i ++) {
+        test_int(ecs_get(world, tiles[i]->entity, Rgb)->g, 200);
+    }
+
+    ecs_add_id(world, terrain, NoShadow);
+    ecs_progress(world, 0);
+    for (i = 0; i < count; i ++) {
+        test_assert(ecs_has_id(world, tiles[i]->entity, NoShadow));
+    }
+
+    ecs_remove(world, terrain, Rgb);
+    ecs_remove_id(world, terrain, NoShadow);
+    ecs_progress(world, 0);
+    for (i = 0; i < count; i ++) {
+        test_assert(!ecs_has(world, tiles[i]->entity, Rgb));
+        test_assert(!ecs_has_id(world, tiles[i]->entity, NoShadow));
+    }
+
+    ecs_progress(world, 0);
+    box_terrain_counters(world, terrain, &updates, &selects);
+    for (i = 0; i < 4; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    box_terrain_counters(world, terrain, &u, &s);
+    test_int(u, updates);
+    ecs_fini(world);
+}
+
+void Terrain_texture_status_updates(void) {
+    ecs_entity_t terrain, focus;
+    ecs_world_t *world = tt_world(&terrain, &focus, 1000);
+    int32_t i, updates, selects, u, s;
+    for (i = 0; i < 5; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    box_terrain_counters(world, terrain, &updates, &selects);
+    test_int(ecs_get(world, terrain, TerrainStatus)->drawn, 0);
+    for (i = 0; i < 4; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    box_terrain_counters(world, terrain, &u, &s);
+    test_int(u, updates);
+
+    tt_ready(world, terrain);
+    ecs_progress(world, 0);
+    box_terrain_counters(world, terrain, &u, &s);
+    test_assert(u > updates);
+    test_int(s, selects);
+    const TerrainStatus *status = ecs_get(world, terrain, TerrainStatus);
+    test_assert(status->drawn > 0);
+    test_int(status->pending, 0);
+    ecs_fini(world);
+}
+
+void Terrain_origin_shift_updates(void) {
+    ecs_entity_t terrain, focus;
+    ecs_world_t *world = tt_world(&terrain, &focus, 1000);
+    int32_t i, updates, selects, u, s;
+    ecs_singleton_add(world, WorldOrigin);
+    WorldOrigin *o = ecs_singleton_get_mut(world, WorldOrigin);
+    o->enabled = false;
+    ecs_singleton_modified(world, WorldOrigin);
+    ecs_progress(world, 0);
+    tt_ready(world, terrain);
+    for (i = 0; i < 4; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    box_terrain_counters(world, terrain, &updates, &selects);
+    uint64_t revision = box_terrain_revision(world);
+    box_world_origin_shift(world, 0, (double[3]){ 512, 0, -256 });
+    test_assert(box_terrain_revision(world) != revision);
+    ecs_progress(world, 0);
+    box_terrain_counters(world, terrain, &u, &s);
+    test_assert(u > updates);
+    for (i = 0; i < 3; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    box_terrain_counters(world, terrain, &updates, &selects);
+    revision = box_terrain_revision(world);
+    for (i = 0; i < 4; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    box_terrain_counters(world, terrain, &u, &s);
+    test_int(u, updates);
+    test_assert(box_terrain_revision(world) == revision);
+    ecs_fini(world);
+}
+
+void Terrain_readback_updates(void) {
+    ecs_entity_t terrain, focus;
+    ecs_world_t *world = tt_world(&terrain, &focus, 1000);
+    int32_t i, k, updates, selects, u, s, count;
+    ecs_progress(world, 0);
+    tt_ready(world, terrain);
+    for (i = 0; i < 4; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    box_terrain_counters(world, terrain, &updates, &selects);
+    box_terrain_tile_t *const *tiles = box_terrain_tiles(world, terrain, &count);
+    test_assert(count > 0);
+    test_bool(tiles[0]->measured, false);
+    ecs_entity_t textures[2] = { tiles[0]->texture, tiles[0]->rough };
+    for (k = 0; k < 2; k ++) {
+        float *data = ecs_os_malloc_n(float, 4);
+        data[0] = 2;
+        data[1] = 3;
+        data[2] = 4;
+        data[3] = 7;
+        box_texture_readback_store(box_texture_readback_ensure(box_textures_get(world),
+            textures[k]), data, 2, 2, ReadbackR32Float, 1, 0);
+    }
+
+    ecs_progress(world, 0);
+    box_terrain_counters(world, terrain, &u, &s);
+    test_assert(u > updates);
+    test_int(s, selects);
+    tiles = box_terrain_tiles(world, terrain, &count);
+    test_bool(tiles[0]->measured, true);
+    const TerrainTile *tile = ecs_get(world, tiles[0]->entity, TerrainTile);
+    test_flt(tile->min_height, 2);
+    test_flt(tile->max_height, 7);
+    ecs_fini(world);
+}

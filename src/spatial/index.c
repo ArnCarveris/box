@@ -124,6 +124,7 @@ box_spatial_scene_t* box_spatial_scene_ensure(
     box_spatial_scene_t *result = box_spatial_scene(index, scene);
     if (!result) {
         result = box_spatial_scene_new(scene);
+        result->revision = index->revision + 1;
         ecs_map_insert_ptr(&index->scenes, scene, result);
     }
 
@@ -193,9 +194,11 @@ int32_t box_spatial_item_add(
     it->moved = false;
     it->disabled = false;
     it->mover = -1;
+    it->sig = 0;
     glm_vec3_copy(ECS_CONST_CAST(float*, min), it->min);
     glm_vec3_copy(ECS_CONST_CAST(float*, max), it->max);
     s->count ++;
+    s->revision += tree != BOX_SPATIAL_DYNAMIC;
     box_spatial_item_place(s, result);
 
     return result;
@@ -250,6 +253,9 @@ bool box_spatial_item_set(
     float margin = box_spatial_margin(min, max);
     vec3 ahead;
     bool stretch = box_spatial_ahead(it, min, max, frame, margin, ahead);
+    bool same = it->tree == tree && glm_vec3_eqv(it->min, ECS_CONST_CAST(float*, min)) &&
+        glm_vec3_eqv(it->max, ECS_CONST_CAST(float*, max));
+    s->revision += !same && (it->tree != BOX_SPATIAL_DYNAMIC || tree != BOX_SPATIAL_DYNAMIC);
     glm_vec3_copy(ECS_CONST_CAST(float*, min), it->min);
     glm_vec3_copy(ECS_CONST_CAST(float*, max), it->max);
     it->frame = frame;
@@ -264,7 +270,7 @@ bool box_spatial_item_set(
         changed = true;
     } else if (placed && tree == BOX_SPATIAL_DYNAMIC) {
         changed = box_bvh_move_fat(&s->trees[tree], item, min, max, margin, ahead);
-    } else if (placed && !it->moved) {
+    } else if (placed && !it->moved && !same) {
         it->moved = true;
         *ecs_vec_append_t(NULL, &s->moved, int32_t) = item;
     }
@@ -290,6 +296,7 @@ void box_spatial_item_remove(
         box_bvh_remove(&s->trees[it->tree], item);
     }
 
+    s->revision += it->tree != BOX_SPATIAL_DYNAMIC;
     it->entity = 0;
     it->moved = false;
     it->stretched = false;
@@ -477,6 +484,8 @@ void box_spatial_commit(
         ecs_entity_t scene = *ecs_vec_get_t(&index->empty, ecs_entity_t, i);
         box_spatial_scene_t *s = box_spatial_scene(index, scene);
         if (s && !s->count) {
+            index->revision = index->revision > s->revision ? index->revision : s->revision;
+            index->revision ++;
             ecs_map_remove(&index->scenes, scene);
             box_spatial_scene_free(s);
         }
@@ -513,6 +522,7 @@ void box_spatial_scene_shift(
 {
     int32_t i, count = ecs_vec_count(&s->items);
     bool all = true;
+    s->revision ++;
     for (i = 0; i < count; i ++) {
         box_spatial_item_t *it = box_spatial_item(s, i);
         if (!it->entity) {

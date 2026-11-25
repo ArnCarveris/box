@@ -306,7 +306,7 @@ void box_gpu_tg_poll(
 
 #ifndef __EMSCRIPTEN__
     if (mapping) {
-        wgpuDevicePoll(gpu->device, false, NULL);
+        box_gpu_poll(gpu);
     }
 #else
     (void)mapping;
@@ -376,6 +376,7 @@ void box_gpu_tg_requests(
             req->index = -1;
         }
 
+        box_gpu_tg_activate(tg, graph);
         r = ecs_os_calloc_t(box_gpu_tg_read_t);
         r->read = *req;
         r->read.texels = NULL;

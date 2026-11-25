@@ -378,6 +378,43 @@ int32_t box_spatial_overlap_box(
     return w.count;
 }
 
+/** Stop the walk at the first item that is not disabled.
+ *
+ * @param item The item
+ * @param ctx The walk, which counts the item
+ * @return false to stop the walk
+ */
+static bool box_spatial_visit_any(
+    int32_t item,
+    void *ctx)
+{
+    box_spatial_walk_t *w = ctx;
+    w->count += !box_spatial_item(w->scene, item)->disabled;
+
+    return !w->count;
+}
+
+bool box_spatial_movers_overlap_box(
+    ecs_world_t *world,
+    ecs_entity_t scene,
+    const vec3 min,
+    const vec3 max)
+{
+    const SpatialIndex *si = ecs_singleton_get(world, SpatialIndex);
+    box_spatial_walk_t w = {
+        .scene = si && si->index ? box_spatial_scene(si->index, scene) : NULL,
+        .min = min,
+        .max = max
+    };
+    if (w.scene && w.scene->trees[BOX_SPATIAL_DYNAMIC].leaves) {
+        box_spatial_of(world);
+        box_bvh_overlap(&w.scene->trees[BOX_SPATIAL_DYNAMIC], min, max,
+            box_spatial_visit_any, &w);
+    }
+
+    return w.count > 0;
+}
+
 int32_t box_spatial_overlap_sphere(
     const ecs_world_t *world,
     ecs_entity_t scene,

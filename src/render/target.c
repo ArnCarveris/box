@@ -686,6 +686,40 @@ done:
     return result;
 }
 
+/** Clear an image of a target to the clear color of its frame and draw its views into it.
+ *
+ * The clear is the load of the first render pass that attaches the image: a pass that would
+ * load it clears it to the clear color instead (box_gpu_profile_render_pass). Only an image
+ * that no pass of the views attached is cleared by a pass of its own.
+ *
+ * @param gpu The backend
+ * @param t The target
+ * @param packet The packet
+ * @param frame The target of the packet
+ * @param encoder The encoder of the frame
+ * @param view The image
+ * @param texture Texture of the image
+ */
+static void box_gpu_target_draw(
+    box_gpu_t *gpu,
+    box_gpu_target_t *t,
+    const box_render_packet_t *packet,
+    const box_render_target_t *frame,
+    WGPUCommandEncoder encoder,
+    WGPUTextureView view,
+    WGPUTexture texture)
+{
+    gpu->clear_view = view;
+    gpu->clear_color = (WGPUColor){
+        frame->clear[0], frame->clear[1], frame->clear[2], frame->clear[3]
+    };
+    box_gpu_draw_views(gpu, t, packet, frame, encoder, view, texture);
+    if (gpu->clear_view) {
+        gpu->clear_view = NULL;
+        box_gpu_clear(gpu, encoder, view, frame->clear);
+    }
+}
+
 /** Draw the views of a frame into the scene texture of a target and submit the work before the
  * target acquires its image. Acquiring a window image blocks until the display frees one, so
  * the GPU renders the frame while the render thread waits instead of after it.
@@ -703,8 +737,7 @@ static void box_gpu_target_scene_draw(
 {
     WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(gpu->device, NULL);
     WGPUCommandBuffer commands;
-    box_gpu_clear(gpu, encoder, t->scene_view, frame->clear);
-    box_gpu_draw_views(gpu, t, packet, frame, encoder, t->scene_view, t->scene);
+    box_gpu_target_draw(gpu, t, packet, frame, encoder, t->scene_view, t->scene);
     commands = wgpuCommandEncoderFinish(encoder, NULL);
     wgpuQueueSubmit(gpu->queue, 1, &commands);
     wgpuCommandBufferRelease(commands);
@@ -734,8 +767,7 @@ void box_gpu_target_render(
     if (drawn) {
         box_gpu_blit(gpu, t, encoder, view);
     } else {
-        box_gpu_clear(gpu, encoder, view, frame->clear);
-        box_gpu_draw_views(gpu, t, packet, frame, encoder, view, texture);
+        box_gpu_target_draw(gpu, t, packet, frame, encoder, view, texture);
     }
 
     if (box_gpu_target_captures(frame)) {

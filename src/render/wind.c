@@ -193,6 +193,8 @@ void box_render_wind_pack(
         out->wind_branch_phase = 0.0f;
         out->occlusion_strength = 0.0f;
         out->wind_pad = 0.0f;
+        out->motion_flutter = 0.0f;
+        out->motion_branch = 0.0f;
         goto done;
     }
 
@@ -229,6 +231,8 @@ void box_render_wind_pack(
     out->wind_branch_phase = 0.0f;
     out->occlusion_strength = 0.0f;
     out->wind_pad = 0.0f;
+    out->motion_flutter = (float)frequency;
+    out->motion_branch = 0.0f;
     if (sway->pivots) {
         double branch = isfinite(sway->branch_frequency)
             ? (double)sway->branch_frequency : 0.0;
@@ -239,6 +243,7 @@ void box_render_wind_pack(
 
         out->wind_branch = isfinite(sway->branch) ? sway->branch : 0.0f;
         out->wind_branch_phase = box_wind_wrap_float(branch * wind->clock, 1.0);
+        out->motion_branch = (float)branch;
     }
 done:
     return;

@@ -21,6 +21,29 @@
 #include <math.h>
 #include <stdlib.h>
 
+/** Singleton with the system of the extract, so its state is found without a lookup */
+typedef struct RenderParticlesSystem {
+    ecs_entity_t system;        /**< The system, whose context is the state */
+} RenderParticlesSystem;
+
+static ECS_COMPONENT_DECLARE(RenderParticlesSystem);
+
+/** Get the system of the particle extract of a world.
+ *
+ * @param world The world
+ * @return The system, NULL before box.render was imported or after the system was deleted
+ */
+static const ecs_system_t* box_particles_system_ctx(
+    const ecs_world_t *world)
+{
+    ecs_entity_t id = ecs_id(RenderParticlesSystem);
+    const RenderParticlesSystem *c = id && ecs_is_alive(world, id)
+        ? ecs_get_id(world, id, id) : NULL;
+
+    return c && c->system && ecs_is_alive(world, c->system)
+        ? ecs_system_get(world, c->system) : NULL;
+}
+
 /** Slots of the smallest pool */
 #define BOX_PARTICLE_CLASS_MIN (1024u)
 
@@ -1719,7 +1742,10 @@ static void BoxRenderExtractParticles(
         stats.dropped = prev->dropped;
     }
 
-    ecs_singleton_set_ptr(world, ParticleStats, &stats);
+    if (!prev || ecs_os_memcmp_t(prev, &stats, ParticleStats)) {
+        ecs_singleton_set_ptr(world, ParticleStats, &stats);
+    }
+
 done:
     return;
 }
@@ -1751,8 +1777,7 @@ static void box_particles_free(
 static box_render_particles_t* box_particles_state(
     const ecs_world_t *world)
 {
-    ecs_entity_t system = ecs_lookup(world, "box.render.extract.Particles");
-    const ecs_system_t *sys = system ? ecs_system_get(world, system) : NULL;
+    const ecs_system_t *sys = box_particles_system_ctx(world);
 
     return sys ? sys->ctx : NULL;
 }
@@ -1769,13 +1794,17 @@ void box_render_particles_init(
     ecs_vec_init_t(NULL, &s->bursts, box_particle_burst_t, 0);
     box_particle_rows_init(&s->curves);
 
-    ecs_system(world, {
+    ecs_set_name_prefix(world, "Render");
+    ECS_COMPONENT_DEFINE(world, RenderParticlesSystem);
+    ecs_set_name_prefix(world, NULL);
+    ecs_entity_t extract = ecs_system(world, {
         .entity = ecs_entity(world, { .name = "extract.Particles" }),
         .phase = RenderExtract,
         .run = BoxRenderExtractParticles,
         .ctx = s,
         .ctx_free = box_particles_free
     });
+    ecs_singleton_set(world, RenderParticlesSystem, { extract });
 }
 
 void box_render_particles_import(

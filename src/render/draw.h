@@ -566,6 +566,26 @@ typedef struct box_draw_batch_t {
     float world_wind;       /**< wind_reach the world bounds were grown by */
     float wind_reach;       /**< Largest world distance the WindSway of a slot of a wind batch
                              *   moves a vertex in the wind of this extract (box_draws_wind) */
+    bool reach_dirty;       /**< A slot was added or removed since wind_reach was computed */
+    bool reach_valid;       /**< wind_reach was computed for reach_speed, reach_gust, reach_size
+                             *   and reach_sways */
+    float reach_speed;      /**< Wind speed wind_reach was computed for */
+    float reach_gust;       /**< Wind gust wind_reach was computed for */
+    float reach_size;       /**< Size of the slots wind_reach was computed for */
+    uint32_t reach_sways;   /**< box_render_draws_t.sways when wind_reach was computed */
+    bool wind_box_dirty;    /**< A slot or its transform changed since wind_min and wind_max
+                             *   were computed */
+    bool nearest_dirty;     /**< A slot or its transform changed since nearest was ordered */
+    float nearest_at[2];    /**< World X and Z of the camera nearest was ordered for */
+    ecs_vec_t nearest;      /**< uint32_t, the slots of a batch of terrain tiles ordered by
+                             *   their distance to the camera (box_draws_send_nearest), empty
+                             *   before they were ordered */
+    bool wind_boxed;        /**< wind_min and wind_max hold the box around the slots */
+    float wind_local[6];    /**< Local center and extent wind_min and wind_max were computed
+                             *   with */
+    float wind_min[3];      /**< Minimum corner of the box around the world box of every slot of
+                             *   a wind caster batch, before its reach (box_draws_wind) */
+    float wind_max[3];      /**< Maximum corner of that box */
     uint32_t lods[BOX_LOD_LEVELS_MAX]; /**< Mesh of each level of detail the views of the packet
                              *   use, see box_render_batch_t.lods */
     int64_t record_frame;   /**< Frame of the packet its batch record was last sent in */
@@ -698,6 +718,10 @@ typedef struct box_draw_water_caustics_state_t {
     double frame[2];        /**< Offset of the water frame in cells, the integral of the WaterFlow
                              *   velocity over the scale, wrapped to 0..BOX_RENDER_CAUSTICS_PERIOD
                              *   (box_draws_water_caustics_step) */
+    double rate[2];         /**< Cells per second the frame moves since time: the WaterFlow
+                             *   velocity over the scale its record was last packed with */
+    double base[2];         /**< The frame at the epoch of the table as its record holds it, which
+                             *   the shader moves on by the rate */
 } box_draw_water_caustics_state_t;
 
 /** The wave table (BOX_RENDER_BUFFER_WATER_WAVES) as the main thread integrates and packs it */
@@ -750,6 +774,11 @@ typedef struct box_draw_materials_t {
                              *   box_draw_water_caustics_state_t, allocated */
     double origin[3];       /**< Absolute position of the local origin (WorldOrigin) the
                              *   records were packed for; a change packs every owner again */
+    double epoch;           /**< Total render time the words of the records that change with
+                             *   the time are packed for; the shader moves them on by the clock
+                             *   of the frame (box_render_material_clock_t) */
+    double clock_epoch;     /**< WindStatus.clock at the epoch */
+    bool epoch_valid;       /**< A send set the epoch */
 } box_draw_materials_t;
 
 /** The root of a changed subtree and the streams the change writes for each of its entities */
@@ -835,6 +864,8 @@ typedef struct box_render_draws_t {
     box_render_wind_t wind;     /**< Wind of this extract */
     bool wind_blew;             /**< The wind blew in the last extract, so the swaying casters
                                  *   render their shadows once more where they came to rest */
+    uint32_t sways;             /**< Changes of a WindSway since the start, which date the
+                                 *   wind_reach of the wind batches */
     ecs_vec_t swaying;          /**< ecs_entity_t, the scenes (0 for the default one) with a
                                  *   ready caster batch with a WindSway while the wind blows in
                                  *   this extract, whose shadow cascades render every frame */
@@ -2062,9 +2093,9 @@ bool box_draws_water_caustics_find(
     ecs_entity_t owner,
     float *out);
 
-/** Integrate the water frame of every owner with WaterCaustics and a WaterFlow to the time of
- * the table, and forget those whose owner is gone, no longer owns a slot or lost its Water,
- * WaterCaustics, WaterFlow or Scene.water.
+/** Forget the water frames of the WaterCaustics whose owner is gone, no longer owns a slot or
+ * lost its Water, WaterCaustics, WaterFlow or Scene.water. The frames themselves are moved on
+ * when their record is packed (box_draws_water_caustics_frame) and by the shader between.
  *
  * @param world The world
  * @param m The table
@@ -2748,6 +2779,46 @@ void box_draws_material_release(
     box_render_draws_t *d,
     ecs_entity_t e);
 
+/** Pack every slot whose record moves with the time from its owner again in the next send: the
+ * features of a scene changed, which the material of an owner is read with, or the table starts
+ * a new epoch.
+ *
+ * @param d The state
+ */
+void box_draws_materials_refresh(
+    box_render_draws_t *d);
+
+/** Pack the scrolling slot an entity owns from it again in the next send, after it moved in the
+ * hierarchy, which may change its scene.
+ *
+ * @param d The state
+ * @param e The entity
+ */
+void box_draws_material_moved(
+    box_render_draws_t *d,
+    ecs_entity_t e);
+
+/** Make a material read with box_draws_material_of one the table packs: its time the epoch of
+ * the table and the clock of its Wind that of the epoch, as the shader moves the words that
+ * change with the time on from there.
+ *
+ * @param m The table
+ * @param material The material
+ */
+void box_draws_material_epoch(
+    const box_draw_materials_t *m,
+    box_draw_material_t *material);
+
+/** Pack the WindSway words of a record again, with its VertexReveal and VertexOcclusion, which
+ * share its flags, as box_draws_material_pack packs them.
+ *
+ * @param out The record
+ * @param material The material
+ */
+void box_draws_material_pack_wind(
+    box_render_material_t *out,
+    const box_draw_material_t *material);
+
 /** Pack the private slot an entity owns again in the next send, or hash the material of the
  * owner of a shared slot again in the next box_draws_materials_resolve.
  *
@@ -2893,7 +2964,7 @@ void box_draws_send_ordered(
 void box_draws_send_nearest(
     box_render_packet_t *p,
     box_render_draws_t *d,
-    const box_draw_batch_t *b,
+    box_draw_batch_t *b,
     box_render_batch_t *out);
 
 /** Compute the local bounds of the slots of a batch with parametric surfaces: the union of the

@@ -8,6 +8,7 @@
 
 ECS_COMPONENT_DECLARE(CameraActionMap);
 ECS_COMPONENT_DECLARE(FirstPersonActionMap);
+ECS_COMPONENT_DECLARE(ControllerRest);
 
 const box_controller_action_t box_camera_actions[BoxCameraActionCount] = {
     [BoxCameraForward] = { "Forward", "Move the camera forward", KeyW, KeyNone },
@@ -118,6 +119,8 @@ void BoxControllersImport(
     ECS_IMPORT(world, BoxTransform);
     ECS_IMPORT(world, BoxInput);
 
+    ECS_COMPONENT_DEFINE(world, ControllerRest);
+    ecs_set_hooks(world, ControllerRest, { .ctor = flecs_default_ctor });
     ECS_META_COMPONENT(world, CameraController);
     ECS_COMPONENT_DEFINE(world, CameraActionMap);
     ecs_set_hooks(world, CameraActionMap, {
@@ -132,6 +135,7 @@ void BoxControllersImport(
     ecs_set_hooks(world, FirstPersonActionMap, { .ctor = flecs_default_ctor });
     ecs_add_pair(world, ecs_id(FirstPersonController), EcsWith, ecs_id(Position));
     ecs_add_pair(world, ecs_id(FirstPersonController), EcsWith, ecs_id(Rotation));
+    ecs_add_pair(world, ecs_id(FirstPersonController), EcsWith, ecs_id(ControllerRest));
 
     CameraActionMap *map = ecs_singleton_ensure(world, CameraActionMap);
     map->scope = box_controller_actions_create(world, "camera", box_camera_actions,
@@ -177,7 +181,8 @@ void BoxControllersImport(
         .query.terms = {
             { .id = ecs_id(FirstPersonController), .inout = EcsInOut },
             { .id = ecs_id(Position), .inout = EcsInOut },
-            { .id = ecs_id(Rotation), .inout = EcsInOut }
+            { .id = ecs_id(Rotation), .inout = EcsInOut },
+            { .id = ecs_id(ControllerRest), .inout = EcsInOut }
         },
         .callback = BoxFirstPersonControllerUpdate
     });

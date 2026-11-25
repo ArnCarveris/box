@@ -85,6 +85,12 @@ typedef struct box_gpu_particle_order_t {
     int32_t index;                  /**< Index of the draw in the draws of the packet */
 } box_gpu_particle_order_t;
 
+/** The bytes a buffer of the frame holds, so a packet whose bytes are the same writes none */
+typedef struct box_gpu_particle_sent_t {
+    WGPUBuffer buffer;              /**< The buffer they were written into */
+    ecs_vec_t bytes;                /**< uint8_t, the bytes written from its start */
+} box_gpu_particle_sent_t;
+
 struct box_gpu_particles_t {
     WGPUBindGroupLayout sim_layout; /**< Blocks, particles, spawn slots, mesh tables, curves,
                                      *   work items and the batch */
@@ -133,6 +139,7 @@ struct box_gpu_particles_t {
     ecs_vec_t slot_data;            /**< uint32_t, the spawn slots of the packet */
     ecs_vec_t work_data;            /**< uint32_t, the work items of the packet */
     ecs_vec_t batch_data;           /**< Bytes of the batch uniforms of the packet */
+    box_gpu_particle_sent_t sent[3]; /**< What the slots, work and batches buffers hold */
     ecs_vec_t chunk_data;           /**< uint32_t, the chunks the views of the packet draw */
     ecs_vec_t dispatches;           /**< box_gpu_particle_dispatch_t of the packet */
     ecs_vec_t draws_of_packet;      /**< box_gpu_particle_draw_t of the last packet */
@@ -195,6 +202,7 @@ static void box_gpu_particle_reserve(
     WGPUBufferUsage usage)
 {
     uint64_t capacity = *size ? *size : 4096;
+    int32_t i;
     if (*buffer && need <= *size) {
         goto done;
     }
@@ -210,6 +218,10 @@ static void box_gpu_particle_reserve(
     *buffer = box_gpu_particle_buffer(gpu, capacity, usage);
     *size = capacity;
     box_gpu_particle_groups_clear(gpu->particles);
+    for (i = 0; i < 3; i ++) {
+        gpu->particles->sent[i].buffer = NULL;
+    }
+
 done:
     return;
 }
@@ -300,6 +312,7 @@ void box_gpu_particles_init(
 {
     box_gpu_particles_t *s = ecs_os_calloc_t(box_gpu_particles_t);
     WGPULimits limits = WGPU_LIMITS_INIT;
+    int32_t i;
     WGPUBindGroupLayoutEntry sim[7] = {
         {
             .binding = 0,
@@ -359,6 +372,10 @@ void box_gpu_particles_init(
     ecs_vec_init_t(NULL, &s->slot_data, uint32_t, 0);
     ecs_vec_init_t(NULL, &s->work_data, uint32_t, 0);
     ecs_vec_init_t(NULL, &s->batch_data, uint8_t, 0);
+    for (i = 0; i < 3; i ++) {
+        ecs_vec_init_t(NULL, &s->sent[i].bytes, uint8_t, 0);
+    }
+
     ecs_vec_init_t(NULL, &s->chunk_data, uint32_t, 0);
     ecs_vec_init_t(NULL, &s->dispatches, box_gpu_particle_dispatch_t, 0);
     ecs_vec_init_t(NULL, &s->draws_of_packet, box_gpu_particle_draw_t, 0);
@@ -407,6 +424,7 @@ void box_gpu_particles_fini(
     box_gpu_t *gpu)
 {
     box_gpu_particles_t *s = gpu->particles;
+    int32_t i;
     if (!s) {
         goto done;
     }
@@ -435,6 +453,10 @@ void box_gpu_particles_fini(
     ecs_vec_fini_t(NULL, &s->slot_data, uint32_t);
     ecs_vec_fini_t(NULL, &s->work_data, uint32_t);
     ecs_vec_fini_t(NULL, &s->batch_data, uint8_t);
+    for (i = 0; i < 3; i ++) {
+        ecs_vec_fini_t(NULL, &s->sent[i].bytes, uint8_t);
+    }
+
     ecs_vec_fini_t(NULL, &s->chunk_data, uint32_t);
     ecs_vec_fini_t(NULL, &s->dispatches, box_gpu_particle_dispatch_t);
     ecs_vec_fini_t(NULL, &s->draws_of_packet, box_gpu_particle_draw_t);
@@ -832,6 +854,35 @@ static bool box_gpu_particle_fits(
     return result;
 }
 
+/** Write the bytes of a buffer of the frame unless it holds them already.
+ *
+ * @param gpu The backend
+ * @param sent What the buffer holds, updated
+ * @param buffer The buffer
+ * @param data The bytes
+ * @param size Number of bytes
+ */
+static void box_gpu_particle_write(
+    box_gpu_t *gpu,
+    box_gpu_particle_sent_t *sent,
+    WGPUBuffer buffer,
+    const void *data,
+    uint64_t size)
+{
+    if (sent->buffer == buffer && (uint64_t)ecs_vec_count(&sent->bytes) == size &&
+        !ecs_os_memcmp(ecs_vec_first(&sent->bytes), data, (ecs_size_t)size))
+    {
+        goto done;
+    }
+
+    sent->buffer = buffer;
+    ecs_vec_set_count_t(NULL, &sent->bytes, uint8_t, (int32_t)size);
+    ecs_os_memcpy(ecs_vec_first(&sent->bytes), data, (ecs_size_t)size);
+    wgpuQueueWriteBuffer(gpu->queue, buffer, 0, data, (size_t)size);
+done:
+    return;
+}
+
 /** Copy the blocks and spawn slots of the pools of a packet into the frame buffers, give each
  * block its first spawn slot and slot in the arena, and keep the work items and the draw of
  * every pool that fits the arena.
@@ -922,12 +973,12 @@ static void box_gpu_particle_upload(
         WGPUBufferUsage_Uniform);
     wgpuQueueWriteBuffer(gpu->queue, s->blocks, 0, ecs_vec_first(&s->block_data),
         (size_t)count * BOX_GPU_PARTICLE_STRIDE);
-    wgpuQueueWriteBuffer(gpu->queue, s->slots, 0, ecs_vec_first(&s->slot_data),
-        (size_t)slot_bytes);
-    wgpuQueueWriteBuffer(gpu->queue, s->work, 0, ecs_vec_first(&s->work_data),
-        (size_t)work_bytes);
-    wgpuQueueWriteBuffer(gpu->queue, s->batches, 0, ecs_vec_first(&s->batch_data),
-        (size_t)batch_bytes);
+    box_gpu_particle_write(gpu, &s->sent[0], s->slots, ecs_vec_first(&s->slot_data),
+        slot_bytes);
+    box_gpu_particle_write(gpu, &s->sent[1], s->work, ecs_vec_first(&s->work_data),
+        work_bytes);
+    box_gpu_particle_write(gpu, &s->sent[2], s->batches, ecs_vec_first(&s->batch_data),
+        batch_bytes);
 }
 
 /** Get the bind group of the simulation, created again after a buffer it binds was replaced.
@@ -989,7 +1040,7 @@ void box_gpu_particles_simulate(
         goto done;
     }
 
-    WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(gpu->device, NULL);
+    WGPUCommandEncoder encoder = box_gpu_frame_encoder(gpu);
     for (i = 0; i < count; i ++) {
         const box_render_particle_pool_t *pool = ecs_vec_get_t(
             &packet->particles, box_render_particle_pool_t, i);
@@ -1016,10 +1067,6 @@ void box_gpu_particles_simulate(
 
     wgpuComputePassEncoderEnd(pass);
     wgpuComputePassEncoderRelease(pass);
-    WGPUCommandBuffer commands = wgpuCommandEncoderFinish(encoder, NULL);
-    wgpuQueueSubmit(gpu->queue, 1, &commands);
-    wgpuCommandBufferRelease(commands);
-    wgpuCommandEncoderRelease(encoder);
 done:
     return;
 }

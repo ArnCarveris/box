@@ -1283,3 +1283,120 @@ void Action_chord_disabled_modifier_unbound(void) {
 
     ecs_fini(world);
 }
+
+void Action_quiet_frames_then_key(void) {
+    // input/actions
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t jump = ecs_entity(world, { .name = "Jump" });
+    ecs_add(world, jump, Action);
+    ecs_set(world, jump, Binding, { .key = KeySpace });
+
+    int32_t i;
+    for (i = 0; i < 5; i ++) {
+        ecs_progress(world, 0);
+        test_bool(ecs_get(world, jump, ActionState)->down, false);
+        test_bool(ecs_get(world, jump, ActionState)->pressed, false);
+        test_bool(ecs_get(world, jump, ActionState)->released, false);
+    }
+
+    box_input_key(world, KeySpace, true);
+    ecs_progress(world, 0);
+    test_bool(ecs_get(world, jump, ActionState)->down, true);
+    test_bool(ecs_get(world, jump, ActionState)->pressed, true);
+
+    ecs_progress(world, 0);
+    test_bool(ecs_get(world, jump, ActionState)->down, true);
+    test_bool(ecs_get(world, jump, ActionState)->pressed, false);
+
+    box_input_key(world, KeySpace, false);
+    ecs_progress(world, 0);
+    test_bool(ecs_get(world, jump, ActionState)->down, false);
+    test_bool(ecs_get(world, jump, ActionState)->released, true);
+
+    for (i = 0; i < 5; i ++) {
+        ecs_progress(world, 0);
+        test_bool(ecs_get(world, jump, ActionState)->down, false);
+        test_bool(ecs_get(world, jump, ActionState)->released, false);
+    }
+
+    box_input_key(world, KeySpace, true);
+    ecs_progress(world, 0);
+    test_bool(ecs_get(world, jump, ActionState)->pressed, true);
+
+    ecs_fini(world);
+}
+
+void Action_quiet_frames_then_hold(void) {
+    // input/actions
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t jump = ecs_entity(world, { .name = "Jump" });
+    ecs_add(world, jump, Action);
+
+    int32_t i;
+    for (i = 0; i < 5; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    box_input_action_press(world, jump, 1);
+    ecs_progress(world, 0);
+    test_bool(ecs_get(world, jump, ActionState)->pressed, true);
+
+    ecs_progress(world, 0);
+    test_bool(ecs_get(world, jump, ActionState)->pressed, false);
+    test_bool(ecs_get(world, jump, ActionState)->released, true);
+
+    ecs_progress(world, 0);
+    test_bool(ecs_get(world, jump, ActionState)->released, false);
+
+    ecs_fini(world);
+}
+
+void Action_quiet_frames_then_binding(void) {
+    // input/actions
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t jump = ecs_entity(world, { .name = "Jump" });
+    ecs_add(world, jump, Action);
+
+    int32_t i;
+    for (i = 0; i < 5; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    ecs_set(world, jump, Binding, { .key = KeySpace });
+    box_input_key(world, KeySpace, true);
+    ecs_progress(world, 0);
+    test_bool(ecs_get(world, jump, ActionState)->pressed, true);
+    test_bool(ecs_get(world, jump, ActionState)->down, true);
+
+    ecs_fini(world);
+}
+
+void Action_quiet_frames_then_state_set(void) {
+    // input/actions
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t jump = ecs_entity(world, { .name = "Jump" });
+    ecs_add(world, jump, Action);
+
+    int32_t i;
+    for (i = 0; i < 5; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    ecs_set(world, jump, ActionState, { .down = true });
+    ecs_progress(world, 0);
+    test_bool(ecs_get(world, jump, ActionState)->down, false);
+    test_bool(ecs_get(world, jump, ActionState)->released, true);
+
+    ecs_progress(world, 0);
+    test_bool(ecs_get(world, jump, ActionState)->released, false);
+
+    ecs_fini(world);
+}

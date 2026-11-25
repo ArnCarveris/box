@@ -237,26 +237,37 @@ static bool box_bake_recording(
 }
 
 /** Remember a shape that changed with the bounds it had, which the spatial index still holds
- * until it is updated in OnStore, or which a removed shape still has.
+ * until it is updated in OnStore, or which a removed shape still has. A shape that changed
+ * again right after its last change keeps the one record with the bounds it had first.
  *
  * @param world The world
  * @param b The state
  * @param e The shape
  * @param removed Whether the shape is being removed, so the index may have lost it already
  * @param geometry Whether the change can move, add or remove surfaces
+ * @param shifted Whether the change is a move in a frame with a shift of the world origin
  */
 static void box_bake_record(
     const ecs_world_t *world,
     box_render_bake_t *b,
     ecs_entity_t e,
     bool removed,
-    bool geometry)
+    bool geometry,
+    bool shifted)
 {
-    box_bake_change_t *c = ecs_vec_append_t(NULL, &b->changes, box_bake_change_t);
-    c->entity = e;
-    c->geometry = geometry;
-    c->shifted = false;
-    c->old = box_spatial_bounds(world, e, &c->scene, c->min, c->max);
+    box_bake_change_t *c = ecs_vec_count(&b->changes) ?
+        ecs_vec_last_t(&b->changes, box_bake_change_t) : NULL;
+    if (c && c->entity == e) {
+        c->geometry = c->geometry || geometry;
+        c->shifted = c->shifted && shifted;
+    } else {
+        c = ecs_vec_append_t(NULL, &b->changes, box_bake_change_t);
+        c->entity = e;
+        c->geometry = geometry;
+        c->shifted = shifted;
+        c->old = box_spatial_bounds(world, e, &c->scene, c->min, c->max);
+    }
+
     if (!c->old && removed && ecs_has(world, e, WorldTransform) &&
         box_bake_shape_bounds(world, e, c->min, c->max))
     {
@@ -265,17 +276,19 @@ static void box_bake_record(
     }
 }
 
-/** Check whether a shape is captured apart from one of the flags that keep shapes out.
+/** Check whether the shapes of a table are captured apart from one of the flags that keep
+ * shapes out, as far as their table tells: every entity of a table has the same components,
+ * owned and inherited.
  *
  * @param world The world
- * @param table The table of the shape
- * @param e The shape
+ * @param table The table of the shapes
+ * @param e An entity of the table
  * @param skip The flag to ignore, 0 for none
- * @return Whether the shape is static and baked as far as the other flags go. The cheap NoBake
+ * @return Whether the shapes are static and baked as far as the other flags go. The cheap NoBake
  * test comes first: a prefab change reaches every instance that inherits it, and the instances
  * of a NoBake prefab whose material changes all the time must stay cheap
  */
-static bool box_bake_captured_but(
+static bool box_bake_table_captured_but(
     const ecs_world_t *world,
     const ecs_table_t *table,
     ecs_entity_t e,
@@ -286,7 +299,24 @@ static bool box_bake_captured_but(
     return !hidden &&
         (skip == DynamicTransform || !box_transform_dynamic(world, table)) &&
         (skip == ManualTransform || !ecs_has_id(world, e, ManualTransform) ||
-            ecs_has(world, e, SurfaceAttachment)) &&
+            ecs_has(world, e, SurfaceAttachment));
+}
+
+/** Check whether a shape is captured apart from one of the flags that keep shapes out.
+ *
+ * @param world The world
+ * @param table The table of the shape
+ * @param e The shape
+ * @param skip The flag to ignore, 0 for none
+ * @return Whether the shape is static and baked as far as the other flags go
+ */
+static bool box_bake_captured_but(
+    const ecs_world_t *world,
+    const ecs_table_t *table,
+    ecs_entity_t e,
+    ecs_id_t skip)
+{
+    return box_bake_table_captured_but(world, table, e, skip) &&
         !box_projection_anchored(world, e);
 }
 
@@ -310,17 +340,18 @@ static void BakeOnChange(
     bool deleted = it->event == EcsOnRemove && it->other_table &&
         ecs_table_get_type(it->other_table)->count == 0;
     int32_t i;
-    if (ecs_should_quit(it->world) || !box_bake_recording(b) || (flag && deleted)) {
+    if (!box_bake_recording(b) || !it->count || (flag && deleted) ||
+        ecs_should_quit(it->world) || !ecs_has(it->world, it->entities[0], ShapeMesh) ||
+        !box_bake_table_captured_but(it->world, it->table, it->entities[0], flag ? id : 0))
+    {
         goto done;
     }
 
     for (i = 0; i < it->count; i ++) {
         ecs_entity_t e = it->entities[i];
-        if (ecs_has(it->world, e, ShapeMesh) &&
-            box_bake_captured_but(it->world, it->table, e, flag ? id : 0))
-        {
+        if (!box_projection_anchored(it->world, e)) {
             box_bake_record(it->world, b, e, it->event == EcsOnRemove,
-                flag || deleted || id == ecs_id(ShapeMesh));
+                flag || deleted || id == ecs_id(ShapeMesh), false);
         }
     }
 
@@ -353,7 +384,7 @@ static void box_bake_record_blends(
             }
 
             if (used && box_bake_captured_but(world, it.table, it.entities[i], 0)) {
-                box_bake_record(world, b, it.entities[i], false, false);
+                box_bake_record(world, b, it.entities[i], false, false, false);
             }
         }
     }
@@ -398,7 +429,7 @@ static void box_bake_record_tree(
     if (ecs_has(world, e, ShapeMesh) &&
         box_bake_captured_but(world, ecs_get_table(world, e), e, 0))
     {
-        box_bake_record(world, b, e, false, false);
+        box_bake_record(world, b, e, false, false, false);
     }
 
     ecs_iter_t it = ecs_children(world, e);
@@ -445,8 +476,7 @@ static void box_bake_on_moved(
     int32_t i;
     for (i = 0; box_bake_recording(b) && i < count; i ++) {
         if (ecs_has(world, entities[i], ShapeMesh) && !ecs_has_id(world, entities[i], NoBake)) {
-            box_bake_record(world, ctx, entities[i], false, true);
-            ecs_vec_last_t(&b->changes, box_bake_change_t)->shifted = b->shifting;
+            box_bake_record(world, b, entities[i], false, true, b->shifting);
         }
     }
 }
@@ -545,7 +575,12 @@ void box_bake_changes(
     box_render_bake_t *b)
 {
     int32_t i;
+    if (!ecs_vec_count(&b->changes) && !ecs_vec_count(&b->regions)) {
+        goto done;
+    }
+
     ecs_vec_clear(&b->regions);
+    b->resolved += ecs_vec_count(&b->changes);
     for (i = 0; i < ecs_vec_count(&b->changes); i ++) {
         const box_bake_change_t *c = ecs_vec_get_t(&b->changes, box_bake_change_t, i);
         ecs_entity_t e = c->entity, scene = 0;
@@ -584,6 +619,9 @@ void box_bake_changes(
         const box_bake_region_t *r = ecs_vec_get_t(&b->regions, box_bake_region_t, i);
         box_bake_region(world, b, r->scene, r->min, r->max, r->geometry);
     }
+
+done:
+    return;
 }
 
 /** Queue the probes a light can reach: within its range, or every probe for a directional

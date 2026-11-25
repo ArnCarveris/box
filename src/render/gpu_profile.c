@@ -27,6 +27,9 @@
 /** Labels the profile tells apart at most */
 #define BOX_GPU_PROFILE_LABELS (BOX_RENDER_GPU_TIMING_LABELS)
 
+/** Color attachments of a render pass at most */
+#define BOX_GPU_PROFILE_ATTACHMENTS (8)
+
 /** Frames each logged mean covers */
 #define BOX_GPU_PROFILE_FRAMES (120)
 
@@ -218,7 +221,27 @@ WGPURenderPassEncoder box_gpu_profile_render_pass(
     const char *label)
 {
     WGPURenderPassDescriptor d = *desc;
+    WGPURenderPassColorAttachment colors[BOX_GPU_PROFILE_ATTACHMENTS];
     WGPUPassTimestampWrites writes;
+    size_t i;
+    for (i = 0; gpu->clear_view && i < d.colorAttachmentCount; i ++) {
+        if (d.colorAttachments[i].view != gpu->clear_view) {
+            continue;
+        }
+
+        if (d.colorAttachments[i].loadOp == WGPULoadOp_Load &&
+            d.colorAttachmentCount <= BOX_GPU_PROFILE_ATTACHMENTS)
+        {
+            ecs_os_memcpy_n(colors, d.colorAttachments, WGPURenderPassColorAttachment,
+                (int32_t)d.colorAttachmentCount);
+            colors[i].loadOp = WGPULoadOp_Clear;
+            colors[i].clearValue = gpu->clear_color;
+            d.colorAttachments = colors;
+        }
+
+        gpu->clear_view = NULL;
+    }
+
     if (d.timestampWrites) {
         box_gpu_profile_borrow(gpu, label, d.timestampWrites);
     } else {
@@ -507,6 +530,12 @@ void box_gpu_profile_frame(
     p->on = on || p->log;
 done:
     return;
+}
+
+bool box_gpu_profile_timed(
+    box_gpu_t *gpu)
+{
+    return gpu->cull.detail || (gpu->profile && gpu->profile->on);
 }
 
 void box_gpu_profile_fini(

@@ -211,31 +211,43 @@ static WGPUBuffer box_gpu_layer_buffer(
         });
         wgpuQueueWriteBuffer(gpu->queue, l->buffer, 0, values, sizeof(*values));
         l->values = *values;
+        l->used = -1;
         l->next = gpu->layer_buffers;
         gpu->layer_buffers = l;
+        gpu->blend_alive ++;
     } else if (ecs_os_memcmp(&l->values, values, ECS_SIZEOF(*values))) {
         wgpuQueueWriteBuffer(gpu->queue, l->buffer, 0, values, sizeof(*values));
         l->values = *values;
     }
 
-    l->used = gpu->blend_frame;
+    if (l->used != gpu->blend_frame) {
+        l->used = gpu->blend_frame;
+        gpu->blend_marks ++;
+    }
 
     return l->buffer;
 }
 
-/** Release a layers group and its reference to its array.
+/** Release a layers group and its reference to its array, and forget the groups the batches
+ * drew with.
  *
+ * @param gpu The backend
  * @param g The group
  */
 static void box_gpu_layer_group_free(
+    box_gpu_t *gpu,
     box_gpu_layer_group_t *g)
 {
+    gpu->blend_alive --;
+    gpu->blend_arrays_stale = true;
+    ecs_vec_clear(&gpu->layer_hints);
     if (g->array) {
         g->array->refs --;
     }
 
     if (g->group) {
         wgpuBindGroupRelease(g->group);
+        gpu->forward_stamp ++;
     }
 
     ecs_os_free(g);
@@ -256,6 +268,7 @@ static void box_gpu_layer_group_bind(
     int32_t i, n = 0;
     if (g->group) {
         wgpuBindGroupRelease(g->group);
+        gpu->forward_stamp ++;
         g->group = NULL;
     }
 
@@ -345,19 +358,7 @@ static void box_gpu_layer_group_bind(
     });
 }
 
-/** Get the bind group of a TextureLayers batch, created on first use, and write the buffers of
- * its layers whose values changed. Once per packet it checks its array, the blend group of a
- * blend batch and the images of a plain one, and binds them again when one changed.
- *
- * The array holds the albedo, ORM, normal and mask of each layer, after the heights of the
- * layers of a TextureBlend, whose blend group lends the rest of its entries.
- *
- * @param gpu The backend
- * @param packet The packet of the batch
- * @param b The batch, box_gpu_layered
- * @return The bind group
- */
-static WGPUBindGroup box_gpu_layer_group(
+WGPUBindGroup box_gpu_layer_group(
     box_gpu_t *gpu,
     const box_render_packet_t *packet,
     const box_render_batch_t *b)
@@ -412,6 +413,13 @@ static WGPUBindGroup box_gpu_layer_group(
     ecs_os_memcpy(key.maps, l->maps, ECS_SIZEOF(key.maps));
     key.count = l->count < 1 ? 1 : l->count > BOX_RENDER_LAYERS ? BOX_RENDER_LAYERS : l->count;
     key.quality = l->quality;
+    box_gpu_layer_group_t **hint = (box_gpu_layer_group_t**)box_gpu_batch_hint(
+        &gpu->layer_hints, packet, b);
+    g = hint ? *hint : NULL;
+    if (g && !ecs_os_memcmp(&g->key, &key, ECS_SIZEOF(key))) {
+        goto found;
+    }
+
     for (g = gpu->layer_groups; g; g = g->next) {
         if (!ecs_os_memcmp(&g->key, &key, ECS_SIZEOF(key))) {
             break;
@@ -422,16 +430,34 @@ static WGPUBindGroup box_gpu_layer_group(
         g = ecs_os_calloc_t(box_gpu_layer_group_t);
         g->key = key;
         g->checked = -1;
+        g->used = -1;
         g->next = gpu->layer_groups;
         gpu->layer_groups = g;
+        gpu->blend_alive ++;
     }
 
-    g->used = gpu->blend_frame;
+    if (hint) {
+        *hint = g;
+    }
+
+found:
+    if (g->used != gpu->blend_frame) {
+        g->used = gpu->blend_frame;
+        gpu->blend_marks ++;
+    }
+
     if (g->checked == gpu->blend_frame && g->group) {
         goto done;
     }
 
     g->checked = gpu->blend_frame;
+    if (g->group && g->seen_textures == gpu->texture_serial &&
+        (!bg || bg->bound == g->base) &&
+        !ecs_os_memcmp(buffers, g->buffers, ECS_SIZEOF(buffers)))
+    {
+        goto done;
+    }
+
     for (k = 0; k < key.count; k ++) {
         for (m = 0; m < BOX_RENDER_LAYER_MAPS; m ++) {
             uint32_t slice = base + k * BOX_RENDER_LAYER_MAPS + m;
@@ -453,12 +479,14 @@ static WGPUBindGroup box_gpu_layer_group(
     if (a != g->array) {
         if (g->array) {
             g->array->refs --;
+            gpu->blend_arrays_stale = true;
         }
 
         a->refs ++;
         g->array = a;
     }
 
+    g->seen_textures = gpu->blend_retry ? 0 : gpu->texture_serial;
     if (stale) {
         ecs_os_memcpy(g->buffers, buffers, ECS_SIZEOF(buffers));
         box_gpu_layer_group_bind(gpu, g, bg);
@@ -473,8 +501,26 @@ WGPUBindGroup box_gpu_forward_group(
     const box_render_packet_t *packet,
     const box_render_batch_t *b)
 {
+    const box_render_batch_t *first = ecs_vec_first(&packet->batches);
+    int32_t count = ecs_vec_count(&packet->batches);
+    box_gpu_forward_memo_t *memo = NULL;
     WGPUBindGroup result = NULL;
     int32_t i;
+    if (first && b >= first && b < first + count) {
+        int32_t have = ecs_vec_count(&gpu->forward_memo);
+        if (have < count) {
+            ecs_vec_set_count_t(NULL, &gpu->forward_memo, box_gpu_forward_memo_t, count);
+            ecs_os_memset_n(ecs_vec_get_t(&gpu->forward_memo, box_gpu_forward_memo_t, have), 0,
+                box_gpu_forward_memo_t, count - have);
+        }
+
+        memo = ecs_vec_get_t(&gpu->forward_memo, box_gpu_forward_memo_t, (int32_t)(b - first));
+        if (memo->stamp == gpu->forward_stamp && memo->rendering == gpu->rendering) {
+            result = memo->group;
+            goto found;
+        }
+    }
+
     if (!box_gpu_layered(b)) {
         result = box_gpu_material_group(gpu, packet, b);
         goto done;
@@ -490,6 +536,14 @@ WGPUBindGroup box_gpu_forward_group(
 
     result = box_gpu_layer_group(gpu, packet, b);
 done:
+    if (memo) {
+        memo = ecs_vec_get_t(&gpu->forward_memo, box_gpu_forward_memo_t, (int32_t)(b - first));
+        memo->stamp = gpu->forward_stamp;
+        memo->rendering = gpu->rendering;
+        memo->group = result;
+    }
+
+found:
     return result;
 }
 
@@ -547,27 +601,11 @@ done:
     return result;
 }
 
-/** Make the bind groups, arrays and buffers of the TextureLayers batches of a packet, and
- * release the groups and buffers no batch of the packet draws with. A packet without such a
- * batch only walks its batches.
- *
- * @param gpu The backend
- * @param packet The packet
- */
-void box_gpu_layers_prepare(
-    box_gpu_t *gpu,
-    const box_render_packet_t *packet)
+void box_gpu_layers_sweep(
+    box_gpu_t *gpu)
 {
-    int32_t i, count = ecs_vec_count(&packet->batches);
     box_gpu_layer_group_t **gp;
     box_gpu_layer_buffer_t **lp;
-    for (i = 0; i < count; i ++) {
-        const box_render_batch_t *b = ecs_vec_get_t(&packet->batches, box_render_batch_t, i);
-        if (box_gpu_layered(b)) {
-            box_gpu_layer_group(gpu, packet, b);
-        }
-    }
-
     for (gp = &gpu->layer_groups; *gp; ) {
         box_gpu_layer_group_t *g = *gp;
         if (g->used == gpu->blend_frame) {
@@ -576,7 +614,7 @@ void box_gpu_layers_prepare(
         }
 
         *gp = g->next;
-        box_gpu_layer_group_free(g);
+        box_gpu_layer_group_free(gpu, g);
     }
 
     for (lp = &gpu->layer_buffers; *lp; ) {
@@ -589,6 +627,7 @@ void box_gpu_layers_prepare(
         *lp = l->next;
         wgpuBufferRelease(l->buffer);
         ecs_os_free(l);
+        gpu->blend_alive --;
     }
 }
 
@@ -602,7 +641,7 @@ void box_gpu_layers_clear(
     while (gpu->layer_groups) {
         box_gpu_layer_group_t *g = gpu->layer_groups;
         gpu->layer_groups = g->next;
-        box_gpu_layer_group_free(g);
+        box_gpu_layer_group_free(gpu, g);
     }
 
     while (gpu->layer_buffers) {
@@ -610,6 +649,7 @@ void box_gpu_layers_clear(
         gpu->layer_buffers = l->next;
         wgpuBufferRelease(l->buffer);
         ecs_os_free(l);
+        gpu->blend_alive --;
     }
 }
 

@@ -292,6 +292,7 @@ static bool box_materials_distortion_moves(
  * @param m The table
  * @param owner The owner, 0 for the default material
  * @param out The record
+ * @param material Receives the material the record was packed from
  * @return Whether the record changes with the time: the owner has or inherits a TextureScroll,
  * a WindSway, a Water whose ripples move or whose shore waves roll in
  * (box_materials_water_moves), that has WaterWaves, WaterCaustics that move
@@ -303,27 +304,76 @@ static bool box_materials_pack(
     const ecs_world_t *world,
     box_draw_materials_t *m,
     ecs_entity_t owner,
-    box_render_material_t *out)
+    box_render_material_t *out,
+    box_draw_material_t *material)
 {
-    box_draw_material_t material;
-    box_draws_material_of(world, owner, m->time, &material);
-    if (material.waves) {
-        material.water_waves = box_draws_water_waves_set(m, owner, material.waves,
-            material.flow);
+    box_draws_material_of(world, owner, m->epoch, material);
+    box_draws_material_epoch(m, material);
+    if (material->waves) {
+        material->water_waves = box_draws_water_waves_set(m, owner, material->waves,
+            material->flow);
     }
 
-    if (material.caustics) {
-        box_draws_water_caustics_frame(m, owner, material.caustics, material.flow,
-            material.caustics_frame);
+    if (material->caustics) {
+        box_draws_water_caustics_frame(m, owner, material->caustics, material->flow,
+            material->caustics_frame);
     }
 
-    box_draws_material_pack(out, &material);
+    box_draws_material_pack(out, material);
 
-    return material.scroll != NULL || material.sway != NULL ||
-        box_materials_water_moves(material.water) || material.waves != NULL ||
-        box_draws_water_caustics_moves(material.caustics, material.flow) ||
-        box_materials_water_flows(material.flow) ||
-        (!material.water && box_materials_distortion_moves(material.distortion));
+    return material->scroll != NULL || material->sway != NULL ||
+        box_materials_water_moves(material->water) || material->waves != NULL ||
+        box_draws_water_caustics_moves(material->caustics, material->flow) ||
+        box_materials_water_flows(material->flow) ||
+        (!material->water && box_materials_distortion_moves(material->distortion));
+}
+
+void box_draws_material_epoch(
+    const box_draw_materials_t *m,
+    box_draw_material_t *material)
+{
+    material->time = m->epoch;
+    if (material->sway) {
+        material->wind.offset[0] = 0.0f;
+        material->wind.offset[1] = 0.0f;
+        material->wind.sway = 0.0f;
+        material->wind.clock = m->clock_epoch;
+    }
+}
+
+void box_draws_materials_refresh(
+    box_render_draws_t *d)
+{
+    box_draw_materials_t *m = &d->materials;
+    int32_t i, kept = 0;
+    for (i = 0; i < ecs_vec_count(&m->scrolling); i ++) {
+        uint32_t slot = *ecs_vec_get_t(&m->scrolling, uint32_t, i);
+        box_draw_material_slot_t *s = box_materials_slot(m, slot);
+        if (!s->owner) {
+            s->flags &= (uint8_t)~BOX_MATERIALS_SCROLLING;
+            continue;
+        }
+
+        *ecs_vec_get_t(&m->scrolling, uint32_t, kept ++) = slot;
+        box_materials_mark(m, slot);
+    }
+
+    ecs_vec_set_count_t(NULL, &m->scrolling, uint32_t, kept);
+}
+
+void box_draws_material_moved(
+    box_render_draws_t *d,
+    ecs_entity_t e)
+{
+    box_draw_materials_t *m = &d->materials;
+    ecs_map_val_t *own = ecs_map_count(&m->owned)
+        ? ecs_map_get(&m->owned, (ecs_map_key_t)e) : NULL;
+    if (own) {
+        box_draw_material_slot_t *s = box_materials_slot(m, (uint32_t)*own);
+        if (s->owner == e && (s->flags & BOX_MATERIALS_SCROLLING)) {
+            box_materials_mark(m, (uint32_t)*own);
+        }
+    }
 }
 
 /** Check whether an entity has or inherits a component whose record changes every frame.
@@ -409,7 +459,8 @@ static uint32_t box_materials_share(
 {
     box_draw_materials_t *m = &d->materials;
     box_render_material_t record;
-    box_materials_pack(world, m, e, &record);
+    box_draw_material_t material;
+    box_materials_pack(world, m, e, &record, &material);
     uint64_t hash = box_materials_hash(&record);
     uint32_t result = box_materials_find(m, hash, &record);
     if (result != BOX_MATERIALS_NONE) {
@@ -1013,6 +1064,10 @@ static void BoxMaterialsOnComponent(
         it->event_id == ecs_id(Water) || it->event_id == ecs_id(Distortion) ||
         it->event_id == ecs_id(WaterFlow);
     bool mark = !prefab && (inline_ || keyed);
+    if (it->event_id == ecs_id(WindSway)) {
+        d->sways ++;
+    }
+
     for (i = 0; i < it->count; i ++) {
         if (owners) {
             box_draws_material_changed(d, it->entities[i]);
@@ -1203,36 +1258,69 @@ static void box_materials_upload(
         };
 }
 
-/** Mark the scrolling slots whose record moved at the time of the table, and drop the slots
- * whose owner is gone, shares its slot or lost its TextureScroll from the list.
+/** Take a slot whose record no longer moves with the time out of the scrolling slots.
  *
- * @param world The world
  * @param m The table
+ * @param slot The slot
  */
-static void box_materials_scroll(
-    const ecs_world_t *world,
-    box_draw_materials_t *m)
+static void box_materials_still(
+    box_draw_materials_t *m,
+    uint32_t slot)
 {
-    box_render_material_t record;
-    int32_t i, kept = 0;
-    for (i = 0; i < ecs_vec_count(&m->scrolling); i ++) {
-        uint32_t slot = *ecs_vec_get_t(&m->scrolling, uint32_t, i);
-        box_draw_material_slot_t *s = box_materials_slot(m, slot);
-        ecs_entity_t owner = s->owner;
-        if (!owner || !ecs_is_alive(world, owner) ||
-            !box_materials_pack(world, m, owner, &record))
-        {
-            s->flags &= (uint8_t)~BOX_MATERIALS_SCROLLING;
-            continue;
-        }
-
-        *ecs_vec_get_t(&m->scrolling, uint32_t, kept ++) = slot;
-        if (ecs_os_memcmp_t(&record, box_materials_record(m, slot), box_render_material_t)) {
-            box_materials_mark(m, slot);
+    uint32_t *slots = ecs_vec_first_t(&m->scrolling, uint32_t);
+    int32_t i, count = ecs_vec_count(&m->scrolling);
+    box_materials_slot(m, slot)->flags &= (uint8_t)~BOX_MATERIALS_SCROLLING;
+    for (i = 0; i < count; i ++) {
+        if (slots[i] == slot) {
+            slots[i] = slots[count - 1];
+            ecs_vec_remove_last(&m->scrolling);
+            break;
         }
     }
+}
 
-    ecs_vec_set_count_t(NULL, &m->scrolling, uint32_t, kept);
+/** Set the clock of the frame, and start a new epoch when the clock is past what a float holds
+ * exactly enough or ran back: the slots whose record moves with the time are packed for it.
+ *
+ * @param world The world
+ * @param d The state
+ * @param p The packet
+ * @param clock Receives the clock
+ */
+static void box_materials_clock(
+    const ecs_world_t *world,
+    box_render_draws_t *d,
+    const box_render_packet_t *p,
+    box_render_material_clock_t *clock)
+{
+    box_draw_materials_t *m = &d->materials;
+    box_render_wind_t wind;
+    box_render_wind_frame(world, &wind);
+    double time = isfinite(p->time) ? p->time : 0.0;
+    double since = time - m->epoch, ticks = wind.clock - m->clock_epoch;
+    if (!m->epoch_valid || !(since >= 0.0 && since < BOX_RENDER_MATERIAL_EPOCH) ||
+        !(ticks >= 0.0 && ticks < BOX_RENDER_MATERIAL_EPOCH))
+    {
+        m->epoch = time;
+        m->clock_epoch = wind.clock;
+        m->epoch_valid = true;
+        since = 0.0;
+        ticks = 0.0;
+        box_draws_materials_refresh(d);
+        box_draws_water_caustics_advance(world, m);
+    }
+
+    ecs_os_memset_t(clock, 0, box_render_material_clock_t);
+    clock->time = (float)since;
+    clock->clock = (float)ticks;
+    clock->wind_offset[0] = wind.offset[0];
+    clock->wind_offset[1] = wind.offset[1];
+    clock->wind_direction[0] = wind.direction[0];
+    clock->wind_direction[1] = wind.direction[1];
+    clock->wind_speed = wind.speed;
+    clock->wind_gust = wind.gust;
+    clock->wind_frequency = wind.frequency;
+    clock->wind_sway = wind.sway;
 }
 
 void box_draws_materials_send(
@@ -1241,10 +1329,10 @@ void box_draws_materials_send(
     box_render_packet_t *p)
 {
     box_draw_materials_t *m = &d->materials;
+    box_render_material_clock_t clock;
     m->time = p->time;
+    box_materials_clock(world, d, p, &clock);
     box_draws_water_waves_advance(world, m);
-    box_draws_water_caustics_advance(world, m);
-    box_materials_scroll(world, m);
     int32_t i, j, count = ecs_vec_count(&m->dirty);
     uint32_t *dirty = ecs_vec_first_t(&m->dirty, uint32_t);
     uint32_t total = (uint32_t)ecs_vec_count(&m->records);
@@ -1263,11 +1351,14 @@ void box_draws_materials_send(
         if (owner && ecs_is_alive(world, owner)) {
             box_render_material_t *record = box_materials_record(m, slot);
             box_render_material_t was = *record;
-            if (box_materials_pack(world, m, owner, record) &&
-                !(s->flags & BOX_MATERIALS_SCROLLING))
-            {
-                s->flags |= BOX_MATERIALS_SCROLLING;
-                *ecs_vec_append_t(NULL, &m->scrolling, uint32_t) = slot;
+            box_draw_material_t material;
+            if (box_materials_pack(world, m, owner, record, &material)) {
+                if (!(s->flags & BOX_MATERIALS_SCROLLING)) {
+                    s->flags |= BOX_MATERIALS_SCROLLING;
+                    *ecs_vec_append_t(NULL, &m->scrolling, uint32_t) = slot;
+                }
+            } else if (s->flags & BOX_MATERIALS_SCROLLING) {
+                box_materials_still(m, slot);
             }
 
             box_materials_shadow(d, slot, &was, record);
@@ -1336,6 +1427,9 @@ void box_draws_materials_send(
     }
 
 done:
+    ecs_os_memcpy(box_render_packet_upload(p, BOX_RENDER_BUFFER_MATERIALS,
+        (uint32_t)offsetof(box_render_material_t, motion_uv),
+        (uint32_t)sizeof(box_render_material_clock_t)), &clock, ECS_SIZEOF(clock));
     box_draws_water_waves_upload(m, p);
     ecs_vec_clear(&m->dirty);
 }

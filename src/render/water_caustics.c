@@ -99,6 +99,7 @@ void box_draws_water_caustics_frame(
     const WaterFlow *flow,
     float *out)
 {
+    int32_t i;
     out[0] = 0.0f;
     out[1] = 0.0f;
     if (!owner || !caustics || !flow) {
@@ -118,10 +119,21 @@ void box_draws_water_caustics_frame(
         s->time = m->time;
     }
 
-    out[0] = (float)s->frame[0];
-    out[1] = (float)s->frame[1];
-    out[0] = out[0] < (float)BOX_RENDER_CAUSTICS_PERIOD ? out[0] : 0.0f;
-    out[1] = out[1] < (float)BOX_RENDER_CAUSTICS_PERIOD ? out[1] : 0.0f;
+    double frequency = (double)box_draws_water_caustics_frequency(caustics);
+    double dt = m->time - s->time, since = m->time - m->epoch;
+    for (i = 0; i < 2; i ++) {
+        double v = isfinite(flow->velocity[i]) ? (double)flow->velocity[i] : 0.0;
+        if (isfinite(dt) && dt > 0.0) {
+            s->frame[i] = box_draws_water_caustics_wrap(s->frame[i] + s->rate[i] * dt);
+        }
+
+        s->rate[i] = v * frequency;
+        s->base[i] = box_draws_water_caustics_wrap(s->frame[i] - s->rate[i] * since);
+        out[i] = (float)s->base[i];
+        out[i] = out[i] < (float)BOX_RENDER_CAUSTICS_PERIOD ? out[i] : 0.0f;
+    }
+
+    s->time = m->time;
 done:
     return;
 }
@@ -141,8 +153,8 @@ bool box_draws_water_caustics_find(
     const box_draw_water_caustics_state_t *s = ecs_map_get_deref(&m->caustics,
         box_draw_water_caustics_state_t, owner);
     if (s) {
-        out[0] = (float)s->frame[0];
-        out[1] = (float)s->frame[1];
+        out[0] = (float)s->base[0];
+        out[1] = (float)s->base[1];
         out[0] = out[0] < (float)BOX_RENDER_CAUSTICS_PERIOD ? out[0] : 0.0f;
         out[1] = out[1] < (float)BOX_RENDER_CAUSTICS_PERIOD ? out[1] : 0.0f;
         result = true;
@@ -167,7 +179,6 @@ void box_draws_water_caustics_advance(
     ecs_map_iter_t it = ecs_map_iter(&m->caustics);
     while (ecs_map_next(&it)) {
         ecs_entity_t owner = (ecs_entity_t)ecs_map_key(&it);
-        box_draw_water_caustics_state_t *s = ecs_map_ptr(&it);
         bool alive = ecs_is_alive(world, owner) &&
             ecs_map_get(&m->owned, (ecs_map_key_t)owner) != NULL;
         if (alive) {
@@ -176,12 +187,7 @@ void box_draws_water_caustics_advance(
 
         if (!alive || !material.caustics || !material.flow) {
             *ecs_vec_append_t(NULL, &gone, ecs_entity_t) = owner;
-            continue;
         }
-
-        box_draws_water_caustics_step(s->frame, material.caustics, material.flow,
-            m->time - s->time);
-        s->time = m->time;
     }
 
     for (i = 0; i < ecs_vec_count(&gone); i ++) {

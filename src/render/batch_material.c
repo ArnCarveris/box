@@ -486,6 +486,10 @@ static void box_draws_water_pack(
         box_draws_texture_scroll(&ripple, time, offsets);
         out->water_ripple_offset[0] = offsets[0];
         out->water_ripple_offset[1] = offsets[1];
+        out->motion_ripple[0] = isfinite(water->ripple_velocity[0])
+            ? water->ripple_velocity[0] : 0.0f;
+        out->motion_ripple[1] = isfinite(water->ripple_velocity[1])
+            ? water->ripple_velocity[1] : 0.0f;
     }
 
 done:
@@ -554,6 +558,7 @@ static void box_draws_water_shore_pack(
     {
         out->water_shore_reach = water->shore_reach;
         out->water_shore_phase = box_draws_water_shore_phase(water->shore_period, time);
+        out->motion_shore = 1.0f / water->shore_period;
     }
 }
 
@@ -602,6 +607,7 @@ static void box_draws_water_flow_pack(
     out->water_flow[0] = isfinite(flow->velocity[0]) ? flow->velocity[0] : 0.0f;
     out->water_flow[1] = isfinite(flow->velocity[1]) ? flow->velocity[1] : 0.0f;
     out->water_flow_phase = box_draws_water_flow_phase(time);
+    out->motion_phase = (float)(1.0 / BOX_RENDER_WATER_FLOW_PERIOD);
     out->water_flow_flags = BOX_RENDER_WATER_FLOW_TEXTURES;
 done:
     return;
@@ -615,6 +621,7 @@ done:
  *
  * @param out The record
  * @param caustics The component, NULL for none
+ * @param flow The WaterFlow of the Water its frame moves with, NULL for none
  * @param frame Offset of its water frame in cells, wrapped
  * @param origin Absolute position of the local origin, which the frame moves back by
  * @param time Total render time the phase is computed at
@@ -622,6 +629,7 @@ done:
 static void box_draws_water_caustics_pack(
     box_render_material_t *out,
     const WaterCaustics *caustics,
+    const WaterFlow *flow,
     const float *frame,
     const double *origin,
     double time)
@@ -653,6 +661,14 @@ static void box_draws_water_caustics_pack(
     }
 
     out->caustics_phase = box_draws_water_caustics_phase(caustics->speed, time);
+    out->motion_caustics_phase = isfinite(caustics->speed)
+        ? (float)((double)caustics->speed / BOX_RENDER_CAUSTICS_LOOP) : 0.0f;
+    if (flow) {
+        out->motion_caustics[0] = isfinite(flow->velocity[0])
+            ? flow->velocity[0] * out->caustics_frequency : 0.0f;
+        out->motion_caustics[1] = isfinite(flow->velocity[1])
+            ? flow->velocity[1] * out->caustics_frequency : 0.0f;
+    }
 done:
     return;
 }
@@ -715,6 +731,7 @@ static void box_draws_distortion_pack(
     out->distortion_strength = strength;
     out->distortion_frequency = 1.0f / scale;
     out->distortion_phase = box_draws_distortion_phase(distortion->speed, time);
+    out->motion_phase = isfinite(distortion->speed) ? distortion->speed : 0.0f;
     out->distortion_flags = BOX_RENDER_DISTORTION_PRESENT;
     if (!transmission) {
         out->distortion_flags |= BOX_RENDER_DISTORTION_SHARP;
@@ -839,6 +856,26 @@ done:
     return;
 }
 
+/** Get a rate of the motion words of a record.
+ *
+ * @param rate The rate
+ * @return The rate, 0 when it is not finite
+ */
+static float box_draws_rate(
+    float rate)
+{
+    return isfinite(rate) ? rate : 0.0f;
+}
+
+void box_draws_material_pack_wind(
+    box_render_material_t *out,
+    const box_draw_material_t *material)
+{
+    box_render_wind_pack(out, material->sway, &material->wind);
+    box_draws_reveal_pack(out, material->shape2d ? NULL : material->reveal);
+    box_draws_occlusion_pack(out, material->shape2d ? NULL : material->occlusion);
+}
+
 void box_draws_material_pack(
     box_render_material_t *out,
     const box_draw_material_t *material)
@@ -868,12 +905,17 @@ void box_draws_material_pack(
     out->uv[1] = uv ? uv->scale_y : 1.0f;
     out->uv[2] = uv ? uv->offset_x : 0.0f;
     out->uv[3] = uv ? uv->offset_y : 0.0f;
+    ecs_os_memset(out->motion_uv, 0, ECS_SIZEOF(float) * 16);
     if (material->scroll) {
         box_draws_texture_scroll(material->scroll, material->time, scroll);
         out->uv[2] += scroll[0];
         out->uv[3] += scroll[1];
         out->normal_offset[0] = scroll[2];
         out->normal_offset[1] = scroll[3];
+        out->motion_uv[0] = box_draws_rate(material->scroll->velocity[0]);
+        out->motion_uv[1] = box_draws_rate(material->scroll->velocity[1]);
+        out->motion_normal[0] = box_draws_rate(material->scroll->normal_velocity[0]);
+        out->motion_normal[1] = box_draws_rate(material->scroll->normal_velocity[1]);
     } else {
         out->normal_offset[0] = 0.0f;
         out->normal_offset[1] = 0.0f;
@@ -881,15 +923,14 @@ void box_draws_material_pack(
 
     box_draws_water_pack(out, material->water, material->water_waves, material->time);
     if (material->water) {
-        box_draws_water_caustics_pack(out, material->caustics, material->caustics_frame,
+        box_draws_water_caustics_pack(out, material->caustics, material->flow,
+            material->caustics_frame,
             material->origin, material->time);
     } else {
         box_draws_fresnel_pack(out, material->fresnel);
     }
 
-    box_render_wind_pack(out, material->sway, &material->wind);
-    box_draws_reveal_pack(out, material->shape2d ? NULL : material->reveal);
-    box_draws_occlusion_pack(out, material->shape2d ? NULL : material->occlusion);
+    box_draws_material_pack_wind(out, material);
     out->transmission_factor = transmission ? transmission->transmission_factor : 0.0f;
     out->ior = transmission ? transmission->ior : BOX_MATERIAL_IOR;
     out->thickness_factor = transmission ? glm_max(transmission->thickness_factor, 0.0f) : 0.0f;

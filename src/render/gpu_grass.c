@@ -398,7 +398,9 @@ static void box_gpu_grass_readback_step(
     }
 }
 
-/** Advance the readbacks by a packet and pick one for the packet when it has a Grass.
+/** Advance the readbacks by a packet and pick one for the packet when it has a Grass and the
+ * passes are timed (box_gpu_profile_timed): the blades are counted while the detailed stats or
+ * the GPU profile are on.
  *
  * @param gpu The backend
  * @param s The grass passes
@@ -412,7 +414,7 @@ static void box_gpu_grass_readbacks(
 #ifndef __EMSCRIPTEN__
     for (i = 0; i < BOX_GPU_GRASS_READBACKS; i ++) {
         if (s->readbacks[i].state == BOX_GPU_GRASS_MAPPING) {
-            wgpuDevicePoll(gpu->device, false, NULL);
+            box_gpu_poll(gpu);
             break;
         }
     }
@@ -430,7 +432,7 @@ static void box_gpu_grass_readbacks(
     }
 
     s->current = -1;
-    for (i = 0; s->active && i < BOX_GPU_GRASS_READBACKS; i ++) {
+    for (i = 0; s->active && box_gpu_profile_timed(gpu) && i < BOX_GPU_GRASS_READBACKS; i ++) {
         if (s->readbacks[i].state == BOX_GPU_GRASS_FREE) {
             s->readbacks[i].state = BOX_GPU_GRASS_RECORDING;
             s->readbacks[i].stamps = 0;
@@ -681,7 +683,10 @@ void box_gpu_grass_begin(
         box_gpu_grass_entity_groups(gpu, s, ecs_map_ptr(&it));
     }
 
-    wgpuQueueWriteBuffer(gpu->queue, s->stats, 0, zero, sizeof(zero));
+    if (s->current != -1) {
+        wgpuQueueWriteBuffer(gpu->queue, s->stats, 0, zero, sizeof(zero));
+    }
+
 done:
     return;
 }
@@ -1025,7 +1030,8 @@ WGPUComputePassEncoder box_gpu_grass_pass(
     WGPUPassTimestampWrites writes;
     gpu->pending.grass_passes ++;
 
-    return box_gpu_compute_begin(gpu, encoder, box_gpu_grass_writes(s, &writes), "grass");
+    return box_gpu_compute_begin(gpu, encoder,
+        box_gpu_profile_timed(gpu) ? box_gpu_grass_writes(s, &writes) : NULL, "grass");
 }
 
 bool box_gpu_grass_dispatch(

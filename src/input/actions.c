@@ -713,7 +713,41 @@ static void box_input_actions_emit(
     ecs_vec_clear(&box_input_actions(world)->events);
 }
 
+/** Whether no key or mouse button is held or went down this frame.
+ *
+ * @param in The Input singleton
+ * @return true when no binding can contribute to an action
+ */
+static bool box_input_quiet(
+    const Input *in)
+{
+    bool result = true;
+    int32_t i;
+    for (i = 0; result && i < BOX_KEY_COUNT; i ++) {
+        result = !in->keys[i].down && !in->keys[i].pressed;
+    }
+
+    return result;
+}
+
+/** A Binding or an ActionState was set: the next update resolves the actions again.
+ *
+ * @param it Iterator of the observer
+ */
+static void BoxInputActionOnSet(
+    ecs_iter_t *it)
+{
+    InputActions *st = box_input_actions(it->world);
+    if (st) {
+        st->idle = false;
+    }
+}
+
 /** Resolve the bindings and synthetic holds into ActionState and raise the action events.
+ *
+ * While no key is held and no hold is left, an update that raised no event left every action
+ * released, and the updates after it would write the same: they are skipped until a key goes
+ * down, a hold arrives or a Binding or ActionState is set.
  *
  * @param it Iterator of the system, which has no terms
  */
@@ -723,9 +757,15 @@ static void BoxInputActionUpdate(
     ecs_world_t *world = ECS_CONST_CAST(ecs_world_t*, ecs_get_world(it->world));
     InputActions *st = box_input_actions(world);
     const Input *in = ecs_singleton_get(world, Input);
+    InputDevice *dev = box_input_device(world);
+    bool quiet = !ecs_vec_count(&dev->holds) && box_input_quiet(in);
     ecs_iter_t qit;
     int32_t i;
-    box_input_bind(world, st, box_input_device(world), in);
+    if (quiet && st->idle) {
+        goto done;
+    }
+
+    box_input_bind(world, st, dev, in);
     qit = ecs_query_iter(world, st->actions);
     while (ecs_query_next(&qit)) {
         ActionState *state = ecs_field(&qit, ActionState, 0);
@@ -736,7 +776,11 @@ static void BoxInputActionUpdate(
         }
     }
 
+    st->idle = quiet && !ecs_vec_count(&st->events);
     box_input_actions_emit(world);
+
+done:
+    return;
 }
 
 /** Suspend a task until an action, or an action under the target, raises a phase.
@@ -823,6 +867,20 @@ void box_input_actions_import(
         .entity = ecs_entity(world, { .name = "ActionStates" }),
         .terms = {{ .id = ecs_id(ActionState), .inout = EcsInOut }},
         .cache_kind = EcsQueryCacheAuto
+    });
+
+    ecs_observer(world, {
+        .entity = ecs_entity(world, { .name = "ActionOnSet" }),
+        .query.terms = {{ .id = ecs_id(ActionState), .src.id = EcsSelf }},
+        .events = { EcsOnSet },
+        .callback = BoxInputActionOnSet
+    });
+
+    ecs_observer(world, {
+        .entity = ecs_entity(world, { .name = "BindingOnSet" }),
+        .query.terms = {{ .id = ecs_id(Binding), .src.id = EcsSelf }},
+        .events = { EcsOnSet },
+        .callback = BoxInputActionOnSet
     });
 
     ecs_system(world, {

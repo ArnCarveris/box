@@ -154,6 +154,11 @@ void box_texture_graph_clear(
     tex->graph_held = false;
     tex->graph_sent = false;
     tex->graph_pending = false;
+    tex->graph_outcome = 0;
+    if (tex->graph_awaited) {
+        tex->graph_awaited = false;
+        t->graph_awaited --;
+    }
 }
 
 void box_texture_graphs_fini(
@@ -171,7 +176,19 @@ void box_texture_graphs_fini(
     ecs_vec_fini_t(NULL, &t->graph_queued, ecs_entity_t);
     ecs_vec_fini_t(NULL, &t->graph_released, uint32_t);
     ecs_vec_fini_t(NULL, &t->reload, ecs_entity_t);
+    ecs_vec_fini_t(NULL, &t->graph_build, ecs_entity_t);
+    ecs_vec_fini_t(NULL, &t->graph_sampling, ecs_entity_t);
     ecs_map_fini(&t->reach);
+}
+
+void box_texture_graph_list(
+    box_textures_t *t,
+    box_texture_t *tex)
+{
+    if (!tex->graph_listed) {
+        tex->graph_listed = true;
+        *ecs_vec_append_t(NULL, &t->graph_build, ecs_entity_t) = tex->entity;
+    }
 }
 
 void box_texture_graph_request(
@@ -182,6 +199,7 @@ void box_texture_graph_request(
     box_texture_t *tex = box_texture_entry(t, e);
     tex->generation ++;
     tex->graph_dirty = true;
+    box_texture_graph_list(t, tex);
     box_texture_status(world, e, TextureLoading, box_texture_revision(world, e), NULL);
 }
 
@@ -201,12 +219,14 @@ void box_texture_graphs_touch(
         int32_t count = ecs_vec_count(&tex->reached);
         if (!e && count) {
             tex->graph_dirty = true;
+            box_texture_graph_list(t, tex);
             continue;
         }
 
         for (i = 0; i < count; i ++) {
             if (reached[i] == e) {
                 tex->graph_dirty = true;
+                box_texture_graph_list(t, tex);
                 break;
             }
         }
@@ -1312,6 +1332,11 @@ static void box_texture_graph_accept(
 
     box_texture_graph_free(tex->graph);
     tex->graph = graph;
+    if (graph->texture_count && !tex->graph_sampling) {
+        tex->graph_sampling = true;
+        *ecs_vec_append_t(NULL, &t->graph_sampling, ecs_entity_t) = e;
+    }
+
     tex->loaded = true;
     tex->width = graph->width;
     tex->height = graph->height;
@@ -1385,9 +1410,11 @@ static void box_texture_graph_build(
         box_texture_fail(world, t, e, b.error);
     } else if (b.waiting) {
         tex->graph_waiting = true;
+        box_texture_graph_list(t, tex);
         box_texture_status(world, e, TextureLoading, box_texture_revision(world, e), NULL);
     } else if (b.held) {
         tex->graph_held = true;
+        box_texture_graph_list(t, tex);
         box_texture_status(world, e, TextureLoading, box_texture_revision(world, e), NULL);
     } else {
         box_texture_graph_accept(world, t, e, box_texture_graph_compile(&b, graph));
@@ -1408,6 +1435,8 @@ done:
  * or wait for a sampled texture to get an image, and fail the ones that waited a frame for a
  * node without a node component.
  *
+ * The graphs come from the list their marks put them in, so a frame without one looks at none.
+ *
  * @param it The iterator of the system
  */
 static void BoxTextureGraphBuild(
@@ -1417,10 +1446,11 @@ static void BoxTextureGraphBuild(
     box_textures_t *t = box_textures_get(world);
     ecs_vec_t build;
     int32_t i, count;
-    if (!t) {
+    if (!t || (!ecs_vec_count(&t->reload) && !ecs_vec_count(&t->graph_build))) {
         goto done;
     }
 
+    t->work.builds ++;
     ecs_vec_init_t(NULL, &build, ecs_entity_t, 0);
     count = ecs_vec_count(&t->reload);
     for (i = 0; i < count; i ++) {
@@ -1437,14 +1467,23 @@ static void BoxTextureGraphBuild(
     }
 
     ecs_vec_clear(&build);
-    ecs_map_iter_t mit = ecs_map_iter(&t->textures);
-    while (ecs_map_next(&mit)) {
-        box_texture_t *tex = ecs_map_ptr(&mit);
+    t->graph_pass ++;
+    count = ecs_vec_count(&t->graph_build);
+    for (i = 0; i < count; i ++) {
+        ecs_entity_t e = *ecs_vec_get_t(&t->graph_build, ecs_entity_t, i);
+        box_texture_t *tex = ecs_map_get_deref(&t->textures, box_texture_t, e);
+        if (!tex || tex->graph_pass == t->graph_pass) {
+            continue;
+        }
+
+        tex->graph_pass = t->graph_pass;
+        tex->graph_listed = false;
         if (tex->graph_dirty || tex->graph_waiting || tex->graph_held) {
-            *ecs_vec_append_t(NULL, &build, ecs_entity_t) = tex->entity;
+            *ecs_vec_append_t(NULL, &build, ecs_entity_t) = e;
         }
     }
 
+    ecs_vec_clear(&t->graph_build);
     count = ecs_vec_count(&build);
     for (i = 0; i < count; i ++) {
         ecs_entity_t e = *ecs_vec_get_t(&build, ecs_entity_t, i);
@@ -1477,6 +1516,8 @@ void box_texture_graphs_init(
     ecs_vec_init_t(NULL, &t->graph_queued, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &t->graph_released, uint32_t, 0);
     ecs_vec_init_t(NULL, &t->reload, ecs_entity_t, 0);
+    ecs_vec_init_t(NULL, &t->graph_build, ecs_entity_t, 0);
+    ecs_vec_init_t(NULL, &t->graph_sampling, ecs_entity_t, 0);
     ecs_map_init(&t->reach, NULL);
     box_texture_nodes_register(world);
     ecs_system(world, {

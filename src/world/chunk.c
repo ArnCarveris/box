@@ -35,6 +35,10 @@ typedef struct box_chunk_state_t {
     ecs_vec_t work;                /**< box_chunk_work_t of the last scan */
     int32_t unloading;             /**< Cells out of range that wait for the budget */
     uint64_t stamp;                /**< Number of the last scan */
+    int32_t loaded[BOX_WORLD_CHUNK_LEVELS]; /**< Loaded cells per level */
+    double slack;                  /**< Distance below which a move of the foci since the last
+                                    *   scan changes neither the cells it visits nor a level */
+    bool idle;                     /**< Whether the status holds a frame without work */
 } box_chunk_state_t;
 
 /** Engine state of a ChunkGrid, added with it */
@@ -43,6 +47,26 @@ typedef struct ChunkGridState {
 } ChunkGridState;
 
 static ECS_COMPONENT_DECLARE(ChunkGridState);
+
+/** A focus of a run of the stream */
+typedef struct box_chunk_focus_t {
+    ecs_entity_t entity;           /**< The focus entity */
+    ecs_entity_t scene;            /**< Its scene */
+    double p[3];                   /**< Its absolute position */
+} box_chunk_focus_t;
+
+/** What the stream of all grids ran on last, so a frame without a change returns at once */
+typedef struct box_chunk_stream_t {
+    uint64_t version;              /**< Bumped when a grid, a template or a scene changes */
+    uint64_t seen;                 /**< Version of the last run */
+    bool ran;                      /**< Whether the stream ran before */
+    bool active;                   /**< Whether a grid has work, deletions or a status left */
+    ecs_vec_t foci;                /**< box_chunk_focus_t of the last run */
+    ecs_vec_t now;                 /**< box_chunk_focus_t of this frame */
+    ecs_vec_t own;                 /**< double[3], scratch for the foci of a grid */
+    int64_t updates;               /**< Grids the stream looked at so far */
+    int64_t scans;                 /**< Scans of the cells of a grid so far */
+} box_chunk_stream_t;
 
 /** Hash a cell coordinate.
  *
@@ -104,6 +128,9 @@ static box_chunk_cell_t* box_chunk_insert(
     cell->next = (box_chunk_cell_t*)(uintptr_t)*head;
     *head = (ecs_map_val_t)(uintptr_t)cell;
     state->count ++;
+    if (level >= 0 && level < BOX_WORLD_CHUNK_LEVELS) {
+        state->loaded[level] ++;
+    }
 
     return cell;
 }
@@ -136,6 +163,10 @@ static void box_chunk_remove(
 
     if (cur) {
         state->count --;
+        if (cur->level >= 0 && cur->level < BOX_WORLD_CHUNK_LEVELS) {
+            state->loaded[cur->level] --;
+        }
+
         ecs_os_free(cur);
     }
 }
@@ -177,6 +208,7 @@ static void box_chunk_state_clear(
     ecs_vec_fini_t(NULL, &cells, box_chunk_cell_t*);
     ecs_map_clear(&state->cells);
     state->count = 0;
+    ecs_os_memset_n(state->loaded, 0, int32_t, BOX_WORLD_CHUNK_LEVELS);
 }
 
 /** Free a grid state.
@@ -666,32 +698,45 @@ static void box_chunk_unload_all(
  *
  * @param world The world
  * @param grid The grid entity
+ * @param foci The foci of the frame
  * @param out Receives double[3] per focus
  */
 static void box_chunk_foci(
     const ecs_world_t *world,
     ecs_entity_t grid,
+    const ecs_vec_t *foci,
     ecs_vec_t *out)
 {
-    int32_t count = box_world_focus(world, NULL, 0), i, own = 0;
-    box_world_focus_t *foci = ecs_os_calloc_n(box_world_focus_t, count ? count : 1);
+    int32_t count = ecs_vec_count(foci), i, own = 0;
+    const box_chunk_focus_t *src = ecs_vec_first_t(foci, box_chunk_focus_t);
     ecs_entity_t scene = box_world_scene_of(world, grid);
-    count = box_world_focus(world, foci, count);
     for (i = 0; i < count; i ++) {
-        own += foci[i].scene == scene;
+        own += src[i].scene == scene;
     }
 
     ecs_vec_clear(out);
     for (i = 0; i < count; i ++) {
-        if (own && foci[i].scene != scene) {
+        if (own && src[i].scene != scene) {
             continue;
         }
 
         double *p = ecs_vec_append(NULL, out, ECS_SIZEOF(double) * 3);
-        box_world_to_absolute(world, foci[i].position, p);
+        ecs_os_memcpy_n(p, src[i].p, double, 3);
     }
+}
 
-    ecs_os_free(foci);
+/** Lower the slack of a grid to a margin.
+ *
+ * @param state The state of the grid
+ * @param margin Distance a focus can move before something changes
+ */
+static void box_chunk_slack(
+    box_chunk_state_t *state,
+    double margin)
+{
+    if (!(margin >= state->slack)) {
+        state->slack = margin > 0 ? margin : 0;
+    }
 }
 
 /** Order work by level, more detail first, then nearest first.
@@ -714,7 +759,8 @@ static int box_chunk_work_compare(
 }
 
 /** Visit a cell in range of a scan: queue its load or level change. A loaded cell past the
- * last ring is left unseen, which box_chunk_unload_unseen deletes.
+ * last ring is left unseen, which box_chunk_unload_unseen deletes. Lowers the slack of the grid
+ * to the distance the cell is from its next load, level change or unload.
  *
  * @param world The world
  * @param state The state of the grid
@@ -729,7 +775,8 @@ static void box_chunk_visit(
     const int32_t c[3],
     double d)
 {
-    int32_t count = box_chunk_level_count(config);
+    int32_t count = box_chunk_level_count(config), l;
+    double h = config->hysteresis > 0 ? (double)config->hysteresis : 0.0;
     box_chunk_cell_t *cell = box_chunk_find(state, c);
     int32_t level;
     if (cell && !ecs_is_alive(world, cell->entity)) {
@@ -744,6 +791,17 @@ static void box_chunk_visit(
         level = box_chunk_level_at(config, count, d, 0.0);
     }
 
+    if (level >= 0) {
+        box_chunk_slack(state, (double)config->levels[level] + h - d);
+        if (level > 0) {
+            box_chunk_slack(state, d - ((double)config->levels[level - 1] - h));
+        }
+    } else {
+        for (l = 0; l < count; l ++) {
+            box_chunk_slack(state, d - (double)config->levels[l]);
+        }
+    }
+
     if (level >= 0 && (!cell || level != cell->level)) {
         box_chunk_work_t *work = ecs_vec_append_t(NULL, &state->work, box_chunk_work_t);
         ecs_os_memcpy_n(work->c, c, int32_t, 3);
@@ -753,7 +811,9 @@ static void box_chunk_visit(
     }
 }
 
-/** Visit the cells in range of every focus once each, the union of the foci.
+/** Visit the cells in range of every focus once each, the union of the foci. Sets the slack
+ * of the grid: while every focus moved less than it since the scan, a scan would visit the same
+ * cells and find no load, level change or unload.
  *
  * @param world The world
  * @param state The state of the grid, its foci set
@@ -772,8 +832,24 @@ static void box_chunk_scan(
     int64_t (*hi)[3] = ecs_os_calloc(ECS_SIZEOF(int64_t) * 3 * (nf ? nf : 1));
     bool *valid = ecs_os_calloc_n(bool, nf ? nf : 1);
     int64_t x, y, z;
+    int32_t a;
+    state->slack = INFINITY;
     for (f = 0; f < nf && reach >= 0; f ++) {
         valid[f] = box_chunk_range(config, &foci[f * 3], reach, lo[f], hi[f]);
+        for (a = 0; a < 3; a ++) {
+            double s = (double)config->cell_size[a];
+            double u = foci[f * 3 + a] - reach, v = foci[f * 3 + a] + reach;
+            if (a == 1 && !box_chunk_is_3d(config)) {
+                continue;
+            }
+
+            double first = (ceil(u / s) - 1.0) * s, last = floor(v / s) * s;
+            box_chunk_slack(state, u - first);
+            box_chunk_slack(state, first + s - u);
+            box_chunk_slack(state, v - last);
+            box_chunk_slack(state, last + s - v);
+        }
+
         for (x = lo[f][0]; valid[f] && x <= hi[f][0]; x ++) {
             for (y = lo[f][1]; y <= hi[f][1]; y ++) {
                 for (z = lo[f][2]; z <= hi[f][2]; z ++) {
@@ -896,7 +972,13 @@ static void box_chunk_apply(
 
         ecs_os_get_time(&op);
         if (work[i].cell) {
+            int32_t from = work[i].cell->level;
             box_chunk_set_level(world, config, work[i].cell, work[i].level);
+            if (from >= 0 && from < BOX_WORLD_CHUNK_LEVELS) {
+                state->loaded[from] --;
+            }
+
+            state->loaded[work[i].level] ++;
             status->changed ++;
         } else {
             ecs_entity_t e = box_chunk_create(world, grid, config, anchor, &work[i]);
@@ -909,8 +991,8 @@ static void box_chunk_apply(
     }
 }
 
-/** Check whether a grid needs a scan: its foci or config changed or work or deletions are
- * pending.
+/** Check whether a grid needs a scan: its config changed, work or deletions are pending, or
+ * its foci changed and one moved by its slack or more since the last scan.
  *
  * @param state The state of the grid
  * @param config The grid
@@ -922,60 +1004,50 @@ static bool box_chunk_dirty(
     const ChunkGrid *config,
     const ecs_vec_t *foci)
 {
+    int32_t count = ecs_vec_count(foci), i;
+    const double *now = ecs_vec_first(foci), *last = ecs_vec_first(&state->foci);
     bool result = !state->scanned || ecs_vec_count(&state->work) > 0 || state->unloading > 0 ||
         ecs_os_memcmp(&state->config, config, ECS_SIZEOF(ChunkGrid)) != 0 ||
-        ecs_vec_count(foci) != ecs_vec_count(&state->foci);
-    if (!result) {
-        result = ecs_os_memcmp(ecs_vec_first(foci), ecs_vec_first(&state->foci),
-            ECS_SIZEOF(double) * 3 * ecs_vec_count(foci)) != 0;
+        count != ecs_vec_count(&state->foci);
+    if (!result && ecs_os_memcmp(now, last, ECS_SIZEOF(double) * 3 * count) != 0) {
+        double moved = 0;
+        for (i = 0; i < count; i ++) {
+            double dx = now[i * 3] - last[i * 3], dy = now[i * 3 + 1] - last[i * 3 + 1];
+            double dz = now[i * 3 + 2] - last[i * 3 + 2];
+            double d = sqrt(dx * dx + dy * dy + dz * dz);
+            moved = d > moved ? d : moved;
+        }
+
+        result = !(moved * (1.0 + 1e-9) + 1e-9 < state->slack);
     }
 
     return result;
 }
 
-/** Count the loaded cells of a grid per level.
- *
- * @param state The state of the grid
- * @param status Receives the counts
- */
-static void box_chunk_count(
-    const box_chunk_state_t *state,
-    ChunkGridStatus *status)
-{
-    ecs_vec_t cells;
-    int32_t i;
-    box_chunk_collect(state, &cells);
-    for (i = 0; i < ecs_vec_count(&cells); i ++) {
-        box_chunk_cell_t *cell = *ecs_vec_get_t(&cells, box_chunk_cell_t*, i);
-        if (cell->level >= 0 && cell->level < BOX_WORLD_CHUNK_LEVELS) {
-            status->loaded[cell->level] ++;
-        }
-    }
-
-    status->cells = state->count;
-    ecs_vec_fini_t(NULL, &cells, box_chunk_cell_t*);
-}
-
-/** Stream the cells of one grid for this frame.
+/** Stream the cells of one grid for this frame. The status is written in a frame with work
+ * and in the frame after it.
  *
  * @param world The world
+ * @param stream The stream, its now the foci of the frame
  * @param grid The grid entity
  */
 static void box_chunk_update(
     ecs_world_t *world,
+    box_chunk_stream_t *stream,
     ecs_entity_t grid)
 {
     ChunkGridState *s = ecs_get_mut(world, grid, ChunkGridState);
     const ChunkGrid *ptr = ecs_get(world, grid, ChunkGrid);
     ChunkGridStatus status = {0};
-    ecs_vec_t foci;
+    ecs_vec_t *foci = &stream->own;
+    bool worked = false;
     ecs_time_t start;
     ecs_os_get_time(&start);
-    ecs_vec_init(NULL, &foci, ECS_SIZEOF(double) * 3, 0);
     if (!s || !ptr) {
         goto done;
     }
 
+    stream->updates ++;
     ChunkGrid config = *ptr;
     if (!ecs_has(world, grid, Position)) {
         ecs_set(world, grid, Position, {0, 0, 0});
@@ -997,20 +1069,23 @@ static void box_chunk_update(
         ecs_os_memcmp(state->config.cell_size, config.cell_size, ECS_SIZEOF(vec3)) ||
         state->config.seed != config.seed);
     if (reset || !valid) {
+        worked = state->count > 0 || ecs_vec_count(&state->work) > 0;
         box_chunk_unload_all(world, state, &status);
         ecs_vec_clear(&state->work);
         state->scanned = valid && state->scanned;
     }
 
-    box_chunk_foci(world, grid, &foci);
-    if (valid && ecs_vec_count(&foci) && box_chunk_dirty(state, &config, &foci)) {
+    box_chunk_foci(world, grid, &stream->now, foci);
+    if (valid && ecs_vec_count(foci) && box_chunk_dirty(state, &config, foci)) {
+        worked = true;
+        stream->scans ++;
         state->stamp ++;
         state->config = config;
         state->scanned = true;
         ecs_vec_clear(&state->foci);
         ecs_os_memcpy(ecs_vec_grow(NULL, &state->foci, ECS_SIZEOF(double) * 3,
-            ecs_vec_count(&foci)), ecs_vec_first(&foci),
-            ECS_SIZEOF(double) * 3 * ecs_vec_count(&foci));
+            ecs_vec_count(foci)), ecs_vec_first(foci),
+            ECS_SIZEOF(double) * 3 * ecs_vec_count(foci));
         ecs_vec_clear(&state->work);
         box_chunk_scan(world, state, &config);
         box_chunk_unload_unseen(world, state, &config, &start, &status);
@@ -1020,17 +1095,55 @@ static void box_chunk_update(
         }
     }
 
-    box_chunk_count(state, &status);
+    ecs_os_memcpy_n(status.loaded, state->loaded, int32_t, BOX_WORLD_CHUNK_LEVELS);
+    status.cells = state->count;
+    if (!worked && state->idle) {
+        goto idle;
+    }
+
+    state->idle = !worked;
+    stream->active = stream->active || worked;
 done:
     status.time_ms = (float)(ecs_time_measure(&start) * 1000.0);
     if (ptr && ecs_is_alive(world, grid)) {
         ecs_set_ptr(world, grid, ChunkGridStatus, &status);
     }
 
-    ecs_vec_fini(NULL, &foci, ECS_SIZEOF(double) * 3);
+idle:
+    return;
 }
 
-/** Stream the cells of every ChunkGrid around the foci.
+/** Collect the foci of the frame with their scenes and absolute positions.
+ *
+ * @param world The world
+ * @param out Receives box_chunk_focus_t
+ */
+static void box_chunk_stream_foci(
+    const ecs_world_t *world,
+    ecs_vec_t *out)
+{
+    box_world_focus_t local[8], *foci = local;
+    int32_t count = box_world_focus(world, local, 8), i;
+    if (count > 8) {
+        foci = ecs_os_calloc_n(box_world_focus_t, count);
+        count = box_world_focus(world, foci, count);
+    }
+
+    ecs_vec_clear(out);
+    for (i = 0; i < count; i ++) {
+        box_chunk_focus_t *f = ecs_vec_append_t(NULL, out, box_chunk_focus_t);
+        f->entity = foci[i].entity;
+        f->scene = foci[i].scene;
+        box_world_to_absolute(world, foci[i].position, f->p);
+    }
+
+    if (foci != local) {
+        ecs_os_free(foci);
+    }
+}
+
+/** Stream the cells of every ChunkGrid around the foci. Returns at once in a frame in which
+ * the foci are where they were, no grid, template or scene changed and no grid has work left.
  *
  * @param it The iterator of the system
  */
@@ -1038,8 +1151,25 @@ static void BoxWorldChunkStream(
     ecs_iter_t *it)
 {
     ecs_world_t *world = it->world;
+    box_chunk_stream_t *stream = it->ctx;
     ecs_vec_t grids;
-    int32_t i;
+    int32_t i, count;
+    box_chunk_stream_foci(world, &stream->now);
+    count = ecs_vec_count(&stream->now);
+    if (stream->ran && !stream->active && stream->seen == stream->version &&
+        count == ecs_vec_count(&stream->foci) && !ecs_os_memcmp(ecs_vec_first(&stream->now),
+            ecs_vec_first(&stream->foci), ECS_SIZEOF(box_chunk_focus_t) * count))
+    {
+        goto done;
+    }
+
+    stream->ran = true;
+    stream->active = false;
+    stream->seen = stream->version;
+    ecs_vec_clear(&stream->foci);
+    ecs_os_memcpy(ecs_vec_grow_t(NULL, &stream->foci, box_chunk_focus_t, count),
+        ecs_vec_first(&stream->now), ECS_SIZEOF(box_chunk_focus_t) * count);
+
     ecs_vec_init_t(NULL, &grids, ecs_entity_t, 0);
     ecs_iter_t qit = ecs_each(world, ChunkGrid);
     while (ecs_each_next(&qit)) {
@@ -1051,11 +1181,54 @@ static void BoxWorldChunkStream(
     for (i = 0; i < ecs_vec_count(&grids); i ++) {
         ecs_entity_t grid = *ecs_vec_get_t(&grids, ecs_entity_t, i);
         if (ecs_is_alive(world, grid) && !ecs_has_id(world, grid, EcsDisabled)) {
-            box_chunk_update(world, grid);
+            box_chunk_update(world, stream, grid);
         }
     }
 
     ecs_vec_fini_t(NULL, &grids, ecs_entity_t);
+done:
+    return;
+}
+
+/** Make the stream look at every grid in its next run.
+ *
+ * @param it The iterator of a hook or observer, its ctx the stream
+ */
+static void box_chunk_stream_changed(
+    ecs_iter_t *it)
+{
+    box_chunk_stream_t *stream = it->ctx;
+    stream->version ++;
+}
+
+/** Free the stream.
+ *
+ * @param ptr The stream
+ */
+static void box_chunk_stream_free(
+    void *ptr)
+{
+    box_chunk_stream_t *stream = ptr;
+    ecs_vec_fini_t(NULL, &stream->foci, box_chunk_focus_t);
+    ecs_vec_fini_t(NULL, &stream->now, box_chunk_focus_t);
+    ecs_vec_fini(NULL, &stream->own, ECS_SIZEOF(double) * 3);
+    ecs_os_free(stream);
+}
+
+void box_chunk_grid_work(
+    const ecs_world_t *world,
+    int64_t *updates,
+    int64_t *scans)
+{
+    const ecs_type_hooks_t *hooks = ecs_get_hooks(world, ChunkGrid);
+    const box_chunk_stream_t *stream = hooks ? hooks->ctx : NULL;
+    if (updates) {
+        *updates = stream ? stream->updates : 0;
+    }
+
+    if (scans) {
+        *scans = stream ? stream->scans : 0;
+    }
 }
 
 ecs_entity_t box_chunk_grid_cell(
@@ -1080,10 +1253,20 @@ ecs_entity_t box_chunk_grid_cell(
 void box_world_chunk_import(
     ecs_world_t *world)
 {
+    box_chunk_stream_t *stream = ecs_os_calloc_t(box_chunk_stream_t);
+    ecs_vec_init_t(NULL, &stream->foci, box_chunk_focus_t, 0);
+    ecs_vec_init_t(NULL, &stream->now, box_chunk_focus_t, 0);
+    ecs_vec_init(NULL, &stream->own, ECS_SIZEOF(double) * 3, 0);
     ECS_COMPONENT_DEFINE(world, ChunkGridGate);
     ECS_COMPONENT_DEFINE(world, ChunkGridState);
 
-    ecs_set_hooks(world, ChunkGrid, { .ctor = box_chunk_grid_ctor });
+    ecs_set_hooks(world, ChunkGrid, {
+        .ctor = box_chunk_grid_ctor,
+        .on_add = box_chunk_stream_changed,
+        .on_set = box_chunk_stream_changed,
+        .ctx = stream,
+        .ctx_free = box_chunk_stream_free
+    });
     ecs_set_hooks(world, ChunkGridState, {
         .ctor = flecs_default_ctor,
         .dtor = box_chunk_state_dtor,
@@ -1093,10 +1276,30 @@ void box_world_chunk_import(
     ecs_add_pair(world, ecs_id(ChunkGrid), EcsWith, ecs_id(ChunkGridState));
     ecs_add_pair(world, ecs_id(ChunkGrid), EcsWith, ecs_id(ChunkGridStatus));
 
+    ecs_observer(world, {
+        .query.terms = {{ .id = ecs_id(ChunkGrid) }, { .id = EcsDisabled }},
+        .events = { EcsOnRemove },
+        .callback = box_chunk_stream_changed,
+        .ctx = stream
+    });
+    ecs_observer(world, {
+        .query.terms = {{ .id = ecs_id(EcsScript) }},
+        .events = { EcsOnAdd, EcsOnSet, EcsOnRemove },
+        .callback = box_chunk_stream_changed,
+        .ctx = stream
+    });
+    ecs_observer(world, {
+        .query.terms = {{ .id = ecs_id(Scene) }},
+        .events = { EcsOnAdd, EcsOnRemove },
+        .callback = box_chunk_stream_changed,
+        .ctx = stream
+    });
+
     ecs_system(world, {
         .entity = ecs_entity(world, { .name = "ChunkGridStream" }),
         .phase = EcsPostUpdate,
         .run = BoxWorldChunkStream,
+        .ctx = stream,
         .immediate = true
     });
 }

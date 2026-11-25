@@ -79,8 +79,9 @@ typedef struct box_render_gpu_stats_t {
                                  *   forward, shadow and capture passes, only when the page or
                                  *   surface assets differ from the ones bound last in the pass */
     int32_t data_binds;         /**< Per vertex data streams bound in the depth prepass,
-                                 *   forward, shadow and capture passes, one per draw of a mesh
-                                 *   with data (Mesh3.data0 to data3); never for a mesh without */
+                                 *   forward, shadow and capture passes for the draws of a mesh
+                                 *   with data (Mesh3.data0 to data3), only when the stream
+                                 *   differs from the one bound last; never for a mesh without */
     int32_t cull_dispatches;    /**< Compute dispatches the cull passes of views recorded:
                                  *   cull_instances, cull_ordered, cull_scan and cull_write,
                                  *   not the pyramid reductions nor the probe capture culls */
@@ -127,7 +128,8 @@ typedef struct box_render_gpu_stats_t {
     int64_t grass_culled_blades; /**< Blades in the frustum of such a view dropped as they were
                                  *   behind it, read back */
     int32_t grass_reads;        /**< Packets whose blades grass_generated, grass_drawn and the
-                                 *   culled patches and blades hold */
+                                 *   culled patches and blades hold: those rendered while
+                                 *   box_render_gpu_stats_detail or the GPU timing is on */
     int32_t shadow_tiles;       /**< Shadow atlas tiles rendered */
     int32_t shadow_reused;      /**< Shadow atlas tiles kept from an earlier frame instead of
                                  *   rendered */
@@ -182,6 +184,16 @@ typedef struct box_render_gpu_stats_t {
     int32_t texture_graph_updates; /**< Evaluations of animated texture graphs that only
                                  *   updated them over time, also counted in
                                  *   texture_graph_evaluations */
+    int32_t texture_graph_visits; /**< Texture graphs the packets looked at: the ones that
+                                 *   changed, the live ones (animated, or sampling a target or
+                                 *   a live graph) and, after an image was written, the ones
+                                 *   that sample textures; none for a graph that is up to date */
+    int32_t terrain_height_scans; /**< Packets that walked their terrain tiles for heights and
+                                 *   masks to copy: the ones whose tiles differ from those of
+                                 *   the packet before, or that follow a texture or mesh change */
+    int32_t ripple_dispatches;  /**< Compute dispatches of the fields of WaterRipples: none for
+                                 *   a field that is flat and has no source, but the one that
+                                 *   writes its velocities when its window or its flow changed */
     int64_t texture_graph_cached_bytes; /**< Bytes of the cached values now, in use or not */
     int32_t texture_graph_cached; /**< Cached values now */
     int32_t packets;            /**< Packets rendered */

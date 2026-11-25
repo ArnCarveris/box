@@ -38,7 +38,7 @@ include infinite_forest/view
 using box.view
 
 $ {
-  box.app.FpsTarget: {120}
+  box.app.FpsTarget: {60}
   Scene: {
     reflections: true,
     environment: true,

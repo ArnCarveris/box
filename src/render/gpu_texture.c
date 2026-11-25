@@ -177,6 +177,7 @@ void box_gpu_materials_clear(
         while (m) {
             box_gpu_material_t *next = m->next;
             wgpuBindGroupRelease(m->group);
+            gpu->forward_stamp ++;
             ecs_os_free(m);
             m = next;
         }
@@ -314,6 +315,9 @@ void box_gpu_texture_init(
     ecs_map_init(&gpu->textures, NULL);
     ecs_map_init(&gpu->materials, NULL);
     ecs_vec_init_t(NULL, &gpu->mips, uint32_t, 0);
+    ecs_vec_init_t(NULL, &gpu->blend_hints, box_gpu_blend_group_t*, 0);
+    ecs_vec_init_t(NULL, &gpu->layer_hints, box_gpu_layer_group_t*, 0);
+    ecs_vec_init_t(NULL, &gpu->forward_memo, box_gpu_forward_memo_t, 0);
 }
 
 void box_gpu_texture_fini(
@@ -331,6 +335,9 @@ void box_gpu_texture_fini(
 
     ecs_map_fini(&gpu->textures);
     ecs_vec_fini_t(NULL, &gpu->mips, uint32_t);
+    ecs_vec_fini_t(NULL, &gpu->blend_hints, box_gpu_blend_group_t*);
+    ecs_vec_fini_t(NULL, &gpu->layer_hints, box_gpu_layer_group_t*);
+    ecs_vec_fini_t(NULL, &gpu->forward_memo, box_gpu_forward_memo_t);
     for (w = 0; w < BOX_GPU_WRAPS; w ++) {
         for (a = 0; a < BOX_GPU_ANISOTROPY_LEVELS; a ++) {
             if (gpu->samplers[w][a]) {
@@ -482,6 +489,7 @@ void box_gpu_texture_apply(
         space = ((box_gpu_texture_entry_t*)tex)->space;
         ecs_map_remove(&gpu->textures, handle);
         box_gpu_texture_free(tex);
+        gpu->texture_serial ++;
     }
 
     if (op == BOX_RENDER_DESTROY || !desc || !desc->width || !desc->height) {
@@ -1292,6 +1300,7 @@ static void box_gpu_blend_array_build(
             a->serials[s] = UINT32_MAX;
         }
 
+        gpu->blend_retry = true;
         goto done;
     }
 
@@ -1432,14 +1441,20 @@ static box_gpu_blend_array_t* box_gpu_blend_array(
         map == BOX_RENDER_BLEND_NORMAL ? UINT32_MAX : 0u);
 }
 
-/** Release a blend group and its references to its arrays.
+/** Release a blend group and its references to its arrays, and forget the groups the batches
+ * drew with.
  *
+ * @param gpu The backend
  * @param g The group
  */
 static void box_gpu_blend_group_free(
+    box_gpu_t *gpu,
     box_gpu_blend_group_t *g)
 {
     int32_t m;
+    gpu->blend_alive --;
+    gpu->blend_arrays_stale = true;
+    ecs_vec_clear(&gpu->blend_hints);
     for (m = 0; m < BOX_RENDER_BLEND_SOURCES; m ++) {
         if (g->arrays[m]) {
             g->arrays[m]->refs --;
@@ -1448,6 +1463,7 @@ static void box_gpu_blend_group_free(
 
     if (g->group) {
         wgpuBindGroupRelease(g->group);
+        gpu->forward_stamp ++;
     }
 
     if (g->uniforms) {
@@ -1475,6 +1491,7 @@ static void box_gpu_blend_group_bind(
     int32_t m;
     if (g->group) {
         wgpuBindGroupRelease(g->group);
+        gpu->forward_stamp ++;
     }
 
     ecs_os_memcpy(u.transforms, g->blend.transforms, ECS_SIZEOF(u.transforms));
@@ -1561,15 +1578,35 @@ static void box_gpu_blend_group_bind(
     });
 }
 
-/** Get the blend group of a TextureBlend batch, created on first use. Once per packet it checks
- * the arrays and the images it binds, and binds them again when one changed, and writes the far
- * field of the Grass on the terrain of a terrain blend into its uniforms when it changed.
+void** box_gpu_batch_hint(
+    ecs_vec_t *hints,
+    const box_render_packet_t *packet,
+    const box_render_batch_t *b)
+{
+    const box_render_batch_t *first = ecs_vec_first(&packet->batches);
+    int32_t count = ecs_vec_count(&packet->batches), have = ecs_vec_count(hints);
+    void **result = NULL;
+    if (!first || b < first || b >= first + count) {
+        goto done;
+    }
+
+    if (have < count) {
+        ecs_vec_set_count_t(NULL, hints, void*, count);
+        ecs_os_memset_n(ecs_vec_get_t(hints, void*, have), 0, void*, count - have);
+    }
+
+    result = ecs_vec_get_t(hints, void*, (int32_t)(b - first));
+done:
+    return result;
+}
+
+/** Get the blend group of a TextureBlend batch, created on first use. Once per packet it writes
+ * the far field of the Grass on the terrain of a terrain blend into its uniforms when it
+ * changed and, after a texture or mesh changed, binds its arrays and images again if they did.
  *
  * The emissive layer and the mask sample loaded images only, not the image of a target. The
  * heights make an array only with a contrast above 0 and a height texture on some layer.
- *
- * Without a height every layer is flat at 0.5 and the group binds the one-slice placeholder;
- * the contrast still sharpens the transitions of the mask.
+ * Without one every layer is flat at 0.5 and the group binds the one-slice placeholder.
  *
  * @param gpu The backend
  * @param packet The packet of the batch
@@ -1588,6 +1625,16 @@ box_gpu_blend_group_t* box_gpu_blend_group_get(
     box_render_grass_far_t grass;
     bool heights = false;
     bool stale, moved;
+    box_gpu_blend_group_t **hint = (box_gpu_blend_group_t**)box_gpu_batch_hint(
+        &gpu->blend_hints, packet, b);
+    g = hint ? *hint : NULL;
+    if (g && g->emissive == emissive && g->wrap == b->wrap &&
+        g->anisotropy == packet->anisotropy &&
+        !ecs_os_memcmp(&g->blend, r, ECS_SIZEOF(box_render_texture_blend_t)))
+    {
+        goto found;
+    }
+
     for (g = gpu->blend_groups; g; g = g->next) {
         if (g->emissive == emissive && g->wrap == b->wrap &&
             g->anisotropy == packet->anisotropy &&
@@ -1604,11 +1651,22 @@ box_gpu_blend_group_t* box_gpu_blend_group_get(
         g->wrap = b->wrap;
         g->anisotropy = packet->anisotropy;
         g->checked = -1;
+        g->used = -1;
         g->next = gpu->blend_groups;
         gpu->blend_groups = g;
+        gpu->blend_alive ++;
     }
 
-    g->used = gpu->blend_frame;
+    if (hint) {
+        *hint = g;
+    }
+
+found:
+    if (g->used != gpu->blend_frame) {
+        g->used = gpu->blend_frame;
+        gpu->blend_marks ++;
+    }
+
     if (g->checked == gpu->blend_frame && g->group) {
         goto done;
     }
@@ -1617,6 +1675,12 @@ box_gpu_blend_group_t* box_gpu_blend_group_get(
     box_render_grass_far_of(packet, r->terrain, &grass);
     moved = ecs_os_memcmp(&grass, &g->grass, ECS_SIZEOF(box_render_grass_far_t)) != 0;
     g->grass = grass;
+    if (g->group && g->seen_textures == gpu->texture_serial &&
+        g->seen_meshes == gpu->mesh_serial)
+    {
+        goto grass;
+    }
+
     for (m = 0; r->contrast > 0.0f && m < (int32_t)r->count; m ++) {
         heights |= r->layers[m][BOX_RENDER_BLEND_HEIGHT] != 0;
     }
@@ -1632,6 +1696,7 @@ box_gpu_blend_group_t* box_gpu_blend_group_get(
         if (a != g->arrays[m]) {
             if (g->arrays[m]) {
                 g->arrays[m]->refs --;
+                gpu->blend_arrays_stale = true;
             }
 
             if (a) {
@@ -1645,9 +1710,15 @@ box_gpu_blend_group_t* box_gpu_blend_group_get(
         stale |= a && g->versions[m] != a->version;
     }
 
+    g->seen_textures = gpu->blend_retry ? 0 : gpu->texture_serial;
+    g->seen_meshes = gpu->mesh_serial;
     if (stale) {
         box_gpu_blend_group_bind(gpu, g);
-    } else if (moved && g->uniforms) {
+        moved = false;
+    }
+
+grass:
+    if (moved && g->uniforms) {
         wgpuQueueWriteBuffer(gpu->queue, g->uniforms,
             offsetof(box_gpu_blend_uniforms_t, grass), &g->grass,
             sizeof(box_render_grass_far_t));
@@ -1682,19 +1753,33 @@ static void box_gpu_blends_prepare(
     box_gpu_t *gpu,
     const box_render_packet_t *packet)
 {
+    const box_render_batch_t *batches = ecs_vec_first(&packet->batches);
     int32_t i, count = ecs_vec_count(&packet->batches);
     box_gpu_blend_group_t **gp;
     box_gpu_blend_array_t **ap;
     gpu->blend_frame ++;
+    gpu->blend_marks = 0;
+    gpu->blend_retry = false;
     for (i = 0; i < count; i ++) {
-        const box_render_batch_t *b = ecs_vec_get_t(&packet->batches, box_render_batch_t, i);
+        const box_render_batch_t *b = &batches[i];
+        if (!b->texture_blend && !b->texture_layers) {
+            continue;
+        }
+
         if (box_gpu_texture_blends(b)) {
             box_gpu_blend_group(gpu, packet, b);
         }
+
+        if (box_gpu_layered(b)) {
+            box_gpu_layer_group(gpu, packet, b);
+        }
     }
 
-    box_gpu_layers_prepare(gpu, packet);
+    if (gpu->blend_marks == gpu->blend_alive) {
+        goto arrays;
+    }
 
+    box_gpu_layers_sweep(gpu);
     for (gp = &gpu->blend_groups; *gp; ) {
         box_gpu_blend_group_t *g = *gp;
         if (g->used == gpu->blend_frame) {
@@ -1703,9 +1788,15 @@ static void box_gpu_blends_prepare(
         }
 
         *gp = g->next;
-        box_gpu_blend_group_free(g);
+        box_gpu_blend_group_free(gpu, g);
     }
 
+arrays:
+    if (!gpu->blend_arrays_stale) {
+        goto done;
+    }
+
+    gpu->blend_arrays_stale = false;
     for (ap = &gpu->blend_arrays; *ap; ) {
         box_gpu_blend_array_t *a = *ap;
         if (a->refs > 0 || a->used == gpu->blend_frame) {
@@ -1718,6 +1809,9 @@ static void box_gpu_blends_prepare(
         gpu->pending.blend_arrays --;
         ecs_os_free(a);
     }
+
+done:
+    return;
 }
 
 void box_gpu_blends_clear(
@@ -1727,7 +1821,7 @@ void box_gpu_blends_clear(
     while (gpu->blend_groups) {
         box_gpu_blend_group_t *g = gpu->blend_groups;
         gpu->blend_groups = g->next;
-        box_gpu_blend_group_free(g);
+        box_gpu_blend_group_free(gpu, g);
     }
 
     while (gpu->blend_arrays) {

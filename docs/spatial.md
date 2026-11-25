@@ -93,7 +93,7 @@ C, automatic for every entity with a component: `ecs_add_pair(world, ecs_id(MyEn
 | `box_spatial_static_bounds(world, scene, min, max)` | Box around all static shapes of a scene |
 | `box_spatial_tree_walk(world, scene, tree, visit, ctx)` | Walk `BOX_SPATIAL_STATIC` / `_DYNAMIC` / `_UI` |
 | `box_spatial_update(world)` / `box_spatial_rebuild(world)` | Update now / rebuild static trees |
-| `box_spatial_stats(world, &s)` | `scenes, entities, movers, updated, rebound, moved` |
+| `box_spatial_stats(world, &s)` | `scenes, entities, movers, updated, rebound, moved, visited` |
 | `box_spatial_layout_stats(world, &s)` | `nodes, solved, synced` |
 
 - `filter` is the narrow phase: return false to reject, may push `*distance` further.

@@ -140,8 +140,10 @@ static void box_render_readback_pixels(
  * @param rb The copy
  * @param desc Its TextureReadback
  * @param now World time
+ * @return Whether the copy has to be looked at again in the next frame: its readback is in
+ * flight or could not be requested
  */
-static void box_render_readback_update(
+static bool box_render_readback_update(
     ecs_world_t *world,
     box_textures_t *t,
     box_texture_readback_t *rb,
@@ -153,6 +155,7 @@ static void box_render_readback_update(
         : desc->level > BOX_RENDER_READBACK_LEVEL_MAX ? BOX_RENDER_READBACK_LEVEL_MAX
         : desc->level;
     uint32_t ticket;
+    bool result = false;
     if (rb->ticket && now - rb->sent > BOX_RENDER_READBACK_TIMEOUT) {
         rb->ticket = 0;
         rb->requested = 0;
@@ -187,10 +190,12 @@ static void box_render_readback_update(
         rb->requested = tex->revision;
         rb->requested_level = level;
         rb->graph_format = tex->graph->format;
+    } else {
+        result = true;
     }
 
 done:
-    return;
+    return result || rb->ticket != 0;
 }
 
 /** Write the status of a copy when it changed.
@@ -241,8 +246,8 @@ static void box_render_readbacks_take(
 /** Store the delivered copies, request the copies of new image revisions and write the
  * statuses of the textures with a TextureReadback.
  *
- * The textures are found with ecs_each_id rather than a query made at import, because
- * box.surface imports box.render before box.texture registers TextureReadback.
+ * Only the copies in the list of the registry are looked at; one stays in it while its readback
+ * is in flight or could not be requested.
  *
  * @param it The iterator of the system
  */
@@ -253,30 +258,45 @@ static void BoxRenderTextureReadbacks(
     box_textures_t *t = box_textures_get(world);
     double now = (double)ecs_get_world_info(world)->world_time_total;
     bool inflight = false;
-    int32_t i;
-    if (!t || !ecs_id(TextureReadback)) {
+    ecs_vec_t dirty;
+    int32_t i, count = t ? ecs_vec_count(&t->readback_dirty) : 0;
+    if (!count || !ecs_id(TextureReadback)) {
         goto done;
     }
 
-    ecs_map_iter_t mit = ecs_map_iter(&t->readbacks);
-    while (!inflight && ecs_map_next(&mit)) {
-        inflight = ((box_texture_readback_t*)ecs_map_ptr(&mit))->ticket != 0;
+    dirty = t->readback_dirty;
+    ecs_vec_init_t(NULL, &t->readback_dirty, ecs_entity_t, 0);
+    for (i = 0; i < count; i ++) {
+        box_texture_readback_t *rb = box_texture_readback_get(t,
+            *ecs_vec_get_t(&dirty, ecs_entity_t, i));
+        if (rb) {
+            rb->listed = false;
+            inflight = inflight || rb->ticket != 0;
+        }
     }
 
     if (inflight) {
         box_render_readbacks_take(world);
     }
 
-    ecs_iter_t qit = ecs_each_id(world, ecs_id(TextureReadback));
-    while (ecs_each_next(&qit)) {
-        const TextureReadback *desc = ecs_field(&qit, TextureReadback, 0);
-        for (i = 0; i < qit.count; i ++) {
-            box_texture_readback_t *rb = box_texture_readback_ensure(t, qit.entities[i]);
-            box_render_readback_update(world, t, rb, &desc[i], now);
-            box_render_readback_status(it->stage, rb);
+    for (i = 0; i < count; i ++) {
+        ecs_entity_t e = *ecs_vec_get_t(&dirty, ecs_entity_t, i);
+        box_texture_readback_t *rb = box_texture_readback_get(t, e);
+        const TextureReadback *desc = rb && ecs_is_alive(world, e)
+            ? ecs_get(world, e, TextureReadback) : NULL;
+        if (!desc) {
+            continue;
         }
+
+        t->work.readbacks ++;
+        if (box_render_readback_update(world, t, rb, desc, now)) {
+            box_texture_readback_touch(t, e);
+        }
+
+        box_render_readback_status(it->stage, rb);
     }
 
+    ecs_vec_fini_t(NULL, &dirty, ecs_entity_t);
 done:
     return;
 }
