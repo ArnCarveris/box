@@ -1,0 +1,74 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.particle
+using state
+using assets
+
+infinite_forest {
+  falling {
+    if started {
+      const r = forest_rainfall(precipitation, temperature)
+      const sleet = precip_kind == PRECIP_SLEET ? precipitation : 0
+      const snowing = precip_kind == PRECIP_SNOW ? precipitation : 0
+
+      raindrops : assets.ForestRain {
+        Position: {0, PRECIP_TOP / 2 - 0.5, 0}
+        Emitter: {
+          max: 26000, rate: RAIN_RATE * r, shape: EmitterBox,
+          extents: {PRECIP_HALF, PRECIP_TOP / 2, PRECIP_HALF},
+          direction: {0, -1, 0}, speed: {7.5, 8.5}, lifetime: {1.1, 1.4}, size: {0.005, 0.007},
+          opacity: {0.12, 0.26}, color: {178, 186, 196}, color_variance: {10, 10, 10}, seed: 81,
+          follow: player
+        }
+        Collision: {die: true, terrain: infinite_forest.land}
+      }
+
+      sleet_pellets : assets.ForestSleet {
+        Position: {0, PRECIP_TOP / 2 - 0.5, 0}
+        Emitter: {
+          max: 8000, rate: 5000 * sleet, shape: EmitterBox,
+          extents: {PRECIP_HALF, PRECIP_TOP / 2, PRECIP_HALF},
+          direction: {0, -1, 0}, speed: {4, 5}, lifetime: {1.8, 2.2}, size: {0.012, 0.02},
+          opacity: {0.6, 0.9}, color: {236, 240, 246}, seed: 82,
+          follow: player
+        }
+        Collision: {die: true, terrain: infinite_forest.land}
+      }
+
+      snowflakes : assets.ForestSnow {
+        Position: {0, PRECIP_TOP / 2 - 0.5, 0}
+        Emitter: {
+          max: 30000, rate: SNOW_RATE * snowing, shape: EmitterBox,
+          extents: {PRECIP_HALF, PRECIP_TOP / 2, PRECIP_HALF},
+          direction: {0, -1, 0}, speed: {0.8, 1.2}, lifetime: {7, 9}, size: {0.024, 0.045},
+          rotation: {0, 360}, opacity: {0.8, 1}, color: {246, 249, 255}, seed: 83,
+          follow: player
+        }
+        Collision: {die: true, terrain: infinite_forest.land}
+      }
+
+      splashes : assets.ForestSplash {
+        Position: {0, 0.02, 0}
+        Emitter: {
+          max: 4000, rate: SPLASH_RATE * r, shape: EmitterDisc, radius: PRECIP_HALF * 0.8,
+          direction: {0, 1, 0}, spread: 45, speed: {0.6, 1.5}, lifetime: {0.18, 0.32},
+          size: {0.007, 0.014}, opacity: {0.35, 0.65}, color: {214, 222, 230}, seed: 84,
+          follow: player, ground: infinite_forest.land
+        }
+      }
+
+      drips : assets.ForestDrip {
+        Position: {0, 6, 0}
+        Emitter: {
+          max: 1200, rate: DRIP_RATE * drip, shape: EmitterBox,
+          extents: {PRECIP_HALF * 0.8, 3.5, PRECIP_HALF * 0.8},
+          direction: {0, -1, 0}, speed: {0, 0.4}, lifetime: {1.6, 2}, size: {0.012, 0.018},
+          opacity: {0.45, 0.75}, color: {210, 220, 228}, seed: 85,
+          follow: player, ground: infinite_forest.land
+        }
+        Collision: {die: true, terrain: infinite_forest.land}
+      }
+    }
+  }
+}

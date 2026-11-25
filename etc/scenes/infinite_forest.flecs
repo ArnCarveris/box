@@ -32,6 +32,7 @@ include infinite_forest/brooks
 include infinite_forest/landmarks
 include infinite_forest/air
 include infinite_forest/fall
+include infinite_forest/precipitation
 include infinite_forest/insects
 include infinite_forest/view
 

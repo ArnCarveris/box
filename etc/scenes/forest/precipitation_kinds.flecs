@@ -1,0 +1,74 @@
+using flecs.script
+using flecs.script.math
+using box.particle
+using state
+using assets
+
+state {
+  // The volume the precipitation falls in: PRECIP_HALF meters to either side of the camera, from
+  // a little under it to PRECIP_TOP meters over it
+  export const PRECIP_HALF: f32 = 11
+  export const PRECIP_TOP: f32 = 9
+
+  // Particles a second at full rain, snow and drips
+  export const RAIN_RATE: f32 = 18000
+  export const SNOW_RATE: f32 = 3200
+  export const SPLASH_RATE: f32 = 7000
+  export const DRIP_RATE: f32 = 260
+
+  // How hard the trees drip, 0..1: in the rain, and while they dry after it. Kept up to date
+  // by the async block at the end in steps of a twentieth, so the drips change rarely
+  fn forest_drip(rain: f64, wet: f64) -> f64 {
+    max(rain, wet * wet * 0.6)
+  }
+
+  export mut drip: f32 = 0
+}
+
+assets {
+  // Rain: thin streaks at their terminal speed, gravity against the drag of the air, which
+  // also carries them along the wind
+  prefab ForestRain {
+    Forces: {gravity: {0, -9.81, 0}, drag: 1.2, global_wind: 1}
+    Appearance: {shape: Circle, blend: Alpha, stretch: 7, lit: 0.85}
+  }
+
+  // Sleet: hard, white pellets among the rain, falling a little slower
+  prefab ForestSleet {
+    Forces: {gravity: {0, -9.81, 0}, drag: 2.2, global_wind: 1, turbulence: 0.6}
+    Appearance: {shape: Circle, blend: Alpha, stretch: 0.8, lit: 0.85}
+  }
+
+  // Snow: flakes that drift down at a meter a second, wandering and swept by the gusts
+  prefab ForestSnow {
+    Forces: {
+      gravity: {0, -3, 0}, drag: 3, global_wind: 1, turbulence: 2.2, turbulence_scale: 1.6
+    }
+    Appearance: {shape: Circle, blend: Alpha, softness: 0.05, lit: 0.45}
+  }
+
+  // Splashes of the rain off the floor: droplets that jump and fall back
+  prefab ForestSplash {
+    Appearance: {shape: Circle, blend: Alpha, stretch: 3, lit: 0.75}
+  }
+
+  // Drips from the leaves and the limbs: larger drops from the crowns, in the rain and while
+  // the trees dry
+  prefab ForestDrip {
+    Forces: {gravity: {0, -9.81, 0}, drag: 0.5, global_wind: 0.3}
+    Appearance: {shape: Circle, blend: Alpha, stretch: 2.5, lit: 0.8}
+  }
+}
+
+// The drips follow the rain and the wetness of the trees
+async {
+  while true {
+    await next_frame()
+    const v = state.forest_drip(state.rain, state.wet)
+    const q: f32 = floor(v * 20 + 0.5) / 20
+
+    if q != state.drip {
+      state.drip = q
+    }
+  }
+}
