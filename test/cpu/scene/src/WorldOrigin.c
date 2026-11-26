@@ -567,6 +567,63 @@ void WorldOrigin_path_follow(void) {
     ecs_fini(world);
 }
 
+void WorldOrigin_vessel(void) {
+    // scenes/world_origin
+    ecs_world_t *world = origin_world(100, 50);
+    Path3D square = { .start = {200, 0, 0}, .closed = true };
+    const float corners[3][2] = { {200, 40}, {240, 40}, {240, 0} };
+    for (int32_t i = 0; i < 3; i ++) {
+        *ecs_vec_append_t(NULL, &square.segments, PathSegment3D) = (PathSegment3D){
+            .kind = PathCatmullRom, .end = {corners[i][0], 0, corners[i][1]} };
+    }
+
+    ecs_entity_t route = ecs_new(world);
+    ecs_set_ptr(world, route, Path3D, &square);
+    ecs_vec_fini_t(NULL, &square.segments, PathSegment3D);
+    ecs_entity_t ship = ecs_new(world);
+    ecs_set(world, ship, Vessel, {.route = route, .wait = 1000, .speed = 6, .accel = 0.3f});
+    ecs_add(world, ship, WorldFocus);
+    ecs_progress(world, 0.1f);
+
+    test_assert(ecs_singleton_get(world, WorldOrigin)->x == 200);
+    test_flt(ecs_get(world, ship, Vessel)->origin[0], -200);
+    test_assert(fabsf(ecs_get(world, ship, Position)->x) < 1e-3f);
+
+    ecs_progress(world, 0.1f);
+    test_assert(fabsf(ecs_get(world, ship, Position)->x) < 1e-3f);
+    test_assert(fabsf(ecs_get(world, ship, Position)->z) < 1e-3f);
+    test_assert(ecs_singleton_get(world, WorldOrigin)->x == 200);
+    test_int(ecs_singleton_get(world, WorldOriginStatus)->shifts, 1);
+
+    ecs_fini(world);
+}
+
+void WorldOrigin_carrier(void) {
+    // scenes/world_origin
+    ecs_world_t *world = origin_world(100, 50);
+    ecs_entity_t platform = origin_entity(world, 120, 0, 0);
+    ecs_add(world, platform, DynamicTransform);
+    ecs_entity_t player = origin_entity(world, 120, 1.7f, 0);
+    FirstPersonController fp = {.ground = -100, .eye = 1.7f, .carrier = platform};
+    glm_translate_make((vec4*)fp.carrier_pose, (vec3){120, 0, 0});
+    ecs_set_ptr(world, player, FirstPersonController, &fp);
+    ecs_add(world, player, WorldFocus);
+    ecs_progress(world, 0.1f);
+
+    test_assert(ecs_singleton_get(world, WorldOrigin)->x == 100);
+    test_assert(fabsf(ecs_get(world, platform, Position)->x - 20) < 1e-3f);
+    test_assert(fabsf(ecs_get(world, player, Position)->x - 20) < 1e-3f);
+    test_assert(ecs_get(world, player, FirstPersonController)->carrier == platform);
+    test_assert(fabsf(ecs_get(world, player, FirstPersonController)->carrier_pose[12] - 20) <
+        1e-3f);
+
+    ecs_progress(world, 0.1f);
+    test_assert(fabsf(ecs_get(world, player, Position)->x - 20) < 1e-3f);
+    test_int(ecs_singleton_get(world, WorldOriginStatus)->shifts, 1);
+
+    ecs_fini(world);
+}
+
 void WorldOrigin_ground_heights(void) {
     // scenes/world_origin
     ecs_world_t *world = origin_world(100, 50);

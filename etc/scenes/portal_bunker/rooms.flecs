@@ -6,7 +6,9 @@ using box.portal
 // VisOccluder per blocker and a PortalDoor (etc/scenes/portal/door.flecs) on the portal of each
 // door. A view draws only the rooms its camera sees through open portals, and a door opens for
 // the camera.
+// The Position places the rooms with their portals, so a WorldOrigin shift moves both.
 bunker {
+  Position: {0, 0, 0}
   hall { // Entrance Hall
     VisArea: {shape: [{-6, 0}, {6, 0}, {6, 10}, {-6, 10}], y: 0, height: 5, ambient: {0.018, 0.018, 0.022}, hub: {0, 1.8, 5}, materials: {floor: BunkerMat_tiles, wall: BunkerMat_plaster, ceiling: BunkerMat_panel}}
   }

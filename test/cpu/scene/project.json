@@ -200,6 +200,8 @@
                     "script_functions",
                     "manual_shift",
                     "path_follow",
+                    "vessel",
+                    "carrier",
                     "ground_heights",
                     "follow_emitter_stays",
                     "spatial_same_hits",

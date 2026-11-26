@@ -142,6 +142,9 @@ ECS_ENUM(VesselMode, {
  *
  * Writes its Position and Rotation, the Rotation.z of wheel (the rudder) and the Rotation.x of
  * lever (the throttle). Implies VesselStatus, Position, Rotation and DynamicTransform.
+ *
+ * The route, the pivot height and water are in the frame of the route, which origin places in
+ * the parent space; a WorldOrigin shift moves origin with the vessel.
  */
 ECS_STRUCT(Vessel, {
     ecs_entity_t route;   /**< Entity with the closed Path3D to cruise, its waypoints the anchors */
@@ -169,6 +172,8 @@ ECS_STRUCT(Vessel, {
     float rudder_rate;    /**< Rudder per second Port and Starboard move, 0.9 by default */
     float rudder_return;  /**< Rudder per second it centres by itself, 0.5 by default */
     ecs_entity_t actions; /**< Scope of the helm actions, default box.controllers.helm */
+    vec3 origin;          /**< Added to the route, the pivot height and water to place them in
+                           *   the parent space, default zero; a WorldOrigin shift moves it */
 });
 
 /** The state of a Vessel, written by its system every frame; set mode or distance to seek */
@@ -187,8 +192,8 @@ ECS_STRUCT(VesselStatus, {
     float roll;           /**< Roll in radians, heel included */
     float heave;          /**< Heave in units */
     float swell;          /**< Share of the waves the vessel feels, low while docked */
-    float x;              /**< X of the pivot in the parent space */
-    float z;              /**< Z of the pivot in the parent space */
+    float x;              /**< X of the pivot in the frame of the route */
+    float z;              /**< Z of the pivot in the frame of the route */
     vec2 offset;          /**< Place off the route after rejoining it, easing to zero */
     float time;           /**< Seconds the waves have run */
     float backoff;        /**< Seconds the autopilot backs away from a bump */

@@ -146,6 +146,10 @@ int32_t box_vessel_blocked(
     }
 
     float middle = (middle_min + middle_max) / 2;
+    float px = x + vessel->origin[0];
+    float py = y + vessel->origin[1];
+    float pz = z + vessel->origin[2];
+    float water = vessel->water + vessel->origin[1];
 
     mat4 parent = GLM_MAT4_IDENTITY_INIT;
     ecs_entity_t up = ecs_get_parent(world, e);
@@ -158,7 +162,7 @@ int32_t box_vessel_blocked(
     ecs_entity_t scene = box_render_scene_of(world, e);
     float c = cosf(heading);
     float s = sinf(heading);
-    float top = y + vessel->deck;
+    float top = py + vessel->deck;
     float depth = vessel->deck - vessel->keel + 1;
     int32_t blocked = 0;
 
@@ -181,11 +185,11 @@ int32_t box_vessel_blocked(
             for (int32_t line = 0; line < 2; line ++) {
                 float ox = (line ? keel_x : qx) - vessel->pivot[0];
                 float oz = qz - vessel->pivot[2];
-                vec3 point = { x + c * ox + s * oz, top, z - s * ox + c * oz };
+                vec3 point = { px + c * ox + s * oz, top, pz - s * ox + c * oz };
                 float ground = box_hull_ground(world, e, scene, parent, point, depth);
                 float limit = line
-                    ? y + vessel->keel + BOX_HULL_CLEARANCE
-                    : vessel->water + BOX_HULL_CLEARANCE;
+                    ? py + vessel->keel + BOX_HULL_CLEARANCE
+                    : water + BOX_HULL_CLEARANCE;
                 blocked += ground > limit ? 1 : 0;
             }
         }

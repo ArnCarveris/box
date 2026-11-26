@@ -237,6 +237,32 @@ static void box_world_map_point(
     }
 }
 
+/** Apply a map to a transform: the map times the transform.
+ *
+ * @param map The map
+ * @param m The transform
+ * @param out Receives the mapped transform, may be m
+ */
+static void box_world_map_matrix(
+    const box_world_map_t *map,
+    const vec4 *m,
+    vec4 *out)
+{
+    mat4 result;
+    int32_t col, i;
+    glm_mat4_copy(ECS_CONST_CAST(vec4*, m), result);
+    for (col = 0; col < 3; col ++) {
+        for (i = 0; i < 3; i ++) {
+            double turned = map->u[i][0] * (double)m[col][0] +
+                map->u[i][1] * (double)m[col][1] + map->u[i][2] * (double)m[col][2];
+            result[col][i] = (float)(map->ratio * turned);
+        }
+    }
+
+    box_world_map_point(map, m[3], result[3]);
+    glm_mat4_copy(result, out);
+}
+
 /** Turn the Rotation of a root by a rotation matrix, or set it to one.
  *
  * @param world The world
@@ -272,7 +298,8 @@ static void box_world_turn_root(
 }
 
 /** Map a root into the new frame of a shift: its Position, the WorldTransform of a
- * ManualTransform root and the offset of a PathFollow, whose path is in its world space.
+ * ManualTransform root, the offset of a PathFollow, whose path is in its world space, and the
+ * origin of a Vessel, whose route is in its parent space.
  *
  * When the rotation or scale of the frame changes, its Rotation and Scale too. A WorldCell
  * root is placed at its cell in the new frame instead.
@@ -292,7 +319,6 @@ static int32_t box_world_shift_root(
     const Position *p = ecs_get(world, e, Position);
     const WorldCell *cell = ecs_get(world, e, WorldCell);
     int32_t written = 0;
-    int32_t i;
 
     if (cell) {
         Position placed;
@@ -329,16 +355,7 @@ static int32_t box_world_shift_root(
         : NULL;
     if (t) {
         WorldTransform moved = *t;
-        int32_t col;
-        for (col = 0; col < 3; col ++) {
-            for (i = 0; i < 3; i ++) {
-                double turned = map->u[i][0] * (double)t->m[col][0] +
-                    map->u[i][1] * (double)t->m[col][1] + map->u[i][2] * (double)t->m[col][2];
-                moved.m[col][i] = (float)(map->ratio * turned);
-            }
-        }
-
-        box_world_map_point(map, t->m[3], moved.m[3]);
+        box_world_map_matrix(map, t->m, moved.m);
         ecs_set_ptr(world, e, WorldTransform, &moved);
         written ++;
     }
@@ -351,11 +368,20 @@ static int32_t box_world_shift_root(
         written ++;
     }
 
+    const Vessel *vessel = ecs_get(world, e, Vessel);
+    if (vessel) {
+        Vessel moved = *vessel;
+        box_world_map_point(map, vessel->origin, moved.origin);
+        ecs_set_ptr(world, e, Vessel, &moved);
+        written ++;
+    }
+
     return written;
 }
 
 /** Map the world heights of the ground planes of the moved first person controllers and
- * particle collisions into the new frame of a shift.
+ * particle collisions into the new frame of a shift, and the last pose of the carrier of such a
+ * controller when it moves too, so riding it does not move the controller by the shift again.
  *
  * @param world The world
  * @param shift The shift
@@ -393,6 +419,10 @@ static int32_t box_world_shift_heights(
         ecs_entity_t e = *ecs_vec_get_t(&controllers, ecs_entity_t, i);
         FirstPersonController c = *ecs_get(world, e, FirstPersonController);
         c.ground = (float)(map->ratio * map->u[1][1] * (double)c.ground + map->d[1]);
+        if (c.carrier && ecs_is_alive(world, c.carrier) && box_world_shifted(shift, c.carrier)) {
+            box_world_map_matrix(map, (vec4*)c.carrier_pose, (vec4*)c.carrier_pose);
+        }
+
         ecs_set_ptr(world, e, FirstPersonController, &c);
     }
 

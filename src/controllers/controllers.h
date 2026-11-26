@@ -767,9 +767,9 @@ float box_route_waypoint(
  * @param world The world
  * @param e The vessel, whose own shapes do not count
  * @param vessel Its settings
- * @param y Height of its frame in the parent space, unturned (the heave)
- * @param x X of the pivot in the parent space
- * @param z Z of the pivot in the parent space
+ * @param y Height of its frame in the frame of the route, unturned (the heave)
+ * @param x X of the pivot in the frame of the route
+ * @param z Z of the pivot in the frame of the route
  * @param heading The heading
  * @return Samples of the keel line and the deck line that are blocked, 0 when clear
  */

@@ -365,9 +365,9 @@ static void box_vessel_pose(
     vec3 turned;
     glm_mat4_mulv3(m, ECS_CONST_CAST(float*, vessel->pivot), 0.0f, turned);
 
-    p->x = status->x - turned[0];
-    p->y = vessel->pivot[1] + status->heave - turned[1];
-    p->z = status->z - turned[2];
+    p->x = vessel->origin[0] + status->x - turned[0];
+    p->y = vessel->origin[1] + vessel->pivot[1] + status->heave - turned[1];
+    p->z = vessel->origin[2] + status->z - turned[2];
     r->x = angles[0];
     r->y = angles[1];
     r->z = angles[2];
