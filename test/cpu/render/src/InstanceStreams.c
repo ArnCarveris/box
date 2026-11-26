@@ -1323,3 +1323,80 @@ void InstanceStreams_mover_animated_child_follows(void) {
     ecs_fini(world);
     box_render_null_free(null);
 }
+
+/** Check that the slot of the shape of a mover, placed by its mover, is the model matrix of the
+ * shape: every member equal to the one box_draws_transform gives from its world transform.
+ *
+ * @param world The world
+ * @param e The mover
+ */
+static void mover_own_is_model(
+    ecs_world_t *world,
+    ecs_entity_t e)
+{
+    box_render_draws_t *d = box_draws_state(world);
+    const DrawSlot *ds = ecs_get(world, e, DrawSlot);
+    box_draw_batch_t *b = box_draws_batch(d, ds->batch);
+    box_render_transform_t tmp, model;
+    WorldTransform buf;
+    int32_t r, c;
+    box_draws_transform(&model, box_transform_world(world, e, &buf), ecs_get(world, e, ShapeMesh));
+    const box_render_transform_t *placed = box_draws_slot_world(d, b, ds->slot, &tmp);
+    for (r = 0; r < 3; r ++) {
+        for (c = 0; c < 4; c ++) {
+            test_assert(placed->rows[r][c] == model.rows[r][c]);
+        }
+    }
+}
+
+void InstanceStreams_mover_own_shape_rides_itself(void) {
+    // renderer/draws: the shape of a WorldCell root rides the root as its children do, so the
+    // compose pass places it from the f64 record of the mover table; its slot holds the scale
+    // of its shape alone, placed it is its model matrix, and a shift writes no slot. The shape
+    // of a mover without a cell draws as a dynamic shape
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t root = ecs_new(world);
+    ecs_set(world, root, WorldCell, {1, 0, 0});
+    ecs_set(world, root, Box, {2, 1, 3});
+    ecs_set(world, root, Rgb, {200, 100, 50});
+    ecs_entity_t child = box_new(world, root, 2);
+    ecs_entity_t ship = box_new(world, 0, 10);
+    ecs_add(world, ship, DynamicTransform);
+
+    frame(world);
+    frame(world);
+    box_render_draws_t *d = box_draws_state(world);
+    const DrawSlot *own = ecs_get(world, root, DrawSlot);
+    const DrawSlot *carried = ecs_get(world, child, DrawSlot);
+    box_draw_batch_t *b = box_draws_batch(d, own->batch);
+    box_draw_batch_t *cb = box_draws_batch(d, carried->batch);
+    test_bool(b->key.mover, true);
+    test_bool(b->key.dynamic_transform, false);
+    uint32_t index = *box_draws_slot_mover(b, own->slot) & BOX_RENDER_MOVER_INDEX;
+    test_assert(index != 0);
+    test_uint(box_draws_mover(d, index)->entity, root);
+    test_uint(*box_draws_slot_mover(cb, carried->slot) & BOX_RENDER_MOVER_INDEX, index);
+    test_bool(box_draws_batch(d, ecs_get(world, ship, DrawSlot)->batch)->key.dynamic_transform,
+        true);
+
+    const box_render_transform_t *local = box_draws_slot_transform(b, own->slot);
+    test_flt(local->rows[0][0], 2);
+    test_flt(local->rows[1][1], 1);
+    test_flt(local->rows[2][2], 3);
+    test_flt(local->rows[0][3], 0);
+    test_flt(local->rows[1][3], 0);
+    test_flt(local->rows[2][3], 0);
+    mover_own_is_model(world, root);
+    test_flt(instance_world_x(world, root), 4096);
+
+    box_world_origin_shift(world, 0, (double[3]){ 256, 0, 0 });
+    frame(world);
+    test_flt(local->rows[0][3], 0);
+    mover_own_is_model(world, root);
+    test_flt(instance_world_x(world, root), 3840);
+    test_flt(instance_world_x(world, child), 3842);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}

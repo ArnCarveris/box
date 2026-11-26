@@ -575,7 +575,8 @@
                     "mover_children_upload_mover",
                     "mover_child_local_change",
                     "mover_child_same_local_writes_nothing",
-                    "mover_animated_child_follows"
+                    "mover_animated_child_follows",
+                    "mover_own_shape_rides_itself"
                 ]
             },
             {

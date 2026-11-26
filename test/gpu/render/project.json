@@ -2267,6 +2267,12 @@
                 "testcases": [
                     "far_same_image"
                 ]
+            },
+            {
+                "id": "RenderOriginMover",
+                "testcases": [
+                    "far_same_image"
+                ]
             }
         ]
     }

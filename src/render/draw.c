@@ -1243,12 +1243,7 @@ write:
         uint32_t *rec = box_draws_slot_mover(b, s->slot);
         *out = model;
         if (rec) {
-            ecs_entity_t mover = box_draws_mover_of(world, e);
-            uint32_t index = box_draws_mover_ref(world, d, mover);
-            box_draws_mover_unref(d, *rec & BOX_RENDER_MOVER_INDEX);
-            *rec = (*rec & BOX_RENDER_MOVER_FRAME) | index;
-            WorldTransform mover_buf;
-            box_draws_relative(out, box_transform_world(world, mover, &mover_buf), &model);
+            box_draws_mover_slot(world, d, e, shape, rec, out);
         }
     }
 

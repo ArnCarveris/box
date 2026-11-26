@@ -205,9 +205,10 @@ typedef struct box_draw_key_t {
     bool dynamic_material;  /**< The shapes or a ChildOf ancestor have DynamicMaterial, so the
                              *   shading uploads every frame */
     bool mover;             /**< 3D shapes that inherit DynamicTransform through
-                             *   DynamicTransformSpread, moved by an ancestor that owns it, and
-                             *   that no transform transition moves: their transforms are
-                             *   relative to that mover and upload when they change, and the
+                             *   DynamicTransformSpread, moved by an ancestor that owns it, or
+                             *   WorldCell roots, movers themselves, and that no transform
+                             *   transition moves: their transforms are relative to that mover
+                             *   (or to themselves) and upload when they change, and the
                              *   compose pass places them with the mover every frame. Their
                              *   pages are of a mover store and dynamic_transform is false */
     bool shadow;            /**< Instances cast shadows, false under NoShadow */
@@ -1407,11 +1408,14 @@ void box_draws_composes(
 
 /** Check whether the shapes of a table of the dynamic transform query move with a mover, so
  * their transforms upload only when they change: 3D shapes that inherit DynamicTransform through
- * DynamicTransformSpread, that no transform transition moves and that own no PlanarReflection,
- * whose instance the reflection passes recognize by its transform record.
+ * DynamicTransformSpread or are WorldCell roots, that no transform transition moves and that own
+ * no PlanarReflection, whose instance the reflection passes recognize by its transform record.
  *
  * A shape that owns DynamicTransform as well, as the target of a transform track does, is a
- * mover itself: it moves in the frame of no other mover and draws as a dynamic shape.
+ * mover itself: it moves in the frame of no other mover and draws as a dynamic shape, its local
+ * record as exact as the f32 pose its mover record is made from. A WorldCell root is the mover
+ * whose record is exact where its local record is not, the corner of its cell in f64: its shape
+ * rides itself, so the compose pass places it from that record as it places its descendants.
  *
  * @param world The world
  * @param table The table
@@ -1511,6 +1515,29 @@ void box_draws_relative(
     box_render_transform_t *out,
     const WorldTransform *mover,
     const box_render_transform_t *model);
+
+/** Write the transform of the slot of a shape of a mover batch relative to its mover, and
+ * reference that mover in the record of the slot of the mover stream.
+ *
+ * The mover of a shape that is a mover itself is the shape: its transform relative to it is the
+ * model matrix of the shape under the identity, its scale alone, so the compose pass gives the
+ * same model matrix as box_draws_transform, placed from the f64 record of the mover table.
+ *
+ * @param world The world
+ * @param d The state
+ * @param e The entity of the shape
+ * @param shape Its shape
+ * @param rec The record of its slot of the mover stream
+ * @param out The transform of its slot, set to its model matrix (box_draws_transform), receives
+ * the transform relative to the mover
+ */
+void box_draws_mover_slot(
+    const ecs_world_t *world,
+    box_render_draws_t *d,
+    ecs_entity_t e,
+    const ShapeMesh *shape,
+    uint32_t *rec,
+    box_render_transform_t *out);
 
 /** Get the world transform of a slot: its transform, or for a mover batch its transform
  * composed with its mover.

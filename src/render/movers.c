@@ -3,7 +3,8 @@
  * @brief Movers: the entities that own DynamicTransform, which place the mover batches.
  *
  * A shape that inherits DynamicTransform through DynamicTransformSpread keeps its transform
- * relative to its mover in a mover page, written when that transform changes.
+ * relative to its mover in a mover page, written when that transform changes; the shape of a
+ * WorldCell root rides itself, its transform relative to itself the scale of its shape.
  *
  * The mover table holds the world transform of every mover with slots relative to the render
  * origin (box_render_frame_t.delta) in f64, sent every frame a mover or the render origin moved;
@@ -403,6 +404,29 @@ done:
     return;
 }
 
+void box_draws_mover_slot(
+    const ecs_world_t *world,
+    box_render_draws_t *d,
+    ecs_entity_t e,
+    const ShapeMesh *shape,
+    uint32_t *rec,
+    box_render_transform_t *out)
+{
+    ecs_entity_t mover = box_draws_mover_at(world, e);
+    uint32_t index = box_draws_mover_ref(world, d, mover);
+    box_draws_mover_unref(d, *rec & BOX_RENDER_MOVER_INDEX);
+    *rec = (*rec & BOX_RENDER_MOVER_FRAME) | index;
+    if (mover == e) {
+        WorldTransform identity;
+        glm_mat4_identity(identity.m);
+        box_draws_transform(out, &identity, shape);
+    } else {
+        box_render_transform_t model = *out;
+        WorldTransform mover_buf;
+        box_draws_relative(out, box_transform_world(world, mover, &mover_buf), &model);
+    }
+}
+
 uint32_t* box_draws_slot_mover(
     box_draw_batch_t *b,
     int32_t slot)
@@ -643,8 +667,11 @@ bool box_draws_mover_table(
     bool flat,
     ecs_id_t spread)
 {
-    return !flat && ecs_table_has_id(world, table, spread) &&
-        !ecs_table_has_id(world, table, DynamicTransform) &&
+    bool carried = ecs_table_has_id(world, table, spread) &&
+        !ecs_table_has_id(world, table, DynamicTransform);
+    bool cell = ecs_id(WorldCell) && ecs_table_has_id(world, table, ecs_id(WorldCell));
+
+    return !flat && (carried || cell) &&
         !ecs_table_has_id(world, table, TransitionTransform) &&
         !ecs_table_has_id(world, table, ecs_id(PlanarReflection));
 }
