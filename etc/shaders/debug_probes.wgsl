@@ -2,6 +2,11 @@
 // sphere at every probe of the irradiance volume the view samples, lit by its own SH, a mirror
 // sphere at the capture point of every reflection probe its clusters list, and the influence and
 // projection boxes of those probes as lines.
+//
+// The spheres and boxes are placed and hit relative to the render origin (render_view_proj),
+// which keeps their precision near it: the stored center of a probe and the camera are moved by
+// it once, as instance_relative moves a record (probe_relative); the light of a probe is taken
+// with directions alone. Without a render origin these are the local positions exactly.
 #include "include/lights.wgsl"
 #include "include/probes.wgsl"
 
@@ -44,9 +49,9 @@ struct ProbeDebug {
 
 struct SphereOut {
     @builtin(position) pos: vec4f,
-    // Point of the quad in the world
+    // Point of the quad relative to the render origin
     @location(0) world: vec3f,
-    // Center and radius of the sphere
+    // Center relative to the render origin and radius of the sphere
     @location(1) @interpolate(flat) sphere: vec4f,
     @location(2) @interpolate(flat) index: u32,
 };
@@ -70,13 +75,18 @@ fn orthographic() -> bool {
     return view.lights.w == 1u;
 }
 
+// A stored local position, the center of a probe or the camera, relative to the render origin.
+fn probe_relative(local: vec3f) -> vec3f {
+    return local - view.render_delta.xyz;
+}
+
 // World direction the camera looks along.
 fn camera_forward() -> vec3f {
     return -normalize(vec3f(view.view[0].z, view.view[1].z, view.view[2].z));
 }
 
 // Corner of the quad of a sphere for one of its 6 vertices, in the plane through its center
-// facing the camera. In perspective the quad is scaled by d / sqrt(d^2 - r^2), where the cone
+// facing the camera, relative to the render origin as the center is. In perspective the quad is scaled by d / sqrt(d^2 - r^2), where the cone
 // of rays that touch the sphere crosses that plane.
 fn sphere_vertex(i: u32, center: vec3f, radius: f32, index: u32) -> SphereOut {
     var corners = array<vec2f, 6>(
@@ -86,7 +96,7 @@ fn sphere_vertex(i: u32, center: vec3f, radius: f32, index: u32) -> SphereOut {
     var toward = camera_forward();
     var scale = 1.0;
     if (!orthographic()) {
-        let offset = center - view.camera.xyz;
+        let offset = center - probe_relative(view.camera.xyz);
         let d = length(offset);
         toward = select(toward, offset / d, d > 1e-6);
         let k = d * d - radius * radius;
@@ -98,7 +108,7 @@ fn sphere_vertex(i: u32, center: vec3f, radius: f32, index: u32) -> SphereOut {
     let upward = cross(right, toward);
     let world = center + (right * c.x + upward * c.y) * (radius * scale);
     var o: SphereOut;
-    o.pos = view.view_proj * vec4f(world, 1.0);
+    o.pos = view.render_view_proj * vec4f(world, 1.0);
     o.world = world;
     o.sphere = vec4f(center, radius);
     o.index = index;
@@ -106,12 +116,13 @@ fn sphere_vertex(i: u32, center: vec3f, radius: f32, index: u32) -> SphereOut {
 }
 
 // Intersect the ray of a fragment, through the point of its quad, with its sphere: the hit
-// nearest the camera in front of it, the far one for a camera inside the sphere.
+// nearest the camera in front of it, the far one for a camera inside the sphere, relative to the
+// render origin.
 fn sphere_hit(in: SphereOut) -> SphereHit {
     var r: SphereHit;
     let center = in.sphere.xyz;
     let radius = in.sphere.w;
-    var origin = view.camera.xyz;
+    var origin = probe_relative(view.camera.xyz);
     var dir = normalize(in.world - origin);
     if (orthographic()) {
         dir = camera_forward();
@@ -135,7 +146,7 @@ fn sphere_hit(in: SphereOut) -> SphereHit {
 
     r.point = origin + dir * t;
     r.normal = normalize(r.point - center);
-    let clip = view.view_proj * vec4f(r.point, 1.0);
+    let clip = view.render_view_proj * vec4f(r.point, 1.0);
     r.depth = clip.z / max(clip.w, 1e-12);
     r.hit = clip.w > 0.0 && r.depth >= 0.0 && r.depth <= 1.0 &&
         (orthographic() || t >= 0.0);
@@ -181,7 +192,7 @@ fn probe_valid(coord: vec3u) -> bool {
 
 @vertex fn vs_light(@builtin(vertex_index) i: u32, @builtin(instance_index) p: u32) -> SphereOut {
     let coord = probe_coord(p);
-    let center = volume.origin.xyz + vec3f(coord) * volume.origin.w;
+    let center = probe_relative(volume.origin.xyz) + vec3f(coord) * volume.origin.w;
     return sphere_vertex(i, center, sphere_radius(LIGHT_RADIUS * volume.origin.w), p);
 }
 
@@ -211,7 +222,8 @@ fn probe_valid(coord: vec3u) -> bool {
 @vertex fn vs_reflection(@builtin(vertex_index) i: u32, @builtin(instance_index) p: u32) ->
     SphereOut
 {
-    return sphere_vertex(i, reflection_probes[p].capture, sphere_radius(REFLECTION_RADIUS), p);
+    let center = probe_relative(reflection_probes[p].capture);
+    return sphere_vertex(i, center, sphere_radius(REFLECTION_RADIUS), p);
 }
 
 // A reflection probe as a mirror: its cubemap in the reflection direction of the hit, at mip 0;
@@ -241,7 +253,7 @@ struct LineOut {
 };
 
 // End i of the 12 edges of a box of half extents extent around the center of a probe, along its
-// axes: edge i / 2 runs along axis i / 8.
+// axes, relative to the render origin: edge i / 2 runs along axis i / 8.
 fn box_vertex(p: ReflectionProbe, i: u32, extent: vec3f) -> vec3f {
     let edge = i / 2u;
     let axis = edge / 4u;
@@ -257,7 +269,7 @@ fn box_vertex(p: ReflectionProbe, i: u32, extent: vec3f) -> vec3f {
     }
 
     let l = c * extent;
-    return p.center + p.axes[0].xyz * l.x + p.axes[1].xyz * l.y + p.axes[2].xyz * l.z;
+    return probe_relative(p.center) + p.axes[0].xyz * l.x + p.axes[1].xyz * l.y + p.axes[2].xyz * l.z;
 }
 
 // Instance 2k draws the influence box of probe k, 2k + 1 its projection box, which is left out
@@ -275,7 +287,7 @@ fn box_vertex(p: ReflectionProbe, i: u32, extent: vec3f) -> vec3f {
     }
 
     let extent = select(p.extent, p.projection, projection);
-    o.pos = view.view_proj * vec4f(box_vertex(p, i % 24u, extent), 1.0);
+    o.pos = view.render_view_proj * vec4f(box_vertex(p, i % 24u, extent), 1.0);
     o.color = select(INFLUENCE_COLOR, PROJECTION_COLOR, projection);
     return o;
 }

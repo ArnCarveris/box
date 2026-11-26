@@ -1,6 +1,11 @@
 // Infinite grid of the debug pass of a view (GridSettings): a triangle covers the target and
 // every fragment casts the ray of its pixel from the near plane through inv_view_proj, which
 // works for an orthographic camera too, onto the plane y = height.
+//
+// The ray is cast relative to the render origin (Grid.inv_view_proj_relative) and the hit is
+// projected with render_view_proj, which keeps their precision near it; the lines take the hit
+// moved by the render origin wrapped to their period, so they stay continuous across a move of
+// the render origin. Without a render origin these are the local values exactly.
 #include "include/lights.wgsl"
 #include "include/fullscreen.wgsl"
 
@@ -14,6 +19,15 @@ struct Grid {
     // x: cells between major lines, 0 for none, y: width of the major lines and the axes in
     // pixels
     config: vec4f,
+    // Clip space of the target to a position relative to the render origin, built in f64;
+    // View.inv_view_proj without a render origin
+    inv_view_proj_relative: mat4x4f,
+    // xyz: the camera relative to the render origin, w: the height of the plane relative to it,
+    // built in f64; View.camera and params.x without a render origin
+    relative: vec4f,
+    // xy: x and z of the render origin wrapped to the period of the lines, the cell times the
+    // cells between major lines, built in f64; 0 without a render origin
+    wrap: vec4f,
 };
 
 @group(0) @binding(0) var<uniform> view: View;
@@ -33,11 +47,12 @@ struct GridRay {
 };
 
 // Cast the ray of a point of the target (uv, 0 at the top left) from the near plane (depth 1,
-// reversed Z) through depth 0.5, finite for an infinite far plane too, onto the plane.
+// reversed Z) through depth 0.5, finite for an infinite far plane too, onto the plane, relative
+// to the render origin: height is that of the plane relative to it.
 fn grid_ray(uv: vec2f, height: f32) -> GridRay {
     let ndc = vec2f(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0);
-    let near4 = view.inv_view_proj * vec4f(ndc, 1.0, 1.0);
-    let mid4 = view.inv_view_proj * vec4f(ndc, 0.5, 1.0);
+    let near4 = grid.inv_view_proj_relative * vec4f(ndc, 1.0, 1.0);
+    let mid4 = grid.inv_view_proj_relative * vec4f(ndc, 0.5, 1.0);
     let origin = near4.xyz / near4.w;
     let dir = normalize(mid4.xyz / mid4.w - origin);
     let side = select(-1.0, 1.0, height >= origin.y);
@@ -92,7 +107,7 @@ fn grid_axes(dist: vec2f, deriv: vec2f, width: f32) -> vec2f {
 }
 
 @fragment fn fs(in: FullscreenOut) -> GridOut {
-    let height = grid.params.x;
+    let height = grid.relative.w;
     let cell = max(grid.params.y, 1e-6);
     let fade_distance = max(grid.params.z, 1e-4);
     let width = grid.params.w;
@@ -100,7 +115,8 @@ fn grid_axes(dist: vec2f, deriv: vec2f, width: f32) -> vec2f {
     let major_width = grid.config.y;
 
     // The ray of the pixel and of points an eighth of a pixel to each side of it, whose
-    // difference is the change of the plane over a pixel along x and y.
+    // difference is the change of the plane over a pixel along x and y, relative to the render
+    // origin.
     let ray = grid_ray(in.uv, height);
     let hit = ray.hit;
     let e = view.viewport.zw * 0.125;
@@ -110,11 +126,14 @@ fn grid_axes(dist: vec2f, deriv: vec2f, width: f32) -> vec2f {
         grid_ray(in.uv - vec2f(0.0, e.y), height).hit.xz) * 4.0;
     let deriv = vec2f(length(vec2f(dx.x, dy.x)), length(vec2f(dx.y, dy.y)));
 
-    let minor = grid_lines(hit.xz, deriv, cell, width);
+    // The point of the plane in the period of the lines, and its distances to the axes, local
+    let lined = hit.xz + grid.wrap.xy;
+    let local = hit.zx + view.render_delta.zx;
+    let minor = grid_lines(lined, deriv, cell, width);
     let major = select(0.0,
-        grid_lines(hit.xz, deriv, cell * max(major_every, 1.0), major_width),
+        grid_lines(lined, deriv, cell * max(major_every, 1.0), major_width),
         major_every >= 1.0);
-    let axes = grid_axes(hit.zx, deriv.yx, major_width) *
+    let axes = grid_axes(local, deriv.yx, major_width) *
         grid_cell_fade(deriv.yx / (cell * max(major_every, 1.0)));
 
     // The lines in the color that covers more, the Z axis (blue) and the X axis (red) over them,
@@ -126,11 +145,11 @@ fn grid_axes(dist: vec2f, deriv: vec2f, width: f32) -> vec2f {
     color = vec4f(1.0, 0.0, 0.0, 1.0) * axis_alpha.x + color * (1.0 - axis_alpha.x);
 
     let distance_fade = 1.0 - smoothstep(fade_distance * 0.5, fade_distance,
-        distance(hit, view.camera.xyz));
+        distance(hit, grid.relative.xyz));
     let horizon_fade = smoothstep(0.0, 0.04, ray.toward);
     let fade = distance_fade * horizon_fade;
 
-    let clip = view.view_proj * vec4f(hit, 1.0);
+    let clip = view.render_view_proj * vec4f(hit, 1.0);
     let depth = clip.z / clip.w;
     if (ray.toward <= 1e-6 || grid.params.y <= 0.0 || color.a * fade <= 0.0 || depth <= 0.0 ||
         depth > 1.0)

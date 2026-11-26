@@ -1,7 +1,12 @@
 // 2D shapes: instanced unit quads shaded with the analytic signed distance of a rounded
 // rectangle (Rect, Circle) or a line segment, anti-aliased over the screen footprint of each
 // fragment so edges stay crisp at any scale, distance and angle.
+//
+// A shape is placed relative to the render origin (instance_relative, render_view_proj), which
+// keeps its precision near it; its clips map its local position. Without a render origin the
+// relative transform and render_view_proj are the local ones exactly.
 #include "include/lights.wgsl"
+#include "include/instance.wgsl"
 
 // BlendMode of the pipeline: the output is shaped for the blend equation it is drawn with.
 override blend_mode: u32 = 0u;
@@ -35,12 +40,6 @@ const clip_depth: u32 = 16u;
 @group(1) @binding(2) var distance_map: texture_2d<f32>;
 @group(1) @binding(4) var material_sampler: sampler;
 
-// The transform stream of the instance page (InstanceTransform of instance.wgsl): the rows of
-// the model matrix.
-struct Shape2DTransform {
-    rows: array<vec4f, 3>,
-};
-
 // The shading stream of the 2D instance page (box_render_shading_t, see instance.wgsl) with the
 // material words read as integers. color is the linear color and alpha as unorm16x4: r | g << 16,
 // b | a << 16.
@@ -52,8 +51,12 @@ struct Shape2DShading {
     ids: vec2u,
 };
 
-@group(2) @binding(0) var<storage, read> transforms: array<Shape2DTransform>;
+// The transform stream of the instance page: the rows of the model matrix.
+@group(2) @binding(0) var<storage, read> transforms: array<InstanceTransform>;
 @group(2) @binding(2) var<storage, read> shadings: array<Shape2DShading>;
+@group(2) @binding(6) var<uniform> instance_page: InstancePage;
+// The surface assets the parametric surfaces of instance.wgsl read, which no shape has
+@group(2) @binding(1) var<storage, read> surface_assets: array<vec4f>;
 
 struct VertexIn {
     @location(0) position: vec3f,
@@ -102,10 +105,9 @@ fn pixels_per_unit(mvp: mat4x4f, clip: vec4f, dir: vec2f) -> f32 {
 
 @vertex fn vs(v: VertexIn) -> VertexOut {
     let inst = shadings[v.slot];
-    let r = transforms[v.slot].rows;
-    let model = mat4x4f(vec4f(r[0].x, r[1].x, r[2].x, 0.0), vec4f(r[0].y, r[1].y, r[2].y, 0.0),
-        vec4f(r[0].z, r[1].z, r[2].z, 0.0), vec4f(r[0].w, r[1].w, r[2].w, 1.0));
-    let mvp = view.view_proj * model;
+    let t = transforms[v.slot];
+    let model = instance_model(instance_local(t, instance_page));
+    let mvp = view.render_view_proj * instance_model(instance_relative(t, instance_page));
     var origin = vec2f(0.0);
     var axis = vec2f(1.0, 0.0);
     var to_model = vec2f(1.0);

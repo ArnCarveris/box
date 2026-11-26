@@ -29,6 +29,10 @@
 /** X of the content */
 #define FX_X (3000.0f)
 
+/** X of the far content of the soft particle case, whole units so the f32 positions of the
+ * scene are exact */
+#define FX_FAR_X (1000000.0f)
+
 /** Largest channel difference between two images that place the same geometry, rounded
  * differently */
 #define FX_CLOSE_DIFF (4)
@@ -136,6 +140,33 @@ static ecs_world_t* fx_particle_scene(void)
     ecs_set(world, floor, PbrMaterial, {.roughness = 1});
     fx_camera(world, 0, FX_X);
     fx_emitter(world, 0, FX_X, false);
+
+    return world;
+}
+
+/** Create a world of soft particles kept in the space of their emitter just over a white floor
+ * at a point, which they fade into as they near it, seen by a camera turned about Y so the X of
+ * the point counts in the view depth.
+ *
+ * @param x X of the content
+ * @return The world
+ */
+static ecs_world_t* fx_soft_scene(
+    float x)
+{
+    ecs_world_t *world = fx_world();
+    ecs_entity_t floor = ecs_new(world);
+    ecs_set(world, floor, Position, {x, -0.1f, 0});
+    ecs_set(world, floor, Box, {60, 0.2f, 60});
+    ecs_set(world, floor, Rgb, {255, 255, 255});
+    ecs_set(world, floor, PbrMaterial, {.roughness = 1});
+    ecs_entity_t camera = fx_camera(world, 0, x);
+    ecs_set(world, camera, Rotation, {-0.45f, 0.3f, 0});
+    ecs_entity_t e = fx_emitter(world, 0, x, false);
+    ecs_set(world, e, Position, {x - 2, 0.25f, 4});
+    ecs_get_mut(world, e, ParticleEmitter)->local = true;
+    ecs_modified(world, e, ParticleEmitter);
+    ecs_set(world, e, ParticleAppearance, {.softness = 1});
 
     return world;
 }
@@ -555,5 +586,23 @@ void RenderOriginFx_grass_render_follow_moving_continuous(void) {
 
     test_assert(ecs_get(worlds[1], cameras[1], Position)->x > FX_X + 3.0f);
     fx_expect_grass(px[0]);
+    fx_free(worlds, 2, px);
+}
+
+void RenderOriginFx_particles_soft_far_same_image(void) {
+    // render/world_origin
+    /* Soft particles kept in the space of their emitter a million units from the local origin,
+     * fading into the floor they rise from, drawn relative to a render origin that follows the
+     * camera: the depth they fade by keeps its precision, and the image matches the same scene
+     * near the local origin, every frame. */
+    ecs_world_t *worlds[2] = { fx_soft_scene(0), fx_soft_scene(FX_FAR_X) };
+    unsigned char *px[2] = {0};
+    fx_render_follow(worlds[1], 0);
+    for (int32_t i = 0; i < 16; i ++) {
+        fx_step(worlds, 2, px);
+        fx_expect_close(px[0], px[1]);
+    }
+
+    fx_expect_particles(px[0]);
     fx_free(worlds, 2, px);
 }

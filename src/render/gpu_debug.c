@@ -53,7 +53,17 @@ typedef struct box_gpu_grid_uniforms_t {
     vec4 params;                    /**< Height, cell size, fade distance, line width */
     vec4 config;                    /**< Cells between major lines, width of the major lines,
                                      *   two unused */
+    mat4 inv_view_proj_relative;    /**< Clip space of the target to a position relative to
+                                     *   the render origin, built in f64; inv_view_proj of the
+                                     *   view without a render origin */
+    vec4 relative;                  /**< The camera relative to the render origin and the
+                                     *   height of the plane relative to it, built in f64 */
+    vec4 wrap;                      /**< X and Z of the render origin wrapped to the period of
+                                     *   the lines, two unused */
 } box_gpu_grid_uniforms_t;
+
+_Static_assert(sizeof(box_gpu_grid_uniforms_t) <= BOX_GPU_DEBUG_UNIFORM_STRIDE,
+    "the uniform of a grid draw fits in its stride");
 
 /** Uniform of a wire draw, matching Wire in debug_wire.wgsl */
 typedef struct box_gpu_wire_uniforms_t {
@@ -141,6 +151,9 @@ struct box_gpu_debug_t {
                                      *   first draw */
     uint64_t bvh_size;              /**< Bytes of the box buffer */
     uint64_t bvh_used;              /**< Bytes of the box buffer the draws of the packet took */
+    ecs_vec_t bvh_boxes;            /**< box_render_debug_box_t, the boxes of a view relative to
+                                     *   the render origin (box_gpu_debug_bvh_relative) */
+    ecs_vec_t bvh_poses;            /**< mat4, the poses of a view relative to it */
 };
 
 /** Convert a display encoded channel to linear light.
@@ -296,6 +309,8 @@ void box_gpu_debug_init(
     d->bvh_layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
         &(WGPUBindGroupLayoutDescriptor){ .entryCount = 2, .entries = bvh_entries });
     WGPUBindGroupLayout bvh_groups[2] = { gpu->view_layout, d->bvh_layout };
+    ecs_vec_init_t(NULL, &d->bvh_boxes, box_render_debug_box_t, 0);
+    ecs_vec_init_t(NULL, &d->bvh_poses, mat4, 0);
     d->bvh_pipeline_layout = wgpuDeviceCreatePipelineLayout(gpu->device,
         &(WGPUPipelineLayoutDescriptor){
             .bindGroupLayoutCount = 2,
@@ -423,6 +438,8 @@ void box_gpu_debug_fini(
         wgpuBufferRelease(d->bvh_buffer);
     }
 
+    ecs_vec_fini_t(NULL, &d->bvh_boxes, box_render_debug_box_t);
+    ecs_vec_fini_t(NULL, &d->bvh_poses, mat4);
     wgpuPipelineLayoutRelease(d->bvh_pipeline_layout);
     wgpuBindGroupLayoutRelease(d->bvh_layout);
 
@@ -890,9 +907,69 @@ done:
     return result;
 }
 
+/** Move the boxes and the poses of the BVH draw of a view by minus the render origin in f64,
+ * into the scratch of the debug passes, so its lines keep the precision of the positions near
+ * it.
+ *
+ * The boxes of the identity pose, which are in the local frame, move by their corners, and the
+ * other poses by their translation (the render origin times their last row).
+ *
+ * @param gpu The backend
+ * @param packet The packet
+ * @param v The view
+ * @param boxes Receives the boxes
+ * @param poses Receives the poses
+ */
+static void box_gpu_debug_bvh_relative(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet,
+    const box_render_view_t *v,
+    const box_render_debug_box_t **boxes,
+    const mat4 **poses)
+{
+    box_gpu_debug_t *d = gpu->debug;
+    const double *delta = gpu->render_delta;
+    box_render_debug_box_t *b;
+    mat4 *m;
+    int32_t i, c, k;
+    ecs_vec_set_count_t(NULL, &d->bvh_boxes, box_render_debug_box_t, v->debug_box_count);
+    ecs_vec_set_count_t(NULL, &d->bvh_poses, mat4, v->debug_pose_count);
+    b = ecs_vec_first_t(&d->bvh_boxes, box_render_debug_box_t);
+    m = ecs_vec_first_t(&d->bvh_poses, mat4);
+    ecs_os_memcpy(b, ecs_vec_get_t(&packet->debug_boxes, box_render_debug_box_t,
+        v->debug_box_first), v->debug_box_count * ECS_SIZEOF(box_render_debug_box_t));
+    ecs_os_memcpy(m, ecs_vec_get_t(&packet->debug_poses, mat4, v->debug_pose_first),
+        v->debug_pose_count * ECS_SIZEOF(mat4));
+
+    for (i = 0; i < v->debug_box_count; i ++) {
+        if (b[i].pose != 0) {
+            continue;
+        }
+
+        for (k = 0; k < 3; k ++) {
+            b[i].min[k] = (float)((double)b[i].min[k] - delta[k]);
+            b[i].max[k] = (float)((double)b[i].max[k] - delta[k]);
+        }
+    }
+
+    for (i = 1; i < v->debug_pose_count; i ++) {
+        for (c = 0; c < 4; c ++) {
+            for (k = 0; k < 3; k ++) {
+                m[i][c][k] = (float)((double)m[i][c][k] - delta[k] * (double)m[i][c][3]);
+            }
+        }
+    }
+
+    *boxes = b;
+    *poses = (const mat4*)m;
+}
+
 /** Create the bind group of the BVH draw of a view with its boxes and the poses that place
- * them, written into the box buffer of the packet, replacing the buffer with a larger one when
- * they do not fit; earlier draws keep the old one through their bind groups.
+ * them relative to the render origin (box_gpu_debug_bvh_relative), written into the box buffer
+ * of the packet.
+ *
+ * The buffer is replaced with a larger one when they do not fit; earlier draws keep the old one
+ * through their bind groups.
  *
  * @param gpu The backend
  * @param packet The packet
@@ -939,10 +1016,18 @@ static WGPUBindGroup box_gpu_debug_bvh_group(
     }
 
     d->bvh_used = offset + bytes;
-    wgpuQueueWriteBuffer(gpu->queue, d->bvh_buffer, offset, ecs_vec_get_t(
-        &packet->debug_boxes, box_render_debug_box_t, v->debug_box_first), (size_t)box_bytes);
-    wgpuQueueWriteBuffer(gpu->queue, d->bvh_buffer, offset + pose_offset, ecs_vec_get_t(
-        &packet->debug_poses, mat4, v->debug_pose_first), (size_t)pose_bytes);
+    const box_render_debug_box_t *boxes = ecs_vec_get_t(
+        &packet->debug_boxes, box_render_debug_box_t, v->debug_box_first);
+    const mat4 *poses = ecs_vec_get_t(&packet->debug_poses, mat4, v->debug_pose_first);
+    if (gpu->render_delta[0] != 0.0 || gpu->render_delta[1] != 0.0 ||
+        gpu->render_delta[2] != 0.0)
+    {
+        box_gpu_debug_bvh_relative(gpu, packet, v, &boxes, &poses);
+    }
+
+    wgpuQueueWriteBuffer(gpu->queue, d->bvh_buffer, offset, boxes, (size_t)box_bytes);
+    wgpuQueueWriteBuffer(gpu->queue, d->bvh_buffer, offset + pose_offset, poses,
+        (size_t)pose_bytes);
     WGPUBindGroupEntry entries[2] = {{
         .binding = 0,
         .buffer = d->bvh_buffer,
@@ -1201,18 +1286,102 @@ static uint64_t box_gpu_debug_reserve(
     return offset;
 }
 
+/** Wrap a coordinate of the render origin to a period, in f64.
+ *
+ * @param value The coordinate
+ * @param period The period, 0 or less for none
+ * @return The coordinate in [0, period), 0 without a period
+ */
+static float box_gpu_debug_wrap(
+    double value,
+    double period)
+{
+    double result = 0.0;
+    if (period > 0.0) {
+        result = fmod(value, period);
+        if (result < 0.0) {
+            result += period;
+        }
+    }
+
+    return (float)result;
+}
+
+/** Fill the members of the uniform of a grid draw about the render origin: the inverse view
+ * projection, the camera and the height of the plane relative to it, and the render origin
+ * wrapped to the period of the lines.
+ *
+ * The grid keeps the precision of the positions near the render origin and stays continuous
+ * across a move of it.
+ *
+ * Clip space to world is the camera transform after the inverse projection: only the
+ * translation of the camera moves, by minus the render origin in f64. Without a render origin
+ * they are copies of inv_view_proj and the camera of the view, the height and 0.
+ *
+ * @param delta The render origin in local units
+ * @param t The target, whose size the projection follows
+ * @param v The view
+ * @param vu The uniforms of the view
+ * @param s The grid settings of the view
+ * @param u The uniform, params and config set
+ */
+static void box_gpu_debug_grid_relative(
+    const double delta[3],
+    const box_gpu_target_t *t,
+    const box_render_view_t *v,
+    const box_gpu_view_uniforms_t *vu,
+    const GridSettings *s,
+    box_gpu_grid_uniforms_t *u)
+{
+    mat4 camera, proj, inv_proj;
+    double period;
+    int32_t i;
+    if (delta[0] == 0.0 && delta[1] == 0.0 && delta[2] == 0.0) {
+        glm_mat4_copy(ECS_CONST_CAST(vec4*, vu->inv_view_proj), u->inv_view_proj_relative);
+        glm_vec3_copy(ECS_CONST_CAST(float*, vu->camera), u->relative);
+        u->relative[3] = s->height;
+        goto done;
+    }
+
+    glm_mat4_copy(ECS_CONST_CAST(vec4*, v->camera_transform), camera);
+    for (i = 0; i < 3; i ++) {
+        double at = (double)v->camera_transform[3][i] - delta[i];
+        camera[3][i] = (float)at;
+        u->relative[i] = (float)at;
+    }
+
+    box_camera_projection(&v->camera_data,
+        (float)t->desc.point_width, (float)t->desc.point_height, proj);
+    glm_mat4_inv(proj, inv_proj);
+    glm_mat4_mul(camera, inv_proj, u->inv_view_proj_relative);
+    u->relative[3] = (float)((double)s->height - delta[1]);
+
+    period = (double)s->cell_size * (double)(s->major_every > 0 ? s->major_every : 1);
+    u->wrap[0] = box_gpu_debug_wrap(delta[0], period);
+    u->wrap[1] = box_gpu_debug_wrap(delta[2], period);
+done:
+    return;
+}
+
 /** Create the bind group of a grid draw with its uniform, written into the buffer of the
  * packet.
  *
  * @param gpu The backend
- * @param s The grid settings of the view
+ * @param t The target
+ * @param v The view
+ * @param slot Slot of the view in the view buffer
  * @return The bind group
  */
 static WGPUBindGroup box_gpu_debug_grid_group(
     box_gpu_t *gpu,
-    const GridSettings *s)
+    const box_gpu_target_t *t,
+    const box_render_view_t *v,
+    int32_t slot)
 {
     box_gpu_debug_t *d = gpu->debug;
+    const GridSettings *s = &v->debug.grid;
+    const box_gpu_view_uniforms_t *vu = (const box_gpu_view_uniforms_t*)ecs_vec_get_t(
+        &gpu->view_data, uint8_t, slot * BOX_GPU_VIEW_STRIDE);
     box_gpu_grid_uniforms_t u;
     uint64_t offset = box_gpu_debug_reserve(gpu);
     ecs_os_memset_t(&u, 0, box_gpu_grid_uniforms_t);
@@ -1224,6 +1393,7 @@ static WGPUBindGroup box_gpu_debug_grid_group(
     u.params[3] = s->line_width;
     u.config[0] = (float)(s->major_every > 0 ? s->major_every : 0);
     u.config[1] = s->line_width * BOX_GPU_DEBUG_MAJOR_WIDTH;
+    box_gpu_debug_grid_relative(gpu->render_delta, t, v, vu, s, &u);
     wgpuQueueWriteBuffer(gpu->queue, d->buffer, offset, &u, sizeof(u));
     WGPUBindGroupEntry entry = {
         .binding = 0,
@@ -1709,7 +1879,7 @@ void box_gpu_debug_record(
     }
 
     if (grid) {
-        grid_group = box_gpu_debug_grid_group(gpu, &v->debug.grid);
+        grid_group = box_gpu_debug_grid_group(gpu, t, v, slot);
     }
 
     if (lights || reflections) {

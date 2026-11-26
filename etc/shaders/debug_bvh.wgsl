@@ -1,6 +1,10 @@
 // Boxes of the spatial index trees of the debug pass of a view (BvhDebug): instance k draws the
 // 12 edges of box k as lines placed by its pose, in the color of its tree, fainter with its depth
 // and at half the alpha for the leaf of an entity.
+//
+// The backend moves the boxes of the identity pose and the other poses by minus the render
+// origin in f64 (box_gpu_debug_bvh_relative), so the lines are placed relative to it with
+// render_view_proj; without a render origin they are the local boxes and poses.
 #include "include/lights.wgsl"
 
 // Colors of the static, dynamic and UI tree, linear.
@@ -127,7 +131,7 @@ fn box_corner(b: BvhBox, i: u32) -> vec3f {
 
     var o: LineOut;
     let world = poses[b.pose] * vec4f(box_corner(b, i % 24u), 1.0);
-    o.pos = view.view_proj * world;
+    o.pos = view.render_view_proj * world;
     o.pos.z *= DEPTH_PULL;
     if (b.style != 0u) {
         // The lines of a portal world are drawn over what is in front of them: they sit on the

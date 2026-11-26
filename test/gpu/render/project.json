@@ -2213,7 +2213,8 @@
                     "particles_ride_moves_with_mover",
                     "grass_render_follow_same_image",
                     "grass_shift_same_image",
-                    "grass_render_follow_moving_continuous"
+                    "grass_render_follow_moving_continuous",
+                    "particles_soft_far_same_image"
                 ]
             },
             {
@@ -2252,6 +2253,19 @@
                 "testcases": [
                     "far_same_image",
                     "far_moving_no_swim"
+                ]
+            },
+            {
+                "id": "RenderOriginDebug",
+                "testcases": [
+                    "grid_far_same_image",
+                    "bvh_far_same_image"
+                ]
+            },
+            {
+                "id": "RenderOriginTransmission",
+                "testcases": [
+                    "far_same_image"
                 ]
             }
         ]

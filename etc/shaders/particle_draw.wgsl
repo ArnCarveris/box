@@ -3,7 +3,9 @@
 // circle or sprite faces the camera; a card is a quad in world space that tumbles around its
 // axis and lies flat once it rests on the ground plane. A particle shades at its world position
 // and is placed relative to the render origin: a pool kept in the space of model through the
-// translation of model minus the render origin, which the backend takes in f64.
+// translation of model minus the render origin, which the backend takes in f64. The view depth
+// of a particle and the projection terms its soft fade reads the depth buffer with are taken
+// relative to the render origin too.
 #include "include/lights.wgsl"
 #include "include/shadow.wgsl"
 #include "include/cookie.wgsl"
@@ -66,13 +68,46 @@ const CORNERS = array<vec2f, 6>(
     vec2f(-1.0, -1.0), vec2f(1.0, -1.0), vec2f(1.0, 1.0),
     vec2f(-1.0, -1.0), vec2f(1.0, 1.0), vec2f(-1.0, 1.0));
 
+// Whether the view draws relative to a render origin.
+fn view_relative() -> bool {
+    return any(view.render_delta.xyz != vec3f(0.0));
+}
+
+// The camera relative to the render origin: its stored position moved by the render origin,
+// which is exact near it where the inverse of the local view matrix is not far from the local
+// origin; without a render origin the translation of that inverse, which the terms below took
+// before, so they stay the same bit for bit.
+fn view_camera_relative() -> vec3f {
+    var result = view.camera.xyz - view.render_delta.xyz;
+    if (!view_relative()) {
+        let r = transpose(mat3x3f(view.view[0].xyz, view.view[1].xyz, view.view[2].xyz));
+        result = -(r * view.view[3].xyz);
+    }
+
+    return result;
+}
+
+// View depth of a point, from its position relative to the render origin and the camera
+// relative to it; from its local position without a render origin.
+fn view_depth(world: vec3f, relative: vec3f) -> f32 {
+    var result = -(view.view * vec4f(world, 1.0)).z;
+    if (view_relative()) {
+        let toward = vec3f(view.view[0].z, view.view[1].z, view.view[2].z);
+        result = -dot(toward, relative - view_camera_relative());
+    }
+
+    return result;
+}
+
 // P[2][2], P[3][2], P[2][3] and P[3][3] of the projection of the view, the view times the
-// inverse of its rigid view matrix.
+// inverse of its rigid view matrix, both relative to the render origin: render_view_proj times
+// the camera transform with the camera relative to it (view_camera_relative). Without a render
+// origin render_view_proj is view_proj and the terms are those of the local view.
 fn view_projection_depth() -> vec4f {
     let r = transpose(mat3x3f(view.view[0].xyz, view.view[1].xyz, view.view[2].xyz));
-    let t = -(r * view.view[3].xyz);
+    let t = view_camera_relative();
     let inv = mat4x4f(vec4f(r[0], 0.0), vec4f(r[1], 0.0), vec4f(r[2], 0.0), vec4f(t, 1.0));
-    let p = view.view_proj * inv;
+    let p = view.render_view_proj * inv;
     return vec4f(p[2].z, p[3].z, p[2].w, p[3].w);
 }
 
@@ -212,7 +247,7 @@ fn vs(@builtin(vertex_index) vertex: u32, @builtin(instance_index) instance: u32
     out.clip = view.render_view_proj * vec4f(relative + spread, 1.0);
     out.world = world;
     out.relative = relative + spread;
-    out.depth = -(view.view * vec4f(world, 1.0)).z;
+    out.depth = view_depth(world, relative + spread);
     out.opacity = particle_scaled(
         particle_draw(seed, p.index, STREAM_OPACITY, emitter.opacity_radial.xy),
         emitter.curve_rows.y, emitter.curve_max.y, emitter.curve_values.y, t,

@@ -752,6 +752,10 @@ fn distortion_sharp(f: VertexOut) -> bool {
 // A Distortion offsets the point of the snapshot by its noise (distortion_offset), clamped to
 // the image. Without Transmission (distortion_sharp) the snapshot shows at its sharp level,
 // without Fresnel, the albedo or absorption.
+//
+// The exit point is found relative to the render origin and projected with render_view_proj,
+// which keeps the point of the snapshot precise far from the local origin; without a render
+// origin the relative position is the local one bit for bit.
 fn transmission(f: VertexOut, s: Surface, v: vec3f, reflected: Lit) -> vec4f {
     var ap = vec4f(0.0, 0.0, 0.0, 1.0);
     if (scene_aerial && view.aerial.w > 0.0) {
@@ -778,8 +782,8 @@ fn transmission(f: VertexOut, s: Surface, v: vec3f, reflected: Lit) -> vec4f {
     let fresnel = select(f0_ior + (1.0 - f0_ior) * (fx2 * fx2 * fx), 0.0, sharp);
 
     let refracted = refract(-v, s.normal, 1.0 / max(ior, 0.001));
-    let exit_pos = vo_world(f) + normalize(refracted) * thickness * vo_model_scale(f);
-    let exit_clip = view.view_proj * vec4f(exit_pos, 1.0);
+    let exit_pos = f.relative + normalize(refracted) * thickness * vo_model_scale(f);
+    let exit_clip = view.render_view_proj * vec4f(exit_pos, 1.0);
     var screen_uv = exit_clip.xy / exit_clip.w * vec2f(0.5, -0.5) + vec2f(0.5, 0.5);
     screen_uv = clamp(screen_uv + distortion_offset(f), vec2f(0.0), vec2f(1.0));
 
