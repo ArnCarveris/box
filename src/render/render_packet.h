@@ -1644,6 +1644,21 @@ typedef struct box_render_clip_t {
     float area[4];          /**< Half width, half height, corner radius, index of the parent clip */
 } box_render_clip_t;
 
+/** The plane record of a layer group in the clip buffer (render/plane.c): the plane of its
+ * anchor, the topmost 2D shape of the group, which shape2d.wgsl moves the vertices of every layer
+ * of the group onto. A 2D instance holds its index in plane[0] of its shading.
+ *
+ * The layers are coplanar, but each world transform rounds to f32 on its own: far from the local
+ * origin a layer stands off its anchor along the normal by more than the rank lift of shape2d.
+ * On the one plane of the anchor every layer has its depth, and the rank alone orders them.
+ */
+typedef struct box_render_plane_t {
+    float point[4];         /**< Origin of the anchor in the local frame, w 0 */
+    float normal[4];        /**< Unit normal of the plane, w 0; zero when the X and Y axes of the
+                             *   anchor span no plane */
+    float unused[4];        /**< 0 */
+} box_render_plane_t;
+
 /** The header of the polygon record of a Polygon2D, which fs_polygon of shape2d.wgsl reads from
  * the clip buffer, followed by its edges in chunks of BOX_RENDER_POLYGON_CHUNK_RECORDS records.
  *
@@ -1743,6 +1758,8 @@ typedef struct box_render_shading_t {
                              *   unorm16x4: r | g << 16, b | a << 16 (box_draws_color_pack) */
     uint32_t ids[2];        /**< Clip index of a 2D instance (0 for none), its rank in the draw
                              *   order of its tree */
+    uint32_t plane[4];      /**< x: index of the plane record (box_render_plane_t) of its layer
+                             *   group in the clip buffer, 0 for none; yzw 0 */
 } box_render_shading_t;
 
 /** A record of the material table (BOX_RENDER_BUFFER_MATERIALS), Material of material.wgsl: the

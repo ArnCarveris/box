@@ -170,6 +170,8 @@ typedef struct DrawSlot {
     uint32_t rank;  /**< Rank of a 2D shape in the draw order of its tree (box_draw_order_t),
                      *   which lifts its depth over the elements drawn before it */
     int32_t clip;   /**< Clip index of the nearest ClipChildren ancestor of a 2D shape, 0 none */
+    int32_t plane;  /**< Index of the plane record of the layer group of a 2D shape in the clip
+                     *   buffer (box_draws_plane_of), 0 for none */
     int32_t slice;  /**< Index of the slice record of a sliced 2D shape in the clip buffer
                      *   (box_draws_slice_of), or of the polygon record of a polygon
                      *   (box_draws_polygon_of), 0 for none */
@@ -272,6 +274,8 @@ typedef struct TextSlots {
     ecs_vec_t slots; /**< box_draw_glyph_slot_t */
     uint32_t rank;   /**< Rank of the glyphs in the draw order of the tree of the Text, above
                       *   the shape of its entity */
+    int32_t plane;   /**< Index of the plane record of the layer group of the glyphs in the clip
+                      *   buffer, 0 for none */
 } TextSlots;
 
 /** Component id of TextSlots */
@@ -289,6 +293,8 @@ typedef struct BoxShadowSlot {
     int32_t slot;   /**< Slot of the shadow in the batch */
     uint32_t rank;  /**< Rank of the shadow in the draw order of the tree of the entity, below
                      *   the shape of its entity */
+    int32_t plane;  /**< Index of the plane record of the layer group of the shadow in the clip
+                     *   buffer, 0 for none */
 } BoxShadowSlot;
 
 /** Component id of BoxShadowSlot */
@@ -346,6 +352,8 @@ typedef struct box_draw_material_t {
     int32_t slice;              /**< Slice record index of a sliced 2D shape, polygon record
                                  *   index of a polygon, 0 for none */
     uint32_t rank;              /**< Rank of a 2D shape or glyph in the draw order of its tree */
+    int32_t plane;              /**< Plane record index of the layer group of a 2D shape or
+                                 *   glyph, 0 for none */
 } box_draw_material_t;
 
 /** What the record a material transition patches is */
@@ -651,6 +659,9 @@ typedef struct box_draw_clips_t {
     ecs_map_t floats;       /**< Float with LayoutFloat.hide_clipped to its clip index, whose
                              *   area is empty while its anchor is clipped out; freed in a send
                              *   once the float is gone or no longer hides */
+    ecs_map_t planes;       /**< Anchor of a layer group to the clip index of its plane record
+                             *   (box_draws_plane_of); freed when the order no longer has the
+                             *   group or the anchor is gone */
     ecs_vec_t entities;     /**< ecs_entity_t per clip index, 0 for a free index */
     ecs_vec_t records;      /**< box_render_clip_t per clip index, as the backend has them */
     ecs_vec_t free;         /**< int32_t, clip indices to reuse */
@@ -3106,6 +3117,76 @@ int32_t box_draws_clip_of(
     const ecs_world_t *world,
     box_render_draws_t *d,
     ecs_entity_t e);
+
+/** Get a clip index for an entity from a map of a kind of record, giving it one when it has
+ * none. A new index holds a zero record until the next send computes it.
+ *
+ * @param c The clips
+ * @param map The map of the kind of record: c->index for ClipChildren, c->floats for a
+ * hide_clipped float, c->planes for the anchor of a layer group
+ * @param e The entity
+ * @return The clip index
+ */
+int32_t box_draws_clip_index(
+    box_draw_clips_t *c,
+    ecs_map_t *map,
+    ecs_entity_t e);
+
+/** Free the clip index of an entity in a map of a kind of record.
+ *
+ * @param c The clips
+ * @param map The map of the kind of record
+ * @param e The entity
+ */
+void box_draws_clip_free(
+    box_draw_clips_t *c,
+    ecs_map_t *map,
+    ecs_entity_t e);
+
+/** Get the anchor of the layer group of a 2D shape or text: the topmost entity with a 2D shape
+ * among the entity and its ancestors. The layers of a group are drawn on the plane of its
+ * anchor where they lie in it (box_render_plane_t).
+ *
+ * @param world The world
+ * @param d The state
+ * @param e The entity
+ * @return The anchor, 0 when neither the entity nor an ancestor has a 2D shape
+ */
+ecs_entity_t box_draws_plane_anchor(
+    const ecs_world_t *world,
+    box_render_draws_t *d,
+    ecs_entity_t e);
+
+/** Get the index of the plane record of the layer group of an anchor, giving the anchor one
+ * when it has none.
+ *
+ * @param d The state
+ * @param anchor The anchor of the group
+ * @return The clip index of the plane record
+ */
+int32_t box_draws_plane_of(
+    box_render_draws_t *d,
+    ecs_entity_t anchor);
+
+/** Free the plane records of the anchors that no longer anchor a group.
+ *
+ * @param d The state
+ * @param anchors The anchors the order has, a map of the anchor entities
+ */
+void box_draws_planes_keep(
+    box_render_draws_t *d,
+    const ecs_map_t *anchors);
+
+/** Compute the plane record of an anchor from its world transform.
+ *
+ * @param world The world
+ * @param anchor The anchor
+ * @param out Receives the record, as a clip record of the clip buffer
+ */
+void box_draws_plane_record(
+    const ecs_world_t *world,
+    ecs_entity_t anchor,
+    box_render_clip_t *out);
 
 /** Count an element that got ClipChildren.
  *

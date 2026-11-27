@@ -252,6 +252,7 @@ void box_draws_material(
     out->uv[3] = uv ? uv->offset_y : 0.0f;
     out->ids[0] = material->clip > 0 ? (uint32_t)material->clip : 0u;
     out->ids[1] = material->rank;
+    out->plane[0] = material->plane > 0 ? (uint32_t)material->plane : 0u;
     if (material->inherited || material->tint || material->shape2d) {
         box_draws_material_mixed(out, linear, material, base);
     }

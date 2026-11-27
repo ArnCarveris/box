@@ -308,6 +308,7 @@ static void box_shadow_color(
  * @param cover Alpha the shape covers the shadow with, box_shadow_cover_alpha
  * @param clip Clip index of the shape
  * @param rank Rank of the shadow
+ * @param plane Plane record index of the layer group of the shape, 0 for none
  * @param record Index of the polygon record of a polygon, 0 for none
  */
 static void box_shadow_shading(
@@ -317,6 +318,7 @@ static void box_shadow_shading(
     float cover,
     int32_t clip,
     uint32_t rank,
+    int32_t plane,
     int32_t record)
 {
     float half = glm_min(box->size[0], box->size[1]) * 0.5f;
@@ -344,6 +346,7 @@ static void box_shadow_shading(
 done:
     out->ids[0] = clip > 0 ? (uint32_t)clip : 0u;
     out->ids[1] = rank;
+    out->plane[0] = plane > 0 ? (uint32_t)plane : 0u;
     box_draws_color_pack(out->color, linear);
 }
 
@@ -356,13 +359,15 @@ done:
  * @param world World matrix of the shape, NULL for the identity
  * @param clip Clip index of the shape
  * @param rank Rank of the shadow
+ * @param plane Plane record index of the layer group of the shape, 0 for none
  */
 static void box_shadow_hidden(
     box_render_transform_t *transform,
     box_render_shading_t *shading,
     const vec4 *world,
     int32_t clip,
-    uint32_t rank)
+    uint32_t rank,
+    int32_t plane)
 {
     box_shadow_box_t box;
     ecs_os_memset_t(&box, 0, box_shadow_box_t);
@@ -370,6 +375,7 @@ static void box_shadow_hidden(
     ecs_os_memset_t(shading, 0, box_render_shading_t);
     shading->ids[0] = clip > 0 ? (uint32_t)clip : 0u;
     shading->ids[1] = rank;
+    shading->plane[0] = plane > 0 ? (uint32_t)plane : 0u;
 }
 
 /** Write streams of the instance of a shadow from its shape.
@@ -407,7 +413,7 @@ static void box_shadow_write(
         box_shadow_color(linear, &shadow->color, material, alpha);
         box_shadow_shading(box_draws_slot_shading(b, bs->slot), box, linear,
             box_draws_box_shadow_cover(shape, blend, alpha), material->clip, bs->rank,
-            material->slice);
+            bs->plane, material->slice);
     }
 
     box_draws_slot_changed(b, bs->slot, kinds);
@@ -584,9 +590,12 @@ void box_draws_box_shadow_patch(
     box_render_shading_t out;
     box_shadow_box_t box;
     uint32_t ids[2];
+    uint32_t plane;
     float words[4];
     ecs_os_memcpy(ids, ECS_OFFSET(shading, offsetof(box_render_shading_t, ids)),
         ECS_SIZEOF(ids));
+    ecs_os_memcpy(&plane, ECS_OFFSET(shading, offsetof(box_render_shading_t, plane)),
+        ECS_SIZEOF(plane));
     ecs_os_memcpy(words, ECS_OFFSET(shading, offsetof(box_render_shading_t, material)),
         ECS_SIZEOF(words));
     if (box_shadow_resolve(&record->material.shape2d,
@@ -597,10 +606,10 @@ void box_draws_box_shadow_patch(
         box_shadow_color(linear, &shadow->color, material, alpha);
         box_shadow_shading(&out, &box, linear,
             glm_clamp(alpha * record->material.shadow_cover, 0.0f, 1.0f), (int32_t)ids[0],
-            ids[1], box.polygon && isfinite(words[0]) ? (int32_t)words[0] : 0);
+            ids[1], (int32_t)plane, box.polygon && isfinite(words[0]) ? (int32_t)words[0] : 0);
         box_shadow_transform(&t, world, &box);
     } else {
-        box_shadow_hidden(&t, &out, world, (int32_t)ids[0], ids[1]);
+        box_shadow_hidden(&t, &out, world, (int32_t)ids[0], ids[1], (int32_t)plane);
         if (record->material.shape2d.kind == BOX_SHAPE2D_POLYGON) {
             out.material[0] = words[0];
         }
@@ -732,7 +741,8 @@ void box_draws_box_shadow_update(
         box_draw_batch_t *b = box_draws_batch(d, bs->batch);
         box_shadow_hidden(box_draws_slot_transform(b, bs->slot),
             box_draws_slot_shading(b, bs->slot),
-            transform ? ECS_CONST_CAST(vec4*, transform->m) : NULL, material.clip, bs->rank);
+            transform ? ECS_CONST_CAST(vec4*, transform->m) : NULL, material.clip, bs->rank,
+            bs->plane);
         if (shape->kind == BOX_SHAPE2D_POLYGON) {
             box_draws_slot_shading(b, bs->slot)->material[0] = (float)s->slice;
         }

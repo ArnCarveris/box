@@ -38,6 +38,7 @@ static void box_text_slots_ctor(
     for (i = 0; i < count; i ++) {
         ecs_vec_init_t(NULL, &values[i].slots, box_draw_glyph_slot_t, 0);
         values[i].rank = 0;
+        values[i].plane = 0;
     }
 }
 
@@ -98,6 +99,7 @@ static void box_text_slots_copy(
     for (i = 0; i < count; i ++) {
         ecs_vec_clear(&values[i].slots);
         values[i].rank = 0;
+        values[i].plane = 0;
     }
 }
 
@@ -402,6 +404,7 @@ void box_draws_text_update(
 
     material.clip = count ? box_draws_clip_of(world, d, e) : 0;
     material.rank = ts ? ts->rank : 0;
+    material.plane = ts ? ts->plane : 0;
     for (i = 0; i < count; i ++) {
         const box_draw_glyph_slot_t *at = ecs_vec_get_t(&ts->slots, box_draw_glyph_slot_t, i);
         box_draw_batch_t *b = box_draws_batch(d, at->batch);

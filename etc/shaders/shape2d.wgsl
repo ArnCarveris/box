@@ -5,6 +5,10 @@
 // A shape is placed relative to the render origin (instance_relative, render_view_proj), which
 // keeps its precision near it; its clips map its local position. Without a render origin the
 // relative transform and render_view_proj are the local ones exactly.
+//
+// The coplanar layers of a group (a screen and the shapes and texts on it, render/plane.c) are
+// placed on the plane of its anchor (plane_position) and told apart by their rank in the draw
+// order of their tree (ranked_depth).
 #include "include/lights.wgsl"
 #include "include/instance.wgsl"
 
@@ -31,6 +35,10 @@ struct Clip {
     area: vec4f,
 };
 
+// Part of the magnitude of the positions involved a vertex may stand off the plane of its layer
+// group and still be moved onto it: 16 times the rounding of an f32 value
+const plane_tolerance: f32 = 1.0 / 1048576.0;
+
 // Most nested clips a fragment intersects, BOX_RENDER_CLIP_DEPTH
 const clip_depth: u32 = 16u;
 
@@ -49,6 +57,8 @@ struct Shape2DShading {
     uv: vec4f,
     color: vec2u,
     ids: vec2u,
+    // x: index of the plane record of its layer group in the clip buffer, 0 for none
+    plane: vec4u,
 };
 
 // The transform stream of the instance page: the rows of the model matrix.
@@ -103,11 +113,47 @@ fn pixels_per_unit(mvp: mat4x4f, clip: vec4f, dir: vec2f) -> f32 {
     return select(0.0, length(ndc * 0.5 * view.viewport.xy), clip.w > 1e-6);
 }
 
+// Clip position of a point of a 2D shape on the plane of its layer group: the plane record
+// (box_render_plane_t) at index of the clip buffer holds the origin of the anchor of the group in
+// the local frame and the unit normal of its plane.
+//
+// The layers of a group are coplanar, but the world transform of each one rounds to f32 on its
+// own, which puts it off the plane of the anchor by some 1e-7 of its distance from the local
+// origin, more than the rank lift of ranked_depth far out. The point is moved onto the plane
+// along its normal and placed from the origin of the anchor, which every layer of the group
+// projects alike, so the rank alone orders the layers. A point that stands off the plane by more
+// than that rounding (plane_tolerance), a layer that is not coplanar, keeps its own position, as
+// does a point without a plane record.
+//
+// relative is the model matrix relative to the render origin, point the position in it and own
+// its clip position.
+fn plane_position(index: u32, relative: mat4x4f, point: vec4f, own: vec4f) -> vec4f {
+    var result = own;
+    if (index != 0u && index < arrayLength(&clips)) {
+        let record = clips[index];
+        let normal = record.y.xyz;
+        let anchor = record.x.xyz - view.render_delta.xyz;
+
+        // The origins are near each other and their difference exact
+        let offset = (relative[3].xyz - anchor) + (relative * vec4f(point.xy, 0.0, 0.0)).xyz;
+        let off = dot(normal, offset);
+        let reach = max(max(abs(record.x.x), abs(record.x.y)), abs(record.x.z)) + length(offset);
+        if (any(normal != vec3f(0.0)) && abs(off) <= plane_tolerance * reach) {
+            let on = offset - normal * off;
+            result = view.render_view_proj * vec4f(anchor, 1.0) +
+                view.render_view_proj * vec4f(on, 0.0);
+        }
+    }
+
+    return result;
+}
+
 @vertex fn vs(v: VertexIn) -> VertexOut {
     let inst = shadings[v.slot];
     let t = transforms[v.slot];
     let model = instance_model(instance_local(t, instance_page));
-    let mvp = view.render_view_proj * instance_model(instance_relative(t, instance_page));
+    let relative = instance_model(instance_relative(t, instance_page));
+    let mvp = view.render_view_proj * relative;
     var origin = vec2f(0.0);
     var axis = vec2f(1.0, 0.0);
     var to_model = vec2f(1.0);
@@ -164,7 +210,7 @@ fn pixels_per_unit(mvp: mat4x4f, clip: vec4f, dir: vec2f) -> f32 {
     let pad = select(vec2f(0.0), grow, (ppu > vec2f(0.0)) & vec2<bool>(!glyph));
     let q = edge + corner * pad;
     let point = vec4f(origin + dir_x * q.x + dir_y * q.y, 0.0, 1.0);
-    o.pos = mvp * point;
+    o.pos = plane_position(inst.plane.x, relative, point, mvp * point);
     o.world = (model * point).xyz;
     o.clip = inst.ids.x;
     o.rank = inst.ids.y;
@@ -332,7 +378,9 @@ fn output(color: vec3f, alpha: f32, cover: f32) -> vec4f {
     }
 }
 
-// Depth of a fragment lifted over the coplanar elements of its tree drawn before it.
+// Depth of a fragment lifted over the coplanar elements of its tree drawn before it. The layers
+// of a group lie on one plane (plane_position), so the lift needs to clear only the precision of
+// the depth; other coplanar elements of a tree are each off by the rounding of their transform.
 fn ranked_depth(depth: f32, rank: u32) -> f32 {
     let slope = max(abs(dpdx(depth)), abs(dpdy(depth)));
     let part = select(rank_depth, 0.0, view.lights.w == 1u);

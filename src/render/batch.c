@@ -24,7 +24,7 @@
 #define BOX_DRAWS_MAX_CHANGES ((uint64_t)128 << 20)
 
 _Static_assert(sizeof(box_render_transform_t) == 48, "InstanceTransform of instance.wgsl");
-_Static_assert(sizeof(box_render_shading_t) == 64, "Shape2DShading of shape2d.wgsl");
+_Static_assert(sizeof(box_render_shading_t) == 80, "Shape2DShading of shape2d.wgsl");
 _Static_assert(sizeof(box_render_mesh_shading_t) == 16, "MeshShading of instance.wgsl");
 _Static_assert(BOX_DRAWS_PAGE_BYTES / sizeof(box_render_transform_t) <= (1u << 22),
     "A visible slot keeps the bits above RANGE_SLOT_BITS of draw_range.wgsl for its dither code");
@@ -1473,8 +1473,7 @@ static void box_draws_send_blended(
     }
 }
 
-/** Write the changed slots of a stream of a batch into the scatter segment of its page and
- * stream.
+/** Write the changed slots of a stream of a batch into the scatter segment of its stream.
  *
  * @param d The state
  * @param b The batch
@@ -1691,7 +1690,8 @@ static void box_draws_fill_material(
             .fade = slots[i].fade,
             .clip = shapes2d ? slots[i].clip : 0,
             .slice = shapes2d ? slots[i].slice : 0,
-            .rank = shapes2d ? slots[i].rank : 0
+            .rank = shapes2d ? slots[i].rank : 0,
+            .plane = shapes2d ? slots[i].plane : 0
         };
         if (walk) {
             material.fade = box_draws_fade(it->world, it->entities[i], &inherited);

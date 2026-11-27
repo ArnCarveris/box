@@ -2275,6 +2275,13 @@
                 ]
             },
             {
+                "id": "RenderOriginLayers",
+                "testcases": [
+                    "coplanar_steady",
+                    "coplanar_steady_render_origin"
+                ]
+            },
+            {
                 "id": "RenderOriginRide",
                 "testcases": [
                     "layers_steady",

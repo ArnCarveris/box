@@ -417,30 +417,84 @@ static uint32_t box_draws_rank_next(
     return result;
 }
 
-/** Write the rank of a 2D slot into its shading when it changed.
+/** Write the rank and the plane record index of a 2D slot into its shading when they changed.
  *
  * @param b The batch
  * @param slot The slot
  * @param rank The rank
+ * @param plane The plane record index, 0 for none
  */
 static void box_draws_rank_write(
     box_draw_batch_t *b,
     int32_t slot,
-    uint32_t rank)
+    uint32_t rank,
+    int32_t plane)
 {
     box_render_shading_t *shading = box_draws_slot_shading(b, slot);
-    if (shading->ids[1] != rank) {
+    if (shading->ids[1] != rank || shading->plane[0] != (uint32_t)plane) {
         shading->ids[1] = rank;
+        shading->plane[0] = (uint32_t)plane;
         box_draws_slot_changed(b, slot, BOX_DRAW_SHADING);
     }
+}
+
+/** Find the anchors of the layer groups of the order: the anchors (box_draws_plane_anchor) of
+ * the entities that are not their own anchor.
+ *
+ * @param world The world
+ * @param d The state
+ * @param anchors Receives the anchors as keys
+ */
+static void box_draws_order_anchors(
+    ecs_world_t *world,
+    box_render_draws_t *d,
+    ecs_map_t *anchors)
+{
+    int32_t i, count = ecs_vec_count(&d->order);
+    const box_draw_order_t *order = ecs_vec_first_t(&d->order, box_draw_order_t);
+    for (i = 0; i < count; i ++) {
+        ecs_entity_t e = order[i].entity;
+        if (!ecs_is_alive(world, e)) {
+            continue;
+        }
+
+        ecs_entity_t anchor = box_draws_plane_anchor(world, d, e);
+        if (anchor && anchor != e) {
+            ecs_map_ensure(anchors, anchor);
+        }
+    }
+}
+
+/** Get the plane record index of an entity: that of the layer group of its anchor, 0 when its
+ * anchor anchors no group.
+ *
+ * @param world The world
+ * @param d The state
+ * @param anchors The anchors of the groups
+ * @param e The entity
+ * @return The plane record index, 0 for none
+ */
+static int32_t box_draws_order_plane(
+    ecs_world_t *world,
+    box_render_draws_t *d,
+    const ecs_map_t *anchors,
+    ecs_entity_t e)
+{
+    ecs_entity_t anchor = box_draws_plane_anchor(world, d, e);
+    int32_t result = 0;
+    if (anchor && ecs_map_get(anchors, anchor)) {
+        result = box_draws_plane_of(d, anchor);
+    }
+
+    return result;
 }
 
 /** Make the runs: the shadow slot, the shape slot and then the glyph slots of every entity in
  * order.
  *
  * Rank the shadow, the shape and the glyphs of every entity in the order of its tree
- * (box_draws_rank_next), the floating elements of a tree after the rest of it, and write the
- * ranks that changed.
+ * (box_draws_rank_next), the floating elements of a tree after the rest of it, give them the
+ * plane record of their layer group, and write the ranks and planes that changed.
  *
  * @param world The world
  * @param d The state
@@ -451,6 +505,9 @@ static void box_draws_order_runs(
 {
     int32_t i, g, count = ecs_vec_count(&d->order);
     const box_draw_order_t *order = ecs_vec_first_t(&d->order, box_draw_order_t);
+    ecs_map_t anchors;
+    ecs_map_init(&anchors, NULL);
+    box_draws_order_anchors(world, d, &anchors);
     ecs_vec_clear(&d->runs);
     ecs_map_clear(&d->tree_ranks);
     for (i = 0; i < count; i ++) {
@@ -459,12 +516,14 @@ static void box_draws_order_runs(
             continue;
         }
 
+        int32_t plane = box_draws_order_plane(world, d, &anchors, e);
         ecs_map_val_t *tree = ecs_map_ensure(&d->tree_ranks, order[i].tree);
         BoxShadowSlot *bs = d->box_shadows ? ecs_get_mut(world, e, BoxShadowSlot) : NULL;
         if (bs && bs->batch >= 0) {
             bs->rank = box_draws_rank_next(tree, bs->rank);
+            bs->plane = plane;
             box_draws_run_add(d, bs->batch, bs->slot);
-            box_draws_rank_write(box_draws_batch(d, bs->batch), bs->slot, bs->rank);
+            box_draws_rank_write(box_draws_batch(d, bs->batch), bs->slot, bs->rank, plane);
         }
 
         DrawSlot *s = ecs_get_mut(world, e, DrawSlot);
@@ -472,24 +531,28 @@ static void box_draws_order_runs(
             box_draws_batch(d, s->batch)->key.pipeline == BOX_RENDER_SHADER_SHAPE2D)
         {
             s->rank = box_draws_rank_next(tree, s->rank);
+            s->plane = plane;
             box_draws_run_add(d, s->batch, s->slot);
-            box_draws_rank_write(box_draws_batch(d, s->batch), s->slot, s->rank);
+            box_draws_rank_write(box_draws_batch(d, s->batch), s->slot, s->rank, plane);
         }
 
         TextSlots *ts = ecs_get_mut(world, e, TextSlots);
         int32_t glyphs = ts ? ecs_vec_count(&ts->slots) : 0;
         if (glyphs) {
             ts->rank = box_draws_rank_next(tree, ts->rank);
+            ts->plane = plane;
         }
 
         for (g = 0; g < glyphs; g ++) {
             const box_draw_glyph_slot_t *at = ecs_vec_get_t(
                 &ts->slots, box_draw_glyph_slot_t, g);
             box_draws_run_add(d, at->batch, at->slot);
-            box_draws_rank_write(box_draws_batch(d, at->batch), at->slot, ts->rank);
+            box_draws_rank_write(box_draws_batch(d, at->batch), at->slot, ts->rank, plane);
         }
     }
 
+    box_draws_planes_keep(d, &anchors);
+    ecs_map_fini(&anchors);
     d->stats.runs = ecs_vec_count(&d->runs);
 }
 

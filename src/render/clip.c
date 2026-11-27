@@ -373,6 +373,7 @@ void box_draws_clips_init(
     box_draw_clips_t *c = &d->clips;
     ecs_map_init(&c->index, NULL);
     ecs_map_init(&c->floats, NULL);
+    ecs_map_init(&c->planes, NULL);
     ecs_vec_init_t(NULL, &c->entities, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &c->records, box_render_clip_t, 0);
     ecs_vec_init_t(NULL, &c->free, int32_t, 0);
@@ -393,6 +394,7 @@ void box_draws_clips_fini(
     box_draw_clips_t *c = &d->clips;
     ecs_map_fini(&c->index);
     ecs_map_fini(&c->floats);
+    ecs_map_fini(&c->planes);
     ecs_vec_fini_t(NULL, &c->entities, ecs_entity_t);
     ecs_vec_fini_t(NULL, &c->records, box_render_clip_t);
     ecs_vec_fini_t(NULL, &c->free, int32_t);
@@ -405,15 +407,7 @@ void box_draws_clips_fini(
     ecs_vec_fini_t(NULL, &c->polygon_edges, vec4);
 }
 
-/** Get the clip index of an element, giving it one when it has none.
- *
- * @param c The clips
- * @param map The map of the kind of clip: c->index for ClipChildren, c->floats for a
- * hide_clipped float
- * @param e The element
- * @return The clip index
- */
-static int32_t box_draws_clip_index(
+int32_t box_draws_clip_index(
     box_draw_clips_t *c,
     ecs_map_t *map,
     ecs_entity_t e)
@@ -440,6 +434,20 @@ static int32_t box_draws_clip_index(
     c->dirty = true;
 done:
     return result;
+}
+
+void box_draws_clip_free(
+    box_draw_clips_t *c,
+    ecs_map_t *map,
+    ecs_entity_t e)
+{
+    uint64_t *found = ecs_map_get(map, e);
+    if (found) {
+        int32_t index = (int32_t)*found;
+        *ecs_vec_get_t(&c->entities, ecs_entity_t, index) = 0;
+        *ecs_vec_append_t(NULL, &c->free, int32_t) = index;
+        ecs_map_remove(map, e);
+    }
 }
 
 int32_t box_draws_clip_of(
@@ -475,15 +483,8 @@ void box_draws_clip_removed(
     box_render_draws_t *d,
     ecs_entity_t e)
 {
-    box_draw_clips_t *c = &d->clips;
-    uint64_t *found = ecs_map_get(&c->index, e);
-    c->tagged --;
-    if (found) {
-        int32_t index = (int32_t)*found;
-        *ecs_vec_get_t(&c->entities, ecs_entity_t, index) = 0;
-        *ecs_vec_append_t(NULL, &c->free, int32_t) = index;
-        ecs_map_remove(&c->index, e);
-    }
+    d->clips.tagged --;
+    box_draws_clip_free(&d->clips, &d->clips.index, e);
 }
 
 int32_t box_draws_slice_of(
@@ -907,7 +908,15 @@ void box_draws_clips_send(
         }
 
         uint64_t *fl = ecs_map_get(&c->floats, e);
-        if (fl && *fl == (uint64_t)i) {
+        uint64_t *pl = ecs_map_get(&c->planes, e);
+        if (pl && *pl == (uint64_t)i) {
+            if (!ecs_is_alive(world, e)) {
+                box_draws_clip_free(c, &c->planes, e);
+                continue;
+            }
+
+            box_draws_plane_record(world, e, &record);
+        } else if (fl && *fl == (uint64_t)i) {
             if (!ecs_is_alive(world, e) || !box_draws_float_hiding(world, e)) {
                 *ecs_vec_get_t(&c->entities, ecs_entity_t, i) = 0;
                 *ecs_vec_append_t(NULL, &c->free, int32_t) = i;

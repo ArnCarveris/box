@@ -1214,6 +1214,7 @@ write:
         s->clip = clip;
         material.clip = clip;
         material.rank = s->rank;
+        material.plane = s->plane;
         bool polygon = material.shape2d->kind == BOX_SHAPE2D_POLYGON;
         int32_t slice = material.shape2d->sliced ? box_draws_slice_of(d, e) :
             polygon ? box_draws_polygon_of(world, d, e, kinds & BOX_DRAW_SHADING) : 0;
@@ -1305,6 +1306,7 @@ void box_draws_shape_material(
         out->clip = s->clip;
         out->slice = s->slice;
         out->rank = s->rank;
+        out->plane = s->plane;
     }
 }
 
@@ -1403,8 +1405,8 @@ static void BoxRenderExtractDraws(
     d->stats.material_bytes = 0;
     box_draws_materials_resolve(world, d);
     box_draws_process(world, d);
-    box_draws_clips_send(world, d, p);
     box_draws_order_update(world, d);
+    box_draws_clips_send(world, d, p);
     box_draws_send(world, d, p);
     RenderStatus *status = ecs_singleton_get_mut(world, RenderStatus);
     if (status) {
