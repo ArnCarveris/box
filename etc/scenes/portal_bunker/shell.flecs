@@ -1445,97 +1445,95 @@ bunker {
 
 
 
-    p_entry_frame_1 : BunkerMat_frame { Position: {-1.16, 1.4, 0}; Box: {0.12, 2.8, 0.3} }
-    p_entry_frame_2 : BunkerMat_frame { Position: {1.16, 1.4, 0}; Box: {0.12, 2.8, 0.3} }
-    p_entry_frame_3 : BunkerMat_frame { Position: {0, 2.86, 0}; Box: {2.44, 0.12, 0.3} }
+    p_entry_frame_1 : BunkerMat_frame { Position: {-1.155, 1.4, 0}; Box: {0.13, 2.8, 0.3} }
+    p_entry_frame_2 : BunkerMat_frame { Position: {1.155, 1.4, 0}; Box: {0.13, 2.8, 0.3} }
+    p_entry_frame_3 : BunkerMat_frame { Position: {0, 2.855, 0}; Box: {2.44, 0.13, 0.3} }
 
-    p_hall_win_frame_1 : BunkerMat_frame { Position: {6, 2.1, 3.44}; Box: {0.3, 1.8, 0.12} }
-    p_hall_win_frame_2 : BunkerMat_frame { Position: {6, 2.1, 6.56}; Box: {0.3, 1.8, 0.12} }
-    p_hall_win_frame_3 : BunkerMat_frame { Position: {6, 3.06, 5}; Box: {0.3, 0.12, 3.24} }
-    p_hall_win_frame_4 : BunkerMat_frame { Position: {6, 1.14, 5}; Box: {0.3, 0.12, 3.24} }
+    p_hall_win_frame_1 : BunkerMat_frame { Position: {6, 2.1, 3.445}; Box: {0.3, 1.8, 0.13} }
+    p_hall_win_frame_2 : BunkerMat_frame { Position: {6, 2.1, 6.555}; Box: {0.3, 1.8, 0.13} }
+    p_hall_win_frame_3 : BunkerMat_frame { Position: {6, 3.055, 5}; Box: {0.3, 0.13, 3.24} }
+    p_hall_win_frame_4 : BunkerMat_frame { Position: {6, 1.145, 5}; Box: {0.3, 0.13, 3.24} }
     p_hall_win_pane_1 : BunkerMat_glass { Position: {6, 2.1, 5}; Box: {0.02, 1.8, 3} }
 
-    p_hall_corr_frame_1 : BunkerMat_frame { Position: {-1.26, 1.3, 10}; Box: {0.12, 2.6, 0.3} }
-    p_hall_corr_frame_2 : BunkerMat_frame { Position: {1.26, 1.3, 10}; Box: {0.12, 2.6, 0.3} }
-    p_hall_corr_frame_3 : BunkerMat_frame { Position: {0, 2.66, 10}; Box: {2.64, 0.12, 0.3} }
+    p_hall_corr_frame_1 : BunkerMat_frame { Position: {-1.255, 1.3, 10}; Box: {0.13, 2.6, 0.3} }
+    p_hall_corr_frame_2 : BunkerMat_frame { Position: {1.255, 1.3, 10}; Box: {0.13, 2.6, 0.3} }
+    p_hall_corr_frame_3 : BunkerMat_frame { Position: {0, 2.655, 10}; Box: {2.64, 0.13, 0.3} }
 
-    p_hall_stairs_frame_1 : BunkerMat_frame { Position: {-6, 1.2, 2.04}; Box: {0.3, 2.4, 0.12} }
-    p_hall_stairs_frame_2 : BunkerMat_frame { Position: {-6, 1.2, 3.96}; Box: {0.3, 2.4, 0.12} }
-    p_hall_stairs_frame_3 : BunkerMat_frame { Position: {-6, 2.46, 3}; Box: {0.3, 0.12, 2.04} }
+    p_hall_stairs_frame_1 : BunkerMat_frame { Position: {-6, 1.2, 2.045}; Box: {0.3, 2.4, 0.13} }
+    p_hall_stairs_frame_2 : BunkerMat_frame { Position: {-6, 1.2, 3.955}; Box: {0.3, 2.4, 0.13} }
+    p_hall_stairs_frame_3 : BunkerMat_frame { Position: {-6, 2.455, 3}; Box: {0.3, 0.13, 2.04} }
 
-    p_corr_ctrl_frame_1 : BunkerMat_frame { Position: {-1.5, 1.2, 16.54}; Box: {0.3, 2.4, 0.12} }
-    p_corr_ctrl_frame_2 : BunkerMat_frame { Position: {-1.5, 1.2, 18.46}; Box: {0.3, 2.4, 0.12} }
-    p_corr_ctrl_frame_3 : BunkerMat_frame { Position: {-1.5, 2.46, 17.5}; Box: {0.3, 0.12, 2.04} }
+    p_corr_ctrl_frame_1 : BunkerMat_frame { Position: {-1.5, 1.2, 16.545}; Box: {0.3, 2.4, 0.13} }
+    p_corr_ctrl_frame_2 : BunkerMat_frame { Position: {-1.5, 1.2, 18.455}; Box: {0.3, 2.4, 0.13} }
+    p_corr_ctrl_frame_3 : BunkerMat_frame { Position: {-1.5, 2.455, 17.5}; Box: {0.3, 0.13, 2.04} }
 
-    p_ctrl_win_frame_1 : BunkerMat_frame { Position: {-12, 1.8, 15.44}; Box: {0.3, 1.2, 0.12} }
-    p_ctrl_win_frame_2 : BunkerMat_frame { Position: {-12, 1.8, 19.56}; Box: {0.3, 1.2, 0.12} }
-    p_ctrl_win_frame_3 : BunkerMat_frame { Position: {-12, 2.46, 17.5}; Box: {0.3, 0.12, 4.24} }
-    p_ctrl_win_frame_4 : BunkerMat_frame { Position: {-12, 1.14, 17.5}; Box: {0.3, 0.12, 4.24} }
+    p_ctrl_win_frame_1 : BunkerMat_frame { Position: {-12, 1.8, 15.445}; Box: {0.3, 1.2, 0.13} }
+    p_ctrl_win_frame_2 : BunkerMat_frame { Position: {-12, 1.8, 19.555}; Box: {0.3, 1.2, 0.13} }
+    p_ctrl_win_frame_3 : BunkerMat_frame { Position: {-12, 2.455, 17.5}; Box: {0.3, 0.13, 4.24} }
+    p_ctrl_win_frame_4 : BunkerMat_frame { Position: {-12, 1.145, 17.5}; Box: {0.3, 0.13, 4.24} }
     p_ctrl_win_pane_1 : BunkerMat_glass { Position: {-12, 1.8, 17.5}; Box: {0.02, 1.2, 4}; Rgb: {115, 166, 179}; Opacity: {0.14} }
 
-    p_hatch_frame_1 : BunkerMat_frame { Position: {-6.76, 3.5, 16}; Box: {0.12, 0.3, 1.4} }
-    p_hatch_frame_2 : BunkerMat_frame { Position: {-5.24, 3.5, 16}; Box: {0.12, 0.3, 1.4} }
-    p_hatch_frame_3 : BunkerMat_frame { Position: {-6, 3.5, 16.76}; Box: {1.64, 0.3, 0.12} }
-    p_hatch_frame_4 : BunkerMat_frame { Position: {-6, 3.5, 15.24}; Box: {1.64, 0.3, 0.12} }
+    p_hatch_frame_1 : BunkerMat_frame { Position: {-6.755, 3.5, 16}; Box: {0.13, 0.3, 1.4} }
+    p_hatch_frame_2 : BunkerMat_frame { Position: {-5.245, 3.5, 16}; Box: {0.13, 0.3, 1.4} }
+    p_hatch_frame_3 : BunkerMat_frame { Position: {-6, 3.5, 16.755}; Box: {1.64, 0.3, 0.13} }
+    p_hatch_frame_4 : BunkerMat_frame { Position: {-6, 3.5, 15.245}; Box: {1.64, 0.3, 0.13} }
 
-    p_loft_win_frame_1 : BunkerMat_frame { Position: {-11, 5, 15.94}; Box: {0.3, 1.2, 0.12} }
-    p_loft_win_frame_2 : BunkerMat_frame { Position: {-11, 5, 19.06}; Box: {0.3, 1.2, 0.12} }
-    p_loft_win_frame_3 : BunkerMat_frame { Position: {-11, 5.66, 17.5}; Box: {0.3, 0.12, 3.24} }
-    p_loft_win_frame_4 : BunkerMat_frame { Position: {-11, 4.34, 17.5}; Box: {0.3, 0.12, 3.24} }
+    p_loft_win_frame_1 : BunkerMat_frame { Position: {-11, 5, 15.945}; Box: {0.3, 1.2, 0.13} }
+    p_loft_win_frame_2 : BunkerMat_frame { Position: {-11, 5, 19.055}; Box: {0.3, 1.2, 0.13} }
+    p_loft_win_frame_3 : BunkerMat_frame { Position: {-11, 5.655, 17.5}; Box: {0.3, 0.13, 3.24} }
+    p_loft_win_frame_4 : BunkerMat_frame { Position: {-11, 4.345, 17.5}; Box: {0.3, 0.13, 3.24} }
     p_loft_win_pane_1 : BunkerMat_glass { Position: {-11, 5, 17.5}; Box: {0.02, 1.2, 3}; Rgb: {179, 153, 115}; Opacity: {0.16} }
 
-    p_corr_atr_frame_1 : BunkerMat_frame { Position: {7.44, 1.4, 22}; Box: {0.12, 2.8, 0.3} }
-    p_corr_atr_frame_2 : BunkerMat_frame { Position: {10.56, 1.4, 22}; Box: {0.12, 2.8, 0.3} }
-    p_corr_atr_frame_3 : BunkerMat_frame { Position: {9, 2.86, 22}; Box: {3.24, 0.12, 0.3} }
+    p_corr_atr_frame_1 : BunkerMat_frame { Position: {7.445, 1.4, 22}; Box: {0.13, 2.8, 0.3} }
+    p_corr_atr_frame_2 : BunkerMat_frame { Position: {10.555, 1.4, 22}; Box: {0.13, 2.8, 0.3} }
+    p_corr_atr_frame_3 : BunkerMat_frame { Position: {9, 2.855, 22}; Box: {3.24, 0.13, 0.3} }
 
-    p_skylight_frame_1 : BunkerMat_frame { Position: {6.44, 8, 28}; Box: {0.12, 0.3, 6} }
-    p_skylight_frame_2 : BunkerMat_frame { Position: {11.56, 8, 28}; Box: {0.12, 0.3, 6} }
-    p_skylight_frame_3 : BunkerMat_frame { Position: {9, 8, 31.06}; Box: {5.24, 0.3, 0.12} }
-    p_skylight_frame_4 : BunkerMat_frame { Position: {9, 8, 24.94}; Box: {5.24, 0.3, 0.12} }
+    p_skylight_frame_1 : BunkerMat_frame { Position: {6.445, 8, 28}; Box: {0.13, 0.3, 6} }
+    p_skylight_frame_2 : BunkerMat_frame { Position: {11.555, 8, 28}; Box: {0.13, 0.3, 6} }
+    p_skylight_frame_3 : BunkerMat_frame { Position: {9, 8, 31.055}; Box: {5.24, 0.3, 0.13} }
+    p_skylight_frame_4 : BunkerMat_frame { Position: {9, 8, 24.945}; Box: {5.24, 0.3, 0.13} }
     p_skylight_pane_1 : BunkerMat_glass { Position: {9, 8, 28}; Box: {5, 0.02, 6}; Rgb: {153, 191, 204}; Opacity: {0.1} }
 
-    p_corr_win_frame_1 : BunkerMat_frame { Position: {16, 1.6, 19.44}; Box: {0.3, 1.2, 0.12} }
-    p_corr_win_frame_2 : BunkerMat_frame { Position: {16, 1.6, 21.56}; Box: {0.3, 1.2, 0.12} }
-    p_corr_win_frame_3 : BunkerMat_frame { Position: {16, 2.26, 20.5}; Box: {0.3, 0.12, 2.24} }
-    p_corr_win_frame_4 : BunkerMat_frame { Position: {16, 0.94, 20.5}; Box: {0.3, 0.12, 2.24} }
+    p_corr_win_frame_1 : BunkerMat_frame { Position: {16, 1.6, 19.445}; Box: {0.3, 1.2, 0.13} }
+    p_corr_win_frame_2 : BunkerMat_frame { Position: {16, 1.6, 21.555}; Box: {0.3, 1.2, 0.13} }
+    p_corr_win_frame_3 : BunkerMat_frame { Position: {16, 2.255, 20.5}; Box: {0.3, 0.13, 2.24} }
+    p_corr_win_frame_4 : BunkerMat_frame { Position: {16, 0.945, 20.5}; Box: {0.3, 0.13, 2.24} }
 
-    p_corr_store_frame_1 : BunkerMat_frame { Position: {10.94, 1.2, 19}; Box: {0.12, 2.4, 0.3} }
-    p_corr_store_frame_2 : BunkerMat_frame { Position: {13.06, 1.2, 19}; Box: {0.12, 2.4, 0.3} }
-    p_corr_store_frame_3 : BunkerMat_frame { Position: {12, 2.46, 19}; Box: {2.24, 0.12, 0.3} }
+    p_corr_store_frame_1 : BunkerMat_frame { Position: {10.945, 1.2, 19}; Box: {0.13, 2.4, 0.3} }
+    p_corr_store_frame_2 : BunkerMat_frame { Position: {13.055, 1.2, 19}; Box: {0.13, 2.4, 0.3} }
+    p_corr_store_frame_3 : BunkerMat_frame { Position: {12, 2.455, 19}; Box: {2.24, 0.13, 0.3} }
 
-    p_store_exit_frame_1 : BunkerMat_frame { Position: {14, 1.2, 13.94}; Box: {0.3, 2.4, 0.12} }
-    p_store_exit_frame_2 : BunkerMat_frame { Position: {14, 1.2, 16.06}; Box: {0.3, 2.4, 0.12} }
-    p_store_exit_frame_3 : BunkerMat_frame { Position: {14, 2.46, 15}; Box: {0.3, 0.12, 2.24} }
+    p_store_exit_frame_1 : BunkerMat_frame { Position: {14, 1.2, 13.945}; Box: {0.3, 2.4, 0.13} }
+    p_store_exit_frame_2 : BunkerMat_frame { Position: {14, 1.2, 16.055}; Box: {0.3, 2.4, 0.13} }
+    p_store_exit_frame_3 : BunkerMat_frame { Position: {14, 2.455, 15}; Box: {0.3, 0.13, 2.24} }
 
-    p_shed_door_frame_1 : BunkerMat_frame { Position: {20, 1.2, -6.96}; Box: {0.3, 2.4, 0.12} }
-    p_shed_door_frame_2 : BunkerMat_frame { Position: {20, 1.2, -5.04}; Box: {0.3, 2.4, 0.12} }
-    p_shed_door_frame_3 : BunkerMat_frame { Position: {20, 2.46, -6}; Box: {0.3, 0.12, 2.04} }
+    p_shed_door_frame_1 : BunkerMat_frame { Position: {20, 1.2, -6.955}; Box: {0.3, 2.4, 0.13} }
+    p_shed_door_frame_2 : BunkerMat_frame { Position: {20, 1.2, -5.045}; Box: {0.3, 2.4, 0.13} }
+    p_shed_door_frame_3 : BunkerMat_frame { Position: {20, 2.455, -6}; Box: {0.3, 0.13, 2.04} }
 
-    p_shed_win_frame_1 : BunkerMat_frame { Position: {22.74, 2, -2}; Box: {0.12, 1, 0.3} }
-    p_shed_win_frame_2 : BunkerMat_frame { Position: {25.26, 2, -2}; Box: {0.12, 1, 0.3} }
-    p_shed_win_frame_3 : BunkerMat_frame { Position: {24, 2.56, -2}; Box: {2.64, 0.12, 0.3} }
-    p_shed_win_frame_4 : BunkerMat_frame { Position: {24, 1.44, -2}; Box: {2.64, 0.12, 0.3} }
+    p_shed_win_frame_1 : BunkerMat_frame { Position: {22.745, 2, -2}; Box: {0.13, 1, 0.3} }
+    p_shed_win_frame_2 : BunkerMat_frame { Position: {25.255, 2, -2}; Box: {0.13, 1, 0.3} }
+    p_shed_win_frame_3 : BunkerMat_frame { Position: {24, 2.555, -2}; Box: {2.64, 0.13, 0.3} }
+    p_shed_win_frame_4 : BunkerMat_frame { Position: {24, 1.445, -2}; Box: {2.64, 0.13, 0.3} }
     p_shed_win_pane_1 : BunkerMat_glass { Position: {24, 2, -2}; Box: {2.4, 1, 0.02} }
 
-    p_stairs_win_frame_1 : BunkerMat_frame { Position: {-11.06, 1.7, 1}; Box: {0.12, 1, 0.3} }
-    p_stairs_win_frame_2 : BunkerMat_frame { Position: {-8.94, 1.7, 1}; Box: {0.12, 1, 0.3} }
-    p_stairs_win_frame_3 : BunkerMat_frame { Position: {-10, 2.26, 1}; Box: {2.24, 0.12, 0.3} }
-    p_stairs_win_frame_4 : BunkerMat_frame { Position: {-10, 1.14, 1}; Box: {2.24, 0.12, 0.3} }
+    p_stairs_win_frame_1 : BunkerMat_frame { Position: {-11.055, 1.7, 1}; Box: {0.13, 1, 0.3} }
+    p_stairs_win_frame_2 : BunkerMat_frame { Position: {-8.945, 1.7, 1}; Box: {0.13, 1, 0.3} }
+    p_stairs_win_frame_3 : BunkerMat_frame { Position: {-10, 2.255, 1}; Box: {2.24, 0.13, 0.3} }
+    p_stairs_win_frame_4 : BunkerMat_frame { Position: {-10, 1.145, 1}; Box: {2.24, 0.13, 0.3} }
     p_stairs_win_pane_1 : BunkerMat_glass { Position: {-10, 1.7, 1}; Box: {2, 1, 0.02}; Rgb: {128, 153, 140}; Opacity: {0.2} }
 
-    p_stairs_base_frame_1 : BunkerMat_frame { Position: {-14, -2.8, 2.04}; Box: {0.3, 2.4, 0.12} }
-    p_stairs_base_frame_2 : BunkerMat_frame { Position: {-14, -2.8, 3.96}; Box: {0.3, 2.4, 0.12} }
-    p_stairs_base_frame_3 : BunkerMat_frame { Position: {-14, -1.54, 3}; Box: {0.3, 0.12, 2.04} }
+    p_stairs_base_frame_1 : BunkerMat_frame { Position: {-14, -2.8, 2.045}; Box: {0.3, 2.4, 0.13} }
+    p_stairs_base_frame_2 : BunkerMat_frame { Position: {-14, -2.8, 3.955}; Box: {0.3, 2.4, 0.13} }
+    p_stairs_base_frame_3 : BunkerMat_frame { Position: {-14, -1.545, 3}; Box: {0.3, 0.13, 2.04} }
 
-    p_base_gen_frame_1 : BunkerMat_frame { Position: {-14, -2.8, 7.94}; Box: {0.3, 2.4, 0.12} }
-    p_base_gen_frame_2 : BunkerMat_frame { Position: {-14, -2.8, 10.06}; Box: {0.3, 2.4, 0.12} }
-    p_base_gen_frame_3 : BunkerMat_frame { Position: {-14, -1.54, 9}; Box: {0.3, 0.12, 2.24} }
+    p_base_gen_frame_1 : BunkerMat_frame { Position: {-14, -2.8, 7.945}; Box: {0.3, 2.4, 0.13} }
+    p_base_gen_frame_2 : BunkerMat_frame { Position: {-14, -2.8, 10.055}; Box: {0.3, 2.4, 0.13} }
+    p_base_gen_frame_3 : BunkerMat_frame { Position: {-14, -1.545, 9}; Box: {0.3, 0.13, 2.24} }
 
-    p_base_vault_frame_1 : BunkerMat_frame { Position: {-20.06, -2.8, -6}; Box: {0.12, 2.4, 0.3} }
-    p_base_vault_frame_2 : BunkerMat_frame { Position: {-17.94, -2.8, -6}; Box: {0.12, 2.4, 0.3} }
-    p_base_vault_frame_3 : BunkerMat_frame { Position: {-19, -1.54, -6}; Box: {2.24, 0.12, 0.3} }
-
-
+    p_base_vault_frame_1 : BunkerMat_frame { Position: {-20.055, -2.8, -6}; Box: {0.13, 2.4, 0.3} }
+    p_base_vault_frame_2 : BunkerMat_frame { Position: {-17.945, -2.8, -6}; Box: {0.13, 2.4, 0.3} }
+    p_base_vault_frame_3 : BunkerMat_frame { Position: {-19, -1.545, -6}; Box: {2.24, 0.13, 0.3} }
 
 
 
@@ -1550,533 +1548,535 @@ bunker {
 
 
 
-    barracks_0_w3_0_x7_0_frame_1 : BunkerMat_frame { Position: {-49.3725, 1.6, 44.95}; Box: {0.12, 1, 0.3} }
-    barracks_0_w3_0_x7_0_frame_2 : BunkerMat_frame { Position: {-48.0525, 1.6, 44.95}; Box: {0.12, 1, 0.3} }
-    barracks_0_w3_0_x7_0_frame_3 : BunkerMat_frame { Position: {-48.7125, 2.16, 44.95}; Box: {1.44, 0.12, 0.3} }
-    barracks_0_w3_0_x7_0_frame_4 : BunkerMat_frame { Position: {-48.7125, 1.04, 44.95}; Box: {1.44, 0.12, 0.3} }
+
+
+    barracks_0_w3_0_x7_0_frame_1 : BunkerMat_frame { Position: {-49.3675, 1.6, 44.95}; Box: {0.13, 1, 0.3} }
+    barracks_0_w3_0_x7_0_frame_2 : BunkerMat_frame { Position: {-48.0575, 1.6, 44.95}; Box: {0.13, 1, 0.3} }
+    barracks_0_w3_0_x7_0_frame_3 : BunkerMat_frame { Position: {-48.7125, 2.155, 44.95}; Box: {1.44, 0.13, 0.3} }
+    barracks_0_w3_0_x7_0_frame_4 : BunkerMat_frame { Position: {-48.7125, 1.045, 44.95}; Box: {1.44, 0.13, 0.3} }
     barracks_0_w3_0_x7_0_pane_1 : BunkerMat_glass { Position: {-48.7125, 1.6, 44.95}; Box: {1.2, 1, 0.02} }
 
-    barracks_0_w3_0_z_8_9_frame_1 : BunkerMat_frame { Position: {-50.95, 1.6, 42.645}; Box: {0.3, 1, 0.12} }
-    barracks_0_w3_0_z_8_9_frame_2 : BunkerMat_frame { Position: {-50.95, 1.6, 43.965}; Box: {0.3, 1, 0.12} }
-    barracks_0_w3_0_z_8_9_frame_3 : BunkerMat_frame { Position: {-50.95, 2.16, 43.305}; Box: {0.3, 0.12, 1.44} }
-    barracks_0_w3_0_z_8_9_frame_4 : BunkerMat_frame { Position: {-50.95, 1.04, 43.305}; Box: {0.3, 0.12, 1.44} }
+    barracks_0_w3_0_z_8_9_frame_1 : BunkerMat_frame { Position: {-50.95, 1.6, 42.65}; Box: {0.3, 1, 0.13} }
+    barracks_0_w3_0_z_8_9_frame_2 : BunkerMat_frame { Position: {-50.95, 1.6, 43.96}; Box: {0.3, 1, 0.13} }
+    barracks_0_w3_0_z_8_9_frame_3 : BunkerMat_frame { Position: {-50.95, 2.155, 43.305}; Box: {0.3, 0.13, 1.44} }
+    barracks_0_w3_0_z_8_9_frame_4 : BunkerMat_frame { Position: {-50.95, 1.045, 43.305}; Box: {0.3, 0.13, 1.44} }
     barracks_0_w3_0_z_8_9_pane_1 : BunkerMat_glass { Position: {-50.95, 1.6, 43.305}; Box: {0.02, 1, 1.2} }
 
-    barracks_0_w4_0_x7_0_frame_1 : BunkerMat_frame { Position: {-44.8975, 1.6, 44.95}; Box: {0.12, 1, 0.3} }
-    barracks_0_w4_0_x7_0_frame_2 : BunkerMat_frame { Position: {-43.5775, 1.6, 44.95}; Box: {0.12, 1, 0.3} }
-    barracks_0_w4_0_x7_0_frame_3 : BunkerMat_frame { Position: {-44.2375, 2.16, 44.95}; Box: {1.44, 0.12, 0.3} }
-    barracks_0_w4_0_x7_0_frame_4 : BunkerMat_frame { Position: {-44.2375, 1.04, 44.95}; Box: {1.44, 0.12, 0.3} }
+    barracks_0_w4_0_x7_0_frame_1 : BunkerMat_frame { Position: {-44.8925, 1.6, 44.95}; Box: {0.13, 1, 0.3} }
+    barracks_0_w4_0_x7_0_frame_2 : BunkerMat_frame { Position: {-43.5825, 1.6, 44.95}; Box: {0.13, 1, 0.3} }
+    barracks_0_w4_0_x7_0_frame_3 : BunkerMat_frame { Position: {-44.2375, 2.155, 44.95}; Box: {1.44, 0.13, 0.3} }
+    barracks_0_w4_0_x7_0_frame_4 : BunkerMat_frame { Position: {-44.2375, 1.045, 44.95}; Box: {1.44, 0.13, 0.3} }
     barracks_0_w4_0_x7_0_pane_1 : BunkerMat_glass { Position: {-44.2375, 1.6, 44.95}; Box: {1.2, 1, 0.02} }
 
-    barracks_0_w5_0_x7_0_frame_1 : BunkerMat_frame { Position: {-40.4225, 1.6, 44.95}; Box: {0.12, 1, 0.3} }
-    barracks_0_w5_0_x7_0_frame_2 : BunkerMat_frame { Position: {-39.1025, 1.6, 44.95}; Box: {0.12, 1, 0.3} }
-    barracks_0_w5_0_x7_0_frame_3 : BunkerMat_frame { Position: {-39.7625, 2.16, 44.95}; Box: {1.44, 0.12, 0.3} }
-    barracks_0_w5_0_x7_0_frame_4 : BunkerMat_frame { Position: {-39.7625, 1.04, 44.95}; Box: {1.44, 0.12, 0.3} }
+    barracks_0_w5_0_x7_0_frame_1 : BunkerMat_frame { Position: {-40.4175, 1.6, 44.95}; Box: {0.13, 1, 0.3} }
+    barracks_0_w5_0_x7_0_frame_2 : BunkerMat_frame { Position: {-39.1075, 1.6, 44.95}; Box: {0.13, 1, 0.3} }
+    barracks_0_w5_0_x7_0_frame_3 : BunkerMat_frame { Position: {-39.7625, 2.155, 44.95}; Box: {1.44, 0.13, 0.3} }
+    barracks_0_w5_0_x7_0_frame_4 : BunkerMat_frame { Position: {-39.7625, 1.045, 44.95}; Box: {1.44, 0.13, 0.3} }
     barracks_0_w5_0_x7_0_pane_1 : BunkerMat_glass { Position: {-39.7625, 1.6, 44.95}; Box: {1.2, 1, 0.02} }
 
-    barracks_0_w6_0_x7_0_frame_1 : BunkerMat_frame { Position: {-35.9475, 1.6, 44.95}; Box: {0.12, 1, 0.3} }
-    barracks_0_w6_0_x7_0_frame_2 : BunkerMat_frame { Position: {-34.6275, 1.6, 44.95}; Box: {0.12, 1, 0.3} }
-    barracks_0_w6_0_x7_0_frame_3 : BunkerMat_frame { Position: {-35.2875, 2.16, 44.95}; Box: {1.44, 0.12, 0.3} }
-    barracks_0_w6_0_x7_0_frame_4 : BunkerMat_frame { Position: {-35.2875, 1.04, 44.95}; Box: {1.44, 0.12, 0.3} }
+    barracks_0_w6_0_x7_0_frame_1 : BunkerMat_frame { Position: {-35.9425, 1.6, 44.95}; Box: {0.13, 1, 0.3} }
+    barracks_0_w6_0_x7_0_frame_2 : BunkerMat_frame { Position: {-34.6325, 1.6, 44.95}; Box: {0.13, 1, 0.3} }
+    barracks_0_w6_0_x7_0_frame_3 : BunkerMat_frame { Position: {-35.2875, 2.155, 44.95}; Box: {1.44, 0.13, 0.3} }
+    barracks_0_w6_0_x7_0_frame_4 : BunkerMat_frame { Position: {-35.2875, 1.045, 44.95}; Box: {1.44, 0.13, 0.3} }
     barracks_0_w6_0_x7_0_pane_1 : BunkerMat_glass { Position: {-35.2875, 1.6, 44.95}; Box: {1.2, 1, 0.02} }
 
-    barracks_0_w6_0_z8_9_frame_1 : BunkerMat_frame { Position: {-33.05, 1.6, 42.645}; Box: {0.3, 1, 0.12} }
-    barracks_0_w6_0_z8_9_frame_2 : BunkerMat_frame { Position: {-33.05, 1.6, 43.965}; Box: {0.3, 1, 0.12} }
-    barracks_0_w6_0_z8_9_frame_3 : BunkerMat_frame { Position: {-33.05, 2.16, 43.305}; Box: {0.3, 0.12, 1.44} }
-    barracks_0_w6_0_z8_9_frame_4 : BunkerMat_frame { Position: {-33.05, 1.04, 43.305}; Box: {0.3, 0.12, 1.44} }
+    barracks_0_w6_0_z8_9_frame_1 : BunkerMat_frame { Position: {-33.05, 1.6, 42.65}; Box: {0.3, 1, 0.13} }
+    barracks_0_w6_0_z8_9_frame_2 : BunkerMat_frame { Position: {-33.05, 1.6, 43.96}; Box: {0.3, 1, 0.13} }
+    barracks_0_w6_0_z8_9_frame_3 : BunkerMat_frame { Position: {-33.05, 2.155, 43.305}; Box: {0.3, 0.13, 1.44} }
+    barracks_0_w6_0_z8_9_frame_4 : BunkerMat_frame { Position: {-33.05, 1.045, 43.305}; Box: {0.3, 0.13, 1.44} }
     barracks_0_w6_0_z8_9_pane_1 : BunkerMat_glass { Position: {-33.05, 1.6, 43.305}; Box: {0.02, 1, 1.2} }
 
-    barracks_0_w8_0_x_7_0_frame_1 : BunkerMat_frame { Position: {-49.2725, 1.6, 31.05}; Box: {0.12, 1, 0.3} }
-    barracks_0_w8_0_x_7_0_frame_2 : BunkerMat_frame { Position: {-47.9525, 1.6, 31.05}; Box: {0.12, 1, 0.3} }
-    barracks_0_w8_0_x_7_0_frame_3 : BunkerMat_frame { Position: {-48.6125, 2.16, 31.05}; Box: {1.44, 0.12, 0.3} }
-    barracks_0_w8_0_x_7_0_frame_4 : BunkerMat_frame { Position: {-48.6125, 1.04, 31.05}; Box: {1.44, 0.12, 0.3} }
+    barracks_0_w8_0_x_7_0_frame_1 : BunkerMat_frame { Position: {-49.2675, 1.6, 31.05}; Box: {0.13, 1, 0.3} }
+    barracks_0_w8_0_x_7_0_frame_2 : BunkerMat_frame { Position: {-47.9575, 1.6, 31.05}; Box: {0.13, 1, 0.3} }
+    barracks_0_w8_0_x_7_0_frame_3 : BunkerMat_frame { Position: {-48.6125, 2.155, 31.05}; Box: {1.44, 0.13, 0.3} }
+    barracks_0_w8_0_x_7_0_frame_4 : BunkerMat_frame { Position: {-48.6125, 1.045, 31.05}; Box: {1.44, 0.13, 0.3} }
     barracks_0_w8_0_x_7_0_pane_1 : BunkerMat_glass { Position: {-48.6125, 1.6, 31.05}; Box: {1.2, 1, 0.02} }
 
-    barracks_0_w8_0_z_8_9_frame_1 : BunkerMat_frame { Position: {-50.95, 1.6, 32.035}; Box: {0.3, 1, 0.12} }
-    barracks_0_w8_0_z_8_9_frame_2 : BunkerMat_frame { Position: {-50.95, 1.6, 33.355}; Box: {0.3, 1, 0.12} }
-    barracks_0_w8_0_z_8_9_frame_3 : BunkerMat_frame { Position: {-50.95, 2.16, 32.695}; Box: {0.3, 0.12, 1.44} }
-    barracks_0_w8_0_z_8_9_frame_4 : BunkerMat_frame { Position: {-50.95, 1.04, 32.695}; Box: {0.3, 0.12, 1.44} }
+    barracks_0_w8_0_z_8_9_frame_1 : BunkerMat_frame { Position: {-50.95, 1.6, 32.04}; Box: {0.3, 1, 0.13} }
+    barracks_0_w8_0_z_8_9_frame_2 : BunkerMat_frame { Position: {-50.95, 1.6, 33.35}; Box: {0.3, 1, 0.13} }
+    barracks_0_w8_0_z_8_9_frame_3 : BunkerMat_frame { Position: {-50.95, 2.155, 32.695}; Box: {0.3, 0.13, 1.44} }
+    barracks_0_w8_0_z_8_9_frame_4 : BunkerMat_frame { Position: {-50.95, 1.045, 32.695}; Box: {0.3, 0.13, 1.44} }
     barracks_0_w8_0_z_8_9_pane_1 : BunkerMat_glass { Position: {-50.95, 1.6, 32.695}; Box: {0.02, 1, 1.2} }
 
-    barracks_0_w9_0_x_7_0_frame_1 : BunkerMat_frame { Position: {-44.5975, 1.6, 31.05}; Box: {0.12, 1, 0.3} }
-    barracks_0_w9_0_x_7_0_frame_2 : BunkerMat_frame { Position: {-43.2775, 1.6, 31.05}; Box: {0.12, 1, 0.3} }
-    barracks_0_w9_0_x_7_0_frame_3 : BunkerMat_frame { Position: {-43.9375, 2.16, 31.05}; Box: {1.44, 0.12, 0.3} }
-    barracks_0_w9_0_x_7_0_frame_4 : BunkerMat_frame { Position: {-43.9375, 1.04, 31.05}; Box: {1.44, 0.12, 0.3} }
+    barracks_0_w9_0_x_7_0_frame_1 : BunkerMat_frame { Position: {-44.5925, 1.6, 31.05}; Box: {0.13, 1, 0.3} }
+    barracks_0_w9_0_x_7_0_frame_2 : BunkerMat_frame { Position: {-43.2825, 1.6, 31.05}; Box: {0.13, 1, 0.3} }
+    barracks_0_w9_0_x_7_0_frame_3 : BunkerMat_frame { Position: {-43.9375, 2.155, 31.05}; Box: {1.44, 0.13, 0.3} }
+    barracks_0_w9_0_x_7_0_frame_4 : BunkerMat_frame { Position: {-43.9375, 1.045, 31.05}; Box: {1.44, 0.13, 0.3} }
     barracks_0_w9_0_x_7_0_pane_1 : BunkerMat_glass { Position: {-43.9375, 1.6, 31.05}; Box: {1.2, 1, 0.02} }
 
-    barracks_0_w10_0_x_7_0_frame_1 : BunkerMat_frame { Position: {-39.0725, 1.6, 31.05}; Box: {0.12, 1, 0.3} }
-    barracks_0_w10_0_x_7_0_frame_2 : BunkerMat_frame { Position: {-37.7525, 1.6, 31.05}; Box: {0.12, 1, 0.3} }
-    barracks_0_w10_0_x_7_0_frame_3 : BunkerMat_frame { Position: {-38.4125, 2.16, 31.05}; Box: {1.44, 0.12, 0.3} }
-    barracks_0_w10_0_x_7_0_frame_4 : BunkerMat_frame { Position: {-38.4125, 1.04, 31.05}; Box: {1.44, 0.12, 0.3} }
+    barracks_0_w10_0_x_7_0_frame_1 : BunkerMat_frame { Position: {-39.0675, 1.6, 31.05}; Box: {0.13, 1, 0.3} }
+    barracks_0_w10_0_x_7_0_frame_2 : BunkerMat_frame { Position: {-37.7575, 1.6, 31.05}; Box: {0.13, 1, 0.3} }
+    barracks_0_w10_0_x_7_0_frame_3 : BunkerMat_frame { Position: {-38.4125, 2.155, 31.05}; Box: {1.44, 0.13, 0.3} }
+    barracks_0_w10_0_x_7_0_frame_4 : BunkerMat_frame { Position: {-38.4125, 1.045, 31.05}; Box: {1.44, 0.13, 0.3} }
     barracks_0_w10_0_x_7_0_pane_1 : BunkerMat_glass { Position: {-38.4125, 1.6, 31.05}; Box: {1.2, 1, 0.02} }
 
-    barracks_0_w11_0_x_7_0_frame_1 : BunkerMat_frame { Position: {-35.4975, 1.6, 31.05}; Box: {0.12, 1, 0.3} }
-    barracks_0_w11_0_x_7_0_frame_2 : BunkerMat_frame { Position: {-34.1775, 1.6, 31.05}; Box: {0.12, 1, 0.3} }
-    barracks_0_w11_0_x_7_0_frame_3 : BunkerMat_frame { Position: {-34.8375, 2.16, 31.05}; Box: {1.44, 0.12, 0.3} }
-    barracks_0_w11_0_x_7_0_frame_4 : BunkerMat_frame { Position: {-34.8375, 1.04, 31.05}; Box: {1.44, 0.12, 0.3} }
+    barracks_0_w11_0_x_7_0_frame_1 : BunkerMat_frame { Position: {-35.4925, 1.6, 31.05}; Box: {0.13, 1, 0.3} }
+    barracks_0_w11_0_x_7_0_frame_2 : BunkerMat_frame { Position: {-34.1825, 1.6, 31.05}; Box: {0.13, 1, 0.3} }
+    barracks_0_w11_0_x_7_0_frame_3 : BunkerMat_frame { Position: {-34.8375, 2.155, 31.05}; Box: {1.44, 0.13, 0.3} }
+    barracks_0_w11_0_x_7_0_frame_4 : BunkerMat_frame { Position: {-34.8375, 1.045, 31.05}; Box: {1.44, 0.13, 0.3} }
     barracks_0_w11_0_x_7_0_pane_1 : BunkerMat_glass { Position: {-34.8375, 1.6, 31.05}; Box: {1.2, 1, 0.02} }
 
-    barracks_0_w11_0_z8_9_frame_1 : BunkerMat_frame { Position: {-33.05, 1.6, 32.035}; Box: {0.3, 1, 0.12} }
-    barracks_0_w11_0_z8_9_frame_2 : BunkerMat_frame { Position: {-33.05, 1.6, 33.355}; Box: {0.3, 1, 0.12} }
-    barracks_0_w11_0_z8_9_frame_3 : BunkerMat_frame { Position: {-33.05, 2.16, 32.695}; Box: {0.3, 0.12, 1.44} }
-    barracks_0_w11_0_z8_9_frame_4 : BunkerMat_frame { Position: {-33.05, 1.04, 32.695}; Box: {0.3, 0.12, 1.44} }
+    barracks_0_w11_0_z8_9_frame_1 : BunkerMat_frame { Position: {-33.05, 1.6, 32.04}; Box: {0.3, 1, 0.13} }
+    barracks_0_w11_0_z8_9_frame_2 : BunkerMat_frame { Position: {-33.05, 1.6, 33.35}; Box: {0.3, 1, 0.13} }
+    barracks_0_w11_0_z8_9_frame_3 : BunkerMat_frame { Position: {-33.05, 2.155, 32.695}; Box: {0.3, 0.13, 1.44} }
+    barracks_0_w11_0_z8_9_frame_4 : BunkerMat_frame { Position: {-33.05, 1.045, 32.695}; Box: {0.3, 0.13, 1.44} }
     barracks_0_w11_0_z8_9_pane_1 : BunkerMat_glass { Position: {-33.05, 1.6, 32.695}; Box: {0.02, 1, 1.2} }
 
-    barracks_0_w12_0_z8_9_frame_1 : BunkerMat_frame { Position: {-33.05, 1.6, 35.51}; Box: {0.3, 1, 0.12} }
-    barracks_0_w12_0_z8_9_frame_2 : BunkerMat_frame { Position: {-33.05, 1.6, 36.83}; Box: {0.3, 1, 0.12} }
-    barracks_0_w12_0_z8_9_frame_3 : BunkerMat_frame { Position: {-33.05, 2.16, 36.17}; Box: {0.3, 0.12, 1.44} }
-    barracks_0_w12_0_z8_9_frame_4 : BunkerMat_frame { Position: {-33.05, 1.04, 36.17}; Box: {0.3, 0.12, 1.44} }
+    barracks_0_w12_0_z8_9_frame_1 : BunkerMat_frame { Position: {-33.05, 1.6, 35.515}; Box: {0.3, 1, 0.13} }
+    barracks_0_w12_0_z8_9_frame_2 : BunkerMat_frame { Position: {-33.05, 1.6, 36.825}; Box: {0.3, 1, 0.13} }
+    barracks_0_w12_0_z8_9_frame_3 : BunkerMat_frame { Position: {-33.05, 2.155, 36.17}; Box: {0.3, 0.13, 1.44} }
+    barracks_0_w12_0_z8_9_frame_4 : BunkerMat_frame { Position: {-33.05, 1.045, 36.17}; Box: {0.3, 0.13, 1.44} }
     barracks_0_w12_0_z8_9_pane_1 : BunkerMat_glass { Position: {-33.05, 1.6, 36.17}; Box: {0.02, 1, 1.2} }
 
-    barracks_0_w13_0_z8_9_frame_1 : BunkerMat_frame { Position: {-33.05, 1.6, 39.17}; Box: {0.3, 1, 0.12} }
-    barracks_0_w13_0_z8_9_frame_2 : BunkerMat_frame { Position: {-33.05, 1.6, 40.49}; Box: {0.3, 1, 0.12} }
-    barracks_0_w13_0_z8_9_frame_3 : BunkerMat_frame { Position: {-33.05, 2.16, 39.83}; Box: {0.3, 0.12, 1.44} }
-    barracks_0_w13_0_z8_9_frame_4 : BunkerMat_frame { Position: {-33.05, 1.04, 39.83}; Box: {0.3, 0.12, 1.44} }
+    barracks_0_w13_0_z8_9_frame_1 : BunkerMat_frame { Position: {-33.05, 1.6, 39.175}; Box: {0.3, 1, 0.13} }
+    barracks_0_w13_0_z8_9_frame_2 : BunkerMat_frame { Position: {-33.05, 1.6, 40.485}; Box: {0.3, 1, 0.13} }
+    barracks_0_w13_0_z8_9_frame_3 : BunkerMat_frame { Position: {-33.05, 2.155, 39.83}; Box: {0.3, 0.13, 1.44} }
+    barracks_0_w13_0_z8_9_frame_4 : BunkerMat_frame { Position: {-33.05, 1.045, 39.83}; Box: {0.3, 0.13, 1.44} }
     barracks_0_w13_0_z8_9_pane_1 : BunkerMat_glass { Position: {-33.05, 1.6, 39.83}; Box: {0.02, 1, 1.2} }
 
-    barracks_0_w14_0_z_8_9_frame_1 : BunkerMat_frame { Position: {-50.95, 1.6, 35.51}; Box: {0.3, 1, 0.12} }
-    barracks_0_w14_0_z_8_9_frame_2 : BunkerMat_frame { Position: {-50.95, 1.6, 36.83}; Box: {0.3, 1, 0.12} }
-    barracks_0_w14_0_z_8_9_frame_3 : BunkerMat_frame { Position: {-50.95, 2.16, 36.17}; Box: {0.3, 0.12, 1.44} }
-    barracks_0_w14_0_z_8_9_frame_4 : BunkerMat_frame { Position: {-50.95, 1.04, 36.17}; Box: {0.3, 0.12, 1.44} }
+    barracks_0_w14_0_z_8_9_frame_1 : BunkerMat_frame { Position: {-50.95, 1.6, 35.515}; Box: {0.3, 1, 0.13} }
+    barracks_0_w14_0_z_8_9_frame_2 : BunkerMat_frame { Position: {-50.95, 1.6, 36.825}; Box: {0.3, 1, 0.13} }
+    barracks_0_w14_0_z_8_9_frame_3 : BunkerMat_frame { Position: {-50.95, 2.155, 36.17}; Box: {0.3, 0.13, 1.44} }
+    barracks_0_w14_0_z_8_9_frame_4 : BunkerMat_frame { Position: {-50.95, 1.045, 36.17}; Box: {0.3, 0.13, 1.44} }
     barracks_0_w14_0_z_8_9_pane_1 : BunkerMat_glass { Position: {-50.95, 1.6, 36.17}; Box: {0.02, 1, 1.2} }
 
-    barracks_0_w15_0_z_8_9_frame_1 : BunkerMat_frame { Position: {-50.95, 1.6, 39.17}; Box: {0.3, 1, 0.12} }
-    barracks_0_w15_0_z_8_9_frame_2 : BunkerMat_frame { Position: {-50.95, 1.6, 40.49}; Box: {0.3, 1, 0.12} }
-    barracks_0_w15_0_z_8_9_frame_3 : BunkerMat_frame { Position: {-50.95, 2.16, 39.83}; Box: {0.3, 0.12, 1.44} }
-    barracks_0_w15_0_z_8_9_frame_4 : BunkerMat_frame { Position: {-50.95, 1.04, 39.83}; Box: {0.3, 0.12, 1.44} }
+    barracks_0_w15_0_z_8_9_frame_1 : BunkerMat_frame { Position: {-50.95, 1.6, 39.175}; Box: {0.3, 1, 0.13} }
+    barracks_0_w15_0_z_8_9_frame_2 : BunkerMat_frame { Position: {-50.95, 1.6, 40.485}; Box: {0.3, 1, 0.13} }
+    barracks_0_w15_0_z_8_9_frame_3 : BunkerMat_frame { Position: {-50.95, 2.155, 39.83}; Box: {0.3, 0.13, 1.44} }
+    barracks_0_w15_0_z_8_9_frame_4 : BunkerMat_frame { Position: {-50.95, 1.045, 39.83}; Box: {0.3, 0.13, 1.44} }
     barracks_0_w15_0_z_8_9_pane_1 : BunkerMat_glass { Position: {-50.95, 1.6, 39.83}; Box: {0.02, 1, 1.2} }
 
-    barracks_0_p0_2_frame_1 : BunkerMat_frame { Position: {-43.41, 1.075, 35.74}; Box: {0.12, 2.15, 0.3} }
-    barracks_0_p0_2_frame_2 : BunkerMat_frame { Position: {-42.19, 1.075, 35.74}; Box: {0.12, 2.15, 0.3} }
-    barracks_0_p0_2_frame_3 : BunkerMat_frame { Position: {-42.8, 2.21, 35.74}; Box: {1.34, 0.12, 0.3} }
+    barracks_0_p0_2_frame_1 : BunkerMat_frame { Position: {-43.405, 1.075, 35.74}; Box: {0.13, 2.15, 0.3} }
+    barracks_0_p0_2_frame_2 : BunkerMat_frame { Position: {-42.195, 1.075, 35.74}; Box: {0.13, 2.15, 0.3} }
+    barracks_0_p0_2_frame_3 : BunkerMat_frame { Position: {-42.8, 2.205, 35.74}; Box: {1.34, 0.13, 0.3} }
 
-    barracks_0_p4_2_frame_1 : BunkerMat_frame { Position: {-43.61, 1.075, 41.66}; Box: {0.12, 2.15, 0.3} }
-    barracks_0_p4_2_frame_2 : BunkerMat_frame { Position: {-42.49, 1.075, 41.66}; Box: {0.12, 2.15, 0.3} }
-    barracks_0_p4_2_frame_3 : BunkerMat_frame { Position: {-43.05, 2.21, 41.66}; Box: {1.24, 0.12, 0.3} }
+    barracks_0_p4_2_frame_1 : BunkerMat_frame { Position: {-43.605, 1.075, 41.66}; Box: {0.13, 2.15, 0.3} }
+    barracks_0_p4_2_frame_2 : BunkerMat_frame { Position: {-42.495, 1.075, 41.66}; Box: {0.13, 2.15, 0.3} }
+    barracks_0_p4_2_frame_3 : BunkerMat_frame { Position: {-43.05, 2.205, 41.66}; Box: {1.24, 0.13, 0.3} }
 
-    barracks_0_p5_2_frame_1 : BunkerMat_frame { Position: {-41.51, 1.075, 41.66}; Box: {0.12, 2.15, 0.3} }
-    barracks_0_p5_2_frame_2 : BunkerMat_frame { Position: {-40.39, 1.075, 41.66}; Box: {0.12, 2.15, 0.3} }
-    barracks_0_p5_2_frame_3 : BunkerMat_frame { Position: {-40.95, 2.21, 41.66}; Box: {1.24, 0.12, 0.3} }
+    barracks_0_p5_2_frame_1 : BunkerMat_frame { Position: {-41.505, 1.075, 41.66}; Box: {0.13, 2.15, 0.3} }
+    barracks_0_p5_2_frame_2 : BunkerMat_frame { Position: {-40.395, 1.075, 41.66}; Box: {0.13, 2.15, 0.3} }
+    barracks_0_p5_2_frame_3 : BunkerMat_frame { Position: {-40.95, 2.205, 41.66}; Box: {1.24, 0.13, 0.3} }
 
-    barracks_0_p9_2_frame_1 : BunkerMat_frame { Position: {-43.41, 1.075, 34.34}; Box: {0.12, 2.15, 0.3} }
-    barracks_0_p9_2_frame_2 : BunkerMat_frame { Position: {-42.29, 1.075, 34.34}; Box: {0.12, 2.15, 0.3} }
-    barracks_0_p9_2_frame_3 : BunkerMat_frame { Position: {-42.85, 2.21, 34.34}; Box: {1.24, 0.12, 0.3} }
+    barracks_0_p9_2_frame_1 : BunkerMat_frame { Position: {-43.405, 1.075, 34.34}; Box: {0.13, 2.15, 0.3} }
+    barracks_0_p9_2_frame_2 : BunkerMat_frame { Position: {-42.295, 1.075, 34.34}; Box: {0.13, 2.15, 0.3} }
+    barracks_0_p9_2_frame_3 : BunkerMat_frame { Position: {-42.85, 2.205, 34.34}; Box: {1.24, 0.13, 0.3} }
 
-    barracks_0_p10_7_frame_1 : BunkerMat_frame { Position: {-40.2, 1.075, 32.735}; Box: {0.3, 2.15, 0.12} }
-    barracks_0_p10_7_frame_2 : BunkerMat_frame { Position: {-40.2, 1.075, 33.855}; Box: {0.3, 2.15, 0.12} }
-    barracks_0_p10_7_frame_3 : BunkerMat_frame { Position: {-40.2, 2.21, 33.295}; Box: {0.3, 0.12, 1.24} }
+    barracks_0_p10_7_frame_1 : BunkerMat_frame { Position: {-40.2, 1.075, 32.74}; Box: {0.3, 2.15, 0.13} }
+    barracks_0_p10_7_frame_2 : BunkerMat_frame { Position: {-40.2, 1.075, 33.85}; Box: {0.3, 2.15, 0.13} }
+    barracks_0_p10_7_frame_3 : BunkerMat_frame { Position: {-40.2, 2.205, 33.295}; Box: {0.3, 0.13, 1.24} }
 
-    barracks_0_p12_2_frame_1 : BunkerMat_frame { Position: {-38.7, 1.075, 36.31}; Box: {0.3, 2.15, 0.12} }
-    barracks_0_p12_2_frame_2 : BunkerMat_frame { Position: {-38.7, 1.075, 37.43}; Box: {0.3, 2.15, 0.12} }
-    barracks_0_p12_2_frame_3 : BunkerMat_frame { Position: {-38.7, 2.21, 36.87}; Box: {0.3, 0.12, 1.24} }
+    barracks_0_p12_2_frame_1 : BunkerMat_frame { Position: {-38.7, 1.075, 36.315}; Box: {0.3, 2.15, 0.13} }
+    barracks_0_p12_2_frame_2 : BunkerMat_frame { Position: {-38.7, 1.075, 37.425}; Box: {0.3, 2.15, 0.13} }
+    barracks_0_p12_2_frame_3 : BunkerMat_frame { Position: {-38.7, 2.205, 36.87}; Box: {0.3, 0.13, 1.24} }
 
-    barracks_0_p13_2_frame_1 : BunkerMat_frame { Position: {-38.7, 1.075, 38.57}; Box: {0.3, 2.15, 0.12} }
-    barracks_0_p13_2_frame_2 : BunkerMat_frame { Position: {-38.7, 1.075, 39.69}; Box: {0.3, 2.15, 0.12} }
-    barracks_0_p13_2_frame_3 : BunkerMat_frame { Position: {-38.7, 2.21, 39.13}; Box: {0.3, 0.12, 1.24} }
+    barracks_0_p13_2_frame_1 : BunkerMat_frame { Position: {-38.7, 1.075, 38.575}; Box: {0.3, 2.15, 0.13} }
+    barracks_0_p13_2_frame_2 : BunkerMat_frame { Position: {-38.7, 1.075, 39.685}; Box: {0.3, 2.15, 0.13} }
+    barracks_0_p13_2_frame_3 : BunkerMat_frame { Position: {-38.7, 2.205, 39.13}; Box: {0.3, 0.13, 1.24} }
 
-    barracks_0_p14_2_frame_1 : BunkerMat_frame { Position: {-45.3, 1.075, 36.31}; Box: {0.3, 2.15, 0.12} }
-    barracks_0_p14_2_frame_2 : BunkerMat_frame { Position: {-45.3, 1.075, 37.43}; Box: {0.3, 2.15, 0.12} }
-    barracks_0_p14_2_frame_3 : BunkerMat_frame { Position: {-45.3, 2.21, 36.87}; Box: {0.3, 0.12, 1.24} }
+    barracks_0_p14_2_frame_1 : BunkerMat_frame { Position: {-45.3, 1.075, 36.315}; Box: {0.3, 2.15, 0.13} }
+    barracks_0_p14_2_frame_2 : BunkerMat_frame { Position: {-45.3, 1.075, 37.425}; Box: {0.3, 2.15, 0.13} }
+    barracks_0_p14_2_frame_3 : BunkerMat_frame { Position: {-45.3, 2.205, 36.87}; Box: {0.3, 0.13, 1.24} }
 
-    barracks_0_p15_2_frame_1 : BunkerMat_frame { Position: {-45.3, 1.075, 38.57}; Box: {0.3, 2.15, 0.12} }
-    barracks_0_p15_2_frame_2 : BunkerMat_frame { Position: {-45.3, 1.075, 39.69}; Box: {0.3, 2.15, 0.12} }
-    barracks_0_p15_2_frame_3 : BunkerMat_frame { Position: {-45.3, 2.21, 39.13}; Box: {0.3, 0.12, 1.24} }
+    barracks_0_p15_2_frame_1 : BunkerMat_frame { Position: {-45.3, 1.075, 38.575}; Box: {0.3, 2.15, 0.13} }
+    barracks_0_p15_2_frame_2 : BunkerMat_frame { Position: {-45.3, 1.075, 39.685}; Box: {0.3, 2.15, 0.13} }
+    barracks_0_p15_2_frame_3 : BunkerMat_frame { Position: {-45.3, 2.205, 39.13}; Box: {0.3, 0.13, 1.24} }
 
-    barracks_0_p3_4_frame_1 : BunkerMat_frame { Position: {-46.475, 1.075, 42.745}; Box: {0.3, 2.15, 0.12} }
-    barracks_0_p3_4_frame_2 : BunkerMat_frame { Position: {-46.475, 1.075, 43.865}; Box: {0.3, 2.15, 0.12} }
-    barracks_0_p3_4_frame_3 : BunkerMat_frame { Position: {-46.475, 2.21, 43.305}; Box: {0.3, 0.12, 1.24} }
+    barracks_0_p3_4_frame_1 : BunkerMat_frame { Position: {-46.475, 1.075, 42.75}; Box: {0.3, 2.15, 0.13} }
+    barracks_0_p3_4_frame_2 : BunkerMat_frame { Position: {-46.475, 1.075, 43.86}; Box: {0.3, 2.15, 0.13} }
+    barracks_0_p3_4_frame_3 : BunkerMat_frame { Position: {-46.475, 2.205, 43.305}; Box: {0.3, 0.13, 1.24} }
 
-    barracks_0_p6_5_frame_1 : BunkerMat_frame { Position: {-37.525, 1.075, 42.745}; Box: {0.3, 2.15, 0.12} }
-    barracks_0_p6_5_frame_2 : BunkerMat_frame { Position: {-37.525, 1.075, 43.865}; Box: {0.3, 2.15, 0.12} }
-    barracks_0_p6_5_frame_3 : BunkerMat_frame { Position: {-37.525, 2.21, 43.305}; Box: {0.3, 0.12, 1.24} }
+    barracks_0_p6_5_frame_1 : BunkerMat_frame { Position: {-37.525, 1.075, 42.75}; Box: {0.3, 2.15, 0.13} }
+    barracks_0_p6_5_frame_2 : BunkerMat_frame { Position: {-37.525, 1.075, 43.86}; Box: {0.3, 2.15, 0.13} }
+    barracks_0_p6_5_frame_3 : BunkerMat_frame { Position: {-37.525, 2.205, 43.305}; Box: {0.3, 0.13, 1.24} }
 
-    barracks_0_p8_9_frame_1 : BunkerMat_frame { Position: {-46.275, 1.075, 32.135}; Box: {0.3, 2.15, 0.12} }
-    barracks_0_p8_9_frame_2 : BunkerMat_frame { Position: {-46.275, 1.075, 33.255}; Box: {0.3, 2.15, 0.12} }
-    barracks_0_p8_9_frame_3 : BunkerMat_frame { Position: {-46.275, 2.21, 32.695}; Box: {0.3, 0.12, 1.24} }
+    barracks_0_p8_9_frame_1 : BunkerMat_frame { Position: {-46.275, 1.075, 32.14}; Box: {0.3, 2.15, 0.13} }
+    barracks_0_p8_9_frame_2 : BunkerMat_frame { Position: {-46.275, 1.075, 33.25}; Box: {0.3, 2.15, 0.13} }
+    barracks_0_p8_9_frame_3 : BunkerMat_frame { Position: {-46.275, 2.205, 32.695}; Box: {0.3, 0.13, 1.24} }
 
-    barracks_0_p11_12_frame_1 : BunkerMat_frame { Position: {-35.3975, 1.075, 34.34}; Box: {0.12, 2.15, 0.3} }
-    barracks_0_p11_12_frame_2 : BunkerMat_frame { Position: {-34.2775, 1.075, 34.34}; Box: {0.12, 2.15, 0.3} }
-    barracks_0_p11_12_frame_3 : BunkerMat_frame { Position: {-34.8375, 2.21, 34.34}; Box: {1.24, 0.12, 0.3} }
+    barracks_0_p11_12_frame_1 : BunkerMat_frame { Position: {-35.3925, 1.075, 34.34}; Box: {0.13, 2.15, 0.3} }
+    barracks_0_p11_12_frame_2 : BunkerMat_frame { Position: {-34.2825, 1.075, 34.34}; Box: {0.13, 2.15, 0.3} }
+    barracks_0_p11_12_frame_3 : BunkerMat_frame { Position: {-34.8375, 2.205, 34.34}; Box: {1.24, 0.13, 0.3} }
 
-    barracks_entrance0_frame_1 : BunkerMat_frame { Position: {-41.56, 1.1, 31.05}; Box: {0.12, 2.2, 0.3} }
-    barracks_entrance0_frame_2 : BunkerMat_frame { Position: {-40.24, 1.1, 31.05}; Box: {0.12, 2.2, 0.3} }
-    barracks_entrance0_frame_3 : BunkerMat_frame { Position: {-40.9, 2.26, 31.05}; Box: {1.44, 0.12, 0.3} }
+    barracks_entrance0_frame_1 : BunkerMat_frame { Position: {-41.555, 1.1, 31.05}; Box: {0.13, 2.2, 0.3} }
+    barracks_entrance0_frame_2 : BunkerMat_frame { Position: {-40.245, 1.1, 31.05}; Box: {0.13, 2.2, 0.3} }
+    barracks_entrance0_frame_3 : BunkerMat_frame { Position: {-40.9, 2.255, 31.05}; Box: {1.44, 0.13, 0.3} }
 
-    barracks_1_w3_0_x7_0_frame_1 : BunkerMat_frame { Position: {-50.1183, 4.8, 44.95}; Box: {0.12, 1, 0.3} }
-    barracks_1_w3_0_x7_0_frame_2 : BunkerMat_frame { Position: {-48.7983, 4.8, 44.95}; Box: {0.12, 1, 0.3} }
-    barracks_1_w3_0_x7_0_frame_3 : BunkerMat_frame { Position: {-49.4583, 5.36, 44.95}; Box: {1.44, 0.12, 0.3} }
-    barracks_1_w3_0_x7_0_frame_4 : BunkerMat_frame { Position: {-49.4583, 4.24, 44.95}; Box: {1.44, 0.12, 0.3} }
+    barracks_1_w3_0_x7_0_frame_1 : BunkerMat_frame { Position: {-50.1133, 4.8, 44.95}; Box: {0.13, 1, 0.3} }
+    barracks_1_w3_0_x7_0_frame_2 : BunkerMat_frame { Position: {-48.8033, 4.8, 44.95}; Box: {0.13, 1, 0.3} }
+    barracks_1_w3_0_x7_0_frame_3 : BunkerMat_frame { Position: {-49.4583, 5.355, 44.95}; Box: {1.44, 0.13, 0.3} }
+    barracks_1_w3_0_x7_0_frame_4 : BunkerMat_frame { Position: {-49.4583, 4.245, 44.95}; Box: {1.44, 0.13, 0.3} }
     barracks_1_w3_0_x7_0_pane_1 : BunkerMat_glass { Position: {-49.4583, 4.8, 44.95}; Box: {1.2, 1, 0.02} }
 
-    barracks_1_w3_0_z_8_9_frame_1 : BunkerMat_frame { Position: {-50.95, 4.8, 42.645}; Box: {0.3, 1, 0.12} }
-    barracks_1_w3_0_z_8_9_frame_2 : BunkerMat_frame { Position: {-50.95, 4.8, 43.965}; Box: {0.3, 1, 0.12} }
-    barracks_1_w3_0_z_8_9_frame_3 : BunkerMat_frame { Position: {-50.95, 5.36, 43.305}; Box: {0.3, 0.12, 1.44} }
-    barracks_1_w3_0_z_8_9_frame_4 : BunkerMat_frame { Position: {-50.95, 4.24, 43.305}; Box: {0.3, 0.12, 1.44} }
+    barracks_1_w3_0_z_8_9_frame_1 : BunkerMat_frame { Position: {-50.95, 4.8, 42.65}; Box: {0.3, 1, 0.13} }
+    barracks_1_w3_0_z_8_9_frame_2 : BunkerMat_frame { Position: {-50.95, 4.8, 43.96}; Box: {0.3, 1, 0.13} }
+    barracks_1_w3_0_z_8_9_frame_3 : BunkerMat_frame { Position: {-50.95, 5.355, 43.305}; Box: {0.3, 0.13, 1.44} }
+    barracks_1_w3_0_z_8_9_frame_4 : BunkerMat_frame { Position: {-50.95, 4.245, 43.305}; Box: {0.3, 0.13, 1.44} }
     barracks_1_w3_0_z_8_9_pane_1 : BunkerMat_glass { Position: {-50.95, 4.8, 43.305}; Box: {0.02, 1, 1.2} }
 
-    barracks_1_w4_0_x7_0_frame_1 : BunkerMat_frame { Position: {-47.135, 4.8, 44.95}; Box: {0.12, 1, 0.3} }
-    barracks_1_w4_0_x7_0_frame_2 : BunkerMat_frame { Position: {-45.815, 4.8, 44.95}; Box: {0.12, 1, 0.3} }
-    barracks_1_w4_0_x7_0_frame_3 : BunkerMat_frame { Position: {-46.475, 5.36, 44.95}; Box: {1.44, 0.12, 0.3} }
-    barracks_1_w4_0_x7_0_frame_4 : BunkerMat_frame { Position: {-46.475, 4.24, 44.95}; Box: {1.44, 0.12, 0.3} }
+    barracks_1_w4_0_x7_0_frame_1 : BunkerMat_frame { Position: {-47.13, 4.8, 44.95}; Box: {0.13, 1, 0.3} }
+    barracks_1_w4_0_x7_0_frame_2 : BunkerMat_frame { Position: {-45.82, 4.8, 44.95}; Box: {0.13, 1, 0.3} }
+    barracks_1_w4_0_x7_0_frame_3 : BunkerMat_frame { Position: {-46.475, 5.355, 44.95}; Box: {1.44, 0.13, 0.3} }
+    barracks_1_w4_0_x7_0_frame_4 : BunkerMat_frame { Position: {-46.475, 4.245, 44.95}; Box: {1.44, 0.13, 0.3} }
     barracks_1_w4_0_x7_0_pane_1 : BunkerMat_glass { Position: {-46.475, 4.8, 44.95}; Box: {1.2, 1, 0.02} }
 
-    barracks_1_w5_0_x7_0_frame_1 : BunkerMat_frame { Position: {-44.1517, 4.8, 44.95}; Box: {0.12, 1, 0.3} }
-    barracks_1_w5_0_x7_0_frame_2 : BunkerMat_frame { Position: {-42.8317, 4.8, 44.95}; Box: {0.12, 1, 0.3} }
-    barracks_1_w5_0_x7_0_frame_3 : BunkerMat_frame { Position: {-43.4917, 5.36, 44.95}; Box: {1.44, 0.12, 0.3} }
-    barracks_1_w5_0_x7_0_frame_4 : BunkerMat_frame { Position: {-43.4917, 4.24, 44.95}; Box: {1.44, 0.12, 0.3} }
+    barracks_1_w5_0_x7_0_frame_1 : BunkerMat_frame { Position: {-44.1467, 4.8, 44.95}; Box: {0.13, 1, 0.3} }
+    barracks_1_w5_0_x7_0_frame_2 : BunkerMat_frame { Position: {-42.8367, 4.8, 44.95}; Box: {0.13, 1, 0.3} }
+    barracks_1_w5_0_x7_0_frame_3 : BunkerMat_frame { Position: {-43.4917, 5.355, 44.95}; Box: {1.44, 0.13, 0.3} }
+    barracks_1_w5_0_x7_0_frame_4 : BunkerMat_frame { Position: {-43.4917, 4.245, 44.95}; Box: {1.44, 0.13, 0.3} }
     barracks_1_w5_0_x7_0_pane_1 : BunkerMat_glass { Position: {-43.4917, 4.8, 44.95}; Box: {1.2, 1, 0.02} }
 
-    barracks_1_w6_0_x7_0_frame_1 : BunkerMat_frame { Position: {-41.1683, 4.8, 44.95}; Box: {0.12, 1, 0.3} }
-    barracks_1_w6_0_x7_0_frame_2 : BunkerMat_frame { Position: {-39.8483, 4.8, 44.95}; Box: {0.12, 1, 0.3} }
-    barracks_1_w6_0_x7_0_frame_3 : BunkerMat_frame { Position: {-40.5083, 5.36, 44.95}; Box: {1.44, 0.12, 0.3} }
-    barracks_1_w6_0_x7_0_frame_4 : BunkerMat_frame { Position: {-40.5083, 4.24, 44.95}; Box: {1.44, 0.12, 0.3} }
+    barracks_1_w6_0_x7_0_frame_1 : BunkerMat_frame { Position: {-41.1633, 4.8, 44.95}; Box: {0.13, 1, 0.3} }
+    barracks_1_w6_0_x7_0_frame_2 : BunkerMat_frame { Position: {-39.8533, 4.8, 44.95}; Box: {0.13, 1, 0.3} }
+    barracks_1_w6_0_x7_0_frame_3 : BunkerMat_frame { Position: {-40.5083, 5.355, 44.95}; Box: {1.44, 0.13, 0.3} }
+    barracks_1_w6_0_x7_0_frame_4 : BunkerMat_frame { Position: {-40.5083, 4.245, 44.95}; Box: {1.44, 0.13, 0.3} }
     barracks_1_w6_0_x7_0_pane_1 : BunkerMat_glass { Position: {-40.5083, 4.8, 44.95}; Box: {1.2, 1, 0.02} }
 
-    barracks_1_w7_0_x7_0_frame_1 : BunkerMat_frame { Position: {-38.185, 4.8, 44.95}; Box: {0.12, 1, 0.3} }
-    barracks_1_w7_0_x7_0_frame_2 : BunkerMat_frame { Position: {-36.865, 4.8, 44.95}; Box: {0.12, 1, 0.3} }
-    barracks_1_w7_0_x7_0_frame_3 : BunkerMat_frame { Position: {-37.525, 5.36, 44.95}; Box: {1.44, 0.12, 0.3} }
-    barracks_1_w7_0_x7_0_frame_4 : BunkerMat_frame { Position: {-37.525, 4.24, 44.95}; Box: {1.44, 0.12, 0.3} }
+    barracks_1_w7_0_x7_0_frame_1 : BunkerMat_frame { Position: {-38.18, 4.8, 44.95}; Box: {0.13, 1, 0.3} }
+    barracks_1_w7_0_x7_0_frame_2 : BunkerMat_frame { Position: {-36.87, 4.8, 44.95}; Box: {0.13, 1, 0.3} }
+    barracks_1_w7_0_x7_0_frame_3 : BunkerMat_frame { Position: {-37.525, 5.355, 44.95}; Box: {1.44, 0.13, 0.3} }
+    barracks_1_w7_0_x7_0_frame_4 : BunkerMat_frame { Position: {-37.525, 4.245, 44.95}; Box: {1.44, 0.13, 0.3} }
     barracks_1_w7_0_x7_0_pane_1 : BunkerMat_glass { Position: {-37.525, 4.8, 44.95}; Box: {1.2, 1, 0.02} }
 
-    barracks_1_w8_0_x7_0_frame_1 : BunkerMat_frame { Position: {-35.2017, 4.8, 44.95}; Box: {0.12, 1, 0.3} }
-    barracks_1_w8_0_x7_0_frame_2 : BunkerMat_frame { Position: {-33.8817, 4.8, 44.95}; Box: {0.12, 1, 0.3} }
-    barracks_1_w8_0_x7_0_frame_3 : BunkerMat_frame { Position: {-34.5417, 5.36, 44.95}; Box: {1.44, 0.12, 0.3} }
-    barracks_1_w8_0_x7_0_frame_4 : BunkerMat_frame { Position: {-34.5417, 4.24, 44.95}; Box: {1.44, 0.12, 0.3} }
+    barracks_1_w8_0_x7_0_frame_1 : BunkerMat_frame { Position: {-35.1967, 4.8, 44.95}; Box: {0.13, 1, 0.3} }
+    barracks_1_w8_0_x7_0_frame_2 : BunkerMat_frame { Position: {-33.8867, 4.8, 44.95}; Box: {0.13, 1, 0.3} }
+    barracks_1_w8_0_x7_0_frame_3 : BunkerMat_frame { Position: {-34.5417, 5.355, 44.95}; Box: {1.44, 0.13, 0.3} }
+    barracks_1_w8_0_x7_0_frame_4 : BunkerMat_frame { Position: {-34.5417, 4.245, 44.95}; Box: {1.44, 0.13, 0.3} }
     barracks_1_w8_0_x7_0_pane_1 : BunkerMat_glass { Position: {-34.5417, 4.8, 44.95}; Box: {1.2, 1, 0.02} }
 
-    barracks_1_w8_0_z8_9_frame_1 : BunkerMat_frame { Position: {-33.05, 4.8, 42.645}; Box: {0.3, 1, 0.12} }
-    barracks_1_w8_0_z8_9_frame_2 : BunkerMat_frame { Position: {-33.05, 4.8, 43.965}; Box: {0.3, 1, 0.12} }
-    barracks_1_w8_0_z8_9_frame_3 : BunkerMat_frame { Position: {-33.05, 5.36, 43.305}; Box: {0.3, 0.12, 1.44} }
-    barracks_1_w8_0_z8_9_frame_4 : BunkerMat_frame { Position: {-33.05, 4.24, 43.305}; Box: {0.3, 0.12, 1.44} }
+    barracks_1_w8_0_z8_9_frame_1 : BunkerMat_frame { Position: {-33.05, 4.8, 42.65}; Box: {0.3, 1, 0.13} }
+    barracks_1_w8_0_z8_9_frame_2 : BunkerMat_frame { Position: {-33.05, 4.8, 43.96}; Box: {0.3, 1, 0.13} }
+    barracks_1_w8_0_z8_9_frame_3 : BunkerMat_frame { Position: {-33.05, 5.355, 43.305}; Box: {0.3, 0.13, 1.44} }
+    barracks_1_w8_0_z8_9_frame_4 : BunkerMat_frame { Position: {-33.05, 4.245, 43.305}; Box: {0.3, 0.13, 1.44} }
     barracks_1_w8_0_z8_9_pane_1 : BunkerMat_glass { Position: {-33.05, 4.8, 43.305}; Box: {0.02, 1, 1.2} }
 
-    barracks_1_w9_0_x_7_0_frame_1 : BunkerMat_frame { Position: {-50.1183, 4.8, 31.05}; Box: {0.12, 1, 0.3} }
-    barracks_1_w9_0_x_7_0_frame_2 : BunkerMat_frame { Position: {-48.7983, 4.8, 31.05}; Box: {0.12, 1, 0.3} }
-    barracks_1_w9_0_x_7_0_frame_3 : BunkerMat_frame { Position: {-49.4583, 5.36, 31.05}; Box: {1.44, 0.12, 0.3} }
-    barracks_1_w9_0_x_7_0_frame_4 : BunkerMat_frame { Position: {-49.4583, 4.24, 31.05}; Box: {1.44, 0.12, 0.3} }
+    barracks_1_w9_0_x_7_0_frame_1 : BunkerMat_frame { Position: {-50.1133, 4.8, 31.05}; Box: {0.13, 1, 0.3} }
+    barracks_1_w9_0_x_7_0_frame_2 : BunkerMat_frame { Position: {-48.8033, 4.8, 31.05}; Box: {0.13, 1, 0.3} }
+    barracks_1_w9_0_x_7_0_frame_3 : BunkerMat_frame { Position: {-49.4583, 5.355, 31.05}; Box: {1.44, 0.13, 0.3} }
+    barracks_1_w9_0_x_7_0_frame_4 : BunkerMat_frame { Position: {-49.4583, 4.245, 31.05}; Box: {1.44, 0.13, 0.3} }
     barracks_1_w9_0_x_7_0_pane_1 : BunkerMat_glass { Position: {-49.4583, 4.8, 31.05}; Box: {1.2, 1, 0.02} }
 
-    barracks_1_w9_0_z_8_9_frame_1 : BunkerMat_frame { Position: {-50.95, 4.8, 32.035}; Box: {0.3, 1, 0.12} }
-    barracks_1_w9_0_z_8_9_frame_2 : BunkerMat_frame { Position: {-50.95, 4.8, 33.355}; Box: {0.3, 1, 0.12} }
-    barracks_1_w9_0_z_8_9_frame_3 : BunkerMat_frame { Position: {-50.95, 5.36, 32.695}; Box: {0.3, 0.12, 1.44} }
-    barracks_1_w9_0_z_8_9_frame_4 : BunkerMat_frame { Position: {-50.95, 4.24, 32.695}; Box: {0.3, 0.12, 1.44} }
+    barracks_1_w9_0_z_8_9_frame_1 : BunkerMat_frame { Position: {-50.95, 4.8, 32.04}; Box: {0.3, 1, 0.13} }
+    barracks_1_w9_0_z_8_9_frame_2 : BunkerMat_frame { Position: {-50.95, 4.8, 33.35}; Box: {0.3, 1, 0.13} }
+    barracks_1_w9_0_z_8_9_frame_3 : BunkerMat_frame { Position: {-50.95, 5.355, 32.695}; Box: {0.3, 0.13, 1.44} }
+    barracks_1_w9_0_z_8_9_frame_4 : BunkerMat_frame { Position: {-50.95, 4.245, 32.695}; Box: {0.3, 0.13, 1.44} }
     barracks_1_w9_0_z_8_9_pane_1 : BunkerMat_glass { Position: {-50.95, 4.8, 32.695}; Box: {0.02, 1, 1.2} }
 
-    barracks_1_w10_0_x_7_0_frame_1 : BunkerMat_frame { Position: {-47.135, 4.8, 31.05}; Box: {0.12, 1, 0.3} }
-    barracks_1_w10_0_x_7_0_frame_2 : BunkerMat_frame { Position: {-45.815, 4.8, 31.05}; Box: {0.12, 1, 0.3} }
-    barracks_1_w10_0_x_7_0_frame_3 : BunkerMat_frame { Position: {-46.475, 5.36, 31.05}; Box: {1.44, 0.12, 0.3} }
-    barracks_1_w10_0_x_7_0_frame_4 : BunkerMat_frame { Position: {-46.475, 4.24, 31.05}; Box: {1.44, 0.12, 0.3} }
+    barracks_1_w10_0_x_7_0_frame_1 : BunkerMat_frame { Position: {-47.13, 4.8, 31.05}; Box: {0.13, 1, 0.3} }
+    barracks_1_w10_0_x_7_0_frame_2 : BunkerMat_frame { Position: {-45.82, 4.8, 31.05}; Box: {0.13, 1, 0.3} }
+    barracks_1_w10_0_x_7_0_frame_3 : BunkerMat_frame { Position: {-46.475, 5.355, 31.05}; Box: {1.44, 0.13, 0.3} }
+    barracks_1_w10_0_x_7_0_frame_4 : BunkerMat_frame { Position: {-46.475, 4.245, 31.05}; Box: {1.44, 0.13, 0.3} }
     barracks_1_w10_0_x_7_0_pane_1 : BunkerMat_glass { Position: {-46.475, 4.8, 31.05}; Box: {1.2, 1, 0.02} }
 
-    barracks_1_w11_0_x_7_0_frame_1 : BunkerMat_frame { Position: {-44.1517, 4.8, 31.05}; Box: {0.12, 1, 0.3} }
-    barracks_1_w11_0_x_7_0_frame_2 : BunkerMat_frame { Position: {-42.8317, 4.8, 31.05}; Box: {0.12, 1, 0.3} }
-    barracks_1_w11_0_x_7_0_frame_3 : BunkerMat_frame { Position: {-43.4917, 5.36, 31.05}; Box: {1.44, 0.12, 0.3} }
-    barracks_1_w11_0_x_7_0_frame_4 : BunkerMat_frame { Position: {-43.4917, 4.24, 31.05}; Box: {1.44, 0.12, 0.3} }
+    barracks_1_w11_0_x_7_0_frame_1 : BunkerMat_frame { Position: {-44.1467, 4.8, 31.05}; Box: {0.13, 1, 0.3} }
+    barracks_1_w11_0_x_7_0_frame_2 : BunkerMat_frame { Position: {-42.8367, 4.8, 31.05}; Box: {0.13, 1, 0.3} }
+    barracks_1_w11_0_x_7_0_frame_3 : BunkerMat_frame { Position: {-43.4917, 5.355, 31.05}; Box: {1.44, 0.13, 0.3} }
+    barracks_1_w11_0_x_7_0_frame_4 : BunkerMat_frame { Position: {-43.4917, 4.245, 31.05}; Box: {1.44, 0.13, 0.3} }
     barracks_1_w11_0_x_7_0_pane_1 : BunkerMat_glass { Position: {-43.4917, 4.8, 31.05}; Box: {1.2, 1, 0.02} }
 
-    barracks_1_w12_0_x_7_0_frame_1 : BunkerMat_frame { Position: {-41.1683, 4.8, 31.05}; Box: {0.12, 1, 0.3} }
-    barracks_1_w12_0_x_7_0_frame_2 : BunkerMat_frame { Position: {-39.8483, 4.8, 31.05}; Box: {0.12, 1, 0.3} }
-    barracks_1_w12_0_x_7_0_frame_3 : BunkerMat_frame { Position: {-40.5083, 5.36, 31.05}; Box: {1.44, 0.12, 0.3} }
-    barracks_1_w12_0_x_7_0_frame_4 : BunkerMat_frame { Position: {-40.5083, 4.24, 31.05}; Box: {1.44, 0.12, 0.3} }
+    barracks_1_w12_0_x_7_0_frame_1 : BunkerMat_frame { Position: {-41.1633, 4.8, 31.05}; Box: {0.13, 1, 0.3} }
+    barracks_1_w12_0_x_7_0_frame_2 : BunkerMat_frame { Position: {-39.8533, 4.8, 31.05}; Box: {0.13, 1, 0.3} }
+    barracks_1_w12_0_x_7_0_frame_3 : BunkerMat_frame { Position: {-40.5083, 5.355, 31.05}; Box: {1.44, 0.13, 0.3} }
+    barracks_1_w12_0_x_7_0_frame_4 : BunkerMat_frame { Position: {-40.5083, 4.245, 31.05}; Box: {1.44, 0.13, 0.3} }
     barracks_1_w12_0_x_7_0_pane_1 : BunkerMat_glass { Position: {-40.5083, 4.8, 31.05}; Box: {1.2, 1, 0.02} }
 
-    barracks_1_w13_0_x_7_0_frame_1 : BunkerMat_frame { Position: {-38.185, 4.8, 31.05}; Box: {0.12, 1, 0.3} }
-    barracks_1_w13_0_x_7_0_frame_2 : BunkerMat_frame { Position: {-36.865, 4.8, 31.05}; Box: {0.12, 1, 0.3} }
-    barracks_1_w13_0_x_7_0_frame_3 : BunkerMat_frame { Position: {-37.525, 5.36, 31.05}; Box: {1.44, 0.12, 0.3} }
-    barracks_1_w13_0_x_7_0_frame_4 : BunkerMat_frame { Position: {-37.525, 4.24, 31.05}; Box: {1.44, 0.12, 0.3} }
+    barracks_1_w13_0_x_7_0_frame_1 : BunkerMat_frame { Position: {-38.18, 4.8, 31.05}; Box: {0.13, 1, 0.3} }
+    barracks_1_w13_0_x_7_0_frame_2 : BunkerMat_frame { Position: {-36.87, 4.8, 31.05}; Box: {0.13, 1, 0.3} }
+    barracks_1_w13_0_x_7_0_frame_3 : BunkerMat_frame { Position: {-37.525, 5.355, 31.05}; Box: {1.44, 0.13, 0.3} }
+    barracks_1_w13_0_x_7_0_frame_4 : BunkerMat_frame { Position: {-37.525, 4.245, 31.05}; Box: {1.44, 0.13, 0.3} }
     barracks_1_w13_0_x_7_0_pane_1 : BunkerMat_glass { Position: {-37.525, 4.8, 31.05}; Box: {1.2, 1, 0.02} }
 
-    barracks_1_w14_0_x_7_0_frame_1 : BunkerMat_frame { Position: {-35.2017, 4.8, 31.05}; Box: {0.12, 1, 0.3} }
-    barracks_1_w14_0_x_7_0_frame_2 : BunkerMat_frame { Position: {-33.8817, 4.8, 31.05}; Box: {0.12, 1, 0.3} }
-    barracks_1_w14_0_x_7_0_frame_3 : BunkerMat_frame { Position: {-34.5417, 5.36, 31.05}; Box: {1.44, 0.12, 0.3} }
-    barracks_1_w14_0_x_7_0_frame_4 : BunkerMat_frame { Position: {-34.5417, 4.24, 31.05}; Box: {1.44, 0.12, 0.3} }
+    barracks_1_w14_0_x_7_0_frame_1 : BunkerMat_frame { Position: {-35.1967, 4.8, 31.05}; Box: {0.13, 1, 0.3} }
+    barracks_1_w14_0_x_7_0_frame_2 : BunkerMat_frame { Position: {-33.8867, 4.8, 31.05}; Box: {0.13, 1, 0.3} }
+    barracks_1_w14_0_x_7_0_frame_3 : BunkerMat_frame { Position: {-34.5417, 5.355, 31.05}; Box: {1.44, 0.13, 0.3} }
+    barracks_1_w14_0_x_7_0_frame_4 : BunkerMat_frame { Position: {-34.5417, 4.245, 31.05}; Box: {1.44, 0.13, 0.3} }
     barracks_1_w14_0_x_7_0_pane_1 : BunkerMat_glass { Position: {-34.5417, 4.8, 31.05}; Box: {1.2, 1, 0.02} }
 
-    barracks_1_w14_0_z8_9_frame_1 : BunkerMat_frame { Position: {-33.05, 4.8, 32.035}; Box: {0.3, 1, 0.12} }
-    barracks_1_w14_0_z8_9_frame_2 : BunkerMat_frame { Position: {-33.05, 4.8, 33.355}; Box: {0.3, 1, 0.12} }
-    barracks_1_w14_0_z8_9_frame_3 : BunkerMat_frame { Position: {-33.05, 5.36, 32.695}; Box: {0.3, 0.12, 1.44} }
-    barracks_1_w14_0_z8_9_frame_4 : BunkerMat_frame { Position: {-33.05, 4.24, 32.695}; Box: {0.3, 0.12, 1.44} }
+    barracks_1_w14_0_z8_9_frame_1 : BunkerMat_frame { Position: {-33.05, 4.8, 32.04}; Box: {0.3, 1, 0.13} }
+    barracks_1_w14_0_z8_9_frame_2 : BunkerMat_frame { Position: {-33.05, 4.8, 33.35}; Box: {0.3, 1, 0.13} }
+    barracks_1_w14_0_z8_9_frame_3 : BunkerMat_frame { Position: {-33.05, 5.355, 32.695}; Box: {0.3, 0.13, 1.44} }
+    barracks_1_w14_0_z8_9_frame_4 : BunkerMat_frame { Position: {-33.05, 4.245, 32.695}; Box: {0.3, 0.13, 1.44} }
     barracks_1_w14_0_z8_9_pane_1 : BunkerMat_glass { Position: {-33.05, 4.8, 32.695}; Box: {0.02, 1, 1.2} }
 
-    barracks_1_w15_0_z8_9_frame_1 : BunkerMat_frame { Position: {-33.05, 4.8, 35.51}; Box: {0.3, 1, 0.12} }
-    barracks_1_w15_0_z8_9_frame_2 : BunkerMat_frame { Position: {-33.05, 4.8, 36.83}; Box: {0.3, 1, 0.12} }
-    barracks_1_w15_0_z8_9_frame_3 : BunkerMat_frame { Position: {-33.05, 5.36, 36.17}; Box: {0.3, 0.12, 1.44} }
-    barracks_1_w15_0_z8_9_frame_4 : BunkerMat_frame { Position: {-33.05, 4.24, 36.17}; Box: {0.3, 0.12, 1.44} }
+    barracks_1_w15_0_z8_9_frame_1 : BunkerMat_frame { Position: {-33.05, 4.8, 35.515}; Box: {0.3, 1, 0.13} }
+    barracks_1_w15_0_z8_9_frame_2 : BunkerMat_frame { Position: {-33.05, 4.8, 36.825}; Box: {0.3, 1, 0.13} }
+    barracks_1_w15_0_z8_9_frame_3 : BunkerMat_frame { Position: {-33.05, 5.355, 36.17}; Box: {0.3, 0.13, 1.44} }
+    barracks_1_w15_0_z8_9_frame_4 : BunkerMat_frame { Position: {-33.05, 4.245, 36.17}; Box: {0.3, 0.13, 1.44} }
     barracks_1_w15_0_z8_9_pane_1 : BunkerMat_glass { Position: {-33.05, 4.8, 36.17}; Box: {0.02, 1, 1.2} }
 
-    barracks_1_w16_0_z8_9_frame_1 : BunkerMat_frame { Position: {-33.05, 4.8, 39.17}; Box: {0.3, 1, 0.12} }
-    barracks_1_w16_0_z8_9_frame_2 : BunkerMat_frame { Position: {-33.05, 4.8, 40.49}; Box: {0.3, 1, 0.12} }
-    barracks_1_w16_0_z8_9_frame_3 : BunkerMat_frame { Position: {-33.05, 5.36, 39.83}; Box: {0.3, 0.12, 1.44} }
-    barracks_1_w16_0_z8_9_frame_4 : BunkerMat_frame { Position: {-33.05, 4.24, 39.83}; Box: {0.3, 0.12, 1.44} }
+    barracks_1_w16_0_z8_9_frame_1 : BunkerMat_frame { Position: {-33.05, 4.8, 39.175}; Box: {0.3, 1, 0.13} }
+    barracks_1_w16_0_z8_9_frame_2 : BunkerMat_frame { Position: {-33.05, 4.8, 40.485}; Box: {0.3, 1, 0.13} }
+    barracks_1_w16_0_z8_9_frame_3 : BunkerMat_frame { Position: {-33.05, 5.355, 39.83}; Box: {0.3, 0.13, 1.44} }
+    barracks_1_w16_0_z8_9_frame_4 : BunkerMat_frame { Position: {-33.05, 4.245, 39.83}; Box: {0.3, 0.13, 1.44} }
     barracks_1_w16_0_z8_9_pane_1 : BunkerMat_glass { Position: {-33.05, 4.8, 39.83}; Box: {0.02, 1, 1.2} }
 
-    barracks_1_w17_0_z_8_9_frame_1 : BunkerMat_frame { Position: {-50.95, 4.8, 35.51}; Box: {0.3, 1, 0.12} }
-    barracks_1_w17_0_z_8_9_frame_2 : BunkerMat_frame { Position: {-50.95, 4.8, 36.83}; Box: {0.3, 1, 0.12} }
-    barracks_1_w17_0_z_8_9_frame_3 : BunkerMat_frame { Position: {-50.95, 5.36, 36.17}; Box: {0.3, 0.12, 1.44} }
-    barracks_1_w17_0_z_8_9_frame_4 : BunkerMat_frame { Position: {-50.95, 4.24, 36.17}; Box: {0.3, 0.12, 1.44} }
+    barracks_1_w17_0_z_8_9_frame_1 : BunkerMat_frame { Position: {-50.95, 4.8, 35.515}; Box: {0.3, 1, 0.13} }
+    barracks_1_w17_0_z_8_9_frame_2 : BunkerMat_frame { Position: {-50.95, 4.8, 36.825}; Box: {0.3, 1, 0.13} }
+    barracks_1_w17_0_z_8_9_frame_3 : BunkerMat_frame { Position: {-50.95, 5.355, 36.17}; Box: {0.3, 0.13, 1.44} }
+    barracks_1_w17_0_z_8_9_frame_4 : BunkerMat_frame { Position: {-50.95, 4.245, 36.17}; Box: {0.3, 0.13, 1.44} }
     barracks_1_w17_0_z_8_9_pane_1 : BunkerMat_glass { Position: {-50.95, 4.8, 36.17}; Box: {0.02, 1, 1.2} }
 
-    barracks_1_w18_0_z_8_9_frame_1 : BunkerMat_frame { Position: {-50.95, 4.8, 39.17}; Box: {0.3, 1, 0.12} }
-    barracks_1_w18_0_z_8_9_frame_2 : BunkerMat_frame { Position: {-50.95, 4.8, 40.49}; Box: {0.3, 1, 0.12} }
-    barracks_1_w18_0_z_8_9_frame_3 : BunkerMat_frame { Position: {-50.95, 5.36, 39.83}; Box: {0.3, 0.12, 1.44} }
-    barracks_1_w18_0_z_8_9_frame_4 : BunkerMat_frame { Position: {-50.95, 4.24, 39.83}; Box: {0.3, 0.12, 1.44} }
+    barracks_1_w18_0_z_8_9_frame_1 : BunkerMat_frame { Position: {-50.95, 4.8, 39.175}; Box: {0.3, 1, 0.13} }
+    barracks_1_w18_0_z_8_9_frame_2 : BunkerMat_frame { Position: {-50.95, 4.8, 40.485}; Box: {0.3, 1, 0.13} }
+    barracks_1_w18_0_z_8_9_frame_3 : BunkerMat_frame { Position: {-50.95, 5.355, 39.83}; Box: {0.3, 0.13, 1.44} }
+    barracks_1_w18_0_z_8_9_frame_4 : BunkerMat_frame { Position: {-50.95, 4.245, 39.83}; Box: {0.3, 0.13, 1.44} }
     barracks_1_w18_0_z_8_9_pane_1 : BunkerMat_glass { Position: {-50.95, 4.8, 39.83}; Box: {0.02, 1, 1.2} }
 
-    barracks_1_p0_2_frame_1 : BunkerMat_frame { Position: {-43.41, 4.275, 35.74}; Box: {0.12, 2.15, 0.3} }
-    barracks_1_p0_2_frame_2 : BunkerMat_frame { Position: {-42.19, 4.275, 35.74}; Box: {0.12, 2.15, 0.3} }
-    barracks_1_p0_2_frame_3 : BunkerMat_frame { Position: {-42.8, 5.41, 35.74}; Box: {1.34, 0.12, 0.3} }
+    barracks_1_p0_2_frame_1 : BunkerMat_frame { Position: {-43.405, 4.275, 35.74}; Box: {0.13, 2.15, 0.3} }
+    barracks_1_p0_2_frame_2 : BunkerMat_frame { Position: {-42.195, 4.275, 35.74}; Box: {0.13, 2.15, 0.3} }
+    barracks_1_p0_2_frame_3 : BunkerMat_frame { Position: {-42.8, 5.405, 35.74}; Box: {1.34, 0.13, 0.3} }
 
-    barracks_1_p5_2_frame_1 : BunkerMat_frame { Position: {-43.4017, 4.275, 41.66}; Box: {0.12, 2.15, 0.3} }
-    barracks_1_p5_2_frame_2 : BunkerMat_frame { Position: {-42.3817, 4.275, 41.66}; Box: {0.12, 2.15, 0.3} }
-    barracks_1_p5_2_frame_3 : BunkerMat_frame { Position: {-42.8917, 5.41, 41.66}; Box: {1.14, 0.12, 0.3} }
+    barracks_1_p5_2_frame_1 : BunkerMat_frame { Position: {-43.3967, 4.275, 41.66}; Box: {0.13, 2.15, 0.3} }
+    barracks_1_p5_2_frame_2 : BunkerMat_frame { Position: {-42.3867, 4.275, 41.66}; Box: {0.13, 2.15, 0.3} }
+    barracks_1_p5_2_frame_3 : BunkerMat_frame { Position: {-42.8917, 5.405, 41.66}; Box: {1.14, 0.13, 0.3} }
 
-    barracks_1_p6_2_frame_1 : BunkerMat_frame { Position: {-41.6183, 4.275, 41.66}; Box: {0.12, 2.15, 0.3} }
-    barracks_1_p6_2_frame_2 : BunkerMat_frame { Position: {-40.5983, 4.275, 41.66}; Box: {0.12, 2.15, 0.3} }
-    barracks_1_p6_2_frame_3 : BunkerMat_frame { Position: {-41.1083, 5.41, 41.66}; Box: {1.14, 0.12, 0.3} }
+    barracks_1_p6_2_frame_1 : BunkerMat_frame { Position: {-41.6133, 4.275, 41.66}; Box: {0.13, 2.15, 0.3} }
+    barracks_1_p6_2_frame_2 : BunkerMat_frame { Position: {-40.6033, 4.275, 41.66}; Box: {0.13, 2.15, 0.3} }
+    barracks_1_p6_2_frame_3 : BunkerMat_frame { Position: {-41.1083, 5.405, 41.66}; Box: {1.14, 0.13, 0.3} }
 
-    barracks_1_p11_2_frame_1 : BunkerMat_frame { Position: {-43.4017, 4.275, 34.34}; Box: {0.12, 2.15, 0.3} }
-    barracks_1_p11_2_frame_2 : BunkerMat_frame { Position: {-42.3817, 4.275, 34.34}; Box: {0.12, 2.15, 0.3} }
-    barracks_1_p11_2_frame_3 : BunkerMat_frame { Position: {-42.8917, 5.41, 34.34}; Box: {1.14, 0.12, 0.3} }
+    barracks_1_p11_2_frame_1 : BunkerMat_frame { Position: {-43.3967, 4.275, 34.34}; Box: {0.13, 2.15, 0.3} }
+    barracks_1_p11_2_frame_2 : BunkerMat_frame { Position: {-42.3867, 4.275, 34.34}; Box: {0.13, 2.15, 0.3} }
+    barracks_1_p11_2_frame_3 : BunkerMat_frame { Position: {-42.8917, 5.405, 34.34}; Box: {1.14, 0.13, 0.3} }
 
-    barracks_1_p12_2_frame_1 : BunkerMat_frame { Position: {-41.6183, 4.275, 34.34}; Box: {0.12, 2.15, 0.3} }
-    barracks_1_p12_2_frame_2 : BunkerMat_frame { Position: {-40.5983, 4.275, 34.34}; Box: {0.12, 2.15, 0.3} }
-    barracks_1_p12_2_frame_3 : BunkerMat_frame { Position: {-41.1083, 5.41, 34.34}; Box: {1.14, 0.12, 0.3} }
+    barracks_1_p12_2_frame_1 : BunkerMat_frame { Position: {-41.6133, 4.275, 34.34}; Box: {0.13, 2.15, 0.3} }
+    barracks_1_p12_2_frame_2 : BunkerMat_frame { Position: {-40.6033, 4.275, 34.34}; Box: {0.13, 2.15, 0.3} }
+    barracks_1_p12_2_frame_3 : BunkerMat_frame { Position: {-41.1083, 5.405, 34.34}; Box: {1.14, 0.13, 0.3} }
 
-    barracks_1_p15_2_frame_1 : BunkerMat_frame { Position: {-38.7, 4.275, 36.36}; Box: {0.3, 2.15, 0.12} }
-    barracks_1_p15_2_frame_2 : BunkerMat_frame { Position: {-38.7, 4.275, 37.38}; Box: {0.3, 2.15, 0.12} }
-    barracks_1_p15_2_frame_3 : BunkerMat_frame { Position: {-38.7, 5.41, 36.87}; Box: {0.3, 0.12, 1.14} }
+    barracks_1_p15_2_frame_1 : BunkerMat_frame { Position: {-38.7, 4.275, 36.365}; Box: {0.3, 2.15, 0.13} }
+    barracks_1_p15_2_frame_2 : BunkerMat_frame { Position: {-38.7, 4.275, 37.375}; Box: {0.3, 2.15, 0.13} }
+    barracks_1_p15_2_frame_3 : BunkerMat_frame { Position: {-38.7, 5.405, 36.87}; Box: {0.3, 0.13, 1.14} }
 
-    barracks_1_p16_2_frame_1 : BunkerMat_frame { Position: {-38.7, 4.275, 38.62}; Box: {0.3, 2.15, 0.12} }
-    barracks_1_p16_2_frame_2 : BunkerMat_frame { Position: {-38.7, 4.275, 39.64}; Box: {0.3, 2.15, 0.12} }
-    barracks_1_p16_2_frame_3 : BunkerMat_frame { Position: {-38.7, 5.41, 39.13}; Box: {0.3, 0.12, 1.14} }
+    barracks_1_p16_2_frame_1 : BunkerMat_frame { Position: {-38.7, 4.275, 38.625}; Box: {0.3, 2.15, 0.13} }
+    barracks_1_p16_2_frame_2 : BunkerMat_frame { Position: {-38.7, 4.275, 39.635}; Box: {0.3, 2.15, 0.13} }
+    barracks_1_p16_2_frame_3 : BunkerMat_frame { Position: {-38.7, 5.405, 39.13}; Box: {0.3, 0.13, 1.14} }
 
-    barracks_1_p17_2_frame_1 : BunkerMat_frame { Position: {-45.3, 4.275, 36.36}; Box: {0.3, 2.15, 0.12} }
-    barracks_1_p17_2_frame_2 : BunkerMat_frame { Position: {-45.3, 4.275, 37.38}; Box: {0.3, 2.15, 0.12} }
-    barracks_1_p17_2_frame_3 : BunkerMat_frame { Position: {-45.3, 5.41, 36.87}; Box: {0.3, 0.12, 1.14} }
+    barracks_1_p17_2_frame_1 : BunkerMat_frame { Position: {-45.3, 4.275, 36.365}; Box: {0.3, 2.15, 0.13} }
+    barracks_1_p17_2_frame_2 : BunkerMat_frame { Position: {-45.3, 4.275, 37.375}; Box: {0.3, 2.15, 0.13} }
+    barracks_1_p17_2_frame_3 : BunkerMat_frame { Position: {-45.3, 5.405, 36.87}; Box: {0.3, 0.13, 1.14} }
 
-    barracks_1_p18_2_frame_1 : BunkerMat_frame { Position: {-45.3, 4.275, 38.62}; Box: {0.3, 2.15, 0.12} }
-    barracks_1_p18_2_frame_2 : BunkerMat_frame { Position: {-45.3, 4.275, 39.64}; Box: {0.3, 2.15, 0.12} }
-    barracks_1_p18_2_frame_3 : BunkerMat_frame { Position: {-45.3, 5.41, 39.13}; Box: {0.3, 0.12, 1.14} }
+    barracks_1_p18_2_frame_1 : BunkerMat_frame { Position: {-45.3, 4.275, 38.625}; Box: {0.3, 2.15, 0.13} }
+    barracks_1_p18_2_frame_2 : BunkerMat_frame { Position: {-45.3, 4.275, 39.635}; Box: {0.3, 2.15, 0.13} }
+    barracks_1_p18_2_frame_3 : BunkerMat_frame { Position: {-45.3, 5.405, 39.13}; Box: {0.3, 0.13, 1.14} }
 
-    barracks_1_p3_18_frame_1 : BunkerMat_frame { Position: {-49.9683, 4.275, 41.66}; Box: {0.12, 2.15, 0.3} }
-    barracks_1_p3_18_frame_2 : BunkerMat_frame { Position: {-48.9483, 4.275, 41.66}; Box: {0.12, 2.15, 0.3} }
-    barracks_1_p3_18_frame_3 : BunkerMat_frame { Position: {-49.4583, 5.41, 41.66}; Box: {1.14, 0.12, 0.3} }
+    barracks_1_p3_18_frame_1 : BunkerMat_frame { Position: {-49.9633, 4.275, 41.66}; Box: {0.13, 2.15, 0.3} }
+    barracks_1_p3_18_frame_2 : BunkerMat_frame { Position: {-48.9533, 4.275, 41.66}; Box: {0.13, 2.15, 0.3} }
+    barracks_1_p3_18_frame_3 : BunkerMat_frame { Position: {-49.4583, 5.405, 41.66}; Box: {1.14, 0.13, 0.3} }
 
-    barracks_1_p4_5_frame_1 : BunkerMat_frame { Position: {-44.9833, 4.275, 42.795}; Box: {0.3, 2.15, 0.12} }
-    barracks_1_p4_5_frame_2 : BunkerMat_frame { Position: {-44.9833, 4.275, 43.815}; Box: {0.3, 2.15, 0.12} }
-    barracks_1_p4_5_frame_3 : BunkerMat_frame { Position: {-44.9833, 5.41, 43.305}; Box: {0.3, 0.12, 1.14} }
+    barracks_1_p4_5_frame_1 : BunkerMat_frame { Position: {-44.9833, 4.275, 42.8}; Box: {0.3, 2.15, 0.13} }
+    barracks_1_p4_5_frame_2 : BunkerMat_frame { Position: {-44.9833, 4.275, 43.81}; Box: {0.3, 2.15, 0.13} }
+    barracks_1_p4_5_frame_3 : BunkerMat_frame { Position: {-44.9833, 5.405, 43.305}; Box: {0.3, 0.13, 1.14} }
 
-    barracks_1_p7_6_frame_1 : BunkerMat_frame { Position: {-39.0167, 4.275, 42.795}; Box: {0.3, 2.15, 0.12} }
-    barracks_1_p7_6_frame_2 : BunkerMat_frame { Position: {-39.0167, 4.275, 43.815}; Box: {0.3, 2.15, 0.12} }
-    barracks_1_p7_6_frame_3 : BunkerMat_frame { Position: {-39.0167, 5.41, 43.305}; Box: {0.3, 0.12, 1.14} }
+    barracks_1_p7_6_frame_1 : BunkerMat_frame { Position: {-39.0167, 4.275, 42.8}; Box: {0.3, 2.15, 0.13} }
+    barracks_1_p7_6_frame_2 : BunkerMat_frame { Position: {-39.0167, 4.275, 43.81}; Box: {0.3, 2.15, 0.13} }
+    barracks_1_p7_6_frame_3 : BunkerMat_frame { Position: {-39.0167, 5.405, 43.305}; Box: {0.3, 0.13, 1.14} }
 
-    barracks_1_p8_16_frame_1 : BunkerMat_frame { Position: {-35.0517, 4.275, 41.66}; Box: {0.12, 2.15, 0.3} }
-    barracks_1_p8_16_frame_2 : BunkerMat_frame { Position: {-34.0317, 4.275, 41.66}; Box: {0.12, 2.15, 0.3} }
-    barracks_1_p8_16_frame_3 : BunkerMat_frame { Position: {-34.5417, 5.41, 41.66}; Box: {1.14, 0.12, 0.3} }
+    barracks_1_p8_16_frame_1 : BunkerMat_frame { Position: {-35.0467, 4.275, 41.66}; Box: {0.13, 2.15, 0.3} }
+    barracks_1_p8_16_frame_2 : BunkerMat_frame { Position: {-34.0367, 4.275, 41.66}; Box: {0.13, 2.15, 0.3} }
+    barracks_1_p8_16_frame_3 : BunkerMat_frame { Position: {-34.5417, 5.405, 41.66}; Box: {1.14, 0.13, 0.3} }
 
-    barracks_1_p9_17_frame_1 : BunkerMat_frame { Position: {-49.9683, 4.275, 34.34}; Box: {0.12, 2.15, 0.3} }
-    barracks_1_p9_17_frame_2 : BunkerMat_frame { Position: {-48.9483, 4.275, 34.34}; Box: {0.12, 2.15, 0.3} }
-    barracks_1_p9_17_frame_3 : BunkerMat_frame { Position: {-49.4583, 5.41, 34.34}; Box: {1.14, 0.12, 0.3} }
+    barracks_1_p9_17_frame_1 : BunkerMat_frame { Position: {-49.9633, 4.275, 34.34}; Box: {0.13, 2.15, 0.3} }
+    barracks_1_p9_17_frame_2 : BunkerMat_frame { Position: {-48.9533, 4.275, 34.34}; Box: {0.13, 2.15, 0.3} }
+    barracks_1_p9_17_frame_3 : BunkerMat_frame { Position: {-49.4583, 5.405, 34.34}; Box: {1.14, 0.13, 0.3} }
 
-    barracks_1_p10_11_frame_1 : BunkerMat_frame { Position: {-44.9833, 4.275, 32.185}; Box: {0.3, 2.15, 0.12} }
-    barracks_1_p10_11_frame_2 : BunkerMat_frame { Position: {-44.9833, 4.275, 33.205}; Box: {0.3, 2.15, 0.12} }
-    barracks_1_p10_11_frame_3 : BunkerMat_frame { Position: {-44.9833, 5.41, 32.695}; Box: {0.3, 0.12, 1.14} }
+    barracks_1_p10_11_frame_1 : BunkerMat_frame { Position: {-44.9833, 4.275, 32.19}; Box: {0.3, 2.15, 0.13} }
+    barracks_1_p10_11_frame_2 : BunkerMat_frame { Position: {-44.9833, 4.275, 33.2}; Box: {0.3, 2.15, 0.13} }
+    barracks_1_p10_11_frame_3 : BunkerMat_frame { Position: {-44.9833, 5.405, 32.695}; Box: {0.3, 0.13, 1.14} }
 
-    barracks_1_p13_12_frame_1 : BunkerMat_frame { Position: {-39.0167, 4.275, 32.185}; Box: {0.3, 2.15, 0.12} }
-    barracks_1_p13_12_frame_2 : BunkerMat_frame { Position: {-39.0167, 4.275, 33.205}; Box: {0.3, 2.15, 0.12} }
-    barracks_1_p13_12_frame_3 : BunkerMat_frame { Position: {-39.0167, 5.41, 32.695}; Box: {0.3, 0.12, 1.14} }
+    barracks_1_p13_12_frame_1 : BunkerMat_frame { Position: {-39.0167, 4.275, 32.19}; Box: {0.3, 2.15, 0.13} }
+    barracks_1_p13_12_frame_2 : BunkerMat_frame { Position: {-39.0167, 4.275, 33.2}; Box: {0.3, 2.15, 0.13} }
+    barracks_1_p13_12_frame_3 : BunkerMat_frame { Position: {-39.0167, 5.405, 32.695}; Box: {0.3, 0.13, 1.14} }
 
-    barracks_1_p14_15_frame_1 : BunkerMat_frame { Position: {-35.0517, 4.275, 34.34}; Box: {0.12, 2.15, 0.3} }
-    barracks_1_p14_15_frame_2 : BunkerMat_frame { Position: {-34.0317, 4.275, 34.34}; Box: {0.12, 2.15, 0.3} }
-    barracks_1_p14_15_frame_3 : BunkerMat_frame { Position: {-34.5417, 5.41, 34.34}; Box: {1.14, 0.12, 0.3} }
+    barracks_1_p14_15_frame_1 : BunkerMat_frame { Position: {-35.0467, 4.275, 34.34}; Box: {0.13, 2.15, 0.3} }
+    barracks_1_p14_15_frame_2 : BunkerMat_frame { Position: {-34.0367, 4.275, 34.34}; Box: {0.13, 2.15, 0.3} }
+    barracks_1_p14_15_frame_3 : BunkerMat_frame { Position: {-34.5417, 5.405, 34.34}; Box: {1.14, 0.13, 0.3} }
 
-    barracks_2_w3_0_x7_0_frame_1 : BunkerMat_frame { Position: {-50.1183, 8, 44.95}; Box: {0.12, 1, 0.3} }
-    barracks_2_w3_0_x7_0_frame_2 : BunkerMat_frame { Position: {-48.7983, 8, 44.95}; Box: {0.12, 1, 0.3} }
-    barracks_2_w3_0_x7_0_frame_3 : BunkerMat_frame { Position: {-49.4583, 8.56, 44.95}; Box: {1.44, 0.12, 0.3} }
-    barracks_2_w3_0_x7_0_frame_4 : BunkerMat_frame { Position: {-49.4583, 7.44, 44.95}; Box: {1.44, 0.12, 0.3} }
+    barracks_2_w3_0_x7_0_frame_1 : BunkerMat_frame { Position: {-50.1133, 8, 44.95}; Box: {0.13, 1, 0.3} }
+    barracks_2_w3_0_x7_0_frame_2 : BunkerMat_frame { Position: {-48.8033, 8, 44.95}; Box: {0.13, 1, 0.3} }
+    barracks_2_w3_0_x7_0_frame_3 : BunkerMat_frame { Position: {-49.4583, 8.555, 44.95}; Box: {1.44, 0.13, 0.3} }
+    barracks_2_w3_0_x7_0_frame_4 : BunkerMat_frame { Position: {-49.4583, 7.445, 44.95}; Box: {1.44, 0.13, 0.3} }
     barracks_2_w3_0_x7_0_pane_1 : BunkerMat_glass { Position: {-49.4583, 8, 44.95}; Box: {1.2, 1, 0.02} }
 
-    barracks_2_w3_0_z_8_9_frame_1 : BunkerMat_frame { Position: {-50.95, 8, 42.645}; Box: {0.3, 1, 0.12} }
-    barracks_2_w3_0_z_8_9_frame_2 : BunkerMat_frame { Position: {-50.95, 8, 43.965}; Box: {0.3, 1, 0.12} }
-    barracks_2_w3_0_z_8_9_frame_3 : BunkerMat_frame { Position: {-50.95, 8.56, 43.305}; Box: {0.3, 0.12, 1.44} }
-    barracks_2_w3_0_z_8_9_frame_4 : BunkerMat_frame { Position: {-50.95, 7.44, 43.305}; Box: {0.3, 0.12, 1.44} }
+    barracks_2_w3_0_z_8_9_frame_1 : BunkerMat_frame { Position: {-50.95, 8, 42.65}; Box: {0.3, 1, 0.13} }
+    barracks_2_w3_0_z_8_9_frame_2 : BunkerMat_frame { Position: {-50.95, 8, 43.96}; Box: {0.3, 1, 0.13} }
+    barracks_2_w3_0_z_8_9_frame_3 : BunkerMat_frame { Position: {-50.95, 8.555, 43.305}; Box: {0.3, 0.13, 1.44} }
+    barracks_2_w3_0_z_8_9_frame_4 : BunkerMat_frame { Position: {-50.95, 7.445, 43.305}; Box: {0.3, 0.13, 1.44} }
     barracks_2_w3_0_z_8_9_pane_1 : BunkerMat_glass { Position: {-50.95, 8, 43.305}; Box: {0.02, 1, 1.2} }
 
-    barracks_2_w4_0_x7_0_frame_1 : BunkerMat_frame { Position: {-47.135, 8, 44.95}; Box: {0.12, 1, 0.3} }
-    barracks_2_w4_0_x7_0_frame_2 : BunkerMat_frame { Position: {-45.815, 8, 44.95}; Box: {0.12, 1, 0.3} }
-    barracks_2_w4_0_x7_0_frame_3 : BunkerMat_frame { Position: {-46.475, 8.56, 44.95}; Box: {1.44, 0.12, 0.3} }
-    barracks_2_w4_0_x7_0_frame_4 : BunkerMat_frame { Position: {-46.475, 7.44, 44.95}; Box: {1.44, 0.12, 0.3} }
+    barracks_2_w4_0_x7_0_frame_1 : BunkerMat_frame { Position: {-47.13, 8, 44.95}; Box: {0.13, 1, 0.3} }
+    barracks_2_w4_0_x7_0_frame_2 : BunkerMat_frame { Position: {-45.82, 8, 44.95}; Box: {0.13, 1, 0.3} }
+    barracks_2_w4_0_x7_0_frame_3 : BunkerMat_frame { Position: {-46.475, 8.555, 44.95}; Box: {1.44, 0.13, 0.3} }
+    barracks_2_w4_0_x7_0_frame_4 : BunkerMat_frame { Position: {-46.475, 7.445, 44.95}; Box: {1.44, 0.13, 0.3} }
     barracks_2_w4_0_x7_0_pane_1 : BunkerMat_glass { Position: {-46.475, 8, 44.95}; Box: {1.2, 1, 0.02} }
 
-    barracks_2_w5_0_x7_0_frame_1 : BunkerMat_frame { Position: {-44.1517, 8, 44.95}; Box: {0.12, 1, 0.3} }
-    barracks_2_w5_0_x7_0_frame_2 : BunkerMat_frame { Position: {-42.8317, 8, 44.95}; Box: {0.12, 1, 0.3} }
-    barracks_2_w5_0_x7_0_frame_3 : BunkerMat_frame { Position: {-43.4917, 8.56, 44.95}; Box: {1.44, 0.12, 0.3} }
-    barracks_2_w5_0_x7_0_frame_4 : BunkerMat_frame { Position: {-43.4917, 7.44, 44.95}; Box: {1.44, 0.12, 0.3} }
+    barracks_2_w5_0_x7_0_frame_1 : BunkerMat_frame { Position: {-44.1467, 8, 44.95}; Box: {0.13, 1, 0.3} }
+    barracks_2_w5_0_x7_0_frame_2 : BunkerMat_frame { Position: {-42.8367, 8, 44.95}; Box: {0.13, 1, 0.3} }
+    barracks_2_w5_0_x7_0_frame_3 : BunkerMat_frame { Position: {-43.4917, 8.555, 44.95}; Box: {1.44, 0.13, 0.3} }
+    barracks_2_w5_0_x7_0_frame_4 : BunkerMat_frame { Position: {-43.4917, 7.445, 44.95}; Box: {1.44, 0.13, 0.3} }
     barracks_2_w5_0_x7_0_pane_1 : BunkerMat_glass { Position: {-43.4917, 8, 44.95}; Box: {1.2, 1, 0.02} }
 
-    barracks_2_w6_0_x7_0_frame_1 : BunkerMat_frame { Position: {-41.1683, 8, 44.95}; Box: {0.12, 1, 0.3} }
-    barracks_2_w6_0_x7_0_frame_2 : BunkerMat_frame { Position: {-39.8483, 8, 44.95}; Box: {0.12, 1, 0.3} }
-    barracks_2_w6_0_x7_0_frame_3 : BunkerMat_frame { Position: {-40.5083, 8.56, 44.95}; Box: {1.44, 0.12, 0.3} }
-    barracks_2_w6_0_x7_0_frame_4 : BunkerMat_frame { Position: {-40.5083, 7.44, 44.95}; Box: {1.44, 0.12, 0.3} }
+    barracks_2_w6_0_x7_0_frame_1 : BunkerMat_frame { Position: {-41.1633, 8, 44.95}; Box: {0.13, 1, 0.3} }
+    barracks_2_w6_0_x7_0_frame_2 : BunkerMat_frame { Position: {-39.8533, 8, 44.95}; Box: {0.13, 1, 0.3} }
+    barracks_2_w6_0_x7_0_frame_3 : BunkerMat_frame { Position: {-40.5083, 8.555, 44.95}; Box: {1.44, 0.13, 0.3} }
+    barracks_2_w6_0_x7_0_frame_4 : BunkerMat_frame { Position: {-40.5083, 7.445, 44.95}; Box: {1.44, 0.13, 0.3} }
     barracks_2_w6_0_x7_0_pane_1 : BunkerMat_glass { Position: {-40.5083, 8, 44.95}; Box: {1.2, 1, 0.02} }
 
-    barracks_2_w7_0_x7_0_frame_1 : BunkerMat_frame { Position: {-38.185, 8, 44.95}; Box: {0.12, 1, 0.3} }
-    barracks_2_w7_0_x7_0_frame_2 : BunkerMat_frame { Position: {-36.865, 8, 44.95}; Box: {0.12, 1, 0.3} }
-    barracks_2_w7_0_x7_0_frame_3 : BunkerMat_frame { Position: {-37.525, 8.56, 44.95}; Box: {1.44, 0.12, 0.3} }
-    barracks_2_w7_0_x7_0_frame_4 : BunkerMat_frame { Position: {-37.525, 7.44, 44.95}; Box: {1.44, 0.12, 0.3} }
+    barracks_2_w7_0_x7_0_frame_1 : BunkerMat_frame { Position: {-38.18, 8, 44.95}; Box: {0.13, 1, 0.3} }
+    barracks_2_w7_0_x7_0_frame_2 : BunkerMat_frame { Position: {-36.87, 8, 44.95}; Box: {0.13, 1, 0.3} }
+    barracks_2_w7_0_x7_0_frame_3 : BunkerMat_frame { Position: {-37.525, 8.555, 44.95}; Box: {1.44, 0.13, 0.3} }
+    barracks_2_w7_0_x7_0_frame_4 : BunkerMat_frame { Position: {-37.525, 7.445, 44.95}; Box: {1.44, 0.13, 0.3} }
     barracks_2_w7_0_x7_0_pane_1 : BunkerMat_glass { Position: {-37.525, 8, 44.95}; Box: {1.2, 1, 0.02} }
 
-    barracks_2_w8_0_x7_0_frame_1 : BunkerMat_frame { Position: {-35.2017, 8, 44.95}; Box: {0.12, 1, 0.3} }
-    barracks_2_w8_0_x7_0_frame_2 : BunkerMat_frame { Position: {-33.8817, 8, 44.95}; Box: {0.12, 1, 0.3} }
-    barracks_2_w8_0_x7_0_frame_3 : BunkerMat_frame { Position: {-34.5417, 8.56, 44.95}; Box: {1.44, 0.12, 0.3} }
-    barracks_2_w8_0_x7_0_frame_4 : BunkerMat_frame { Position: {-34.5417, 7.44, 44.95}; Box: {1.44, 0.12, 0.3} }
+    barracks_2_w8_0_x7_0_frame_1 : BunkerMat_frame { Position: {-35.1967, 8, 44.95}; Box: {0.13, 1, 0.3} }
+    barracks_2_w8_0_x7_0_frame_2 : BunkerMat_frame { Position: {-33.8867, 8, 44.95}; Box: {0.13, 1, 0.3} }
+    barracks_2_w8_0_x7_0_frame_3 : BunkerMat_frame { Position: {-34.5417, 8.555, 44.95}; Box: {1.44, 0.13, 0.3} }
+    barracks_2_w8_0_x7_0_frame_4 : BunkerMat_frame { Position: {-34.5417, 7.445, 44.95}; Box: {1.44, 0.13, 0.3} }
     barracks_2_w8_0_x7_0_pane_1 : BunkerMat_glass { Position: {-34.5417, 8, 44.95}; Box: {1.2, 1, 0.02} }
 
-    barracks_2_w8_0_z8_9_frame_1 : BunkerMat_frame { Position: {-33.05, 8, 42.645}; Box: {0.3, 1, 0.12} }
-    barracks_2_w8_0_z8_9_frame_2 : BunkerMat_frame { Position: {-33.05, 8, 43.965}; Box: {0.3, 1, 0.12} }
-    barracks_2_w8_0_z8_9_frame_3 : BunkerMat_frame { Position: {-33.05, 8.56, 43.305}; Box: {0.3, 0.12, 1.44} }
-    barracks_2_w8_0_z8_9_frame_4 : BunkerMat_frame { Position: {-33.05, 7.44, 43.305}; Box: {0.3, 0.12, 1.44} }
+    barracks_2_w8_0_z8_9_frame_1 : BunkerMat_frame { Position: {-33.05, 8, 42.65}; Box: {0.3, 1, 0.13} }
+    barracks_2_w8_0_z8_9_frame_2 : BunkerMat_frame { Position: {-33.05, 8, 43.96}; Box: {0.3, 1, 0.13} }
+    barracks_2_w8_0_z8_9_frame_3 : BunkerMat_frame { Position: {-33.05, 8.555, 43.305}; Box: {0.3, 0.13, 1.44} }
+    barracks_2_w8_0_z8_9_frame_4 : BunkerMat_frame { Position: {-33.05, 7.445, 43.305}; Box: {0.3, 0.13, 1.44} }
     barracks_2_w8_0_z8_9_pane_1 : BunkerMat_glass { Position: {-33.05, 8, 43.305}; Box: {0.02, 1, 1.2} }
 
-    barracks_2_w9_0_x_7_0_frame_1 : BunkerMat_frame { Position: {-50.1183, 8, 31.05}; Box: {0.12, 1, 0.3} }
-    barracks_2_w9_0_x_7_0_frame_2 : BunkerMat_frame { Position: {-48.7983, 8, 31.05}; Box: {0.12, 1, 0.3} }
-    barracks_2_w9_0_x_7_0_frame_3 : BunkerMat_frame { Position: {-49.4583, 8.56, 31.05}; Box: {1.44, 0.12, 0.3} }
-    barracks_2_w9_0_x_7_0_frame_4 : BunkerMat_frame { Position: {-49.4583, 7.44, 31.05}; Box: {1.44, 0.12, 0.3} }
+    barracks_2_w9_0_x_7_0_frame_1 : BunkerMat_frame { Position: {-50.1133, 8, 31.05}; Box: {0.13, 1, 0.3} }
+    barracks_2_w9_0_x_7_0_frame_2 : BunkerMat_frame { Position: {-48.8033, 8, 31.05}; Box: {0.13, 1, 0.3} }
+    barracks_2_w9_0_x_7_0_frame_3 : BunkerMat_frame { Position: {-49.4583, 8.555, 31.05}; Box: {1.44, 0.13, 0.3} }
+    barracks_2_w9_0_x_7_0_frame_4 : BunkerMat_frame { Position: {-49.4583, 7.445, 31.05}; Box: {1.44, 0.13, 0.3} }
     barracks_2_w9_0_x_7_0_pane_1 : BunkerMat_glass { Position: {-49.4583, 8, 31.05}; Box: {1.2, 1, 0.02} }
 
-    barracks_2_w9_0_z_8_9_frame_1 : BunkerMat_frame { Position: {-50.95, 8, 32.035}; Box: {0.3, 1, 0.12} }
-    barracks_2_w9_0_z_8_9_frame_2 : BunkerMat_frame { Position: {-50.95, 8, 33.355}; Box: {0.3, 1, 0.12} }
-    barracks_2_w9_0_z_8_9_frame_3 : BunkerMat_frame { Position: {-50.95, 8.56, 32.695}; Box: {0.3, 0.12, 1.44} }
-    barracks_2_w9_0_z_8_9_frame_4 : BunkerMat_frame { Position: {-50.95, 7.44, 32.695}; Box: {0.3, 0.12, 1.44} }
+    barracks_2_w9_0_z_8_9_frame_1 : BunkerMat_frame { Position: {-50.95, 8, 32.04}; Box: {0.3, 1, 0.13} }
+    barracks_2_w9_0_z_8_9_frame_2 : BunkerMat_frame { Position: {-50.95, 8, 33.35}; Box: {0.3, 1, 0.13} }
+    barracks_2_w9_0_z_8_9_frame_3 : BunkerMat_frame { Position: {-50.95, 8.555, 32.695}; Box: {0.3, 0.13, 1.44} }
+    barracks_2_w9_0_z_8_9_frame_4 : BunkerMat_frame { Position: {-50.95, 7.445, 32.695}; Box: {0.3, 0.13, 1.44} }
     barracks_2_w9_0_z_8_9_pane_1 : BunkerMat_glass { Position: {-50.95, 8, 32.695}; Box: {0.02, 1, 1.2} }
 
-    barracks_2_w10_0_x_7_0_frame_1 : BunkerMat_frame { Position: {-47.135, 8, 31.05}; Box: {0.12, 1, 0.3} }
-    barracks_2_w10_0_x_7_0_frame_2 : BunkerMat_frame { Position: {-45.815, 8, 31.05}; Box: {0.12, 1, 0.3} }
-    barracks_2_w10_0_x_7_0_frame_3 : BunkerMat_frame { Position: {-46.475, 8.56, 31.05}; Box: {1.44, 0.12, 0.3} }
-    barracks_2_w10_0_x_7_0_frame_4 : BunkerMat_frame { Position: {-46.475, 7.44, 31.05}; Box: {1.44, 0.12, 0.3} }
+    barracks_2_w10_0_x_7_0_frame_1 : BunkerMat_frame { Position: {-47.13, 8, 31.05}; Box: {0.13, 1, 0.3} }
+    barracks_2_w10_0_x_7_0_frame_2 : BunkerMat_frame { Position: {-45.82, 8, 31.05}; Box: {0.13, 1, 0.3} }
+    barracks_2_w10_0_x_7_0_frame_3 : BunkerMat_frame { Position: {-46.475, 8.555, 31.05}; Box: {1.44, 0.13, 0.3} }
+    barracks_2_w10_0_x_7_0_frame_4 : BunkerMat_frame { Position: {-46.475, 7.445, 31.05}; Box: {1.44, 0.13, 0.3} }
     barracks_2_w10_0_x_7_0_pane_1 : BunkerMat_glass { Position: {-46.475, 8, 31.05}; Box: {1.2, 1, 0.02} }
 
-    barracks_2_w11_0_x_7_0_frame_1 : BunkerMat_frame { Position: {-44.1517, 8, 31.05}; Box: {0.12, 1, 0.3} }
-    barracks_2_w11_0_x_7_0_frame_2 : BunkerMat_frame { Position: {-42.8317, 8, 31.05}; Box: {0.12, 1, 0.3} }
-    barracks_2_w11_0_x_7_0_frame_3 : BunkerMat_frame { Position: {-43.4917, 8.56, 31.05}; Box: {1.44, 0.12, 0.3} }
-    barracks_2_w11_0_x_7_0_frame_4 : BunkerMat_frame { Position: {-43.4917, 7.44, 31.05}; Box: {1.44, 0.12, 0.3} }
+    barracks_2_w11_0_x_7_0_frame_1 : BunkerMat_frame { Position: {-44.1467, 8, 31.05}; Box: {0.13, 1, 0.3} }
+    barracks_2_w11_0_x_7_0_frame_2 : BunkerMat_frame { Position: {-42.8367, 8, 31.05}; Box: {0.13, 1, 0.3} }
+    barracks_2_w11_0_x_7_0_frame_3 : BunkerMat_frame { Position: {-43.4917, 8.555, 31.05}; Box: {1.44, 0.13, 0.3} }
+    barracks_2_w11_0_x_7_0_frame_4 : BunkerMat_frame { Position: {-43.4917, 7.445, 31.05}; Box: {1.44, 0.13, 0.3} }
     barracks_2_w11_0_x_7_0_pane_1 : BunkerMat_glass { Position: {-43.4917, 8, 31.05}; Box: {1.2, 1, 0.02} }
 
-    barracks_2_w12_0_x_7_0_frame_1 : BunkerMat_frame { Position: {-41.1683, 8, 31.05}; Box: {0.12, 1, 0.3} }
-    barracks_2_w12_0_x_7_0_frame_2 : BunkerMat_frame { Position: {-39.8483, 8, 31.05}; Box: {0.12, 1, 0.3} }
-    barracks_2_w12_0_x_7_0_frame_3 : BunkerMat_frame { Position: {-40.5083, 8.56, 31.05}; Box: {1.44, 0.12, 0.3} }
-    barracks_2_w12_0_x_7_0_frame_4 : BunkerMat_frame { Position: {-40.5083, 7.44, 31.05}; Box: {1.44, 0.12, 0.3} }
+    barracks_2_w12_0_x_7_0_frame_1 : BunkerMat_frame { Position: {-41.1633, 8, 31.05}; Box: {0.13, 1, 0.3} }
+    barracks_2_w12_0_x_7_0_frame_2 : BunkerMat_frame { Position: {-39.8533, 8, 31.05}; Box: {0.13, 1, 0.3} }
+    barracks_2_w12_0_x_7_0_frame_3 : BunkerMat_frame { Position: {-40.5083, 8.555, 31.05}; Box: {1.44, 0.13, 0.3} }
+    barracks_2_w12_0_x_7_0_frame_4 : BunkerMat_frame { Position: {-40.5083, 7.445, 31.05}; Box: {1.44, 0.13, 0.3} }
     barracks_2_w12_0_x_7_0_pane_1 : BunkerMat_glass { Position: {-40.5083, 8, 31.05}; Box: {1.2, 1, 0.02} }
 
-    barracks_2_w13_0_x_7_0_frame_1 : BunkerMat_frame { Position: {-38.185, 8, 31.05}; Box: {0.12, 1, 0.3} }
-    barracks_2_w13_0_x_7_0_frame_2 : BunkerMat_frame { Position: {-36.865, 8, 31.05}; Box: {0.12, 1, 0.3} }
-    barracks_2_w13_0_x_7_0_frame_3 : BunkerMat_frame { Position: {-37.525, 8.56, 31.05}; Box: {1.44, 0.12, 0.3} }
-    barracks_2_w13_0_x_7_0_frame_4 : BunkerMat_frame { Position: {-37.525, 7.44, 31.05}; Box: {1.44, 0.12, 0.3} }
+    barracks_2_w13_0_x_7_0_frame_1 : BunkerMat_frame { Position: {-38.18, 8, 31.05}; Box: {0.13, 1, 0.3} }
+    barracks_2_w13_0_x_7_0_frame_2 : BunkerMat_frame { Position: {-36.87, 8, 31.05}; Box: {0.13, 1, 0.3} }
+    barracks_2_w13_0_x_7_0_frame_3 : BunkerMat_frame { Position: {-37.525, 8.555, 31.05}; Box: {1.44, 0.13, 0.3} }
+    barracks_2_w13_0_x_7_0_frame_4 : BunkerMat_frame { Position: {-37.525, 7.445, 31.05}; Box: {1.44, 0.13, 0.3} }
     barracks_2_w13_0_x_7_0_pane_1 : BunkerMat_glass { Position: {-37.525, 8, 31.05}; Box: {1.2, 1, 0.02} }
 
-    barracks_2_w14_0_x_7_0_frame_1 : BunkerMat_frame { Position: {-35.2017, 8, 31.05}; Box: {0.12, 1, 0.3} }
-    barracks_2_w14_0_x_7_0_frame_2 : BunkerMat_frame { Position: {-33.8817, 8, 31.05}; Box: {0.12, 1, 0.3} }
-    barracks_2_w14_0_x_7_0_frame_3 : BunkerMat_frame { Position: {-34.5417, 8.56, 31.05}; Box: {1.44, 0.12, 0.3} }
-    barracks_2_w14_0_x_7_0_frame_4 : BunkerMat_frame { Position: {-34.5417, 7.44, 31.05}; Box: {1.44, 0.12, 0.3} }
+    barracks_2_w14_0_x_7_0_frame_1 : BunkerMat_frame { Position: {-35.1967, 8, 31.05}; Box: {0.13, 1, 0.3} }
+    barracks_2_w14_0_x_7_0_frame_2 : BunkerMat_frame { Position: {-33.8867, 8, 31.05}; Box: {0.13, 1, 0.3} }
+    barracks_2_w14_0_x_7_0_frame_3 : BunkerMat_frame { Position: {-34.5417, 8.555, 31.05}; Box: {1.44, 0.13, 0.3} }
+    barracks_2_w14_0_x_7_0_frame_4 : BunkerMat_frame { Position: {-34.5417, 7.445, 31.05}; Box: {1.44, 0.13, 0.3} }
     barracks_2_w14_0_x_7_0_pane_1 : BunkerMat_glass { Position: {-34.5417, 8, 31.05}; Box: {1.2, 1, 0.02} }
 
-    barracks_2_w14_0_z8_9_frame_1 : BunkerMat_frame { Position: {-33.05, 8, 32.035}; Box: {0.3, 1, 0.12} }
-    barracks_2_w14_0_z8_9_frame_2 : BunkerMat_frame { Position: {-33.05, 8, 33.355}; Box: {0.3, 1, 0.12} }
-    barracks_2_w14_0_z8_9_frame_3 : BunkerMat_frame { Position: {-33.05, 8.56, 32.695}; Box: {0.3, 0.12, 1.44} }
-    barracks_2_w14_0_z8_9_frame_4 : BunkerMat_frame { Position: {-33.05, 7.44, 32.695}; Box: {0.3, 0.12, 1.44} }
+    barracks_2_w14_0_z8_9_frame_1 : BunkerMat_frame { Position: {-33.05, 8, 32.04}; Box: {0.3, 1, 0.13} }
+    barracks_2_w14_0_z8_9_frame_2 : BunkerMat_frame { Position: {-33.05, 8, 33.35}; Box: {0.3, 1, 0.13} }
+    barracks_2_w14_0_z8_9_frame_3 : BunkerMat_frame { Position: {-33.05, 8.555, 32.695}; Box: {0.3, 0.13, 1.44} }
+    barracks_2_w14_0_z8_9_frame_4 : BunkerMat_frame { Position: {-33.05, 7.445, 32.695}; Box: {0.3, 0.13, 1.44} }
     barracks_2_w14_0_z8_9_pane_1 : BunkerMat_glass { Position: {-33.05, 8, 32.695}; Box: {0.02, 1, 1.2} }
 
-    barracks_2_w15_0_z8_9_frame_1 : BunkerMat_frame { Position: {-33.05, 8, 35.51}; Box: {0.3, 1, 0.12} }
-    barracks_2_w15_0_z8_9_frame_2 : BunkerMat_frame { Position: {-33.05, 8, 36.83}; Box: {0.3, 1, 0.12} }
-    barracks_2_w15_0_z8_9_frame_3 : BunkerMat_frame { Position: {-33.05, 8.56, 36.17}; Box: {0.3, 0.12, 1.44} }
-    barracks_2_w15_0_z8_9_frame_4 : BunkerMat_frame { Position: {-33.05, 7.44, 36.17}; Box: {0.3, 0.12, 1.44} }
+    barracks_2_w15_0_z8_9_frame_1 : BunkerMat_frame { Position: {-33.05, 8, 35.515}; Box: {0.3, 1, 0.13} }
+    barracks_2_w15_0_z8_9_frame_2 : BunkerMat_frame { Position: {-33.05, 8, 36.825}; Box: {0.3, 1, 0.13} }
+    barracks_2_w15_0_z8_9_frame_3 : BunkerMat_frame { Position: {-33.05, 8.555, 36.17}; Box: {0.3, 0.13, 1.44} }
+    barracks_2_w15_0_z8_9_frame_4 : BunkerMat_frame { Position: {-33.05, 7.445, 36.17}; Box: {0.3, 0.13, 1.44} }
     barracks_2_w15_0_z8_9_pane_1 : BunkerMat_glass { Position: {-33.05, 8, 36.17}; Box: {0.02, 1, 1.2} }
 
-    barracks_2_w16_0_z8_9_frame_1 : BunkerMat_frame { Position: {-33.05, 8, 39.17}; Box: {0.3, 1, 0.12} }
-    barracks_2_w16_0_z8_9_frame_2 : BunkerMat_frame { Position: {-33.05, 8, 40.49}; Box: {0.3, 1, 0.12} }
-    barracks_2_w16_0_z8_9_frame_3 : BunkerMat_frame { Position: {-33.05, 8.56, 39.83}; Box: {0.3, 0.12, 1.44} }
-    barracks_2_w16_0_z8_9_frame_4 : BunkerMat_frame { Position: {-33.05, 7.44, 39.83}; Box: {0.3, 0.12, 1.44} }
+    barracks_2_w16_0_z8_9_frame_1 : BunkerMat_frame { Position: {-33.05, 8, 39.175}; Box: {0.3, 1, 0.13} }
+    barracks_2_w16_0_z8_9_frame_2 : BunkerMat_frame { Position: {-33.05, 8, 40.485}; Box: {0.3, 1, 0.13} }
+    barracks_2_w16_0_z8_9_frame_3 : BunkerMat_frame { Position: {-33.05, 8.555, 39.83}; Box: {0.3, 0.13, 1.44} }
+    barracks_2_w16_0_z8_9_frame_4 : BunkerMat_frame { Position: {-33.05, 7.445, 39.83}; Box: {0.3, 0.13, 1.44} }
     barracks_2_w16_0_z8_9_pane_1 : BunkerMat_glass { Position: {-33.05, 8, 39.83}; Box: {0.02, 1, 1.2} }
 
-    barracks_2_w17_0_z_8_9_frame_1 : BunkerMat_frame { Position: {-50.95, 8, 35.51}; Box: {0.3, 1, 0.12} }
-    barracks_2_w17_0_z_8_9_frame_2 : BunkerMat_frame { Position: {-50.95, 8, 36.83}; Box: {0.3, 1, 0.12} }
-    barracks_2_w17_0_z_8_9_frame_3 : BunkerMat_frame { Position: {-50.95, 8.56, 36.17}; Box: {0.3, 0.12, 1.44} }
-    barracks_2_w17_0_z_8_9_frame_4 : BunkerMat_frame { Position: {-50.95, 7.44, 36.17}; Box: {0.3, 0.12, 1.44} }
+    barracks_2_w17_0_z_8_9_frame_1 : BunkerMat_frame { Position: {-50.95, 8, 35.515}; Box: {0.3, 1, 0.13} }
+    barracks_2_w17_0_z_8_9_frame_2 : BunkerMat_frame { Position: {-50.95, 8, 36.825}; Box: {0.3, 1, 0.13} }
+    barracks_2_w17_0_z_8_9_frame_3 : BunkerMat_frame { Position: {-50.95, 8.555, 36.17}; Box: {0.3, 0.13, 1.44} }
+    barracks_2_w17_0_z_8_9_frame_4 : BunkerMat_frame { Position: {-50.95, 7.445, 36.17}; Box: {0.3, 0.13, 1.44} }
     barracks_2_w17_0_z_8_9_pane_1 : BunkerMat_glass { Position: {-50.95, 8, 36.17}; Box: {0.02, 1, 1.2} }
 
-    barracks_2_w18_0_z_8_9_frame_1 : BunkerMat_frame { Position: {-50.95, 8, 39.17}; Box: {0.3, 1, 0.12} }
-    barracks_2_w18_0_z_8_9_frame_2 : BunkerMat_frame { Position: {-50.95, 8, 40.49}; Box: {0.3, 1, 0.12} }
-    barracks_2_w18_0_z_8_9_frame_3 : BunkerMat_frame { Position: {-50.95, 8.56, 39.83}; Box: {0.3, 0.12, 1.44} }
-    barracks_2_w18_0_z_8_9_frame_4 : BunkerMat_frame { Position: {-50.95, 7.44, 39.83}; Box: {0.3, 0.12, 1.44} }
+    barracks_2_w18_0_z_8_9_frame_1 : BunkerMat_frame { Position: {-50.95, 8, 39.175}; Box: {0.3, 1, 0.13} }
+    barracks_2_w18_0_z_8_9_frame_2 : BunkerMat_frame { Position: {-50.95, 8, 40.485}; Box: {0.3, 1, 0.13} }
+    barracks_2_w18_0_z_8_9_frame_3 : BunkerMat_frame { Position: {-50.95, 8.555, 39.83}; Box: {0.3, 0.13, 1.44} }
+    barracks_2_w18_0_z_8_9_frame_4 : BunkerMat_frame { Position: {-50.95, 7.445, 39.83}; Box: {0.3, 0.13, 1.44} }
     barracks_2_w18_0_z_8_9_pane_1 : BunkerMat_glass { Position: {-50.95, 8, 39.83}; Box: {0.02, 1, 1.2} }
 
-    barracks_2_p0_2_frame_1 : BunkerMat_frame { Position: {-43.41, 7.475, 35.74}; Box: {0.12, 2.15, 0.3} }
-    barracks_2_p0_2_frame_2 : BunkerMat_frame { Position: {-42.19, 7.475, 35.74}; Box: {0.12, 2.15, 0.3} }
-    barracks_2_p0_2_frame_3 : BunkerMat_frame { Position: {-42.8, 8.61, 35.74}; Box: {1.34, 0.12, 0.3} }
+    barracks_2_p0_2_frame_1 : BunkerMat_frame { Position: {-43.405, 7.475, 35.74}; Box: {0.13, 2.15, 0.3} }
+    barracks_2_p0_2_frame_2 : BunkerMat_frame { Position: {-42.195, 7.475, 35.74}; Box: {0.13, 2.15, 0.3} }
+    barracks_2_p0_2_frame_3 : BunkerMat_frame { Position: {-42.8, 8.605, 35.74}; Box: {1.34, 0.13, 0.3} }
 
-    barracks_2_p5_2_frame_1 : BunkerMat_frame { Position: {-43.4017, 7.475, 41.66}; Box: {0.12, 2.15, 0.3} }
-    barracks_2_p5_2_frame_2 : BunkerMat_frame { Position: {-42.3817, 7.475, 41.66}; Box: {0.12, 2.15, 0.3} }
-    barracks_2_p5_2_frame_3 : BunkerMat_frame { Position: {-42.8917, 8.61, 41.66}; Box: {1.14, 0.12, 0.3} }
+    barracks_2_p5_2_frame_1 : BunkerMat_frame { Position: {-43.3967, 7.475, 41.66}; Box: {0.13, 2.15, 0.3} }
+    barracks_2_p5_2_frame_2 : BunkerMat_frame { Position: {-42.3867, 7.475, 41.66}; Box: {0.13, 2.15, 0.3} }
+    barracks_2_p5_2_frame_3 : BunkerMat_frame { Position: {-42.8917, 8.605, 41.66}; Box: {1.14, 0.13, 0.3} }
 
-    barracks_2_p6_2_frame_1 : BunkerMat_frame { Position: {-41.6183, 7.475, 41.66}; Box: {0.12, 2.15, 0.3} }
-    barracks_2_p6_2_frame_2 : BunkerMat_frame { Position: {-40.5983, 7.475, 41.66}; Box: {0.12, 2.15, 0.3} }
-    barracks_2_p6_2_frame_3 : BunkerMat_frame { Position: {-41.1083, 8.61, 41.66}; Box: {1.14, 0.12, 0.3} }
+    barracks_2_p6_2_frame_1 : BunkerMat_frame { Position: {-41.6133, 7.475, 41.66}; Box: {0.13, 2.15, 0.3} }
+    barracks_2_p6_2_frame_2 : BunkerMat_frame { Position: {-40.6033, 7.475, 41.66}; Box: {0.13, 2.15, 0.3} }
+    barracks_2_p6_2_frame_3 : BunkerMat_frame { Position: {-41.1083, 8.605, 41.66}; Box: {1.14, 0.13, 0.3} }
 
-    barracks_2_p11_2_frame_1 : BunkerMat_frame { Position: {-43.4017, 7.475, 34.34}; Box: {0.12, 2.15, 0.3} }
-    barracks_2_p11_2_frame_2 : BunkerMat_frame { Position: {-42.3817, 7.475, 34.34}; Box: {0.12, 2.15, 0.3} }
-    barracks_2_p11_2_frame_3 : BunkerMat_frame { Position: {-42.8917, 8.61, 34.34}; Box: {1.14, 0.12, 0.3} }
+    barracks_2_p11_2_frame_1 : BunkerMat_frame { Position: {-43.3967, 7.475, 34.34}; Box: {0.13, 2.15, 0.3} }
+    barracks_2_p11_2_frame_2 : BunkerMat_frame { Position: {-42.3867, 7.475, 34.34}; Box: {0.13, 2.15, 0.3} }
+    barracks_2_p11_2_frame_3 : BunkerMat_frame { Position: {-42.8917, 8.605, 34.34}; Box: {1.14, 0.13, 0.3} }
 
-    barracks_2_p12_2_frame_1 : BunkerMat_frame { Position: {-41.6183, 7.475, 34.34}; Box: {0.12, 2.15, 0.3} }
-    barracks_2_p12_2_frame_2 : BunkerMat_frame { Position: {-40.5983, 7.475, 34.34}; Box: {0.12, 2.15, 0.3} }
-    barracks_2_p12_2_frame_3 : BunkerMat_frame { Position: {-41.1083, 8.61, 34.34}; Box: {1.14, 0.12, 0.3} }
+    barracks_2_p12_2_frame_1 : BunkerMat_frame { Position: {-41.6133, 7.475, 34.34}; Box: {0.13, 2.15, 0.3} }
+    barracks_2_p12_2_frame_2 : BunkerMat_frame { Position: {-40.6033, 7.475, 34.34}; Box: {0.13, 2.15, 0.3} }
+    barracks_2_p12_2_frame_3 : BunkerMat_frame { Position: {-41.1083, 8.605, 34.34}; Box: {1.14, 0.13, 0.3} }
 
-    barracks_2_p15_2_frame_1 : BunkerMat_frame { Position: {-38.7, 7.475, 36.36}; Box: {0.3, 2.15, 0.12} }
-    barracks_2_p15_2_frame_2 : BunkerMat_frame { Position: {-38.7, 7.475, 37.38}; Box: {0.3, 2.15, 0.12} }
-    barracks_2_p15_2_frame_3 : BunkerMat_frame { Position: {-38.7, 8.61, 36.87}; Box: {0.3, 0.12, 1.14} }
+    barracks_2_p15_2_frame_1 : BunkerMat_frame { Position: {-38.7, 7.475, 36.365}; Box: {0.3, 2.15, 0.13} }
+    barracks_2_p15_2_frame_2 : BunkerMat_frame { Position: {-38.7, 7.475, 37.375}; Box: {0.3, 2.15, 0.13} }
+    barracks_2_p15_2_frame_3 : BunkerMat_frame { Position: {-38.7, 8.605, 36.87}; Box: {0.3, 0.13, 1.14} }
 
-    barracks_2_p16_2_frame_1 : BunkerMat_frame { Position: {-38.7, 7.475, 38.62}; Box: {0.3, 2.15, 0.12} }
-    barracks_2_p16_2_frame_2 : BunkerMat_frame { Position: {-38.7, 7.475, 39.64}; Box: {0.3, 2.15, 0.12} }
-    barracks_2_p16_2_frame_3 : BunkerMat_frame { Position: {-38.7, 8.61, 39.13}; Box: {0.3, 0.12, 1.14} }
+    barracks_2_p16_2_frame_1 : BunkerMat_frame { Position: {-38.7, 7.475, 38.625}; Box: {0.3, 2.15, 0.13} }
+    barracks_2_p16_2_frame_2 : BunkerMat_frame { Position: {-38.7, 7.475, 39.635}; Box: {0.3, 2.15, 0.13} }
+    barracks_2_p16_2_frame_3 : BunkerMat_frame { Position: {-38.7, 8.605, 39.13}; Box: {0.3, 0.13, 1.14} }
 
-    barracks_2_p17_2_frame_1 : BunkerMat_frame { Position: {-45.3, 7.475, 36.36}; Box: {0.3, 2.15, 0.12} }
-    barracks_2_p17_2_frame_2 : BunkerMat_frame { Position: {-45.3, 7.475, 37.38}; Box: {0.3, 2.15, 0.12} }
-    barracks_2_p17_2_frame_3 : BunkerMat_frame { Position: {-45.3, 8.61, 36.87}; Box: {0.3, 0.12, 1.14} }
+    barracks_2_p17_2_frame_1 : BunkerMat_frame { Position: {-45.3, 7.475, 36.365}; Box: {0.3, 2.15, 0.13} }
+    barracks_2_p17_2_frame_2 : BunkerMat_frame { Position: {-45.3, 7.475, 37.375}; Box: {0.3, 2.15, 0.13} }
+    barracks_2_p17_2_frame_3 : BunkerMat_frame { Position: {-45.3, 8.605, 36.87}; Box: {0.3, 0.13, 1.14} }
 
-    barracks_2_p18_2_frame_1 : BunkerMat_frame { Position: {-45.3, 7.475, 38.62}; Box: {0.3, 2.15, 0.12} }
-    barracks_2_p18_2_frame_2 : BunkerMat_frame { Position: {-45.3, 7.475, 39.64}; Box: {0.3, 2.15, 0.12} }
-    barracks_2_p18_2_frame_3 : BunkerMat_frame { Position: {-45.3, 8.61, 39.13}; Box: {0.3, 0.12, 1.14} }
+    barracks_2_p18_2_frame_1 : BunkerMat_frame { Position: {-45.3, 7.475, 38.625}; Box: {0.3, 2.15, 0.13} }
+    barracks_2_p18_2_frame_2 : BunkerMat_frame { Position: {-45.3, 7.475, 39.635}; Box: {0.3, 2.15, 0.13} }
+    barracks_2_p18_2_frame_3 : BunkerMat_frame { Position: {-45.3, 8.605, 39.13}; Box: {0.3, 0.13, 1.14} }
 
-    barracks_2_p3_18_frame_1 : BunkerMat_frame { Position: {-49.9683, 7.475, 41.66}; Box: {0.12, 2.15, 0.3} }
-    barracks_2_p3_18_frame_2 : BunkerMat_frame { Position: {-48.9483, 7.475, 41.66}; Box: {0.12, 2.15, 0.3} }
-    barracks_2_p3_18_frame_3 : BunkerMat_frame { Position: {-49.4583, 8.61, 41.66}; Box: {1.14, 0.12, 0.3} }
+    barracks_2_p3_18_frame_1 : BunkerMat_frame { Position: {-49.9633, 7.475, 41.66}; Box: {0.13, 2.15, 0.3} }
+    barracks_2_p3_18_frame_2 : BunkerMat_frame { Position: {-48.9533, 7.475, 41.66}; Box: {0.13, 2.15, 0.3} }
+    barracks_2_p3_18_frame_3 : BunkerMat_frame { Position: {-49.4583, 8.605, 41.66}; Box: {1.14, 0.13, 0.3} }
 
-    barracks_2_p4_5_frame_1 : BunkerMat_frame { Position: {-44.9833, 7.475, 42.795}; Box: {0.3, 2.15, 0.12} }
-    barracks_2_p4_5_frame_2 : BunkerMat_frame { Position: {-44.9833, 7.475, 43.815}; Box: {0.3, 2.15, 0.12} }
-    barracks_2_p4_5_frame_3 : BunkerMat_frame { Position: {-44.9833, 8.61, 43.305}; Box: {0.3, 0.12, 1.14} }
+    barracks_2_p4_5_frame_1 : BunkerMat_frame { Position: {-44.9833, 7.475, 42.8}; Box: {0.3, 2.15, 0.13} }
+    barracks_2_p4_5_frame_2 : BunkerMat_frame { Position: {-44.9833, 7.475, 43.81}; Box: {0.3, 2.15, 0.13} }
+    barracks_2_p4_5_frame_3 : BunkerMat_frame { Position: {-44.9833, 8.605, 43.305}; Box: {0.3, 0.13, 1.14} }
 
-    barracks_2_p7_6_frame_1 : BunkerMat_frame { Position: {-39.0167, 7.475, 42.795}; Box: {0.3, 2.15, 0.12} }
-    barracks_2_p7_6_frame_2 : BunkerMat_frame { Position: {-39.0167, 7.475, 43.815}; Box: {0.3, 2.15, 0.12} }
-    barracks_2_p7_6_frame_3 : BunkerMat_frame { Position: {-39.0167, 8.61, 43.305}; Box: {0.3, 0.12, 1.14} }
+    barracks_2_p7_6_frame_1 : BunkerMat_frame { Position: {-39.0167, 7.475, 42.8}; Box: {0.3, 2.15, 0.13} }
+    barracks_2_p7_6_frame_2 : BunkerMat_frame { Position: {-39.0167, 7.475, 43.81}; Box: {0.3, 2.15, 0.13} }
+    barracks_2_p7_6_frame_3 : BunkerMat_frame { Position: {-39.0167, 8.605, 43.305}; Box: {0.3, 0.13, 1.14} }
 
-    barracks_2_p8_16_frame_1 : BunkerMat_frame { Position: {-35.0517, 7.475, 41.66}; Box: {0.12, 2.15, 0.3} }
-    barracks_2_p8_16_frame_2 : BunkerMat_frame { Position: {-34.0317, 7.475, 41.66}; Box: {0.12, 2.15, 0.3} }
-    barracks_2_p8_16_frame_3 : BunkerMat_frame { Position: {-34.5417, 8.61, 41.66}; Box: {1.14, 0.12, 0.3} }
+    barracks_2_p8_16_frame_1 : BunkerMat_frame { Position: {-35.0467, 7.475, 41.66}; Box: {0.13, 2.15, 0.3} }
+    barracks_2_p8_16_frame_2 : BunkerMat_frame { Position: {-34.0367, 7.475, 41.66}; Box: {0.13, 2.15, 0.3} }
+    barracks_2_p8_16_frame_3 : BunkerMat_frame { Position: {-34.5417, 8.605, 41.66}; Box: {1.14, 0.13, 0.3} }
 
-    barracks_2_p9_17_frame_1 : BunkerMat_frame { Position: {-49.9683, 7.475, 34.34}; Box: {0.12, 2.15, 0.3} }
-    barracks_2_p9_17_frame_2 : BunkerMat_frame { Position: {-48.9483, 7.475, 34.34}; Box: {0.12, 2.15, 0.3} }
-    barracks_2_p9_17_frame_3 : BunkerMat_frame { Position: {-49.4583, 8.61, 34.34}; Box: {1.14, 0.12, 0.3} }
+    barracks_2_p9_17_frame_1 : BunkerMat_frame { Position: {-49.9633, 7.475, 34.34}; Box: {0.13, 2.15, 0.3} }
+    barracks_2_p9_17_frame_2 : BunkerMat_frame { Position: {-48.9533, 7.475, 34.34}; Box: {0.13, 2.15, 0.3} }
+    barracks_2_p9_17_frame_3 : BunkerMat_frame { Position: {-49.4583, 8.605, 34.34}; Box: {1.14, 0.13, 0.3} }
 
-    barracks_2_p10_11_frame_1 : BunkerMat_frame { Position: {-44.9833, 7.475, 32.185}; Box: {0.3, 2.15, 0.12} }
-    barracks_2_p10_11_frame_2 : BunkerMat_frame { Position: {-44.9833, 7.475, 33.205}; Box: {0.3, 2.15, 0.12} }
-    barracks_2_p10_11_frame_3 : BunkerMat_frame { Position: {-44.9833, 8.61, 32.695}; Box: {0.3, 0.12, 1.14} }
+    barracks_2_p10_11_frame_1 : BunkerMat_frame { Position: {-44.9833, 7.475, 32.19}; Box: {0.3, 2.15, 0.13} }
+    barracks_2_p10_11_frame_2 : BunkerMat_frame { Position: {-44.9833, 7.475, 33.2}; Box: {0.3, 2.15, 0.13} }
+    barracks_2_p10_11_frame_3 : BunkerMat_frame { Position: {-44.9833, 8.605, 32.695}; Box: {0.3, 0.13, 1.14} }
 
-    barracks_2_p13_12_frame_1 : BunkerMat_frame { Position: {-39.0167, 7.475, 32.185}; Box: {0.3, 2.15, 0.12} }
-    barracks_2_p13_12_frame_2 : BunkerMat_frame { Position: {-39.0167, 7.475, 33.205}; Box: {0.3, 2.15, 0.12} }
-    barracks_2_p13_12_frame_3 : BunkerMat_frame { Position: {-39.0167, 8.61, 32.695}; Box: {0.3, 0.12, 1.14} }
+    barracks_2_p13_12_frame_1 : BunkerMat_frame { Position: {-39.0167, 7.475, 32.19}; Box: {0.3, 2.15, 0.13} }
+    barracks_2_p13_12_frame_2 : BunkerMat_frame { Position: {-39.0167, 7.475, 33.2}; Box: {0.3, 2.15, 0.13} }
+    barracks_2_p13_12_frame_3 : BunkerMat_frame { Position: {-39.0167, 8.605, 32.695}; Box: {0.3, 0.13, 1.14} }
 
-    barracks_2_p14_15_frame_1 : BunkerMat_frame { Position: {-35.0517, 7.475, 34.34}; Box: {0.12, 2.15, 0.3} }
-    barracks_2_p14_15_frame_2 : BunkerMat_frame { Position: {-34.0317, 7.475, 34.34}; Box: {0.12, 2.15, 0.3} }
-    barracks_2_p14_15_frame_3 : BunkerMat_frame { Position: {-34.5417, 8.61, 34.34}; Box: {1.14, 0.12, 0.3} }
+    barracks_2_p14_15_frame_1 : BunkerMat_frame { Position: {-35.0467, 7.475, 34.34}; Box: {0.13, 2.15, 0.3} }
+    barracks_2_p14_15_frame_2 : BunkerMat_frame { Position: {-34.0367, 7.475, 34.34}; Box: {0.13, 2.15, 0.3} }
+    barracks_2_p14_15_frame_3 : BunkerMat_frame { Position: {-34.5417, 8.605, 34.34}; Box: {1.14, 0.13, 0.3} }
 
 
 
@@ -2973,324 +2973,324 @@ freighter {
     deckhouse_stair_floor_1 : BunkerMat_steel { Position: {54.2, 5.025, 38}; Box: {2.2, 0.05, 4.52} }
     deckhouse_stair_ceiling_1 : BunkerMat_shipwhite { Position: {54.2, 10.775, 38}; Box: {2.2, 0.05, 4.52} }
     deckhouse_stair_roof_1 : BunkerMat_shipdeck { Position: {54.2, 10.9, 38}; Box: {2.2, 0.2, 4.52} }
-    p_ship_port_frame_1 : BunkerMat_frame { Position: {51, 6.1, -0.06}; Box: {0.3, 2, 0.12} }
-    p_ship_port_frame_2 : BunkerMat_frame { Position: {51, 6.1, 1.06}; Box: {0.3, 2, 0.12} }
-    p_ship_port_frame_3 : BunkerMat_frame { Position: {51, 7.16, 0.5}; Box: {0.3, 0.12, 1.24} }
-    p_ship_stbd_frame_1 : BunkerMat_frame { Position: {59, 6.1, -0.06}; Box: {0.3, 2, 0.12} }
-    p_ship_stbd_frame_2 : BunkerMat_frame { Position: {59, 6.1, 1.06}; Box: {0.3, 2, 0.12} }
-    p_ship_stbd_frame_3 : BunkerMat_frame { Position: {59, 7.16, 0.5}; Box: {0.3, 0.12, 1.24} }
-    p_ship_fwd_frame_1 : BunkerMat_frame { Position: {54.44, 6.1, 5}; Box: {0.12, 2, 0.3} }
-    p_ship_fwd_frame_2 : BunkerMat_frame { Position: {55.56, 6.1, 5}; Box: {0.12, 2, 0.3} }
-    p_ship_fwd_frame_3 : BunkerMat_frame { Position: {55, 7.16, 5}; Box: {1.24, 0.12, 0.3} }
-    p_ship_porthole_p_frame_1 : BunkerMat_frame { Position: {51, 6.8, -3.36}; Box: {0.3, 0.6, 0.12} }
-    p_ship_porthole_p_frame_2 : BunkerMat_frame { Position: {51, 6.8, -2.64}; Box: {0.3, 0.6, 0.12} }
-    p_ship_porthole_p_frame_3 : BunkerMat_frame { Position: {51, 7.16, -3}; Box: {0.3, 0.12, 0.84} }
-    p_ship_porthole_p_frame_4 : BunkerMat_frame { Position: {51, 6.44, -3}; Box: {0.3, 0.12, 0.84} }
+    p_ship_port_frame_1 : BunkerMat_frame { Position: {51, 6.1, -0.055}; Box: {0.3, 2, 0.13} }
+    p_ship_port_frame_2 : BunkerMat_frame { Position: {51, 6.1, 1.055}; Box: {0.3, 2, 0.13} }
+    p_ship_port_frame_3 : BunkerMat_frame { Position: {51, 7.155, 0.5}; Box: {0.3, 0.13, 1.24} }
+    p_ship_stbd_frame_1 : BunkerMat_frame { Position: {59, 6.1, -0.055}; Box: {0.3, 2, 0.13} }
+    p_ship_stbd_frame_2 : BunkerMat_frame { Position: {59, 6.1, 1.055}; Box: {0.3, 2, 0.13} }
+    p_ship_stbd_frame_3 : BunkerMat_frame { Position: {59, 7.155, 0.5}; Box: {0.3, 0.13, 1.24} }
+    p_ship_fwd_frame_1 : BunkerMat_frame { Position: {54.445, 6.1, 5}; Box: {0.13, 2, 0.3} }
+    p_ship_fwd_frame_2 : BunkerMat_frame { Position: {55.555, 6.1, 5}; Box: {0.13, 2, 0.3} }
+    p_ship_fwd_frame_3 : BunkerMat_frame { Position: {55, 7.155, 5}; Box: {1.24, 0.13, 0.3} }
+    p_ship_porthole_p_frame_1 : BunkerMat_frame { Position: {51, 6.8, -3.355}; Box: {0.3, 0.6, 0.13} }
+    p_ship_porthole_p_frame_2 : BunkerMat_frame { Position: {51, 6.8, -2.645}; Box: {0.3, 0.6, 0.13} }
+    p_ship_porthole_p_frame_3 : BunkerMat_frame { Position: {51, 7.155, -3}; Box: {0.3, 0.13, 0.84} }
+    p_ship_porthole_p_frame_4 : BunkerMat_frame { Position: {51, 6.445, -3}; Box: {0.3, 0.13, 0.84} }
     p_ship_porthole_p_pane_1 : BunkerMat_glass { Position: {51, 6.8, -3}; Box: {0.02, 0.6, 0.6}; Rgb: {128, 153, 153}; Opacity: {0.18} }
-    p_ship_porthole_s_frame_1 : BunkerMat_frame { Position: {59, 6.8, -3.36}; Box: {0.3, 0.6, 0.12} }
-    p_ship_porthole_s_frame_2 : BunkerMat_frame { Position: {59, 6.8, -2.64}; Box: {0.3, 0.6, 0.12} }
-    p_ship_porthole_s_frame_3 : BunkerMat_frame { Position: {59, 7.16, -3}; Box: {0.3, 0.12, 0.84} }
-    p_ship_porthole_s_frame_4 : BunkerMat_frame { Position: {59, 6.44, -3}; Box: {0.3, 0.12, 0.84} }
+    p_ship_porthole_s_frame_1 : BunkerMat_frame { Position: {59, 6.8, -3.355}; Box: {0.3, 0.6, 0.13} }
+    p_ship_porthole_s_frame_2 : BunkerMat_frame { Position: {59, 6.8, -2.645}; Box: {0.3, 0.6, 0.13} }
+    p_ship_porthole_s_frame_3 : BunkerMat_frame { Position: {59, 7.155, -3}; Box: {0.3, 0.13, 0.84} }
+    p_ship_porthole_s_frame_4 : BunkerMat_frame { Position: {59, 6.445, -3}; Box: {0.3, 0.13, 0.84} }
     p_ship_porthole_s_pane_1 : BunkerMat_glass { Position: {59, 6.8, -3}; Box: {0.02, 0.6, 0.6}; Rgb: {128, 153, 153}; Opacity: {0.18} }
-    p_ship_bridge_door_frame_1 : BunkerMat_frame { Position: {58, 9.1, -2.56}; Box: {0.3, 2, 0.12} }
-    p_ship_bridge_door_frame_2 : BunkerMat_frame { Position: {58, 9.1, -1.44}; Box: {0.3, 2, 0.12} }
-    p_ship_bridge_door_frame_3 : BunkerMat_frame { Position: {58, 10.16, -2}; Box: {0.3, 0.12, 1.24} }
-    p_bridge_win_1_frame_1 : BunkerMat_frame { Position: {52.79, 9.7, 3}; Box: {0.12, 0.9, 0.3} }
-    p_bridge_win_1_frame_2 : BunkerMat_frame { Position: {54.21, 9.7, 3}; Box: {0.12, 0.9, 0.3} }
-    p_bridge_win_1_frame_3 : BunkerMat_frame { Position: {53.5, 10.21, 3}; Box: {1.54, 0.12, 0.3} }
-    p_bridge_win_1_frame_4 : BunkerMat_frame { Position: {53.5, 9.19, 3}; Box: {1.54, 0.12, 0.3} }
+    p_ship_bridge_door_frame_1 : BunkerMat_frame { Position: {58, 9.1, -2.555}; Box: {0.3, 2, 0.13} }
+    p_ship_bridge_door_frame_2 : BunkerMat_frame { Position: {58, 9.1, -1.445}; Box: {0.3, 2, 0.13} }
+    p_ship_bridge_door_frame_3 : BunkerMat_frame { Position: {58, 10.155, -2}; Box: {0.3, 0.13, 1.24} }
+    p_bridge_win_1_frame_1 : BunkerMat_frame { Position: {52.795, 9.7, 3}; Box: {0.13, 0.9, 0.3} }
+    p_bridge_win_1_frame_2 : BunkerMat_frame { Position: {54.205, 9.7, 3}; Box: {0.13, 0.9, 0.3} }
+    p_bridge_win_1_frame_3 : BunkerMat_frame { Position: {53.5, 10.205, 3}; Box: {1.54, 0.13, 0.3} }
+    p_bridge_win_1_frame_4 : BunkerMat_frame { Position: {53.5, 9.195, 3}; Box: {1.54, 0.13, 0.3} }
     p_bridge_win_1_pane_1 : BunkerMat_glass { Position: {53.5, 9.7, 3}; Box: {1.3, 0.9, 0.02}; Rgb: {102, 140, 153}; Opacity: {0.12} }
-    p_bridge_win_2_frame_1 : BunkerMat_frame { Position: {54.29, 9.7, 3}; Box: {0.12, 0.9, 0.3} }
-    p_bridge_win_2_frame_2 : BunkerMat_frame { Position: {55.71, 9.7, 3}; Box: {0.12, 0.9, 0.3} }
-    p_bridge_win_2_frame_3 : BunkerMat_frame { Position: {55, 10.21, 3}; Box: {1.54, 0.12, 0.3} }
-    p_bridge_win_2_frame_4 : BunkerMat_frame { Position: {55, 9.19, 3}; Box: {1.54, 0.12, 0.3} }
+    p_bridge_win_2_frame_1 : BunkerMat_frame { Position: {54.295, 9.7, 3}; Box: {0.13, 0.9, 0.3} }
+    p_bridge_win_2_frame_2 : BunkerMat_frame { Position: {55.705, 9.7, 3}; Box: {0.13, 0.9, 0.3} }
+    p_bridge_win_2_frame_3 : BunkerMat_frame { Position: {55, 10.205, 3}; Box: {1.54, 0.13, 0.3} }
+    p_bridge_win_2_frame_4 : BunkerMat_frame { Position: {55, 9.195, 3}; Box: {1.54, 0.13, 0.3} }
     p_bridge_win_2_pane_1 : BunkerMat_glass { Position: {55, 9.7, 3}; Box: {1.3, 0.9, 0.02}; Rgb: {102, 140, 153}; Opacity: {0.12} }
-    p_bridge_win_3_frame_1 : BunkerMat_frame { Position: {55.79, 9.7, 3}; Box: {0.12, 0.9, 0.3} }
-    p_bridge_win_3_frame_2 : BunkerMat_frame { Position: {57.21, 9.7, 3}; Box: {0.12, 0.9, 0.3} }
-    p_bridge_win_3_frame_3 : BunkerMat_frame { Position: {56.5, 10.21, 3}; Box: {1.54, 0.12, 0.3} }
-    p_bridge_win_3_frame_4 : BunkerMat_frame { Position: {56.5, 9.19, 3}; Box: {1.54, 0.12, 0.3} }
+    p_bridge_win_3_frame_1 : BunkerMat_frame { Position: {55.795, 9.7, 3}; Box: {0.13, 0.9, 0.3} }
+    p_bridge_win_3_frame_2 : BunkerMat_frame { Position: {57.205, 9.7, 3}; Box: {0.13, 0.9, 0.3} }
+    p_bridge_win_3_frame_3 : BunkerMat_frame { Position: {56.5, 10.205, 3}; Box: {1.54, 0.13, 0.3} }
+    p_bridge_win_3_frame_4 : BunkerMat_frame { Position: {56.5, 9.195, 3}; Box: {1.54, 0.13, 0.3} }
     p_bridge_win_3_pane_1 : BunkerMat_glass { Position: {56.5, 9.7, 3}; Box: {1.3, 0.9, 0.02}; Rgb: {102, 140, 153}; Opacity: {0.12} }
-    p_bridge_win_p_frame_1 : BunkerMat_frame { Position: {52, 9.7, -0.56}; Box: {0.3, 0.9, 0.12} }
-    p_bridge_win_p_frame_2 : BunkerMat_frame { Position: {52, 9.7, 1.56}; Box: {0.3, 0.9, 0.12} }
-    p_bridge_win_p_frame_3 : BunkerMat_frame { Position: {52, 10.21, 0.5}; Box: {0.3, 0.12, 2.24} }
-    p_bridge_win_p_frame_4 : BunkerMat_frame { Position: {52, 9.19, 0.5}; Box: {0.3, 0.12, 2.24} }
+    p_bridge_win_p_frame_1 : BunkerMat_frame { Position: {52, 9.7, -0.555}; Box: {0.3, 0.9, 0.13} }
+    p_bridge_win_p_frame_2 : BunkerMat_frame { Position: {52, 9.7, 1.555}; Box: {0.3, 0.9, 0.13} }
+    p_bridge_win_p_frame_3 : BunkerMat_frame { Position: {52, 10.205, 0.5}; Box: {0.3, 0.13, 2.24} }
+    p_bridge_win_p_frame_4 : BunkerMat_frame { Position: {52, 9.195, 0.5}; Box: {0.3, 0.13, 2.24} }
     p_bridge_win_p_pane_1 : BunkerMat_glass { Position: {52, 9.7, 0.5}; Box: {0.02, 0.9, 2}; Rgb: {102, 140, 153}; Opacity: {0.12} }
-    p_bridge_win_s_frame_1 : BunkerMat_frame { Position: {58, 9.7, 0.64}; Box: {0.3, 0.9, 0.12} }
-    p_bridge_win_s_frame_2 : BunkerMat_frame { Position: {58, 9.7, 1.96}; Box: {0.3, 0.9, 0.12} }
-    p_bridge_win_s_frame_3 : BunkerMat_frame { Position: {58, 10.21, 1.3}; Box: {0.3, 0.12, 1.44} }
-    p_bridge_win_s_frame_4 : BunkerMat_frame { Position: {58, 9.19, 1.3}; Box: {0.3, 0.12, 1.44} }
+    p_bridge_win_s_frame_1 : BunkerMat_frame { Position: {58, 9.7, 0.645}; Box: {0.3, 0.9, 0.13} }
+    p_bridge_win_s_frame_2 : BunkerMat_frame { Position: {58, 9.7, 1.955}; Box: {0.3, 0.9, 0.13} }
+    p_bridge_win_s_frame_3 : BunkerMat_frame { Position: {58, 10.205, 1.3}; Box: {0.3, 0.13, 1.44} }
+    p_bridge_win_s_frame_4 : BunkerMat_frame { Position: {58, 9.195, 1.3}; Box: {0.3, 0.13, 1.44} }
     p_bridge_win_s_pane_1 : BunkerMat_glass { Position: {58, 9.7, 1.3}; Box: {0.02, 0.9, 1.2}; Rgb: {102, 140, 153}; Opacity: {0.12} }
-    p_ship_hatch_up_frame_1 : BunkerMat_frame { Position: {55.94, 8, -2.5}; Box: {0.12, 0.3, 1} }
-    p_ship_hatch_up_frame_2 : BunkerMat_frame { Position: {57.06, 8, -2.5}; Box: {0.12, 0.3, 1} }
-    p_ship_hatch_up_frame_3 : BunkerMat_frame { Position: {56.5, 8, -1.94}; Box: {1.24, 0.3, 0.12} }
-    p_ship_hatch_up_frame_4 : BunkerMat_frame { Position: {56.5, 8, -3.06}; Box: {1.24, 0.3, 0.12} }
-    p_ship_hatch_down_frame_1 : BunkerMat_frame { Position: {52.44, 5, -3}; Box: {0.12, 0.3, 1} }
-    p_ship_hatch_down_frame_2 : BunkerMat_frame { Position: {53.56, 5, -3}; Box: {0.12, 0.3, 1} }
-    p_ship_hatch_down_frame_3 : BunkerMat_frame { Position: {53, 5, -2.44}; Box: {1.24, 0.3, 0.12} }
-    p_ship_hatch_down_frame_4 : BunkerMat_frame { Position: {53, 5, -3.56}; Box: {1.24, 0.3, 0.12} }
-    p_ship_bulkhead_frame_1 : BunkerMat_frame { Position: {54.14, -0.8, 7}; Box: {0.12, 2.4, 0.3} }
-    p_ship_bulkhead_frame_2 : BunkerMat_frame { Position: {55.86, -0.8, 7}; Box: {0.12, 2.4, 0.3} }
-    p_ship_bulkhead_frame_3 : BunkerMat_frame { Position: {55, 0.46, 7}; Box: {1.84, 0.12, 0.3} }
-    p_cargo_hatch_frame_1 : BunkerMat_frame { Position: {51.94, 5, 22}; Box: {0.12, 0.3, 14} }
-    p_cargo_hatch_frame_2 : BunkerMat_frame { Position: {58.06, 5, 22}; Box: {0.12, 0.3, 14} }
-    p_cargo_hatch_frame_3 : BunkerMat_frame { Position: {55, 5, 29.06}; Box: {6.24, 0.3, 0.12} }
-    p_cargo_hatch_frame_4 : BunkerMat_frame { Position: {55, 5, 14.94}; Box: {6.24, 0.3, 0.12} }
-    deckhouse_0_w3_0_x6_0_frame_1 : BunkerMat_frame { Position: {50.2525, 6.6, 43.95}; Box: {0.12, 1, 0.3} }
-    deckhouse_0_w3_0_x6_0_frame_2 : BunkerMat_frame { Position: {51.5725, 6.6, 43.95}; Box: {0.12, 1, 0.3} }
-    deckhouse_0_w3_0_x6_0_frame_3 : BunkerMat_frame { Position: {50.9125, 7.16, 43.95}; Box: {1.44, 0.12, 0.3} }
-    deckhouse_0_w3_0_x6_0_frame_4 : BunkerMat_frame { Position: {50.9125, 6.04, 43.95}; Box: {1.44, 0.12, 0.3} }
+    p_ship_hatch_up_frame_1 : BunkerMat_frame { Position: {55.945, 8, -2.5}; Box: {0.13, 0.3, 1} }
+    p_ship_hatch_up_frame_2 : BunkerMat_frame { Position: {57.055, 8, -2.5}; Box: {0.13, 0.3, 1} }
+    p_ship_hatch_up_frame_3 : BunkerMat_frame { Position: {56.5, 8, -1.945}; Box: {1.24, 0.3, 0.13} }
+    p_ship_hatch_up_frame_4 : BunkerMat_frame { Position: {56.5, 8, -3.055}; Box: {1.24, 0.3, 0.13} }
+    p_ship_hatch_down_frame_1 : BunkerMat_frame { Position: {52.445, 5, -3}; Box: {0.13, 0.3, 1} }
+    p_ship_hatch_down_frame_2 : BunkerMat_frame { Position: {53.555, 5, -3}; Box: {0.13, 0.3, 1} }
+    p_ship_hatch_down_frame_3 : BunkerMat_frame { Position: {53, 5, -2.445}; Box: {1.24, 0.3, 0.13} }
+    p_ship_hatch_down_frame_4 : BunkerMat_frame { Position: {53, 5, -3.555}; Box: {1.24, 0.3, 0.13} }
+    p_ship_bulkhead_frame_1 : BunkerMat_frame { Position: {54.145, -0.8, 7}; Box: {0.13, 2.4, 0.3} }
+    p_ship_bulkhead_frame_2 : BunkerMat_frame { Position: {55.855, -0.8, 7}; Box: {0.13, 2.4, 0.3} }
+    p_ship_bulkhead_frame_3 : BunkerMat_frame { Position: {55, 0.455, 7}; Box: {1.84, 0.13, 0.3} }
+    p_cargo_hatch_frame_1 : BunkerMat_frame { Position: {51.945, 5, 22}; Box: {0.13, 0.3, 14} }
+    p_cargo_hatch_frame_2 : BunkerMat_frame { Position: {58.055, 5, 22}; Box: {0.13, 0.3, 14} }
+    p_cargo_hatch_frame_3 : BunkerMat_frame { Position: {55, 5, 29.055}; Box: {6.24, 0.3, 0.13} }
+    p_cargo_hatch_frame_4 : BunkerMat_frame { Position: {55, 5, 14.945}; Box: {6.24, 0.3, 0.13} }
+    deckhouse_0_w3_0_x6_0_frame_1 : BunkerMat_frame { Position: {50.2575, 6.6, 43.95}; Box: {0.13, 1, 0.3} }
+    deckhouse_0_w3_0_x6_0_frame_2 : BunkerMat_frame { Position: {51.5675, 6.6, 43.95}; Box: {0.13, 1, 0.3} }
+    deckhouse_0_w3_0_x6_0_frame_3 : BunkerMat_frame { Position: {50.9125, 7.155, 43.95}; Box: {1.44, 0.13, 0.3} }
+    deckhouse_0_w3_0_x6_0_frame_4 : BunkerMat_frame { Position: {50.9125, 6.045, 43.95}; Box: {1.44, 0.13, 0.3} }
     deckhouse_0_w3_0_x6_0_pane_1 : BunkerMat_glass { Position: {50.9125, 6.6, 43.95}; Box: {1.2, 1, 0.02} }
-    deckhouse_0_w3_0_z_5_5_frame_1 : BunkerMat_frame { Position: {49.55, 6.6, 42.045}; Box: {0.3, 1, 0.12} }
-    deckhouse_0_w3_0_z_5_5_frame_2 : BunkerMat_frame { Position: {49.55, 6.6, 43.365}; Box: {0.3, 1, 0.12} }
-    deckhouse_0_w3_0_z_5_5_frame_3 : BunkerMat_frame { Position: {49.55, 7.16, 42.705}; Box: {0.3, 0.12, 1.44} }
-    deckhouse_0_w3_0_z_5_5_frame_4 : BunkerMat_frame { Position: {49.55, 6.04, 42.705}; Box: {0.3, 0.12, 1.44} }
+    deckhouse_0_w3_0_z_5_5_frame_1 : BunkerMat_frame { Position: {49.55, 6.6, 42.05}; Box: {0.3, 1, 0.13} }
+    deckhouse_0_w3_0_z_5_5_frame_2 : BunkerMat_frame { Position: {49.55, 6.6, 43.36}; Box: {0.3, 1, 0.13} }
+    deckhouse_0_w3_0_z_5_5_frame_3 : BunkerMat_frame { Position: {49.55, 7.155, 42.705}; Box: {0.3, 0.13, 1.44} }
+    deckhouse_0_w3_0_z_5_5_frame_4 : BunkerMat_frame { Position: {49.55, 6.045, 42.705}; Box: {0.3, 0.13, 1.44} }
     deckhouse_0_w3_0_z_5_5_pane_1 : BunkerMat_glass { Position: {49.55, 6.6, 42.705}; Box: {0.02, 1, 1.2} }
-    deckhouse_0_w4_0_x6_0_frame_1 : BunkerMat_frame { Position: {52.9775, 6.6, 43.95}; Box: {0.12, 1, 0.3} }
-    deckhouse_0_w4_0_x6_0_frame_2 : BunkerMat_frame { Position: {54.2975, 6.6, 43.95}; Box: {0.12, 1, 0.3} }
-    deckhouse_0_w4_0_x6_0_frame_3 : BunkerMat_frame { Position: {53.6375, 7.16, 43.95}; Box: {1.44, 0.12, 0.3} }
-    deckhouse_0_w4_0_x6_0_frame_4 : BunkerMat_frame { Position: {53.6375, 6.04, 43.95}; Box: {1.44, 0.12, 0.3} }
+    deckhouse_0_w4_0_x6_0_frame_1 : BunkerMat_frame { Position: {52.9825, 6.6, 43.95}; Box: {0.13, 1, 0.3} }
+    deckhouse_0_w4_0_x6_0_frame_2 : BunkerMat_frame { Position: {54.2925, 6.6, 43.95}; Box: {0.13, 1, 0.3} }
+    deckhouse_0_w4_0_x6_0_frame_3 : BunkerMat_frame { Position: {53.6375, 7.155, 43.95}; Box: {1.44, 0.13, 0.3} }
+    deckhouse_0_w4_0_x6_0_frame_4 : BunkerMat_frame { Position: {53.6375, 6.045, 43.95}; Box: {1.44, 0.13, 0.3} }
     deckhouse_0_w4_0_x6_0_pane_1 : BunkerMat_glass { Position: {53.6375, 6.6, 43.95}; Box: {1.2, 1, 0.02} }
-    deckhouse_0_w5_0_x6_0_frame_1 : BunkerMat_frame { Position: {55.7025, 6.6, 43.95}; Box: {0.12, 1, 0.3} }
-    deckhouse_0_w5_0_x6_0_frame_2 : BunkerMat_frame { Position: {57.0225, 6.6, 43.95}; Box: {0.12, 1, 0.3} }
-    deckhouse_0_w5_0_x6_0_frame_3 : BunkerMat_frame { Position: {56.3625, 7.16, 43.95}; Box: {1.44, 0.12, 0.3} }
-    deckhouse_0_w5_0_x6_0_frame_4 : BunkerMat_frame { Position: {56.3625, 6.04, 43.95}; Box: {1.44, 0.12, 0.3} }
+    deckhouse_0_w5_0_x6_0_frame_1 : BunkerMat_frame { Position: {55.7075, 6.6, 43.95}; Box: {0.13, 1, 0.3} }
+    deckhouse_0_w5_0_x6_0_frame_2 : BunkerMat_frame { Position: {57.0175, 6.6, 43.95}; Box: {0.13, 1, 0.3} }
+    deckhouse_0_w5_0_x6_0_frame_3 : BunkerMat_frame { Position: {56.3625, 7.155, 43.95}; Box: {1.44, 0.13, 0.3} }
+    deckhouse_0_w5_0_x6_0_frame_4 : BunkerMat_frame { Position: {56.3625, 6.045, 43.95}; Box: {1.44, 0.13, 0.3} }
     deckhouse_0_w5_0_x6_0_pane_1 : BunkerMat_glass { Position: {56.3625, 6.6, 43.95}; Box: {1.2, 1, 0.02} }
-    deckhouse_0_w6_0_x6_0_frame_1 : BunkerMat_frame { Position: {58.4275, 6.6, 43.95}; Box: {0.12, 1, 0.3} }
-    deckhouse_0_w6_0_x6_0_frame_2 : BunkerMat_frame { Position: {59.7475, 6.6, 43.95}; Box: {0.12, 1, 0.3} }
-    deckhouse_0_w6_0_x6_0_frame_3 : BunkerMat_frame { Position: {59.0875, 7.16, 43.95}; Box: {1.44, 0.12, 0.3} }
-    deckhouse_0_w6_0_x6_0_frame_4 : BunkerMat_frame { Position: {59.0875, 6.04, 43.95}; Box: {1.44, 0.12, 0.3} }
+    deckhouse_0_w6_0_x6_0_frame_1 : BunkerMat_frame { Position: {58.4325, 6.6, 43.95}; Box: {0.13, 1, 0.3} }
+    deckhouse_0_w6_0_x6_0_frame_2 : BunkerMat_frame { Position: {59.7425, 6.6, 43.95}; Box: {0.13, 1, 0.3} }
+    deckhouse_0_w6_0_x6_0_frame_3 : BunkerMat_frame { Position: {59.0875, 7.155, 43.95}; Box: {1.44, 0.13, 0.3} }
+    deckhouse_0_w6_0_x6_0_frame_4 : BunkerMat_frame { Position: {59.0875, 6.045, 43.95}; Box: {1.44, 0.13, 0.3} }
     deckhouse_0_w6_0_x6_0_pane_1 : BunkerMat_glass { Position: {59.0875, 6.6, 43.95}; Box: {1.2, 1, 0.02} }
-    deckhouse_0_w6_0_z5_5_frame_1 : BunkerMat_frame { Position: {60.45, 6.6, 42.045}; Box: {0.3, 1, 0.12} }
-    deckhouse_0_w6_0_z5_5_frame_2 : BunkerMat_frame { Position: {60.45, 6.6, 43.365}; Box: {0.3, 1, 0.12} }
-    deckhouse_0_w6_0_z5_5_frame_3 : BunkerMat_frame { Position: {60.45, 7.16, 42.705}; Box: {0.3, 0.12, 1.44} }
-    deckhouse_0_w6_0_z5_5_frame_4 : BunkerMat_frame { Position: {60.45, 6.04, 42.705}; Box: {0.3, 0.12, 1.44} }
+    deckhouse_0_w6_0_z5_5_frame_1 : BunkerMat_frame { Position: {60.45, 6.6, 42.05}; Box: {0.3, 1, 0.13} }
+    deckhouse_0_w6_0_z5_5_frame_2 : BunkerMat_frame { Position: {60.45, 6.6, 43.36}; Box: {0.3, 1, 0.13} }
+    deckhouse_0_w6_0_z5_5_frame_3 : BunkerMat_frame { Position: {60.45, 7.155, 42.705}; Box: {0.3, 0.13, 1.44} }
+    deckhouse_0_w6_0_z5_5_frame_4 : BunkerMat_frame { Position: {60.45, 6.045, 42.705}; Box: {0.3, 0.13, 1.44} }
     deckhouse_0_w6_0_z5_5_pane_1 : BunkerMat_glass { Position: {60.45, 6.6, 42.705}; Box: {0.02, 1, 1.2} }
-    deckhouse_0_w8_0_x_6_0_frame_1 : BunkerMat_frame { Position: {50.3775, 6.6, 32.05}; Box: {0.12, 1, 0.3} }
-    deckhouse_0_w8_0_x_6_0_frame_2 : BunkerMat_frame { Position: {51.6975, 6.6, 32.05}; Box: {0.12, 1, 0.3} }
-    deckhouse_0_w8_0_x_6_0_frame_3 : BunkerMat_frame { Position: {51.0375, 7.16, 32.05}; Box: {1.44, 0.12, 0.3} }
-    deckhouse_0_w8_0_x_6_0_frame_4 : BunkerMat_frame { Position: {51.0375, 6.04, 32.05}; Box: {1.44, 0.12, 0.3} }
+    deckhouse_0_w8_0_x_6_0_frame_1 : BunkerMat_frame { Position: {50.3825, 6.6, 32.05}; Box: {0.13, 1, 0.3} }
+    deckhouse_0_w8_0_x_6_0_frame_2 : BunkerMat_frame { Position: {51.6925, 6.6, 32.05}; Box: {0.13, 1, 0.3} }
+    deckhouse_0_w8_0_x_6_0_frame_3 : BunkerMat_frame { Position: {51.0375, 7.155, 32.05}; Box: {1.44, 0.13, 0.3} }
+    deckhouse_0_w8_0_x_6_0_frame_4 : BunkerMat_frame { Position: {51.0375, 6.045, 32.05}; Box: {1.44, 0.13, 0.3} }
     deckhouse_0_w8_0_x_6_0_pane_1 : BunkerMat_glass { Position: {51.0375, 6.6, 32.05}; Box: {1.2, 1, 0.02} }
-    deckhouse_0_w8_0_z_5_5_frame_1 : BunkerMat_frame { Position: {49.55, 6.6, 32.635}; Box: {0.3, 1, 0.12} }
-    deckhouse_0_w8_0_z_5_5_frame_2 : BunkerMat_frame { Position: {49.55, 6.6, 33.955}; Box: {0.3, 1, 0.12} }
-    deckhouse_0_w8_0_z_5_5_frame_3 : BunkerMat_frame { Position: {49.55, 7.16, 33.295}; Box: {0.3, 0.12, 1.44} }
-    deckhouse_0_w8_0_z_5_5_frame_4 : BunkerMat_frame { Position: {49.55, 6.04, 33.295}; Box: {0.3, 0.12, 1.44} }
+    deckhouse_0_w8_0_z_5_5_frame_1 : BunkerMat_frame { Position: {49.55, 6.6, 32.64}; Box: {0.3, 1, 0.13} }
+    deckhouse_0_w8_0_z_5_5_frame_2 : BunkerMat_frame { Position: {49.55, 6.6, 33.95}; Box: {0.3, 1, 0.13} }
+    deckhouse_0_w8_0_z_5_5_frame_3 : BunkerMat_frame { Position: {49.55, 7.155, 33.295}; Box: {0.3, 0.13, 1.44} }
+    deckhouse_0_w8_0_z_5_5_frame_4 : BunkerMat_frame { Position: {49.55, 6.045, 33.295}; Box: {0.3, 0.13, 1.44} }
     deckhouse_0_w8_0_z_5_5_pane_1 : BunkerMat_glass { Position: {49.55, 6.6, 33.295}; Box: {0.02, 1, 1.2} }
-    deckhouse_0_w9_0_x_6_0_frame_1 : BunkerMat_frame { Position: {53.3525, 6.6, 32.05}; Box: {0.12, 1, 0.3} }
-    deckhouse_0_w9_0_x_6_0_frame_2 : BunkerMat_frame { Position: {54.6725, 6.6, 32.05}; Box: {0.12, 1, 0.3} }
-    deckhouse_0_w9_0_x_6_0_frame_3 : BunkerMat_frame { Position: {54.0125, 7.16, 32.05}; Box: {1.44, 0.12, 0.3} }
-    deckhouse_0_w9_0_x_6_0_frame_4 : BunkerMat_frame { Position: {54.0125, 6.04, 32.05}; Box: {1.44, 0.12, 0.3} }
+    deckhouse_0_w9_0_x_6_0_frame_1 : BunkerMat_frame { Position: {53.3575, 6.6, 32.05}; Box: {0.13, 1, 0.3} }
+    deckhouse_0_w9_0_x_6_0_frame_2 : BunkerMat_frame { Position: {54.6675, 6.6, 32.05}; Box: {0.13, 1, 0.3} }
+    deckhouse_0_w9_0_x_6_0_frame_3 : BunkerMat_frame { Position: {54.0125, 7.155, 32.05}; Box: {1.44, 0.13, 0.3} }
+    deckhouse_0_w9_0_x_6_0_frame_4 : BunkerMat_frame { Position: {54.0125, 6.045, 32.05}; Box: {1.44, 0.13, 0.3} }
     deckhouse_0_w9_0_x_6_0_pane_1 : BunkerMat_glass { Position: {54.0125, 6.6, 32.05}; Box: {1.2, 1, 0.02} }
-    deckhouse_0_w10_0_x_6_0_frame_1 : BunkerMat_frame { Position: {57.915, 6.6, 32.05}; Box: {0.12, 1, 0.3} }
-    deckhouse_0_w10_0_x_6_0_frame_2 : BunkerMat_frame { Position: {59.235, 6.6, 32.05}; Box: {0.12, 1, 0.3} }
-    deckhouse_0_w10_0_x_6_0_frame_3 : BunkerMat_frame { Position: {58.575, 7.16, 32.05}; Box: {1.44, 0.12, 0.3} }
-    deckhouse_0_w10_0_x_6_0_frame_4 : BunkerMat_frame { Position: {58.575, 6.04, 32.05}; Box: {1.44, 0.12, 0.3} }
+    deckhouse_0_w10_0_x_6_0_frame_1 : BunkerMat_frame { Position: {57.92, 6.6, 32.05}; Box: {0.13, 1, 0.3} }
+    deckhouse_0_w10_0_x_6_0_frame_2 : BunkerMat_frame { Position: {59.23, 6.6, 32.05}; Box: {0.13, 1, 0.3} }
+    deckhouse_0_w10_0_x_6_0_frame_3 : BunkerMat_frame { Position: {58.575, 7.155, 32.05}; Box: {1.44, 0.13, 0.3} }
+    deckhouse_0_w10_0_x_6_0_frame_4 : BunkerMat_frame { Position: {58.575, 6.045, 32.05}; Box: {1.44, 0.13, 0.3} }
     deckhouse_0_w10_0_x_6_0_pane_1 : BunkerMat_glass { Position: {58.575, 6.6, 32.05}; Box: {1.2, 1, 0.02} }
-    deckhouse_0_w10_0_z5_5_frame_1 : BunkerMat_frame { Position: {60.45, 6.6, 32.635}; Box: {0.3, 1, 0.12} }
-    deckhouse_0_w10_0_z5_5_frame_2 : BunkerMat_frame { Position: {60.45, 6.6, 33.955}; Box: {0.3, 1, 0.12} }
-    deckhouse_0_w10_0_z5_5_frame_3 : BunkerMat_frame { Position: {60.45, 7.16, 33.295}; Box: {0.3, 0.12, 1.44} }
-    deckhouse_0_w10_0_z5_5_frame_4 : BunkerMat_frame { Position: {60.45, 6.04, 33.295}; Box: {0.3, 0.12, 1.44} }
+    deckhouse_0_w10_0_z5_5_frame_1 : BunkerMat_frame { Position: {60.45, 6.6, 32.64}; Box: {0.3, 1, 0.13} }
+    deckhouse_0_w10_0_z5_5_frame_2 : BunkerMat_frame { Position: {60.45, 6.6, 33.95}; Box: {0.3, 1, 0.13} }
+    deckhouse_0_w10_0_z5_5_frame_3 : BunkerMat_frame { Position: {60.45, 7.155, 33.295}; Box: {0.3, 0.13, 1.44} }
+    deckhouse_0_w10_0_z5_5_frame_4 : BunkerMat_frame { Position: {60.45, 6.045, 33.295}; Box: {0.3, 0.13, 1.44} }
     deckhouse_0_w10_0_z5_5_pane_1 : BunkerMat_glass { Position: {60.45, 6.6, 33.295}; Box: {0.02, 1, 1.2} }
-    deckhouse_0_w11_0_z5_5_frame_1 : BunkerMat_frame { Position: {60.45, 6.6, 35.0333}; Box: {0.3, 1, 0.12} }
-    deckhouse_0_w11_0_z5_5_frame_2 : BunkerMat_frame { Position: {60.45, 6.6, 36.3533}; Box: {0.3, 1, 0.12} }
-    deckhouse_0_w11_0_z5_5_frame_3 : BunkerMat_frame { Position: {60.45, 7.16, 35.6933}; Box: {0.3, 0.12, 1.44} }
-    deckhouse_0_w11_0_z5_5_frame_4 : BunkerMat_frame { Position: {60.45, 6.04, 35.6933}; Box: {0.3, 0.12, 1.44} }
+    deckhouse_0_w11_0_z5_5_frame_1 : BunkerMat_frame { Position: {60.45, 6.6, 35.0383}; Box: {0.3, 1, 0.13} }
+    deckhouse_0_w11_0_z5_5_frame_2 : BunkerMat_frame { Position: {60.45, 6.6, 36.3483}; Box: {0.3, 1, 0.13} }
+    deckhouse_0_w11_0_z5_5_frame_3 : BunkerMat_frame { Position: {60.45, 7.155, 35.6933}; Box: {0.3, 0.13, 1.44} }
+    deckhouse_0_w11_0_z5_5_frame_4 : BunkerMat_frame { Position: {60.45, 6.045, 35.6933}; Box: {0.3, 0.13, 1.44} }
     deckhouse_0_w11_0_z5_5_pane_1 : BunkerMat_glass { Position: {60.45, 6.6, 35.6933}; Box: {0.02, 1, 1.2} }
-    deckhouse_0_w12_0_z5_5_frame_1 : BunkerMat_frame { Position: {60.45, 6.6, 37.34}; Box: {0.3, 1, 0.12} }
-    deckhouse_0_w12_0_z5_5_frame_2 : BunkerMat_frame { Position: {60.45, 6.6, 38.66}; Box: {0.3, 1, 0.12} }
-    deckhouse_0_w12_0_z5_5_frame_3 : BunkerMat_frame { Position: {60.45, 7.16, 38}; Box: {0.3, 0.12, 1.44} }
-    deckhouse_0_w12_0_z5_5_frame_4 : BunkerMat_frame { Position: {60.45, 6.04, 38}; Box: {0.3, 0.12, 1.44} }
+    deckhouse_0_w12_0_z5_5_frame_1 : BunkerMat_frame { Position: {60.45, 6.6, 37.345}; Box: {0.3, 1, 0.13} }
+    deckhouse_0_w12_0_z5_5_frame_2 : BunkerMat_frame { Position: {60.45, 6.6, 38.655}; Box: {0.3, 1, 0.13} }
+    deckhouse_0_w12_0_z5_5_frame_3 : BunkerMat_frame { Position: {60.45, 7.155, 38}; Box: {0.3, 0.13, 1.44} }
+    deckhouse_0_w12_0_z5_5_frame_4 : BunkerMat_frame { Position: {60.45, 6.045, 38}; Box: {0.3, 0.13, 1.44} }
     deckhouse_0_w12_0_z5_5_pane_1 : BunkerMat_glass { Position: {60.45, 6.6, 38}; Box: {0.02, 1, 1.2} }
-    deckhouse_0_w13_0_z5_5_frame_1 : BunkerMat_frame { Position: {60.45, 6.6, 39.6467}; Box: {0.3, 1, 0.12} }
-    deckhouse_0_w13_0_z5_5_frame_2 : BunkerMat_frame { Position: {60.45, 6.6, 40.9667}; Box: {0.3, 1, 0.12} }
-    deckhouse_0_w13_0_z5_5_frame_3 : BunkerMat_frame { Position: {60.45, 7.16, 40.3067}; Box: {0.3, 0.12, 1.44} }
-    deckhouse_0_w13_0_z5_5_frame_4 : BunkerMat_frame { Position: {60.45, 6.04, 40.3067}; Box: {0.3, 0.12, 1.44} }
+    deckhouse_0_w13_0_z5_5_frame_1 : BunkerMat_frame { Position: {60.45, 6.6, 39.6517}; Box: {0.3, 1, 0.13} }
+    deckhouse_0_w13_0_z5_5_frame_2 : BunkerMat_frame { Position: {60.45, 6.6, 40.9617}; Box: {0.3, 1, 0.13} }
+    deckhouse_0_w13_0_z5_5_frame_3 : BunkerMat_frame { Position: {60.45, 7.155, 40.3067}; Box: {0.3, 0.13, 1.44} }
+    deckhouse_0_w13_0_z5_5_frame_4 : BunkerMat_frame { Position: {60.45, 6.045, 40.3067}; Box: {0.3, 0.13, 1.44} }
     deckhouse_0_w13_0_z5_5_pane_1 : BunkerMat_glass { Position: {60.45, 6.6, 40.3067}; Box: {0.02, 1, 1.2} }
-    deckhouse_0_w14_0_z_5_5_frame_1 : BunkerMat_frame { Position: {49.55, 6.6, 35.0333}; Box: {0.3, 1, 0.12} }
-    deckhouse_0_w14_0_z_5_5_frame_2 : BunkerMat_frame { Position: {49.55, 6.6, 36.3533}; Box: {0.3, 1, 0.12} }
-    deckhouse_0_w14_0_z_5_5_frame_3 : BunkerMat_frame { Position: {49.55, 7.16, 35.6933}; Box: {0.3, 0.12, 1.44} }
-    deckhouse_0_w14_0_z_5_5_frame_4 : BunkerMat_frame { Position: {49.55, 6.04, 35.6933}; Box: {0.3, 0.12, 1.44} }
+    deckhouse_0_w14_0_z_5_5_frame_1 : BunkerMat_frame { Position: {49.55, 6.6, 35.0383}; Box: {0.3, 1, 0.13} }
+    deckhouse_0_w14_0_z_5_5_frame_2 : BunkerMat_frame { Position: {49.55, 6.6, 36.3483}; Box: {0.3, 1, 0.13} }
+    deckhouse_0_w14_0_z_5_5_frame_3 : BunkerMat_frame { Position: {49.55, 7.155, 35.6933}; Box: {0.3, 0.13, 1.44} }
+    deckhouse_0_w14_0_z_5_5_frame_4 : BunkerMat_frame { Position: {49.55, 6.045, 35.6933}; Box: {0.3, 0.13, 1.44} }
     deckhouse_0_w14_0_z_5_5_pane_1 : BunkerMat_glass { Position: {49.55, 6.6, 35.6933}; Box: {0.02, 1, 1.2} }
-    deckhouse_0_w15_0_z_5_5_frame_1 : BunkerMat_frame { Position: {49.55, 6.6, 37.34}; Box: {0.3, 1, 0.12} }
-    deckhouse_0_w15_0_z_5_5_frame_2 : BunkerMat_frame { Position: {49.55, 6.6, 38.66}; Box: {0.3, 1, 0.12} }
-    deckhouse_0_w15_0_z_5_5_frame_3 : BunkerMat_frame { Position: {49.55, 7.16, 38}; Box: {0.3, 0.12, 1.44} }
-    deckhouse_0_w15_0_z_5_5_frame_4 : BunkerMat_frame { Position: {49.55, 6.04, 38}; Box: {0.3, 0.12, 1.44} }
+    deckhouse_0_w15_0_z_5_5_frame_1 : BunkerMat_frame { Position: {49.55, 6.6, 37.345}; Box: {0.3, 1, 0.13} }
+    deckhouse_0_w15_0_z_5_5_frame_2 : BunkerMat_frame { Position: {49.55, 6.6, 38.655}; Box: {0.3, 1, 0.13} }
+    deckhouse_0_w15_0_z_5_5_frame_3 : BunkerMat_frame { Position: {49.55, 7.155, 38}; Box: {0.3, 0.13, 1.44} }
+    deckhouse_0_w15_0_z_5_5_frame_4 : BunkerMat_frame { Position: {49.55, 6.045, 38}; Box: {0.3, 0.13, 1.44} }
     deckhouse_0_w15_0_z_5_5_pane_1 : BunkerMat_glass { Position: {49.55, 6.6, 38}; Box: {0.02, 1, 1.2} }
-    deckhouse_0_w16_0_z_5_5_frame_1 : BunkerMat_frame { Position: {49.55, 6.6, 39.6467}; Box: {0.3, 1, 0.12} }
-    deckhouse_0_w16_0_z_5_5_frame_2 : BunkerMat_frame { Position: {49.55, 6.6, 40.9667}; Box: {0.3, 1, 0.12} }
-    deckhouse_0_w16_0_z_5_5_frame_3 : BunkerMat_frame { Position: {49.55, 7.16, 40.3067}; Box: {0.3, 0.12, 1.44} }
-    deckhouse_0_w16_0_z_5_5_frame_4 : BunkerMat_frame { Position: {49.55, 6.04, 40.3067}; Box: {0.3, 0.12, 1.44} }
+    deckhouse_0_w16_0_z_5_5_frame_1 : BunkerMat_frame { Position: {49.55, 6.6, 39.6517}; Box: {0.3, 1, 0.13} }
+    deckhouse_0_w16_0_z_5_5_frame_2 : BunkerMat_frame { Position: {49.55, 6.6, 40.9617}; Box: {0.3, 1, 0.13} }
+    deckhouse_0_w16_0_z_5_5_frame_3 : BunkerMat_frame { Position: {49.55, 7.155, 40.3067}; Box: {0.3, 0.13, 1.44} }
+    deckhouse_0_w16_0_z_5_5_frame_4 : BunkerMat_frame { Position: {49.55, 6.045, 40.3067}; Box: {0.3, 0.13, 1.44} }
     deckhouse_0_w16_0_z_5_5_pane_1 : BunkerMat_glass { Position: {49.55, 6.6, 40.3067}; Box: {0.02, 1, 1.2} }
-    deckhouse_0_p0_2_frame_1 : BunkerMat_frame { Position: {53.59, 6.075, 35.74}; Box: {0.12, 2.15, 0.3} }
-    deckhouse_0_p0_2_frame_2 : BunkerMat_frame { Position: {54.81, 6.075, 35.74}; Box: {0.12, 2.15, 0.3} }
-    deckhouse_0_p0_2_frame_3 : BunkerMat_frame { Position: {54.2, 7.21, 35.74}; Box: {1.34, 0.12, 0.3} }
-    deckhouse_0_p4_2_frame_1 : BunkerMat_frame { Position: {53.7775, 6.075, 41.46}; Box: {0.12, 2.15, 0.3} }
-    deckhouse_0_p4_2_frame_2 : BunkerMat_frame { Position: {54.6975, 6.075, 41.46}; Box: {0.12, 2.15, 0.3} }
-    deckhouse_0_p4_2_frame_3 : BunkerMat_frame { Position: {54.2375, 7.21, 41.46}; Box: {1.04, 0.12, 0.3} }
-    deckhouse_0_p5_2_frame_1 : BunkerMat_frame { Position: {55.3025, 6.075, 41.46}; Box: {0.12, 2.15, 0.3} }
-    deckhouse_0_p5_2_frame_2 : BunkerMat_frame { Position: {56.2225, 6.075, 41.46}; Box: {0.12, 2.15, 0.3} }
-    deckhouse_0_p5_2_frame_3 : BunkerMat_frame { Position: {55.7625, 7.21, 41.46}; Box: {1.04, 0.12, 0.3} }
-    deckhouse_0_p9_2_frame_1 : BunkerMat_frame { Position: {54.1525, 6.075, 34.54}; Box: {0.12, 2.15, 0.3} }
-    deckhouse_0_p9_2_frame_2 : BunkerMat_frame { Position: {55.0725, 6.075, 34.54}; Box: {0.12, 2.15, 0.3} }
-    deckhouse_0_p9_2_frame_3 : BunkerMat_frame { Position: {54.6125, 7.21, 34.54}; Box: {1.04, 0.12, 0.3} }
-    deckhouse_0_p10_7_frame_1 : BunkerMat_frame { Position: {56.7, 6.075, 32.835}; Box: {0.3, 2.15, 0.12} }
-    deckhouse_0_p10_7_frame_2 : BunkerMat_frame { Position: {56.7, 6.075, 33.755}; Box: {0.3, 2.15, 0.12} }
-    deckhouse_0_p10_7_frame_3 : BunkerMat_frame { Position: {56.7, 7.21, 33.295}; Box: {0.3, 0.12, 1.04} }
-    deckhouse_0_p12_2_frame_1 : BunkerMat_frame { Position: {58.1, 6.075, 37.54}; Box: {0.3, 2.15, 0.12} }
-    deckhouse_0_p12_2_frame_2 : BunkerMat_frame { Position: {58.1, 6.075, 38.46}; Box: {0.3, 2.15, 0.12} }
-    deckhouse_0_p12_2_frame_3 : BunkerMat_frame { Position: {58.1, 7.21, 38}; Box: {0.3, 0.12, 1.04} }
-    deckhouse_0_p15_2_frame_1 : BunkerMat_frame { Position: {51.9, 6.075, 37.54}; Box: {0.3, 2.15, 0.12} }
-    deckhouse_0_p15_2_frame_2 : BunkerMat_frame { Position: {51.9, 6.075, 38.46}; Box: {0.3, 2.15, 0.12} }
-    deckhouse_0_p15_2_frame_3 : BunkerMat_frame { Position: {51.9, 7.21, 38}; Box: {0.3, 0.12, 1.04} }
-    deckhouse_0_p3_4_frame_1 : BunkerMat_frame { Position: {52.275, 6.075, 42.245}; Box: {0.3, 2.15, 0.12} }
-    deckhouse_0_p3_4_frame_2 : BunkerMat_frame { Position: {52.275, 6.075, 43.165}; Box: {0.3, 2.15, 0.12} }
-    deckhouse_0_p3_4_frame_3 : BunkerMat_frame { Position: {52.275, 7.21, 42.705}; Box: {0.3, 0.12, 1.04} }
-    deckhouse_0_p6_5_frame_1 : BunkerMat_frame { Position: {57.725, 6.075, 42.245}; Box: {0.3, 2.15, 0.12} }
-    deckhouse_0_p6_5_frame_2 : BunkerMat_frame { Position: {57.725, 6.075, 43.165}; Box: {0.3, 2.15, 0.12} }
-    deckhouse_0_p6_5_frame_3 : BunkerMat_frame { Position: {57.725, 7.21, 42.705}; Box: {0.3, 0.12, 1.04} }
-    deckhouse_0_p8_9_frame_1 : BunkerMat_frame { Position: {52.525, 6.075, 32.835}; Box: {0.3, 2.15, 0.12} }
-    deckhouse_0_p8_9_frame_2 : BunkerMat_frame { Position: {52.525, 6.075, 33.755}; Box: {0.3, 2.15, 0.12} }
-    deckhouse_0_p8_9_frame_3 : BunkerMat_frame { Position: {52.525, 7.21, 33.295}; Box: {0.3, 0.12, 1.04} }
-    deckhouse_0_p11_12_frame_1 : BunkerMat_frame { Position: {58.815, 6.075, 36.8467}; Box: {0.12, 2.15, 0.3} }
-    deckhouse_0_p11_12_frame_2 : BunkerMat_frame { Position: {59.735, 6.075, 36.8467}; Box: {0.12, 2.15, 0.3} }
-    deckhouse_0_p11_12_frame_3 : BunkerMat_frame { Position: {59.275, 7.21, 36.8467}; Box: {1.04, 0.12, 0.3} }
-    deckhouse_0_p13_12_frame_1 : BunkerMat_frame { Position: {58.815, 6.075, 39.1533}; Box: {0.12, 2.15, 0.3} }
-    deckhouse_0_p13_12_frame_2 : BunkerMat_frame { Position: {59.735, 6.075, 39.1533}; Box: {0.12, 2.15, 0.3} }
-    deckhouse_0_p13_12_frame_3 : BunkerMat_frame { Position: {59.275, 7.21, 39.1533}; Box: {1.04, 0.12, 0.3} }
-    deckhouse_0_p14_15_frame_1 : BunkerMat_frame { Position: {50.265, 6.075, 36.8467}; Box: {0.12, 2.15, 0.3} }
-    deckhouse_0_p14_15_frame_2 : BunkerMat_frame { Position: {51.185, 6.075, 36.8467}; Box: {0.12, 2.15, 0.3} }
-    deckhouse_0_p14_15_frame_3 : BunkerMat_frame { Position: {50.725, 7.21, 36.8467}; Box: {1.04, 0.12, 0.3} }
-    deckhouse_0_p16_15_frame_1 : BunkerMat_frame { Position: {50.265, 6.075, 39.1533}; Box: {0.12, 2.15, 0.3} }
-    deckhouse_0_p16_15_frame_2 : BunkerMat_frame { Position: {51.185, 6.075, 39.1533}; Box: {0.12, 2.15, 0.3} }
-    deckhouse_0_p16_15_frame_3 : BunkerMat_frame { Position: {50.725, 7.21, 39.1533}; Box: {1.04, 0.12, 0.3} }
-    deckhouse_entrance0_frame_1 : BunkerMat_frame { Position: {55.54, 6.1, 32.05}; Box: {0.12, 2.2, 0.3} }
-    deckhouse_entrance0_frame_2 : BunkerMat_frame { Position: {56.66, 6.1, 32.05}; Box: {0.12, 2.2, 0.3} }
-    deckhouse_entrance0_frame_3 : BunkerMat_frame { Position: {56.1, 7.26, 32.05}; Box: {1.24, 0.12, 0.3} }
-    deckhouse_1_w3_0_x6_0_frame_1 : BunkerMat_frame { Position: {50.2525, 9.5, 43.95}; Box: {0.12, 1, 0.3} }
-    deckhouse_1_w3_0_x6_0_frame_2 : BunkerMat_frame { Position: {51.5725, 9.5, 43.95}; Box: {0.12, 1, 0.3} }
-    deckhouse_1_w3_0_x6_0_frame_3 : BunkerMat_frame { Position: {50.9125, 10.06, 43.95}; Box: {1.44, 0.12, 0.3} }
-    deckhouse_1_w3_0_x6_0_frame_4 : BunkerMat_frame { Position: {50.9125, 8.94, 43.95}; Box: {1.44, 0.12, 0.3} }
+    deckhouse_0_p0_2_frame_1 : BunkerMat_frame { Position: {53.595, 6.075, 35.74}; Box: {0.13, 2.15, 0.3} }
+    deckhouse_0_p0_2_frame_2 : BunkerMat_frame { Position: {54.805, 6.075, 35.74}; Box: {0.13, 2.15, 0.3} }
+    deckhouse_0_p0_2_frame_3 : BunkerMat_frame { Position: {54.2, 7.205, 35.74}; Box: {1.34, 0.13, 0.3} }
+    deckhouse_0_p4_2_frame_1 : BunkerMat_frame { Position: {53.7825, 6.075, 41.46}; Box: {0.13, 2.15, 0.3} }
+    deckhouse_0_p4_2_frame_2 : BunkerMat_frame { Position: {54.6925, 6.075, 41.46}; Box: {0.13, 2.15, 0.3} }
+    deckhouse_0_p4_2_frame_3 : BunkerMat_frame { Position: {54.2375, 7.205, 41.46}; Box: {1.04, 0.13, 0.3} }
+    deckhouse_0_p5_2_frame_1 : BunkerMat_frame { Position: {55.3075, 6.075, 41.46}; Box: {0.13, 2.15, 0.3} }
+    deckhouse_0_p5_2_frame_2 : BunkerMat_frame { Position: {56.2175, 6.075, 41.46}; Box: {0.13, 2.15, 0.3} }
+    deckhouse_0_p5_2_frame_3 : BunkerMat_frame { Position: {55.7625, 7.205, 41.46}; Box: {1.04, 0.13, 0.3} }
+    deckhouse_0_p9_2_frame_1 : BunkerMat_frame { Position: {54.1575, 6.075, 34.54}; Box: {0.13, 2.15, 0.3} }
+    deckhouse_0_p9_2_frame_2 : BunkerMat_frame { Position: {55.0675, 6.075, 34.54}; Box: {0.13, 2.15, 0.3} }
+    deckhouse_0_p9_2_frame_3 : BunkerMat_frame { Position: {54.6125, 7.205, 34.54}; Box: {1.04, 0.13, 0.3} }
+    deckhouse_0_p10_7_frame_1 : BunkerMat_frame { Position: {56.7, 6.075, 32.84}; Box: {0.3, 2.15, 0.13} }
+    deckhouse_0_p10_7_frame_2 : BunkerMat_frame { Position: {56.7, 6.075, 33.75}; Box: {0.3, 2.15, 0.13} }
+    deckhouse_0_p10_7_frame_3 : BunkerMat_frame { Position: {56.7, 7.205, 33.295}; Box: {0.3, 0.13, 1.04} }
+    deckhouse_0_p12_2_frame_1 : BunkerMat_frame { Position: {58.1, 6.075, 37.545}; Box: {0.3, 2.15, 0.13} }
+    deckhouse_0_p12_2_frame_2 : BunkerMat_frame { Position: {58.1, 6.075, 38.455}; Box: {0.3, 2.15, 0.13} }
+    deckhouse_0_p12_2_frame_3 : BunkerMat_frame { Position: {58.1, 7.205, 38}; Box: {0.3, 0.13, 1.04} }
+    deckhouse_0_p15_2_frame_1 : BunkerMat_frame { Position: {51.9, 6.075, 37.545}; Box: {0.3, 2.15, 0.13} }
+    deckhouse_0_p15_2_frame_2 : BunkerMat_frame { Position: {51.9, 6.075, 38.455}; Box: {0.3, 2.15, 0.13} }
+    deckhouse_0_p15_2_frame_3 : BunkerMat_frame { Position: {51.9, 7.205, 38}; Box: {0.3, 0.13, 1.04} }
+    deckhouse_0_p3_4_frame_1 : BunkerMat_frame { Position: {52.275, 6.075, 42.25}; Box: {0.3, 2.15, 0.13} }
+    deckhouse_0_p3_4_frame_2 : BunkerMat_frame { Position: {52.275, 6.075, 43.16}; Box: {0.3, 2.15, 0.13} }
+    deckhouse_0_p3_4_frame_3 : BunkerMat_frame { Position: {52.275, 7.205, 42.705}; Box: {0.3, 0.13, 1.04} }
+    deckhouse_0_p6_5_frame_1 : BunkerMat_frame { Position: {57.725, 6.075, 42.25}; Box: {0.3, 2.15, 0.13} }
+    deckhouse_0_p6_5_frame_2 : BunkerMat_frame { Position: {57.725, 6.075, 43.16}; Box: {0.3, 2.15, 0.13} }
+    deckhouse_0_p6_5_frame_3 : BunkerMat_frame { Position: {57.725, 7.205, 42.705}; Box: {0.3, 0.13, 1.04} }
+    deckhouse_0_p8_9_frame_1 : BunkerMat_frame { Position: {52.525, 6.075, 32.84}; Box: {0.3, 2.15, 0.13} }
+    deckhouse_0_p8_9_frame_2 : BunkerMat_frame { Position: {52.525, 6.075, 33.75}; Box: {0.3, 2.15, 0.13} }
+    deckhouse_0_p8_9_frame_3 : BunkerMat_frame { Position: {52.525, 7.205, 33.295}; Box: {0.3, 0.13, 1.04} }
+    deckhouse_0_p11_12_frame_1 : BunkerMat_frame { Position: {58.82, 6.075, 36.8467}; Box: {0.13, 2.15, 0.3} }
+    deckhouse_0_p11_12_frame_2 : BunkerMat_frame { Position: {59.73, 6.075, 36.8467}; Box: {0.13, 2.15, 0.3} }
+    deckhouse_0_p11_12_frame_3 : BunkerMat_frame { Position: {59.275, 7.205, 36.8467}; Box: {1.04, 0.13, 0.3} }
+    deckhouse_0_p13_12_frame_1 : BunkerMat_frame { Position: {58.82, 6.075, 39.1533}; Box: {0.13, 2.15, 0.3} }
+    deckhouse_0_p13_12_frame_2 : BunkerMat_frame { Position: {59.73, 6.075, 39.1533}; Box: {0.13, 2.15, 0.3} }
+    deckhouse_0_p13_12_frame_3 : BunkerMat_frame { Position: {59.275, 7.205, 39.1533}; Box: {1.04, 0.13, 0.3} }
+    deckhouse_0_p14_15_frame_1 : BunkerMat_frame { Position: {50.27, 6.075, 36.8467}; Box: {0.13, 2.15, 0.3} }
+    deckhouse_0_p14_15_frame_2 : BunkerMat_frame { Position: {51.18, 6.075, 36.8467}; Box: {0.13, 2.15, 0.3} }
+    deckhouse_0_p14_15_frame_3 : BunkerMat_frame { Position: {50.725, 7.205, 36.8467}; Box: {1.04, 0.13, 0.3} }
+    deckhouse_0_p16_15_frame_1 : BunkerMat_frame { Position: {50.27, 6.075, 39.1533}; Box: {0.13, 2.15, 0.3} }
+    deckhouse_0_p16_15_frame_2 : BunkerMat_frame { Position: {51.18, 6.075, 39.1533}; Box: {0.13, 2.15, 0.3} }
+    deckhouse_0_p16_15_frame_3 : BunkerMat_frame { Position: {50.725, 7.205, 39.1533}; Box: {1.04, 0.13, 0.3} }
+    deckhouse_entrance0_frame_1 : BunkerMat_frame { Position: {55.545, 6.1, 32.05}; Box: {0.13, 2.2, 0.3} }
+    deckhouse_entrance0_frame_2 : BunkerMat_frame { Position: {56.655, 6.1, 32.05}; Box: {0.13, 2.2, 0.3} }
+    deckhouse_entrance0_frame_3 : BunkerMat_frame { Position: {56.1, 7.255, 32.05}; Box: {1.24, 0.13, 0.3} }
+    deckhouse_1_w3_0_x6_0_frame_1 : BunkerMat_frame { Position: {50.2575, 9.5, 43.95}; Box: {0.13, 1, 0.3} }
+    deckhouse_1_w3_0_x6_0_frame_2 : BunkerMat_frame { Position: {51.5675, 9.5, 43.95}; Box: {0.13, 1, 0.3} }
+    deckhouse_1_w3_0_x6_0_frame_3 : BunkerMat_frame { Position: {50.9125, 10.055, 43.95}; Box: {1.44, 0.13, 0.3} }
+    deckhouse_1_w3_0_x6_0_frame_4 : BunkerMat_frame { Position: {50.9125, 8.945, 43.95}; Box: {1.44, 0.13, 0.3} }
     deckhouse_1_w3_0_x6_0_pane_1 : BunkerMat_glass { Position: {50.9125, 9.5, 43.95}; Box: {1.2, 1, 0.02} }
-    deckhouse_1_w3_0_z_5_5_frame_1 : BunkerMat_frame { Position: {49.55, 9.5, 42.045}; Box: {0.3, 1, 0.12} }
-    deckhouse_1_w3_0_z_5_5_frame_2 : BunkerMat_frame { Position: {49.55, 9.5, 43.365}; Box: {0.3, 1, 0.12} }
-    deckhouse_1_w3_0_z_5_5_frame_3 : BunkerMat_frame { Position: {49.55, 10.06, 42.705}; Box: {0.3, 0.12, 1.44} }
-    deckhouse_1_w3_0_z_5_5_frame_4 : BunkerMat_frame { Position: {49.55, 8.94, 42.705}; Box: {0.3, 0.12, 1.44} }
+    deckhouse_1_w3_0_z_5_5_frame_1 : BunkerMat_frame { Position: {49.55, 9.5, 42.05}; Box: {0.3, 1, 0.13} }
+    deckhouse_1_w3_0_z_5_5_frame_2 : BunkerMat_frame { Position: {49.55, 9.5, 43.36}; Box: {0.3, 1, 0.13} }
+    deckhouse_1_w3_0_z_5_5_frame_3 : BunkerMat_frame { Position: {49.55, 10.055, 42.705}; Box: {0.3, 0.13, 1.44} }
+    deckhouse_1_w3_0_z_5_5_frame_4 : BunkerMat_frame { Position: {49.55, 8.945, 42.705}; Box: {0.3, 0.13, 1.44} }
     deckhouse_1_w3_0_z_5_5_pane_1 : BunkerMat_glass { Position: {49.55, 9.5, 42.705}; Box: {0.02, 1, 1.2} }
-    deckhouse_1_w4_0_x6_0_frame_1 : BunkerMat_frame { Position: {52.9775, 9.5, 43.95}; Box: {0.12, 1, 0.3} }
-    deckhouse_1_w4_0_x6_0_frame_2 : BunkerMat_frame { Position: {54.2975, 9.5, 43.95}; Box: {0.12, 1, 0.3} }
-    deckhouse_1_w4_0_x6_0_frame_3 : BunkerMat_frame { Position: {53.6375, 10.06, 43.95}; Box: {1.44, 0.12, 0.3} }
-    deckhouse_1_w4_0_x6_0_frame_4 : BunkerMat_frame { Position: {53.6375, 8.94, 43.95}; Box: {1.44, 0.12, 0.3} }
+    deckhouse_1_w4_0_x6_0_frame_1 : BunkerMat_frame { Position: {52.9825, 9.5, 43.95}; Box: {0.13, 1, 0.3} }
+    deckhouse_1_w4_0_x6_0_frame_2 : BunkerMat_frame { Position: {54.2925, 9.5, 43.95}; Box: {0.13, 1, 0.3} }
+    deckhouse_1_w4_0_x6_0_frame_3 : BunkerMat_frame { Position: {53.6375, 10.055, 43.95}; Box: {1.44, 0.13, 0.3} }
+    deckhouse_1_w4_0_x6_0_frame_4 : BunkerMat_frame { Position: {53.6375, 8.945, 43.95}; Box: {1.44, 0.13, 0.3} }
     deckhouse_1_w4_0_x6_0_pane_1 : BunkerMat_glass { Position: {53.6375, 9.5, 43.95}; Box: {1.2, 1, 0.02} }
-    deckhouse_1_w5_0_x6_0_frame_1 : BunkerMat_frame { Position: {55.7025, 9.5, 43.95}; Box: {0.12, 1, 0.3} }
-    deckhouse_1_w5_0_x6_0_frame_2 : BunkerMat_frame { Position: {57.0225, 9.5, 43.95}; Box: {0.12, 1, 0.3} }
-    deckhouse_1_w5_0_x6_0_frame_3 : BunkerMat_frame { Position: {56.3625, 10.06, 43.95}; Box: {1.44, 0.12, 0.3} }
-    deckhouse_1_w5_0_x6_0_frame_4 : BunkerMat_frame { Position: {56.3625, 8.94, 43.95}; Box: {1.44, 0.12, 0.3} }
+    deckhouse_1_w5_0_x6_0_frame_1 : BunkerMat_frame { Position: {55.7075, 9.5, 43.95}; Box: {0.13, 1, 0.3} }
+    deckhouse_1_w5_0_x6_0_frame_2 : BunkerMat_frame { Position: {57.0175, 9.5, 43.95}; Box: {0.13, 1, 0.3} }
+    deckhouse_1_w5_0_x6_0_frame_3 : BunkerMat_frame { Position: {56.3625, 10.055, 43.95}; Box: {1.44, 0.13, 0.3} }
+    deckhouse_1_w5_0_x6_0_frame_4 : BunkerMat_frame { Position: {56.3625, 8.945, 43.95}; Box: {1.44, 0.13, 0.3} }
     deckhouse_1_w5_0_x6_0_pane_1 : BunkerMat_glass { Position: {56.3625, 9.5, 43.95}; Box: {1.2, 1, 0.02} }
-    deckhouse_1_w6_0_x6_0_frame_1 : BunkerMat_frame { Position: {58.4275, 9.5, 43.95}; Box: {0.12, 1, 0.3} }
-    deckhouse_1_w6_0_x6_0_frame_2 : BunkerMat_frame { Position: {59.7475, 9.5, 43.95}; Box: {0.12, 1, 0.3} }
-    deckhouse_1_w6_0_x6_0_frame_3 : BunkerMat_frame { Position: {59.0875, 10.06, 43.95}; Box: {1.44, 0.12, 0.3} }
-    deckhouse_1_w6_0_x6_0_frame_4 : BunkerMat_frame { Position: {59.0875, 8.94, 43.95}; Box: {1.44, 0.12, 0.3} }
+    deckhouse_1_w6_0_x6_0_frame_1 : BunkerMat_frame { Position: {58.4325, 9.5, 43.95}; Box: {0.13, 1, 0.3} }
+    deckhouse_1_w6_0_x6_0_frame_2 : BunkerMat_frame { Position: {59.7425, 9.5, 43.95}; Box: {0.13, 1, 0.3} }
+    deckhouse_1_w6_0_x6_0_frame_3 : BunkerMat_frame { Position: {59.0875, 10.055, 43.95}; Box: {1.44, 0.13, 0.3} }
+    deckhouse_1_w6_0_x6_0_frame_4 : BunkerMat_frame { Position: {59.0875, 8.945, 43.95}; Box: {1.44, 0.13, 0.3} }
     deckhouse_1_w6_0_x6_0_pane_1 : BunkerMat_glass { Position: {59.0875, 9.5, 43.95}; Box: {1.2, 1, 0.02} }
-    deckhouse_1_w6_0_z5_5_frame_1 : BunkerMat_frame { Position: {60.45, 9.5, 42.045}; Box: {0.3, 1, 0.12} }
-    deckhouse_1_w6_0_z5_5_frame_2 : BunkerMat_frame { Position: {60.45, 9.5, 43.365}; Box: {0.3, 1, 0.12} }
-    deckhouse_1_w6_0_z5_5_frame_3 : BunkerMat_frame { Position: {60.45, 10.06, 42.705}; Box: {0.3, 0.12, 1.44} }
-    deckhouse_1_w6_0_z5_5_frame_4 : BunkerMat_frame { Position: {60.45, 8.94, 42.705}; Box: {0.3, 0.12, 1.44} }
+    deckhouse_1_w6_0_z5_5_frame_1 : BunkerMat_frame { Position: {60.45, 9.5, 42.05}; Box: {0.3, 1, 0.13} }
+    deckhouse_1_w6_0_z5_5_frame_2 : BunkerMat_frame { Position: {60.45, 9.5, 43.36}; Box: {0.3, 1, 0.13} }
+    deckhouse_1_w6_0_z5_5_frame_3 : BunkerMat_frame { Position: {60.45, 10.055, 42.705}; Box: {0.3, 0.13, 1.44} }
+    deckhouse_1_w6_0_z5_5_frame_4 : BunkerMat_frame { Position: {60.45, 8.945, 42.705}; Box: {0.3, 0.13, 1.44} }
     deckhouse_1_w6_0_z5_5_pane_1 : BunkerMat_glass { Position: {60.45, 9.5, 42.705}; Box: {0.02, 1, 1.2} }
-    deckhouse_1_w8_0_x_6_0_frame_1 : BunkerMat_frame { Position: {50.3775, 9.5, 32.05}; Box: {0.12, 1, 0.3} }
-    deckhouse_1_w8_0_x_6_0_frame_2 : BunkerMat_frame { Position: {51.6975, 9.5, 32.05}; Box: {0.12, 1, 0.3} }
-    deckhouse_1_w8_0_x_6_0_frame_3 : BunkerMat_frame { Position: {51.0375, 10.06, 32.05}; Box: {1.44, 0.12, 0.3} }
-    deckhouse_1_w8_0_x_6_0_frame_4 : BunkerMat_frame { Position: {51.0375, 8.94, 32.05}; Box: {1.44, 0.12, 0.3} }
+    deckhouse_1_w8_0_x_6_0_frame_1 : BunkerMat_frame { Position: {50.3825, 9.5, 32.05}; Box: {0.13, 1, 0.3} }
+    deckhouse_1_w8_0_x_6_0_frame_2 : BunkerMat_frame { Position: {51.6925, 9.5, 32.05}; Box: {0.13, 1, 0.3} }
+    deckhouse_1_w8_0_x_6_0_frame_3 : BunkerMat_frame { Position: {51.0375, 10.055, 32.05}; Box: {1.44, 0.13, 0.3} }
+    deckhouse_1_w8_0_x_6_0_frame_4 : BunkerMat_frame { Position: {51.0375, 8.945, 32.05}; Box: {1.44, 0.13, 0.3} }
     deckhouse_1_w8_0_x_6_0_pane_1 : BunkerMat_glass { Position: {51.0375, 9.5, 32.05}; Box: {1.2, 1, 0.02} }
-    deckhouse_1_w8_0_z_5_5_frame_1 : BunkerMat_frame { Position: {49.55, 9.5, 32.635}; Box: {0.3, 1, 0.12} }
-    deckhouse_1_w8_0_z_5_5_frame_2 : BunkerMat_frame { Position: {49.55, 9.5, 33.955}; Box: {0.3, 1, 0.12} }
-    deckhouse_1_w8_0_z_5_5_frame_3 : BunkerMat_frame { Position: {49.55, 10.06, 33.295}; Box: {0.3, 0.12, 1.44} }
-    deckhouse_1_w8_0_z_5_5_frame_4 : BunkerMat_frame { Position: {49.55, 8.94, 33.295}; Box: {0.3, 0.12, 1.44} }
+    deckhouse_1_w8_0_z_5_5_frame_1 : BunkerMat_frame { Position: {49.55, 9.5, 32.64}; Box: {0.3, 1, 0.13} }
+    deckhouse_1_w8_0_z_5_5_frame_2 : BunkerMat_frame { Position: {49.55, 9.5, 33.95}; Box: {0.3, 1, 0.13} }
+    deckhouse_1_w8_0_z_5_5_frame_3 : BunkerMat_frame { Position: {49.55, 10.055, 33.295}; Box: {0.3, 0.13, 1.44} }
+    deckhouse_1_w8_0_z_5_5_frame_4 : BunkerMat_frame { Position: {49.55, 8.945, 33.295}; Box: {0.3, 0.13, 1.44} }
     deckhouse_1_w8_0_z_5_5_pane_1 : BunkerMat_glass { Position: {49.55, 9.5, 33.295}; Box: {0.02, 1, 1.2} }
-    deckhouse_1_w9_0_x_6_0_frame_1 : BunkerMat_frame { Position: {53.3525, 9.5, 32.05}; Box: {0.12, 1, 0.3} }
-    deckhouse_1_w9_0_x_6_0_frame_2 : BunkerMat_frame { Position: {54.6725, 9.5, 32.05}; Box: {0.12, 1, 0.3} }
-    deckhouse_1_w9_0_x_6_0_frame_3 : BunkerMat_frame { Position: {54.0125, 10.06, 32.05}; Box: {1.44, 0.12, 0.3} }
-    deckhouse_1_w9_0_x_6_0_frame_4 : BunkerMat_frame { Position: {54.0125, 8.94, 32.05}; Box: {1.44, 0.12, 0.3} }
+    deckhouse_1_w9_0_x_6_0_frame_1 : BunkerMat_frame { Position: {53.3575, 9.5, 32.05}; Box: {0.13, 1, 0.3} }
+    deckhouse_1_w9_0_x_6_0_frame_2 : BunkerMat_frame { Position: {54.6675, 9.5, 32.05}; Box: {0.13, 1, 0.3} }
+    deckhouse_1_w9_0_x_6_0_frame_3 : BunkerMat_frame { Position: {54.0125, 10.055, 32.05}; Box: {1.44, 0.13, 0.3} }
+    deckhouse_1_w9_0_x_6_0_frame_4 : BunkerMat_frame { Position: {54.0125, 8.945, 32.05}; Box: {1.44, 0.13, 0.3} }
     deckhouse_1_w9_0_x_6_0_pane_1 : BunkerMat_glass { Position: {54.0125, 9.5, 32.05}; Box: {1.2, 1, 0.02} }
-    deckhouse_1_w10_0_x_6_0_frame_1 : BunkerMat_frame { Position: {57.915, 9.5, 32.05}; Box: {0.12, 1, 0.3} }
-    deckhouse_1_w10_0_x_6_0_frame_2 : BunkerMat_frame { Position: {59.235, 9.5, 32.05}; Box: {0.12, 1, 0.3} }
-    deckhouse_1_w10_0_x_6_0_frame_3 : BunkerMat_frame { Position: {58.575, 10.06, 32.05}; Box: {1.44, 0.12, 0.3} }
-    deckhouse_1_w10_0_x_6_0_frame_4 : BunkerMat_frame { Position: {58.575, 8.94, 32.05}; Box: {1.44, 0.12, 0.3} }
+    deckhouse_1_w10_0_x_6_0_frame_1 : BunkerMat_frame { Position: {57.92, 9.5, 32.05}; Box: {0.13, 1, 0.3} }
+    deckhouse_1_w10_0_x_6_0_frame_2 : BunkerMat_frame { Position: {59.23, 9.5, 32.05}; Box: {0.13, 1, 0.3} }
+    deckhouse_1_w10_0_x_6_0_frame_3 : BunkerMat_frame { Position: {58.575, 10.055, 32.05}; Box: {1.44, 0.13, 0.3} }
+    deckhouse_1_w10_0_x_6_0_frame_4 : BunkerMat_frame { Position: {58.575, 8.945, 32.05}; Box: {1.44, 0.13, 0.3} }
     deckhouse_1_w10_0_x_6_0_pane_1 : BunkerMat_glass { Position: {58.575, 9.5, 32.05}; Box: {1.2, 1, 0.02} }
-    deckhouse_1_w10_0_z5_5_frame_1 : BunkerMat_frame { Position: {60.45, 9.5, 32.635}; Box: {0.3, 1, 0.12} }
-    deckhouse_1_w10_0_z5_5_frame_2 : BunkerMat_frame { Position: {60.45, 9.5, 33.955}; Box: {0.3, 1, 0.12} }
-    deckhouse_1_w10_0_z5_5_frame_3 : BunkerMat_frame { Position: {60.45, 10.06, 33.295}; Box: {0.3, 0.12, 1.44} }
-    deckhouse_1_w10_0_z5_5_frame_4 : BunkerMat_frame { Position: {60.45, 8.94, 33.295}; Box: {0.3, 0.12, 1.44} }
+    deckhouse_1_w10_0_z5_5_frame_1 : BunkerMat_frame { Position: {60.45, 9.5, 32.64}; Box: {0.3, 1, 0.13} }
+    deckhouse_1_w10_0_z5_5_frame_2 : BunkerMat_frame { Position: {60.45, 9.5, 33.95}; Box: {0.3, 1, 0.13} }
+    deckhouse_1_w10_0_z5_5_frame_3 : BunkerMat_frame { Position: {60.45, 10.055, 33.295}; Box: {0.3, 0.13, 1.44} }
+    deckhouse_1_w10_0_z5_5_frame_4 : BunkerMat_frame { Position: {60.45, 8.945, 33.295}; Box: {0.3, 0.13, 1.44} }
     deckhouse_1_w10_0_z5_5_pane_1 : BunkerMat_glass { Position: {60.45, 9.5, 33.295}; Box: {0.02, 1, 1.2} }
-    deckhouse_1_w11_0_z5_5_frame_1 : BunkerMat_frame { Position: {60.45, 9.5, 35.0333}; Box: {0.3, 1, 0.12} }
-    deckhouse_1_w11_0_z5_5_frame_2 : BunkerMat_frame { Position: {60.45, 9.5, 36.3533}; Box: {0.3, 1, 0.12} }
-    deckhouse_1_w11_0_z5_5_frame_3 : BunkerMat_frame { Position: {60.45, 10.06, 35.6933}; Box: {0.3, 0.12, 1.44} }
-    deckhouse_1_w11_0_z5_5_frame_4 : BunkerMat_frame { Position: {60.45, 8.94, 35.6933}; Box: {0.3, 0.12, 1.44} }
+    deckhouse_1_w11_0_z5_5_frame_1 : BunkerMat_frame { Position: {60.45, 9.5, 35.0383}; Box: {0.3, 1, 0.13} }
+    deckhouse_1_w11_0_z5_5_frame_2 : BunkerMat_frame { Position: {60.45, 9.5, 36.3483}; Box: {0.3, 1, 0.13} }
+    deckhouse_1_w11_0_z5_5_frame_3 : BunkerMat_frame { Position: {60.45, 10.055, 35.6933}; Box: {0.3, 0.13, 1.44} }
+    deckhouse_1_w11_0_z5_5_frame_4 : BunkerMat_frame { Position: {60.45, 8.945, 35.6933}; Box: {0.3, 0.13, 1.44} }
     deckhouse_1_w11_0_z5_5_pane_1 : BunkerMat_glass { Position: {60.45, 9.5, 35.6933}; Box: {0.02, 1, 1.2} }
-    deckhouse_1_w12_0_z5_5_frame_1 : BunkerMat_frame { Position: {60.45, 9.5, 37.34}; Box: {0.3, 1, 0.12} }
-    deckhouse_1_w12_0_z5_5_frame_2 : BunkerMat_frame { Position: {60.45, 9.5, 38.66}; Box: {0.3, 1, 0.12} }
-    deckhouse_1_w12_0_z5_5_frame_3 : BunkerMat_frame { Position: {60.45, 10.06, 38}; Box: {0.3, 0.12, 1.44} }
-    deckhouse_1_w12_0_z5_5_frame_4 : BunkerMat_frame { Position: {60.45, 8.94, 38}; Box: {0.3, 0.12, 1.44} }
+    deckhouse_1_w12_0_z5_5_frame_1 : BunkerMat_frame { Position: {60.45, 9.5, 37.345}; Box: {0.3, 1, 0.13} }
+    deckhouse_1_w12_0_z5_5_frame_2 : BunkerMat_frame { Position: {60.45, 9.5, 38.655}; Box: {0.3, 1, 0.13} }
+    deckhouse_1_w12_0_z5_5_frame_3 : BunkerMat_frame { Position: {60.45, 10.055, 38}; Box: {0.3, 0.13, 1.44} }
+    deckhouse_1_w12_0_z5_5_frame_4 : BunkerMat_frame { Position: {60.45, 8.945, 38}; Box: {0.3, 0.13, 1.44} }
     deckhouse_1_w12_0_z5_5_pane_1 : BunkerMat_glass { Position: {60.45, 9.5, 38}; Box: {0.02, 1, 1.2} }
-    deckhouse_1_w13_0_z5_5_frame_1 : BunkerMat_frame { Position: {60.45, 9.5, 39.6467}; Box: {0.3, 1, 0.12} }
-    deckhouse_1_w13_0_z5_5_frame_2 : BunkerMat_frame { Position: {60.45, 9.5, 40.9667}; Box: {0.3, 1, 0.12} }
-    deckhouse_1_w13_0_z5_5_frame_3 : BunkerMat_frame { Position: {60.45, 10.06, 40.3067}; Box: {0.3, 0.12, 1.44} }
-    deckhouse_1_w13_0_z5_5_frame_4 : BunkerMat_frame { Position: {60.45, 8.94, 40.3067}; Box: {0.3, 0.12, 1.44} }
+    deckhouse_1_w13_0_z5_5_frame_1 : BunkerMat_frame { Position: {60.45, 9.5, 39.6517}; Box: {0.3, 1, 0.13} }
+    deckhouse_1_w13_0_z5_5_frame_2 : BunkerMat_frame { Position: {60.45, 9.5, 40.9617}; Box: {0.3, 1, 0.13} }
+    deckhouse_1_w13_0_z5_5_frame_3 : BunkerMat_frame { Position: {60.45, 10.055, 40.3067}; Box: {0.3, 0.13, 1.44} }
+    deckhouse_1_w13_0_z5_5_frame_4 : BunkerMat_frame { Position: {60.45, 8.945, 40.3067}; Box: {0.3, 0.13, 1.44} }
     deckhouse_1_w13_0_z5_5_pane_1 : BunkerMat_glass { Position: {60.45, 9.5, 40.3067}; Box: {0.02, 1, 1.2} }
-    deckhouse_1_w14_0_z_5_5_frame_1 : BunkerMat_frame { Position: {49.55, 9.5, 35.0333}; Box: {0.3, 1, 0.12} }
-    deckhouse_1_w14_0_z_5_5_frame_2 : BunkerMat_frame { Position: {49.55, 9.5, 36.3533}; Box: {0.3, 1, 0.12} }
-    deckhouse_1_w14_0_z_5_5_frame_3 : BunkerMat_frame { Position: {49.55, 10.06, 35.6933}; Box: {0.3, 0.12, 1.44} }
-    deckhouse_1_w14_0_z_5_5_frame_4 : BunkerMat_frame { Position: {49.55, 8.94, 35.6933}; Box: {0.3, 0.12, 1.44} }
+    deckhouse_1_w14_0_z_5_5_frame_1 : BunkerMat_frame { Position: {49.55, 9.5, 35.0383}; Box: {0.3, 1, 0.13} }
+    deckhouse_1_w14_0_z_5_5_frame_2 : BunkerMat_frame { Position: {49.55, 9.5, 36.3483}; Box: {0.3, 1, 0.13} }
+    deckhouse_1_w14_0_z_5_5_frame_3 : BunkerMat_frame { Position: {49.55, 10.055, 35.6933}; Box: {0.3, 0.13, 1.44} }
+    deckhouse_1_w14_0_z_5_5_frame_4 : BunkerMat_frame { Position: {49.55, 8.945, 35.6933}; Box: {0.3, 0.13, 1.44} }
     deckhouse_1_w14_0_z_5_5_pane_1 : BunkerMat_glass { Position: {49.55, 9.5, 35.6933}; Box: {0.02, 1, 1.2} }
-    deckhouse_1_w15_0_z_5_5_frame_1 : BunkerMat_frame { Position: {49.55, 9.5, 37.34}; Box: {0.3, 1, 0.12} }
-    deckhouse_1_w15_0_z_5_5_frame_2 : BunkerMat_frame { Position: {49.55, 9.5, 38.66}; Box: {0.3, 1, 0.12} }
-    deckhouse_1_w15_0_z_5_5_frame_3 : BunkerMat_frame { Position: {49.55, 10.06, 38}; Box: {0.3, 0.12, 1.44} }
-    deckhouse_1_w15_0_z_5_5_frame_4 : BunkerMat_frame { Position: {49.55, 8.94, 38}; Box: {0.3, 0.12, 1.44} }
+    deckhouse_1_w15_0_z_5_5_frame_1 : BunkerMat_frame { Position: {49.55, 9.5, 37.345}; Box: {0.3, 1, 0.13} }
+    deckhouse_1_w15_0_z_5_5_frame_2 : BunkerMat_frame { Position: {49.55, 9.5, 38.655}; Box: {0.3, 1, 0.13} }
+    deckhouse_1_w15_0_z_5_5_frame_3 : BunkerMat_frame { Position: {49.55, 10.055, 38}; Box: {0.3, 0.13, 1.44} }
+    deckhouse_1_w15_0_z_5_5_frame_4 : BunkerMat_frame { Position: {49.55, 8.945, 38}; Box: {0.3, 0.13, 1.44} }
     deckhouse_1_w15_0_z_5_5_pane_1 : BunkerMat_glass { Position: {49.55, 9.5, 38}; Box: {0.02, 1, 1.2} }
-    deckhouse_1_w16_0_z_5_5_frame_1 : BunkerMat_frame { Position: {49.55, 9.5, 39.6467}; Box: {0.3, 1, 0.12} }
-    deckhouse_1_w16_0_z_5_5_frame_2 : BunkerMat_frame { Position: {49.55, 9.5, 40.9667}; Box: {0.3, 1, 0.12} }
-    deckhouse_1_w16_0_z_5_5_frame_3 : BunkerMat_frame { Position: {49.55, 10.06, 40.3067}; Box: {0.3, 0.12, 1.44} }
-    deckhouse_1_w16_0_z_5_5_frame_4 : BunkerMat_frame { Position: {49.55, 8.94, 40.3067}; Box: {0.3, 0.12, 1.44} }
+    deckhouse_1_w16_0_z_5_5_frame_1 : BunkerMat_frame { Position: {49.55, 9.5, 39.6517}; Box: {0.3, 1, 0.13} }
+    deckhouse_1_w16_0_z_5_5_frame_2 : BunkerMat_frame { Position: {49.55, 9.5, 40.9617}; Box: {0.3, 1, 0.13} }
+    deckhouse_1_w16_0_z_5_5_frame_3 : BunkerMat_frame { Position: {49.55, 10.055, 40.3067}; Box: {0.3, 0.13, 1.44} }
+    deckhouse_1_w16_0_z_5_5_frame_4 : BunkerMat_frame { Position: {49.55, 8.945, 40.3067}; Box: {0.3, 0.13, 1.44} }
     deckhouse_1_w16_0_z_5_5_pane_1 : BunkerMat_glass { Position: {49.55, 9.5, 40.3067}; Box: {0.02, 1, 1.2} }
-    deckhouse_1_p0_2_frame_1 : BunkerMat_frame { Position: {53.59, 8.975, 35.74}; Box: {0.12, 2.15, 0.3} }
-    deckhouse_1_p0_2_frame_2 : BunkerMat_frame { Position: {54.81, 8.975, 35.74}; Box: {0.12, 2.15, 0.3} }
-    deckhouse_1_p0_2_frame_3 : BunkerMat_frame { Position: {54.2, 10.11, 35.74}; Box: {1.34, 0.12, 0.3} }
-    deckhouse_1_p4_2_frame_1 : BunkerMat_frame { Position: {53.7775, 8.975, 41.46}; Box: {0.12, 2.15, 0.3} }
-    deckhouse_1_p4_2_frame_2 : BunkerMat_frame { Position: {54.6975, 8.975, 41.46}; Box: {0.12, 2.15, 0.3} }
-    deckhouse_1_p4_2_frame_3 : BunkerMat_frame { Position: {54.2375, 10.11, 41.46}; Box: {1.04, 0.12, 0.3} }
-    deckhouse_1_p5_2_frame_1 : BunkerMat_frame { Position: {55.3025, 8.975, 41.46}; Box: {0.12, 2.15, 0.3} }
-    deckhouse_1_p5_2_frame_2 : BunkerMat_frame { Position: {56.2225, 8.975, 41.46}; Box: {0.12, 2.15, 0.3} }
-    deckhouse_1_p5_2_frame_3 : BunkerMat_frame { Position: {55.7625, 10.11, 41.46}; Box: {1.04, 0.12, 0.3} }
-    deckhouse_1_p9_2_frame_1 : BunkerMat_frame { Position: {54.1525, 8.975, 34.54}; Box: {0.12, 2.15, 0.3} }
-    deckhouse_1_p9_2_frame_2 : BunkerMat_frame { Position: {55.0725, 8.975, 34.54}; Box: {0.12, 2.15, 0.3} }
-    deckhouse_1_p9_2_frame_3 : BunkerMat_frame { Position: {54.6125, 10.11, 34.54}; Box: {1.04, 0.12, 0.3} }
-    deckhouse_1_p10_7_frame_1 : BunkerMat_frame { Position: {56.7, 8.975, 32.835}; Box: {0.3, 2.15, 0.12} }
-    deckhouse_1_p10_7_frame_2 : BunkerMat_frame { Position: {56.7, 8.975, 33.755}; Box: {0.3, 2.15, 0.12} }
-    deckhouse_1_p10_7_frame_3 : BunkerMat_frame { Position: {56.7, 10.11, 33.295}; Box: {0.3, 0.12, 1.04} }
-    deckhouse_1_p12_2_frame_1 : BunkerMat_frame { Position: {58.1, 8.975, 37.54}; Box: {0.3, 2.15, 0.12} }
-    deckhouse_1_p12_2_frame_2 : BunkerMat_frame { Position: {58.1, 8.975, 38.46}; Box: {0.3, 2.15, 0.12} }
-    deckhouse_1_p12_2_frame_3 : BunkerMat_frame { Position: {58.1, 10.11, 38}; Box: {0.3, 0.12, 1.04} }
-    deckhouse_1_p15_2_frame_1 : BunkerMat_frame { Position: {51.9, 8.975, 37.54}; Box: {0.3, 2.15, 0.12} }
-    deckhouse_1_p15_2_frame_2 : BunkerMat_frame { Position: {51.9, 8.975, 38.46}; Box: {0.3, 2.15, 0.12} }
-    deckhouse_1_p15_2_frame_3 : BunkerMat_frame { Position: {51.9, 10.11, 38}; Box: {0.3, 0.12, 1.04} }
-    deckhouse_1_p3_4_frame_1 : BunkerMat_frame { Position: {52.275, 8.975, 42.245}; Box: {0.3, 2.15, 0.12} }
-    deckhouse_1_p3_4_frame_2 : BunkerMat_frame { Position: {52.275, 8.975, 43.165}; Box: {0.3, 2.15, 0.12} }
-    deckhouse_1_p3_4_frame_3 : BunkerMat_frame { Position: {52.275, 10.11, 42.705}; Box: {0.3, 0.12, 1.04} }
-    deckhouse_1_p6_5_frame_1 : BunkerMat_frame { Position: {57.725, 8.975, 42.245}; Box: {0.3, 2.15, 0.12} }
-    deckhouse_1_p6_5_frame_2 : BunkerMat_frame { Position: {57.725, 8.975, 43.165}; Box: {0.3, 2.15, 0.12} }
-    deckhouse_1_p6_5_frame_3 : BunkerMat_frame { Position: {57.725, 10.11, 42.705}; Box: {0.3, 0.12, 1.04} }
-    deckhouse_1_p8_9_frame_1 : BunkerMat_frame { Position: {52.525, 8.975, 32.835}; Box: {0.3, 2.15, 0.12} }
-    deckhouse_1_p8_9_frame_2 : BunkerMat_frame { Position: {52.525, 8.975, 33.755}; Box: {0.3, 2.15, 0.12} }
-    deckhouse_1_p8_9_frame_3 : BunkerMat_frame { Position: {52.525, 10.11, 33.295}; Box: {0.3, 0.12, 1.04} }
-    deckhouse_1_p11_12_frame_1 : BunkerMat_frame { Position: {58.815, 8.975, 36.8467}; Box: {0.12, 2.15, 0.3} }
-    deckhouse_1_p11_12_frame_2 : BunkerMat_frame { Position: {59.735, 8.975, 36.8467}; Box: {0.12, 2.15, 0.3} }
-    deckhouse_1_p11_12_frame_3 : BunkerMat_frame { Position: {59.275, 10.11, 36.8467}; Box: {1.04, 0.12, 0.3} }
-    deckhouse_1_p13_12_frame_1 : BunkerMat_frame { Position: {58.815, 8.975, 39.1533}; Box: {0.12, 2.15, 0.3} }
-    deckhouse_1_p13_12_frame_2 : BunkerMat_frame { Position: {59.735, 8.975, 39.1533}; Box: {0.12, 2.15, 0.3} }
-    deckhouse_1_p13_12_frame_3 : BunkerMat_frame { Position: {59.275, 10.11, 39.1533}; Box: {1.04, 0.12, 0.3} }
-    deckhouse_1_p14_15_frame_1 : BunkerMat_frame { Position: {50.265, 8.975, 36.8467}; Box: {0.12, 2.15, 0.3} }
-    deckhouse_1_p14_15_frame_2 : BunkerMat_frame { Position: {51.185, 8.975, 36.8467}; Box: {0.12, 2.15, 0.3} }
-    deckhouse_1_p14_15_frame_3 : BunkerMat_frame { Position: {50.725, 10.11, 36.8467}; Box: {1.04, 0.12, 0.3} }
-    deckhouse_1_p16_15_frame_1 : BunkerMat_frame { Position: {50.265, 8.975, 39.1533}; Box: {0.12, 2.15, 0.3} }
-    deckhouse_1_p16_15_frame_2 : BunkerMat_frame { Position: {51.185, 8.975, 39.1533}; Box: {0.12, 2.15, 0.3} }
-    deckhouse_1_p16_15_frame_3 : BunkerMat_frame { Position: {50.725, 10.11, 39.1533}; Box: {1.04, 0.12, 0.3} }
+    deckhouse_1_p0_2_frame_1 : BunkerMat_frame { Position: {53.595, 8.975, 35.74}; Box: {0.13, 2.15, 0.3} }
+    deckhouse_1_p0_2_frame_2 : BunkerMat_frame { Position: {54.805, 8.975, 35.74}; Box: {0.13, 2.15, 0.3} }
+    deckhouse_1_p0_2_frame_3 : BunkerMat_frame { Position: {54.2, 10.105, 35.74}; Box: {1.34, 0.13, 0.3} }
+    deckhouse_1_p4_2_frame_1 : BunkerMat_frame { Position: {53.7825, 8.975, 41.46}; Box: {0.13, 2.15, 0.3} }
+    deckhouse_1_p4_2_frame_2 : BunkerMat_frame { Position: {54.6925, 8.975, 41.46}; Box: {0.13, 2.15, 0.3} }
+    deckhouse_1_p4_2_frame_3 : BunkerMat_frame { Position: {54.2375, 10.105, 41.46}; Box: {1.04, 0.13, 0.3} }
+    deckhouse_1_p5_2_frame_1 : BunkerMat_frame { Position: {55.3075, 8.975, 41.46}; Box: {0.13, 2.15, 0.3} }
+    deckhouse_1_p5_2_frame_2 : BunkerMat_frame { Position: {56.2175, 8.975, 41.46}; Box: {0.13, 2.15, 0.3} }
+    deckhouse_1_p5_2_frame_3 : BunkerMat_frame { Position: {55.7625, 10.105, 41.46}; Box: {1.04, 0.13, 0.3} }
+    deckhouse_1_p9_2_frame_1 : BunkerMat_frame { Position: {54.1575, 8.975, 34.54}; Box: {0.13, 2.15, 0.3} }
+    deckhouse_1_p9_2_frame_2 : BunkerMat_frame { Position: {55.0675, 8.975, 34.54}; Box: {0.13, 2.15, 0.3} }
+    deckhouse_1_p9_2_frame_3 : BunkerMat_frame { Position: {54.6125, 10.105, 34.54}; Box: {1.04, 0.13, 0.3} }
+    deckhouse_1_p10_7_frame_1 : BunkerMat_frame { Position: {56.7, 8.975, 32.84}; Box: {0.3, 2.15, 0.13} }
+    deckhouse_1_p10_7_frame_2 : BunkerMat_frame { Position: {56.7, 8.975, 33.75}; Box: {0.3, 2.15, 0.13} }
+    deckhouse_1_p10_7_frame_3 : BunkerMat_frame { Position: {56.7, 10.105, 33.295}; Box: {0.3, 0.13, 1.04} }
+    deckhouse_1_p12_2_frame_1 : BunkerMat_frame { Position: {58.1, 8.975, 37.545}; Box: {0.3, 2.15, 0.13} }
+    deckhouse_1_p12_2_frame_2 : BunkerMat_frame { Position: {58.1, 8.975, 38.455}; Box: {0.3, 2.15, 0.13} }
+    deckhouse_1_p12_2_frame_3 : BunkerMat_frame { Position: {58.1, 10.105, 38}; Box: {0.3, 0.13, 1.04} }
+    deckhouse_1_p15_2_frame_1 : BunkerMat_frame { Position: {51.9, 8.975, 37.545}; Box: {0.3, 2.15, 0.13} }
+    deckhouse_1_p15_2_frame_2 : BunkerMat_frame { Position: {51.9, 8.975, 38.455}; Box: {0.3, 2.15, 0.13} }
+    deckhouse_1_p15_2_frame_3 : BunkerMat_frame { Position: {51.9, 10.105, 38}; Box: {0.3, 0.13, 1.04} }
+    deckhouse_1_p3_4_frame_1 : BunkerMat_frame { Position: {52.275, 8.975, 42.25}; Box: {0.3, 2.15, 0.13} }
+    deckhouse_1_p3_4_frame_2 : BunkerMat_frame { Position: {52.275, 8.975, 43.16}; Box: {0.3, 2.15, 0.13} }
+    deckhouse_1_p3_4_frame_3 : BunkerMat_frame { Position: {52.275, 10.105, 42.705}; Box: {0.3, 0.13, 1.04} }
+    deckhouse_1_p6_5_frame_1 : BunkerMat_frame { Position: {57.725, 8.975, 42.25}; Box: {0.3, 2.15, 0.13} }
+    deckhouse_1_p6_5_frame_2 : BunkerMat_frame { Position: {57.725, 8.975, 43.16}; Box: {0.3, 2.15, 0.13} }
+    deckhouse_1_p6_5_frame_3 : BunkerMat_frame { Position: {57.725, 10.105, 42.705}; Box: {0.3, 0.13, 1.04} }
+    deckhouse_1_p8_9_frame_1 : BunkerMat_frame { Position: {52.525, 8.975, 32.84}; Box: {0.3, 2.15, 0.13} }
+    deckhouse_1_p8_9_frame_2 : BunkerMat_frame { Position: {52.525, 8.975, 33.75}; Box: {0.3, 2.15, 0.13} }
+    deckhouse_1_p8_9_frame_3 : BunkerMat_frame { Position: {52.525, 10.105, 33.295}; Box: {0.3, 0.13, 1.04} }
+    deckhouse_1_p11_12_frame_1 : BunkerMat_frame { Position: {58.82, 8.975, 36.8467}; Box: {0.13, 2.15, 0.3} }
+    deckhouse_1_p11_12_frame_2 : BunkerMat_frame { Position: {59.73, 8.975, 36.8467}; Box: {0.13, 2.15, 0.3} }
+    deckhouse_1_p11_12_frame_3 : BunkerMat_frame { Position: {59.275, 10.105, 36.8467}; Box: {1.04, 0.13, 0.3} }
+    deckhouse_1_p13_12_frame_1 : BunkerMat_frame { Position: {58.82, 8.975, 39.1533}; Box: {0.13, 2.15, 0.3} }
+    deckhouse_1_p13_12_frame_2 : BunkerMat_frame { Position: {59.73, 8.975, 39.1533}; Box: {0.13, 2.15, 0.3} }
+    deckhouse_1_p13_12_frame_3 : BunkerMat_frame { Position: {59.275, 10.105, 39.1533}; Box: {1.04, 0.13, 0.3} }
+    deckhouse_1_p14_15_frame_1 : BunkerMat_frame { Position: {50.27, 8.975, 36.8467}; Box: {0.13, 2.15, 0.3} }
+    deckhouse_1_p14_15_frame_2 : BunkerMat_frame { Position: {51.18, 8.975, 36.8467}; Box: {0.13, 2.15, 0.3} }
+    deckhouse_1_p14_15_frame_3 : BunkerMat_frame { Position: {50.725, 10.105, 36.8467}; Box: {1.04, 0.13, 0.3} }
+    deckhouse_1_p16_15_frame_1 : BunkerMat_frame { Position: {50.27, 8.975, 39.1533}; Box: {0.13, 2.15, 0.3} }
+    deckhouse_1_p16_15_frame_2 : BunkerMat_frame { Position: {51.18, 8.975, 39.1533}; Box: {0.13, 2.15, 0.3} }
+    deckhouse_1_p16_15_frame_3 : BunkerMat_frame { Position: {50.725, 10.105, 39.1533}; Box: {1.04, 0.13, 0.3} }
   }
 }
