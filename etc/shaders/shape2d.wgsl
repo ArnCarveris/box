@@ -9,8 +9,13 @@
 // The coplanar layers of a group (a screen and the shapes and texts on it, render/plane.c) are
 // placed on the plane of its anchor (plane_position) and told apart by their rank in the draw
 // order of their tree (ranked_depth).
+//
+// A shape is seen through the fog between it and the eye as the meshes around it are (fogged):
+// the fog of the area it is in (areas.wgsl) and that of the fog volumes (fog_blend.wgsl).
 #include "include/lights.wgsl"
 #include "include/instance.wgsl"
+#include "include/areas.wgsl"
+#include "include/fog_blend.wgsl"
 
 // BlendMode of the pipeline: the output is shaped for the blend equation it is drawn with.
 override blend_mode: u32 = 0u;
@@ -20,6 +25,9 @@ override blend_mode: u32 = 0u;
 override polygon: bool = false;
 
 @group(0) @binding(0) var<uniform> view: View;
+
+// The clamping trilinear sampler the froxel grid is looked up with (fog_froxels)
+@group(0) @binding(10) var aerial_sampler: sampler;
 
 // Depth slope in pixels the depth of an instance is lifted by per rank
 const rank_slope: f32 = 1.0 / 64.0;
@@ -98,6 +106,11 @@ struct VertexOut {
     @location(11) @interpolate(flat) rank: u32,
     // Index of the polygon record of a polygon, 0 for any other shape
     @location(12) @interpolate(flat) record: u32,
+    // Position relative to the render origin brought back into the local frame, as the meshes
+    // rebuild it (vo_world): where the fog is looked up, alike with and without a render origin
+    @location(13) fog_world: vec3f,
+    // Unit normal of the plane of the shape, zero for a degenerate model matrix
+    @location(14) @interpolate(flat) normal: vec3f,
 };
 
 struct FragmentOut {
@@ -212,6 +225,9 @@ fn plane_position(index: u32, relative: mat4x4f, point: vec4f, own: vec4f) -> ve
     let point = vec4f(origin + dir_x * q.x + dir_y * q.y, 0.0, 1.0);
     o.pos = plane_position(inst.plane.x, relative, point, mvp * point);
     o.world = (model * point).xyz;
+    o.fog_world = (relative * point).xyz + view.render_delta.xyz;
+    let across = cross(relative[0].xyz, relative[1].xyz);
+    o.normal = select(vec3f(0.0), normalize(across), dot(across, across) > 0.0);
     o.clip = inst.ids.x;
     o.rank = inst.ids.y;
     o.local = q + bounds.xy;
@@ -378,6 +394,44 @@ fn output(color: vec3f, alpha: f32, cover: f32) -> vec4f {
     }
 }
 
+// Output of a fragment seen through the fog between it and the eye, shaped for the blend equation
+// as area_fogged and fog_blended shape the color of a mesh (mesh_common.wgsl).
+//
+// The fog of the areas is that of the area on the side of the plane of the shape that faces the
+// eye (area_fragment), so a screen on a wall belongs to the room it is seen from. The fog volumes
+// come after it, as for a mesh. Every 2D shape draws after the fog apply draw, an Opaque one with
+// the AlphaBlend equation, so each adds the fog volumes in front of itself, whatever its blend
+// mode. The shadow of a shape is fogged as a shape: drawn over the surface it falls on, it
+// darkens that surface and leaves the fog in front of it.
+//
+// A view without areas and fog volumes, such as a HUD, leaves the output as it is.
+fn fogged(out: vec4f, f: VertexOut) -> vec4f {
+    // A Multiply or Min fragment would tint the fog in front of the target, it is left as it is
+    if (blend_mode == 4u || blend_mode == 7u) {
+        return out;
+    }
+
+    let toward = dot(f.normal, view.camera.xyz - f.fog_world) >= 0.0;
+    area_fragment(f.fog_world, select(-f.normal, f.normal, toward));
+    let area = area_fog(f.fog_world);
+    let volumes = fog_froxels(f.pos, f.fog_world);
+
+    // The light the area scatters in passes the fog volumes in front of it
+    let transmittance = area.w * volumes.a;
+    let inscatter = area.rgb * volumes.a + volumes.rgb;
+    switch blend_mode {
+        case 0u, 1u: {
+            return vec4f(out.rgb * transmittance + inscatter, out.a);
+        }
+        case 2u: {
+            return vec4f(out.rgb * transmittance + inscatter * out.a, out.a);
+        }
+        default: {
+            return vec4f(out.rgb * transmittance, out.a);
+        }
+    }
+}
+
 // Depth of a fragment lifted over the coplanar elements of its tree drawn before it. The layers
 // of a group lie on one plane (plane_position), so the lift needs to clear only the precision of
 // the depth; other coplanar elements of a tree are each off by the rounding of their transform.
@@ -432,7 +486,7 @@ fn ranked_depth(depth: f32, rank: u32) -> f32 {
         discard;
     }
 
-    return FragmentOut(output(color, alpha, cover), depth);
+    return FragmentOut(fogged(output(color, alpha, cover), f), depth);
 }
 
 // Distance of a point to one edge of a polygon, squared, with the vector from the nearest point of
@@ -565,7 +619,7 @@ fn polygon_distance(index: u32, p: vec2f) -> vec4f {
         discard;
     }
 
-    return FragmentOut(output(color, alpha, cover), depth);
+    return FragmentOut(fogged(output(color, alpha, cover), f), depth);
 }
 
 // The shadows of Polygon2D shapes: the Gaussian falloff of the distance to the outline moved by
@@ -607,7 +661,7 @@ fn polygon_distance(index: u32, p: vec2f) -> vec4f {
         discard;
     }
 
-    return FragmentOut(output(f.color.rgb, alpha, cover), depth);
+    return FragmentOut(fogged(output(f.color.rgb, alpha, cover), f), depth);
 }
 
 // Texture coordinate of a position along one axis of a sliced image and its rate of change per
@@ -692,7 +746,7 @@ fn slice_axis(p: f32, edges: vec4f, coords: vec4f, period: f32, half: f32) -> ve
         discard;
     }
 
-    return FragmentOut(output(color, alpha, cover), depth);
+    return FragmentOut(fogged(output(color, alpha, cover), f), depth);
 }
 
 // The shadows of the 2D shapes, drawn by pipelines of their own: no texture samples and none of
@@ -721,5 +775,5 @@ fn slice_axis(p: f32, edges: vec4f, coords: vec4f, period: f32, half: f32) -> ve
         discard;
     }
 
-    return FragmentOut(output(f.color.rgb, alpha, cover), depth);
+    return FragmentOut(fogged(output(f.color.rgb, alpha, cover), f), depth);
 }

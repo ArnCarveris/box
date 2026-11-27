@@ -2287,6 +2287,14 @@
                     "layers_steady",
                     "layers_steady_render_origin"
                 ]
+            },
+            {
+                "id": "Shape2DFog",
+                "testcases": [
+                    "area_fog_like_mesh",
+                    "area_fog_render_origin",
+                    "hud_unfogged"
+                ]
             }
         ]
     }
