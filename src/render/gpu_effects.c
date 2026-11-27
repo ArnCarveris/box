@@ -844,7 +844,8 @@ static WGPUBuffer box_gpu_fx_measure(
     if (!s->histogram) {
         s->histogram = box_gpu_fx_buffer(gpu,
             BOX_GPU_EXPOSURE_BINS * sizeof(uint32_t), WGPUBufferUsage_Storage);
-        s->exposure = box_gpu_fx_buffer(gpu, 4 * sizeof(float), WGPUBufferUsage_Storage);
+        s->exposure = box_gpu_fx_buffer(gpu, 4 * sizeof(float),
+            WGPUBufferUsage_Storage | WGPUBufferUsage_CopySrc);
     }
 
     uint32_t w = (uint32_t)ctx->ft->width, h = (uint32_t)ctx->ft->height, stride = 1;

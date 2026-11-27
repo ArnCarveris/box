@@ -119,6 +119,10 @@ struct View {
     // shadow_matrix of the positions relative to the render origin, which the shadow lookups
     // take (shadow.wgsl); shadow_matrix without a render origin
     shadow_relative: array<mat4x4f, 4>,
+    // How its 2D shapes show their colors (shape2d.wgsl): x the exposure scale of the view, y
+    // its tone map operator (tonemap_curve.wgsl), z 1 when the view scales or tone maps its
+    // image, so a 2D color is a display value taken back to HDR, and 0 when it is HDR as it is
+    display: vec4f,
 };
 
 // shadow is the index of the tile record of a spot or point light in the shadow atlas of the

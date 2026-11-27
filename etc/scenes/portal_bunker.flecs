@@ -426,8 +426,12 @@ views {
 }
 
 view {
+  // The exposure scales the image before the bloom, so the threshold is in exposed values: the
+  // bright strokes of the screens, near white on the display, are about 3.4 there and glow,
+  // while the dim room the exposure brings to about 0.1 to 0.3 does not
   exposure { AutoExposure: {} }
-  tonemap { Tonemap: {auto_exposure: exposure} }
+  bloom { Bloom: {intensity: 0.15, threshold: 1.2, threshold_softness: 0.5} }
+  tonemap { Tonemap: {} }
   smaa { Smaa: {} }
   View: {
     camera: camera,
@@ -435,6 +439,6 @@ view {
     lighting: {enabled: true, reflections: true, atmosphere: true,
       environment: {source: sky, intensity: 1, background: false}},
     shadows: {enabled: true},
-    effects: [{effect: tonemap}, {effect: smaa}]
+    effects: [{effect: exposure}, {effect: bloom}, {effect: tonemap}, {effect: smaa}]
   }
 }

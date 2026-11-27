@@ -2295,6 +2295,13 @@
                     "area_fog_render_origin",
                     "hud_unfogged"
                 ]
+            },
+            {
+                "id": "Shape2DDisplay",
+                "testcases": [
+                    "authored_color_tonemapped",
+                    "fogged_tonemapped"
+                ]
             }
         ]
     }

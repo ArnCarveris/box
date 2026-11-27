@@ -1298,6 +1298,12 @@ typedef struct box_gpu_view_uniforms_t {
     mat4 shadow_relative[BOX_RENDER_SHADOW_CASCADES]; /**< shadow_matrix of the positions
                                      *   relative to the render origin, which the shadow lookups
                                      *   take; shadow_matrix without one */
+    vec4 display;                   /**< How its 2D shapes show their colors: the adapted
+                                     *   exposure scale of the view (copied from the exposure
+                                     *   on the GPU, see box_gpu_display_copy), its
+                                     *   tone map operator (0 none, 1 PBR Neutral, 2 Tony
+                                     *   McMapface), 1 when the view scales or tone maps its
+                                     *   image and 0 when not, unused */
 } box_gpu_view_uniforms_t;
 
 /** The render origin of an instance page as the shaders take it (InstancePage of
@@ -1316,6 +1322,11 @@ _Static_assert(sizeof(box_gpu_view_uniforms_t) <= BOX_GPU_VIEW_STRIDE,
 _Static_assert(offsetof(box_gpu_view_uniforms_t, shadow_relative) ==
     offsetof(box_gpu_view_uniforms_t, render_delta) + sizeof(vec4),
     "shadow_relative follows render_delta as in View of lights.wgsl");
+
+_Static_assert(offsetof(box_gpu_view_uniforms_t, display) ==
+    offsetof(box_gpu_view_uniforms_t, shadow_relative) +
+    BOX_RENDER_SHADOW_CASCADES * sizeof(mat4),
+    "display follows shadow_relative as in View of lights.wgsl");
 
 /** The shadow atlas of a scene: the depth texture its spot and point light tiles render into */
 typedef struct box_gpu_atlas_t {

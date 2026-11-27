@@ -12,10 +12,17 @@
 //
 // A shape is seen through the fog between it and the eye as the meshes around it are (fogged):
 // the fog of the area it is in (areas.wgsl) and that of the fog volumes (fog_blend.wgsl).
+//
+// In a view that scales or tone maps its image the colors of a shape are display values: they
+// are taken back to the HDR values the exposure and the operator of the view map to them
+// (displayed), so in clear air a screen shows its authored colors whatever the exposure, and
+// its bright strokes are bright HDR values that bloom and that the fog dims less than a lit
+// wall. A view without, such as a HUD, draws them as they are.
 #include "include/lights.wgsl"
 #include "include/instance.wgsl"
 #include "include/areas.wgsl"
 #include "include/fog_blend.wgsl"
+#include "include/tonemap_curve.wgsl"
 
 // BlendMode of the pipeline: the output is shaped for the blend equation it is drawn with.
 override blend_mode: u32 = 0u;
@@ -377,7 +384,20 @@ fn clip_coverage(first: u32, world: vec3f, world_dx: vec3f, world_dy: vec3f) -> 
     return cover;
 }
 
-fn output(color: vec3f, alpha: f32, cover: f32) -> vec4f {
+// The HDR color of a display color in a view that scales or tone maps its image (View.display):
+// what the exposure and the operator of the view map back to it. A Multiply, Screen or Min
+// color is a factor of the target, not a light, and keeps its value, as do the colors of a view
+// without.
+fn displayed(color: vec3f) -> vec3f {
+    if (view.display.z == 0.0 || blend_mode == 4u || blend_mode == 5u || blend_mode == 7u) {
+        return color;
+    }
+
+    return display_to_hdr(color, view.display.x, u32(view.display.y + 0.5));
+}
+
+fn output(display: vec3f, alpha: f32, cover: f32) -> vec4f {
+    let color = displayed(display);
     switch blend_mode {
         case 2u: {
             return vec4f(color * cover, alpha);

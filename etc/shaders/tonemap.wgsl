@@ -9,6 +9,7 @@
 #include "include/effect.wgsl"
 #include "include/grading.wgsl"
 #include "include/vignette.wgsl"
+#include "include/tonemap_curve.wgsl"
 
 struct Tonemap {
     flags: vec4u,
@@ -33,26 +34,6 @@ struct Exposure {
 // of binding 1; a placeholder for the other operators.
 @group(0) @binding(6) var tony_lut: texture_3d<f32>;
 
-// Khronos PBR Neutral: colors below the shoulder keep their value, brighter ones roll off to
-// white with their hue and desaturate as they approach it.
-fn pbr_neutral(color: vec3f) -> vec3f {
-    let start = 0.8 - 0.04;
-    let desaturation = 0.15;
-    let low = min(color.r, min(color.g, color.b));
-    let offset = select(0.04, low - 6.25 * low * low, low < 0.08);
-    var c = color - vec3f(offset);
-    let peak = max(c.r, max(c.g, c.b));
-    if (peak < start) {
-        return c;
-    }
-
-    let d = 1.0 - start;
-    let new_peak = 1.0 - d * d / (peak + d - start);
-    c *= new_peak / peak;
-    let g = 1.0 - 1.0 / (desaturation * (peak - new_peak) + 1.0);
-    return mix(c, vec3f(new_peak), g);
-}
-
 // Noise in [0, 1) that differs between neighboring pixels (Jimenez 2014).
 fn interleaved_gradient_noise(p: vec2f) -> f32 {
     return fract(52.9829189 * fract(0.06711056 * p.x + 0.00583715 * p.y));
@@ -62,7 +43,7 @@ fn interleaved_gradient_noise(p: vec2f) -> f32 {
 // texel so 0 and 1 land on the centers of the first and last texels, plus a dither of up to
 // half an 8 bit step against banding.
 fn tony_mc_mapface(color: vec3f, pixel: vec2f) -> vec3f {
-    let encoded = color / (color + vec3f(1.0));
+    let encoded = tony_encode(color);
     let dims = vec3f(textureDimensions(tony_lut));
     let uv = clamp(encoded * ((dims - vec3f(1.0)) / dims) + (vec3f(0.5) / dims),
         vec3f(0.0), vec3f(1.0));
@@ -78,9 +59,9 @@ fn tony_mc_mapface(color: vec3f, pixel: vec2f) -> vec3f {
         c *= exposure.scale;
     }
 
-    if (tonemap.flags.y == 1u) {
+    if (tonemap.flags.y == TONEMAP_PBR_NEUTRAL) {
         c = pbr_neutral(c);
-    } else if (tonemap.flags.y == 2u) {
+    } else if (tonemap.flags.y == TONEMAP_TONY) {
         c = tony_mc_mapface(c, v.pos.xy);
     }
 

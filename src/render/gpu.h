@@ -2813,6 +2813,42 @@ WGPUTextureView box_gpu_effects_begin(
     const box_render_packet_t *packet,
     const box_render_view_t *v);
 
+/** Fill the members of the uniforms of a view about how its 2D shapes show their colors
+ * (display): whether a pass of its effects scales or tone maps the image, the operator of its
+ * first Tonemap and an exposure scale of 1, which box_gpu_display_copy replaces with
+ * the adapted one.
+ *
+ * @param gpu The backend
+ * @param packet The packet
+ * @param v The view
+ * @param u The uniforms of the view
+ */
+void box_gpu_display_uniforms(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet,
+    const box_render_view_t *v,
+    box_gpu_view_uniforms_t *u);
+
+/** Record a copy of the adapted exposure scale of a view into the display member of its
+ * uniforms, before its passes draw, so its 2D shapes divide by the scale its exposure pass
+ * multiplies by. The scale is the one the last frame adapted to; nothing is copied before the
+ * exposure of the view has been measured once, nor for a view without an AutoExposure.
+ *
+ * @param gpu The backend
+ * @param t The target
+ * @param encoder The encoder of the frame
+ * @param packet The packet
+ * @param v The view
+ * @param slot The slot of the uniforms of the view
+ */
+void box_gpu_display_copy(
+    box_gpu_t *gpu,
+    const box_gpu_target_t *t,
+    WGPUCommandEncoder encoder,
+    const box_render_packet_t *packet,
+    const box_render_view_t *v,
+    int32_t slot);
+
 /** Get the texture of the HDR image box_gpu_effects_begin returned for the view being drawn.
  *
  * @param gpu The backend

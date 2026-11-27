@@ -1040,6 +1040,7 @@ static int32_t box_gpu_view_write(
         box_gpu_cookie_uniforms(gpu, v, u);
         box_gpu_water_fields_uniforms(gpu, v, u);
         box_gpu_fog_volumes_uniforms(gpu, t, v, u);
+        box_gpu_display_uniforms(gpu, packet, v, u);
         box_gpu_origin_split(packet->origin, u->origin);
         box_gpu_cull_add(gpu, t, packet, i, result, proj, u);
         *ecs_vec_append_t(NULL, &gpu->area_views, const box_render_view_t*) = v;
@@ -1918,6 +1919,7 @@ void box_gpu_draw_views(
         }
 
         WGPUTextureView hdr = box_gpu_effects_begin(gpu, t, packet, v);
+        box_gpu_display_copy(gpu, t, encoder, packet, v, slot);
         WGPUTexture source = hdr ? box_gpu_effects_image(gpu) : texture;
         bool occludes = box_gpu_cull_occludes(gpu, slot);
         box_gpu_atmosphere_view(gpu, t, encoder, packet, v);
